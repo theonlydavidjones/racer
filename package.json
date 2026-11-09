@@ -10,13 +10,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "data:polar": "node scripts/fetch-orc-polar.mjs"
+    "data:polar": "node scripts/fetch-orc-polar.mjs",
+    "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs"
   },
   "dependencies": {
-    "three": "^0.187.0"
+    "three": "^0.186.1"
   },
   "devDependencies": {
-    "@types/three": "^0.187.0",
+    "@types/three": "^0.186.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.7",
     "vitest": "^5.1.0"

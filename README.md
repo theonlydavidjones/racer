@@ -8,7 +8,10 @@ npm run dev        # http://localhost:5173
 npm test           # rules + simulation tests
 npm run build      # static site in dist/ (relative paths, host anywhere)
 npm run data:polar # re-pull Folkboat ORC certificates (behind a proxy: NODE_USE_ENV_PROXY=1)
+npm run build:artifact  # single-page build for the claude.ai artifact → artifact/folkboat-racing-sim.html
 ```
+
+**Playing it:** the claude.ai artifact link is the playable version (any browser, phone or desktop). It's rebuilt with `npm run build:artifact` and republished after changes; three.js loads from jsDelivr, pinned to the version in package.json.
 
 The original single-file prototype is kept, unchanged, at `reference/folkboat-sim.html`.
 
