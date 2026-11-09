@@ -206,7 +206,7 @@ export class SceneView {
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number }, over: Overhead): void {
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     this.ripAngle += (-w.windModel.base * D2R - this.ripAngle) * Math.min(1, dt * 0.2);
@@ -233,8 +233,8 @@ export class SceneView {
       camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, u.heel * 0.6 * D2R * Math.cos(look.yaw));
     } else if (viewMode === 1) {
       // chase: orbit the boat with the look direction
-      const hv = V(u.h - look.yaw / D2R), height = Math.max(2, 9 + look.pitch * 25);
-      camera.position.lerp(P3(u.x - hv.x * 24, u.y - hv.y * 24, height), Math.min(1, dt * 3));
+      const dist = look.chase ?? 24, hv = V(u.h - look.yaw / D2R), height = Math.max(1.2, (9 + look.pitch * 25) * dist / 24);
+      camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
       camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
     } else {
       // overhead: straight down, north / bow / wind at the top, zoomed and panned as you like

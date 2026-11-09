@@ -97,13 +97,15 @@ export const stern = (b: Vec & { h: number }): Vec => { const u = V(b.h); return
 export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood' }
 const WOOD: Build = { hull: 'wood', spars: 'wood' };
 
-export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build }
+/** How a boat looks: hull topsides, boot stripe, bottom paint, deck, and the name on her quarters (if shown). */
+export interface Paint { deck: string; boot: string; bottom: string; boatName?: string }
+export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
-  // the playable boat: fiberglass hull, aluminium mast and boom
-  { name: 'You', hull: '#f2eee4', sail: '#fbfaf5', tag: '#ffb627', no: 'US 110', build: { hull: 'fiberglass', spars: 'aluminium' } },
-  { name: 'Red', hull: '#b3302a', sail: '#f6f2ea', tag: '#ff6a5c', no: 'US 87', build: WOOD },
-  { name: 'Blue', hull: '#25579e', sail: '#f6f2ea', tag: '#6fa8ff', no: 'US 104', build: WOOD },
-  { name: 'Green', hull: '#2b7349', sail: '#f6f2ea', tag: '#58d08a', no: 'US 92', build: WOOD },
-  { name: 'Black', hull: '#26272b', sail: '#efe9dc', tag: '#c9cdd4', no: 'US 120', build: WOOD },
-  { name: 'Varnish', hull: '#9a6a36', sail: '#f3ecdc', tag: '#e2b071', no: 'US 63', build: WOOD }
+  // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom
+  { name: 'You', hull: '#f4f1e8', sail: '#fbfaf5', tag: '#ffb627', no: 'US 110', build: { hull: 'fiberglass', spars: 'aluminium' }, paint: { deck: '#8e9f7c', boot: '#24324f', bottom: '#2a2d33', boatName: 'JOSEPHINE' } },
+  { name: 'Red', hull: '#b3302a', sail: '#f6f2ea', tag: '#ff6a5c', no: 'US 87', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } },
+  { name: 'Blue', hull: '#25579e', sail: '#f6f2ea', tag: '#6fa8ff', no: 'US 104', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#2a2d33' } },
+  { name: 'Green', hull: '#2b7349', sail: '#f6f2ea', tag: '#58d08a', no: 'US 92', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } },
+  { name: 'Black', hull: '#26272b', sail: '#efe9dc', tag: '#c9cdd4', no: 'US 120', build: WOOD, paint: { deck: '#cdbb94', boot: '#d4b05a', bottom: '#2a2d33' } },
+  { name: 'Varnish', hull: '#9a6a36', sail: '#f3ecdc', tag: '#e2b071', no: 'US 63', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } }
 ];

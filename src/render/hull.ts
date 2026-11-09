@@ -1,0 +1,276 @@
+import './three-setup';
+import * as THREE from 'three';
+
+/**
+ * A Nordic Folkboat hull, built from a few functions of position along the boat. Class figures: 7.64 m
+ * overall, about 6.0 m on the waterline, 2.20 m beam, 1.20 m draft. The rest (freeboard, sheer, sections,
+ * keel profile, cabin and cockpit sizes) is estimated from the boat's well-known look, not from the lines
+ * plan: long overhangs, a sweeping sheer, slack bilges into a long keel with a cutaway forefoot, the rudder
+ * hung on a small raked transom with the tiller over its top, and clinker (lapstrake) planking, which the
+ * glassfibre boats copy in their moulding.
+ *
+ * Frame: x to starboard, y up (waterline at 0), z aft; the bow is at z = −L/2.
+ */
+export const L = 7.64;
+const zAt = (u: number) => -L / 2 + u * L;
+
+/** Sheer height above the waterline: high bow, lowest about 60% aft, a little rise to the transom. */
+export function sheer(u: number): number {
+  return u < 0.62 ? 0.56 + 0.40 * Math.pow((0.62 - u) / 0.62, 1.8) : 0.56 + 0.14 * ((u - 0.62) / 0.38) ** 2;
+}
+/** Half-beam at the sheer: fine bow, full amidships, a small transom (about 0.9 m wide at the top). */
+export function halfBeam(u: number): number {
+  return u <= 0.5 ? 1.1 * Math.pow(Math.max(0, 1 - ((0.5 - u) / 0.5) ** 2), 0.62) : 1.1 * (1 - 0.58 * Math.pow((u - 0.5) / 0.5, 2.2));
+}
+const ease = (f: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, f)))) / 2;
+
+/**
+ * The stern: the raked transom and the sternpost are one straight line, from the heel of the keel up to the
+ * top of the transom, and the rudder hangs on it. The waterline ends where it crosses y = 0.
+ */
+export const HEEL = { z: 2.75, y: -1.15 }, TRANSOM_TOP = { z: L / 2, y: sheer(1) };
+export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - HEEL.z) / (TRANSOM_TOP.y - HEEL.y);
+
+/** Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. */
+function canoe(u: number): number {
+  if (u < 0.15) return 0.96 - 1.06 * Math.pow(u / 0.15, 0.85);
+  if (u < 0.45) return -0.1 - 0.38 * ease((u - 0.15) / 0.3);
+  if (u < 0.62) return -0.48;
+  return -0.48 + 0.65 * ease((u - 0.62) / 0.38);
+}
+/** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band). */
+function keel(u: number): number {
+  if (u <= 0.15) return canoe(u);
+  if (u < 0.33) return -0.1 + (-0.95 + 0.1) * ease((u - 0.15) / 0.18);
+  return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / 0.53);
+}
+/** Half-thickness of the keel (ballast keel and deadwood). */
+function keelHalf(u: number): number {
+  if (u <= 0.15) return 0;
+  return 0.03 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - 0.15) / 0.75)), 0.7);
+}
+/** Section fullness: V-shaped forward, slack round bilge amidships, firmer aft. */
+const sectionN = (u: number) => 1.35 + 1.0 * ease(u / 0.5) - 0.25 * ease((u - 0.6) / 0.4);
+
+const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
+
+/** The section point at station u: p from 0 at the sheer to 0.8 at the keel's side (canoe body), 1 at the keel bottom. */
+function sectionPoint(u: number, p: number): { x: number; y: number } {
+  const b = halfBeam(u), s = sheer(u), kc = canoe(u), wk = keelHalf(u), kb = Math.min(keel(u), kc);
+  if (p <= 0.8) {
+    const a = (p / 0.8) * Math.PI / 2, n = sectionN(u);
+    const xs = b * Math.pow(Math.cos(a), 2 / n), ys = s - (s - kc) * Math.pow(Math.sin(a), 2 / (n * 0.8));
+    return { x: p >= 0.8 ? wk : Math.pow(xs ** 4 + wk ** 4, 0.25), y: ys }; // blends smoothly into the keel's side
+  }
+  const f = (p - 0.8) / 0.2;
+  return f < 0.85 ? { x: wk * (1 - 0.15 * f / 0.85), y: kc + (kb - kc) * f / 0.85 } : { x: wk * 0.85 * (1 - (f - 0.85) / 0.15), y: kb };
+}
+/** How far aft the hull goes along the line of constant p: where it meets the raked transom / sternpost plane. */
+const uMaxCache = new Map<number, number>();
+function uMax(p: number): number {
+  const c = uMaxCache.get(p); if (c != null) return c;
+  let lo = 0.6, hi = 1;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, q = sectionPoint(m, p); if (zAt(m) < aftLineZ(q.y)) lo = m; else hi = m; }
+  uMaxCache.set(p, lo); return lo;
+}
+function hullPoint(u: number, p: number): THREE.Vector3 { const q = sectionPoint(u, p); return new THREE.Vector3(q.x, q.y, zAt(u)); }
+
+export interface HullPaint { topsides: THREE.Color; boot: THREE.Color; bottom: THREE.Color }
+
+/** The hull shell (both sides), clinker planked, painted: bottom paint below the waterline, a boot stripe, topsides. */
+export function hullGeometry(paint: HullPaint): THREE.BufferGeometry {
+  const pos: number[] = [], col: number[] = [], idx: number[] = [];
+  const colorAt = (y: number) => (y < 0.04 ? paint.bottom : y < 0.1 ? paint.boot : paint.topsides);
+  // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel
+  type Row = { p: number; lap: number; shade?: number }[];
+  const strips: Row[] = [];
+  for (let k = 0; k < STRAKES; k++) {
+    const p0 = 0.8 * k / STRAKES, p1 = 0.8 * (k + 1) / STRAKES, row: Row = [];
+    if (k > 0) row.push({ p: p0 - 0.02, lap: 0, shade: 1 }); // the land: this plank's top edge, hidden behind the plank above
+    for (let j = 0; j <= 3; j++) row.push({ p: p0 + (p1 - p0) * j / 3, lap: LAP * j / 3, shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
+    strips.push(row);
+    if (k < STRAKES - 1) strips.push([{ p: p1, lap: LAP }, { p: p1, lap: 0 }]); // the lap's edge, facing down
+  }
+  { const row: Row = []; for (let j = 0; j <= NF; j++) row.push({ p: 0.8 + 0.2 * j / NF, lap: 0 }); strips.push(row); }
+  for (const side of [1, -1]) {
+    for (const row of strips) {
+      const base = pos.length / 3;
+      for (let i = 0; i <= NU; i++) for (const r of row) {
+        const f = i / NU, u = f * uMax(r.p), pt = hullPoint(u, r.p);
+        // push the lap outward across the section (along the section's outward normal); the planks run out
+        // flush at the stem and the transom
+        const lap = r.lap * Math.min(1, f / 0.04, (1 - f) / 0.03);
+        if (lap > 0) { const q = hullPoint(u, Math.min(0.8, r.p + 0.01)), dx = pt.x - q.x, dy = pt.y - q.y, l = Math.hypot(dx, dy) || 1; pt.x += (-dy / l) * lap; pt.y += (dx / l) * lap; }
+        pos.push(pt.x * side, pt.y, pt.z);
+        const c = colorAt(pt.y), k = row.length === 2 && row[0].p === row[1].p ? 0.55 : r.shade ?? 1; col.push(c.r * k, c.g * k, c.b * k);
+      }
+      const W = row.length, ledge = W === 2 && row[0].p === row[1].p; // a lap's edge faces down, into its own shadow
+      for (let i = 0; i < NU; i++) for (let j = 0; j < W - 1; j++) {
+        const a = base + i * W + j, b = a + 1, c = a + W, d = c + 1;
+        if ((side > 0) !== ledge) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+      }
+    }
+  }
+  // transom and sternpost: the hull's aft ends, all on the raked plane, closed with a fan
+  { const ring: number[] = [], P = 40;
+    const add = (x: number, y: number, z: number) => { pos.push(x, y, z); const c = colorAt(y); col.push(c.r, c.g, c.b); return pos.length / 3 - 1; };
+    for (let j = 0; j <= P; j++) { const p = j / P, pt = hullPoint(uMax(p), p); ring.push(add(pt.x, pt.y, pt.z)); }
+    for (let j = P; j >= 0; j--) { const p = j / P, pt = hullPoint(uMax(p), p); ring.push(add(-pt.x, pt.y, pt.z)); }
+    const cy = 0.15, ctr = add(0, cy, aftLineZ(cy));
+    for (let j = 0; j < ring.length - 1; j++) idx.push(ctr, ring[j], ring[j + 1]);
+    idx.push(ctr, ring[ring.length - 1], ring[0]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+/* ---------- deck, cabin, cockpit ---------- */
+
+/** Openings in the deck: the cabin trunk and the cockpit well (u range, half-width). */
+export const CABIN = { u0: 0.355, u1: 0.6, w: 0.62, h: 0.32 };
+export const COCKPIT = { u0: 0.6, u1: 0.93, w: 0.7, sole: 0.24 };
+/** Cockpit half-width: narrows aft with the hull, leaving a side deck. */
+export const cockpitHalf = (u: number) => Math.min(COCKPIT.w, halfBeam(u) - 0.24);
+const CAMBER = 0.05;
+export const deckY = (u: number, x: number) => sheer(u) + CAMBER * Math.max(0, 1 - (x / Math.max(0.05, halfBeam(u))) ** 2) * halfBeam(u) / 1.1;
+
+/** The deck: cambered, following the sheer, open where the cabin and cockpit are. */
+export function deckGeometry(): THREE.BufferGeometry {
+  const pos: number[] = [], idx: number[] = [];
+  const us: number[] = [];
+  for (let i = 0; i <= NU; i++) us.push(i / NU);
+  for (const e of [CABIN.u0, CABIN.u1, COCKPIT.u1]) us.push(e - 1e-4, e + 1e-4);
+  us.sort((a, b) => a - b);
+  const inner = (u: number) => (u > CABIN.u0 && u < CABIN.u1 ? cabinHalf(u) : u > COCKPIT.u0 && u < COCKPIT.u1 ? cockpitHalf(u) : 0);
+  const NX = 8;
+  for (const side of [1, -1]) {
+    const base = pos.length / 3;
+    for (const u of us) {
+      const b = Math.max(0.001, halfBeam(u) - 0.01), xi = Math.min(inner(u), b - 0.05);
+      for (let j = 0; j <= NX; j++) { const x = xi + (b - xi) * j / NX; pos.push(x * side, deckY(u, x), zAt(u)); }
+    }
+    for (let i = 0; i < us.length - 1; i++) for (let j = 0; j < NX; j++) {
+      const a = base + i * (NX + 1) + j, b2 = a + 1, c = a + NX + 1, d = c + 1;
+      if (side > 0) idx.push(a, b2, c, b2, d, c); else idx.push(a, c, b2, b2, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+/** Cabin trunk half-width: rounded in plan at the front. */
+function cabinHalf(u: number): number {
+  const r = 0.09; // the rounded front, as a fraction of the length
+  if (u < CABIN.u0 + r) { const f = (CABIN.u0 + r - u) / r; return CABIN.w * Math.sqrt(Math.max(0, 1 - f * f * 0.85)); }
+  return CABIN.w;
+}
+
+/** The cabin trunk: sides from below the deck up to a cambered top with rounded edges. Returns [sides, top]. */
+export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; topY: (u: number) => number } {
+  const N = 40, topY = (u: number) => deckY(u, CABIN.w) + CABIN.h + 0.02 * (u - CABIN.u1) / (CABIN.u0 - CABIN.u1);
+  const outline: { u: number; x: number }[] = [];
+  for (let i = 0; i <= N; i++) { const u = CABIN.u0 + (CABIN.u1 - CABIN.u0) * i / N; outline.push({ u, x: cabinHalf(u) }); }
+  const sides: number[] = [], sIdx: number[] = [];
+  const ring = [...outline.map(o => ({ u: o.u, x: o.x })), ...outline.slice().reverse().map(o => ({ u: o.u, x: -o.x }))];
+  ring.push(ring[0]); // close the front
+  for (const o of ring) {
+    const lean = 0.06; // sides lean in toward the top
+    sides.push(o.x, 0.45, zAt(o.u), o.x - Math.sign(o.x) * lean, topY(o.u), zAt(o.u));
+  }
+  for (let i = 0; i < ring.length - 1; i++) { const a = i * 2; sIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  // aft face (closing the ring at the back)
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3)); sg.setIndex(sIdx); sg.computeVertexNormals();
+  const top: number[] = [], tIdx: number[] = [], NX = 8;
+  for (let i = 0; i <= N; i++) {
+    const u = outline[i].u, w = outline[i].x - 0.06;
+    for (let j = 0; j <= NX; j++) { const x = -w + 2 * w * j / NX; top.push(x, topY(u) + 0.06 * (1 - (x / CABIN.w) ** 2), zAt(u)); }
+  }
+  for (let i = 0; i < N; i++) for (let j = 0; j < NX; j++) { const a = i * (NX + 1) + j, b = a + 1, c = a + NX + 1, d = c + 1; tIdx.push(a, b, c, b, d, c); }
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); tg.setIndex(tIdx); tg.computeVertexNormals();
+  return { sides: sg, top: tg, topY };
+}
+
+/** A flat quad from four corners (counter-clockwise seen from the side it faces). */
+export function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry().setFromPoints([a, b, c, a, c, d]); g.computeVertexNormals(); return g;
+}
+
+/** Cockpit well: sole, the side walls from the deck edge down to it (following the taper), and the aft wall. */
+export function cockpitGeometry(): THREE.BufferGeometry[] {
+  const { u0, u1, sole } = COCKPIT, N = 16, us = Array.from({ length: N + 1 }, (_, i) => u0 + (u1 - u0) * i / N);
+  const strip = (pts: [THREE.Vector3, THREE.Vector3][], flip: boolean) => {
+    const pos: number[] = [], idx: number[] = [];
+    for (const [a, b] of pts) pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+    for (let i = 0; i < pts.length - 1; i++) { const a = i * 2; if (flip) idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  const out = [strip(us.map(u => [V(-cockpitHalf(u), sole, zAt(u)), V(cockpitHalf(u), sole, zAt(u))]), true)]; // sole
+  for (const s of [1, -1]) out.push(strip(us.map(u => [V(s * cockpitHalf(u), sole, zAt(u)), V(s * cockpitHalf(u), deckY(u, cockpitHalf(u)), zAt(u))]), s > 0));
+  const w1 = cockpitHalf(u1), ya = deckY(u1, 0);
+  out.push(quad(V(w1, sole, zAt(u1)), V(-w1, sole, zAt(u1)), V(-w1, ya, zAt(u1)), V(w1, ya, zAt(u1)))); // aft wall
+  return out;
+}
+
+/** Cockpit seats along each side, following the taper. */
+export function cockpitSeats(): THREE.BufferGeometry[] {
+  const { u0, u1 } = COCKPIT, h = 0.42, d = 0.3, N = 12, out: THREE.BufferGeometry[] = [];
+  for (const s of [1, -1]) {
+    const pos: number[] = [], idx: number[] = [];
+    for (let i = 0; i <= N; i++) { const u = u0 + 0.01 + (u1 - u0 - 0.03) * i / N, w = cockpitHalf(u) - 0.005; pos.push(s * w, h, zAt(u), s * (w - d), h, zAt(u)); }
+    for (let i = 0; i < N; i++) { const a = i * 2; if (s > 0) idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); out.push(g);
+  }
+  return out;
+}
+
+/** The sheer as a line of points (one side), for the toerail and the coaming. */
+export function sheerLine(side: number, inset = 0.01, n = 60): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= n; i++) { const u = i / n, b = Math.max(0, halfBeam(u) - inset); pts.push(new THREE.Vector3(side * b, sheer(u), zAt(u))); }
+  return pts;
+}
+
+/** A strip standing up from a line of points (toerail, coaming), height h, thickness t. */
+export function rail(pts: THREE.Vector3[], h: number, t: number): THREE.BufferGeometry {
+  const pos: number[] = [], idx: number[] = [];
+  for (const p of pts) { pos.push(p.x - t / 2 * Math.sign(p.x || 1), p.y, p.z, p.x - t / 2 * Math.sign(p.x || 1), p.y + h, p.z, p.x + t / 2 * Math.sign(p.x || 1), p.y + h, p.z, p.x + t / 2 * Math.sign(p.x || 1), p.y, p.z); }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = i * 4, b = a + 4;
+    for (let k = 0; k < 3; k++) idx.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * Rudder and tiller, in a frame whose y axis is the hinge line (the raked sternpost/transom), origin at the
+ * heel, z aft. Put the group at HEEL rotated by RUDDER_RAKE about x; turn it about its y axis to steer.
+ */
+export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
+export function rudderGeometry(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
+  const len = Math.hypot(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y) + 0.1, a = (y: number) => (y - HEEL.y) / Math.cos(RUDDER_RAKE);
+  // outline in (chord aft, along the hinge): deep blade, narrowing to the head above the transom
+  const sh = new THREE.Shape();
+  sh.moveTo(0, 0); sh.lineTo(0.42, 0.02); sh.quadraticCurveTo(0.5, 0.12, 0.47, 0.4); sh.lineTo(0.36, a(0)); sh.lineTo(0.2, a(0.45)); sh.lineTo(0.1, len); sh.lineTo(0, len); sh.closePath();
+  const blade = new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2 });
+  // shape (x, y) → (z, y); extrusion → x, centred
+  blade.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.025, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+  blade.computeVertexNormals();
+  // tiller: from the rudder head, forward and a little up into the cockpit
+  const head = new THREE.Vector3(0, len - 0.03, 0.04), dir = new THREE.Vector3(0, -0.317, -0.949).normalize();
+  const tl = 1.3, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 8);
+  tiller.translate(0, tl / 2, 0); tiller.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)); tiller.translate(head.x, head.y, head.z);
+  return { blade, tiller };
+}
+
+/** A point on the starboard topsides with its outward normal (for lettering on the hull). */
+export function hullFrame(u: number, p: number): { pos: THREE.Vector3; normal: THREE.Vector3 } {
+  const a = hullPoint(u, p), du = hullPoint(u + 0.005, p).sub(hullPoint(u - 0.005, p)), dp = hullPoint(u, p + 0.005).sub(hullPoint(u, Math.max(0, p - 0.005)));
+  return { pos: a, normal: new THREE.Vector3().crossVectors(du, dp).normalize().multiplyScalar(-1) };
+}

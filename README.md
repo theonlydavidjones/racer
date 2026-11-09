@@ -22,7 +22,7 @@ The original single-file prototype is kept, unchanged, at `reference/folkboat-si
 Every key can be changed: Setup → **Keyboard settings**, or **K** in the game. Your keys are saved in the browser.
 
 - **Tiller.** Click the water in cockpit or chase view, or press **T** in any view, to take the tiller. While you hold it, the cursor's left–right position *is* the tiller handle: the dashed line down the middle of the screen is straight ahead; right of it pushes the handle to starboard, which turns the boat to port (as on a real boat), and left of it turns her to starboard. The further from the centre, the harder over; the solid lines mark hard over. Over buttons and panels the tiller stays put, so you can reach them. Click again, **T** or **Esc** lets go (Esc never pauses while you hold the tiller), and the tiller springs back to centre. You can also drag the tiller bar at the bottom, or hold **A**/**D** to turn to port/starboard. There are no tack or gybe buttons: you put the helm over and hold it until she's round. (Earlier versions captured the mouse; browsers handle that badly, especially inside the claude.ai page.)
-- **Views.** **1** cockpit, **2** chase, **3** overhead, **V** cycles. In cockpit view you look over the helm's shoulder from behind the boat, so you see all of her; scroll (or **+**/**−**) to move your eye fore and aft. It's remembered.
+- **Views.** **1** cockpit, **2** chase (scroll or **+**/**−** to move closer or farther), **3** overhead, **V** cycles. In cockpit view you look over the helm's shoulder from behind the boat, so you see all of her; scroll (or **+**/**−**) to move your eye fore and aft. It's remembered.
 - **Look around.** Arrow keys (or Q/E/R/F) turn your head; **W** looks ahead again. Looking never steers.
 - **Overhead.** **N** switches between north up, bow up and wind up (saved). Scroll or **+**/**−** to zoom, drag to move the map, **B** (or the "Back to boat" chip) recentres on your boat.
 - **Sails.** **S** luffs (hold), **O** whisker pole, Z/X and , / . work the sheets when you trim.
@@ -129,6 +129,17 @@ Setup → Current → **Real tide** (the default), then pick the race day and th
 - **Through the race.** The current changes as the race goes on: the HUD clock shows the local time, the course map draws the current across the water (arrows longer where it's stronger), and the map corner shows the current where you are.
 - **Presets.** Slack, flood and ebb presets (uniform, with the same shore relief) are still there for practice.
 - Not modelled yet: eddies behind points, and the difference between surface and deeper current.
+
+### The boat model (3D)
+
+`src/render/hull.ts` builds a Nordic Folkboat from a handful of functions along the hull: the sheer, the half-beam, the section shape (V-shaped forward, slack bilges amidships), the canoe body and the long keel with its cutaway forefoot (1.2 m draft), and the stern, where the raked transom and the sternpost are one straight line from the heel of the keel to the deck. Class figures are used where known (7.64 m overall, about 6 m on the waterline, 2.20 m beam, 1.20 m draft); freeboard, sections, keel profile, cabin and cockpit sizes are estimates from the boat's well-known look, not from the lines plan.
+
+- **Clinker planking** (nine strakes a side) on every boat: the wooden ones are built that way and the glassfibre ones are moulded to match. Each plank overlaps the one below, with a shadow line under each lap.
+- **Paint:** bottom paint, a boot stripe and topsides colour per boat; wooden boats painted or varnished, glassfibre glossy.
+- **Deck and fittings:** cambered deck with a varnished toerail; cabin trunk with a rounded front, portlights, wooden grab rails, a sliding hatch, the companionway and a compass on its aft end; a cockpit well that narrows aft with the hull, with seats and coamings; the mainsheet down to the transom.
+- **Rudder and tiller** hung on the transom; they swing as the boat turns (pushing the tiller to starboard turns her to port).
+- **Josephine** (your boat): pearl-white glassfibre hull, pale green non-skid deck, cream cabin sides, her name on both quarters.
+- The rig is lifted to sit on the real deck height (the sails and spars are unchanged).
 
 ### Sails and trim
 
