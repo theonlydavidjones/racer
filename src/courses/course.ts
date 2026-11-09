@@ -36,6 +36,7 @@ export interface CourseMark extends RulesMark {
   key: string; // mark id in the file, e.g. "X"
   side: Side;
   shape: 'cylinder' | 'sphere';
+  leg: 'beat' | 'reach' | 'run'; // point of sail on the leg to this mark, for the course's typical wind
   prev: Vec; next: Vec; // where boats come from / go to
   dir: Vec; // pass marks: direction of travel
   sv: Vec; // pass marks: unit vector from the mark toward the side boats pass on
@@ -96,7 +97,7 @@ export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
     const p = posCache[leg.mark] ??= markPos(def, lineCenter);
     return {
       key: leg.mark, name: def.name, p, type: leg.type, side: leg.side === 'starboard' ? 's' : 'p',
-      shape: def.shape ?? 'cylinder', beat: false,
+      shape: def.shape ?? 'cylinder', beat: false, leg: 'reach',
       prev: p, next: p, dir: { x: 0, y: 1 }, sv: { x: 0, y: 0 }, r: { x: 0, y: 0 }
     };
   });
@@ -122,7 +123,9 @@ function prepCourse(C: Course): Course {
   C.marks.forEach((m, i) => {
     const prev = i === 0 ? center : C.marks[i - 1].p, next = i === n - 1 ? center : C.marks[i + 1].p;
     m.prev = prev; m.next = next;
-    m.beat = Math.abs(wrap(C.base - brg(m.p.x - prev.x, m.p.y - prev.y))) < 55;
+    const off = Math.abs(wrap(C.base - brg(m.p.x - prev.x, m.p.y - prev.y)));
+    m.beat = off < 55;
+    m.leg = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
     if (m.type === 'pass') {
       const d = unit(sub(next, prev)); m.dir = d;
       m.sv = m.side === 's' ? { x: -d.y, y: d.x } : { x: d.y, y: -d.x };

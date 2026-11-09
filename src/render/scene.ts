@@ -2,6 +2,7 @@ import './three-setup';
 import * as THREE from 'three';
 import { D2R, V, ZONE } from '../core/math';
 import type { World } from '../sim/world';
+import { laylinesFor } from '../sim/laylines';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape } from './landscape';
@@ -19,6 +20,8 @@ export class SceneView {
   private courseObjs: THREE.Object3D[] = [];
   private camLocal = new THREE.Vector3();
   private camSide = 1;
+  private laylines: THREE.Line[] = [];
+  private laylineAcc = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -51,6 +54,29 @@ export class SceneView {
     water.rotation.x = -Math.PI / 2; scene.add(water);
 
     addLandscape(scene);
+
+    // laylines on the water: starboard-tack (green) and port-tack (red), redrawn as the wind shifts
+    for (const color of [0x3fd197, 0xff6a5c]) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const line = new THREE.Line(g, new THREE.LineDashedMaterial({ color, dashSize: 6, gapSize: 4, transparent: true, opacity: 0.85 }));
+      line.frustumCulled = false; line.visible = false; scene.add(line); this.laylines.push(line);
+    }
+  }
+
+  /** Laylines for the user's target mark, 900 m long, refreshed twice a second. */
+  private updateLaylines(w: World, dt: number): void {
+    this.laylineAcc += dt; if (this.laylineAcc < 0.5) return; this.laylineAcc = 0;
+    const L = w.settings.aids ? laylinesFor(w, w.user) : null;
+    this.laylines.forEach((line, i) => {
+      line.visible = !!L;
+      if (!L) return;
+      const m = L.mark.p, g = L.tracks[i], a = P3(m.x, m.y, 0.15), b = P3(m.x - g.x * 900, m.y - g.y * 900, 0.15);
+      const arr = (line.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
+      arr.set([a.x, a.y, a.z, b.x, b.y, b.z]);
+      line.geometry.attributes.position.needsUpdate = true;
+      line.computeLineDistances();
+    });
   }
 
   resize(w: number, h: number): void {
@@ -60,6 +86,7 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   setWorld(w: World): void {
+    this.laylineAcc = 1;
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => { const m = buildBoatMesh(b); this.scene.add(m.grp); return m; });
     this.buildCourse(w);
@@ -99,10 +126,11 @@ export class SceneView {
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
-  render(w: World, dt: number, now: number, viewMode: number, lookYaw: number): void {
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number }): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     this.wtex.offset.x -= w.cvec.x * k; this.wtex.offset.y -= w.cvec.y * k;
     w.boats.forEach((b, i) => syncBoatMesh(this.boatMeshes[i], b, t));
+    this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     camera.up.set(0, 1, 0);
     if (viewMode === 0) {
@@ -111,10 +139,11 @@ export class SceneView {
       this.camLocal.set(0.55 * this.camSide, 1.5, 2.6);
       um.grp.updateMatrixWorld();
       camera.position.copy(this.camLocal).applyMatrix4(um.grp.matrixWorld);
-      camera.rotation.set(-4 * D2R, -u.h * D2R + lookYaw, u.heel * 0.6 * D2R);
+      camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, u.heel * 0.6 * D2R * Math.cos(look.yaw));
     } else if (viewMode === 1) {
-      const hv = V(u.h);
-      camera.position.lerp(P3(u.x - hv.x * 24, u.y - hv.y * 24, 9), Math.min(1, dt * 3));
+      // chase: orbit the boat with the look direction
+      const hv = V(u.h - look.yaw / D2R), height = Math.max(2, 9 + look.pitch * 25);
+      camera.position.lerp(P3(u.x - hv.x * 24, u.y - hv.y * 24, height), Math.min(1, dt * 3));
       camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
     } else {
       const wv = V(w.C.base);

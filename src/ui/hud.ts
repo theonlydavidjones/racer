@@ -1,11 +1,14 @@
 import { bow, type Boat } from '../boat/boat';
 import { timeToCover } from '../boat/dynamics';
 import { beatAngle, polar } from '../boat/polar';
-import { D2R, KT, V, brg, clamp, dist, dot, sub, unit, wrap } from '../core/math';
+import { sailPlan } from '../boat/physics';
+import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
 import { cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
-import { drawCourse, drawLand, fitCanvas, makeTf, type Tf } from './draw2d';
+import { toast } from './feedback';
+import { drawCourse, drawLand, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { laylinesFor } from '../sim/laylines';
 
 export function fmtClock(t: number): string {
   const a = Math.abs(t), m = Math.floor(a / 60), s = Math.floor(a % 60);
@@ -30,13 +33,40 @@ export class Hud {
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1) + ' kt';
     $('hdg').textContent = String(Math.round(u.h) % 360).padStart(3, '0');
-    $('tackLab').textContent = (u.tack === 'S' ? 'Starboard' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : '');
+    const poleTxt = u.pole === 'set' ? (u.poleTack === u.tack ? ' · wing' : '') : u.pole === 'setting' ? ' · poling' : u.pole === 'stowing' ? ' · stowing' : '';
+    $('tackLab').textContent = (u.tack === 'S' ? 'Starboard' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt);
+    const bp = $('bPole');
+    bp.textContent = u.pole === 'down' ? 'Pole out' : u.pole === 'set' ? 'Pole in' : u.pole === 'setting' ? 'Poling…' : 'Stowing…';
+    bp.classList.toggle('on', u.pole === 'set' || u.pole === 'setting');
+    this.poleHints(w, u);
     $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
     else { sl.textContent = ww.kt.toFixed(0) + ' kt on water'; sl.className = 'sub'; }
     $('bTack').textContent = u.twa < 100 ? 'Tack' : 'Gybe';
     this.situation(w, u); this.lineBox(w, u); this.dial(u); this.map(w, u);
+  }
+
+  private deepT = 0;
+  private abackT = 0;
+  private hinted = { deep: false, aback: false };
+  /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
+  private poleHints(w: World, u: Boat): void {
+    if (w.t < 0 || u.finished) return;
+    const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
+    this.deepT = deep ? this.deepT + 0.1 : 0;
+    if (!deep && u.twa < 140) this.hinted.deep = false;
+    if (this.deepT > 6 && !this.hinted.deep) {
+      this.hinted.deep = true;
+      toast('Running deep: the main is blanketing the jib. Pole it out to windward and go wing-on-wing (Pole / O).', 4500);
+    }
+    const aback = u.pole === 'set' && u.twa < 140;
+    this.abackT = aback ? this.abackT + 0.1 : 0;
+    if (!aback) this.hinted.aback = false;
+    if (this.abackT > 3 && !this.hinted.aback) {
+      this.hinted.aback = true;
+      toast('The poled-out jib is aback on this course. Stow the pole (Pole / O).', 4000);
+    }
   }
 
   /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
@@ -75,7 +105,7 @@ export class Hud {
       el.className = '';
       // time to the line on this heading if you sheet in now: accelerating from your current speed, with the current
       const cN = u.cur.x * w.N.x + u.cur.y * w.N.y;
-      const tl = uN > 0.15 ? timeToCover(-d, u.v, polar(u.ww.kt, u.twa), uN, cN) : Infinity;
+      const tl = uN > 0.15 ? timeToCover(-d, u.v, polar(u.ww.kt, u.twa, sailPlan(u)), uN, cN) : Infinity;
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
       el.innerHTML = `Line ${(-d).toFixed(0)} m · ${tStr}${burn}${fav}`;
@@ -128,18 +158,7 @@ export class Hud {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     drawLand(ctx, tf);
     drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1);
-    const m = wd.nextMark(u);
-    if (wd.settings.aids && m && m.beat && u.started) {
-      // laylines to the next windward mark, allowing for current at the mark
-      const ww = u.ww, beat = beatAngle(ww.kt), vs = polar(ww.kt, beat), c = wd.currentAt(m.p), mk = tf(m.p.x, m.p.y);
-      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(233,242,245,.4)'; ctx.lineWidth = 1;
-      for (const hh of [ww.from - beat, ww.from + beat]) {
-        const uu = V(hh), g = unit({ x: uu.x * vs + c.x, y: uu.y * vs + c.y });
-        const e = tf(m.p.x - g.x * 450, m.p.y - g.y * 450);
-        ctx.beginPath(); ctx.moveTo(mk[0], mk[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
-      }
-      ctx.setLineDash([]);
-    }
+    if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), 450);
     for (const b of wd.boats) {
       const p = tf(b.x, b.y), s = b.isUser ? 5 : 4;
       ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R);

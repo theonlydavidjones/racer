@@ -3,7 +3,36 @@ import { onLand } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, maxTurnRate, surgeAccel } from './dynamics';
-import { NO_GO, beatAngle, polar } from './polar';
+import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
+
+/** Crew timings for the whisker pole, s. */
+export const POLE = { set: 8, stow: 5, gybe: 8 };
+
+/** How the jib is working right now, from the pole state. */
+export function sailPlan(b: Boat): SailPlan {
+  if (b.pole === 'set') return b.poleTack === b.tack ? 'wing' : 'main';
+  if (b.pole === 'down') return 'jib';
+  return 'main'; // crew busy with the pole: jib not drawing
+}
+
+/** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
+function crewPole(b: Boat, dt: number, emit: Emit): void {
+  const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg }); };
+  if (b.poleWant && (b.pole === 'down' || b.pole === 'stowing')) { b.pole = 'setting'; b.poleT = POLE.set; b.poleTack = b.tack; }
+  else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow; }
+  else if (b.pole === 'set' && b.tack !== b.poleTack) {
+    b.pole = 'setting'; b.poleT = POLE.gybe; b.poleTack = b.tack;
+    say('Gybing the pole end-for-end. The jib is down for a few seconds.');
+  }
+  if (b.pole === 'setting' || b.pole === 'stowing') {
+    if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
+    b.poleT -= dt;
+    if (b.poleT <= 0) {
+      if (b.pole === 'setting') { b.pole = 'set'; say('Pole set: jib out to windward, wing-on-wing.'); }
+      else { b.pole = 'down'; say('Pole stowed: jib back to leeward.'); }
+    }
+  }
+}
 
 export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   const ww = b.ww;
@@ -29,7 +58,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; }
   if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled: Rule 13 ends
-  let target = polar(ww.kt, twa);
+  crewPole(b, dt, emit);
+  let target = polar(ww.kt, twa, sailPlan(b));
   if (b.luff) target *= HANDLING.luffFactor;
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
@@ -45,14 +75,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg: 'Aground! Steer back out to open water.' }); }
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it
-  const { arel, awa } = apparent(ww.from, ww.kt, b.h, b.v);
-  b.awa = awa;
-  const side = arel >= 0 ? -1 : 1; // sails go to leeward: wind from starboard puts them to port
+  const aw = apparent(ww.from, ww.kt, b.h, b.v), awa = aw.awa;
+  b.awa = awa; b.arel = aw.arel; b.aws = aw.aws;
+  // The main goes to leeward for the tack the boat is on (so sailing a little by the lee it stays put).
+  const side = b.tack === 'S' ? -1 : 1;
   const boomT = clamp((awa - 18) * 0.55, 4, 85);
-  const jibT = clamp((awa - 18) * 0.5 + 7, 8, 68);
+  // Jib: to leeward normally; poled out square to windward when wing-on-wing; hanging centred while the crew works the pole.
+  const plan = sailPlan(b);
+  const jibT = plan === 'wing' ? -side * 82 : plan === 'main' ? side * 10 : side * clamp((awa - 18) * 0.5 + 7, 8, 68);
   const k = Math.min(1, dt * 3);
   b.boom += (side * boomT - b.boom) * k;
-  b.jib += (side * jibT - b.jib) * k;
+  b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
   const heelT = (b.luff ? 0.25 : 1) * Math.min(24, ww.kt * 1.25) * (twa < 35 ? 0.2 : twa < 100 ? 1 : 0.45) * (rel >= 0 ? 1 : -1);
   b.heel += (heelT - b.heel) * Math.min(1, dt * 1.5);
 }

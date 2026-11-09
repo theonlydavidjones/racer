@@ -53,10 +53,19 @@ export interface Boat {
   rel: number; // signed true wind angle (+ = wind from starboard)
   twa: number;
   awa: number;
+  arel: number; // signed apparent wind angle (+ = from starboard), for the shroud ribbons
+  aws: number; // apparent wind speed, m/s
+  // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
+  poleWant: boolean;
+  pole: PoleState;
+  poleT: number; // seconds left in the current crew job
+  poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
   ai: AiState | null;
 }
+
+export type PoleState = 'down' | 'setting' | 'set' | 'stowing';
 
 export const bow = (b: Vec & { h: number }): Vec => { const u = V(b.h); return { x: b.x + u.x * HALF, y: b.y + u.y * HALF }; };
 export const stern = (b: Vec & { h: number }): Vec => { const u = V(b.h); return { x: b.x - u.x * HALF, y: b.y - u.y * HALF }; };

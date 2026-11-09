@@ -156,3 +156,48 @@ describe('predictions used by the AI and the line aid match the simulation', () 
     expect(Math.abs(predicted - sim) / sim).toBeLessThan(0.2);
   });
 });
+
+describe('downwind: wing-on-wing with the whisker pole', () => {
+  it('dead downwind, the main blankets a normally-sheeted jib; poled out wing-on-wing is faster', () => {
+    for (const tws of [6, 12, 18]) expect(FOLKBOAT.speedKt(tws, 175, 'wing')).toBeGreaterThan(FOLKBOAT.speedKt(tws, 175, 'jib') * 1.03);
+  });
+
+  it('on a reach the pole is wrong: a poled-out jib is aback, so normal trim is faster', () => {
+    for (const a of [90, 120, 135]) expect(FOLKBOAT.speedKt(12, a, 'jib')).toBeGreaterThan(FOLKBOAT.speedKt(12, a, 'wing') * 1.05);
+  });
+
+  it('poling out pays from roughly 150–160° true wind angle', () => {
+    const cross = [...Array(61).keys()].map(i => 120 + i).find(a => FOLKBOAT.bestPlan(12, a) === 'wing');
+    expect(cross).toBeGreaterThan(145);
+    expect(cross).toBeLessThan(162);
+  });
+
+  it('the best downwind VMG angle uses the pole and sails deep (~165–175°)', () => {
+    expect(FOLKBOAT.runAngle(12)).toBeGreaterThan(163);
+    expect(FOLKBOAT.runAngle(12, 'wing')).toBeGreaterThan(FOLKBOAT.runAngle(12, 'jib'));
+  });
+
+  it('setting the pole takes the crew a few seconds, then the boat speeds up', () => {
+    const b = testBoat({ heading: 175, kt: 3.9 }); // wind from north, running south on port... rel = −175 → port tack
+    sail(b, 30); const before = kt(b);
+    b.poleWant = true;
+    sail(b, 2); expect(b.pole).toBe('setting');
+    sail(b, 40);
+    expect(b.pole).toBe('set');
+    expect(kt(b)).toBeGreaterThan(before * 1.03);
+  });
+
+  it('gybing with the pole set: the crew gybes it end-for-end, then it is wing-on-wing on the new side', () => {
+    const b = testBoat({ heading: 175, kt: 4 });
+    b.poleWant = true; sail(b, 12);
+    expect(b.pole).toBe('set');
+    const tack0 = b.tack;
+    b.h = 185; b.turnTarget = null; // gybe
+    sail(b, 1);
+    expect(b.tack).not.toBe(tack0);
+    expect(b.pole).toBe('setting');
+    sail(b, 10);
+    expect(b.pole).toBe('set');
+    expect(b.poleTack).toBe(b.tack);
+  });
+});

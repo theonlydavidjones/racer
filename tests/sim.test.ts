@@ -113,3 +113,36 @@ describe('AI starts (regression guard, 8 races × 5 boats)', () => {
     expect(r.median).toBeLessThan(25);
   }, 60_000);
 });
+
+describe('laylines and course description', () => {
+  it('before the start, laylines point at the first mark (a beat) and straddle the wind', async () => {
+    const { laylinesFor } = await import('../src/sim/laylines');
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 3);
+    w.step(DT);
+    const L = laylinesFor(w, w.user)!;
+    expect(L.kind).toBe('up');
+    expect(L.mark.key).toBe('A');
+    // tracks arriving at an upwind mark head into the wind, one each side of it
+    const into = (g: { x: number; y: number }) => brg(g.x, g.y);
+    const off = L.tracks.map(g => ((into(g) - w.user.ww.from + 540) % 360) - 180);
+    expect(off[0]).toBeLessThan(-35); expect(off[1]).toBeGreaterThan(35);
+  });
+
+  it('on the run to 6 the laylines are downwind ones', async () => {
+    const { laylinesFor } = await import('../src/sim/laylines');
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 3);
+    w.step(DT); w.user.started = true; w.user.leg = 2;
+    expect(laylinesFor(w, w.user)!.kind).toBe('down');
+  });
+
+  it('describes how to sail every leg', async () => {
+    const { legDescriptions } = await import('../src/ui/courseView');
+    const w = new World(SS2, settings({ fleet: 0 }), 3);
+    const legs = legDescriptions(w);
+    expect(legs).toHaveLength(8);
+    expect(legs[0]).toBe('Start → A: beat (upwind). Round A leaving it to starboard (clockwise).');
+    expect(legs[1]).toBe("A → X: run (downwind). Pass X leaving it to starboard. Don't round it.");
+    expect(legs[3]).toContain('Pass X leaving it to port');
+    expect(legs[7]).toBe('6 → Finish: cross the line between GGYC race deck and X.');
+  });
+});

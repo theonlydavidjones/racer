@@ -131,6 +131,18 @@ table.res{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 table.res td,table.res th{padding:6px 4px;border-bottom:1px solid var(--rule);text-align:left;font-size:14px}
 table.res th{font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+/* course view */
+.panel.wide{max-width:960px}
+.cvhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+#cvcanvas{width:100%;height:min(62vh,560px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.cvkey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.cvkey span{display:flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.sw.s{border-color:var(--row)} .sw.p{border-color:var(--giveway)} .sw.x{border-style:dashed}
+.sw.ll{border-radius:0;height:0;border-width:2px 0 0;border-style:dashed;border-color:var(--row);width:18px}
+.cvlegs{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.4}
+.cvlegs li.now{color:var(--accent);font-weight:700}
+.cvlegs li.done{color:var(--muted)}
 @media (min-width:760px){
   .val{font-size:28px}
   #dial{width:120px;height:120px;top:calc(env(safe-area-inset-top,0px) + 82px)}

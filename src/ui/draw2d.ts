@@ -1,6 +1,7 @@
 import { D2R, HALF, ZONE } from '../core/math';
 import { LAND } from '../geo/shore';
 import type { Course } from '../courses/course';
+import type { Laylines } from '../sim/laylines';
 
 export type Tf = (x: number, y: number) => [number, number];
 
@@ -56,4 +57,17 @@ export function fitCanvas(c: HTMLCanvasElement): [CanvasRenderingContext2D, numb
   const dpr = Math.min(2, devicePixelRatio || 1), w = c.clientWidth, h = c.clientHeight;
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
   const ctx = c.getContext('2d')!; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [ctx, w, h];
+}
+
+/** Starboard-tack (green) and port-tack (red) laylines from the mark, `len` metres long. */
+export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines | null, len: number, width = 1): void {
+  if (!L) return;
+  const m = L.mark.p, mk = tf(m.x, m.y);
+  ctx.save(); ctx.setLineDash([4, 4]); ctx.lineWidth = width;
+  L.tracks.forEach((g, i) => {
+    const e = tf(m.x - g.x * len, m.y - g.y * len);
+    ctx.strokeStyle = i === 0 ? 'rgba(63,209,151,.75)' : 'rgba(255,106,92,.75)';
+    ctx.beginPath(); ctx.moveTo(mk[0], mk[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
+  });
+  ctx.restore();
 }

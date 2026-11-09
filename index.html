@@ -31,13 +31,16 @@
     <button class="chip" id="bFast" type="button">Speed 1×</button>
     <button class="chip" id="bSound" type="button">Sound on</button>
     <button class="chip" id="bPause" type="button">Pause</button>
+    <button class="chip" id="bCourse" type="button">Course</button>
+    <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
   </div>
   <div class="row2">
     <button class="big steer" id="bLeft" type="button" aria-label="Steer to port">◀</button>
     <button class="big steer" id="bRight" type="button" aria-label="Steer to starboard">▶</button>
-    <span class="keys">← → steer · Space tack · ↓ luff · V view · drag to look</span>
+    <span class="keys">← → steer · Space tack · ↓ luff · O pole · M course · V view · drag or Q/E/R/F to look</span>
     <div class="spacer"></div>
     <button class="big tack" id="bTack" type="button">Tack</button>
+    <button class="big" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button>
     <button class="big" id="bLuff" type="button">Luff</button>
   </div>
 </div>
@@ -63,13 +66,31 @@
       <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
     <div class="field"><span>Training aids</span>
       <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div></div>
-    <button class="cta" id="bGo" type="button">Start the sequence</button>
+    <div class="btnrow"><button class="ghost" id="bPreview" type="button">View the course</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
     <div class="help">
       <b>Steer</b><span>◀ ▶ buttons, arrow keys or A / D</span>
       <b>Tack / gybe</b><span>Tack button or Space. Turns through the wind to the other close-hauled course.</span>
       <b>Luff</b><span>Hold to ease the sails and slow down. This is how you burn time before the gun.</span>
-      <b>Look</b><span>Drag the view. Double-tap to look forward again.</span>
+      <b>Look</b><span>Drag the view in any direction, or hold Q / E / R / F. Looking never steers the boat. Double-tap or W to look ahead again.</span>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="courseView" hidden>
+  <div class="panel wide">
+    <div class="cvhead">
+      <div><div class="eyebrow" id="cvEyebrow">Course</div><h2 id="cvTitle">Course</h2></div>
+      <button class="ghost" id="bCvClose" type="button">Close · M</button>
+    </div>
+    <canvas id="cvcanvas" aria-label="Full course map with rounding directions"></canvas>
+    <div class="cvkey">
+      <span><i class="sw s"></i>Leave to starboard (round clockwise)</span>
+      <span><i class="sw p"></i>Leave to port (round counter-clockwise)</span>
+      <span><i class="sw x"></i>Pass mark: pass on the side shown, don't round</span>
+      <span><i class="sw ll"></i>Laylines to your next mark</span>
+    </div>
+    <ol class="cvlegs" id="cvLegs"></ol>
+    <p class="lede" id="cvNotes"></p>
   </div>
 </div>
 

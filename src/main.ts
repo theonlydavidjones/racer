@@ -14,6 +14,7 @@ import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
 import { horn, sound, toast } from './ui/feedback';
 import { Hud, fmtClock, sideWord } from './ui/hud';
+import { CourseView } from './ui/courseView';
 
 const S: Settings = loadSettings();
 if (!COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
@@ -22,9 +23,18 @@ const view = new SceneView($<HTMLCanvasElement>('gl'));
 const labels = new Labels($('labels'));
 const hud = new Hud();
 const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));
+const courseView = new CourseView();
 
 let w!: World;
-let viewMode = 0, lookYaw = 0, acc = 0;
+let viewMode = 0, acc = 0;
+/** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
+const look = { yaw: 0, pitch: 0 };
+const LOOK_PITCH_MIN = -0.5, LOOK_PITCH_MAX = 1.1;
+function setLook(yaw: number, pitch: number): void {
+  look.yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw)); // keep within ±π
+  look.pitch = Math.max(LOOK_PITCH_MIN, Math.min(LOOK_PITCH_MAX, pitch));
+}
+function lookAhead(): void { setLook(0, 0); }
 let pendingPenalty: Boat | null = null;
 
 function newGame(): void {
@@ -95,7 +105,14 @@ holdBtn('bLeft', () => { w.user.steer = -1; }, () => { if (w.user.steer === -1) 
 holdBtn('bRight', () => { w.user.steer = 1; }, () => { if (w.user.steer === 1) w.user.steer = 0; });
 holdBtn('bLuff', () => { w.user.luff = true; }, () => { w.user.luff = false; });
 $('bTack').addEventListener('click', doTack);
-$('bView').onclick = () => { viewMode = (viewMode + 1) % 3; lookYaw = 0; $('bView').textContent = 'View · ' + VIEWS[viewMode]; };
+function togglePole(): void { if (!w.running || w.paused) return; w.user.poleWant = !w.user.poleWant; }
+$('bPole').addEventListener('click', togglePole);
+$('bView').onclick = () => { viewMode = (viewMode + 1) % 3; lookAhead(); $('bView').textContent = 'View · ' + VIEWS[viewMode]; };
+$('bLook').onclick = lookAhead;
+// Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
+$('bCourse').onclick = () => courseView.toggle(w);
+$('bPreview').onclick = () => courseView.open(w);
+$('bCvClose').onclick = () => courseView.close();
 $('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1; $('bFast').textContent = 'Speed ' + w.speed + '×'; };
 $('bSound').onclick = () => { sound.on = !sound.on; $('bSound').textContent = sound.on ? 'Sound on' : 'Sound off'; };
 $('bPause').onclick = () => { if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false; };
@@ -108,6 +125,8 @@ $('map').addEventListener('click', () => { hud.mapZoom = !hud.mapZoom; $('mapHin
 
 const keys: Record<string, boolean> = {};
 addEventListener('keydown', e => {
+  if ((e.key === 'm' || e.key === 'M') && $('replay').hidden && $('results').hidden) { courseView.toggle(w); return; }
+  if (e.key === 'Escape' && courseView.isOpen) { courseView.close(); return; }
   if (!$('setup').hidden || !$('replay').hidden || !$('results').hidden) return;
   const u = w.user, k = e.key;
   if (keys[k]) return; keys[k] = true;
@@ -115,11 +134,10 @@ addEventListener('keydown', e => {
   else if (k === 'ArrowRight' || k === 'd' || k === 'D') u.steer = 1;
   else if (k === 'ArrowDown' || k === 's' || k === 'S') u.luff = true;
   else if (k === ' ' || k === 't' || k === 'T') { e.preventDefault(); doTack(); }
+  else if (k === 'o' || k === 'O') togglePole();
   else if (k === 'v' || k === 'V') $('bView').click();
   else if (k === 'p' || k === 'P' || k === 'Escape') { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); }
-  else if (k === 'q' || k === 'Q') lookYaw += 0.6;
-  else if (k === 'e' || k === 'E') lookYaw -= 0.6;
-  else if (k === 'w' || k === 'W') lookYaw = 0;
+  else if (k === 'w' || k === 'W') lookAhead();
 });
 addEventListener('keyup', e => {
   const u = w.user, k = e.key; keys[k] = false;
@@ -127,9 +145,29 @@ addEventListener('keyup', e => {
   if ((k === 'ArrowRight' || k === 'd' || k === 'D') && u.steer === 1) u.steer = 0;
   if (k === 'ArrowDown' || k === 's' || k === 'S') u.luff = false;
 });
-let drag: { x: number; y0: number } | null = null, lastTap = 0;
-$('gl').addEventListener('pointerdown', e => { drag = { x: e.clientX, y0: lookYaw }; const now = performance.now(); if (now - lastTap < 300) lookYaw = 0; lastTap = now; });
-addEventListener('pointermove', e => { if (drag && viewMode === 0) lookYaw = drag.y0 + (e.clientX - drag.x) * 0.006; });
+// Look around by dragging the view (mouse or finger). Double-tap/double-click looks ahead again.
+let drag: { x: number; y: number; yaw0: number; pitch0: number } | null = null, lastTap = 0;
+$('gl').addEventListener('pointerdown', e => {
+  drag = { x: e.clientX, y: e.clientY, yaw0: look.yaw, pitch0: look.pitch };
+  const now = performance.now(); if (now - lastTap < 300) lookAhead(); lastTap = now;
+});
+addEventListener('pointermove', e => {
+  if (drag && viewMode !== 2) setLook(drag.yaw0 + (e.clientX - drag.x) * 0.006, drag.pitch0 + (e.clientY - drag.y) * 0.006);
+});
+/** Held keys pan the view: Q/E left/right, R/F up/down. */
+function keyLook(dt: number): void {
+  const rate = 1.6 * dt;
+  if (keys.q || keys.Q) setLook(look.yaw + rate, look.pitch);
+  if (keys.e || keys.E) setLook(look.yaw - rate, look.pitch);
+  if (keys.r || keys.R) setLook(look.yaw, look.pitch + rate);
+  if (keys.f || keys.F) setLook(look.yaw, look.pitch - rate);
+}
+function lookLabel(): void {
+  const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
+  const off = Math.abs(deg) > 8 || Math.abs(look.pitch) > 0.15;
+  el.hidden = !off || viewMode === 2;
+  if (off) el.textContent = Math.abs(deg) <= 8 ? 'Look ahead' : `Looking ${Math.abs(deg)}° ${deg > 0 ? 'stbd' : 'port'} · ahead`;
+}
 addEventListener('pointerup', () => { drag = null; });
 addEventListener('pointercancel', () => { drag = null; });
 
@@ -158,7 +196,7 @@ document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListen
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course') ? v : Number(v);
   paintSeg(); newGame(); courseCard();
 }));
-function openSetup(): void { w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; }
+function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; }
 function beginRace(): void {
   saveSettings(S);
   newGame();
@@ -168,7 +206,7 @@ function beginRace(): void {
   const m0 = w.C.marks[0];
   toast(`${S.seq}-minute sequence. Current: ${w.cur.label}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
 }
-$('bGo').onclick = () => { $('setup').hidden = true; beginRace(); };
+$('bGo').onclick = () => { courseView.close(); $('setup').hidden = true; beginRace(); };
 
 function showResults(): void {
   w.finishShown = true;
@@ -200,7 +238,8 @@ function frame(now: number): void {
     if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
   }
   for (const e of w.drainEvents()) handle(e);
-  view.render(w, dt, now, viewMode, lookYaw);
+  keyLook(dt); lookLabel();
+  view.render(w, dt, now, viewMode, look);
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
 }

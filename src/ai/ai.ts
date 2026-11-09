@@ -127,4 +127,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     }
   }
   b.desired = desired; b.luff = luff;
+  // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
+  const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && dist(b, nm.p) < 45;
+  if (w.t < 0 || nearMark || b.twa < 146) b.poleWant = false;
+  else if (b.twa > 156) b.poleWant = true;
 }
