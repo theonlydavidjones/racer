@@ -45,6 +45,8 @@ let pendingPenalty: Boat | null = null;
 function newGame(seed = randomSeed()): void {
   w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM } : {});
   acc = 0; drillShown = false;
+  $('trimPanel').classList.toggle('manual', !!S.manualTrim);
+  $('bTrim').textContent = S.manualTrim ? 'Trim · you' : 'Trim · crew';
   view.setWorld(w);
   labels.build(w);
 }
@@ -93,7 +95,7 @@ $('bCont').onclick = () => {
 
 /* ---------------- input ---------------- */
 function setControlsIdle(): void {
-  const u = w.user; u.steer = 0; u.luff = false;
+  const u = w.user; u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0;
   ['bLeft', 'bRight', 'bLuff'].forEach(id => $(id).classList.remove('on'));
 }
 function doTack(): void {
@@ -110,6 +112,19 @@ holdBtn('bLeft', () => { w.user.steer = -1; }, () => { if (w.user.steer === -1) 
 holdBtn('bRight', () => { w.user.steer = 1; }, () => { if (w.user.steer === 1) w.user.steer = 0; });
 holdBtn('bLuff', () => { w.user.luff = true; }, () => { w.user.luff = false; });
 $('bTack').addEventListener('click', doTack);
+// Sheets: hold Trim/Ease (or Z/X for the main, , and . for the jib) when you're trimming.
+function setTrimMode(manual: boolean): void {
+  S.manualTrim = manual ? 1 : 0; saveSettings(S);
+  w.user.manualTrim = manual; w.user.sheetCmd.main = w.user.sheetCmd.jib = 0;
+  $('bTrim').textContent = manual ? 'Trim · you' : 'Trim · crew';
+  $('bTrim').setAttribute('aria-pressed', String(manual));
+  $('trimPanel').classList.toggle('manual', manual);
+}
+$('bTrim').onclick = () => { setTrimMode(!w.user.manualTrim); toast(w.user.manualTrim ? 'You have the sheets. Watch the telltales.' : 'The crew is trimming.', 2000); };
+const sheetBtn = (id: string, sail: 'main' | 'jib', dir: -1 | 1) =>
+  holdBtn(id, () => { w.user.sheetCmd[sail] = dir; }, () => { if (w.user.sheetCmd[sail] === dir) w.user.sheetCmd[sail] = 0; });
+sheetBtn('bMainIn', 'main', -1); sheetBtn('bMainOut', 'main', 1); sheetBtn('bJibIn', 'jib', -1); sheetBtn('bJibOut', 'jib', 1);
+const SHEET_KEYS: Record<string, ['main' | 'jib', -1 | 1]> = { z: ['main', -1], Z: ['main', -1], x: ['main', 1], X: ['main', 1], ',': ['jib', -1], '.': ['jib', 1] };
 function togglePole(): void { if (!w.running || w.paused) return; w.user.poleWant = !w.user.poleWant; }
 $('bPole').addEventListener('click', togglePole);
 $('bView').onclick = () => { viewMode = (viewMode + 1) % 3; lookAhead(); $('bView').textContent = 'View · ' + VIEWS[viewMode]; };
@@ -139,6 +154,7 @@ addEventListener('keydown', e => {
   else if (k === 'ArrowRight' || k === 'd' || k === 'D') u.steer = 1;
   else if (k === 'ArrowDown' || k === 's' || k === 'S') u.luff = true;
   else if (k === ' ' || k === 't' || k === 'T') { e.preventDefault(); doTack(); }
+  else if (SHEET_KEYS[k] && w.user.manualTrim) { const [sail, dir] = SHEET_KEYS[k]; w.user.sheetCmd[sail] = dir; }
   else if (k === 'o' || k === 'O') togglePole();
   else if (k === 'v' || k === 'V') $('bView').click();
   else if (k === 'p' || k === 'P' || k === 'Escape') { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); }
@@ -149,6 +165,7 @@ addEventListener('keyup', e => {
   if ((k === 'ArrowLeft' || k === 'a' || k === 'A') && u.steer === -1) u.steer = 0;
   if ((k === 'ArrowRight' || k === 'd' || k === 'D') && u.steer === 1) u.steer = 0;
   if (k === 'ArrowDown' || k === 's' || k === 'S') u.luff = false;
+  if (SHEET_KEYS[k]) { const [sail, dir] = SHEET_KEYS[k]; if (u.sheetCmd[sail] === dir) u.sheetCmd[sail] = 0; }
 });
 // Look around by dragging the view (mouse or finger). Double-tap/double-click looks ahead again.
 let drag: { x: number; y: number; yaw0: number; pitch0: number } | null = null, lastTap = 0;

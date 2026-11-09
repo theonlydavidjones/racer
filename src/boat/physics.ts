@@ -4,11 +4,15 @@ import type { Emit } from '../sim/events';
 import { bow, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
 import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
+import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. */
 export const PENALTY_TURN_RATE = 10;
 /** Below this speed (m/s, ~2.5 kt) the AI won't try to tack: she'd stall head to wind. */
 export const SLOW_TACK = 1.3;
+
+/** The crew's reaction time to a change in apparent wind angle, s. */
+export const CREW_LAG = 0.8;
 
 /** Crew timings for the whisker pole, s. */
 export const POLE = { set: 8, stow: 5, gybe: 8 };
@@ -85,11 +89,15 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; }
   if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled: Rule 13 ends
   crewPole(b, dt, emit);
-  let target = polar(ww.kt, twa, sailPlan(b));
+  const plan = sailPlan(b);
+  const ap = apparent(ww.from, ww.kt, b.h, b.v);
+  trimSails(b, ap.awa, plan, dt);
+  let target = polar(ww.kt, twa, plan);
   if (b.luff) target *= luffDriveFactor(twa);
+  // Drive scales with trim efficiency; speed with roughly the square root of drive.
+  else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib));
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
-  const ap = apparent(ww.from, ww.kt, b.h, b.v);
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)));
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
@@ -105,15 +113,38 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.awa = awa; b.arel = aw.arel; b.aws = aw.aws;
   // The main goes to leeward for the tack the boat is on (so sailing a little by the lee it stays put).
   const side = b.tack === 'S' ? -1 : 1;
-  const boomT = clamp((awa - 18) * 0.55, 4, 85);
+  // The sails sit at their sheet angles; easing to luff lets them right out.
+  const boomT = b.luff ? SAILS.main.max : b.sheets.main;
   // Jib: to leeward normally; poled out square to windward when wing-on-wing; hanging centred while the crew works the pole.
-  const plan = sailPlan(b);
-  const jibT = plan === 'wing' ? -side * 82 : plan === 'main' ? side * 10 : side * clamp((awa - 18) * 0.5 + 7, 8, 68);
-  const k = Math.min(1, dt * 3);
+  const jibT = plan === 'wing' ? -side * 82 : plan === 'main' ? side * 10 : side * (b.luff ? SAILS.jib.max : b.sheets.jib);
+  const k = Math.min(1, dt * 4);
+  void awa;
   b.boom += (side * boomT - b.boom) * k;
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
-  const heelT = (b.luff ? 0.25 : 1) * Math.min(24, ww.kt * 1.25) * (twa < 35 ? 0.2 : twa < 100 ? 1 : 0.45) * (rel >= 0 ? 1 : -1);
+  // heel: less when the sails are luffing, a little more when they're over-trimmed and stalled
+  const trimHeel = b.luff ? 0.25 : 0.4 + 0.6 * trimDrive(b.trim.main, b.trim.jib) + (b.trim.main.flow === 'stalled' ? 0.15 * b.trim.main.amount : 0);
+  const heelT = trimHeel * Math.min(24, ww.kt * 1.25) * (twa < 35 ? 0.2 : twa < 100 ? 1 : 0.45) * (rel >= 0 ? 1 : -1);
   b.heel += (heelT - b.heel) * Math.min(1, dt * 1.5);
+}
+
+/**
+ * Work the sheets: the crew trims each sail toward its best sheet angle at a human pace, reacting to the
+ * apparent wind with a short lag (so a quick luff or bear-away shows on the telltales before they catch
+ * up); or you trim with the sheet buttons. Then work out how each sail is drawing.
+ */
+function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
+  b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
+  for (const name of ['main', 'jib'] as const) {
+    const spec = SAILS[name];
+    if (b.manualTrim && b.isUser) b.sheets[name] += b.sheetCmd[name] * spec.handRate * dt;
+    else {
+      const d = optimalSheet(name, b.awaSlow) - b.sheets[name];
+      b.sheets[name] += Math.sign(d) * Math.min(Math.abs(d), spec.crewRate * dt);
+    }
+    b.sheets[name] = clamp(b.sheets[name], spec.min, spec.max);
+  }
+  b.trim.main = sailTrim('main', awa, b.sheets.main);
+  b.trim.jib = plan === 'jib' ? sailTrim('jib', awa, b.sheets.jib) : null; // poled out or down: the sheet isn't in play
 }
 
 /** Apparent wind: wind over the water minus the boat's motion through it. aws in m/s, arel signed (+ from starboard). */

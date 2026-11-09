@@ -11,7 +11,7 @@ export function testBoat(o: { heading: number; kt: number; windFrom?: number; wi
     steer: 0, turnTarget: null, turnDir: 0, luff: false, desired: o.heading,
     penalty: 0, started: true, ocs: false, leg: 0, finished: false, finishT: null,
     prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null,
-    cur: { x: 0, y: 0 }, ww: { from: windFrom, kt: windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S', heel: 0, boom: 0, jib: 0, ai: null
+    cur: { x: 0, y: 0 }, ww: { from: windFrom, kt: windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: false, sheetCmd: { main: 0, jib: 0 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S', heel: 0, boom: 0, jib: 0, ai: null
   };
 }
 

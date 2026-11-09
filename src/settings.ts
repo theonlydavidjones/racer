@@ -7,9 +7,10 @@ export interface Settings {
   fleet: number; // number of opponents
   seq: number; // start sequence, minutes
   aids: 0 | 1; // line, zones and laylines drawn
+  manualTrim: 0 | 1; // you trim the sheets (otherwise the crew does)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 12, current: 'ebb', bias: 0, fleet: 3, seq: 3, aids: 1 };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 12, current: 'ebb', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0 };
 
 const KEY = 'fbsim-settings-v2';
 

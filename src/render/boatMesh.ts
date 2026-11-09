@@ -4,22 +4,20 @@ import { D2R } from '../core/math';
 import type { Boat } from '../boat/boat';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
+import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
 
-function sailGeom(tack: number[], head: number[], clew: number[], depth: number): THREE.BufferGeometry {
-  const R = 8, C = 5, pos: number[] = [], idx: number[] = [];
-  for (let i = 0; i <= R; i++) {
-    const t = i / R;
-    const lx = tack[1] + (head[1] - tack[1]) * t, lz = tack[2] + (head[2] - tack[2]) * t;
-    const fx = clew[1] + (head[1] - clew[1]) * t, fz = clew[2] + (head[2] - clew[2]) * t;
-    for (let j = 0; j <= C; j++) { const s = j / C; pos.push(depth * Math.sin(Math.PI * s) * (1 - t * 0.75), lx + (fx - lx) * s, lz + (fz - lz) * s); }
-  }
-  for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) { const a = i * (C + 1) + j, b = a + 1, c = a + C + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  return g;
-}
-const MAIN_G = sailGeom([0, 1.05, 0], [0, 9.3, 0.05], [0, 1.05, 3.3], 0.45);
-const JIB_G = sailGeom([0, 0, 0], [0, 6.1, 2.35], [0, 0.35, 2.9], 0.38);
+const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+/** Main: on the mast and boom, three battens, and a long, low rectangular window parallel to the boom
+ * (about 1.8 m by 0.35 m, starting about 0.3 m above the boom), as on most Folkboat mains. */
+const MAIN_LUFF = 8.25, MAIN_FOOT = 3.3;
+const MAIN_DEF: SailDef = {
+  tack: V3(0, 1.05, 0), head: V3(0, 9.3, 0.05), clew: V3(0, 1.05, MAIN_FOOT), depth: 0.42, rows: 16, cols: 10,
+  window: { t0: 0.3 / MAIN_LUFF, t1: 0.65 / MAIN_LUFF, s0: 0.18, s1: 0.18 + 1.8 / MAIN_FOOT },
+  battens: [{ t: 0.3, len: 0.75 }, { t: 0.55, len: 0.75 }, { t: 0.8, len: 0.5 }]
+};
+/** Jib: hanked on the forestay. */
+const JIB_DEF: SailDef = { tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0, 0.35, 2.9), depth: 0.36, rows: 8, cols: 6 };
+const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 const JIB_AXIS = new THREE.Vector3(0, 6.1, 2.35).normalize(); // the forestay: the jib swings around it, so its luff stays on the stay
 
 function hullShape(k: number): THREE.Shape {
@@ -48,7 +46,8 @@ const MAT = {
 
 interface Ribbon { geom: THREE.BufferGeometry; anchor: THREE.Vector3; phase: number }
 export interface BoatMesh {
-  grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: THREE.Mesh; jib: THREE.Mesh;
+  grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: Sail; jib: Sail;
+  jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
   pole: THREE.Mesh; ribbons: Ribbon[];
 }
 
@@ -57,8 +56,10 @@ const HOUNDS = new THREE.Vector3(0, 7.2, -0.6); // where the forestay and upper 
 const CHAINPLATE_Z = -0.45, CHAINPLATE_X = 1.0, DECK_Y = 0.42;
 const POLE_INBOARD = new THREE.Vector3(0, 1.5, -0.6); // pole fitting on the front of the mast
 const JIB_CLEW = new THREE.Vector3(0, 0.35, 2.9); // in the jib pivot's frame
-const RIBBON_LEN = 0.4, RIBBON_W = 0.035, RIBBON_N = 7;
-const RIBBON_MAT = new THREE.MeshBasicMaterial({ color: 0xe8322a, side: THREE.DoubleSide });
+// Cassette-tape telltales: old audio tape tied to the shrouds, about 1.4 m above the deck (low enough to
+// see from the cockpit). Dark brown and shiny, like the real thing.
+const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
+const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
 export function buildBoatMesh(b: Boat): BoatMesh {
@@ -73,19 +74,31 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.32, 2.1), MAT.cabin); cab.position.set(0, 0.56, -0.7); grp.add(cab);
   // aluminium extrusion: constant section; wooden mast: tapered
   const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.055, 0.06, 9.0, 10) : new THREE.CylinderGeometry(0.05, 0.08, 9.0, 6), spar); mast.position.set(0, 4.9, -0.6); grp.add(mast);
-  const sailMat = new THREE.MeshLambertMaterial({ color: b.sailColor, side: THREE.DoubleSide });
+  // Your own sails are slightly see-through, as Dacron is in daylight, so the leeward telltales show through.
+  const sailMat = b.isUser
+    ? new THREE.MeshLambertMaterial({ color: b.sailColor, side: THREE.DoubleSide, transparent: true, opacity: 0.86 })
+    : new THREE.MeshLambertMaterial({ color: b.sailColor, side: THREE.DoubleSide });
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, -0.6); grp.add(boomPivot);
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, alu ? 10 : 5), spar); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
-  const main = new THREE.Mesh(MAIN_G, sailMat); boomPivot.add(main);
+  const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT); boomPivot.add(main.mesh);
   const jibPivot = new THREE.Group(); jibPivot.position.set(0, 0.75, -3.7); grp.add(jibPivot);
-  const jib = new THREE.Mesh(JIB_G, sailMat); jibPivot.add(jib);
+  const jib = new Sail(JIB_DEF, sailMat, null); jibPivot.add(jib.mesh);
+  // Telltales on your own boat: three pairs on the jib luff, one at each batten on the main leech.
+  const jibTells = { windward: [] as Telltale[], leeward: [] as Telltale[] }, leechTells: Telltale[] = [];
+  if (b.isUser) {
+    [0.25, 0.5, 0.75].forEach((t, i) => {
+      jibTells.windward.push(new Telltale(jib, t, 0.13, false, 0.26, i * 1.9));
+      jibTells.leeward.push(new Telltale(jib, t, 0.13, true, 0.26, i * 2.3 + 1));
+    });
+    for (const bt of MAIN_DEF.battens!) leechTells.push(new Telltale(main, bt.t, 0.995, true, 0.3, bt.t * 7));
+  }
   grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.75, -3.7), new THREE.Vector3(0, 7.2, -0.6)]), MAT.wire));
-  // upper shrouds, with a wind ribbon tied on a third of the way up each one
+  // upper shrouds, each with a cassette-tape telltale tied on low enough to see from the cockpit
   const ribbons: Ribbon[] = [];
   for (const sx of [-1, 1]) {
     const foot = new THREE.Vector3(sx * CHAINPLATE_X, DECK_Y, CHAINPLATE_Z);
     grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, HOUNDS]), MAT.wire));
-    const anchor = foot.clone().lerp(HOUNDS, 1 / 3);
+    const anchor = foot.clone().lerp(HOUNDS, TAPE_HEIGHT / (HOUNDS.y - DECK_Y));
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RIBBON_N * 2 * 3), 3));
     const idx: number[] = [];
@@ -97,7 +110,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; grp.add(pole);
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
-  return { grp, boomPivot, jibPivot, main, jib, pole, ribbons };
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -107,15 +120,33 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number): void {
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);
-  const luffing = b.luff || b.twa < 32, plan = sailPlan(b);
-  const flapM = luffing ? 0.25 * Math.sin(t * 17 + b.id) : 1;
-  // Jib: poled out it stays full; dead downwind without the pole the main blankets it, so it collapses and
-  // refills; while the crew works the pole it hangs and flaps.
-  const flapJ = plan === 'main' ? 0.2 * Math.sin(t * 9 + b.id)
-    : luffing ? 0.25 * Math.sin(t * 15 + b.id)
-    : plan === 'jib' && b.awa > 160 ? 0.35 + 0.4 * Math.abs(Math.sin(t * 1.7 + b.id)) : 1;
-  m.main.scale.x = Math.sign(b.boom || 1) * flapM;
-  m.jib.scale.x = Math.sign(b.jib || 1) * flapJ;
+  const plan = sailPlan(b), headToWind = b.twa < 32;
+  // main: twists more as the sheet is eased; bubbles at the luff when under-trimmed; flogs when let go
+  const tm = b.trim.main, sheetM = Math.abs(b.boom);
+  const mainShape: SailShape = {
+    twist: 5 + 12 * Math.min(1, sheetM / 50), time: t + b.id,
+    bubble: tm.flow === 'luffing' ? Math.min(1, tm.amount * 1.4) : 0,
+    flog: b.luff || headToWind ? 0.85 : tm.flow === 'luffing' ? Math.max(0, tm.amount - 0.6) * 2 : 0
+  };
+  // jib: full when poled out; hangs while the crew handles the pole; collapses behind the main dead downwind
+  const tj = b.trim.jib;
+  const jibShape: SailShape = {
+    twist: 4 + 10 * Math.min(1, Math.abs(b.jib) / 40), time: t * 1.1 + b.id,
+    bubble: tj && tj.flow === 'luffing' ? Math.min(1, tj.amount * 1.6) : 0,
+    flog: plan === 'main' ? 0.7 : b.luff || headToWind ? 0.85 : plan === 'jib' && b.awa > 160 ? 0.35 + 0.35 * Math.abs(Math.sin(t * 1.7 + b.id))
+      : tj && tj.flow === 'luffing' ? Math.max(0, tj.amount - 0.6) * 2 : 0
+  };
+  m.main.update(mainShape); m.jib.update(jibShape);
+  m.main.mesh.scale.x = Math.sign(b.boom || 1);
+  m.jib.mesh.scale.x = Math.sign(b.jib || 1);
+  if (b.isUser) {
+    const st = b.luff ? { windward: 'lift' as TellState, leeward: 'hang' as TellState } : luffTellStates(plan === 'jib' ? tj : null, b.awa);
+    const amt = tj?.amount ?? 0, mirJ = m.jib.mesh.scale.x < 0;
+    m.jibTells.windward.forEach(tt => tt.update(jibShape, st.windward, amt, mirJ));
+    m.jibTells.leeward.forEach(tt => tt.update(jibShape, st.leeward, amt, mirJ));
+    const leech: TellState = b.awa > 115 || b.luff ? 'hang' : tm.flow === 'stalled' && tm.amount > 0.12 ? 'curl' : 'stream';
+    m.leechTells.forEach(tt => tt.update(mainShape, leech, tm.amount, m.main.mesh.scale.x < 0));
+  }
   syncPole(m, plan === 'wing');
   for (const r of m.ribbons) syncRibbon(r, b, t);
 }
@@ -131,7 +162,7 @@ function syncPole(m: BoatMesh, on: boolean): void {
   m.pole.scale.set(1, len, 1);
 }
 
-/** A ribbon streams the way the apparent wind blows, droops when it's light, and flutters. */
+/** A cassette tape streams the way the apparent wind blows, droops when it's light, and flutters. */
 function syncRibbon(r: Ribbon, b: Boat, t: number): void {
   const pos = r.geom.attributes.position as THREE.BufferAttribute, arr = pos.array as Float32Array;
   const th = b.arel * D2R;

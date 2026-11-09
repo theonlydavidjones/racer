@@ -24,6 +24,13 @@
 <div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
 <div id="linebox" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="trimPanel" aria-label="Sail trim">
+  <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
+    <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button></div>
+  <div class="tp-row" id="tpJibRow"><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span>
+    <button class="tp-btn" id="bJibIn" type="button" aria-label="Trim the jib in">Trim</button><button class="tp-btn" id="bJibOut" type="button" aria-label="Ease the jib">Ease</button></div>
+  <div class="tp-hint" id="tpHint"></div>
+</div>
 
 <div id="controls">
   <div class="row1">
@@ -32,12 +39,13 @@
     <button class="chip" id="bSound" type="button">Sound on</button>
     <button class="chip" id="bPause" type="button">Pause</button>
     <button class="chip" id="bCourse" type="button">Course</button>
+    <button class="chip" id="bTrim" type="button" aria-pressed="false">Trim · crew</button>
     <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
   </div>
   <div class="row2">
     <button class="big steer" id="bLeft" type="button" aria-label="Steer to port">◀</button>
     <button class="big steer" id="bRight" type="button" aria-label="Steer to starboard">▶</button>
-    <span class="keys">← → steer · Space tack · ↓ luff · O pole · M course · V view · drag or Q/E/R/F to look</span>
+    <span class="keys">← → steer · Space tack · ↓ luff · O pole · Z/X main · ,/. jib · M course · V view · drag or Q/E/R/F to look</span>
     <div class="spacer"></div>
     <button class="big tack" id="bTack" type="button">Tack</button>
     <button class="big" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button>
@@ -74,6 +82,7 @@
       <b>Steer</b><span>◀ ▶ buttons, arrow keys or A / D</span>
       <b>Tack / gybe</b><span>Tack button or Space. Turns through the wind to the other close-hauled course.</span>
       <b>Luff</b><span>Hold to ease the sails and slow down. This is how you burn time before the gun.</span>
+      <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
       <b>Look</b><span>Drag the view in any direction, or hold Q / E / R / F. Looking never steers the boat. Double-tap or W to look ahead again.</span>
     </div>
   </div>
@@ -85,7 +94,17 @@
       <div><div class="eyebrow" id="cvEyebrow">Course</div><h2 id="cvTitle">Course</h2></div>
       <button class="ghost" id="bCvClose" type="button">Close · M</button>
     </div>
-    <canvas id="cvcanvas" aria-label="Full course map with rounding directions"></canvas>
+    <div class="cvbar">
+      <button class="ghost sm" id="bCvPrev" type="button" aria-label="Previous leg">◀</button>
+      <div class="cvleg" id="cvLeg" aria-live="polite"></div>
+      <button class="ghost sm" id="bCvNext" type="button" aria-label="Next leg">▶</button>
+      <button class="ghost sm" id="bCvAll" type="button">Whole course</button>
+    </div>
+    <div class="cvwrap">
+      <canvas id="cvcanvas" aria-label="Course map with rounding directions. Drag to pan, scroll or pinch to zoom."></canvas>
+      <div class="cvzoom"><button class="ghost sm" id="bCvIn" type="button" aria-label="Zoom in">+</button><button class="ghost sm" id="bCvOut" type="button" aria-label="Zoom out">−</button></div>
+      <div class="cvhint">Drag to move · scroll or pinch to zoom · tap a leg below</div>
+    </div>
     <div class="cvkey">
       <span><i class="sw s"></i>Leave to starboard (round clockwise)</span>
       <span><i class="sw p"></i>Leave to port (round counter-clockwise)</span>

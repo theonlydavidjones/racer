@@ -2,6 +2,7 @@ import { bow, type Boat } from '../boat/boat';
 import { timeToCover } from '../boat/dynamics';
 import { beatAngle, polar } from '../boat/polar';
 import { sailPlan } from '../boat/physics';
+import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
 import { cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
@@ -39,12 +40,28 @@ export class Hud {
     bp.textContent = u.pole === 'down' ? 'Pole out' : u.pole === 'set' ? 'Pole in' : u.pole === 'setting' ? 'Poling…' : 'Stowing…';
     bp.classList.toggle('on', u.pole === 'set' || u.pole === 'setting');
     this.poleHints(w, u);
+    this.trimPanel(u);
     $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
     else { sl.textContent = ww.kt.toFixed(0) + ' kt on water'; sl.className = 'sub'; }
     $('bTack').textContent = u.twa < 100 ? 'Tack' : 'Gybe';
     this.situation(w, u); this.lineBox(w, u); this.dial(u); this.map(w, u);
+  }
+
+  /** How each sail is drawing, in words, with what to do about it. */
+  private trimPanel(u: Boat): void {
+    const word = (t: SailTrim | null, off: string) => !t ? [off, 'off'] : t.flow === 'good' ? ['Good', 'good'] : t.flow === 'luffing' ? ['Luffing', 'luffing'] : ['Stalled', 'stalled'];
+    const plan = sailPlan(u);
+    const [mw, mc] = u.luff ? ['Eased', 'off'] : word(u.trim.main, '');
+    const [jw, jc] = u.luff ? ['Eased', 'off'] : word(u.trim.jib, plan === 'wing' ? 'Poled out' : 'Down');
+    const tm = $('tpMain'), tj = $('tpJib');
+    tm.textContent = mw; tm.className = 'tp-state ' + mc;
+    tj.textContent = jw; tj.className = 'tp-state ' + jc;
+    const bad = [u.trim.jib, u.trim.main].find(t => t && t.flow !== 'good' && t.amount > 0.1);
+    $('tpHint').textContent = u.luff || u.awa > 115 || !bad ? ''
+      : bad.flow === 'luffing' ? (u.manualTrim ? 'Windward telltales lifting: trim in, or bear away.' : 'Windward telltales lifting: bear away a little.')
+      : (u.manualTrim ? 'Leeward telltales drooping: ease, or head up.' : 'Leeward telltales drooping: head up a little.');
   }
 
   private deepT = 0;

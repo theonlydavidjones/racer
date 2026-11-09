@@ -201,3 +201,68 @@ describe('downwind: wing-on-wing with the whisker pole', () => {
     expect(b.poleTack).toBe(b.tack);
   });
 });
+
+describe('sail trim', async () => {
+  const { optimalSheet, sailTrim, SAILS } = await import('../src/boat/trim');
+
+  it('best sheet angles: tight close-hauled, eased on a reach, all the way out on a run', () => {
+    expect(optimalSheet('main', 30)).toBeCloseTo(8, 0);
+    expect(optimalSheet('jib', 30)).toBeCloseTo(12, 0);
+    expect(optimalSheet('main', 65)).toBeCloseTo(43, 0);
+    expect(optimalSheet('main', 170)).toBeCloseTo(SAILS.main.max, 0);
+  });
+
+  it('trimmed right, the sail draws fully', () => {
+    const t = sailTrim('jib', 40, optimalSheet('jib', 40));
+    expect(t.flow).toBe('good');
+    expect(t.eff).toBeCloseTo(1, 6);
+  });
+
+  it('eased 10° too far, the sail luffs and loses most of its drive', () => {
+    const t = sailTrim('jib', 40, optimalSheet('jib', 40) + 10);
+    expect(t.flow).toBe('luffing');
+    expect(t.eff).toBeLessThan(0.5);
+  });
+
+  it('pinching with the sheets hard in still luffs the jib (windward telltales lift)', () => {
+    const t = sailTrim('jib', 18, SAILS.jib.min);
+    expect(t.flow).toBe('luffing');
+  });
+
+  it('sheeted hard in on a reach, the sails stall: some drive left, but well down', () => {
+    const t = sailTrim('main', 70, SAILS.main.min);
+    expect(t.flow).toBe('stalled');
+    expect(t.eff).toBeGreaterThan(0.45);
+    expect(t.eff).toBeLessThan(0.8);
+  });
+
+  it('on a run, sheeted in costs drive (less sail facing the wind); no luffing or stalling to speak of', () => {
+    const out = sailTrim('main', 170, SAILS.main.max), half = sailTrim('main', 170, 40);
+    expect(out.eff).toBeCloseTo(1, 2);
+    expect(half.eff).toBeLessThan(0.9);
+    expect(half.flow).toBe('good');
+  });
+
+  it('the crew keeps the sails drawing when sailing steadily close-hauled', () => {
+    const b = testBoat({ heading: 360 - FOLKBOAT.beatAngle(12), kt: 4.5 });
+    sail(b, 20);
+    expect(b.trim.main.flow).toBe('good');
+    expect(b.trim.jib?.flow).toBe('good');
+  });
+
+  it('pinching 12° above close-hauled makes the jib luff, and the boat slows', () => {
+    const beat = FOLKBOAT.beatAngle(12), b = testBoat({ heading: 360 - beat, kt: 4.6 });
+    sail(b, 20); const v0 = kt(b);
+    b.h = 360 - (beat - 12);
+    sail(b, 8);
+    expect(b.trim.jib?.flow).toBe('luffing');
+    expect(kt(b)).toBeLessThan(v0 * 0.9);
+  });
+
+  it('trimming yourself with the sheets hard in on a beam reach is much slower than the crew trimming', () => {
+    const crew = testBoat({ heading: 270, kt: 5 }), you = testBoat({ heading: 270, kt: 5 });
+    you.manualTrim = true; you.sheets.main = SAILS.main.min; you.sheets.jib = SAILS.jib.min;
+    sail(crew, 60); sail(you, 60);
+    expect(kt(you)).toBeLessThan(kt(crew) * 0.85);
+  });
+});

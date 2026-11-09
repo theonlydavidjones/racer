@@ -1,5 +1,6 @@
 import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
+import type { SailTrim } from './trim';
 
 export type Tack = 'S' | 'P';
 
@@ -63,6 +64,12 @@ export interface Boat {
   awa: number;
   arel: number; // signed apparent wind angle (+ = from starboard), for the shroud ribbons
   aws: number; // apparent wind speed, m/s
+  // sail trim: sheet angles (deg from centreline), who trims, and how each sail is drawing
+  sheets: { main: number; jib: number };
+  manualTrim: boolean; // you trim the sheets (otherwise the crew does)
+  sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
+  trim: { main: SailTrim; jib: SailTrim | null };
+  awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
   pole: PoleState;
