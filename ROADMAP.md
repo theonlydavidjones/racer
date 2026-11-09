@@ -13,20 +13,28 @@ What's planned, roughly in order. Done work is described in the README.
 
 Build every line on the boat as something you can see in 3D and work yourself, each with its effect on sail shape and speed. This extends the sail trim model (`src/boat/trim.ts`), which today has only the two sheets.
 
-### Lines and where they're led
+### Lines and where they're led (from the owner's boat)
+
+The **piano** is the row of cam cleats on the aft face of the cabin top (the bridge deck bulkhead), one row each side of the companionway. Lines run forward along the cabin top to turning blocks at the mast.
+
+| Piano | Inboard (by the companionway) → outboard |
+|---|---|
+| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats) |
+| Port | Vang · Outhaul · *main Cunningham / downhaul* · Jib Cunningham (three cam cleats, plus a fixed clam cleat set ~2 in forward, between the jib Cunningham and outhaul cams) |
 
 | Control | Sail | Led to | Notes |
 |---|---|---|---|
-| Vang | Main | Piano, innermost (nearest the centreline) | Dual-ended: port and starboard tails are one line, so pulling one end also pulls the other |
-| Outhaul | Main | Piano, next out | Dual-ended |
-| Cunningham | Jib (main? to confirm) | Piano, outermost | Dual-ended? To confirm |
-| Halyard | Main | To confirm | Luff tension |
-| Halyard | Jib | To confirm | Luff tension |
-| Mainsheet | Main | Transom | |
-| Traveller | Main | Transom | |
+| Vang | Main | Piano, both sides, innermost | Dual-ended: pulling one tail pulls the other |
+| Outhaul | Main | Piano, both sides, middle | Dual-ended |
+| Jib Cunningham | Jib | Piano, both sides, outermost | Dual-ended |
+| Main Cunningham (downhaul) | Main | Port piano only, fixed clam cleat | Labelled "CUN" on the boat. Single-ended. What exactly it pulls: to confirm (see below) |
+| Main halyard | Main | Port side, tail parked | Set before racing, not adjusted under way |
+| Jib halyard | Jib | To confirm | |
+| Mainsheet | Main | Boom end to the traveller car on the transom | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
+| Traveller | Main | Transom | Dual-ended |
 | Backstay | Rig | Both sides of the transom | Dual-ended |
-| Jib sheets | Jib | Along the side decks to the winches | The only lines on the winches |
-| Jib cars | Jib | Tracks on the cabin top | Move the jib sheet lead fore and aft |
+| Jib sheets | Jib | Along the side decks to the winches | The only lines on the winches. Winches are **not** self-tailing: one hand cranks, the other tails, so trimming in a breeze is slow and takes crew |
+| Jib cars | Jib | Tracks on the cabin top | Moved by hand, pin stop: a set of fixed positions, set before a leg, not adjusted while loaded |
 
 ### What each one does (the physics to model)
 
@@ -46,15 +54,12 @@ Build every line on the boat as something you can see in 3D and work yourself, e
 - Telltales, the leech, the draft position and the speed readout respond, so you learn by feel and by numbers.
 - Keyboard controls (rebindable) and a trim panel that groups the lines as they are on the boat: piano, transom, winches.
 
-### Questions for the owner (before building)
+### Still to confirm
 
-1. Is the Cunningham on the piano for the jib or the main? Is there a Cunningham for the other sail too, and where is it led?
-2. Is the piano Cunningham dual-ended? (If pulling the port tail also moves the starboard tail, yes.)
-3. Where are the main and jib halyards led: the piano, or cleated at the mast?
-4. Jib cars: moved by hand along the track with a pin stop, or with a control line? Same position on both sides, or set separately?
-5. Traveller: a dual-ended line across the transom (pull to windward, ease to leeward)?
-6. Mainsheet: straight to the boom, or a multi-part purchase? Cleated on the traveller car?
-7. Are the winches self-tailing?
+1. **Main Cunningham vs. downhaul.** Follow the line from the port fixed clam cleat forward to the mast. If it ends at a ring in the mainsail's luff just above the boom, it's a Cunningham. If it ends at the gooseneck and pulls the boom down a track on the mast, it's a gooseneck downhaul. If it goes up inside the mast, it's the halyard tail with a tackle (a halyard tensioner). All three tension the luff and sail the same in the sim; they just look different.
+2. **Mainsheet purchase.** Count the parts of line running between the block on the boom and the block on the traveller car: that number is the purchase (4 parts = 4:1).
+3. **Jib halyard.** Where is it led and cleated?
+4. **Jib cars.** How many pin positions, and roughly how far apart?
 
 ## Later
 
