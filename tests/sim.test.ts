@@ -234,3 +234,65 @@ describe('hails at the Cityfront shore (Rule 20)', () => {
     expect(foul).toBeNull();
   });
 });
+
+describe('Rule 31 · touching a mark', () => {
+  it('sailing into the next mark costs a one-turn penalty, once per touch', () => {
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
+    w.t = 30; const u = w.user; u.started = true; u.ocs = false; u.leg = 0;
+    const m = w.C.marks[0], h = w.wind.from + 180; // run straight down onto the mark from upwind
+    const back = { x: Math.sin(w.wind.from * Math.PI / 180), y: Math.cos(w.wind.from * Math.PI / 180) };
+    Object.assign(u, { x: m.p.x + back.x * 12, y: m.p.y + back.y * 12, h: h % 360, v: 2, desired: h % 360 });
+    let toasts = '';
+    for (let i = 0; i < 60 * 8; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg; }
+    expect(toasts).toContain('Rule 31');
+    expect(u.penaltyTotal).toBe(360);
+    expect(w.fouls).toBe(1);
+  });
+
+  it('marks of other legs don\'t count', () => {
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
+    const u = w.user; u.started = true; u.leg = 0;
+    const names = w.touchableMarks(u).map(t => t.name);
+    expect(names).toContain(w.C.marks[0].name);
+    expect(names).not.toContain(w.C.marks[2].name);
+  });
+});
+
+describe('"You tack" (Rule 20.2(c))', () => {
+  it('an AI boat clear ahead replies "You tack" to your hail instead of tacking', () => {
+    const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 4);
+    w.t = 30; for (const b of w.boats) { b.started = true; b.ocs = false; b.leg = 0; }
+    w.step(DT);
+    const red = w.boats[1], u = w.user, from = w.wind.from, h = (from - 41 + 360) % 360, wv = V(from), hv = V(h);
+    Object.assign(u, { x: 0, y: 0, h, tack: 'S' as const, lastTackT: -999 });
+    Object.assign(red, { x: hv.x * 16 + wv.x * 5, y: hv.y * 16 + wv.y * 5, h, tack: 'S' as const, lastTackT: -999 }); // two lengths ahead, a little to windward
+    w.pairs = {};
+    expect(w.hail(u, red, 'room')).toBe(true);
+    expect(w.pairRecord(u, red)?.hail?.replyAt).toBe(w.t);
+    expect(w.rights(u, red)).toMatchObject({ kc: red, rule: '20' });
+  });
+
+  it('an AI boat beside you tacks instead', () => {
+    const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 4);
+    w.t = 30; for (const b of w.boats) { b.started = true; b.ocs = false; b.leg = 0; }
+    w.step(DT);
+    const red = w.boats[1], u = w.user, from = w.wind.from, h = (from - 41 + 360) % 360, wv = V(from);
+    Object.assign(u, { x: 0, y: 0, h, tack: 'S' as const, lastTackT: -999 });
+    Object.assign(red, { x: wv.x * 8, y: wv.y * 8, h, tack: 'S' as const, lastTackT: -999 });
+    w.pairs = {};
+    w.hail(u, red, 'room');
+    expect(w.pairRecord(u, red)?.hail?.replyAt).toBeUndefined();
+  });
+
+  it('when an AI boat hails you, H replies "You tack"', () => {
+    const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 4);
+    w.t = 30; for (const b of w.boats) { b.started = true; b.ocs = false; b.leg = 0; }
+    w.step(DT);
+    const red = w.boats[1], u = w.user;
+    u.lastTackT = -999; w.pairs = {};
+    w.hail(red, u, 'room');
+    w.userHail();
+    expect(w.pairRecord(u, red)?.hail?.replyAt).toBe(w.t);
+    expect(w.rights(u, red)).toMatchObject({ kc: u, rule: '20' });
+  });
+});

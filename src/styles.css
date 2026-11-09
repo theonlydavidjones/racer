@@ -131,6 +131,16 @@ table.res{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 table.res td,table.res th{padding:6px 4px;border-bottom:1px solid var(--rule);text-align:left;font-size:14px}
 table.res th{font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+/* tiller guide: shown while you hold the tiller with the cursor */
+#tillerGuide{position:fixed;inset:0;pointer-events:none;display:none;z-index:1}
+body.tiller-held #tillerGuide{display:block}
+body.tiller-held #gl{cursor:ew-resize}
+.tg-line{position:absolute;left:50%;top:22%;bottom:22%;border-left:2px dashed rgba(255,255,255,.55);margin-left:-1px}
+.tg-hard{position:absolute;top:30%;bottom:30%;border-left:2px solid rgba(255,182,39,.45)}
+.tg-hl{left:15%}.tg-hr{left:85%}
+.tg-cur{position:absolute;top:26%;bottom:26%;width:4px;margin-left:-2px;border-radius:2px;background:var(--accent);left:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.tg-l,.tg-r{position:absolute;top:calc(78% + 6px);font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.tg-l{right:calc(50% + 12px)}.tg-r{left:calc(50% + 12px)}
 /* tiller bar */
 .tiller{position:relative;flex:2 1 220px;min-width:0;height:64px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);touch-action:none;cursor:ew-resize}
 .tiller.held{border-color:var(--accent)}

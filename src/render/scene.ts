@@ -29,6 +29,7 @@ export class SceneView {
   private courseObjs: THREE.Object3D[] = [];
   private camLocal = new THREE.Vector3();
   private camSide = 1;
+  private baseFov = 60;
   private laylines: THREE.Line[] = [];
   private laylineAcc = 1;
 
@@ -90,7 +91,7 @@ export class SceneView {
 
   resize(w: number, h: number): void {
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h; this.camera.fov = w < h ? 72 : 60; this.camera.updateProjectionMatrix();
+    this.camera.aspect = w / h; this.baseFov = this.camera.fov = w < h ? 72 : 60; this.camera.updateProjectionMatrix();
   }
 
   /** Rebuild boats and course objects for a new race. */
@@ -135,17 +136,21 @@ export class SceneView {
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number }, over: Overhead): void {
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     this.wtex.offset.x -= w.cvec.x * k; this.wtex.offset.y -= w.cvec.y * k;
     w.boats.forEach((b, i) => syncBoatMesh(this.boatMeshes[i], b, t));
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     camera.up.set(0, 1, 0);
+    const fov = viewMode === 0 ? 72 : this.baseFov;
+    if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     if (viewMode === 0) {
       // sit on the windward side, like a helm hiking
       this.camSide += ((u.rel >= 0 ? 1 : -1) - this.camSide) * Math.min(1, dt * 1.5);
-      this.camLocal.set(0.6 * this.camSide, 1.6, 3.3); // helm position, near the stern on the windward side
+      // over the helm's shoulder, on the windward side; `aft` (m aft of amidships) is yours to set
+      const aft = look.aft ?? 6.5;
+      this.camLocal.set(Math.max(0.35, 0.8 - (aft - 3.3) * 0.06) * this.camSide, 1.6 + Math.max(0, aft - 3.3) * 0.25, aft);
       um.grp.updateMatrixWorld();
       camera.position.copy(this.camLocal).applyMatrix4(um.grp.matrixWorld);
       camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, u.heel * 0.6 * D2R * Math.cos(look.yaw));

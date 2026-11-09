@@ -24,17 +24,21 @@ export interface RulesMark {
   name: string;
   p: Vec;
   type: 'round' | 'pass';
-  /** True if the leg to this mark is a beat (boats on opposite tacks there are outside the model). */
+  /** True if the leg to this mark is a beat (Rule 18 doesn't apply between boats on opposite tacks there). */
   beat: boolean;
+  /** Side to leave it on: 's' starboard, 'p' port. */
+  side?: 's' | 'p';
 }
 
 export interface RulesContext {
   t: number; // race time, s (negative before the start signal)
   windFrom: number; // true wind direction, deg
   marks: RulesMark[]; // the course's mark sequence
+  /** Close-hauled true wind angle, deg (for "fetching" a mark). Default 42. */
+  beat?: number;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '17' | '18.2(b)' | '20' | '22.1' | '22.2';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '17' | '18.2(b)' | '18.3' | '20' | '22.1' | '22.2';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -57,13 +61,21 @@ export interface PairRecord {
   r17: number | null;
   /** A hail between the pair: who hailed, when, and what. */
   hail: Hail | null;
+  /** Rule 18.3: a boat that tacked from port to starboard in the zone of a port-hand windward mark, and the mark. */
+  r183: { tacker: number; idx: number } | null;
+  /** Each boat's lastTackT at the previous step (to see a tack happen). */
+  seenTack: Record<number, number>;
 }
 
 /** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */
-export interface Hail { by: number; at: number; kind: 'room' | 'starboard' }
+export interface Hail {
+  by: number; at: number; kind: 'room' | 'starboard';
+  /** Rule 20.2(c): the hailed boat replied "You tack" at this time, and now owes the hailing boat room to tack and avoid her. */
+  replyAt?: number;
+}
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {} });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 

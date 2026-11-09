@@ -4,7 +4,7 @@ import { beatAngle, polar } from '../boat/polar';
 import { sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
-import { cpa, situationText } from '../rules';
+import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
 import { toast } from './feedback';
@@ -21,6 +21,8 @@ export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
 export class Hud {
   private acc = 0;
   mapZoom = false;
+  /** Label of the key bound to Hail (set by main, which owns the key map). */
+  hailKey: () => string = () => 'H';
   private dialC = $<HTMLCanvasElement>('dial');
   private mapC = $<HTMLCanvasElement>('map');
 
@@ -104,12 +106,21 @@ export class Hud {
     const note17 = r17 === u.id ? ' Rule 17: you came from astern, so sail no higher than your proper course.'
       : r17 === o.id ? ` ${o.name} came from astern: they may not luff you above their proper course (Rule 17).` : '';
     const hail = w.pairRecord(u, o)?.hail;
-    if (hail && hail.kind === 'room' && hail.by === o.id) {
-      // a hail for room to tack trumps everything else: answer it
-      const left = Math.max(0, hail.at + 5 - w.t);
-      $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now: ${left.toFixed(0)} s to respond.`;
-      $('situRule').textContent = 'Rule 20';
-      el.className = 'kc alarm'; el.hidden = false;
+    if (hail && hail.kind === 'room') {
+      // a hail for room to tack trumps everything else
+      const key = this.hailKey();
+      if (hail.replyAt != null) {
+        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now: they must give you room.`;
+        el.className = hail.by === o.id ? 'kc' : 'row';
+      } else if (hail.by === o.id) {
+        const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
+        $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
+        el.className = 'kc alarm';
+      } else {
+        $('situMsg').textContent = `You hailed "Room to tack!" ${o.name} must tack or reply "You tack".`;
+        el.className = 'row';
+      }
+      $('situRule').textContent = 'Rule 20'; el.hidden = false;
       return;
     }
     $('situMsg').textContent = situationText(r.rule, kc, o.name) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');

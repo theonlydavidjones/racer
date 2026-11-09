@@ -10,6 +10,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '16.1': ['Rule 16.1 · Changing course', 'When a right-of-way boat changes course, she shall give the other boat room to keep clear.'],
   '17': ['Rule 17 · On the same tack; proper course', 'If a boat clear astern becomes overlapped within two of her hull lengths to leeward of a boat on the same tack, she shall not sail above her proper course while they remain on the same tack and overlapped within that distance.'],
   '18.2(b)': ['Rule 18.2(b) · Mark-room', 'If boats are overlapped when the first reaches the zone (three lengths from the mark), the outside boat gives the inside boat mark-room. If a boat is clear ahead when she reaches the zone, the boat clear astern gives her mark-room.'],
+  '18.3': ['Rule 18.3 · Tacking in the zone', 'If a boat passes head to wind from port to starboard tack in the zone of a mark to be left to port, rule 18.2 no longer applies between her and a starboard-tack boat fetching the mark. She shall not cause that boat to sail above close-hauled to avoid her, and shall give it mark-room if it becomes overlapped inside her.'],
   '20': ['Rule 20 · Room to tack at an obstruction', 'When approaching an obstruction, a boat sailing close-hauled or above may hail for room to tack and avoid a boat on the same tack. The hailed boat shall respond either by tacking as soon as possible, or by immediately replying "You tack" and then giving the hailing boat room to tack and avoid her.'],
   '22.1': ['Rule 22.1 · Returning to start', 'A boat sailing back to start after being over early keeps clear of boats that are not.'],
   '22.2': ['Rule 22.2 · Taking a penalty', 'A boat taking a penalty keeps clear of boats that are not.']
@@ -68,7 +69,19 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       tip = you ? 'Inside the zone, mark-room overrides windward/leeward and port/starboard on a run. Settle who is inside or ahead before you reach three lengths.' : 'You were entitled to room to round. Sail your proper course around the mark.';
       break;
     }
+    case '18.3': {
+      const mk = e.markName ?? 'the mark';
+      what = you ? `You tacked onto starboard inside the zone at ${mk}, right in front of ${o}, who was already fetching the mark on starboard. That takes away your rights against them: they don't have to sail above close-hauled to avoid you.` : `${o} tacked onto starboard inside the zone at ${mk}, under your bow, while you were fetching it. They broke Rule 18.3.`;
+      tip = you ? 'Coming into a port-hand windward mark on port, don\'t tack in the zone close to a starboard boat that is laying the mark. Tack before the zone, or duck them and tack after they pass.' : 'On the starboard layline you were entitled to sail close-hauled to the mark. You didn\'t have to go above that to avoid a boat that tacked in front of you.';
+      break;
+    }
     case '20':
+      if (e.kind !== 'hail') {
+        // contact or swerve after a "You tack" reply
+        what = you ? `${o} hailed for room to tack and you replied "You tack". That meant giving them room to tack and get clear of you, and you didn't.` : `You hailed ${o} for room to tack. They replied "You tack", which obliged them to give you room to tack and keep clear, and they didn't.`;
+        tip = you ? 'Reply "You tack" only when you can easily let them tack and pass behind you, typically when you are well ahead. Otherwise just tack.' : 'After a "You tack" reply, tack straight away and pass behind them; they must give you room to do it.';
+        break;
+      }
       what = you ? `${o} was being squeezed against the shore and hailed you for room to tack. You didn't respond.` : `You hailed ${o} for room to tack and they didn't respond.`;
       tip = you ? 'When a boat to leeward near the shore (or any obstruction) hails "Room to tack!", tack right away (or reply "You tack" and give them room). They may not be able to hold their course much longer.' : 'You did the right thing: hail early, clearly, and only when you really need to tack to clear the obstruction.';
       break;
@@ -98,7 +111,8 @@ export function situationText(rule: RuleId, youKeepClear: boolean, other: string
     '16.1': kc ? `${nm} changed course. Keep clear.` : `If you change course, give ${nm} room to keep clear.`,
     '17': kc ? `${nm} overlapped from astern. Keep clear.` : `You overlapped from astern: no higher than your proper course.`,
     '18.2(b)': kc ? `Give ${nm} mark-room.` : `${nm} owes you mark-room.`,
-    '20': kc ? `${nm} hailed for room to tack. Tack now.` : `You hailed ${nm} for room to tack.`,
+    '18.3': kc ? `You tacked in the zone: don't make ${nm} sail above close-hauled.` : `${nm} tacked in the zone in front of you: they must keep clear.`,
+    '20': kc ? `Give ${nm} room to tack and get clear of you.` : `${nm} must give you room to tack.`,
     '22.1': kc ? `You're returning. Keep clear of everyone.` : `${nm} is returning and must keep clear.`,
     '22.2': kc ? `You're doing turns. Keep clear of everyone.` : `${nm} is doing turns and must keep clear.`
   };

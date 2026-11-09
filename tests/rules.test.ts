@@ -67,6 +67,23 @@ describe('Rule 11 · windward/leeward', () => {
 
 });
 
+describe('Windward and leeward are sides, not "farther upwind"', () => {
+  //            wind ↓
+  //     ↖ Red      Red is half a length ahead and 3 m to leeward of Blue, both close-hauled on starboard.
+  //        ↖ Blue  Red's centre is farther upwind (she's ahead), but she is on Blue's leeward side.
+  it('close-hauled, slightly ahead and to leeward: still the leeward boat', () => {
+    const blue = boat('Blue', { at: [0, 0], heading: 315 });
+    const red = boat('Red', { at: [-0.707 * 4 - 0.707 * 3, 0.707 * 4 - 0.707 * 3], heading: 315 });
+    expect(red.y).toBeGreaterThan(blue.y);
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Blue', rule: '11' });
+  });
+  it('same on port tack', () => {
+    const blue = boat('Blue', { at: [0, 0], heading: 45 });
+    const red = boat('Red', { at: [0.707 * 4 + 0.707 * 3, 0.707 * 4 - 0.707 * 3], heading: 45 });
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Blue', rule: '11' });
+  });
+});
+
 describe('Rule 12 · clear astern', () => {
   it('boat clear astern keeps clear of boat clear ahead', () => {
     //   ← Blue        ← Red      (both starboard, Red one length behind)
@@ -182,8 +199,88 @@ describe('Rule 18.2(b) · mark-room at the zone', () => {
     expect(p.rec.mark).toBeNull();
   });
 
-  it.todo('Rule 18.3: tacking in the zone of a port-rounding windward mark (not modelled yet)');
-  it.todo('Mark-room for boats on opposite tacks at a windward mark (not modelled yet)');
+});
+
+describe('Rule 18.1(a) · opposite tacks at a windward mark', () => {
+  const mark: RulesMark = { name: 'Windward mark', p: { x: 0, y: 0 }, type: 'round', beat: true, side: 'p' };
+  it('no mark-room between boats on opposite tacks on a beat: port/starboard (Rule 10) still decides', () => {
+    const blue = boat('Blue', { at: [12, -10], heading: 315 }); // starboard, fetching
+    const red = boat('Red', { at: [-6, -12], heading: 45 }); // port, nearer the mark
+    const p = pair(blue, red, [mark]);
+    expect(p.at(100)).toMatchObject({ keepsClear: 'Red', rule: '10' });
+    expect(p.rec.mark).toBeNull();
+  });
+});
+
+describe('Rule 18.3 · tacking in the zone', () => {
+  // Windward mark at the origin, to be left to port. The starboard layline runs down to the right (SE).
+  //            wind ↓
+  //              ● mark
+  //               ╲          Blue ↖ on starboard, fetching the mark (just above the layline)
+  //        Red ↗   ╲  ↖      Red comes in on port, tacks onto starboard inside the zone,
+  //                  Blue      ahead and just to leeward of Blue
+  const mark: RulesMark = { name: 'Windward mark', p: { x: 0, y: 0 }, type: 'round', beat: true, side: 'p' };
+  const blueAt: [number, number] = [14, -12];
+  const ahead = (d: number, l: number): [number, number] => [blueAt[0] - 0.707 * d - 0.707 * l, blueAt[1] + 0.707 * d - 0.707 * l]; // d along Blue's heading, l to leeward
+
+  const scene = (opt: { markSide?: 's' | 'p'; blue?: [number, number]; redAt?: [number, number] } = {}) => {
+    const mk = { ...mark, side: opt.markSide ?? 'p' };
+    const blue = boat('Blue', { at: opt.blue ?? blueAt, heading: 315 });
+    const redAt = opt.redAt ?? ahead(4, 5);
+    const red = boat('Red', { at: redAt, heading: 8 }); // on port, nearly head to wind
+    const p = pair(blue, red, [mk]);
+    expect(p.at(100).foul).toBeNull(); // Red on port, Blue on starboard
+    // Red passes head to wind at 100.8
+    red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; moveTo(red, redAt, 0);
+    const mid = p.at(101);
+    red.tacking = false; moveTo(red, redAt, 315);
+    return { blue, red, p, mid };
+  };
+
+  it('a boat that tacks from port to starboard in the zone, under the bow of a boat fetching the mark, must keep clear', () => {
+    const { red, p, mid } = scene();
+    expect(Math.hypot(red.x, red.y)).toBeLessThan(ZONE);
+    expect(mid).toMatchObject({ keepsClear: 'Red', rule: '13' }); // while she is tacking
+    expect(p.rec.r183).toMatchObject({ tacker: red.id });
+    expect(p.at(103)).toMatchObject({ keepsClear: 'Red', rule: '18.3' }); // though she is now the leeward boat
+  });
+
+  it('Blue, fetching, need not sail above close-hauled: contact is Red\'s foul under 18.3', () => {
+    const { blue, p } = scene();
+    p.at(103);
+    moveTo(blue, ahead(4, 3.6)); // Blue holds her course and closes on Red's windward side
+    expect(p.at(104).foul).toMatchObject({ by: 'Red', rule: '18.3', kind: 'contact' });
+  });
+
+  it('Blue forced to luff above close-hauled to avoid her counts too', () => {
+    const { p } = scene();
+    expect(p.at(103, { swerve: true }).foul).toMatchObject({ by: 'Red', rule: '18.3', kind: 'swerve' });
+  });
+
+  it('tacking outside the zone is plain Rule 11 (after Rule 15 gives Blue time to respond)', () => {
+    const far = (k: number): [number, number] => [blueAt[0] * k, blueAt[1] * k];
+    const blue = boat('Blue', { at: far(2.2), heading: 315 });
+    const redAt: [number, number] = [far(2.2)[0] - 2.83 - 3.54, far(2.2)[1] + 2.83 - 3.54];
+    const red = boat('Red', { at: redAt, heading: 45 });
+    const p = pair(blue, red, [mark]);
+    p.at(100);
+    red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; moveTo(red, redAt, 0); p.at(101);
+    red.tacking = false; moveTo(red, redAt, 315);
+    expect(p.rec.r183).toBeNull();
+    expect(p.at(110)).toMatchObject({ keepsClear: 'Blue', rule: '11' });
+  });
+
+  it('a mark to be left to starboard: no 18.3', () => {
+    const { p } = scene({ markSide: 's' });
+    expect(p.rec.r183).toBeNull();
+  });
+
+  it('only against a boat fetching the mark: Blue below the layline (she would have to tack) gets no 18.3 protection', () => {
+    const lowBlue: [number, number] = [6, -16]; // below the starboard layline: can't lay the mark on starboard
+    const { p, red } = scene({ blue: lowBlue, redAt: [lowBlue[0] - 6.37, lowBlue[1] - 0.71] });
+    expect(Math.hypot(red.x, red.y)).toBeLessThan(ZONE);
+    expect(p.rec.r183).toBeNull();
+  });
 });
 
 describe('Incidents before the start signal count too', () => {
@@ -346,6 +443,35 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     p.rec.hail = { by: red.id, at: 50, kind: 'room' };
     expect(p.at(53).foul).toBeNull(); // still time to respond
     expect(p.at(55.5).foul).toEqual({ by: 'Blue', rule: '20', kind: 'hail', why: null });
+  });
+
+  it('replying "You tack" answers the hail: no Rule 20 breach after 5 s', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315 }), blue = boat('Blue', { at: [-6, 13], heading: 315 }); // Blue clear ahead, to windward
+    const p = pair(red, blue);
+    p.at(50);
+    p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
+    expect(p.at(56)).toMatchObject({ keepsClear: 'Blue', rule: '20', foul: null }); // Blue now gives Red room to tack and avoid her
+  });
+
+  it('after "You tack", the boat that replied must give room: contact is her foul', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315 }), blue = boat('Blue', { at: [-6, 13], heading: 315 });
+    const p = pair(red, blue);
+    p.at(50);
+    p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
+    red.lastTackT = 51; moveTo(red, [-3, 9], 45); // Red tacks onto port, toward Blue's stern
+    moveTo(blue, [-4.5, 10.5], 315); // Blue slowed down and is still in the way
+    expect(p.at(53).foul).toMatchObject({ by: 'Blue', rule: '20', kind: 'contact' });
+  });
+
+  it('the "You tack" obligation ends once the hailing boat has tacked and got going', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315 }), blue = boat('Blue', { at: [-6, 13], heading: 315 });
+    const p = pair(red, blue);
+    p.at(50);
+    p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
+    red.lastTackT = 51; moveTo(red, [6, 4], 45);
+    p.at(58);
+    expect(p.rec.hail).toBeNull();
+    expect(p.at(59).rule).toBe('10');
   });
 
   it('tacking promptly answers the hail', () => {

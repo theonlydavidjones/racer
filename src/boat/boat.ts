@@ -60,6 +60,7 @@ export interface Boat {
   prevPass: number | null;
   nearMin: number;
   forced14: number | null; // id of the boat this right-of-way boat had to swerve for
+  markTouch: string | null; // the mark she is touching right now (Rule 31), if any
   headingAgo?: number; // heading RULE16_WINDOW seconds ago (Rule 16.1), kept by the World
   aboveProper?: boolean; // sailing above her proper course (Rule 17), kept by the World
   // environment at the boat

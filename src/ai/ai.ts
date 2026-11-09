@@ -8,6 +8,22 @@ import type { World } from '../sim/world';
 
 /** A boat owing a penalty first gets this far (m) from other boats before turning. */
 const PENALTY_CLEAR = 25;
+/** ...and this far from marks. */
+const MARK_CLEAR = 20;
+/** Pass marks with at least this much room between the mark and her centreline, m (Rule 31). */
+const MARK_ROOM = 5;
+
+/** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
+function avoidMarks(w: World, b: Boat, desired: number): number {
+  for (const m of w.touchableMarks(b)) {
+    const d = dist(b, m.p);
+    if (d > 30 || d < 0.5) continue;
+    const rel = wrap(brg(m.p.x - b.x, m.p.y - b.y) - desired); // + = mark to starboard of the course
+    const need = Math.asin(Math.min(1, MARK_ROOM / d)) / (Math.PI / 180);
+    if (Math.abs(rel) < need && Math.abs(rel) < 90) desired = n360(desired + (rel > 0 ? -(need - rel) : need + rel));
+  }
+  return desired;
+}
 
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
@@ -71,9 +87,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   let desired = b.h, luff = false, beating = false;
   if (b.penalty > 0) {
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
-    let near: Boat | null = null, nd = PENALTY_CLEAR;
+    let near: Vec | null = null, nd = PENALTY_CLEAR;
     for (const o of w.boats) if (o !== b) { const d = dist(o, b); if (d < nd) { nd = d; near = o; } }
-    ai.clearing = !!near && b.penalty >= 719;
+    for (const m of w.touchableMarks(b)) { const d = dist(m.p, b); if (d < MARK_CLEAR && d < nd + 10) { nd = d; near = m.p; } } // and away from the marks
+    ai.clearing = !!near && b.penalty >= b.penaltyTotal - 1; // not started turning yet
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
     b.luff = false; return;
   }
@@ -190,12 +207,16 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
     }
   }
-  // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(b)).
   for (const o of w.boats) {
     const h = o !== b ? w.pairRecord(b, o)?.hail : null;
-    if (h && h.kind === 'room' && h.by === o.id && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+    if (!h || h.kind !== 'room') continue;
+    // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(c)), unless she replied "You tack".
+    if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+    // She hailed and got "You tack": tack now and pass astern of that boat.
+    if (h.by === b.id && h.replyAt != null && b.lastTackT < h.replyAt && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; }
   }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
+  desired = sailable(b, avoidMarks(w, b, desired));
   b.desired = desired; b.luff = luff;
   // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && dist(b, nm.p) < 45;

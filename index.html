@@ -10,6 +10,8 @@
 </head>
 <body>
 <canvas id="gl" aria-label="3D view of the race course"></canvas>
+<div id="tillerGuide" aria-hidden="true"><div class="tg-hard tg-hl"></div><div class="tg-line"></div><div class="tg-hard tg-hr"></div><div class="tg-cur" id="tgCur"></div>
+  <span class="tg-l">◀ tiller to port · turns to starboard</span><span class="tg-r">tiller to starboard · turns to port ▶</span></div>
 <div id="labels"></div>
 
 <header id="hud">
@@ -87,7 +89,7 @@
     <div class="btnrow"><button class="ghost" id="bPreview" type="button">View the course</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
     <div class="btnrow"><button class="ghost" id="bKeys1" type="button">Keyboard settings</button></div>
     <div class="help">
-      <b>Steer</b><span>With a trackpad or mouse, click the water to take the tiller, then slide left/right: pushing the tiller to starboard (slide right) turns the boat to port. A two-finger sideways swipe works too. Esc lets go. On a phone, drag the tiller bar. A / D push the boat to port / starboard, C centres the tiller. Tack and gybe by steering through the wind.</span>
+      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also drag the tiller bar, or hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
       <b>Luff</b><span>Hold the Luff button (or S) to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
       <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>

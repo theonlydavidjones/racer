@@ -11,7 +11,7 @@ export type Action =
 export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut']);
 
 export const ACTIONS: { id: Action; label: string; group: string }[] = [
-  { id: 'takeTiller', label: 'Take the tiller (trackpad / mouse)', group: 'Helm' },
+  { id: 'takeTiller', label: 'Take or let go of the tiller (then the cursor steers)', group: 'Helm' },
   { id: 'steerPort', label: 'Turn to port (push the tiller to starboard)', group: 'Helm' },
   { id: 'steerStbd', label: 'Turn to starboard (push the tiller to port)', group: 'Helm' },
   { id: 'centreTiller', label: 'Centre the tiller', group: 'Helm' },
@@ -21,7 +21,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'jibIn', label: 'Trim the jib in', group: 'Sails' },
   { id: 'jibOut', label: 'Ease the jib', group: 'Sails' },
   { id: 'pole', label: 'Whisker pole out / in', group: 'Sails' },
-  { id: 'hail', label: 'Hail ("Room to tack!" / "Starboard!")', group: 'Racing' },
+  { id: 'hail', label: 'Hail ("Room to tack!", "Starboard!", or reply "You tack")', group: 'Racing' },
   { id: 'course', label: 'Course view', group: 'Racing' },
   { id: 'viewCockpit', label: 'Cockpit view', group: 'Views' },
   { id: 'viewChase', label: 'Chase view', group: 'Views' },
@@ -33,8 +33,8 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'lookDown', label: 'Look down', group: 'Views' },
   { id: 'lookAhead', label: 'Look ahead again', group: 'Views' },
   { id: 'orient', label: 'Overhead: north up / bow up / wind up', group: 'Overhead' },
-  { id: 'zoomIn', label: 'Overhead: zoom in', group: 'Overhead' },
-  { id: 'zoomOut', label: 'Overhead: zoom out', group: 'Overhead' },
+  { id: 'zoomIn', label: 'Zoom in (overhead) · eye forward (cockpit)', group: 'Overhead' },
+  { id: 'zoomOut', label: 'Zoom out (overhead) · eye aft (cockpit)', group: 'Overhead' },
   { id: 'recentre', label: 'Overhead: back to your boat', group: 'Overhead' },
   { id: 'log', label: 'All messages', group: 'General' },
   { id: 'pause', label: 'Pause', group: 'General' },

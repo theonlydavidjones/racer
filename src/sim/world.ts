@@ -1,13 +1,13 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { moveBoat } from '../boat/physics';
-import { D2R, KT, LOA, V, brg, cross, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, cross, dist, dot, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { windAt, type Wind, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, cpa, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -21,6 +21,16 @@ export const TWO_TURNS = 720;
 
 /** Start a penalty of `deg` degrees (360 = one turn, 720 = two). */
 export function startPenalty(b: Boat, deg: number): void { b.penalty = b.penaltyTotal = deg; b.penaltyTurned = 0; b.penaltyDir = 0; }
+/** Add `deg` degrees to a penalty she's already doing, or start one. */
+export function addPenalty(b: Boat, deg: number): void { if (b.penalty > 0) { b.penalty += deg; b.penaltyTotal += deg; } else startPenalty(b, deg); }
+
+/** One-Turn Penalty for touching a mark (Rules 31 and 44.1), degrees. */
+export const ONE_TURN = 360;
+/** Half the hull's width for mark contact, m (a Folkboat is 2.2 m wide, narrower toward the ends). */
+const HULL_HALF_BEAM = 0.85;
+
+/** A mark a boat could touch: where it is and how big its float is. */
+export interface Touchable { name: string; p: Vec; r: number }
 
 export interface StartReport { delay: number; frac: number; kt: number }
 
@@ -134,7 +144,7 @@ export class World {
       x: p.x, y: p.y, h, v: isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
-      prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null,
+      prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.C.base, kt: this.settings.windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0,
       ai: isUser ? null : {
@@ -145,7 +155,7 @@ export class World {
   }
 
   /* ---------- queries used by AI, HUD and rendering ---------- */
-  rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks }; }
+  rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt) }; }
   rights(A: Boat, B: Boat): Verdict<Boat> { return rightOfWay(A, B, this.rulesCtx(), this.pairs[pairKey(A, B)]); }
   pairRecord(A: Boat, B: Boat): PairRecord | undefined { return this.pairs[pairKey(A, B)]; }
   /** Signed distance of a point from the line; positive on the course side. */
@@ -167,7 +177,7 @@ export class World {
     for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.wind, b.cur); }
     for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
-    if (!this.freeSail) this.checkLines(prevT);
+    if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.trackCourses();
     this.checkPairs();
     if (!this.freeSail) this.signals(prevT);
@@ -209,6 +219,55 @@ export class World {
       }
       b.prevD = d;
       this.markProgress(b);
+    }
+  }
+
+  /**
+   * Rule 31: while racing, a boat shall not touch a starting mark before starting, a mark that begins, bounds
+   * or ends the leg she is sailing, or a finishing mark after finishing. Penalty: one turn (Rule 44.1).
+   */
+  touchableMarks(b: Boat): Touchable[] {
+    const C = this.C, n = C.marks.length, out: Touchable[] = [];
+    if (b.finished) return out;
+    const pinMark = C.marks.find(m => dist(m.p, C.pin) < 1);
+    const pin: Touchable | null = C.pinKind === 'buoy' ? { name: C.pinLabel, p: C.pin, r: 0.9 }
+      : pinMark ? { name: pinMark.name, p: C.pin, r: pinMark.shape === 'sphere' ? 1.2 : 1.0 } : null;
+    const mk = (i: number): Touchable => ({ name: C.marks[i].name, p: C.marks[i].p, r: C.marks[i].shape === 'sphere' ? 1.2 : 1.0 });
+    if (!b.started) { if (pin) out.push(pin); return out; } // a starting mark (the line begins the first leg)
+    if (b.leg === 0 && pin) out.push(pin);
+    if (b.leg >= 1) out.push(mk(b.leg - 1));
+    if (b.leg < n) out.push(mk(b.leg));
+    else if (pin) out.push(pin); // finishing mark
+    return out;
+  }
+
+  private checkMarkTouches(): void {
+    for (const b of this.boats) {
+      const bw = bow(b), st = stern(b);
+      let touching: Touchable | null = null;
+      for (const m of this.touchableMarks(b)) {
+        const gap = segPt(m.p, bw, st) - m.r - HULL_HALF_BEAM;
+        if (gap < 0) {
+          touching = m;
+          // bounce off: push her clear of the float, away from the nearest point of her hull
+          const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((m.p.x - bw.x) * ax + (m.p.y - bw.y) * ay) / (ax * ax + ay * ay)));
+          const dx = bw.x + ax * k - m.p.x, dy = bw.y + ay * k - m.p.y, l = Math.hypot(dx, dy) || 1;
+          b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
+          b.v *= 0.97;
+        }
+      }
+      // the same touch until she's got clearly away from that mark
+      const prev = b.markTouch ? this.touchableMarks(b).find(m => m.name === b.markTouch) : undefined;
+      const stillNear = !!prev && segPt(prev.p, bw, st) - prev.r - HULL_HALF_BEAM < 1.5;
+      if (touching && b.markTouch !== touching.name) {
+        b.v *= 0.6;
+        addPenalty(b, ONE_TURN);
+        if (b.isUser) {
+          this.fouls++;
+          this.emit({ type: 'toast', ms: 6000, msg: `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a gybe.` });
+        } else this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+      }
+      b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }
   }
 
@@ -337,14 +396,38 @@ export class World {
     if (rec.hail && rec.hail.kind === kind) return false;
     rec.hail = { by: by.id, at: this.t, kind };
     if (kind === 'starboard' && to.ai) to.ai.duckUntil = this.t + 10;
-    if (to.isUser) this.emit({ type: 'toast', msg: kind === 'room' ? `${by.name}: "Room to tack!" Tack now (Rule 20).` : `${by.name}: "Starboard!"`, ms: 3500 });
-    if (by.isUser) this.emit({ type: 'toast', msg: kind === 'room' ? `You: "Room to tack!" ${to.name} must tack.` : `You: "Starboard!" ${to.name} should keep clear.`, ms: 2500 });
+    // An AI boat that is clear ahead, with room for the hailing boat to tack and pass astern, replies "You tack".
+    const reply = kind === 'room' && !!to.ai && youTackPays(by, to);
+    if (to.isUser) this.emit({ type: 'toast', msg: kind === 'room' ? `${by.name}: "Room to tack!" Tack now, or reply "You tack" and give them room (Rule 20).` : `${by.name}: "Starboard!"`, ms: 3500 });
+    if (by.isUser && !reply) this.emit({ type: 'toast', msg: kind === 'room' ? `You: "Room to tack!" ${to.name} must tack or reply "You tack".` : `You: "Starboard!" ${to.name} should keep clear.`, ms: 2500 });
+    if (reply) this.replyYouTack(to, by);
     return true;
   }
 
-  /** You pressed Hail: hail for room to tack if you're entitled to, "Starboard!" at a converging port boat, or explain. */
+  /** Rule 20.2(c): `by`, hailed for room to tack by `hailer`, replies "You tack" and now owes her room to tack and avoid her. */
+  replyYouTack(by: Boat, hailer: Boat): void {
+    const rec = this.pairs[pairKey(by, hailer)];
+    if (!rec?.hail || rec.hail.kind !== 'room' || rec.hail.by !== hailer.id || rec.hail.replyAt != null) return;
+    rec.hail.replyAt = this.t;
+    if (hailer.isUser) this.emit({ type: 'toast', msg: `You: "Room to tack!" ${by.name}: "You tack!" Tack now and pass astern of them. They must give you room.`, ms: 4000 });
+    if (by.isUser) this.emit({ type: 'toast', msg: `You: "You tack!" Now give ${hailer.name} room to tack and pass astern of you (Rule 20.2(c)).`, ms: 4000 });
+  }
+
+  /** A hail for room to tack from another boat that you haven't answered yet. */
+  pendingRoomHail(b: Boat): Boat | null {
+    for (const o of this.boats) {
+      const h = o !== b ? this.pairs[pairKey(b, o)]?.hail : null;
+      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) return o;
+    }
+    return null;
+  }
+
+  /** You pressed Hail: answer a hail with "You tack", hail for room to tack if you're entitled to,
+   * "Starboard!" at a converging port boat, or explain. */
   userHail(): void {
-    const u = this.user, blocker = this.roomBlocker(u);
+    const u = this.user, hailer = this.pendingRoomHail(u);
+    if (hailer) { this.replyYouTack(u, hailer); return; }
+    const blocker = this.roomBlocker(u);
     if (blocker) { this.hail(u, blocker, 'room'); return; }
     if (u.tack === 'S') {
       const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
@@ -358,6 +441,12 @@ export class World {
   assignPenalty(b: Boat): void { startPenalty(b, this.penaltyDeg); }
   /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */
   get penaltyDeg(): number { return (this.settings.penaltyTurns === 1 ? 1 : 2) * 360; }
+}
+
+/** Is replying "You tack" sensible for `to`? Only when she's clear ahead of the hailing boat with a
+ * length or so to spare, so the hailing boat can tack and pass astern of her. */
+export function youTackPays(hailer: Boat, to: Boat): boolean {
+  return clearAstern(hailer, to) && hullGap(hailer, to) > LOA * 0.6;
 }
 
 /**

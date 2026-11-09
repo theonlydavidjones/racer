@@ -35,7 +35,14 @@ let drillShown = false;
 let w!: World;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look = { yaw: 0, pitch: 0 };
+const look = { yaw: 0, pitch: 0, aft: 6.5 };
+/* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
+const EYE_MIN = 2.6, EYE_MAX = 10;
+try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
+function setEye(aft: number): void {
+  look.aft = Math.max(EYE_MIN, Math.min(EYE_MAX, aft));
+  try { localStorage.setItem('fbsim-eye', look.aft.toFixed(2)); } catch { /* storage unavailable */ }
+}
 const LOOK_PITCH_MIN = -0.5, LOOK_PITCH_MAX = 1.1;
 function setLook(yaw: number, pitch: number): void {
   look.yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw)); // keep within ±π
@@ -70,7 +77,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   const mr = inc.verdict.mr;
   const ex = explain({
     youFouled: youFault, other: other.name, userTack: user.tack, rule: inc.rule, kind: inc.kind, byWhy: inc.byWhy,
-    markName: mr ? w.C.marks[mr.idx].name : undefined, markOverlapped: mr?.overlapped, turned: inc.turned
+    markName: mr ? w.C.marks[mr.idx].name : inc.rule === '18.3' ? w.nextMark(user)?.name : undefined, markOverlapped: mr?.overlapped, turned: inc.turned
   });
   $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : inc.kind === 'hail' ? 'Didn\'t answer a hail' : 'Forced to avoid'}` : `${other.name} fouled you`;
   $('rTitle').textContent = RULES[inc.rule][0];
@@ -114,42 +121,63 @@ holdBtn('bLuff', () => { w.user.luff = true; }, () => { w.user.luff = held.has('
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
-const TILLER_PX = 260; // trackpad / mouse travel for full deflection, px
 function setTiller(v: number): void { w.user.tiller = Math.max(-1, Math.min(1, v)); }
 function centreTiller(): void { setTiller(0); }
 function showTiller(): void {
   const t = w.user.tiller;
   $('tillerHandle').style.left = `${50 + t * 44}%`;
+  if (tillerHeld) $('tgCur').style.left = `${50 + t * TILLER_SPAN * 100}%`;
   $('tiller').setAttribute('aria-valuenow', String(Math.round(t * 100)));
   $('tillerLab').textContent = Math.abs(t) < 0.04 ? 'Tiller · centred' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
 }
-// Tiller bar (touch or mouse): drag the handle left/right.
+// Tiller bar: drag the handle left/right. Let go and it springs back to centre.
+let barDrag = false;
 {
   const pad = $('tiller');
-  let start: { x: number; t: number } | null = null, lastTap = 0;
+  let start: { x: number; t: number } | null = null;
   pad.addEventListener('pointerdown', e => {
     e.preventDefault(); pad.setPointerCapture?.(e.pointerId);
-    start = { x: e.clientX, t: w.user.tiller };
-    const now = performance.now(); if (now - lastTap < 300) centreTiller(); lastTap = now;
+    start = { x: e.clientX, t: w.user.tiller }; barDrag = true;
   });
   pad.addEventListener('pointermove', e => { if (start) setTiller(start.t + (e.clientX - start.x) / (pad.clientWidth * 0.45)); });
-  const end = () => { start = null; };
+  const end = () => { start = null; barDrag = false; };
   pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
 }
-// Take the tiller with the trackpad: click the view; then sliding left/right moves the tiller. Esc lets go.
+/* Holding the tiller with the trackpad or mouse: while you hold it, the cursor's left–right position IS
+ * the tiller handle. The middle of the screen is centred; to the right pushes the handle to starboard
+ * (the boat turns to port). T, a click on the water, or Esc takes it or lets go. Let go and it springs
+ * back to centre. Over the buttons and panels the tiller stays put, so you can reach them. */
 const gl = $('gl');
-let toldTiller = false;
-function haveTiller(): boolean { return document.pointerLockElement === gl; }
-document.addEventListener('pointerlockchange', () => {
-  $('tiller').classList.toggle('held', haveTiller());
-  if (haveTiller() && !toldTiller) { toldTiller = true; toast('You have the tiller: slide on the trackpad to move it. Esc to let go.', 3500); }
-});
-addEventListener('mousemove', e => { if (haveTiller() && w.running && !w.paused) setTiller(w.user.tiller + e.movementX / TILLER_PX); });
-// A two-finger sideways swipe on a trackpad also moves the tiller.
+const TILLER_SPAN = 0.35; // fraction of the window width from centre to hard over
+let tillerHeld = false, toldTiller = false, panning = false;
+let lastCursorX: number | undefined;
+function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN)); }
+function takeTiller(x?: number): void {
+  if (!w.running || w.paused || tillerHeld) return;
+  tillerHeld = true; document.body.classList.add('tiller-held'); $('tiller').classList.add('held');
+  if (x != null) tillerFromCursor(x);
+  if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's centre line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
+}
+function releaseTiller(): void {
+  if (!tillerHeld) return;
+  tillerHeld = false; document.body.classList.remove('tiller-held'); $('tiller').classList.remove('held');
+}
+const overControl = (t: EventTarget | null) => t instanceof Element && !!t.closest('button, a, input, select, #tiller, #msgLog, #map, #trimPanel, .overlay');
+addEventListener('mousemove', e => { lastCursorX = e.clientX; if (tillerHeld && !panning && !overControl(e.target) && w.running && !w.paused) tillerFromCursor(e.clientX); });
+addEventListener('blur', releaseTiller);
+/** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
+function tillerSpring(dt: number): void {
+  if (tillerHeld && (!w.running || w.paused)) releaseTiller(); // paused or stopped: hands off
+  if (tillerHeld || barDrag || !w.running || w.paused) return;
+  const t = w.user.tiller; if (t !== 0) setTiller(t - Math.sign(t) * Math.min(Math.abs(t), 2.5 * dt));
+}
+// Trackpad: two-finger up/down zooms the overhead map, or moves your eye fore and aft in the cockpit. (Sideways swipes don't steer: their direction
+// depends on the "natural scrolling" setting, and a stray swipe would turn the boat.)
 gl.addEventListener('wheel', e => {
   e.preventDefault();
-  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { if (w.running && !w.paused) setTiller(w.user.tiller + e.deltaX / TILLER_PX); }
-  else if (viewMode === 2) zoomOverhead(Math.exp(e.deltaY * 0.0015)); // overhead: scroll / two-finger up-down zooms
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+  if (viewMode === 2) zoomOverhead(Math.exp(e.deltaY * 0.0015));
+  else if (viewMode === 0) setEye(look.aft + e.deltaY * 0.006); // cockpit: move your eye fore and aft
 }, { passive: false });
 
 // Sheets: hold Trim/Ease (or Z/X for the main, , and . for the jib) when you're trimming.
@@ -204,9 +232,10 @@ const keysView = new KeysView(keymap, () => keysHint());
 const held = new Set<Action>();
 function keysHint(): void {
   const k = (a: Action) => keymap.label(a);
-  $('keysHint').textContent = `${k('takeTiller')}/click: take tiller · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} keys`;
+  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · scroll: eye fore/aft · ${k('keys')} keys`;
 }
 keysHint();
+hud.hailKey = () => keymap.label('hail');
 $('bKeys1').onclick = () => keysView.open();
 $('bKeys2').onclick = () => keysView.open();
 /** Helm and sheets follow whatever is held. */
@@ -223,7 +252,6 @@ function setView(i: number): void {
   viewMode = i; lookAhead();
   $('bView').textContent = 'View · ' + VIEWS[viewMode];
   $('bOrient').hidden = viewMode !== 2;
-  if (viewMode === 2 && haveTiller()) document.exitPointerLock();
 }
 const anyOverlay = () => !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
 addEventListener('keydown', e => {
@@ -232,7 +260,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (courseView.isOpen) { courseView.close(); return; }
     if (!$('logView').hidden) { $('logView').hidden = true; return; }
-    if (haveTiller()) return; // Esc lets go of the tiller (the browser handles it)
+    if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
     if (!$('pause').hidden) { $('bResume').click(); return; }
     if (!anyOverlay() && w.running) $('bPause').click();
     return;
@@ -246,7 +274,7 @@ addEventListener('keydown', e => {
   if (HELD.has(a)) { if (!e.repeat) { held.add(a); applyHeld(); } return; }
   if (e.repeat) return;
   switch (a) {
-    case 'takeTiller': takeTiller(); break;
+    case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': centreTiller(); break;
     case 'pole': togglePole(); break;
     case 'hail': doHail(); break;
@@ -284,20 +312,16 @@ function panOverhead(dx: number, dy: number): void {
   const upB = overheadUp(over, w), U = V(upB), R = V(upB + 90);
   over.off.x += (-R.x * dx + U.x * dy) * mpp; over.off.y += (-R.y * dx + U.y * dy) * mpp;
 }
-function takeTiller(): void {
-  if (!w.running || w.paused || haveTiller()) return;
-  try { (gl.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {}); } catch { /* not available here */ }
-}
 
-// The view: click to take the tiller (mouse/trackpad, not overhead); on a touch screen, drag to look.
+// The view: click to take or let go of the tiller (mouse/trackpad, not overhead); on a touch screen, drag to look.
 // Overhead: drag to pan, pinch or scroll to zoom. Double-tap: look ahead / back to your boat.
 let drag: { x: number; y: number; yaw0: number; pitch0: number } | null = null, lastTap = 0;
 const touches = new Map<number, [number, number]>();
 let pinch: { d: number; h: number } | null = null;
 gl.addEventListener('pointerdown', e => {
   const now = performance.now(); if (now - lastTap < 300) { if (viewMode === 2) recentre(); else lookAhead(); } lastTap = now;
-  if (viewMode === 2) { gl.setPointerCapture?.(e.pointerId); touches.set(e.pointerId, [e.clientX, e.clientY]); pinch = null; return; }
-  if (e.pointerType === 'mouse' && w.running && !w.paused && !haveTiller()) { takeTiller(); return; }
+  if (viewMode === 2) { gl.setPointerCapture?.(e.pointerId); touches.set(e.pointerId, [e.clientX, e.clientY]); pinch = null; panning = true; return; }
+  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); return; }
   drag = { x: e.clientX, y: e.clientY, yaw0: look.yaw, pitch0: look.pitch };
 });
 gl.addEventListener('pointermove', e => {
@@ -310,7 +334,7 @@ gl.addEventListener('pointermove', e => {
     if (!pinch) pinch = { d, h: over.height }; else over.height = Math.max(40, Math.min(3000, pinch.h * pinch.d / d));
   }
 });
-const endTouch = (e: PointerEvent) => { touches.delete(e.pointerId); pinch = null; };
+const endTouch = (e: PointerEvent) => { touches.delete(e.pointerId); pinch = null; panning = touches.size > 0; };
 gl.addEventListener('pointerup', endTouch); gl.addEventListener('pointercancel', endTouch);
 addEventListener('pointermove', e => {
   if (drag && viewMode !== 2) setLook(drag.yaw0 + (e.clientX - drag.x) * 0.006, drag.pitch0 + (e.clientY - drag.y) * 0.006);
@@ -322,8 +346,8 @@ function keyLook(dt: number): void {
   if (held.has('lookRight')) setLook(look.yaw - rate, look.pitch);
   if (held.has('lookUp')) setLook(look.yaw, look.pitch + rate);
   if (held.has('lookDown')) setLook(look.yaw, look.pitch - rate);
-  if (held.has('zoomIn')) zoomOverhead(Math.exp(-1.2 * dt));
-  if (held.has('zoomOut')) zoomOverhead(Math.exp(1.2 * dt));
+  if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); }
+  if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); }
 }
 function lookLabel(): void {
   const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
@@ -438,7 +462,7 @@ function frame(now: number): void {
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of w.drainEvents()) handle(e);
-  keyLook(dt); lookLabel(); showTiller();
+  keyLook(dt); lookLabel(); tillerSpring(dt); showTiller();
   view.render(w, dt, now, viewMode, look, over);
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
