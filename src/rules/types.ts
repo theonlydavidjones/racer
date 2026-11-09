@@ -14,6 +14,10 @@ export interface RulesBoat {
   ocs: boolean; // over early and not yet returned
   started: boolean;
   leg: number; // index of her next mark
+  /** Her heading RULE16_WINDOW seconds ago (for Rule 16.1). Omit if unknown. */
+  headingAgo?: number;
+  /** She is sailing above her proper course (for Rule 17). Omit if unknown. */
+  aboveProper?: boolean;
 }
 
 export interface RulesMark {
@@ -30,7 +34,7 @@ export interface RulesContext {
   marks: RulesMark[]; // the course's mark sequence
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '18.2(b)' | '22.1' | '22.2';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '17' | '18.2(b)' | '22.1' | '22.2';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -49,9 +53,12 @@ export interface PairRecord {
   byWhy: 'tack' | 'overlap' | null;
   cool: number; // no new incident for this pair until this time
   mark: MarkRoomState | null;
+  /** Rule 17: id of the boat that became overlapped to leeward from clear astern within two lengths. */
+  r17: number | null;
 }
 
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -1, by: null, byWhy: null, cool: -1, mark: null });
+// Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 
@@ -61,5 +68,7 @@ export interface Incident<B> {
   fouler: B;
   rule: RuleId;
   byWhy: 'tack' | 'overlap' | null;
+  /** Rule 16.1: how far (deg) the right-of-way boat turned toward the other boat just before. */
+  turned?: number;
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }

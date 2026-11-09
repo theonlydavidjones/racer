@@ -83,7 +83,11 @@ export class Hud {
     if (!best || (!best.risk && best.d > 45)) { el.hidden = true; return; }
     el.hidden = false;
     const { o, r, c, risk } = best, kc = r.kc === u;
-    $('situMsg').textContent = situationText(r.rule, kc, o.name) + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
+    // Rule 17: whoever got the leeward overlap from astern may not luff above her proper course
+    const r17 = w.t > 0 ? w.pairRecord(u, o)?.r17 : null;
+    const note17 = r17 === u.id ? ' Rule 17: you came from astern, so sail no higher than your proper course.'
+      : r17 === o.id ? ` ${o.name} came from astern: they may not luff you above their proper course (Rule 17).` : '';
+    $('situMsg').textContent = situationText(r.rule, kc, o.name) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
     $('situRule').textContent = 'Rule ' + r.rule;
     el.className = (kc ? 'kc' : 'row') + (kc && risk && c.t < 6 && c.d < 8 ? ' alarm' : '');
   }

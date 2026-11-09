@@ -62,6 +62,14 @@ function residuaryFraction(fn: number): number {
   return 0;
 }
 
+/** Drive left when you ease the sails to slow down. Upwind and reaching they flog and stop pulling;
+ * from a broad reach to a run, eased sails still fill against the shrouds, so easing barely slows you
+ * (to slow down there, head up first). */
+export function luffDriveFactor(twa: number): number {
+  const t = Math.min(1, Math.max(0, (twa - 100) / 60));
+  return HANDLING.luffFactor + (0.75 - HANDLING.luffFactor) * t * t * (3 - 2 * t);
+}
+
 /** Calm-water hull resistance at speed v (m/s), newtons. */
 export function hullResistance(v: number): number {
   if (v <= 0) return 0;
@@ -92,7 +100,7 @@ export function airDrag(aws: number, awa: number, flog: number): number {
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */
 export function flogAmount(twa: number, beat: number, noGo: number, luffing: boolean): number {
   const byAngle = twa >= beat ? 0 : Math.min(1, (beat - twa) / (beat - noGo));
-  return luffing ? Math.max(HANDLING.luffFlog, byAngle) : byAngle;
+  return luffing ? Math.max(HANDLING.luffFlog * (1 - Math.min(1, Math.max(0, (twa - 100) / 60))), byAngle) : byAngle;
 }
 
 /** Surge acceleration, m/s². */

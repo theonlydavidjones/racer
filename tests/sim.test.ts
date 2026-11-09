@@ -107,10 +107,10 @@ describe('AI starts (regression guard, 8 races × 5 boats)', () => {
     delays.sort((a, b) => a - b);
     return { median: delays[delays.length >> 1], ocsRate: ocs / delays.length };
   };
-  for (const cur of ['slack', 'ebb']) it(`Seaweed Soup line, ${cur}: few OCS, median start within 25 s of the gun (the AI is no ace yet)`, () => {
+  for (const cur of ['slack', 'ebb']) it(`Seaweed Soup line, ${cur}: few OCS, median start within 18 s of the gun`, () => {
     const r = starts(cur);
-    expect(r.ocsRate).toBeLessThan(0.15);
-    expect(r.median).toBeLessThan(25);
+    expect(r.ocsRate).toBeLessThan(0.1);
+    expect(r.median).toBeLessThan(18);
   }, 60_000);
 });
 
@@ -144,5 +144,47 @@ describe('laylines and course description', () => {
     expect(legs[1]).toBe("A → X: run (downwind). Pass X leaving it to starboard. Don't round it.");
     expect(legs[3]).toContain('Pass X leaving it to port');
     expect(legs[7]).toBe('6 → Finish: cross the line between GGYC flagpole and X.');
+  });
+});
+
+describe('start practice debrief', () => {
+  const drill = async (d: number, speedKt: number) => {
+    const { startDebrief } = await import('../src/sim/startDebrief');
+    const w = new World(TRAIN, settings({ mode: 'drill', fleet: 0, current: 'slack' }), 5, { startAt: 60 });
+    const u = w.user, toCourse = brg(w.N.x, w.N.y);
+    w.t = -0.2;
+    u.x = w.center.x + w.N.x * d - w.L.x * w.lineLen * 0.3; u.y = w.center.y + w.N.y * d - w.L.y * w.lineLen * 0.3;
+    u.h = toCourse; u.v = speedKt * 0.5144; u.prevD = null;
+    for (let i = 0; i < 60 * 3; i++) w.step(DT);
+    return { w, r: startDebrief(w) };
+  };
+
+  it('starts at one minute to go in practice mode', () => {
+    const w = new World(TRAIN, settings({ mode: 'drill' }), 5, { startAt: 60 });
+    expect(w.t).toBe(-60);
+  });
+
+  it('on the line at full speed: great start', async () => {
+    const { r, w } = await drill(-4.5, 4.6);
+    expect(w.gun).not.toBeNull();
+    expect(r.grade).toBe('great');
+    expect(r.facts[0]).toMatch(/behind the line/);
+  });
+
+  it('over the line at the gun: OCS, with advice about the last 10 seconds', async () => {
+    const { r } = await drill(2, 4.5);
+    expect(r.grade).toBe('ocs');
+    expect(r.tips.join(' ')).toMatch(/one boat length behind the line/);
+  });
+
+  it('four lengths back: late, with how many seconds to turn earlier', async () => {
+    const { r } = await drill(-35, 4.5);
+    expect(r.grade).toBe('late');
+    expect(r.tips[0]).toMatch(/s late/);
+  });
+
+  it('on the line but crawling: slow', async () => {
+    const { r } = await drill(-5, 1.2); // centre 5 m back: bow ~1 m behind the line
+    expect(r.grade).toBe('slow');
   });
 });

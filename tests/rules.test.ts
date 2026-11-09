@@ -50,12 +50,12 @@ describe('Rule 11 · windward/leeward', () => {
     expect(verdict(red, blue)).toEqual({ keepsClear: 'Blue', rule: '11' });
   });
 
-  it('leeward boat luffs into windward boat: windward boat is penalized', () => {
+  it('leeward boat luffs slowly into windward boat, who fails to respond: windward boat is penalized', () => {
     const red = boat('Red', { at: [0, 0], heading: 270 });
     const blue = boat('Blue', { at: [0, 6], heading: 270 });
     const p = pair(red, blue);
     expect(p.at(10).foul).toBeNull();
-    moveTo(red, [-2, 2.5], 300); // Red heads up toward Blue
+    moveTo(red, [-2, 2.5], 300, 295); // Red has been heading up gradually toward Blue (a sudden turn would be Rule 16.1)
     expect(p.at(11).foul).toEqual({ by: 'Blue', rule: '11', kind: 'contact', why: null });
   });
 
@@ -65,8 +65,6 @@ describe('Rule 11 · windward/leeward', () => {
     expect(verdict(red, blue)).toEqual({ keepsClear: 'Blue', rule: '11' });
   });
 
-  it.todo('Rule 16: leeward boat changing course must give windward boat room to keep clear (not modelled yet)');
-  it.todo('Rule 17: boat that overlaps to leeward from clear astern may not sail above proper course (not modelled yet)');
 });
 
 describe('Rule 12 · clear astern', () => {
@@ -188,6 +186,14 @@ describe('Rule 18.2(b) · mark-room at the zone', () => {
   it.todo('Mark-room for boats on opposite tacks at a windward mark (not modelled yet)');
 });
 
+describe('Incidents before the start signal count too', () => {
+  it('contact at −90 s is judged like any other', () => {
+    const red = boat('Red', { at: [0, 0], heading: 45, started: false });
+    const blue = boat('Blue', { at: [3, 3], heading: 315, started: false });
+    expect(pair(red, blue).at(-90).foul).toEqual({ by: 'Red', rule: '10', kind: 'contact', why: null });
+  });
+});
+
 describe('Barging at the committee boat', () => {
   // Starting line runs east from the pin to the committee boat at (60, 0); course side is north.
   // Rule 18 does not apply at a starting mark surrounded by navigable water when boats are
@@ -244,5 +250,87 @@ describe('Rule 22.2 · taking a penalty', () => {
     const red = boat('Red', { at: [0, 0], heading: 315, penalty: 400 });
     const blue = boat('Blue', { at: [10, 0], heading: 45 });
     expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '22.2' });
+  });
+});
+
+describe('Rule 16.1 · changing course', () => {
+  //            wind ↓
+  //   ← Blue  (windward)
+  //   ← Red   (leeward) ...then Red swings up 35° into Blue, and they touch a moment later
+  it('a right-of-way boat that suddenly luffs into the keep-clear boat breaks 16.1', () => {
+    const red = boat('Red', { at: [0, 0], heading: 270 });
+    const blue = boat('Blue', { at: [0, 6], heading: 270 });
+    const p = pair(red, blue);
+    expect(p.at(30).foul).toBeNull();
+    moveTo(red, [-2, 3.5], 305, 270); // was heading 270 three seconds ago, now 305: turned toward Blue
+    expect(p.at(31).foul).toEqual({ by: 'Red', rule: '16.1', kind: 'contact', why: null });
+  });
+
+  it('a slow, steady luff that gives the windward boat time to respond is fine: windward boat fouls (Rule 11)', () => {
+    const red = boat('Red', { at: [0, 0], heading: 270 });
+    const blue = boat('Blue', { at: [0, 6], heading: 270 });
+    const p = pair(red, blue);
+    p.at(30);
+    moveTo(red, [-2, 3.5], 305, 298); // only 7° in the last three seconds: Blue had time
+    expect(p.at(40).foul).toEqual({ by: 'Blue', rule: '11', kind: 'contact', why: null });
+  });
+
+  //            wind ↓
+  //      ↖ Blue (S)          Blue "hunts" the port boat: bears away toward Red as Red tries to duck
+  //    ↗ Red (P)
+  it('starboard boat bears away into a port boat that is ducking her: starboard breaks 16.1', () => {
+    const red = boat('Red', { at: [0, 0], heading: 60 }); // port, footing to duck
+    const blue = boat('Blue', { at: [3, 3.5], heading: 260, headingAgo: 315 }); // was close-hauled, bore away 55°
+    expect(pair(red, blue).at(60).foul).toMatchObject({ by: 'Blue', rule: '16.1' });
+  });
+
+  it('turning away from the other boat is not a 16.1 problem (that is avoiding a collision)', () => {
+    const red = boat('Red', { at: [0, 0], heading: 45 });
+    const blue = boat('Blue', { at: [3, 3], heading: 330, headingAgo: 300 }); // starboard boat turned away
+    expect(pair(red, blue).at(60).foul).toMatchObject({ by: 'Red', rule: '10' });
+  });
+});
+
+describe('Rule 17 · overlapped from astern: no luffing above proper course', () => {
+  //  t=60   ← Blue        ← Red          Red clear astern (Rule 12)
+  //  t=61   ← Blue
+  //          ← Red                       Red overlaps to leeward within two lengths: Rule 11, and Rule 17 restricts Red
+  //  t=70   Red luffs above her proper course into Blue
+  it('the leeward boat that came from astern may not sail above her proper course', () => {
+    const blue = boat('Blue', { at: [0, 0], heading: 270 });
+    const red = boat('Red', { at: [10, -4], heading: 270 });
+    const p = pair(blue, red);
+    expect(p.at(60)).toMatchObject({ keepsClear: 'Red', rule: '12' });
+    moveTo(red, [4, -4.5]);
+    expect(p.at(61)).toMatchObject({ keepsClear: 'Blue', rule: '11' });
+    expect(p.rec.r17).toBe(red.id);
+    red.aboveProper = true; moveTo(red, [0.5, -2], 290, 287);
+    expect(p.at(70).foul).toEqual({ by: 'Red', rule: '17', kind: 'contact', why: null });
+  });
+
+  it('sailing her proper course, the leeward boat keeps her rights: windward boat fouls (Rule 11)', () => {
+    const blue = boat('Blue', { at: [0, 0], heading: 270 });
+    const red = boat('Red', { at: [10, -4], heading: 270 });
+    const p = pair(blue, red);
+    p.at(60); moveTo(red, [4, -4.5]); p.at(61);
+    moveTo(red, [0.5, -2]); // still on her proper course; Blue drifted down onto her
+    expect(p.at(70).foul).toMatchObject({ by: 'Blue', rule: '11' });
+  });
+
+  it('an overlap from more than two lengths away to leeward does not bring Rule 17', () => {
+    const blue = boat('Blue', { at: [0, 0], heading: 270 });
+    const red = boat('Red', { at: [12, -25], heading: 270 });
+    const p = pair(blue, red);
+    p.at(60); moveTo(red, [4, -24]); p.at(61);
+    expect(p.rec.r17).toBeNull();
+  });
+
+  it('before the start signal there is no proper course, so Rule 17 cannot bite', () => {
+    const blue = boat('Blue', { at: [0, 0], heading: 270, started: false });
+    const red = boat('Red', { at: [10, -4], heading: 270, started: false });
+    const p = pair(blue, red);
+    p.at(-60); moveTo(red, [4, -4.5]); p.at(-59);
+    red.aboveProper = true; moveTo(red, [0.5, -2], 290, 287);
+    expect(p.at(-50).foul).toMatchObject({ by: 'Blue', rule: '11' });
   });
 });

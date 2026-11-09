@@ -2,8 +2,13 @@ import { KT, V, brg, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, type Boat } from './boat';
-import { HANDLING, airDrag, flogAmount, maxTurnRate, surgeAccel } from './dynamics';
+import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
 import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
+
+/** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. */
+export const PENALTY_TURN_RATE = 10;
+/** Below this speed (m/s, ~2.5 kt) the AI won't try to tack: she'd stall head to wind. */
+export const SLOW_TACK = 1.3;
 
 /** Crew timings for the whisker pole, s. */
 export const POLE = { set: 8, stow: 5, gybe: 8 };
@@ -45,7 +50,28 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       rate = b.turnDir * maxRate;
       if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.h = b.turnTarget; b.turnTarget = null; }
     } else { rate = b.steer * maxRate; if (b.steer !== 0) b.turnTarget = null; }
-  } else rate = b.penalty > 0 ? maxRate : clamp(wrap(b.desired - b.h) * 1.6, -maxRate, maxRate);
+  } else if (b.penalty > 0 && !b.ai?.clearing) {
+    // penalty turns: the crew backs the sails to spin the boat even when slow
+    rate = Math.max(maxRate, PENALTY_TURN_RATE);
+  } else {
+    let err = wrap(b.desired - b.h);
+    const ai = b.ai;
+    // a commitment ends when the turn is nearly done or she wants to go somewhere else
+    if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || Math.abs(wrap(b.desired - ai.commitFor)) > 45)) ai.turnCommit = 0;
+    if (ai && ai.turnCommit === 0 && Math.abs(err) > 30) {
+      // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
+      // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
+      const toWind = wrap(b.ww.from - b.h);
+      const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
+      ai.turnCommit = throughWind && b.v < SLOW_TACK ? -Math.sign(err) : Math.sign(err);
+      ai.commitFor = b.desired;
+    }
+    if (ai && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
+      const long = err + ai.turnCommit * 360;
+      if (Math.abs(long) > 330) ai.turnCommit = 0; else err = long; // target moved: drop the commitment
+    }
+    rate = clamp(err * 1.6, -maxRate, maxRate);
+  }
   const dh = rate * dt;
   b.h = n360(b.h + dh);
   if (b.penalty > 0) {
@@ -60,7 +86,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled: Rule 13 ends
   crewPole(b, dt, emit);
   let target = polar(ww.kt, twa, sailPlan(b));
-  if (b.luff) target *= HANDLING.luffFactor;
+  if (b.luff) target *= luffDriveFactor(twa);
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
   const ap = apparent(ww.from, ww.kt, b.h, b.v);

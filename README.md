@@ -35,7 +35,7 @@ scripts/
   fetch-orc-polar.mjs  pulls current ORC certificates for the class and writes the averaged polar
 tests/
   diagram.ts    helpers for writing tests like rulebook diagrams
-  boat.test.ts  polar vs ORC data, acceleration, slowing, turning, tack loss
+  boat.test.ts  polar vs ORC data, acceleration, slowing, turning, tack loss, wing-on-wing
   rules.test.ts classic rules scenarios
   sim.test.ts   course loading, reproducibility, OCS through the real line logic, AI completes both courses
 ```
@@ -54,8 +54,28 @@ tests/
 - **Speed.** Forces, not a fixed lag: drive is set so the boat settles at its polar speed; hull drag comes from the certificate's wetted surface plus wave drag rising toward hull speed; flogging sails and rig windage slow the boat when it luffs or points too high. Calibration (12 kt): 1 kt → 90% speed in ~12 s; luffing halves speed in ~13 s, then the boat stops and loses steerage; shooting head to wind carries ~3.5 lengths; a tack takes ~7 s, slows to ~58% and costs ~0.9 lengths. `tests/boat.test.ts` pins these ranges. All tuning constants are in `HANDLING` in `src/boat/dynamics.ts`.
 - **Downwind: wing-on-wing.** The polar has three sail plans: `jib` (sheeted normally, on the main's side: blanketed by the main when deep), `wing` (poled out to windward with the whisker pole: only fills within ~15–20° of dead downwind, aback on a reach) and `main` (jib not drawing while the crew handles the pole). Each plan's speed comes from the sail area actually drawing, using the same dead-run drag model. In 12 kt dead downwind: 3.95 kt normal, 4.26 kt wing-on-wing; poling out pays from ~153° TWA; best downwind VMG ~168°. The crew takes 8 s to set the pole, 5 s to stow it, and gybes it end-for-end (8 s) when you gybe. Use **Pole** or **O**. The HUD suggests the pole when you run deep without it and warns when it's left out on a reach. AI boats pole out when running deep and stow before rounding marks.
 - **Build.** Your boat is fiberglass with an aluminium mast and boom; the AI fleet is wooden. Class rules give both the same minimum weight and they race on equal terms, so build changes looks only (`build` in `FLEET`, `src/boat/boat.ts`).
+- **Easing sails to slow down** works upwind and reaching (the sails flog). From a broad reach to a run, eased sails still fill against the shrouds, so it barely slows you: head up first.
 - **Turning.** Turn rate = speed / turning radius (9 m), up to 22°/s, down to 4°/s when nearly stopped. Turning bleeds speed.
 - **Uses of the polar.** The tack button, AI close-hauled courses, the dial's no-go zone and the laylines use the polar's beat angle (it changes with wind speed) instead of a fixed 42°. The line aid's "time to line" and the AI's start approach assume you sheet in now and accelerate from your current speed, and the AI allows for coasting when it eases sails.
+
+### Start practice
+
+Setup → Mode → **Start practice**. You begin one minute before the gun, somewhere below the line. Fifteen seconds after the gun the race pauses for a debrief:
+
+- where you were at the gun (distance from the line, speed as a % of full close-hauled speed, position along the line), when you crossed and your place in the order across the line;
+- which end was favored and by how much (in metres upwind);
+- a grade (great, good, late, slow, over early) with specific tips (how many seconds to turn earlier, when to sheet in, what the current was doing);
+- an overhead replay of the last 45 s, with every boat's position at the gun marked.
+
+**Same start again** replays the identical setup (same seed: same boats, wind and positions). **New start** draws a new one; **Keep racing** carries on with the race. The debrief logic is `src/sim/startDebrief.ts`.
+
+### Rules
+
+Implemented: 10, 11, 12, 13, 15, 16.1, 17, 18.2(b), 22.1, 22.2, plus a right-of-way boat forced to swerve (14).
+
+- **16.1:** a right-of-way boat that turned more than 12° toward the other boat in the 3 s before an incident didn't give her room to keep clear, and is the one penalized. Slow, steady course changes are fine; turning away is fine.
+- **17:** if a boat clear astern gets an overlap to leeward within two lengths, she may not sail above her proper course while that overlap lasts (after the start signal; there's no proper course before it). "Proper course" is approximated as straight at the next mark if she can lay it, close-hauled if not, and no deeper than the best downwind angle. The situation banner says when Rule 17 restricts you or the other boat.
+- Incidents before the start signal now count. (In the prototype, a timer started at −1 s, so collisions before the gun were never judged.)
 
 ### Seeing the wind, the course and the laylines
 
@@ -77,8 +97,8 @@ The port keeps the prototype's behaviour. These differences are deliberate:
 
 - Acceleration, slowing and turning are calibrated from physics and sailing judgement, not measured on a real Folkboat. If your boat feels different, the constants in `HANDLING` are the place to adjust.
 - Above 24 kt the polar is held flat (no depowering model yet). No sail trim beyond automatic.
-- The AI's starts are mediocre (median ~15–20 s late in slack water).
+- AI starts: on the Seaweed Soup line, median 5–11 s after the gun in slack and ebb, ~25 s in flood, almost never over early. On the short training line they're slower (crowding). The AI keeps clear, takes penalties in clear water, won't tack when too slow to make it, and doesn't sail on a broad reach expecting to slow down by easing sails.
 - Wind is a synthetic oscillation. Current is uniform, with a simple shore-relief factor.
 - The shoreline is hand-traced.
-- Rules not modelled yet: 14 (beyond the swerve check), 16, 17, 18.3, 19, hails. Mark-room is only modelled for same-tack or downwind approaches. These appear as `todo` entries in `tests/rules.test.ts`.
+- Rules not modelled yet: 14 (beyond the swerve check), 16.2, 18.3, 19, hails. Mark-room is only modelled for same-tack or downwind approaches. These appear as `todo` entries in `tests/rules.test.ts`.
 - Fouls between two AI boats are penalized but not explained.

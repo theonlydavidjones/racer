@@ -1,4 +1,4 @@
-import { ZONE, dist } from '../core/math';
+import { LOA, ZONE, brg, dist, wrap } from '../core/math';
 import { clearAstern, hullGap } from './geometry';
 import { rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, RulesBoat, RulesContext, Verdict } from './types';
@@ -11,6 +11,23 @@ export const RULE15_GRACE = 3.5;
 export const JUST_TACKED = 2;
 /** After an incident, the same pair can't foul again for this long, s. */
 export const INCIDENT_COOLDOWN = 6;
+/** Rule 16.1: a right-of-way boat that turned toward the other boat within this many seconds before
+ * the incident didn't give her room to keep clear. (About the time a Folkboat needs to respond.) */
+export const RULE16_WINDOW = 3;
+/** Rule 16.1: a turn smaller than this (deg) is ordinary steering, not a course change. */
+export const RULE16_MIN_TURN = 12;
+/** Rule 17 applies when the leeward overlap starts within two hull lengths. */
+export const RULE17_RANGE = 2 * LOA;
+
+/** Did `row` turn toward `other` over the last RULE16_WINDOW seconds? Returns the turn in degrees, or 0. */
+export function turnedToward(row: RulesBoat, other: RulesBoat): number {
+  if (row.headingAgo == null) return 0;
+  const turn = wrap(row.h - row.headingAgo);
+  if (Math.abs(turn) < RULE16_MIN_TURN) return 0;
+  const b = brg(other.x - row.x, other.y - row.y);
+  const before = Math.abs(wrap(b - row.headingAgo)), after = Math.abs(wrap(b - row.h));
+  return after < before - 5 ? Math.abs(turn) : 0;
+}
 
 export interface PairObservation {
   /** A right-of-way boat had to change course to avoid the other boat (Rule 14 / "forced to swerve"). */
@@ -45,18 +62,30 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
       rec.grace = ctx.t + RULE15_GRACE; rec.by = newRow.id; rec.byWhy = tacked ? 'tack' : 'overlap';
     }
   }
+  // Rule 17: overlap established to leeward from clear astern within two lengths, on the same tack.
+  const gap = hullGap(A, B);
+  if (r.rule === '11' && rec.rule === '12' && rec.kc != null && r.kc.id !== rec.kc && gap < RULE17_RANGE) rec.r17 = rec.kc; // the boat that was astern is now leeward
+  if (rec.r17 != null && (A.tack !== B.tack || r.rule !== '11' || gap > RULE17_RANGE)) rec.r17 = null;
   rec.kc = r.kc.id; rec.rule = r.rule;
   if (rec.cool > ctx.t) return { verdict: r, incident: null };
 
   let kind: 'contact' | 'swerve' | null = null;
-  if (hullGap(A, B) < CONTACT_GAP) kind = 'contact';
+  if (gap < CONTACT_GAP) kind = 'contact';
   else if (obs.swerve) kind = 'swerve';
   if (!kind) return { verdict: r, incident: null };
 
   rec.cool = ctx.t + INCIDENT_COOLDOWN;
-  let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null;
+  let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null, turned: number | undefined;
+  const row = r.kc === A ? B : A;
   if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
+    // Rule 15: she only just got right of way
     fouler = rec.by === A.id ? A : B; rule = '15'; byWhy = rec.byWhy;
+  } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {
+    // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond
+    fouler = row; rule = '16.1';
+  } else if (r.rule === '11' && rec.r17 === row.id && ctx.t > 0 && row.aboveProper) {
+    // Rule 17: overlapped from astern within two lengths, then sailed above her proper course
+    fouler = row; rule = '17';
   }
-  return { verdict: r, incident: { kind, fouler, rule, byWhy, verdict: r } };
+  return { verdict: r, incident: { kind, fouler, rule, byWhy, turned, verdict: r } };
 }

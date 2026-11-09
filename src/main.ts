@@ -10,6 +10,7 @@ import { loadSettings, saveSettings, type Settings } from './settings';
 import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World } from './sim/world';
+import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
 import { horn, sound, toast } from './ui/feedback';
@@ -24,6 +25,10 @@ const labels = new Labels($('labels'));
 const hud = new Hud();
 const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));
 const courseView = new CourseView();
+const drillView = new ReplayView($<HTMLCanvasElement>('dcanvas'));
+/** Start practice begins this many seconds before the gun, and the debrief comes this long after it. */
+const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
+let drillShown = false;
 
 let w!: World;
 let viewMode = 0, acc = 0;
@@ -37,9 +42,9 @@ function setLook(yaw: number, pitch: number): void {
 function lookAhead(): void { setLook(0, 0); }
 let pendingPenalty: Boat | null = null;
 
-function newGame(): void {
-  w = new World(courseFile(S.course), S, randomSeed());
-  acc = 0;
+function newGame(seed = randomSeed()): void {
+  w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM } : {});
+  acc = 0; drillShown = false;
   view.setWorld(w);
   labels.build(w);
 }
@@ -49,7 +54,7 @@ function handle(e: SimEvent): void {
   switch (e.type) {
     case 'toast': toast(e.msg, e.ms); break;
     case 'horn': if (e.delayMs) setTimeout(() => horn(e.dur), e.delayMs); else horn(e.dur); break;
-    case 'incident': showIncident(e.a, e.b, e.incident, { frames: e.frames, ia: e.a.id, ib: e.b.id, wind: e.wind }); break;
+    case 'incident': showIncident(e.a, e.b, e.incident, { frames: e.frames, focus: [e.a.id, e.b.id], wind: e.wind, kind: 'incident' }); break;
     case 'finished': break;
   }
 }
@@ -61,7 +66,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   const mr = inc.verdict.mr;
   const ex = explain({
     youFouled: youFault, other: other.name, userTack: user.tack, rule: inc.rule, kind: inc.kind, byWhy: inc.byWhy,
-    markName: mr ? w.C.marks[mr.idx].name : undefined, markOverlapped: mr?.overlapped
+    markName: mr ? w.C.marks[mr.idx].name : undefined, markOverlapped: mr?.overlapped, turned: inc.turned
   });
   $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : 'Forced to avoid'}` : `${other.name} fouled you`;
   $('rTitle').textContent = RULES[inc.rule][0];
@@ -125,9 +130,9 @@ $('map').addEventListener('click', () => { hud.mapZoom = !hud.mapZoom; $('mapHin
 
 const keys: Record<string, boolean> = {};
 addEventListener('keydown', e => {
-  if ((e.key === 'm' || e.key === 'M') && $('replay').hidden && $('results').hidden) { courseView.toggle(w); return; }
+  if ((e.key === 'm' || e.key === 'M') && $('replay').hidden && $('results').hidden && $('drill').hidden) { courseView.toggle(w); return; }
   if (e.key === 'Escape' && courseView.isOpen) { courseView.close(); return; }
-  if (!$('setup').hidden || !$('replay').hidden || !$('results').hidden) return;
+  if (!$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden) return;
   const u = w.user, k = e.key;
   if (keys[k]) return; keys[k] = true;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') u.steer = -1;
@@ -183,6 +188,11 @@ function courseCard(): void {
     .concat(['<span class="m">Finish</span>']);
   $('courseCard').innerHTML = `<div class="legs">${chips.join('<span class="arr">→</span>')}</div><small>${C.notes}</small>`;
   $('biasField').hidden = !C.biasAdjustable;
+  $('seqField').hidden = S.mode === 'drill';
+  $('modeNote').textContent = S.mode === 'drill'
+    ? 'Starts one minute before the gun. Fifteen seconds after it you get a debrief and an overhead replay, and can try the same start again.'
+    : 'The whole race, from the warning signal to the finish.';
+  $('bGo').textContent = S.mode === 'drill' ? 'Practice a start' : 'Start the sequence';
 }
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg').forEach(seg => {
@@ -193,19 +203,42 @@ function paintSeg(): void {
 document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course') ? v : Number(v);
+  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode') ? v : Number(v);
   paintSeg(); newGame(); courseCard();
 }));
 function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; }
-function beginRace(): void {
+function beginRace(seed?: number): void {
   saveSettings(S);
-  newGame();
+  newGame(seed);
   w.running = true; w.paused = false;
   $('bFast').textContent = 'Speed 1×';
   horn(1.0);
   const m0 = w.C.marks[0];
-  toast(`${S.seq}-minute sequence. Current: ${w.cur.label}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+  toast(S.mode === 'drill'
+    ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
+    : `${S.seq}-minute sequence. Current: ${w.cur.label}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
 }
+
+/* ---------------- start practice debrief ---------------- */
+let drillClip: ReplayClip | null = null;
+function showDrill(): void {
+  drillShown = true; w.paused = true; setControlsIdle();
+  const d = startDebrief(w);
+  $('dTitle').textContent = d.title;
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  $('dFacts').innerHTML = d.facts.map(f => `<li>${esc(f)}</li>`).join('');
+  $('dTips').innerHTML = d.tips.map(f => `<li>${esc(f)}</li>`).join('');
+  $('dVerdict').className = 'verdict' + (d.grade === 'great' || d.grade === 'good' ? ' ok' : '');
+  $('drill').hidden = false;
+  drillClip = { frames: w.rec.slice(), focus: [w.user.id], wind: w.gun?.windFrom ?? w.wind.from, kind: 'start' };
+  drillView.play(w, drillClip);
+}
+const closeDrill = () => { $('drill').hidden = true; drillView.stop(); };
+$('bDReplay').onclick = () => { if (drillClip) drillView.play(w, drillClip); };
+$('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
+$('bDNew').onclick = () => { closeDrill(); beginRace(); };
+$('bDKeep').onclick = () => { closeDrill(); w.paused = false; };
+$('bDSetup').onclick = () => { closeDrill(); openSetup(); };
 $('bGo').onclick = () => { courseView.close(); $('setup').hidden = true; beginRace(); };
 
 function showResults(): void {
@@ -236,6 +269,7 @@ function frame(now: number): void {
       if (w.paused) { acc = 0; break; }
     }
     if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
+    if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of w.drainEvents()) handle(e);
   keyLook(dt); lookLabel();

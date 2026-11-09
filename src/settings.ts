@@ -1,4 +1,5 @@
 export interface Settings {
+  mode: 'race' | 'drill'; // full race, or start practice (from one minute to go)
   course: string; // course id
   windKt: number;
   current: string; // current preset id
@@ -8,7 +9,7 @@ export interface Settings {
   aids: 0 | 1; // line, zones and laylines drawn
 }
 
-export const DEFAULT_SETTINGS: Settings = { course: 'ss2', windKt: 12, current: 'ebb', bias: 0, fleet: 3, seq: 3, aids: 1 };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 12, current: 'ebb', bias: 0, fleet: 3, seq: 3, aids: 1 };
 
 const KEY = 'fbsim-settings-v2';
 

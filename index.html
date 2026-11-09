@@ -50,6 +50,9 @@
     <div class="eyebrow">San Francisco Cityfront</div>
     <h1>Folkboat Racing Sim</h1>
     <p class="lede">Race Folkboats off a real start line with real current. Every foul pauses the race and replays it from overhead with the rule that applies.</p>
+    <div class="field"><span>Mode</span>
+      <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button></div>
+      <small id="modeNote"></small></div>
     <div class="field"><span>Course</span>
       <div class="seg" data-k="course"><!-- filled from src/courses/data/*.json --></div></div>
     <div class="coursecard" id="courseCard"></div>
@@ -62,7 +65,7 @@
       <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
     <div class="field"><span>Opponents</span>
       <div class="seg" data-k="fleet"><button type="button" data-v="1">1</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></div></div>
-    <div class="field"><span>Sequence</span>
+    <div class="field" id="seqField"><span>Sequence</span>
       <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
     <div class="field"><span>Training aids</span>
       <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div></div>
@@ -91,6 +94,18 @@
     </div>
     <ol class="cvlegs" id="cvLegs"></ol>
     <p class="lede" id="cvNotes"></p>
+  </div>
+</div>
+
+<div class="overlay" id="drill" hidden>
+  <div class="panel">
+    <div class="eyebrow">Start practice</div>
+    <h2 id="dTitle">Start</h2>
+    <canvas id="dcanvas" aria-label="Overhead replay of your start"></canvas>
+    <ul class="facts" id="dFacts"></ul>
+    <div class="verdict" id="dVerdict"><ul class="facts" id="dTips"></ul></div>
+    <div class="btnrow"><button class="ghost" id="bDReplay" type="button">Replay</button><button class="cta" id="bDAgain" type="button">Same start again</button></div>
+    <div class="btnrow"><button class="ghost" id="bDNew" type="button">New start</button><button class="ghost" id="bDKeep" type="button">Keep racing</button><button class="ghost" id="bDSetup" type="button">Change setup</button></div>
   </div>
 </div>
 

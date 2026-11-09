@@ -17,17 +17,23 @@ let nextId = 1;
 export function boat(name: string, o: {
   at: [number, number]; heading: number; speed?: number;
   tacking?: boolean; lastTackT?: number; penalty?: number; ocs?: boolean; started?: boolean; leg?: number;
+  /** heading a few seconds ago (Rule 16.1); defaults to the current heading */
+  headingAgo?: number;
+  /** sailing above her proper course (Rule 17) */
+  aboveProper?: boolean;
 }): DiagramBoat {
   const rel = wrap(WIND - o.heading), u = V(o.heading), s = o.speed ?? 2.5;
   return {
     id: nextId++, name, x: o.at[0], y: o.at[1], h: o.heading, vx: u.x * s, vy: u.y * s,
     tack: rel >= 0 ? 'S' : 'P', tacking: o.tacking ?? false, lastTackT: o.lastTackT ?? -999,
-    penalty: o.penalty ?? 0, ocs: o.ocs ?? false, started: o.started ?? true, leg: o.leg ?? 0
+    penalty: o.penalty ?? 0, ocs: o.ocs ?? false, started: o.started ?? true, leg: o.leg ?? 0,
+    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false
   };
 }
 
-/** Move a boat to a new position (and optionally heading) for the next frame of a diagram. */
-export function moveTo(b: DiagramBoat, at: [number, number], heading = b.h): DiagramBoat {
+/** Move a boat for the next frame. Unless told otherwise, she had her old heading a few seconds ago. */
+export function moveTo(b: DiagramBoat, at: [number, number], heading = b.h, headingAgo = b.h): DiagramBoat {
+  b.headingAgo = headingAgo;
   const rel = wrap(WIND - heading), u = V(heading), s = Math.hypot(b.vx, b.vy) || 2.5;
   b.x = at[0]; b.y = at[1]; b.h = heading; b.vx = u.x * s; b.vy = u.y * s;
   if (!b.tacking) b.tack = rel >= 0 ? 'S' : 'P';

@@ -7,7 +7,9 @@ import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } f
 import { windAt, type Wind, type WindModel } from '../environment/wind';
 import { onLand } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
-import { assessPair, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { beatAngle, polar, runAngle } from '../boat/polar';
+import { aimPoint } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink } from '../ai/ai';
 import type { SimEvent } from './events';
@@ -18,6 +20,21 @@ export const DT = 1 / 60;
 export const TWO_TURNS = 720;
 
 export interface StartReport { delay: number; frac: number; kt: number }
+
+/** Where a boat was at the start signal. */
+export interface GunSnap {
+  d: number; // bow distance from the line, m (+ = over)
+  frac: number; // position along the line, 0 = pin end, 1 = committee end
+  v: number; // speed through the water, m/s
+  target: number; // close-hauled target speed for that wind, m/s
+  ocs: boolean;
+  penalty: boolean; // doing penalty turns at the gun
+}
+
+export interface WorldOptions {
+  /** Begin this many seconds before the start signal instead of at the warning signal (start practice). */
+  startAt?: number;
+}
 
 const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '-' + A.id;
 
@@ -48,20 +65,30 @@ export class World {
   userFinishT: number | null = null;
   groundToast = { t: -99 };
   events: SimEvent[] = [];
+  /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
+  private hHist: number[][] = [];
 
-  constructor(file: CourseFile, settings: Settings, seed: number) {
+  /** Every boat at the start signal (null until the gun). */
+  gun: { windFrom: number; boats: GunSnap[] } | null = null;
+  /** Race time each boat started (crossed the line properly), or null. */
+  startTimes: (number | null)[] = [];
+  readonly startAt: number;
+
+  constructor(file: CourseFile, settings: Settings, seed: number, opts: WorldOptions = {}) {
     this.settings = { ...settings };
     this.seed = seed;
     this.rng = makeRng(seed);
     this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet });
     this.cur = CURRENTS[settings.current] ?? CURRENTS.slack;
     this.cvec = currentVector(this.cur);
-    this.t = -settings.seq * 60;
+    this.startAt = opts.startAt ?? settings.seq * 60;
+    this.t = -this.startAt;
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
     this.wind = windAt(this.windModel, this.t);
     this.avgFrom = this.C.base;
     for (let i = 0; i <= settings.fleet; i++) this.boats.push(this.makeBoat(i));
+    this.startTimes = this.boats.map(() => null);
   }
 
   get user(): Boat { return this.boats[0]; }
@@ -80,15 +107,20 @@ export class World {
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
     let p: Vec, h: number;
-    if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
+    if (isUser && this.startAt < 120) {
+      // start practice: somewhere below the line, reaching along it, with a minute or so to go
+      p = place(55 + r() * 45, (r() - 0.5) * this.lineLen * 0.6); h = n360(lineH + (r() < 0.5 ? 0 : 180));
+    } else if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
     else {
       let tries = 0;
-      do { p = place(70 + r() * 60, (r() - 0.5) * this.lineLen * 0.8); tries++; } while (onLand(p) && tries < 20);
+      // somewhere below the line, not on land and not on top of another boat
+      const crowded = (q: Vec) => this.boats.some(o => dist(o, q) < 20);
+      do { p = place(70 + r() * 60, (r() - 0.5) * this.lineLen * 0.8); tries++; } while ((onLand(p) || crowded(p)) && tries < 40);
       h = n360(lineH + (r() < 0.5 ? 0 : 180));
     }
     return {
       id: i, isUser, name: F.name, no: F.no, color: F.tag, hullColor: F.hull, sailColor: F.sail, build: F.build,
-      x: p.x, y: p.y, h, v: 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
+      x: p.x, y: p.y, h, v: isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null,
@@ -96,7 +128,7 @@ export class World {
       heel: 0, boom: 0, jib: 0,
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
-        depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7
+        depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0
       }
     };
   }
@@ -104,6 +136,7 @@ export class World {
   /* ---------- queries used by AI, HUD and rendering ---------- */
   rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks }; }
   rights(A: Boat, B: Boat): Verdict<Boat> { return rightOfWay(A, B, this.rulesCtx(), this.pairs[pairKey(A, B)]); }
+  pairRecord(A: Boat, B: Boat): PairRecord | undefined { return this.pairs[pairKey(A, B)]; }
   /** Signed distance of a point from the line; positive on the course side. */
   lineD(p: Vec): number { return (p.x - this.center.x) * this.N.x + (p.y - this.center.y) * this.N.y; }
   /** Position along the line from its centre; positive toward the committee end. */
@@ -124,6 +157,7 @@ export class World {
     for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
     this.checkLines(prevT);
+    this.trackCourses();
     this.checkPairs();
     this.signals(prevT);
     if (this.steps % RECORD_EVERY_STEPS === 0) {
@@ -134,6 +168,7 @@ export class World {
 
   private checkLines(prevT: number): void {
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
+    if (gun) this.snapGun();
     for (const b of this.boats) {
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
@@ -145,7 +180,7 @@ export class World {
         if (b.ocs && d < 0 && this.lineD(stern(b)) < 0) { b.ocs = false; if (b.isUser) this.emit({ type: 'toast', msg: 'Cleared. Now start properly.' }); }
         const crossedFwd = b.prevD <= 0 && d > 0 && within, crossedBack = b.prevD > 0 && d <= 0 && within;
         if (!b.started && !b.ocs && crossedFwd) {
-          b.started = true;
+          b.started = true; this.startTimes[b.id] = this.t;
           if (b.isUser) {
             const frac = (a + this.lineLen / 2) / this.lineLen;
             this.startReport = { delay: this.t, frac, kt: b.v / KT };
@@ -164,6 +199,16 @@ export class World {
       b.prevD = d;
       this.markProgress(b);
     }
+  }
+
+  private snapGun(): void {
+    this.gun = {
+      windFrom: this.wind.from,
+      boats: this.boats.map(b => ({
+        d: this.lineD(bow(b)), frac: (this.lineA(b) + this.lineLen / 2) / this.lineLen, v: b.v,
+        target: polar(b.ww.kt, beatAngle(b.ww.kt)), ocs: this.lineD(bow(b)) > 0 && Math.abs(this.lineA(b)) < this.lineLen / 2 + 25, penalty: b.penalty > 0
+      }))
+    };
   }
 
   private markProgress(b: Boat): void {
@@ -207,6 +252,17 @@ export class World {
     }
   }
 
+  /** Heading history (Rule 16.1) and proper course (Rule 17) for every boat. */
+  private trackCourses(): void {
+    const keep = Math.round(RULE16_WINDOW / 0.1) + 1;
+    this.boats.forEach((b, i) => {
+      const h = this.hHist[i] ??= [];
+      if (this.steps % RECORD_EVERY_STEPS === 0) { h.push(b.h); if (h.length > keep) h.shift(); }
+      b.headingAgo = h.length ? h[0] : b.h;
+      b.aboveProper = this.t > 0 && b.started && !b.finished && b.twa < properTwa(this, b) - 10;
+    });
+  }
+
   private checkPairs(): void {
     const bs = this.boats, ctx = this.rulesCtx();
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
@@ -223,7 +279,7 @@ export class World {
         this.paused = true;
         if (incident.fouler.isUser) this.fouls++; else this.fouledBy++;
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else incident.fouler.penalty = TWO_TURNS;
+      } else if (incident.fouler.penalty <= 0) incident.fouler.penalty = TWO_TURNS; // a boat already doing turns finishes them
     }
   }
 
@@ -243,4 +299,14 @@ export class World {
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
   assignPenalty(b: Boat): void { b.penalty = TWO_TURNS; }
+}
+
+/**
+ * True wind angle of a boat's proper course: roughly, the course she'd sail to finish as soon as
+ * possible with no other boats around. Straight at her next mark if she can lay it; close-hauled
+ * if it's upwind; no deeper than the best downwind angle if it's dead downwind.
+ */
+export function properTwa(w: World, b: Boat): number {
+  const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), twa = Math.abs(wrap(b.ww.from - toMark));
+  return Math.min(Math.max(twa, beatAngle(b.ww.kt)), Math.max(runAngle(b.ww.kt), 150));
 }

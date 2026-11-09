@@ -11,6 +11,12 @@ export interface AiState {
   aggr: number; // seconds of extra margin taken on the approach
   width: number; // how far off the rhumb line before tacking back, m
   aware: boolean; // accounts for current on the approach
+  clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** Expensive start-timing predictions, refreshed 10 times a second. */
+  plan: { leave: number; tReach: number; coast: number; back: boolean };
+  /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
+  turnCommit: number;
+  commitFor: number; // the desired heading that commitment was for
 }
 
 export interface Boat {
@@ -47,6 +53,8 @@ export interface Boat {
   prevPass: number | null;
   nearMin: number;
   forced14: number | null; // id of the boat this right-of-way boat had to swerve for
+  headingAgo?: number; // heading RULE16_WINDOW seconds ago (Rule 16.1), kept by the World
+  aboveProper?: boolean; // sailing above her proper course (Rule 17), kept by the World
   // environment at the boat
   cur: Vec;
   ww: Wind;
