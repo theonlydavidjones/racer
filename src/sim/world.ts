@@ -1,13 +1,13 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { moveBoat } from '../boat/physics';
-import { D2R, KT, brg, cross, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, cross, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { windAt, type Wind, type WindModel } from '../environment/wind';
-import { onLand } from '../geo/shore';
+import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, cpa, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -128,7 +128,7 @@ export class World {
       heel: 0, boom: 0, jib: 0,
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
-        depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0
+        depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
       }
     };
   }
@@ -270,6 +270,7 @@ export class World {
       const rec = this.pairs[key] ??= newPairRecord();
       const { incident } = assessPair(rec, A, B, ctx, { swerve: A.forced14 === B.id || B.forced14 === A.id });
       if (!incident) continue;
+      if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
@@ -295,6 +296,51 @@ export class World {
         if (!this.user.ocs) this.emit({ type: 'toast', msg: 'Gun! Go.', ms: 1500 });
       } else if (s === -60) this.emit({ type: 'toast', msg: 'One minute', ms: 1500 });
     }
+  }
+
+  /* ---------- hails ---------- */
+
+  /**
+   * Rule 20.1: may `b` hail for room to tack? She must be sailing close-hauled (or above), approaching an
+   * obstruction (here, the shore) so that she'll soon have to tack, with a boat on the same tack to
+   * windward that she'd hit if she tacked. Returns that boat, or null.
+   */
+  roomBlocker(b: Boat): Boat | null {
+    if (b.twa > beatAngle(b.ww.kt) + 8 || b.tacking) return null;
+    const u = V(b.h), ahead = { x: b.x + u.x * 3 * LOA, y: b.y + u.y * 3 * LOA };
+    if (!onLand(ahead) && shoreDist(ahead) > 15) return null;
+    const wv = V(this.wind.from);
+    let best: Boat | null = null, bd = 30;
+    for (const o of this.boats) {
+      if (o === b || o.tack !== b.tack || o.finished) continue;
+      const dx = o.x - b.x, dy = o.y - b.y, d = Math.hypot(dx, dy);
+      const toWindward = dx * wv.x + dy * wv.y > 1, notAstern = dx * u.x + dy * u.y > -LOA;
+      if (d < bd && toWindward && notAstern) { bd = d; best = o; }
+    }
+    return best;
+  }
+
+  /** Make a hail. Returns false if one is already pending between the pair. */
+  hail(by: Boat, to: Boat, kind: 'room' | 'starboard'): boolean {
+    const rec = this.pairs[pairKey(by, to)] ??= newPairRecord();
+    if (rec.hail && rec.hail.kind === kind) return false;
+    rec.hail = { by: by.id, at: this.t, kind };
+    if (kind === 'starboard' && to.ai) to.ai.duckUntil = this.t + 10;
+    if (to.isUser) this.emit({ type: 'toast', msg: kind === 'room' ? `${by.name}: "Room to tack!" Tack now (Rule 20).` : `${by.name}: "Starboard!"`, ms: 3500 });
+    if (by.isUser) this.emit({ type: 'toast', msg: kind === 'room' ? `You: "Room to tack!" ${to.name} must tack.` : `You: "Starboard!" ${to.name} should keep clear.`, ms: 2500 });
+    return true;
+  }
+
+  /** You pressed Hail: hail for room to tack if you're entitled to, "Starboard!" at a converging port boat, or explain. */
+  userHail(): void {
+    const u = this.user, blocker = this.roomBlocker(u);
+    if (blocker) { this.hail(u, blocker, 'room'); return; }
+    if (u.tack === 'S') {
+      const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
+        .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
+      if (port) { this.hail(u, port.o, 'starboard'); return; }
+    }
+    this.emit({ type: 'toast', ms: 5000, msg: 'Nothing to hail. "Room to tack!" is for when you\'re close-hauled near the shore with a boat to windward stopping you tacking (Rule 20). "Starboard!" is for a port-tack boat on a collision course with you.' });
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */

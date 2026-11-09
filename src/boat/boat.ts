@@ -18,6 +18,8 @@ export interface AiState {
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
   commitFor: number; // the desired heading that commitment was for
+  duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
+  lastHail: number; // when she last hailed for room to tack
 }
 
 export interface Boat {

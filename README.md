@@ -74,10 +74,11 @@ Setup → Mode → **Start practice**. You begin one minute before the gun, some
 
 ### Rules
 
-Implemented: 10, 11, 12, 13, 15, 16.1, 17, 18.2(b), 22.1, 22.2, plus a right-of-way boat forced to swerve (14).
+Implemented: 10, 11, 12, 13, 15, 16.1, 17, 18.2(b), 20, 22.1, 22.2, plus a right-of-way boat forced to swerve (14).
 
 - **16.1:** a right-of-way boat that turned more than 12° toward the other boat in the 3 s before an incident didn't give her room to keep clear, and is the one penalized. Slow, steady course changes are fine; turning away is fine.
 - **17:** if a boat clear astern gets an overlap to leeward within two lengths, she may not sail above her proper course while that overlap lasts (after the start signal; there's no proper course before it). "Proper course" is approximated as straight at the next mark if she can lay it, close-hauled if not, and no deeper than the best downwind angle. The situation banner says when Rule 17 restricts you or the other boat.
+- **20 and hails:** close-hauled near the shore with a boat on the same tack to windward stopping you tacking, you may hail "Room to tack!" (**Hail** / **H**); the hailed boat must start to tack within 5 s. AI boats pinned against the Cityfront hail you, a banner counts down, and ignoring it is a foul. On starboard with a port boat converging, Hail calls "Starboard!" and she ducks earlier. Hail when you're not entitled to and it explains why not. (The "You tack" reply isn't modelled.)
 - Incidents before the start signal now count. (In the prototype, a timer started at −1 s, so collisions before the gun were never judged.)
 
 ### Sails and trim
@@ -110,5 +111,5 @@ The port keeps the prototype's behaviour. These differences are deliberate:
 - AI starts: on the Seaweed Soup line, median 5–11 s after the gun in slack and ebb, ~25 s in flood, almost never over early. On the short training line they're slower (crowding). The AI keeps clear, takes penalties in clear water, won't tack when too slow to make it, and doesn't sail on a broad reach expecting to slow down by easing sails.
 - Wind is a synthetic oscillation. Current is uniform, with a simple shore-relief factor.
 - The shoreline is hand-traced.
-- Rules not modelled yet: 14 (beyond the swerve check), 16.2, 18.3, 19, hails. Mark-room is only modelled for same-tack or downwind approaches. These appear as `todo` entries in `tests/rules.test.ts`.
+- Rules not modelled yet: 14 (beyond the swerve check), 16.2, 18.3, 19 (room at obstructions other than via the Rule 20 hail), the "You tack" reply. Mark-room is only modelled for same-tack or downwind approaches. These appear as `todo` entries in `tests/rules.test.ts`.
 - Fouls between two AI boats are penalized but not explained.

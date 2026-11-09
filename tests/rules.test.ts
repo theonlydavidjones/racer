@@ -334,3 +334,27 @@ describe('Rule 17 · overlapped from astern: no luffing above proper course', ()
     expect(p.at(-50).foul).toMatchObject({ by: 'Blue', rule: '11' });
   });
 });
+
+describe('Rule 20 · room to tack at an obstruction', () => {
+  //   shore ████████████████
+  //        ↖ Red (leeward, close-hauled, about to hit the shore) — hails "Room to tack!"
+  //     ↖ Blue (to windward, same tack)
+  it('a hailed boat that does not start to tack within 5 s breaks Rule 20', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315 }), blue = boat('Blue', { at: [2, 9], heading: 315 }); // ~8 m to windward, overlapped
+    const p = pair(red, blue);
+    p.at(50);
+    p.rec.hail = { by: red.id, at: 50, kind: 'room' };
+    expect(p.at(53).foul).toBeNull(); // still time to respond
+    expect(p.at(55.5).foul).toEqual({ by: 'Blue', rule: '20', kind: 'hail', why: null });
+  });
+
+  it('tacking promptly answers the hail', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315 }), blue = boat('Blue', { at: [2, 9], heading: 315 }); // ~8 m to windward, overlapped
+    const p = pair(red, blue);
+    p.at(50);
+    p.rec.hail = { by: red.id, at: 50, kind: 'room' };
+    blue.lastTackT = 52; moveTo(blue, [3, 12], 45);
+    expect(p.at(56).foul).toBeNull();
+    expect(p.rec.hail).toBeNull();
+  });
+});

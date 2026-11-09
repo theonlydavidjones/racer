@@ -3,7 +3,7 @@ import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatAngle, polar } from '../boat/polar';
 import { V, brg, clamp, cross, dist, dot, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { onLand } from '../geo/shore';
-import { cpa } from '../rules';
+import { HAIL_RESPONSE, cpa } from '../rules';
 import type { World } from '../sim/world';
 
 /** A boat owing a penalty first gets this far (m) from other boats before turning. */
@@ -160,8 +160,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     } else desired = sailable(b, bP);
   }
   // keep off the shore (and off the line mid-race)
+  let holdForHail = false;
   if (blocked(w, b, desired, 45)) {
-    if (beating && w.t - b.lastTackT > 4) desired = b.tack === 'S' ? csP : csS;
+    // Pinned by a boat to windward? Hail for room to tack (Rule 20) and hold on while she responds.
+    const blocker = beating ? w.roomBlocker(b) : null;
+    if (blocker && w.t - ai.lastHail > 40) { w.hail(b, blocker, 'room'); ai.lastHail = w.t; }
+    if (blocker && w.t - ai.lastHail < HAIL_RESPONSE + 1 && !blocked(w, b, desired, 12)) holdForHail = true;
+    else if (beating && w.t - b.lastTackT > 4) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   }
   // collision avoidance under the rules
@@ -171,6 +176,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (dx * dx + dy * dy > 3600) continue;
     const r = w.rights(b, o), cp = cpa(b, o);
     // keep clear early: slow, heavy boats need time to respond
+    // hailed "Starboard!" by this boat: duck early and generously
+    const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
+    if (ducking && cp.t < 16 && cp.d < 22) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); continue; }
     if (r.kc === b && cp.t < 12 && cp.d < 14) {
       const away = sailable(b, brg(-dx, -dy));
       if (r.rule === '10') desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32);
@@ -182,6 +190,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
     }
   }
+  // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(b)).
+  for (const o of w.boats) {
+    const h = o !== b ? w.pairRecord(b, o)?.hail : null;
+    if (h && h.kind === 'room' && h.by === o.id && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+  }
+  if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   b.desired = desired; b.luff = luff;
   // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && dist(b, nm.p) < 45;

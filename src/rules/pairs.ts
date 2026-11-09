@@ -19,6 +19,21 @@ export const RULE16_MIN_TURN = 12;
 /** Rule 17 applies when the leeward overlap starts within two hull lengths. */
 export const RULE17_RANGE = 2 * LOA;
 
+/** Rule 20.2(b): a boat hailed for room to tack must start to respond (by tacking) within this many seconds. */
+export const HAIL_RESPONSE = 5;
+
+/**
+ * Rule 20: has the boat hailed for room to tack failed to respond? Returns the hailed boat if so.
+ * (She may also reply "You tack" and give room; that reply isn't modelled, so tacking is the response.)
+ */
+export function hailIgnored<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: number): B | null {
+  const h = rec.hail;
+  if (!h || h.kind !== 'room') return null;
+  const hailed = h.by === A.id ? B : A;
+  if (t < h.at + HAIL_RESPONSE) return null;
+  return hailed.lastTackT >= h.at || hailed.tacking ? null : hailed;
+}
+
 /** Did `row` turn toward `other` over the last RULE16_WINDOW seconds? Returns the turn in degrees, or 0. */
 export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   if (row.headingAgo == null) return 0;
@@ -68,6 +83,15 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   if (rec.r17 != null && (A.tack !== B.tack || r.rule !== '11' || gap > RULE17_RANGE)) rec.r17 = null;
   rec.kc = r.kc.id; rec.rule = r.rule;
   if (rec.cool > ctx.t) return { verdict: r, incident: null };
+
+  // Rule 20: ignoring a hail for room to tack is a breach in itself
+  const ignored = hailIgnored(rec, A, B, ctx.t);
+  if (ignored) {
+    rec.hail = null; rec.cool = ctx.t + INCIDENT_COOLDOWN;
+    return { verdict: r, incident: { kind: 'hail', fouler: ignored, rule: '20', byWhy: null, verdict: r } };
+  }
+  // a hail is answered (or stale) once the hailed boat has tacked, or after half a minute
+  if (rec.hail && (ctx.t > rec.hail.at + 30 || [A, B].some(x => x.id !== rec.hail!.by && x.lastTackT >= rec.hail!.at + 0.01 && !x.tacking))) rec.hail = null;
 
   let kind: 'contact' | 'swerve' | null = null;
   if (gap < CONTACT_GAP) kind = 'contact';

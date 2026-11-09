@@ -5,7 +5,8 @@ import type { CourseFile } from '../src/courses/course';
 import { buildCourse } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { brg } from '../src/core/math';
+import { V, brg } from '../src/core/math';
+import { onLand, shoreDist } from '../src/geo/shore';
 
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, ...o });
@@ -186,5 +187,50 @@ describe('start practice debrief', () => {
   it('on the line but crawling: slow', async () => {
     const { r } = await drill(-5, 1.2); // centre 5 m back: bow ~1 m behind the line
     expect(r.grade).toBe('slow');
+  });
+});
+
+describe('hails at the Cityfront shore (Rule 20)', () => {
+  const setup = () => {
+    const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 4);
+    w.t = 30; for (const b of w.boats) { b.started = true; b.ocs = false; b.leg = 0; }
+    w.step(DT);
+    const red = w.boats[1], u = w.user, from = w.wind.from;
+    // a spot about 30 m off the beach where the starboard close-hauled course runs straight at it
+    const h = (from - 41 + 360) % 360, wv = V(from), hv = V(h);
+    let p = { x: 0, y: 0 };
+    search: for (let x = -1200; x < 300; x += 10) for (let y = -900; y < 100; y += 4) {
+      const q = { x, y }, hit = { x: x + hv.x * 30, y: y + hv.y * 30 };
+      if (!onLand(q) && shoreDist(q) > 22 && onLand(hit)) { p = q; break search; }
+    }
+    Object.assign(red, { x: p.x, y: p.y, h, v: 2.4, desired: h, tack: 'S' as const, lastTackT: w.t - 3 }); // just tacked onto starboard toward the shore
+    Object.assign(u, { x: p.x + wv.x * 9, y: p.y + wv.y * 9, h, v: 2.4, tack: 'S' as const, lastTackT: -999, turnTarget: null });
+    w.pairs = {};
+    return { w, red, u };
+  };
+
+  it('a boat pinned against the shore hails you; ignore it and you foul Rule 20', () => {
+    const { w, red, u } = setup();
+    let hailed = false, foul: string | null = null;
+    for (let i = 0; i < 60 * 12 && !foul; i++) {
+      w.step(DT);
+      if (w.pairRecord(u, red)?.hail?.by === red.id) hailed = true;
+      for (const e of w.drainEvents()) if (e.type === 'incident') foul = e.incident.rule;
+    }
+    expect(hailed).toBe(true);
+    expect(foul).toBe('20');
+  });
+
+  it('tack when hailed and there is no foul', async () => {
+    const { tackTarget } = await import('../src/boat/physics');
+    const { w, red, u } = setup();
+    let foul: string | null = null, tacked = false;
+    for (let i = 0; i < 60 * 12 && !foul; i++) {
+      w.step(DT);
+      if (!tacked && w.pairRecord(u, red)?.hail) { const t = tackTarget(u); u.turnDir = t.dir; u.turnTarget = t.target; tacked = true; }
+      for (const e of w.drainEvents()) if (e.type === 'incident') foul = e.incident.rule;
+    }
+    expect(tacked).toBe(true);
+    expect(foul).toBeNull();
   });
 });

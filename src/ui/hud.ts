@@ -104,6 +104,15 @@ export class Hud {
     const r17 = w.t > 0 ? w.pairRecord(u, o)?.r17 : null;
     const note17 = r17 === u.id ? ' Rule 17: you came from astern, so sail no higher than your proper course.'
       : r17 === o.id ? ` ${o.name} came from astern: they may not luff you above their proper course (Rule 17).` : '';
+    const hail = w.pairRecord(u, o)?.hail;
+    if (hail && hail.kind === 'room' && hail.by === o.id) {
+      // a hail for room to tack trumps everything else: answer it
+      const left = Math.max(0, hail.at + 5 - w.t);
+      $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now: ${left.toFixed(0)} s to respond.`;
+      $('situRule').textContent = 'Rule 20';
+      el.className = 'kc alarm'; el.hidden = false;
+      return;
+    }
     $('situMsg').textContent = situationText(r.rule, kc, o.name) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
     $('situRule').textContent = 'Rule ' + r.rule;
     el.className = (kc ? 'kc' : 'row') + (kc && risk && c.t < 6 && c.d < 8 ? ' alarm' : '');

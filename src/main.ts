@@ -70,7 +70,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
     youFouled: youFault, other: other.name, userTack: user.tack, rule: inc.rule, kind: inc.kind, byWhy: inc.byWhy,
     markName: mr ? w.C.marks[mr.idx].name : undefined, markOverlapped: mr?.overlapped, turned: inc.turned
   });
-  $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : 'Forced to avoid'}` : `${other.name} fouled you`;
+  $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : inc.kind === 'hail' ? 'Didn\'t answer a hail' : 'Forced to avoid'}` : `${other.name} fouled you`;
   $('rTitle').textContent = RULES[inc.rule][0];
   $('rRule').textContent = RULES[inc.rule][1];
   $('rVerdict').className = 'verdict' + (youFault ? '' : ' ok');
@@ -127,6 +127,8 @@ sheetBtn('bMainIn', 'main', -1); sheetBtn('bMainOut', 'main', 1); sheetBtn('bJib
 const SHEET_KEYS: Record<string, ['main' | 'jib', -1 | 1]> = { z: ['main', -1], Z: ['main', -1], x: ['main', 1], X: ['main', 1], ',': ['jib', -1], '.': ['jib', 1] };
 function togglePole(): void { if (!w.running || w.paused) return; w.user.poleWant = !w.user.poleWant; }
 $('bPole').addEventListener('click', togglePole);
+function doHail(): void { if (w.running && !w.paused) w.userHail(); }
+$('bHail').onclick = doHail;
 $('bView').onclick = () => { viewMode = (viewMode + 1) % 3; lookAhead(); $('bView').textContent = 'View · ' + VIEWS[viewMode]; };
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
@@ -156,6 +158,7 @@ addEventListener('keydown', e => {
   else if (k === ' ' || k === 't' || k === 'T') { e.preventDefault(); doTack(); }
   else if (SHEET_KEYS[k] && w.user.manualTrim) { const [sail, dir] = SHEET_KEYS[k]; w.user.sheetCmd[sail] = dir; }
   else if (k === 'o' || k === 'O') togglePole();
+  else if (k === 'h' || k === 'H') doHail();
   else if (k === 'v' || k === 'V') $('bView').click();
   else if (k === 'p' || k === 'P' || k === 'Escape') { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); }
   else if (k === 'w' || k === 'W') lookAhead();

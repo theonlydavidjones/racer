@@ -34,7 +34,7 @@ export interface RulesContext {
   marks: RulesMark[]; // the course's mark sequence
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '17' | '18.2(b)' | '22.1' | '22.2';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '17' | '18.2(b)' | '20' | '22.1' | '22.2';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -55,14 +55,19 @@ export interface PairRecord {
   mark: MarkRoomState | null;
   /** Rule 17: id of the boat that became overlapped to leeward from clear astern within two lengths. */
   r17: number | null;
+  /** A hail between the pair: who hailed, when, and what. */
+  hail: Hail | null;
 }
 
+/** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */
+export interface Hail { by: number; at: number; kind: 'room' | 'starboard' }
+
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 
-export type IncidentKind = 'contact' | 'swerve';
+export type IncidentKind = 'contact' | 'swerve' | 'hail';
 export interface Incident<B> {
   kind: IncidentKind;
   fouler: B;
