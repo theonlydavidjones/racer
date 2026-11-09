@@ -7,6 +7,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm test           # rules + simulation tests
 npm run build      # static site in dist/ (relative paths, host anywhere)
+npm run data:polar # re-pull Folkboat ORC certificates (behind a proxy: NODE_USE_ENV_PROXY=1)
 ```
 
 The original single-file prototype is kept, unchanged, at `reference/folkboat-sim.html`.
@@ -18,7 +19,9 @@ src/
   core/         math.ts (units, vectors, angles), rng.ts (seeded PRNG)
   geo/          geo.ts (lat/lon → local metres), shore.ts (Cityfront shoreline, grounding, distance to shore)
   environment/  wind.ts (synthetic oscillating breeze), current.ts (presets, shore relief, wind felt on the water)
-  boat/         boat.ts (Boat state, fleet), polar.ts (target speeds), physics.ts (steering, tacking, speed, trim, heel)
+  boat/         boat.ts (Boat state, fleet), polar.ts (ORC-based polar), dynamics.ts (forces: drive, drag,
+                windage, turning), physics.ts (per-step steering, tacking, speed, trim, heel),
+                data/nordic-folkboat-orc.json (written by scripts/fetch-orc-polar.mjs)
   rules/        pure RRS engine: rightOfWay.ts, pairs.ts (zone tracking, Rule 15 grace, incidents),
                 geometry.ts (overlap, hull gap, CPA), explain.ts (rule text, explanations, banner text)
   ai/           ai.ts (pre-start holding and approach, beating, laylines, marks, shore, rules-based avoidance)
@@ -28,8 +31,11 @@ src/
   render/       three.js scene, boat meshes, landscape, floating labels
   ui/           HUD (pods, dial, map, situation banner, line aid), toasts, horn, 2D drawing helpers
   main.ts       wiring: input, setup screen, incident and results panels, the frame loop
+scripts/
+  fetch-orc-polar.mjs  pulls current ORC certificates for the class and writes the averaged polar
 tests/
   diagram.ts    helpers for writing tests like rulebook diagrams
+  boat.test.ts  polar vs ORC data, acceleration, slowing, turning, tack loss
   rules.test.ts classic rules scenarios
   sim.test.ts   course loading, reproducibility, OCS through the real line logic, AI completes both courses
 ```
@@ -40,6 +46,14 @@ tests/
 - **Fixed timestep.** `main.ts` accumulates wall-clock time × sim speed and calls `step` in whole 1/60 s steps. Rendering runs at the display rate. With the same seed and inputs a race replays identically (there's a test for this). All sim randomness comes from `World.rng`; `Math.random` is used only for scenery.
 - **Rules engine** (`rules/`) is pure: it gets boats (only the fields it needs), a context (race time, wind, marks) and a per-pair record, and returns who keeps clear, under which rule, and any incident. The pair record is the engine's memory (who was inside at the zone, who just gained right of way) and is passed in explicitly.
 - **Courses are data.** Every file in `src/courses/data/` shows up in the course picker. Marks have lat/lon (or an offset from the line centre), legs give the rounding side and `round` or `pass`, the start line is either two fixed ends or a centre, bearing and length, and `obstructions` marks the line as an obstruction once racing. See `course.schema.json`.
+
+### Boat model
+
+- **Polar.** Averaged from four current ORC certificates for Nordic Folkboats (NED 737, NED 923, EST F51, EST F39). In 12 kt: 4.7 kt close-hauled at 40.7°, 5.9 kt on a beam reach. Below the beat angle the curve is shaped so that the ORC beat angle really is the best VMG angle; nothing sails below 25°.
+- **No spinnaker.** The certificates assume a 24 m² spinnaker; Folkboats race without one. Jib-only downwind speeds are derived from the certificates' own dead-run data: drive ∝ sail area × apparent wind², with main + poled-out jib (26 m²) instead of main + spinnaker (43 m²). Result: 85% of spinnaker speed in light air, 93% near hull speed; 4.3 kt dead downwind in 12 kt. The spinnaker version is still available (`new Polar(data, { spinnaker: true })`).
+- **Speed.** Forces, not a fixed lag: drive is set so the boat settles at its polar speed; hull drag comes from the certificate's wetted surface plus wave drag rising toward hull speed; flogging sails and rig windage slow the boat when it luffs or points too high. Calibration (12 kt): 1 kt → 90% speed in ~12 s; luffing halves speed in ~13 s, then the boat stops and loses steerage; shooting head to wind carries ~3.5 lengths; a tack takes ~7 s, slows to ~58% and costs ~0.9 lengths. `tests/boat.test.ts` pins these ranges. All tuning constants are in `HANDLING` in `src/boat/dynamics.ts`.
+- **Turning.** Turn rate = speed / turning radius (9 m), up to 22°/s, down to 4°/s when nearly stopped. Turning bleeds speed.
+- **Uses of the polar.** The tack button, AI close-hauled courses, the dial's no-go zone and the laylines use the polar's beat angle (it changes with wind speed) instead of a fixed 42°. The line aid's "time to line" and the AI's start approach assume you sheet in now and accelerate from your current speed, and the AI allows for coasting when it eases sails.
 
 ### Changes from the prototype
 
@@ -52,7 +66,9 @@ The port keeps the prototype's behaviour. These differences are deliberate:
 
 ## Known gaps
 
-- The polar is invented. Acceleration and turn rates are rough.
+- Acceleration, slowing and turning are calibrated from physics and sailing judgement, not measured on a real Folkboat. If your boat feels different, the constants in `HANDLING` are the place to adjust.
+- Above 24 kt the polar is held flat (no depowering model yet). No sail trim beyond automatic.
+- The AI's starts are mediocre (median ~15–20 s late in slack water).
 - Wind is a synthetic oscillation. Current is uniform, with a simple shore-relief factor.
 - The shoreline is hand-traced.
 - Rules not modelled yet: 14 (beyond the swerve check), 16, 17, 18.3, 19, hails. Mark-room is only modelled for same-tack or downwind approaches. These appear as `todo` entries in `tests/rules.test.ts`.

@@ -91,3 +91,25 @@ describe('AI fleet sails the course', () => {
     for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
   }, 60_000);
 });
+
+describe('AI starts (regression guard, 8 races × 5 boats)', () => {
+  const starts = (cur: string) => {
+    const delays: number[] = []; let ocs = 0;
+    for (let seed = 1; seed <= 8; seed++) {
+      const w = new World(SS2, settings({ fleet: 5, current: cur }), seed), ai = w.boats.slice(1), st = new Map<number, number>();
+      while (w.t < 90) {
+        w.step(DT);
+        if (Math.abs(w.t) < DT) ocs += ai.filter(b => b.ocs).length;
+        for (const b of ai) if (b.started && !st.has(b.id)) st.set(b.id, w.t);
+      }
+      for (const b of ai) delays.push(st.get(b.id) ?? 90);
+    }
+    delays.sort((a, b) => a - b);
+    return { median: delays[delays.length >> 1], ocsRate: ocs / delays.length };
+  };
+  for (const cur of ['slack', 'ebb']) it(`Seaweed Soup line, ${cur}: few OCS, median start within 25 s of the gun (the AI is no ace yet)`, () => {
+    const r = starts(cur);
+    expect(r.ocsRate).toBeLessThan(0.15);
+    expect(r.median).toBeLessThan(25);
+  }, 60_000);
+});

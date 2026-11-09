@@ -1,15 +1,14 @@
-import { KT, V, brg, clamp, wrap, n360 } from '../core/math';
+import { KT, V, brg, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, type Boat } from './boat';
-import { polar } from './polar';
+import { HANDLING, airDrag, flogAmount, maxTurnRate, surgeAccel } from './dynamics';
+import { NO_GO, beatAngle, polar } from './polar';
 
-/** Advance one boat by dt: steering, tack detection, speed, drift, grounding, sail trim and heel.
- * Expects b.ww (wind on the water) and b.cur (current) to be set for this step. */
 export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   const ww = b.ww;
-  // turn rate falls off at low speed: a Folkboat needs water over the rudder
-  const maxRate = 30 * (0.35 + 0.65 * Math.min(1, b.v / 2.6));
+  // turn rate falls off at low speed: a Folkboat needs water flowing over the rudder
+  const maxRate = maxTurnRate(b.v);
   let rate: number;
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
@@ -29,12 +28,15 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; }
-  if (b.tacking && twa >= 40) b.tacking = false;
+  if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled: Rule 13 ends
   let target = polar(ww.kt, twa);
-  if (b.luff) target *= 0.12;
+  if (b.luff) target *= HANDLING.luffFactor;
   if (b.penalty > 0) target *= 0.7;
-  b.v += (target - b.v) * dt / (target > b.v ? 5.5 : 3.2);
-  b.v = Math.max(0, b.v * (1 - 0.004 * Math.abs(rate) * dt)); // turning bleeds speed
+  const beat = beatAngle(ww.kt);
+  const ap = apparent(ww.from, ww.kt, b.h, b.v);
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)));
+  b.v = Math.max(0, b.v + a * dt);
+  b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
   b.vx = u.x * b.v + b.cur.x; b.vy = u.y * b.v + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
@@ -43,8 +45,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg: 'Aground! Steer back out to open water.' }); }
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it
-  const wv = V(ww.from), ax = -wv.x * ww.kt * KT - u.x * b.v, ay = -wv.y * ww.kt * KT - u.y * b.v;
-  const arel = wrap(brg(-ax, -ay) - b.h), awa = Math.abs(arel);
+  const { arel, awa } = apparent(ww.from, ww.kt, b.h, b.v);
   b.awa = awa;
   const side = arel >= 0 ? -1 : 1; // sails go to leeward: wind from starboard puts them to port
   const boomT = clamp((awa - 18) * 0.55, 4, 85);
@@ -56,9 +57,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.heel += (heelT - b.heel) * Math.min(1, dt * 1.5);
 }
 
+/** Apparent wind: wind over the water minus the boat's motion through it. aws in m/s, arel signed (+ from starboard). */
+export function apparent(from: number, windKt: number, h: number, v: number): { aws: number; arel: number; awa: number } {
+  const wv = V(from), u = V(h), ax = -wv.x * windKt * KT - u.x * v, ay = -wv.y * windKt * KT - u.y * v;
+  const arel = wrap(brg(-ax, -ay) - h);
+  return { aws: Math.hypot(ax, ay), arel, awa: Math.abs(arel) };
+}
+
 /** Heading a user tack/gybe aims for: the matching course on the other side of the wind. */
 export function tackTarget(b: Boat): { dir: number; target: number } {
   const rel = b.rel, twa = b.twa, from = b.ww.from;
-  if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(42, Math.min(twa, 60))) };
+  // upwind: tack to the same angle on the other side, but at least close-hauled; downwind: gybe to the mirror angle
+  if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatAngle(b.ww.kt), Math.min(twa, 60))) };
   return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
 }

@@ -1,5 +1,6 @@
 import { bow, type Boat } from '../boat/boat';
-import { polar } from '../boat/polar';
+import { coastDistance, timeToCover } from '../boat/dynamics';
+import { beatAngle, polar } from '../boat/polar';
 import { V, brg, cross, dist, dot, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { onLand } from '../geo/shore';
 import { cpa } from '../rules';
@@ -7,11 +8,11 @@ import type { World } from '../sim/world';
 
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
-  const from = b.ww.from, rel = wrap(from - desired);
-  if (Math.abs(rel) >= 43) return n360(desired);
-  if (b.tack === 'S' && rel < -25) return n360(from + 43);
-  if (b.tack === 'P' && rel > 25) return n360(from - 43);
-  return b.tack === 'S' ? n360(from - 43) : n360(from + 43);
+  const from = b.ww.from, rel = wrap(from - desired), ch = beatAngle(b.ww.kt) + 1;
+  if (Math.abs(rel) >= ch) return n360(desired);
+  if (b.tack === 'S' && rel < -25) return n360(from + ch);
+  if (b.tack === 'P' && rel > 25) return n360(from - ch);
+  return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
 }
 
 function blocked(w: World, b: Boat, h: number, d: number): boolean {
@@ -42,7 +43,7 @@ export function aimPoint(w: World, b: Boat): Vec {
 /** One decision step for an AI boat: sets b.desired and b.luff. */
 export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
-  const csS = n360(ww.from - 42), csP = n360(ww.from + 42);
+  const beat = beatAngle(ww.kt), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
   if (b.penalty > 0) { b.desired = b.h + 60; b.luff = false; return; }
   if (b.finished) { b.desired = n360(ww.from + 90); b.luff = true; return; }
@@ -62,10 +63,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (ai.mode === 'approach') {
       desired = sailable(b, brg(tgt.x - b.x, tgt.y - b.y));
       const d = w.lineD(bow(b)), uv = V(desired), twaD = Math.abs(wrap(ww.from - desired));
-      const vfull = (uv.x * polar(ww.kt, twaD) + c.x) * N.x + (uv.y * polar(ww.kt, twaD) + c.y) * N.y;
-      if (-d / Math.max(0.3, vfull) < tl - 2.5) luff = true; // early: burn time
+      // time to the line if we sheet in now, allowing for acceleration and current
+      const tReach = timeToCover(-d, b.v, polar(ww.kt, twaD), uv.x * N.x + uv.y * N.y, c.x * N.x + c.y * N.y);
+      if (tReach < tl - 2.5) luff = true; // early: burn time
+      // where we'd end up at the gun if we eased the sails now: coasting plus (for current-aware boats) drift
+      const coast = coastDistance(b.v, tl, ww.kt, b.twa) * (V(b.h).x * N.x + V(b.h).y * N.y);
       const drift = ai.aware ? (c.x * N.x + c.y * N.y) * tl : 0;
-      if (d + drift > -2 && tl > 3) { luff = true; if (d + drift > 0) desired = sailable(b, brg(-N.x, -N.y)); }
+      if (d + drift + coast > -2 && tl > 3) { luff = true; if (d + drift + coast > 0) desired = sailable(b, brg(-N.x, -N.y)); }
     }
   } else {
     if (ai.mode === 'hold' || ai.mode === 'approach') ai.mode = 'race';
@@ -77,7 +81,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       beating = true;
       desired = b.tack === 'S' ? csS : csP;
       if (w.t - b.lastTackT > 9) {
-        const d = sub(P, b), vs = polar(ww.kt, 42);
+        const d = sub(P, b), vs = polar(ww.kt, beat);
         // can we fetch P on tack tk, allowing for current?
         const fetch = (tk: 'S' | 'P') => {
           const uu = V(tk === 'S' ? csS : csP), g = unit({ x: uu.x * vs + c.x, y: uu.y * vs + c.y });

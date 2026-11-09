@@ -1,5 +1,6 @@
 import { bow, type Boat } from '../boat/boat';
-import { polar } from '../boat/polar';
+import { timeToCover } from '../boat/dynamics';
+import { beatAngle, polar } from '../boat/polar';
 import { D2R, KT, V, brg, clamp, dist, dot, sub, unit, wrap } from '../core/math';
 import { cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
@@ -63,7 +64,7 @@ export class Hud {
     if (u.finished) { el.hidden = true; return; }
     el.hidden = false;
     if (w.t < 0 || u.ocs || !u.started) {
-      const d = w.lineD(bow(u)), vn = u.vx * w.N.x + u.vy * w.N.y;
+      const d = w.lineD(bow(u)), uN = Math.sin(u.h * D2R) * w.N.x + Math.cos(u.h * D2R) * w.N.y;
       let fav = '';
       if (w.settings.aids) {
         // the end closer to the wind on the water is favored
@@ -72,8 +73,10 @@ export class Hud {
       }
       if (d > 0) { el.className = 'over'; el.innerHTML = w.t < 0 ? `Over the line by ${d.toFixed(0)} m · get back` : 'OCS · dip back below the line'; return; }
       el.className = '';
-      const tl = vn > 0.15 ? -d / vn : Infinity;
-      const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to line` : 'sailing away';
+      // time to the line on this heading if you sheet in now: accelerating from your current speed, with the current
+      const cN = u.cur.x * w.N.x + u.cur.y * w.N.y;
+      const tl = uN > 0.15 ? timeToCover(-d, u.v, polar(u.ww.kt, u.twa), uN, cN) : Infinity;
+      const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
       el.innerHTML = `Line ${(-d).toFixed(0)} m · ${tStr}${burn}${fav}`;
     } else {
@@ -87,10 +90,10 @@ export class Hud {
   private dial(u: Boat): void {
     const [ctx, w, h] = fitCanvas(this.dialC), cx = w / 2, cy = h / 2, R = w / 2 - 6;
     ctx.clearRect(0, 0, w, h);
-    const a0 = (u.rel - 90) * D2R;
-    // no-go zone
+    const a0 = (u.rel - 90) * D2R, ba = beatAngle(u.ww.kt) * D2R;
+    // no-go zone: inside the close-hauled angle
     ctx.fillStyle = 'rgba(255,93,76,.22)';
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0 - 42 * D2R, a0 + 42 * D2R); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0 - ba, a0 + ba); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = 'rgba(150,196,218,.35)'; ctx.lineWidth = 1;
     for (let i = 0; i < 36; i++) { const a = i * 10 * D2R, r1 = i % 9 === 0 ? R - 7 : R - 3; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke(); }
     ctx.fillStyle = '#e9f2f5';
@@ -128,9 +131,9 @@ export class Hud {
     const m = wd.nextMark(u);
     if (wd.settings.aids && m && m.beat && u.started) {
       // laylines to the next windward mark, allowing for current at the mark
-      const ww = u.ww, vs = polar(ww.kt, 42), c = wd.currentAt(m.p), mk = tf(m.p.x, m.p.y);
+      const ww = u.ww, beat = beatAngle(ww.kt), vs = polar(ww.kt, beat), c = wd.currentAt(m.p), mk = tf(m.p.x, m.p.y);
       ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(233,242,245,.4)'; ctx.lineWidth = 1;
-      for (const hh of [ww.from - 42, ww.from + 42]) {
+      for (const hh of [ww.from - beat, ww.from + beat]) {
         const uu = V(hh), g = unit({ x: uu.x * vs + c.x, y: uu.y * vs + c.y });
         const e = tf(m.p.x - g.x * 450, m.p.y - g.y * 450);
         ctx.beginPath(); ctx.moveTo(mk[0], mk[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
