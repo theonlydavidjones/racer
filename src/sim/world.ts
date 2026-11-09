@@ -87,7 +87,7 @@ export class World {
       h = n360(lineH + (r() < 0.5 ? 0 : 180));
     }
     return {
-      id: i, isUser, name: F.name, no: F.no, color: F.tag, hullColor: F.hull, sailColor: F.sail,
+      id: i, isUser, name: F.name, no: F.no, color: F.tag, hullColor: F.hull, sailColor: F.sail, build: F.build,
       x: p.x, y: p.y, h, v: 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,

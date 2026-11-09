@@ -21,6 +21,7 @@ export interface Boat {
   color: string;
   hullColor: string;
   sailColor: string;
+  build: Build;
   // kinematics
   x: number; y: number; h: number; // position (m) and heading (deg)
   v: number; // speed through the water, m/s
@@ -60,12 +61,18 @@ export interface Boat {
 export const bow = (b: Vec & { h: number }): Vec => { const u = V(b.h); return { x: b.x + u.x * HALF, y: b.y + u.y * HALF }; };
 export const stern = (b: Vec & { h: number }): Vec => { const u = V(b.h); return { x: b.x - u.x * HALF, y: b.y - u.y * HALF }; };
 
-export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string }
+/** How a boat is built. Class rules give wooden and fiberglass Nordic Folkboats the same minimum
+ * weight and they race on equal terms, so this changes looks, not speed. */
+export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood' }
+const WOOD: Build = { hull: 'wood', spars: 'wood' };
+
+export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build }
 export const FLEET: FleetEntry[] = [
-  { name: 'You', hull: '#f2eee4', sail: '#fbfaf5', tag: '#ffb627', no: 'US 110' },
-  { name: 'Red', hull: '#b3302a', sail: '#f6f2ea', tag: '#ff6a5c', no: 'US 87' },
-  { name: 'Blue', hull: '#25579e', sail: '#f6f2ea', tag: '#6fa8ff', no: 'US 104' },
-  { name: 'Green', hull: '#2b7349', sail: '#f6f2ea', tag: '#58d08a', no: 'US 92' },
-  { name: 'Black', hull: '#26272b', sail: '#efe9dc', tag: '#c9cdd4', no: 'US 120' },
-  { name: 'Varnish', hull: '#9a6a36', sail: '#f3ecdc', tag: '#e2b071', no: 'US 63' }
+  // the playable boat: fiberglass hull, aluminium mast and boom
+  { name: 'You', hull: '#f2eee4', sail: '#fbfaf5', tag: '#ffb627', no: 'US 110', build: { hull: 'fiberglass', spars: 'aluminium' } },
+  { name: 'Red', hull: '#b3302a', sail: '#f6f2ea', tag: '#ff6a5c', no: 'US 87', build: WOOD },
+  { name: 'Blue', hull: '#25579e', sail: '#f6f2ea', tag: '#6fa8ff', no: 'US 104', build: WOOD },
+  { name: 'Green', hull: '#2b7349', sail: '#f6f2ea', tag: '#58d08a', no: 'US 92', build: WOOD },
+  { name: 'Black', hull: '#26272b', sail: '#efe9dc', tag: '#c9cdd4', no: 'US 120', build: WOOD },
+  { name: 'Varnish', hull: '#9a6a36', sail: '#f3ecdc', tag: '#e2b071', no: 'US 63', build: WOOD }
 ];

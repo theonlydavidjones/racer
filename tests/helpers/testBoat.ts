@@ -6,7 +6,7 @@ import { V, KT } from '../../src/core/math';
 export function testBoat(o: { heading: number; kt: number; windFrom?: number; windKt?: number }): Boat {
   const windFrom = o.windFrom ?? 0, windKt = o.windKt ?? 12;
   return {
-    id: 0, isUser: true, name: 'Test', no: '', color: '#fff', hullColor: '#fff', sailColor: '#fff',
+    id: 0, isUser: true, name: 'Test', no: '', color: '#fff', hullColor: '#fff', sailColor: '#fff', build: { hull: 'fiberglass', spars: 'aluminium' },
     x: 0, y: 3000, h: o.heading, v: o.kt * KT, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
     steer: 0, turnTarget: null, turnDir: 0, luff: false, desired: o.heading,
     penalty: 0, started: true, ocs: false, leg: 0, finished: false, finishT: null,

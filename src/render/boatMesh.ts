@@ -36,9 +36,12 @@ const HULL_G = (() => {
 })();
 const DECK_G = (() => { const g = new THREE.ShapeGeometry(hullShape(0.93)); g.rotateX(-Math.PI / 2); g.translate(0, 0.41, 0); return g; })();
 const MAT = {
-  deck: new THREE.MeshLambertMaterial({ color: 0xb98d5c, side: THREE.DoubleSide }),
+  deck: new THREE.MeshLambertMaterial({ color: 0xb98d5c, side: THREE.DoubleSide }), // laid teak / varnish
   cabin: new THREE.MeshLambertMaterial({ color: 0xece6d8 }),
-  spar: new THREE.MeshLambertMaterial({ color: 0xc7a06a }),
+  spar: new THREE.MeshLambertMaterial({ color: 0xc7a06a }), // varnished spruce
+  // fiberglass boats: off-white non-skid gelcoat deck, anodised aluminium spars
+  deckGrp: new THREE.MeshLambertMaterial({ color: 0xb9b5ab, side: THREE.DoubleSide }), // matte non-skid reads darker than the glossy cabin top
+  sparAlu: new THREE.MeshPhongMaterial({ color: 0xaeb5bc, specular: 0x9aa0a6, shininess: 70 }),
   wire: new THREE.LineBasicMaterial({ color: 0x333333 })
 };
 
@@ -46,13 +49,19 @@ export interface BoatMesh { grp: THREE.Group; boomPivot: THREE.Group; jibPivot: 
 
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
-  grp.add(new THREE.Mesh(HULL_G, new THREE.MeshLambertMaterial({ color: b.hullColor })));
-  grp.add(new THREE.Mesh(DECK_G, MAT.deck));
+  const glass = b.build.hull === 'fiberglass', alu = b.build.spars === 'aluminium';
+  const hullMat = glass
+    ? new THREE.MeshPhongMaterial({ color: b.hullColor, specular: 0x666666, shininess: 60 }) // glossy gelcoat
+    : new THREE.MeshLambertMaterial({ color: b.hullColor });
+  const spar = alu ? MAT.sparAlu : MAT.spar;
+  grp.add(new THREE.Mesh(HULL_G, hullMat));
+  grp.add(new THREE.Mesh(DECK_G, glass ? MAT.deckGrp : MAT.deck));
   const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.32, 2.1), MAT.cabin); cab.position.set(0, 0.56, -0.7); grp.add(cab);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 9.0, 6), MAT.spar); mast.position.set(0, 4.9, -0.6); grp.add(mast);
+  // aluminium extrusion: constant section; wooden mast: tapered
+  const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.055, 0.06, 9.0, 10) : new THREE.CylinderGeometry(0.05, 0.08, 9.0, 6), spar); mast.position.set(0, 4.9, -0.6); grp.add(mast);
   const sailMat = new THREE.MeshLambertMaterial({ color: b.sailColor, side: THREE.DoubleSide });
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, -0.6); grp.add(boomPivot);
-  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, 5), MAT.spar); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, alu ? 10 : 5), spar); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
   const main = new THREE.Mesh(MAIN_G, sailMat); boomPivot.add(main);
   const jibPivot = new THREE.Group(); jibPivot.position.set(0, 0.75, -3.7); grp.add(jibPivot);
   const jib = new THREE.Mesh(JIB_G, sailMat); jibPivot.add(jib);
