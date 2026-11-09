@@ -4,32 +4,84 @@
   "order": 1,
   "title": "Seaweed Soup · Course 2",
   "area": "San Francisco Cityfront",
-  "source": "GGYC Seaweed Soup 2026–27, Addendum B. Mark positions from YRA (github.com/nkiesel/YRA-Marks).",
+  "source": "GGYC Manuel Fagundes Seaweed Soup Regatta 2026–27, Addendum B: Courses and Marks, Revision 1 (2026-11-05). Mark positions from YRA (github.com/nkiesel/YRA-Marks). Main sailing instructions not available.",
   "notes": "GGYC Seaweed Soup 2026–27, Addendum B. About 3.2 nm. Start westward off the GGYC race deck. Pass X on the side shown to keep clear of the line; it is not a rounding mark. Crossing the line mid-race is a two-turn penalty. Marks are at YRA positions; the line runs from the race deck out to X, an assumption to check against the sailing instructions.",
   "windBase": 275,
   "marks": {
-    "A": { "name": "A", "lat": 37.810767, "lon": -122.446817, "shape": "sphere" },
-    "X": { "name": "X", "lat": 37.811667, "lon": -122.443333 },
-    "6": { "name": "6 · Fort Mason", "lat": 37.811667, "lon": -122.430000 }
+    "A": {
+      "name": "A",
+      "lat": 37.810767,
+      "lon": -122.446817,
+      "shape": "sphere"
+    },
+    "X": {
+      "name": "X",
+      "lat": 37.811667,
+      "lon": -122.443333
+    },
+    "6": {
+      "name": "6 · Fort Mason",
+      "lat": 37.811667,
+      "lon": -122.43
+    }
   },
   "startLine": {
     "committee": {
-      "label": "GGYC race deck", "kind": "shore", "lat": 37.80925, "lon": -122.44325,
-      "verify": "Line from the race deck to X is an assumption; the addendum does not define it. Check against the main sailing instructions."
+      "label": "GGYC race deck",
+      "kind": "shore",
+      "lat": 37.80925,
+      "lon": -122.44325,
+      "verify": "The line is not defined in Addendum B (it refers to the main SIs). Race deck to X is inferred: X is 'approximately 300 yards north of Golden Gate YC' (B2) and exists 'to keep boats out of the start/finish line mid-race' (footnote 1), which only works if X marks the line's outer end; the 2011–12 SIs reportedly used the race deck and X. Confirm against the 2026–27 SIs."
     },
-    "pin": { "label": "X", "mark": "X" }
+    "pin": {
+      "label": "X",
+      "mark": "X"
+    }
   },
   "finish": "startLine",
   "legs": [
-    { "mark": "A", "type": "round", "side": "starboard" },
-    { "mark": "X", "type": "pass", "side": "starboard" },
-    { "mark": "6", "type": "round", "side": "starboard" },
-    { "mark": "X", "type": "pass", "side": "port" },
-    { "mark": "A", "type": "round", "side": "starboard" },
-    { "mark": "X", "type": "pass", "side": "starboard" },
-    { "mark": "6", "type": "round", "side": "starboard" }
+    {
+      "mark": "A",
+      "type": "round",
+      "side": "starboard"
+    },
+    {
+      "mark": "X",
+      "type": "pass",
+      "side": "starboard"
+    },
+    {
+      "mark": "6",
+      "type": "round",
+      "side": "starboard"
+    },
+    {
+      "mark": "X",
+      "type": "pass",
+      "side": "port"
+    },
+    {
+      "mark": "A",
+      "type": "round",
+      "side": "starboard"
+    },
+    {
+      "mark": "X",
+      "type": "pass",
+      "side": "starboard"
+    },
+    {
+      "mark": "6",
+      "type": "round",
+      "side": "starboard"
+    }
   ],
   "obstructions": [
-    { "kind": "startFinishLine", "when": "racing", "penalty": "twoTurns", "note": "The start/finish line is an obstruction once racing; crossing it costs a two-turn penalty." }
+    {
+      "kind": "startFinishLine",
+      "when": "racing",
+      "penalty": "twoTurns",
+      "note": "Addendum B1.1: the start/finish line is an obstruction for boats not in their starting sequence or on their first or last leg; crossing it is a two-turn penalty (SI 7.x)."
+    }
   ]
 }
