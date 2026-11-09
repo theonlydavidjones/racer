@@ -1,10 +1,12 @@
 import './styles.css';
-import { tackTarget } from './boat/physics';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { Labels } from './render/labels';
-import { SceneView, VIEWS } from './render/scene';
+import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
+import { HELD, KeyMap, type Action } from './ui/keys';
+import { KeysView } from './ui/keysView';
+import { D2R, V } from './core/math';
 import { RULES, explain, type Incident } from './rules';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import type { Boat } from './boat/boat';
@@ -13,7 +15,7 @@ import { DT, World } from './sim/world';
 import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
-import { horn, sound, toast } from './ui/feedback';
+import { horn, logMessage, messageLog, setLogClock, sound, toast } from './ui/feedback';
 import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 
@@ -43,7 +45,7 @@ function lookAhead(): void { setLook(0, 0); }
 let pendingPenalty: Boat | null = null;
 
 function newGame(seed = randomSeed()): void {
-  w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM } : {});
+  w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM } : S.mode === 'sail' ? { freeSail: true } : {});
   acc = 0; drillShown = false;
   $('trimPanel').classList.toggle('manual', !!S.manualTrim);
   $('bTrim').textContent = S.manualTrim ? 'Trim · you' : 'Trim · crew';
@@ -76,7 +78,11 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   $('rVerdict').className = 'verdict' + (youFault ? '' : ' ok');
   $('rWhat').textContent = ex.what;
   $('rTip').textContent = ex.tip;
-  $('rPen').textContent = youFault ? 'Penalty: two turns (720°). Steer in two full circles, keeping clear of everyone while you turn.' : `${other.name} takes a two-turns penalty.`;
+  const turns = w.penaltyDeg === 720 ? 'two turns' : 'one turn';
+  $('rPen').textContent = youFault
+    ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a gybe (Rule 44.2).`
+    : `${other.name} takes a ${turns} penalty.`;
+  logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
   pendingPenalty = inc.fouler;
   lastClip = clip;
   $('replay').hidden = false;
@@ -87,7 +93,7 @@ $('bCont').onclick = () => {
   $('replay').hidden = true; replayView.stop();
   if (pendingPenalty) {
     w.assignPenalty(pendingPenalty);
-    if (pendingPenalty.isUser) toast('Do your two turns now: hold one steering button for two full circles.', 4000);
+    if (pendingPenalty.isUser) toast(`Do your ${w.penaltyDeg === 720 ? 'two turns' : 'turn'} now: put the tiller over and keep turning the same way.`, 4000);
     pendingPenalty = null;
   }
   w.paused = false;
@@ -96,11 +102,7 @@ $('bCont').onclick = () => {
 /* ---------------- input ---------------- */
 function setControlsIdle(): void {
   const u = w.user; u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0;
-  ['bLeft', 'bRight', 'bLuff'].forEach(id => $(id).classList.remove('on'));
-}
-function doTack(): void {
-  const u = w.user; if (!w.running || w.paused) return;
-  const t = tackTarget(u); u.turnDir = t.dir; u.turnTarget = t.target;
+  ['bLuff'].forEach(id => $(id).classList.remove('on'));
 }
 function holdBtn(id: string, on: () => void, off: () => void): void {
   const el = $(id);
@@ -108,10 +110,48 @@ function holdBtn(id: string, on: () => void, off: () => void): void {
   const end = () => { el.classList.remove('on'); off(); };
   (['pointerup', 'pointercancel', 'lostpointercapture'] as const).forEach(ev => el.addEventListener(ev, end));
 }
-holdBtn('bLeft', () => { w.user.steer = -1; }, () => { if (w.user.steer === -1) w.user.steer = 0; });
-holdBtn('bRight', () => { w.user.steer = 1; }, () => { if (w.user.steer === 1) w.user.steer = 0; });
-holdBtn('bLuff', () => { w.user.luff = true; }, () => { w.user.luff = false; });
-$('bTack').addEventListener('click', doTack);
+holdBtn('bLuff', () => { w.user.luff = true; }, () => { w.user.luff = held.has('luff'); });
+
+/* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
+ * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
+const TILLER_PX = 260; // trackpad / mouse travel for full deflection, px
+function setTiller(v: number): void { w.user.tiller = Math.max(-1, Math.min(1, v)); }
+function centreTiller(): void { setTiller(0); }
+function showTiller(): void {
+  const t = w.user.tiller;
+  $('tillerHandle').style.left = `${50 + t * 44}%`;
+  $('tiller').setAttribute('aria-valuenow', String(Math.round(t * 100)));
+  $('tillerLab').textContent = Math.abs(t) < 0.04 ? 'Tiller · centred' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
+}
+// Tiller bar (touch or mouse): drag the handle left/right.
+{
+  const pad = $('tiller');
+  let start: { x: number; t: number } | null = null, lastTap = 0;
+  pad.addEventListener('pointerdown', e => {
+    e.preventDefault(); pad.setPointerCapture?.(e.pointerId);
+    start = { x: e.clientX, t: w.user.tiller };
+    const now = performance.now(); if (now - lastTap < 300) centreTiller(); lastTap = now;
+  });
+  pad.addEventListener('pointermove', e => { if (start) setTiller(start.t + (e.clientX - start.x) / (pad.clientWidth * 0.45)); });
+  const end = () => { start = null; };
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+}
+// Take the tiller with the trackpad: click the view; then sliding left/right moves the tiller. Esc lets go.
+const gl = $('gl');
+let toldTiller = false;
+function haveTiller(): boolean { return document.pointerLockElement === gl; }
+document.addEventListener('pointerlockchange', () => {
+  $('tiller').classList.toggle('held', haveTiller());
+  if (haveTiller() && !toldTiller) { toldTiller = true; toast('You have the tiller: slide on the trackpad to move it. Esc to let go.', 3500); }
+});
+addEventListener('mousemove', e => { if (haveTiller() && w.running && !w.paused) setTiller(w.user.tiller + e.movementX / TILLER_PX); });
+// A two-finger sideways swipe on a trackpad also moves the tiller.
+gl.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { if (w.running && !w.paused) setTiller(w.user.tiller + e.deltaX / TILLER_PX); }
+  else if (viewMode === 2) zoomOverhead(Math.exp(e.deltaY * 0.0015)); // overhead: scroll / two-finger up-down zooms
+}, { passive: false });
+
 // Sheets: hold Trim/Ease (or Z/X for the main, , and . for the jib) when you're trimming.
 function setTrimMode(manual: boolean): void {
   S.manualTrim = manual ? 1 : 0; saveSettings(S);
@@ -124,12 +164,11 @@ $('bTrim').onclick = () => { setTrimMode(!w.user.manualTrim); toast(w.user.manua
 const sheetBtn = (id: string, sail: 'main' | 'jib', dir: -1 | 1) =>
   holdBtn(id, () => { w.user.sheetCmd[sail] = dir; }, () => { if (w.user.sheetCmd[sail] === dir) w.user.sheetCmd[sail] = 0; });
 sheetBtn('bMainIn', 'main', -1); sheetBtn('bMainOut', 'main', 1); sheetBtn('bJibIn', 'jib', -1); sheetBtn('bJibOut', 'jib', 1);
-const SHEET_KEYS: Record<string, ['main' | 'jib', -1 | 1]> = { z: ['main', -1], Z: ['main', -1], x: ['main', 1], X: ['main', 1], ',': ['jib', -1], '.': ['jib', 1] };
 function togglePole(): void { if (!w.running || w.paused) return; w.user.poleWant = !w.user.poleWant; }
 $('bPole').addEventListener('click', togglePole);
 function doHail(): void { if (w.running && !w.paused) w.userHail(); }
 $('bHail').onclick = doHail;
-$('bView').onclick = () => { viewMode = (viewMode + 1) % 3; lookAhead(); $('bView').textContent = 'View · ' + VIEWS[viewMode]; };
+$('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
 $('bCourse').onclick = () => courseView.toggle(w);
@@ -145,53 +184,153 @@ $('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
 $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 $('map').addEventListener('click', () => { hud.mapZoom = !hud.mapZoom; $('mapHint').textContent = hud.mapZoom ? 'Tap map · course' : 'Tap map · zoom'; });
 
-const keys: Record<string, boolean> = {};
+/* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
+/* ---------------- message log ---------------- */
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const stamp = (t: number | null) => t == null ? '' : `<span class="lt">${fmtClock(t)}</span>`;
+function renderLog(): void {
+  const recent = messageLog.filter(m => !m.msg.startsWith('— ')).slice(-4).reverse();
+  $('msgRecent').innerHTML = recent.map(m => `<li>${stamp(m.t)}${esc(m.msg)}</li>`).join('');
+  if (!$('logView').hidden) $('logList').innerHTML = messageLog.slice().reverse().map(m =>
+    m.msg.startsWith('— ') ? `<li class="sep">${esc(m.msg.slice(2))}</li>` : `<li>${stamp(m.t)}${esc(m.msg)}</li>`).join('');
+}
+setLogClock(() => (w && w.running ? w.t : null), renderLog);
+function openLog(): void { $('logView').hidden = false; renderLog(); }
+$('bLogAll').onclick = openLog;
+$('bLogClose').onclick = () => { $('logView').hidden = true; };
+
+const keymap = new KeyMap();
+const keysView = new KeysView(keymap, () => keysHint());
+const held = new Set<Action>();
+function keysHint(): void {
+  const k = (a: Action) => keymap.label(a);
+  $('keysHint').textContent = `${k('takeTiller')}/click: take tiller · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} keys`;
+}
+keysHint();
+$('bKeys1').onclick = () => keysView.open();
+$('bKeys2').onclick = () => keysView.open();
+/** Helm and sheets follow whatever is held. */
+function applyHeld(): void {
+  const u = w.user;
+  u.steer = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0);
+  u.luff = held.has('luff') || $('bLuff').classList.contains('on');
+  if (u.manualTrim) {
+    u.sheetCmd.main = (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0);
+    u.sheetCmd.jib = (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0);
+  }
+}
+function setView(i: number): void {
+  viewMode = i; lookAhead();
+  $('bView').textContent = 'View · ' + VIEWS[viewMode];
+  $('bOrient').hidden = viewMode !== 2;
+  if (viewMode === 2 && haveTiller()) document.exitPointerLock();
+}
+const anyOverlay = () => !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
 addEventListener('keydown', e => {
-  if ((e.key === 'm' || e.key === 'M') && $('replay').hidden && $('results').hidden && $('drill').hidden) { courseView.toggle(w); return; }
-  if (e.key === 'Escape' && courseView.isOpen) { courseView.close(); return; }
-  if (!$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden) return;
-  const u = w.user, k = e.key;
-  if (keys[k]) return; keys[k] = true;
-  if (k === 'ArrowLeft' || k === 'a' || k === 'A') u.steer = -1;
-  else if (k === 'ArrowRight' || k === 'd' || k === 'D') u.steer = 1;
-  else if (k === 'ArrowDown' || k === 's' || k === 'S') u.luff = true;
-  else if (k === ' ' || k === 't' || k === 'T') { e.preventDefault(); doTack(); }
-  else if (SHEET_KEYS[k] && w.user.manualTrim) { const [sail, dir] = SHEET_KEYS[k]; w.user.sheetCmd[sail] = dir; }
-  else if (k === 'o' || k === 'O') togglePole();
-  else if (k === 'h' || k === 'H') doHail();
-  else if (k === 'v' || k === 'V') $('bView').click();
-  else if (k === 'p' || k === 'P' || k === 'Escape') { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); }
-  else if (k === 'w' || k === 'W') lookAhead();
+  if (keysView.isOpen) return; // the settings screen handles keys while it's open
+  const a = keymap.actionFor(e.key);
+  if (e.key === 'Escape') {
+    if (courseView.isOpen) { courseView.close(); return; }
+    if (!$('logView').hidden) { $('logView').hidden = true; return; }
+    if (haveTiller()) return; // Esc lets go of the tiller (the browser handles it)
+    if (!$('pause').hidden) { $('bResume').click(); return; }
+    if (!anyOverlay() && w.running) $('bPause').click();
+    return;
+  }
+  if (a === 'keys') { keysView.open(); return; }
+  if (a === 'log') { if ($('logView').hidden) openLog(); else $('logView').hidden = true; return; }
+  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { courseView.toggle(w); return; }
+  if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
+  if (anyOverlay() || !a) return;
+  if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
+  if (HELD.has(a)) { if (!e.repeat) { held.add(a); applyHeld(); } return; }
+  if (e.repeat) return;
+  switch (a) {
+    case 'takeTiller': takeTiller(); break;
+    case 'centreTiller': centreTiller(); break;
+    case 'pole': togglePole(); break;
+    case 'hail': doHail(); break;
+    case 'viewCockpit': setView(0); break;
+    case 'viewChase': setView(1); break;
+    case 'viewOverhead': setView(2); break;
+    case 'cycleView': setView((viewMode + 1) % 3); break;
+    case 'lookAhead': lookAhead(); break;
+    case 'orient': cycleOrient(); break;
+    case 'recentre': recentre(); break;
+  }
 });
 addEventListener('keyup', e => {
-  const u = w.user, k = e.key; keys[k] = false;
-  if ((k === 'ArrowLeft' || k === 'a' || k === 'A') && u.steer === -1) u.steer = 0;
-  if ((k === 'ArrowRight' || k === 'd' || k === 'D') && u.steer === 1) u.steer = 0;
-  if (k === 'ArrowDown' || k === 's' || k === 'S') u.luff = false;
-  if (SHEET_KEYS[k]) { const [sail, dir] = SHEET_KEYS[k]; if (u.sheetCmd[sail] === dir) u.sheetCmd[sail] = 0; }
+  const a = keymap.actionFor(e.key);
+  if (a && held.delete(a)) applyHeld();
 });
-// Look around by dragging the view (mouse or finger). Double-tap/double-click looks ahead again.
+addEventListener('blur', () => { held.clear(); applyHeld(); });
+
+/* ---------------- overhead view: north / bow / wind up, zoom and pan ---------------- */
+const over: Overhead = { orient: 'north', height: 170, off: { x: 0, y: 0 } };
+try { const o = localStorage.getItem('fbsim-orient'); if (o === 'north' || o === 'bow' || o === 'wind') over.orient = o; } catch { /* ignore */ }
+function cycleOrient(): void {
+  over.orient = over.orient === 'north' ? 'bow' : over.orient === 'bow' ? 'wind' : 'north';
+  try { localStorage.setItem('fbsim-orient', over.orient); } catch { /* ignore */ }
+  $('bOrient').textContent = ORIENT_LABEL[over.orient];
+}
+$('bOrient').textContent = ORIENT_LABEL[over.orient];
+$('bOrient').onclick = cycleOrient;
+function zoomOverhead(k: number): void { over.height = Math.max(40, Math.min(3000, over.height * k)); }
+function recentre(): void { over.off.x = 0; over.off.y = 0; }
+$('bRecentre').onclick = recentre;
+/** Drag the overhead map by (dx, dy) screen pixels. */
+function panOverhead(dx: number, dy: number): void {
+  const mpp = 2 * over.height * Math.tan(view.camera.fov * D2R / 2) / (gl.clientHeight || 1);
+  const upB = overheadUp(over, w), U = V(upB), R = V(upB + 90);
+  over.off.x += (-R.x * dx + U.x * dy) * mpp; over.off.y += (-R.y * dx + U.y * dy) * mpp;
+}
+function takeTiller(): void {
+  if (!w.running || w.paused || haveTiller()) return;
+  try { (gl.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {}); } catch { /* not available here */ }
+}
+
+// The view: click to take the tiller (mouse/trackpad, not overhead); on a touch screen, drag to look.
+// Overhead: drag to pan, pinch or scroll to zoom. Double-tap: look ahead / back to your boat.
 let drag: { x: number; y: number; yaw0: number; pitch0: number } | null = null, lastTap = 0;
-$('gl').addEventListener('pointerdown', e => {
+const touches = new Map<number, [number, number]>();
+let pinch: { d: number; h: number } | null = null;
+gl.addEventListener('pointerdown', e => {
+  const now = performance.now(); if (now - lastTap < 300) { if (viewMode === 2) recentre(); else lookAhead(); } lastTap = now;
+  if (viewMode === 2) { gl.setPointerCapture?.(e.pointerId); touches.set(e.pointerId, [e.clientX, e.clientY]); pinch = null; return; }
+  if (e.pointerType === 'mouse' && w.running && !w.paused && !haveTiller()) { takeTiller(); return; }
   drag = { x: e.clientX, y: e.clientY, yaw0: look.yaw, pitch0: look.pitch };
-  const now = performance.now(); if (now - lastTap < 300) lookAhead(); lastTap = now;
 });
+gl.addEventListener('pointermove', e => {
+  const prev = touches.get(e.pointerId); if (!prev || viewMode !== 2) return;
+  const cur: [number, number] = [e.clientX, e.clientY];
+  if (touches.size === 1) panOverhead(cur[0] - prev[0], cur[1] - prev[1]);
+  touches.set(e.pointerId, cur);
+  if (touches.size === 2) {
+    const [p1, p2] = [...touches.values()], d = Math.hypot(p1[0] - p2[0], p1[1] - p2[1]);
+    if (!pinch) pinch = { d, h: over.height }; else over.height = Math.max(40, Math.min(3000, pinch.h * pinch.d / d));
+  }
+});
+const endTouch = (e: PointerEvent) => { touches.delete(e.pointerId); pinch = null; };
+gl.addEventListener('pointerup', endTouch); gl.addEventListener('pointercancel', endTouch);
 addEventListener('pointermove', e => {
   if (drag && viewMode !== 2) setLook(drag.yaw0 + (e.clientX - drag.x) * 0.006, drag.pitch0 + (e.clientY - drag.y) * 0.006);
 });
-/** Held keys pan the view: Q/E left/right, R/F up/down. */
+/** Held keys pan the view (look) or zoom the overhead map. */
 function keyLook(dt: number): void {
   const rate = 1.6 * dt;
-  if (keys.q || keys.Q) setLook(look.yaw + rate, look.pitch);
-  if (keys.e || keys.E) setLook(look.yaw - rate, look.pitch);
-  if (keys.r || keys.R) setLook(look.yaw, look.pitch + rate);
-  if (keys.f || keys.F) setLook(look.yaw, look.pitch - rate);
+  if (held.has('lookLeft')) setLook(look.yaw + rate, look.pitch);
+  if (held.has('lookRight')) setLook(look.yaw - rate, look.pitch);
+  if (held.has('lookUp')) setLook(look.yaw, look.pitch + rate);
+  if (held.has('lookDown')) setLook(look.yaw, look.pitch - rate);
+  if (held.has('zoomIn')) zoomOverhead(Math.exp(-1.2 * dt));
+  if (held.has('zoomOut')) zoomOverhead(Math.exp(1.2 * dt));
 }
 function lookLabel(): void {
   const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
   const off = Math.abs(deg) > 8 || Math.abs(look.pitch) > 0.15;
   el.hidden = !off || viewMode === 2;
   if (off) el.textContent = Math.abs(deg) <= 8 ? 'Look ahead' : `Looking ${Math.abs(deg)}° ${deg > 0 ? 'stbd' : 'port'} · ahead`;
+  $('bRecentre').hidden = viewMode !== 2 || Math.hypot(over.off.x, over.off.y) < 5;
 }
 addEventListener('pointerup', () => { drag = null; });
 addEventListener('pointercancel', () => { drag = null; });
@@ -208,11 +347,15 @@ function courseCard(): void {
     .concat(['<span class="m">Finish</span>']);
   $('courseCard').innerHTML = `<div class="legs">${chips.join('<span class="arr">→</span>')}</div><small>${C.notes}</small>`;
   $('biasField').hidden = !C.biasAdjustable;
-  $('seqField').hidden = S.mode === 'drill';
+  $('seqField').hidden = S.mode !== 'race';
+  $('fleetField').hidden = S.mode === 'sail';
+  $('penaltyField').hidden = S.mode === 'sail';
   $('modeNote').textContent = S.mode === 'drill'
     ? 'Starts one minute before the gun. Fifteen seconds after it you get a debrief and an overhead replay, and can try the same start again.'
+    : S.mode === 'sail'
+    ? 'Open water on the course, no other boats, no start and no clock: practise steering, trimming and the pole.'
     : 'The whole race, from the warning signal to the finish.';
-  $('bGo').textContent = S.mode === 'drill' ? 'Practice a start' : 'Start the sequence';
+  $('bGo').textContent = S.mode === 'drill' ? 'Practice a start' : S.mode === 'sail' ? 'Go sailing' : 'Start the sequence';
 }
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg').forEach(seg => {
@@ -230,11 +373,14 @@ function openSetup(): void { courseView.close(); w.running = false; paintSeg(); 
 function beginRace(seed?: number): void {
   saveSettings(S);
   newGame(seed);
+  logMessage(`— ${S.mode === 'sail' ? 'Just sail' : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${w.C.title}`);
   w.running = true; w.paused = false;
   $('bFast').textContent = 'Speed 1×';
   horn(1.0);
   const m0 = w.C.marks[0];
-  toast(S.mode === 'drill'
+  toast(S.mode === 'sail'
+    ? `Just sail: open water, no race. ${S.windKt} kt westerly, ${w.cur.label.toLowerCase()}. Try the tiller, the trim and the pole.`
+    : S.mode === 'drill'
     ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
     : `${S.seq}-minute sequence. Current: ${w.cur.label}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
 }
@@ -292,8 +438,8 @@ function frame(now: number): void {
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of w.drainEvents()) handle(e);
-  keyLook(dt); lookLabel();
-  view.render(w, dt, now, viewMode, look);
+  keyLook(dt); lookLabel(); showTiller();
+  view.render(w, dt, now, viewMode, look, over);
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
 }

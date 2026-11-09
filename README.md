@@ -11,9 +11,27 @@ npm run data:polar # re-pull Folkboat ORC certificates (behind a proxy: NODE_USE
 npm run build:artifact  # single-page build for the claude.ai artifact → artifact/folkboat-racing-sim.html
 ```
 
-**Playing it:** the claude.ai artifact link is the playable version (any browser, phone or desktop). It's rebuilt with `npm run build:artifact` and republished after changes; three.js loads from jsDelivr, pinned to the version in package.json.
+**Playing it:** the claude.ai artifact link is the playable version. It's built for desktop (keyboard plus trackpad or mouse); phone layout is on hold. It's rebuilt with `npm run build:artifact` and republished after changes; three.js loads from jsDelivr, pinned to the version in package.json.
 
 The original single-file prototype is kept, unchanged, at `reference/folkboat-sim.html`.
+
+## Controls (desktop)
+
+Every key can be changed: Setup → **Keyboard settings**, or **K** in the game. Your keys are saved in the browser.
+
+- **Tiller.** Click the water in cockpit or chase view (or press **T** in any view) to take the tiller with the trackpad or mouse; **Esc** lets go. Moving your finger left to right pushes the tiller handle from port to starboard, which turns the boat to port, as on a real boat; right to left turns her to starboard. The tiller stays where you leave it, like a real one. **C** centres it. You can also drag the tiller bar at the bottom, or scroll sideways on the trackpad. **A**/**D** steer while held (port/starboard). There are no tack or gybe buttons: you put the helm over and hold it until she's round.
+- **Views.** **1** cockpit, **2** chase, **3** overhead, **V** cycles. The cockpit eye is near the stern, so you see most of the boat.
+- **Look around.** Arrow keys (or Q/E/R/F) turn your head; **W** looks ahead again. Looking never steers.
+- **Overhead.** **N** switches between north up, bow up and wind up (saved). Scroll or **+**/**−** to zoom, drag to move the map, **B** (or the "Back to boat" chip) recentres on your boat.
+- **Sails.** **S** luffs (hold), **O** whisker pole, Z/X and , / . work the sheets when you trim.
+- **Other.** **H** hail, **M** course view, **L** message log, **P** pause.
+- **Messages.** Notices stay up longer than before, the last few stay in the Messages panel at the right, and **All** (or **L**) opens the whole session's log, including incident explanations.
+
+## Modes
+
+- **Full race:** the start sequence, the course and the fleet.
+- **Start practice:** see below.
+- **Just sail:** open water, no fleet, no clock. Practise steering with the tiller, trimming, tacking, gybing and poling out. The HUD shows the polar target speed for your wind angle and how close you are to it.
 
 ## Layout
 
@@ -59,7 +77,7 @@ tests/
 - **Build.** Your boat is fiberglass with an aluminium mast and boom; the AI fleet is wooden. Class rules give both the same minimum weight and they race on equal terms, so build changes looks only (`build` in `FLEET`, `src/boat/boat.ts`).
 - **Easing sails to slow down** works upwind and reaching (the sails flog). From a broad reach to a run, eased sails still fill against the shrouds, so it barely slows you: head up first.
 - **Turning.** Turn rate = speed / turning radius (9 m), up to 22°/s, down to 4°/s when nearly stopped. Turning bleeds speed.
-- **Uses of the polar.** The tack button, AI close-hauled courses, the dial's no-go zone and the laylines use the polar's beat angle (it changes with wind speed) instead of a fixed 42°. The line aid's "time to line" and the AI's start approach assume you sheet in now and accelerate from your current speed, and the AI allows for coasting when it eases sails.
+- **Uses of the polar.** AI close-hauled courses, the dial's no-go zone and the laylines use the polar's beat angle (it changes with wind speed) instead of a fixed 42°. The line aid's "time to line" and the AI's start approach assume you sheet in now and accelerate from your current speed, and the AI allows for coasting when it eases sails.
 
 ### Start practice
 
@@ -79,6 +97,7 @@ Implemented: 10, 11, 12, 13, 15, 16.1, 17, 18.2(b), 20, 22.1, 22.2, plus a right
 - **16.1:** a right-of-way boat that turned more than 12° toward the other boat in the 3 s before an incident didn't give her room to keep clear, and is the one penalized. Slow, steady course changes are fine; turning away is fine.
 - **17:** if a boat clear astern gets an overlap to leeward within two lengths, she may not sail above her proper course while that overlap lasts (after the start signal; there's no proper course before it). "Proper course" is approximated as straight at the next mark if she can lay it, close-hauled if not, and no deeper than the best downwind angle. The situation banner says when Rule 17 restricts you or the other boat.
 - **20 and hails:** close-hauled near the shore with a boat on the same tack to windward stopping you tacking, you may hail "Room to tack!" (**Hail** / **H**); the hailed boat must start to tack within 5 s. AI boats pinned against the Cityfront hail you, a banner counts down, and ignoring it is a foul. On starboard with a port boat converging, Hail calls "Starboard!" and she ducks earlier. Hail when you're not entitled to and it explains why not. (The "You tack" reply isn't modelled.)
+- **Penalties.** A Part 2 foul (Rules 10–22) costs a two-turns penalty (RRS 44.1): two full turns, each with a tack and a gybe, in the same direction. Turns only count in one direction: wiggling back and forth doesn't finish it. Sailing instructions sometimes reduce this to one turn, so Setup has a **Penalty** setting (two turns, the rulebook default, or one). Touching a mark (Rule 31) is a one-turn penalty in the rules, but mark touches aren't modelled yet. Being on the course side at the start under SI B1.1 is still two turns.
 - Incidents before the start signal now count. (In the prototype, a timer started at −1 s, so collisions before the gun were never judged.)
 
 ### Sails and trim
@@ -91,7 +110,7 @@ Implemented: 10, 11, 12, 13, 15, 16.1, 17, 18.2(b), 20, 22.1, 22.2, plus a right
 ### Seeing the wind, the course and the laylines
 
 - **Cassette-tape telltales.** Both upper shrouds carry a length of old cassette tape about 1.4 m above the deck, where you can see it from the cockpit. Each streams the way the apparent wind blows, droops when it's light (under ~6 kt apparent) and flutters.
-- **Free look.** In cockpit (and chase) view, drag the view in any direction or hold Q/E (left/right) and R/F (up/down). Looking never steers. Double-tap, W or the "Look ahead" chip faces forward again.
+- **Free look.** In cockpit and chase view, the arrow keys (or Q/E and R/F) turn your head. Looking never steers. W or the "Look ahead" chip faces forward again.
 - **Course view.** "View the course" on the setup screen, or **Course** / **M** during the race (the race keeps running). It opens on one leg (your current one) with the others faded; step through with ◀ ▶, tap a leg in the list, or show the whole course. Drag to move, scroll or pinch to zoom. It shows every leg in order with numbers, the way round each rounding mark (green clockwise arc = leave to starboard, red counter-clockwise = leave to port), the side to pass each pass mark, the start/finish line, zones, laylines, wind, current and boats, plus a plain-language list of the legs with your current one highlighted.
 - **Laylines.** Dashed lines on the water and on both maps for your next rounding mark: green = starboard-tack layline, red = port-tack. On beats they use the polar's beat angle; on runs, the best downwind angle (wing-on-wing). Both allow for the current at the mark. Before your start they point at the first mark. Turned off with the training aids.
 

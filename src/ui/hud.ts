@@ -28,8 +28,8 @@ export class Hud {
     this.acc += dt; if (this.acc < 0.1) return; this.acc = 0;
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
-    $('clockLab').textContent = w.t < 0 ? 'Start in' : 'Race time';
-    $('clockSub').textContent = w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
+    $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
+    $('clockSub').textContent = w.freeSail ? 'Just sail' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
       u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish';
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1) + ' kt';
@@ -45,7 +45,6 @@ export class Hud {
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
     else { sl.textContent = ww.kt.toFixed(0) + ' kt on water'; sl.className = 'sub'; }
-    $('bTack').textContent = u.twa < 100 ? 'Tack' : 'Gybe';
     this.situation(w, u); this.lineBox(w, u); this.dial(u); this.map(w, u);
   }
 
@@ -122,6 +121,14 @@ export class Hud {
   private lineBox(w: World, u: Boat): void {
     const el = $('linebox'), C = w.C;
     if (u.finished) { el.hidden = true; return; }
+    if (w.freeSail) {
+      // just sailing: how you're doing against the boat's target speed at this angle
+      const target = polar(u.ww.kt, u.twa, sailPlan(u)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
+      const vmg = u.v * Math.cos(u.twa * D2R) / KT;
+      el.hidden = false; el.className = '';
+      el.textContent = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%` + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
+      return;
+    }
     el.hidden = false;
     if (w.t < 0 || u.ocs || !u.started) {
       const d = w.lineD(bow(u)), uN = Math.sin(u.h * D2R) * w.N.x + Math.cos(u.h * D2R) * w.N.y;

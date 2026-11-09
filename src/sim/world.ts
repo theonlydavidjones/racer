@@ -19,6 +19,9 @@ export const DT = 1 / 60;
 /** Two-turns penalty, in degrees of turning. */
 export const TWO_TURNS = 720;
 
+/** Start a penalty of `deg` degrees (360 = one turn, 720 = two). */
+export function startPenalty(b: Boat, deg: number): void { b.penalty = b.penaltyTotal = deg; b.penaltyTurned = 0; b.penaltyDir = 0; }
+
 export interface StartReport { delay: number; frac: number; kt: number }
 
 /** Where a boat was at the start signal. */
@@ -34,6 +37,8 @@ export interface GunSnap {
 export interface WorldOptions {
   /** Begin this many seconds before the start signal instead of at the warning signal (start practice). */
   startAt?: number;
+  /** Just sail: no race, no other boats, no start sequence. */
+  freeSail?: boolean;
 }
 
 const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '-' + A.id;
@@ -73,6 +78,7 @@ export class World {
   /** Race time each boat started (crossed the line properly), or null. */
   startTimes: (number | null)[] = [];
   readonly startAt: number;
+  readonly freeSail: boolean;
 
   constructor(file: CourseFile, settings: Settings, seed: number, opts: WorldOptions = {}) {
     this.settings = { ...settings };
@@ -81,13 +87,14 @@ export class World {
     this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet });
     this.cur = CURRENTS[settings.current] ?? CURRENTS.slack;
     this.cvec = currentVector(this.cur);
-    this.startAt = opts.startAt ?? settings.seq * 60;
+    this.freeSail = !!opts.freeSail;
+    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
     this.t = -this.startAt;
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
     this.wind = windAt(this.windModel, this.t);
     this.avgFrom = this.C.base;
-    for (let i = 0; i <= settings.fleet; i++) this.boats.push(this.makeBoat(i));
+    for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i));
     this.startTimes = this.boats.map(() => null);
   }
 
@@ -107,7 +114,11 @@ export class World {
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
     let p: Vec, h: number;
-    if (isUser && this.startAt < 120) {
+    if (isUser && this.freeSail) {
+      // open water out on the course, on a beam reach
+      p = place(-220, 0); h = n360(lineH + 180);
+      for (let k = 0; onLand(p) && k < 20; k++) p = place(-220 - 40 * k, 0);
+    } else if (isUser && this.startAt < 120) {
       // start practice: somewhere below the line, reaching along it, with a minute or so to go
       p = place(55 + r() * 45, (r() - 0.5) * this.lineLen * 0.6); h = n360(lineH + (r() < 0.5 ? 0 : 180));
     } else if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
@@ -121,8 +132,8 @@ export class World {
     return {
       id: i, isUser, name: F.name, no: F.no, color: F.tag, hullColor: F.hull, sailColor: F.sail, build: F.build,
       x: p.x, y: p.y, h, v: isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
-      steer: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
-      penalty: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
+      steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
+      penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null,
       cur: { x: 0, y: 0 }, ww: { from: this.C.base, kt: this.settings.windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0,
@@ -156,10 +167,10 @@ export class World {
     for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.wind, b.cur); }
     for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
-    this.checkLines(prevT);
+    if (!this.freeSail) this.checkLines(prevT);
     this.trackCourses();
     this.checkPairs();
-    this.signals(prevT);
+    if (!this.freeSail) this.signals(prevT);
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
@@ -192,7 +203,7 @@ export class World {
           b.finished = true; b.finishT = this.t;
           if (b.isUser) { this.userFinishT = this.t; this.emit({ type: 'toast', msg: 'Finished!' }); this.emit({ type: 'horn', dur: 0.5 }); this.emit({ type: 'finished' }); }
         } else if (this.obstructed(b) && (crossedFwd || crossedBack) && b.penalty <= 0) {
-          b.penalty = TWO_TURNS;
+          startPenalty(b, TWO_TURNS); // the Seaweed Soup addendum (B1.1) sets two turns for this, whatever the foul penalty
           if (b.isUser) this.emit({ type: 'toast', msg: 'You crossed the start/finish line mid-race. It is an obstruction here: two-turn penalty.', ms: 4500 });
         }
       }
@@ -280,7 +291,7 @@ export class World {
         this.paused = true;
         if (incident.fouler.isUser) this.fouls++; else this.fouledBy++;
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.fouler.penalty <= 0) incident.fouler.penalty = TWO_TURNS; // a boat already doing turns finishes them
+      } else if (incident.fouler.penalty <= 0) startPenalty(incident.fouler, this.penaltyDeg); // a boat already doing turns finishes them
     }
   }
 
@@ -344,7 +355,9 @@ export class World {
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
-  assignPenalty(b: Boat): void { b.penalty = TWO_TURNS; }
+  assignPenalty(b: Boat): void { startPenalty(b, this.penaltyDeg); }
+  /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */
+  get penaltyDeg(): number { return (this.settings.penaltyTurns === 1 ? 1 : 2) * 360; }
 }
 
 /**

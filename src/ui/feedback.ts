@@ -16,8 +16,23 @@ export function horn(dur: number): void {
   } catch { /* no audio */ }
 }
 
+/** Everything the game has told you, with race time, so nothing is lost when a message fades. */
+export interface LogEntry { t: number | null; msg: string }
+export const messageLog: LogEntry[] = [];
+let clock: () => number | null = () => null;
+let onLog: () => void = () => {};
+export function setLogClock(f: () => number | null, changed: () => void): void { clock = f; onLog = changed; }
+export function logMessage(msg: string): void {
+  messageLog.push({ t: clock(), msg });
+  if (messageLog.length > 300) messageLog.shift();
+  onLog();
+}
+
 let toastT = 0;
+/** Show a message for a while (longer for longer messages), and keep it in the log. */
 export function toast(msg: string, ms = 2500): void {
   const el = $('toast'); el.textContent = msg; el.classList.add('show');
-  clearTimeout(toastT); toastT = window.setTimeout(() => el.classList.remove('show'), ms);
+  const hold = Math.max(ms * 1.6, 2500 + msg.length * 45);
+  clearTimeout(toastT); toastT = window.setTimeout(() => el.classList.remove('show'), hold);
+  logMessage(msg);
 }

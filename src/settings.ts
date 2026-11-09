@@ -1,5 +1,5 @@
 export interface Settings {
-  mode: 'race' | 'drill'; // full race, or start practice (from one minute to go)
+  mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
   course: string; // course id
   windKt: number;
   current: string; // current preset id
@@ -8,9 +8,10 @@ export interface Settings {
   seq: number; // start sequence, minutes
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1; // you trim the sheets (otherwise the crew does)
+  penaltyTurns: 1 | 2; // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 12, current: 'ebb', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0 };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 12, current: 'ebb', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2 };
 
 const KEY = 'fbsim-settings-v2';
 

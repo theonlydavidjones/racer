@@ -39,13 +39,17 @@ export interface Boat {
   tacking: boolean; // past head to wind, not yet close-hauled (Rule 13)
   lastTackT: number;
   // helm
-  steer: -1 | 0 | 1;
+  steer: number; // −1..1: turn to port .. starboard (keys, and the AI's helm)
+  tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;
   desired: number;
   // race state
   penalty: number; // degrees of penalty turn remaining
+  penaltyTotal: number; // 360 or 720
+  penaltyTurned: number; // signed degrees turned since the penalty started
+  penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
   started: boolean;
   ocs: boolean;
   leg: number; // index of the next mark

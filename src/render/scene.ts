@@ -9,6 +9,15 @@ import { addLandscape } from './landscape';
 
 export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
 
+/** Overhead view state: which way is up, how high the camera is (m), and how far it's panned from the boat (m). */
+export type Orient = 'north' | 'bow' | 'wind';
+export interface Overhead { orient: Orient; height: number; off: { x: number; y: number } }
+export const ORIENT_LABEL: Record<Orient, string> = { north: 'North up', bow: 'Bow up', wind: 'Wind up' };
+/** Which compass direction is at the top of the overhead view. */
+export function overheadUp(o: Overhead, w: World): number {
+  return o.orient === 'north' ? 0 : o.orient === 'bow' ? w.user.h : w.C.base;
+}
+
 
 export class SceneView {
   readonly renderer: THREE.WebGLRenderer;
@@ -126,7 +135,7 @@ export class SceneView {
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number }): void {
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     this.wtex.offset.x -= w.cvec.x * k; this.wtex.offset.y -= w.cvec.y * k;
     w.boats.forEach((b, i) => syncBoatMesh(this.boatMeshes[i], b, t));
@@ -136,7 +145,7 @@ export class SceneView {
     if (viewMode === 0) {
       // sit on the windward side, like a helm hiking
       this.camSide += ((u.rel >= 0 ? 1 : -1) - this.camSide) * Math.min(1, dt * 1.5);
-      this.camLocal.set(0.55 * this.camSide, 1.5, 2.6);
+      this.camLocal.set(0.6 * this.camSide, 1.6, 3.3); // helm position, near the stern on the windward side
       um.grp.updateMatrixWorld();
       camera.position.copy(this.camLocal).applyMatrix4(um.grp.matrixWorld);
       camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, u.heel * 0.6 * D2R * Math.cos(look.yaw));
@@ -146,8 +155,9 @@ export class SceneView {
       camera.position.lerp(P3(u.x - hv.x * 24, u.y - hv.y * 24, height), Math.min(1, dt * 3));
       camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
     } else {
-      const wv = V(w.C.base);
-      camera.position.copy(P3(u.x, u.y, 170)); camera.up.set(wv.x, 0, -wv.y); camera.lookAt(P3(u.x, u.y, 0));
+      // overhead: straight down, north / bow / wind at the top, zoomed and panned as you like
+      const up = V(overheadUp(over, w)), cx = u.x + over.off.x, cy = u.y + over.off.y;
+      camera.position.copy(P3(cx, cy, over.height)); camera.up.set(up.x, 0, -up.y); camera.lookAt(P3(cx, cy, 0));
     }
     this.renderer.render(this.scene, camera);
   }

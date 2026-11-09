@@ -266,3 +266,21 @@ describe('sail trim', async () => {
     expect(kt(you)).toBeLessThan(kt(crew) * 0.85);
   });
 });
+
+describe('penalty turns (Rule 44.2)', async () => {
+  const { startPenalty } = await import('../src/sim/world');
+  it('only turning one way counts: wiggling back and forth does not finish a penalty', () => {
+    const b = testBoat({ heading: 270, kt: 4 });
+    startPenalty(b, 720);
+    for (let i = 0; i < 10; i++) { b.tiller = 1; sail(b, 1.5); b.tiller = -1; sail(b, 1.5); }
+    expect(b.penalty).toBeGreaterThan(600);
+  });
+  it('two full circles the same way finish a two-turns penalty', () => {
+    const b = testBoat({ heading: 270, kt: 4 });
+    startPenalty(b, 720);
+    b.tiller = 1; // tiller to starboard: turning to port, round and round
+    sail(b, 240, () => b.penalty === 0);
+    expect(b.penalty).toBe(0);
+    expect(b.penaltyDir).toBe(-1);
+  });
+});

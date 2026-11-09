@@ -24,6 +24,7 @@
 <div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
 <div id="linebox" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="trimPanel" aria-label="Sail trim">
   <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
     <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button></div>
@@ -42,13 +43,15 @@
     <button class="chip" id="bTrim" type="button" aria-pressed="false">Trim · crew</button>
     <button class="chip" id="bHail" type="button">Hail</button>
     <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
+    <button class="chip" id="bOrient" type="button" hidden>North up</button>
+    <button class="chip" id="bRecentre" type="button" hidden>Back to boat</button>
   </div>
   <div class="row2">
-    <button class="big steer" id="bLeft" type="button" aria-label="Steer to port">◀</button>
-    <button class="big steer" id="bRight" type="button" aria-label="Steer to starboard">▶</button>
-    <span class="keys">← → steer · Space tack · ↓ luff · O pole · H hail · Z/X main · ,/. jib · M course · V view · drag or Q/E/R/F to look</span>
-    <div class="spacer"></div>
-    <button class="big tack" id="bTack" type="button">Tack</button>
+    <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+      <div class="tiller-track"></div><div class="tiller-mid"></div><div class="tiller-handle" id="tillerHandle"></div>
+      <span class="tiller-lab" id="tillerLab">Tiller · centred</span>
+    </div>
+    <span class="keys" id="keysHint"></span>
     <button class="big" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button>
     <button class="big" id="bLuff" type="button">Luff</button>
   </div>
@@ -60,7 +63,7 @@
     <h1>Folkboat Racing Sim</h1>
     <p class="lede">Race Folkboats off a real start line with real current. Every foul pauses the race and replays it from overhead with the rule that applies.</p>
     <div class="field"><span>Mode</span>
-      <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button></div>
+      <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button><button type="button" data-v="sail">Just sail</button></div>
       <small id="modeNote"></small></div>
     <div class="field"><span>Course</span>
       <div class="seg" data-k="course"><!-- filled from src/courses/data/*.json --></div></div>
@@ -72,20 +75,23 @@
       <small>Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small></div>
     <div class="field" id="biasField"><span>Line set by the committee</span>
       <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
-    <div class="field"><span>Opponents</span>
+    <div class="field" id="fleetField"><span>Opponents</span>
       <div class="seg" data-k="fleet"><button type="button" data-v="1">1</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></div></div>
     <div class="field" id="seqField"><span>Sequence</span>
       <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
+    <div class="field" id="penaltyField"><span>Penalty for a foul</span>
+      <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (rulebook)</button><button type="button" data-v="1">One turn</button></div>
+      <small>The Racing Rules default is two turns (Rule 44.1). Some sailing instructions change it to one; check yours. Crossing the Seaweed Soup line mid-race is always two turns.</small></div>
     <div class="field"><span>Training aids</span>
       <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div></div>
     <div class="btnrow"><button class="ghost" id="bPreview" type="button">View the course</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+    <div class="btnrow"><button class="ghost" id="bKeys1" type="button">Keyboard settings</button></div>
     <div class="help">
-      <b>Steer</b><span>◀ ▶ buttons, arrow keys or A / D</span>
-      <b>Tack / gybe</b><span>Tack button or Space. Turns through the wind to the other close-hauled course.</span>
-      <b>Luff</b><span>Hold to ease the sails and slow down. This is how you burn time before the gun.</span>
+      <b>Steer</b><span>With a trackpad or mouse, click the water to take the tiller, then slide left/right: pushing the tiller to starboard (slide right) turns the boat to port. A two-finger sideways swipe works too. Esc lets go. On a phone, drag the tiller bar. A / D push the boat to port / starboard, C centres the tiller. Tack and gybe by steering through the wind.</span>
+      <b>Luff</b><span>Hold the Luff button (or S) to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
       <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
-      <b>Look</b><span>Drag the view in any direction, or hold Q / E / R / F. Looking never steers the boat. Double-tap or W to look ahead again.</span>
+      <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div>
   </div>
 </div>
@@ -125,8 +131,28 @@
     <canvas id="dcanvas" aria-label="Overhead replay of your start"></canvas>
     <ul class="facts" id="dFacts"></ul>
     <div class="verdict" id="dVerdict"><ul class="facts" id="dTips"></ul></div>
-    <div class="btnrow"><button class="ghost" id="bDReplay" type="button">Replay</button><button class="cta" id="bDAgain" type="button">Same start again</button></div>
+    <div class="btnrow"><button class="ghost" id="bDReplay" type="button">Watch again</button><button class="cta" id="bDAgain" type="button">Same start again</button></div>
     <div class="btnrow"><button class="ghost" id="bDNew" type="button">New start</button><button class="ghost" id="bDKeep" type="button">Keep racing</button><button class="ghost" id="bDSetup" type="button">Change setup</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="logView" hidden>
+  <div class="panel">
+    <div class="cvhead"><div><div class="eyebrow">This session</div><h2>Messages</h2></div><button class="ghost" id="bLogClose" type="button">Done</button></div>
+    <ol class="loglist" id="logList"></ol>
+  </div>
+</div>
+
+<div class="overlay" id="keysView" hidden>
+  <div class="panel">
+    <div class="cvhead">
+      <div><div class="eyebrow">Settings</div><h2>Keyboard</h2></div>
+      <button class="ghost" id="bKeysClose" type="button">Done</button>
+    </div>
+    <p class="lede">Click Change, then press the key you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</p>
+    <p class="knote" id="keysNote" aria-live="polite"></p>
+    <div id="keysList"></div>
+    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
   </div>
 </div>
 
@@ -139,7 +165,7 @@
     <div class="verdict" id="rVerdict"><p id="rWhat"></p></div>
     <p id="rTip"></p>
     <p id="rPen" class="lede"></p>
-    <div class="btnrow"><button class="ghost" id="bReplay" type="button">Replay</button><button class="cta" id="bCont" type="button">Continue racing</button></div>
+    <div class="btnrow"><button class="ghost" id="bReplay" type="button">Watch again</button><button class="cta" id="bCont" type="button">Continue racing</button></div>
   </div>
 </div>
 
@@ -147,7 +173,7 @@
   <div class="panel">
     <h2>Paused</h2>
     <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
-    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Change course or conditions</button></div>
+    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Change course or conditions</button><button class="ghost" id="bKeys2" type="button">Keyboard settings</button></div>
   </div>
 </div>
 

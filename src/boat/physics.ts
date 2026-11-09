@@ -53,7 +53,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       const err = wrap(b.turnTarget - b.h);
       rate = b.turnDir * maxRate;
       if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.h = b.turnTarget; b.turnTarget = null; }
-    } else { rate = b.steer * maxRate; if (b.steer !== 0) b.turnTarget = null; }
+    } else {
+      // tiller to starboard turns the bow to port; keys add a push of their own
+      const helm = clamp(b.steer - b.tiller, -1, 1);
+      rate = helm * maxRate; if (helm !== 0) b.turnTarget = null;
+    }
   } else if (b.penalty > 0 && !b.ai?.clearing) {
     // penalty turns: the crew backs the sails to spin the boat even when slow
     rate = Math.max(maxRate, PENALTY_TURN_RATE);
@@ -79,7 +83,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const dh = rate * dt;
   b.h = n360(b.h + dh);
   if (b.penalty > 0) {
-    b.penalty -= Math.abs(dh);
+    // Penalty turns count only in one direction, so each full turn includes a tack and a gybe (Rule 44.2).
+    // The direction is settled once she has turned 30° one way; nothing counts while she sails clear first.
+    if (!b.ai?.clearing) b.penaltyTurned += dh;
+    if (!b.penaltyDir && Math.abs(b.penaltyTurned) > 30) b.penaltyDir = Math.sign(b.penaltyTurned);
+    if (b.penaltyDir) b.penalty = Math.max(0, b.penaltyTotal - Math.max(0, b.penaltyTurned * b.penaltyDir));
     if (b.penalty <= 0) { b.penalty = 0; if (b.isUser) emit({ type: 'toast', msg: 'Penalty turns done. Back to racing.' }); }
   }
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel);
