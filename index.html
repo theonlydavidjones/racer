@@ -71,15 +71,16 @@
       <div class="seg" data-k="course"><!-- filled from src/courses/data/*.json --></div></div>
     <div class="coursecard" id="courseCard"></div>
     <div class="field"><span>Wind (westerly)</span>
-      <div class="seg" data-k="windKt"><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div></div>
+      <div class="seg" data-k="windKt"><button type="button" data-v="0">Afternoon westerly</button><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div>
+      <div class="seg" data-k="windDay" id="windDaySeg"><button type="button" data-v="0">Light day</button><button type="button" data-v="1">Typical day</button><button type="button" data-v="2">Windy day</button></div>
+      <small id="windNote">The sea breeze for the race day and time, from five years of NOAA wind records at Crissy Field. Puffs and lulls drift across the course either way.</small></div>
     <div class="field"><span>Current</span>
       <div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div>
-      <div id="tideBox" hidden>
-        <div class="tiderow"><label>Race day <input type="date" id="tideDate"></label><label>Start signal <input type="time" id="tideTime" step="300"></label></div>
-        <canvas id="tideGraph" aria-label="Current at the start line through the day"></canvas>
-        <small id="tideNote"></small>
-      </div>
       <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small></div>
+    <div class="field" id="tideBox" hidden><span>Race day</span>
+      <div class="tiderow"><label>Date <input type="date" id="tideDate"></label><label>Start signal <input type="time" id="tideTime" step="300"></label></div>
+      <canvas id="tideGraph" aria-label="Current and wind at the start line through the day"></canvas>
+      <small id="tideNote"></small></div>
     <div class="field" id="biasField"><span>Line set by the committee</span>
       <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
     <div class="field" id="fleetField"><span>Opponents</span>

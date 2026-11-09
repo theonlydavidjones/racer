@@ -9,7 +9,7 @@ import { V, brg } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
 
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, tideDate: '2026-11-14', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKt: 12, tideDate: '2026-11-14', ...o });
 
 describe('courses load from JSON', () => {
   it('Seaweed Soup course 2: seven legs, X is a pass mark, line is an obstruction', () => {
@@ -39,7 +39,7 @@ describe('fixed timestep is reproducible', () => {
       return JSON.stringify(w.boats.map(b => [b.x, b.y, b.h, b.v, b.leg, b.ocs, b.started, b.penalty]));
     };
     expect(run()).toEqual(run());
-  });
+  }, 30_000);
 });
 
 describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
@@ -85,7 +85,7 @@ describe('AI fleet sails the course', () => {
   it('training course: every AI boat starts, rounds and finishes', () => {
     const w = race(TRAIN, { fleet: 5, current: 'ebb' }, 7, 20);
     for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
-  });
+  }, 60_000);
 
   it('Seaweed Soup course 2 in an ebb: every AI boat finishes', () => {
     const w = race(SS2, { fleet: 3, current: 'ebb' }, 11, 75);

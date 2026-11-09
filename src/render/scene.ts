@@ -2,12 +2,36 @@ import './three-setup';
 import * as THREE from 'three';
 import { D2R, V, ZONE } from '../core/math';
 import type { World } from '../sim/world';
+import { Puffs, TerrainGrid } from '../environment/wind';
 import { laylinesFor } from '../sim/laylines';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape } from './landscape';
 
 export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
+
+/** Wind map on the water: PUFF_N × PUFF_N texels over PUFF_SPAN metres around the camera. */
+const PUFF_N = 160, PUFF_SPAN = 3200;
+
+/**
+ * Water colour from the wind on it. Stronger wind roughens the surface: denser, higher-contrast ripples and a
+ * darker look (rough water reflects less of the bright sky), whitecaps from about 12 kt. Lighter wind
+ * leaves it smoother and paler. Outside the wind map the water looks as it does in the mean wind.
+ */
+const WATER_FRAGMENT = `
+  vec4 texelColor = texture2D( map, vMapUv );
+  vec2 puv = (vec2(vPuffXZ.x, -vPuffXZ.y) - uPuffO) / uPuffS;
+  float edge = smoothstep(0.0, 0.1, min(min(puv.x, 1.0 - puv.x), min(puv.y, 1.0 - puv.y)));
+  float kw = mix(1.0, 0.4 + 1.4 * texture2D(uPuff, clamp(puv, 0.0, 1.0)).r, edge);
+  float gust = clamp((kw - 1.0) / 0.22, -1.0, 1.0);
+  vec4 fine = texture2D( map, vMapUv * 2.7 + vec2(0.31, 0.17) );
+  float rough = clamp(0.85 + 0.55 * gust, 0.25, 1.4);
+  diffuseColor.rgb *= mix(vec3(1.0), texelColor.rgb * mix(vec3(1.0), fine.rgb * 1.12, clamp(rough - 0.6, 0.0, 1.0)), rough);
+  diffuseColor.rgb *= 1.0 - 0.38 * max(gust, 0.0) + 0.28 * max(-gust, 0.0);
+  float caps = smoothstep(12.0, 21.0, uMeanKt * kw);
+  float speck = smoothstep(0.9 - 0.1 * caps, 0.98, fine.r * texelColor.r);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), speck * caps * 0.75);
+`;
 
 /** Overhead view state: which way is up, how high the camera is (m), and how far it's panned from the boat (m). */
 export type Orient = 'north' | 'bow' | 'wind';
@@ -31,6 +55,15 @@ export class SceneView {
   private camSide = 1;
   private baseFov = 60;
   private laylines: THREE.Line[] = [];
+  /* Wind on the water: a map of the wind strength around the camera, refreshed several times a second, that
+   * the water shader turns into darker, rougher patches in the puffs and paler, smoother ones in the lulls. */
+  private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
+  private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
+  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 } };
+  private puffAcc = 1;
+  private terrain: TerrainGrid | null = null;
+  private terrainKey = '';
+  private ripAngle = 0;
   private laylineAcc = 1;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -60,7 +93,19 @@ export class SceneView {
     wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(600, 600);
     wtex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const WSIZE = 18000; this.tile = WSIZE / 600;
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), new THREE.MeshLambertMaterial({ color: 0x3b6d84, map: wtex }));
+    wtex.center.set(0.5, 0.5);
+    this.puffTex.magFilter = this.puffTex.minFilter = THREE.LinearFilter;
+    const waterMat = new THREE.MeshLambertMaterial({ color: 0x3b6d84, map: wtex });
+    waterMat.onBeforeCompile = sh => {
+      Object.assign(sh.uniforms, this.puffUni);
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vPuffXZ;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPuffXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; varying vec2 vPuffXZ;')
+        .replace('#include <map_fragment>', WATER_FRAGMENT);
+    };
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), waterMat);
     water.rotation.x = -Math.PI / 2; scene.add(water);
 
     addLandscape(scene);
@@ -96,7 +141,9 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   setWorld(w: World): void {
-    this.laylineAcc = 1;
+    this.laylineAcc = 1; this.puffAcc = 1;
+    const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)}`;
+    if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y); this.terrainKey = key; }
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => { const m = buildBoatMesh(b); this.scene.add(m.grp); return m; });
     this.buildCourse(w);
@@ -135,10 +182,40 @@ export class SceneView {
     }
   }
 
+  /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
+  private drawWindOnWater(w: World, at: { x: number; y: number }, span: number): void {
+    const PUFF_SPAN = span, cell = span / PUFF_N, x0 = Math.round((at.x - PUFF_SPAN / 2) / cell) * cell, y0 = Math.round((at.y - PUFF_SPAN / 2) / cell) * cell;
+    const sum = new Float32Array(PUFF_N * PUFF_N), g = w.puffs.gustiness;
+    for (const p of w.puffs.cells) {
+      const R = p.r * 1.5;
+      const i0 = Math.max(0, Math.floor((p.x - R - x0) / cell)), i1 = Math.min(PUFF_N - 1, Math.ceil((p.x + R - x0) / cell));
+      const j0 = Math.max(0, Math.floor((p.y - R - y0) / cell)), j1 = Math.min(PUFF_N - 1, Math.ceil((p.y + R - y0) / cell));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const wt = Puffs.weight(p, x0 + (i + 0.5) * cell, y0 + (j + 0.5) * cell, w.puffs.dir);
+        if (wt) sum[j * PUFF_N + i] += p.amp * g * wt;
+      }
+    }
+    const tg = this.terrain, d = this.puffData;
+    for (let j = 0; j < PUFF_N; j++) for (let i = 0; i < PUFF_N; i++) {
+      const kk = Math.min(1.8, Math.max(0.4, (1 + sum[j * PUFF_N + i]) * (tg ? tg.at(x0 + (i + 0.5) * cell, y0 + (j + 0.5) * cell) : 1)));
+      d[(j * PUFF_N + i) * 4] = Math.round((kk - 0.4) / 1.4 * 255);
+    }
+    this.puffTex.needsUpdate = true;
+    this.puffUni.uPuffO.value.set(x0, y0); this.puffUni.uPuffS.value = span;
+    this.puffUni.uMeanKt.value = w.wind.kt;
+  }
+
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
   render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
-    this.wtex.offset.x -= w.cvec.x * k; this.wtex.offset.y -= w.cvec.y * k;
+    // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
+    this.ripAngle += (-w.windModel.base * D2R - this.ripAngle) * Math.min(1, dt * 0.2);
+    const c = Math.cos(this.ripAngle), s = Math.sin(this.ripAngle);
+    this.wtex.rotation = this.ripAngle;
+    // the texture drifts with the current: offset in texture space is the rotated displacement
+    this.wtex.offset.x -= (c * w.cvec.x + s * w.cvec.y) * k; this.wtex.offset.y -= (-s * w.cvec.x + c * w.cvec.y) * k;
+    this.puffAcc += dt;
+    if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     w.boats.forEach((b, i) => syncBoatMesh(this.boatMeshes[i], b, t));
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];

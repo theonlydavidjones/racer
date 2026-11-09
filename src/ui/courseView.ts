@@ -3,7 +3,7 @@ import type { CourseMark } from '../courses/course';
 import { laylinesFor } from '../sim/laylines';
 import type { World } from '../sim/world';
 import { $ } from './dom';
-import { drawCurrentArrows, drawLand, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
 
 type P = [number, number];
@@ -152,6 +152,7 @@ export class CourseView {
     const shown = (i: number) => focus == null || i === focus;
 
     ctx.fillStyle = '#0c2534'; ctx.fillRect(0, 0, cw, ch);
+    drawPuffs(ctx, tf, w.puffs.cells, w.puffs.dir, w.puffs.gustiness);
     drawLand(ctx, tf);
     { const half = Math.max(cw, ch) / this.view.scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentAt(p), this.view.cx, this.view.cy, half, Math.max(80, half / 6), 14, onLand); }
 

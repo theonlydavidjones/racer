@@ -5,7 +5,7 @@ import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
-import { windAt, type Wind, type WindModel } from '../environment/wind';
+import { Puffs, breezeAt, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
@@ -65,7 +65,15 @@ export class World {
   /** Real tide: NOAA-based current field, and the start signal's time (minutes since epoch, UTC). */
   readonly tide: CurrentField | null = null;
   readonly gunUtc: number = 0;
-  readonly tideDate: string = '';
+  /** Race day (YYYY-MM-DD, San Francisco) and whether the clock time matters (real tide or sea breeze). */
+  readonly raceDate: string = '';
+  readonly realTime: boolean = false;
+  /** The afternoon westerly from the NOAA records (Settings.windKt 0), and which kind of day. */
+  readonly seaBreeze: boolean;
+  readonly windDay: WindDay;
+  breeze: Breeze | null = null;
+  /** Puffs and lulls drifting across the course. */
+  readonly puffs: Puffs;
   readonly windModel: WindModel;
 
   t: number; // race time, s; negative before the start signal
@@ -106,17 +114,23 @@ export class World {
     this.freeSail = !!opts.freeSail;
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
     this.t = -this.startAt;
+    this.seaBreeze = settings.windKt === 0;
+    this.windDay = settings.windDay ?? 1;
+    this.realTime = settings.current === 'real' || this.seaBreeze;
+    if (this.realTime) {
+      this.raceDate = settings.tideDate || nextSaturday();
+      this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
+    }
     if (settings.current === 'real') {
-      this.tideDate = settings.tideDate || nextSaturday();
-      this.gunUtc = sfLocalToUtcMin(this.tideDate, settings.tideTime || '12:00');
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
       this.updateTide();
     }
     const r = this.rng;
-    this.windModel = { base: this.C.base, kt: settings.windKt, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
+    this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
+    this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), this.C.center);
+    this.updateBreeze();
     this.wind = windAt(this.windModel, this.t);
-    if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
-    this.avgFrom = this.C.base;
+    this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i));
     this.startTimes = this.boats.map(() => null);
   }
@@ -158,7 +172,7 @@ export class World {
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
-      cur: { x: 0, y: 0 }, ww: { from: this.C.base, kt: this.settings.windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
+      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0,
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
@@ -183,7 +197,24 @@ export class World {
     const c = this.tide.at(p), k = shoreRelief(p);
     return { x: c.x * k, y: c.y * k };
   }
-  /** Clock time now, minutes since epoch UTC (real tide only). */
+  /**
+   * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
+   * lighter near the shore, plus whatever puff or lull is passing.
+   */
+  windHere(p: Vec): Wind {
+    const q = this.puffs.at(p);
+    return { from: n360(this.wind.from + q.veer), kt: this.wind.kt * windTerrain(p) * q.k };
+  }
+
+  /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
+  private updateBreeze(): void {
+    if (!this.seaBreeze) { this.puffs.setGust(1.5); return; }
+    const b = this.breeze = breezeAt(this.clockUtc, this.windDay);
+    this.windModel.base = b.from; this.windModel.kt = b.kt;
+    this.puffs.setGust(b.gust);
+  }
+
+  /** Clock time now, minutes since epoch UTC (real tide or sea breeze). */
   get clockUtc(): number { return this.gunUtc + this.t / 60; }
   /** Local San Francisco time of day now, e.g. "12:04" (real tide only). */
   get clock(): string { return sfClock(this.clockUtc); }
@@ -201,10 +232,12 @@ export class World {
     const prevT = this.t;
     this.t += dt;
     this.steps++;
+    if (this.steps % 60 === 0) this.updateBreeze();
     this.wind = windAt(this.windModel, this.t);
+    this.puffs.step(dt, this.wind);
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
-    for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.wind, b.cur); }
+    for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b), b.cur); }
     for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }

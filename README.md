@@ -9,6 +9,7 @@ npm test           # rules + simulation tests
 npm run build      # static site in dist/ (relative paths, host anywhere)
 npm run data:polar # re-pull Folkboat ORC certificates (behind a proxy: NODE_USE_ENV_PROXY=1)
 npm run data:currents # re-pull NOAA tidal-current data for the Cityfront (same proxy note)
+npm run data:wind  # rebuild the wind climatology from NOAA's Crissy Field station (same proxy note)
 npm run build:artifact  # single-page build for the claude.ai artifact → artifact/folkboat-racing-sim.html
 ```
 
@@ -107,6 +108,18 @@ Checked against the official 2025–2028 rulebook (World Sailing, with changes a
 - **Penalties.** A Part 2 foul (Rules 10–22) costs a two-turns penalty (RRS 44.1): two full turns, each with a tack and a gybe, in the same direction. Turns only count in one direction: wiggling back and forth doesn't finish it. Sailing instructions sometimes reduce this to one turn, so Setup has a **Penalty** setting (two turns, the rulebook default, or one). Touching a mark (Rule 31) is always one turn. Being on the course side at the start under SI B1.1 is still two turns.
 - Incidents before the start signal now count. (In the prototype, a timer started at −1 s, so collisions before the gun were never judged.)
 
+### The afternoon westerly, puffs and lulls
+
+Setup → Wind → **Afternoon westerly** (the default), then a light, typical or windy day. It uses the same race day and start time as the tide (Setup → Race day), and the graph shows the wind (green line) as well as the current.
+
+- **From the records.** Five years (2021–2025, 43,745 hours) of NOAA's hourly wind at its San Francisco station (9414290, on the shore at Crissy Field, the west end of the race area), summarized by month and hour (`scripts/fetch-wind-climate.mjs` → `src/environment/data/sf-wind-climate.json`). Light, typical and windy days are the 25th, 50th and 75th percentile of the westerly hours. The westerly fills in through the day and follows the clock during the race: in July it builds from about 7 kt at 11:00 to about 12 kt at 16:00 at the station; in November it's lighter and blows on only about half of afternoons (the setup note says how often).
+- **Open water vs the station.** The station is on the shore, where the land slows the wind; out on the race course it blows harder. The sim assumes open water is 25% windier than the station (an estimate, not a measurement), easing to 80% of that at the shoreline, so the field matches the station at the station.
+- **The slot.** Up to 20% more wind along a band from the Golden Gate toward Alcatraz and Angel Island, where the westerly funnels in; less close to the Cityfront.
+- **Puffs and lulls.** Patches of stronger and lighter wind, longer downwind than across, drifting downwind at a bit less than the wind speed and fading in and out over one to three minutes. A puff is up to about a third stronger and veered a few degrees (wind brought down from aloft is veered in the northern hemisphere); a lull is lighter. How strong they are follows the gust factor in the records. Every boat feels the wind where she is.
+- **Seeing them.** On the water, puffs are darker and rougher with denser ripples (rough water reflects less of the bright sky), lulls paler and smoother, with whitecaps from about 12 kt; the ripples lie across the wind. They show as dark and pale streaks on the course map and course view, and the wind readout says "puff" or "lull".
+- **Presets.** 8, 12 and 18 kt are still there (steady mean wind, with the same slot, shore and puffs).
+- Not modelled yet: the wind bending along the shore, the fog and the evening fade beyond what the hourly records show, and the AI deliberately sailing to the pressure.
+
 ### Real tides and currents
 
 Setup → Current → **Real tide** (the default), then pick the race day and the time of the start signal. A graph shows the current at the start line through the day, with the gun and the length of a race marked, and a line like "Ebb 0.8 kt, building · turns to flood ~22:45".
@@ -149,7 +162,7 @@ See [ROADMAP.md](ROADMAP.md) for what's planned, including full sail controls (b
 - Acceleration, slowing and turning are calibrated from physics and sailing judgement, not measured on a real Folkboat. If your boat feels different, the constants in `HANDLING` are the place to adjust.
 - Above 24 kt the polar is held flat (no depowering model yet). No sail trim beyond automatic.
 - AI starts: on the Seaweed Soup line, median 5–11 s after the gun in slack and ebb, ~25 s in flood, almost never over early. On the short training line they're slower (crowding). The AI keeps clear, takes penalties in clear water, won't tack when too slow to make it, and doesn't sail on a broad reach expecting to slow down by easing sails.
-- Wind is a synthetic oscillation (the afternoon westerly is next). Current between the six NOAA stations is interpolated, not modelled hydrodynamically.
+- Wind shifts are still a synthetic oscillation on top of the westerly; puffs are random (seeded), not forecast. Current between the six NOAA stations is interpolated, not modelled hydrodynamically.
 - The shoreline is hand-traced.
 - Rules not modelled yet: 14 (beyond the swerve check), 18.1(a)(2) (opposite tacks when only one boat must tack at the mark), 18.2(c) and (d), 18.4 (gybing at a mark), 19 (room at obstructions other than via the Rule 20 hail), 21.3 (backing a sail), 23, exoneration (43), and 44.1(a) (a Part 2 foul and a mark touch in the same incident need only the Part 2 penalty). Touching the committee boat isn't detected.
 - Fouls between two AI boats are penalized but not explained.

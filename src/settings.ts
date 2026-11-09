@@ -1,7 +1,8 @@
 export interface Settings {
   mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
   course: string; // course id
-  windKt: number;
+  windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
+  windDay: 0 | 1 | 2; // with the westerly: a light, typical or windy day (25th, 50th, 75th percentile)
   current: string; // 'real' (NOAA predictions for tideDate/tideTime) or a uniform preset id
   tideDate: string; // race day, YYYY-MM-DD, San Francisco local ('' = the coming Saturday)
   tideTime: string; // time of the start signal, HH:MM, San Francisco local
@@ -13,7 +14,7 @@ export interface Settings {
   penaltyTurns: 1 | 2; // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 12, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2 };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2 };
 
 const KEY = 'fbsim-settings-v2';
 

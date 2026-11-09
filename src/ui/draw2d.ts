@@ -94,3 +94,22 @@ export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p:
   }
   ctx.restore();
 }
+
+/** Puffs (dark) and lulls (pale) as soft streaks along the wind, as you'd see them on the water from aloft. */
+export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: number; y: number; r: number; amp: number; age: number; life: number }[],
+  dir: { x: number; y: number }, gustiness: number): void {
+  ctx.save();
+  for (const c of cells) {
+    const env = Math.sin(Math.PI * c.age / c.life), a = c.amp * gustiness * env;
+    if (Math.abs(a) < 0.03) continue;
+    const p = tf(c.x, c.y), e = tf(c.x + dir.x * c.r * 1.5, c.y + dir.y * c.r * 1.5), s = tf(c.x + dir.y * c.r * 0.75, c.y - dir.x * c.r * 0.75);
+    const rx = Math.hypot(e[0] - p[0], e[1] - p[1]), ry = Math.hypot(s[0] - p[0], s[1] - p[1]);
+    if (rx < 1.5) continue;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    const col = a > 0 ? `rgba(8,22,40,${Math.min(0.5, a * 1.6)})` : `rgba(190,225,240,${Math.min(0.35, -a * 1.4)})`;
+    g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(Math.atan2(e[1] - p[1], e[0] - p[0])); ctx.scale(rx, ry);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+  ctx.restore();
+}

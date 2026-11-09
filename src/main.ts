@@ -14,6 +14,7 @@ import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { shoreRelief } from './environment/current';
+import { breezeAt, windTerrain } from './environment/wind';
 import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
@@ -385,42 +386,59 @@ function courseCard(): void {
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
 function tideBox(): void {
-  const real = S.current === 'real';
-  $('tideBox').hidden = !real; $('currentNote').hidden = real;
-  if (!real || !w.tide) return;
+  $('tideBox').hidden = !w.realTime; $('currentNote').hidden = S.current === 'real';
+  $('windDaySeg').hidden = !w.seaBreeze;
+  if (!w.realTime) return;
   const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
-  d.value = w.tideDate; tm.value = S.tideTime || '12:00';
+  d.value = w.raceDate; tm.value = S.tideTime || '12:00';
   drawTideGraph();
 }
+/** Current (filled: flood up, ebb down) and the westerly (line, right scale) at the start line through the day. */
 function drawTideGraph(): void {
   const cv = $<HTMLCanvasElement>('tideGraph'), dpr = devicePixelRatio || 1, W = cv.clientWidth || 360, H = cv.clientHeight || 120;
   cv.width = W * dpr; cv.height = H * dpr;
   const ctx = cv.getContext('2d')!; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-  const f = new CurrentField(w.tide!.stations), p = w.C.center, k = shoreRelief(p);
-  const from = w.gunUtc - 3 * 60, to = w.gunUtc + 4 * 60, n = 84;
-  // signed speed at the line: + flood (toward the east, into the Bay), − ebb
-  const fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
-  const pts: number[] = [];
-  for (let i = 0; i <= n; i++) { f.setTime(from + (to - from) * i / n); const c = f.at(p); pts.push((c.x * fl.x + c.y * fl.y) * k / 0.5144); }
-  const top = 14, bot = H - 18, mid = (top + bot) / 2, max = Math.max(1, ...pts.map(Math.abs)), y = (v: number) => mid - v / max * (bot - top) / 2, x = (i: number) => 8 + (W - 16) * i / n;
+  const p = w.C.center, from = w.gunUtc - 3 * 60, to = w.gunUtc + 4 * 60, n = 84;
+  const top = 16, bot = H - 18, mid = (top + bot) / 2, x = (i: number) => 8 + (W - 16) * i / n;
   const tx = (m: number) => 8 + (W - 16) * (m - from) / (to - from);
   // race window: the gun to about 75 minutes later
   ctx.fillStyle = 'rgba(255,182,39,.10)'; ctx.fillRect(tx(w.gunUtc), top - 6, tx(w.gunUtc + 75) - tx(w.gunUtc), bot - top + 12);
-  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, mid); ctx.lineTo(W - 8, mid); ctx.stroke();
-  for (const [sign, col] of [[1, 'rgba(111,168,255,.45)'], [-1, 'rgba(255,140,90,.45)']] as const) {
-    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x(0), mid);
-    pts.forEach((v, i) => ctx.lineTo(x(i), sign * v > 0 ? y(v) : mid)); ctx.lineTo(x(n), mid); ctx.fill();
+  const notes: string[] = [];
+  if (w.tide) {
+    // signed current at the line: + flood (east, into the Bay), − ebb
+    const f = new CurrentField(w.tide.stations), k = shoreRelief(p), fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
+    const pts: number[] = [];
+    for (let i = 0; i <= n; i++) { f.setTime(from + (to - from) * i / n); const c = f.at(p); pts.push((c.x * fl.x + c.y * fl.y) * k / 0.5144); }
+    const max = Math.max(1, ...pts.map(Math.abs)), y = (v: number) => mid - v / max * (bot - top) / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, mid); ctx.lineTo(W - 8, mid); ctx.stroke();
+    for (const [sign, col] of [[1, 'rgba(111,168,255,.40)'], [-1, 'rgba(255,140,90,.40)']] as const) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x(0), mid);
+      pts.forEach((v, i) => ctx.lineTo(x(i), sign * v > 0 ? y(v) : mid)); ctx.lineTo(x(n), mid); ctx.fill();
+    }
+    ctx.font = '600 10px system-ui, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#9cc3ff'; ctx.fillText('FLOOD ↑', 10, top + 2);
+    ctx.fillStyle = '#ffb08a'; ctx.fillText('EBB ↓', 10, bot);
+    f.setTime(w.gunUtc);
+    notes.push(`current ${describeTide(f, p, w.gunUtc).label} near the line`);
   }
-  ctx.strokeStyle = '#e8eef6'; ctx.lineWidth = 1.5; ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)))); ctx.stroke();
+  if (w.seaBreeze) {
+    // the westerly in the open water near the line, kt, on its own scale (right)
+    const kts: number[] = [];
+    for (let i = 0; i <= n; i++) kts.push(breezeAt(from + (to - from) * i / n, w.windDay).kt * windTerrain(p));
+    const kmax = Math.max(10, Math.ceil(Math.max(...kts) / 5) * 5), yk = (v: number) => bot - v / kmax * (bot - top);
+    ctx.strokeStyle = '#7fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); kts.forEach((v, i) => (i ? ctx.lineTo(x(i), yk(v)) : ctx.moveTo(x(i), yk(v)))); ctx.stroke();
+    ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = '#7fe0a8'; ctx.textAlign = 'right';
+    ctx.fillText(`WIND ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
+    const b = breezeAt(w.gunUtc, w.windDay), b2 = breezeAt(w.gunUtc + 90, w.windDay);
+    const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * windTerrain(p))} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * windTerrain(p))} kt` : 'steady';
+    notes.push(`wind ${Math.round(b.kt * windTerrain(p))} kt from ${Math.round(b.from)}° near the line, ${trend} over the next 90 minutes (more out in the slot); a westerly blows on about ${Math.round(b.west * 100)}% of ${new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' })} days at this hour`);
+  }
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#9cc3ff'; ctx.fillText('FLOOD ↑ (east)', 10, top + 2);
-  ctx.fillStyle = '#ffb08a'; ctx.fillText('EBB ↓ (west, to the Gate)', 10, bot);
-  ctx.fillStyle = '#ffb627'; ctx.textAlign = 'center'; ctx.fillText('gun', tx(w.gunUtc), top - 4 < 8 ? 9 : top - 4);
-  f.setTime(w.gunUtc);
-  const at = describeTide(f, p, w.gunUtc);
-  $('tideNote').textContent = `${new Date(w.tideDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, gun at ${sfClock(w.gunUtc)}: ${at.label} near the line (NOAA predictions). Shaded: about the length of the race.`;
+  ctx.fillStyle = '#ffb627'; ctx.fillText('gun', tx(w.gunUtc), 10);
+  const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  $('tideNote').textContent = `${day}, gun at ${sfClock(w.gunUtc)}: ${notes.join('; ')}. Shaded: about the length of a race. Sources: NOAA current predictions and wind records.`;
 }
 $<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); newGame(); tideBox(); });
 $<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); newGame(); tideBox(); });
@@ -447,7 +465,7 @@ function beginRace(seed?: number): void {
   horn(1.0);
   const m0 = w.C.marks[0];
   toast(S.mode === 'sail'
-    ? `Just sail: open water, no race. ${S.windKt} kt westerly, ${w.cur.label.toLowerCase()}. Try the tiller, the trim and the pole.`
+    ? `Just sail: open water, no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Try the tiller, the trim and the pole.`
     : S.mode === 'drill'
     ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
     : `${S.seq}-minute sequence. Current: ${w.cur.label}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);

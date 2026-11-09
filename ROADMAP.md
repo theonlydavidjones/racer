@@ -5,7 +5,7 @@ What's planned, roughly in order. Done work is described in the README.
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
-- **Afternoon westerly.** The breeze fills in and builds through the afternoon, with stronger patches in the slot off the Golden Gate.
+- ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). Later: wind bending along the shore, the AI sailing to the pressure, real wind for a past race day.
 - **Remaining rules.** 18.4 (gybing at a mark), 19 (room at obstructions other than through a Rule 20 hail), 18.2(c)/(d), 21.3, 23, exoneration (43) and 44.1(a). Also detect touching the committee boat.
 - **Real shoreline.** Replace the hand-traced Cityfront outline with real coastline data.
 
@@ -30,6 +30,25 @@ The principle: everything you see on the water comes from the same wind, current
 - **Marks and moored boats:** buoys lean and trail a wake downstream in the current; anchored and moored boats swing to point into the current (or the wind, when it wins), as they do in the harbour before the start.
 - **The water texture moves with the current** (flow-mapped normals), so you can see the set over the bottom against the wind waves.
 - **Rendering approach:** a sum of Gerstner waves (or an FFT ocean) built from the wave spectrum, with the wind sea and swell as separate components; a foam and whitecap layer driven by wave steepness; a current-convergence map for tidelines and debris; a puff map from the wind field darkening and roughening the surface. Phone-friendly fallbacks come later.
+
+## Looks: the boats and the bay (requested)
+
+Same principle as the water: realistic means *recognisably the real thing*, and the details a sailor uses (a transit on the shore, the committee boat's flags, a wake) should be there and correct. Rough order: most realism for the effort first.
+
+### The boats
+1. **A real Folkboat hull** from the class lines: the deep, narrow hull with its sweeping sheer, the long keel with the rudder hung on the transom, the doghouse-style cabin trunk with portlights, the cockpit well and coamings, the tiller. Wooden boats lapstrake (clinker), with the plank lands visible; yours smooth glassfibre with a boot stripe and antifouling that shows when she heels.
+2. **Materials and light:** physically based materials (gloss gelcoat, varnished wood, anodised aluminium, Dacron sails with seams and a little translucency), shadows (sails shading the deck, boats shading the water), and reflections of the sky.
+3. **Crew:** helm and crew figures that hike out, move across on a tack, and sit where you'd sit.
+4. **Bow wave, wake and spray,** sized by boat speed; boats pitch and roll in the waves once sea state is in.
+5. **Rigging detail:** blocks, sheets and control lines (comes with the full sail controls), sail numbers and the class insignia.
+
+### The bay
+1. **Sky and sun for the race day and time:** the sun where it really is (we already know the date and time), glare and glitter on the water, and the summer fog bank pouring in through the Gate in the afternoon.
+2. **Real terrain:** elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
+3. **Landmarks you steer and sight by:** the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
+4. **Marks and the committee boat:** real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
+5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
+6. **Moored boats and marina life** in the harbour behind the line; traffic (see below).
 
 ## Ship traffic and wakes (later)
 

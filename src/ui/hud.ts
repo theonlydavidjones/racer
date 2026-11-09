@@ -8,7 +8,7 @@ import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
 import { toast } from './feedback';
-import { drawCourse, drawCurrentArrows, drawLand, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCourse, drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
 import { laylinesFor } from '../sim/laylines';
 
@@ -47,7 +47,12 @@ export class Hud {
     $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
-    else { sl.textContent = ww.kt.toFixed(0) + ' kt on water'; sl.className = 'sub'; }
+    else {
+      // in a puff or a lull?
+      const k = w.puffs.at(u).k;
+      sl.textContent = ww.kt.toFixed(0) + ' kt on water' + (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : '');
+      sl.className = 'sub' + (k > 1.08 ? ' lift' : '');
+    }
     this.situation(w, u); this.lineBox(w, u); this.dial(u); this.map(w, u);
   }
 
@@ -209,6 +214,7 @@ export class Hud {
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
+    drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness);
     drawLand(ctx, tf);
     { // the current across the water around you, from the sim's own current field
       const half = Math.max(w, h) / scale * 0.75, mid = ctr;
