@@ -82,4 +82,3 @@ The port keeps the prototype's behaviour. These differences are deliberate:
 - The shoreline is hand-traced.
 - Rules not modelled yet: 14 (beyond the swerve check), 16, 17, 18.3, 19, hails. Mark-room is only modelled for same-tack or downwind approaches. These appear as `todo` entries in `tests/rules.test.ts`.
 - Fouls between two AI boats are penalized but not explained.
-- The Seaweed Soup start/finish line (race deck → X) is an assumption to check against the sailing instructions.

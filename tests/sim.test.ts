@@ -17,7 +17,7 @@ describe('courses load from JSON', () => {
       ['A:s', 'X(pass):s', '6:s', 'X(pass):p', 'A:s', 'X(pass):s', '6:s']);
     expect(C.obstruction).toBe(true);
     expect(C.pinKind).toBe('mark');
-    expect(C.lineLen).toBeGreaterThan(200); // race deck to X
+    expect(C.lineLen).toBeGreaterThan(200); // GGYC flagpole to X
     // first leg (to A) is a beat into the westerly; leg to 6 is downwind
     expect(C.marks[0].beat).toBe(true);
     expect(C.marks[2].beat).toBe(false);
@@ -143,6 +143,6 @@ describe('laylines and course description', () => {
     expect(legs[0]).toBe('Start → A: beat (upwind). Round A leaving it to starboard (clockwise).');
     expect(legs[1]).toBe("A → X: run (downwind). Pass X leaving it to starboard. Don't round it.");
     expect(legs[3]).toContain('Pass X leaving it to port');
-    expect(legs[7]).toBe('6 → Finish: cross the line between GGYC race deck and X.');
+    expect(legs[7]).toBe('6 → Finish: cross the line between GGYC flagpole and X.');
   });
 });

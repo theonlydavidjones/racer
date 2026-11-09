@@ -5,7 +5,7 @@
   "title": "Seaweed Soup · Course 2",
   "area": "San Francisco Cityfront",
   "source": "GGYC Manuel Fagundes Seaweed Soup Regatta 2026–27, Addendum B: Courses and Marks, Revision 1 (2026-11-05). Mark positions from YRA (github.com/nkiesel/YRA-Marks). Main sailing instructions not available.",
-  "notes": "GGYC Seaweed Soup 2026–27, Addendum B. About 3.2 nm. Start westward off the GGYC race deck. Pass X on the side shown to keep clear of the line; it is not a rounding mark. Crossing the line mid-race is a two-turn penalty. Marks are at YRA positions; the line runs from the race deck out to X, an assumption to check against the sailing instructions.",
+  "notes": "GGYC Seaweed Soup 2026–27, course 2. About 3.2 nm. The start line runs from the flagpole on the GGYC deck out to mark X; start heading west. X is not a rounding mark: just pass it on the side shown, which keeps you off the line. Crossing the line in the middle of the race costs a two-turn penalty.",
   "windBase": 275,
   "marks": {
     "A": {
@@ -27,11 +27,11 @@
   },
   "startLine": {
     "committee": {
-      "label": "GGYC race deck",
+      "label": "GGYC flagpole",
       "kind": "shore",
       "lat": 37.80925,
       "lon": -122.44325,
-      "verify": "The line is not defined in Addendum B (it refers to the main SIs). Race deck to X is inferred: X is 'approximately 300 yards north of Golden Gate YC' (B2) and exists 'to keep boats out of the start/finish line mid-race' (footnote 1), which only works if X marks the line's outer end; the 2011–12 SIs reportedly used the race deck and X. Confirm against the 2026–27 SIs."
+      "verify": "Flagpole on the GGYC deck to X. The addendum doesn't define the line; X is ~300 yd north of GGYC and exists to keep boats off the line mid-race, so it is the outer end."
     },
     "pin": {
       "label": "X",
