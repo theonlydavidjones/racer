@@ -71,3 +71,26 @@ export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines 
   });
   ctx.restore();
 }
+
+/**
+ * Small arrows showing the current across the water, on a grid `spacing` metres apart around (cx, cy).
+ * Length grows with speed; land and the shore relief come from `at`, the sim's own current field.
+ */
+export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x: number; y: number }) => { x: number; y: number },
+  cx: number, cy: number, half: number, spacing: number, pxPerKt: number, onLand: (p: { x: number; y: number }) => boolean): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(111,208,255,.55)'; ctx.fillStyle = 'rgba(111,208,255,.55)'; ctx.lineWidth = 1.2;
+  const x0 = Math.floor((cx - half) / spacing) * spacing, y0 = Math.floor((cy - half) / spacing) * spacing;
+  for (let x = x0; x <= cx + half; x += spacing) for (let y = y0; y <= cy + half; y += spacing) {
+    const p = { x, y };
+    if (onLand(p)) continue;
+    const c = at(p), kt = Math.hypot(c.x, c.y) / 0.5144;
+    if (kt < 0.08) continue;
+    const a = tf(x, y), b = tf(x + c.x / (kt * 0.5144) * 10, y + c.y / (kt * 0.5144) * 10); // direction only
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, len = Math.min(spacing * 0.8, kt * pxPerKt);
+    const ux = dx / l, uy = dy / l, tx = a[0] + ux * len / 2, ty = a[1] + uy * len / 2;
+    ctx.beginPath(); ctx.moveTo(a[0] - ux * len / 2, a[1] - uy * len / 2); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - ux * 4 - uy * 2.5, ty - uy * 4 + ux * 2.5); ctx.lineTo(tx - ux * 4 + uy * 2.5, ty - uy * 4 - ux * 2.5); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}

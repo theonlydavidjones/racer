@@ -4,9 +4,9 @@ import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
 
-/** Uniform tidal current presets. `set` is the direction the water flows toward.
- * TODO: replace with SFBOFS grids and CO-OPS tide timing. */
+/** Uniform current presets (for practice), and 'real' for NOAA predictions (tide.ts). `set` is the direction the water flows toward. */
 export const CURRENTS: Record<string, CurrentPreset> = {
+  real: { id: 'real', set: 0, kt: 0, label: 'Real tide', button: 'Real tide' },
   slack: { id: 'slack', set: 0, kt: 0, label: 'Slack', button: 'Slack' },
   flood: { id: 'flood', set: 95, kt: 1.0, label: 'Flood 1.0 kt', button: 'Flood 1.0' },
   ebb: { id: 'ebb', set: 280, kt: 1.5, label: 'Ebb 1.5 kt', button: 'Ebb 1.5' },
@@ -19,9 +19,12 @@ export function currentVector(c: CurrentPreset): Vec {
   return { x: v.x * c.kt * KT, y: v.y * c.kt * KT };
 }
 
-/** Current at a point, in m/s. It eases near the shore (current relief): 25% at the beach, full strength 350 m out. */
+/** Current relief near the shore: 25% of the open-water current at the beach, full strength 350 m out. */
+export const shoreRelief = (p: Vec): number => clamp(0.25 + 0.75 * shoreDist(p) / 350, 0.25, 1);
+
+/** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec): Vec {
-  const k = clamp(0.25 + 0.75 * shoreDist(p) / 350, 0.25, 1);
+  const k = shoreRelief(p);
   return { x: open.x * k, y: open.y * k };
 }
 

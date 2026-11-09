@@ -4,7 +4,7 @@ What's planned, roughly in order. Done work is described in the README.
 
 ## Next up
 
-- **Real SF Bay currents and tide timing.** Use real tide and current predictions for a chosen date, so the ebb and flood build, turn and ease during a race. Add stronger relief along the Cityfront shore. Needs a data source the environment can reach (NOAA).
+- ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
 - **Afternoon westerly.** The breeze fills in and builds through the afternoon, with stronger patches in the slot off the Golden Gate.
 - **Remaining rules.** 18.4 (gybing at a mark), 19 (room at obstructions other than through a Rule 20 hail), 18.2(c)/(d), 21.3, 23, exoneration (43) and 44.1(a). Also detect touching the committee boat.
 - **Real shoreline.** Replace the hand-traced Cityfront outline with real coastline data.

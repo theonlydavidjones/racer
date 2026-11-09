@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "data:polar": "node scripts/fetch-orc-polar.mjs",
+    "data:currents": "node scripts/fetch-currents.mjs",
     "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs"
   },
   "dependencies": {

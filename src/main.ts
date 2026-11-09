@@ -11,7 +11,9 @@ import { RULES, explain, type Incident } from './rules';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
-import { DT, World } from './sim/world';
+import { DT, World, describeTide } from './sim/world';
+import { CurrentField, nextSaturday, sfClock } from './environment/tide';
+import { shoreRelief } from './environment/current';
 import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
@@ -381,6 +383,48 @@ function courseCard(): void {
     : 'The whole race, from the warning signal to the finish.';
   $('bGo').textContent = S.mode === 'drill' ? 'Practice a start' : S.mode === 'sail' ? 'Go sailing' : 'Start the sequence';
 }
+/* Real tide: race day, start time, and a graph of the current at the start line through the day. */
+function tideBox(): void {
+  const real = S.current === 'real';
+  $('tideBox').hidden = !real; $('currentNote').hidden = real;
+  if (!real || !w.tide) return;
+  const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
+  d.value = w.tideDate; tm.value = S.tideTime || '12:00';
+  drawTideGraph();
+}
+function drawTideGraph(): void {
+  const cv = $<HTMLCanvasElement>('tideGraph'), dpr = devicePixelRatio || 1, W = cv.clientWidth || 360, H = cv.clientHeight || 120;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext('2d')!; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const f = new CurrentField(w.tide!.stations), p = w.C.center, k = shoreRelief(p);
+  const from = w.gunUtc - 3 * 60, to = w.gunUtc + 4 * 60, n = 84;
+  // signed speed at the line: + flood (toward the east, into the Bay), − ebb
+  const fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
+  const pts: number[] = [];
+  for (let i = 0; i <= n; i++) { f.setTime(from + (to - from) * i / n); const c = f.at(p); pts.push((c.x * fl.x + c.y * fl.y) * k / 0.5144); }
+  const top = 14, bot = H - 18, mid = (top + bot) / 2, max = Math.max(1, ...pts.map(Math.abs)), y = (v: number) => mid - v / max * (bot - top) / 2, x = (i: number) => 8 + (W - 16) * i / n;
+  const tx = (m: number) => 8 + (W - 16) * (m - from) / (to - from);
+  // race window: the gun to about 75 minutes later
+  ctx.fillStyle = 'rgba(255,182,39,.10)'; ctx.fillRect(tx(w.gunUtc), top - 6, tx(w.gunUtc + 75) - tx(w.gunUtc), bot - top + 12);
+  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, mid); ctx.lineTo(W - 8, mid); ctx.stroke();
+  for (const [sign, col] of [[1, 'rgba(111,168,255,.45)'], [-1, 'rgba(255,140,90,.45)']] as const) {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x(0), mid);
+    pts.forEach((v, i) => ctx.lineTo(x(i), sign * v > 0 ? y(v) : mid)); ctx.lineTo(x(n), mid); ctx.fill();
+  }
+  ctx.strokeStyle = '#e8eef6'; ctx.lineWidth = 1.5; ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)))); ctx.stroke();
+  ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
+  ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
+  for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#9cc3ff'; ctx.fillText('FLOOD ↑ (east)', 10, top + 2);
+  ctx.fillStyle = '#ffb08a'; ctx.fillText('EBB ↓ (west, to the Gate)', 10, bot);
+  ctx.fillStyle = '#ffb627'; ctx.textAlign = 'center'; ctx.fillText('gun', tx(w.gunUtc), top - 4 < 8 ? 9 : top - 4);
+  f.setTime(w.gunUtc);
+  const at = describeTide(f, p, w.gunUtc);
+  $('tideNote').textContent = `${new Date(w.tideDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, gun at ${sfClock(w.gunUtc)}: ${at.label} near the line (NOAA predictions). Shaded: about the length of the race.`;
+}
+$<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); newGame(); tideBox(); });
+$<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); newGame(); tideBox(); });
+
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg').forEach(seg => {
     const k = seg.dataset.k as keyof Settings;
@@ -391,9 +435,9 @@ document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListen
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode') ? v : Number(v);
-  paintSeg(); newGame(); courseCard();
+  paintSeg(); newGame(); courseCard(); tideBox();
 }));
-function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; }
+function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; tideBox(); }
 function beginRace(seed?: number): void {
   saveSettings(S);
   newGame(seed);
@@ -469,7 +513,7 @@ function frame(now: number): void {
 }
 
 buildSetupChoices();
-newGame(); paintSeg(); courseCard();
+newGame(); paintSeg(); courseCard(); tideBox();
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.

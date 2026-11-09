@@ -8,7 +8,8 @@ import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
 import { toast } from './feedback';
-import { drawCourse, drawLand, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCourse, drawCurrentArrows, drawLand, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { onLand } from '../geo/shore';
 import { laylinesFor } from '../sim/laylines';
 
 export function fmtClock(t: number): string {
@@ -31,8 +32,8 @@ export class Hud {
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
-    $('clockSub').textContent = w.freeSail ? 'Just sail' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish';
+    $('clockSub').textContent = (w.tide ? w.clock + ' · ' : '') + (w.freeSail ? 'Just sail' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
+      u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1) + ' kt';
     $('hdg').textContent = String(Math.round(u.h) % 360).padStart(3, '0');
@@ -195,7 +196,7 @@ export class Hud {
     const [ctx, w, h] = fitCanvas(this.mapC);
     ctx.clearRect(0, 0, w, h);
     const W = wd.C.base;
-    let tf: Tf, scale: number;
+    let tf: Tf, scale: number, ctr = { x: u.x, y: u.y };
     if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
     else {
       const pts = [wd.pin, wd.committee].concat(wd.C.marks.map(m => m.p));
@@ -205,10 +206,14 @@ export class Hud {
       scale = Math.min(w / spanX, h / spanY);
       const mcx = (Math.max(...xs) + Math.min(...xs)) / 2, mcy = (Math.max(...ys) + Math.min(...ys)) / 2;
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
-      tf = makeTf(back.x, back.y, W, scale, w, h);
+      tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     drawLand(ctx, tf);
+    { // the current across the water around you, from the sim's own current field
+      const half = Math.max(w, h) / scale * 0.75, mid = ctr;
+      drawCurrentArrows(ctx, tf, p => wd.currentAt(p), mid.x, mid.y, half, Math.max(60, half / 4), 9, onLand);
+    }
     drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1);
     if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), 450);
     for (const b of wd.boats) {
@@ -221,11 +226,13 @@ export class Hud {
     ctx.restore();
     ctx.fillStyle = '#94abb7'; ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
     ctx.fillText('WIND ↓', 6, 12);
-    if (wd.cur.kt > 0) {
-      const cb = (wd.cur.set - W) * D2R, ox = w - 18, oy = 16;
+    const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
+    if (ckt > 0.05) {
+      // the current where you are
+      const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w - 18, oy = 16;
       ctx.strokeStyle = '#6fd0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
       ctx.fillStyle = '#6fd0ff'; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
-      ctx.textAlign = 'right'; ctx.fillText(wd.cur.kt.toFixed(1) + ' kt', w - 6, h - 6);
+      ctx.textAlign = 'right'; ctx.fillText('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6);
     }
   }
 }

@@ -3,7 +3,8 @@ import { moveBoat } from '../boat/physics';
 import { D2R, KT, LOA, V, brg, cross, dist, dot, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
-import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
+import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
+import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { windAt, type Wind, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
@@ -58,8 +59,13 @@ export class World {
   readonly settings: Settings;
   readonly seed: number;
   readonly rng: Rng;
-  readonly cur: CurrentPreset;
-  readonly cvec: Vec; // open-water current, m/s
+  /** The current near the start line, summarized (direction, speed, words). Updated as the tide changes. */
+  cur: CurrentPreset;
+  cvec: Vec; // current near the start line, m/s
+  /** Real tide: NOAA-based current field, and the start signal's time (minutes since epoch, UTC). */
+  readonly tide: CurrentField | null = null;
+  readonly gunUtc: number = 0;
+  readonly tideDate: string = '';
   readonly windModel: WindModel;
 
   t: number; // race time, s; negative before the start signal
@@ -95,14 +101,21 @@ export class World {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet });
-    this.cur = CURRENTS[settings.current] ?? CURRENTS.slack;
+    this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail;
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
     this.t = -this.startAt;
+    if (settings.current === 'real') {
+      this.tideDate = settings.tideDate || nextSaturday();
+      this.gunUtc = sfLocalToUtcMin(this.tideDate, settings.tideTime || '12:00');
+      this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
+      this.updateTide();
+    }
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
     this.wind = windAt(this.windModel, this.t);
+    if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = this.C.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i));
     this.startTimes = this.boats.map(() => null);
@@ -165,7 +178,23 @@ export class World {
   nextMark(b: Boat): CourseMark | null { return b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
-  currentAt(p: Vec): Vec { return currentAt(p, this.cvec); }
+  currentAt(p: Vec): Vec {
+    if (!this.tide) return currentAt(p, this.cvec);
+    const c = this.tide.at(p), k = shoreRelief(p);
+    return { x: c.x * k, y: c.y * k };
+  }
+  /** Clock time now, minutes since epoch UTC (real tide only). */
+  get clockUtc(): number { return this.gunUtc + this.t / 60; }
+  /** Local San Francisco time of day now, e.g. "12:04" (real tide only). */
+  get clock(): string { return sfClock(this.clockUtc); }
+
+  /** The real tide at the course: refresh the field, and the summary used by the HUD, maps and messages. */
+  private updateTide(): void {
+    const f = this.tide!, now = this.clockUtc;
+    f.setTime(now);
+    this.cvec = this.currentAt(this.C.center);
+    this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
+  }
 
   /* ---------- the fixed step ---------- */
   step(dt = DT): void {
@@ -173,6 +202,7 @@ export class World {
     this.t += dt;
     this.steps++;
     this.wind = windAt(this.windModel, this.t);
+    if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.wind, b.cur); }
     for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
@@ -448,6 +478,22 @@ export class World {
   assignPenalty(b: Boat): void { startPenalty(b, this.penaltyDeg); }
   /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */
   get penaltyDeg(): number { return (this.settings.penaltyTurns === 1 ? 1 : 2) * 360; }
+}
+
+/**
+ * The tide in words at a place: "Ebb 1.4 kt, easing · turns to flood ~13:42". The speed is the sim's own
+ * current there (blended stations, eased near the shore), measured along the nearest station's flood/ebb axis.
+ */
+export function describeTide(f: CurrentField, p: Vec, now: number): { label: string; button: string } {
+  const st = f.stations.reduce((a, s) => (dist(s.p, p) < dist(a.p, p) ? s : a)), ax = V(st.flood), k = shoreRelief(p);
+  const g = new CurrentField(f.stations);
+  const at = (m: number) => { g.setTime(m); const c = g.at(p); return (c.x * ax.x + c.y * ax.y) * k / KT; };
+  const v = at(now), later = at(now + 15);
+  let slack = '';
+  for (let m = 5; m <= 8 * 60; m += 5) if (Math.sign(at(now + m)) !== Math.sign(v)) { slack = sfClock(now + m); break; }
+  if (Math.abs(v) < 0.15) return { label: `Slack, turning to ${later >= v ? 'flood' : 'ebb'}`, button: 'Slack' };
+  const kind = v > 0 ? 'Flood' : 'Ebb', trend = Math.abs(later) > Math.abs(v) + 0.02 ? 'building' : Math.abs(later) < Math.abs(v) - 0.02 ? 'easing' : 'at its strongest';
+  return { label: `${kind} ${Math.abs(v).toFixed(1)} kt, ${trend}${slack ? ` · turns to ${v > 0 ? 'ebb' : 'flood'} ~${slack}` : ''}`, button: kind };
 }
 
 /** Is replying "You tack" sensible for `to`? Only when she's clear ahead of the hailing boat with a

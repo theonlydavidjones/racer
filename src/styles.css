@@ -221,3 +221,9 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 }
 @media (max-width:759px){ .keys{display:none} }
 @media (prefers-reduced-motion:reduce){ #situ.alarm{animation:none;background:rgba(120,24,18,.9)} #toast{transition:none} }
+
+/* real tide on the setup screen */
+.tiderow{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 6px}
+.tiderow label{display:flex;flex-direction:column;gap:4px;font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tiderow input{font:500 15px/1.2 var(--f-ui, inherit);color:var(--ink, #fff);background:var(--btn);border:1px solid var(--rule);border-radius:8px;padding:6px 8px;color-scheme:dark}
+#tideGraph{display:block;width:100%;height:120px;margin:4px 0 2px;border-radius:8px;background:rgba(255,255,255,.03)}

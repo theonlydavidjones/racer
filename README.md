@@ -8,6 +8,7 @@ npm run dev        # http://localhost:5173
 npm test           # rules + simulation tests
 npm run build      # static site in dist/ (relative paths, host anywhere)
 npm run data:polar # re-pull Folkboat ORC certificates (behind a proxy: NODE_USE_ENV_PROXY=1)
+npm run data:currents # re-pull NOAA tidal-current data for the Cityfront (same proxy note)
 npm run build:artifact  # single-page build for the claude.ai artifact → artifact/folkboat-racing-sim.html
 ```
 
@@ -106,6 +107,16 @@ Checked against the official 2025–2028 rulebook (World Sailing, with changes a
 - **Penalties.** A Part 2 foul (Rules 10–22) costs a two-turns penalty (RRS 44.1): two full turns, each with a tack and a gybe, in the same direction. Turns only count in one direction: wiggling back and forth doesn't finish it. Sailing instructions sometimes reduce this to one turn, so Setup has a **Penalty** setting (two turns, the rulebook default, or one). Touching a mark (Rule 31) is always one turn. Being on the course side at the start under SI B1.1 is still two turns.
 - Incidents before the start signal now count. (In the prototype, a timer started at −1 s, so collisions before the gun were never judged.)
 
+### Real tides and currents
+
+Setup → Current → **Real tide** (the default), then pick the race day and the time of the start signal. A graph shows the current at the start line through the day, with the gun and the length of a race marked, and a line like "Ebb 0.8 kt, building · turns to flood ~22:45".
+
+- **Where it comes from.** NOAA's tidal-current predictions for six stations around the race area: east of the Golden Gate Bridge (SFB1203), the north side of the channel (SFB1202), southwest and north of Alcatraz (SFB1204, SFB1211), off Pier 35 (SFB1205), and off Crissy Field (PCT0286, where the flood is weak and turns early along the Presidio shore). `scripts/fetch-currents.mjs` downloads each station's tidal constants once (8 KB); the game then predicts the current for any date and time with no network, by summing the tidal constituents with their yearly corrections (`src/environment/harmonics.ts`). The Crissy Field station is derived from SFB1202's slacks and peaks with NOAA's time and speed offsets. The tests check the predictions against NOAA's own: within about 0.03–0.08 kt typically (worst case under 0.2 kt).
+- **Across the water.** The station currents are blended by distance, then eased near the shore (25% at the beach, full strength 350 m out), since no station sits right on the Marina Green or Fort Mason shoreline.
+- **Through the race.** The current changes as the race goes on: the HUD clock shows the local time, the course map draws the current across the water (arrows longer where it's stronger), and the map corner shows the current where you are.
+- **Presets.** Slack, flood and ebb presets (uniform, with the same shore relief) are still there for practice.
+- Not modelled yet: eddies behind points, and the difference between surface and deeper current.
+
 ### Sails and trim
 
 - **Trim physics** (`src/boat/trim.ts`). Each sail has a sheet angle. Its angle of attack is the apparent wind angle minus that; each sail drives best at one angle of attack (main 22°, jib 18°). Ease past it and the sail luffs (drive falls fast: gone 12° past); trim past it and it stalls (drive falls slowly, to about half). From a broad reach to a run the sails just want easing right out. Trim efficiency scales the target speed (by its square root, since drive ∝ speed²). Pointing too high luffs the jib even with the sheet hard in.
@@ -138,7 +149,7 @@ See [ROADMAP.md](ROADMAP.md) for what's planned, including full sail controls (b
 - Acceleration, slowing and turning are calibrated from physics and sailing judgement, not measured on a real Folkboat. If your boat feels different, the constants in `HANDLING` are the place to adjust.
 - Above 24 kt the polar is held flat (no depowering model yet). No sail trim beyond automatic.
 - AI starts: on the Seaweed Soup line, median 5–11 s after the gun in slack and ebb, ~25 s in flood, almost never over early. On the short training line they're slower (crowding). The AI keeps clear, takes penalties in clear water, won't tack when too slow to make it, and doesn't sail on a broad reach expecting to slow down by easing sails.
-- Wind is a synthetic oscillation. Current is uniform, with a simple shore-relief factor.
+- Wind is a synthetic oscillation (the afternoon westerly is next). Current between the six NOAA stations is interpolated, not modelled hydrodynamically.
 - The shoreline is hand-traced.
 - Rules not modelled yet: 14 (beyond the swerve check), 18.1(a)(2) (opposite tacks when only one boat must tack at the mark), 18.2(c) and (d), 18.4 (gybing at a mark), 19 (room at obstructions other than via the Rule 20 hail), 21.3 (backing a sail), 23, exoneration (43), and 44.1(a) (a Part 2 foul and a mark touch in the same incident need only the Part 2 penalty). Touching the committee boat isn't detected.
 - Fouls between two AI boats are penalized but not explained.
