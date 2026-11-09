@@ -212,8 +212,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (!h || h.kind !== 'room') continue;
     // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(c)), unless she replied "You tack".
     if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; }
-    // She hailed and got "You tack": tack now and pass astern of that boat.
-    if (h.by === b.id && h.replyAt != null && b.lastTackT < h.replyAt && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; }
+    // She hailed and the other boat responded (tacked, or replied "You tack"): tack now (Rule 20.2(d)).
+    if (h.by === b.id && h.respondedAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; }
   }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   desired = sailable(b, avoidMarks(w, b, desired));

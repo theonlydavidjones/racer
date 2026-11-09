@@ -49,7 +49,7 @@ export function startDebrief(w: World): StartDebrief {
     grade = 'ocs'; title = 'Over early';
     tips.push('Aim to be about one boat length behind the line with 10 seconds to go, then sheet in and accelerate. The last 10 seconds are for speed, not distance.');
     if (cN > 0.15) tips.push(`The current was carrying you toward the line at ${kt(cN)} kt. With the current pushing you over, hang back farther and luff earlier.`);
-    tips.push('Being over costs far more than being a little late: you have to dip back below the line and keep clear of everyone while you do (Rule 22.1).');
+    tips.push('Being over costs far more than being a little late: you have to dip back below the line and keep clear of everyone while you do (Rule 21.1).');
   } else if (behind > 1.5 * LOA) {
     grade = 'late'; title = 'Late start';
     const secs = behind / Math.max(0.5, me.target);

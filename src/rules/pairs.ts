@@ -19,19 +19,26 @@ export const RULE16_MIN_TURN = 12;
 /** Rule 17 applies when the leeward overlap starts within two hull lengths. */
 export const RULE17_RANGE = 2 * LOA;
 
-/** Rule 20.2(b): a boat hailed for room to tack must start to respond (by tacking) within this many seconds. */
+/** Rule 20.2: "as soon as possible", modelled as starting to respond within this many seconds. It applies to the
+ * hailed boat (tack, or reply "You tack") and then to the hailing boat (tack once the hailed boat has responded). */
 export const HAIL_RESPONSE = 5;
 
 /**
- * Rule 20: has the boat hailed for room to tack failed to respond? Returns the hailed boat if so.
- * (She may also reply "You tack" and give room; that reply isn't modelled, so tacking is the response.)
+ * Rule 20.2: has someone failed to respond to a hail for room to tack? Updates `respondedAt` and returns the
+ * boat in breach: the hailed boat if she neither tacked nor replied "You tack" in time (20.2(c)), or the hailing
+ * boat if she didn't tack soon after the hailed boat responded (20.2(d)).
  */
-export function hailIgnored<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: number): B | null {
+export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: number): { boat: B; role: 'hailed' | 'hailer' } | null {
   const h = rec.hail;
-  if (!h || h.kind !== 'room' || h.replyAt != null) return null; // replying "You tack" is a response
-  const hailed = h.by === A.id ? B : A;
-  if (t < h.at + HAIL_RESPONSE) return null;
-  return hailed.lastTackT >= h.at || hailed.tacking ? null : hailed;
+  if (!h || h.kind !== 'room') return null;
+  const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
+  if (h.respondedAt == null) {
+    if (h.replyAt != null) h.respondedAt = h.replyAt;
+    else if (hailed.lastTackT >= h.at || hailed.tacking) h.respondedAt = t;
+  }
+  if (h.respondedAt == null) return t >= h.at + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
+  const hailerTacked = hailer.lastTackT >= h.at || hailer.tacking;
+  return !hailerTacked && t >= h.respondedAt + HAIL_RESPONSE ? { boat: hailer, role: 'hailer' } : null;
 }
 
 /** Rule 20.2(c): how long after a "You tack" reply the hailing boat has to get round and clear, s. */
@@ -58,6 +65,13 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   return after < before - 5 ? Math.abs(turn) : 0;
 }
 
+/** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
+function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
+  if (b.headingAgo == null || b.tack !== 'S') return false;
+  const before = Math.abs(wrap(ctx.windFrom - b.headingAgo)), now = Math.abs(wrap(ctx.windFrom - b.h));
+  return before < (ctx.beat ?? 42) + 15 && now > before;
+}
+
 export interface PairObservation {
   /** A right-of-way boat had to change course to avoid the other boat (Rule 14 / "forced to swerve"). */
   swerve: boolean;
@@ -69,21 +83,36 @@ export interface PairAssessment<B> { verdict: Verdict<B>; incident: Incident<B> 
  * reports any incident. Deterministic: depends only on its arguments. */
 export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation): PairAssessment<B> {
   const n = ctx.marks.length;
-  // Mark-room: freeze who is inside / clear ahead when the first boat reaches the zone.
+  // Mark-room (Rule 18.2(a)): fixed when the first boat reaches the zone (three lengths from the mark).
   if (A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round' && A.started && B.started) {
     const mk = ctx.marks[A.leg], dA = dist(A, mk.p), dB = dist(B, mk.p);
-    // Rule 18.3: a boat passing head to wind from port to starboard in the zone of a mark left to port, when
-    // the other boat is on starboard fetching it. Rule 18.2 then stops applying between them.
+    // Rule 18.3 needs to know who has been on starboard since entering the zone.
+    for (const [X, d] of [[A, dA], [B, dB]] as const) {
+      if (d >= ZONE) delete rec.stbdInZone[X.id];
+      else if (!(X.id in rec.stbdInZone)) rec.stbdInZone[X.id] = X.tack === 'S' && !X.tacking;
+      else if (X.tack !== 'S' || X.tacking) rec.stbdInZone[X.id] = false;
+    }
+    // Rule 18.3: a boat passing head to wind from port to starboard in the zone of a mark to be left to port.
+    // Rule 18.2 then doesn't apply between her and a starboard-tack boat fetching the mark.
     for (const [T, O] of [[A, B], [B, A]] as const) {
       const seen = rec.seenTack[T.id];
-      if (seen != null && T.lastTackT > seen && T.tack === 'S' && mk.beat && mk.side === 'p' && dist(T, mk.p) < ZONE
-        && O.tack === 'S' && !O.tacking && fetching(O, mk, ctx)) { rec.r183 = { tacker: T.id, idx: A.leg }; rec.mark = null; }
+      if (seen != null && T.lastTackT > seen && T.tack === 'S' && mk.side === 'p' && dist(T, mk.p) < ZONE
+        && O.tack === 'S' && !O.tacking && fetching(O, mk, ctx)) {
+        rec.r183 = { tacker: T.id, idx: A.leg, binds: rec.stbdInZone[O.id] === true }; rec.mark = null;
+      }
     }
     if (!rec.mark && !rec.r183 && (dA < ZONE || dB < ZONE) && (A.tack === B.tack || !mk.beat)) {
       const ov = !clearAstern(A, B) && !clearAstern(B, A);
+      const entitled = ov ? (dA < dB ? A : B) : (dA < ZONE && dB >= ZONE ? A : dB < ZONE && dA >= ZONE ? B : clearAstern(A, B) ? B : A);
       rec.mark = ov
-        ? { idx: A.leg, overlapped: true, inside: dA < dB ? A.id : B.id }
-        : { idx: A.leg, overlapped: false, ahead: clearAstern(A, B) ? B.id : A.id };
+        ? { idx: A.leg, overlapped: true, inside: entitled.id, tackT: entitled.lastTackT }
+        : { idx: A.leg, overlapped: false, ahead: entitled.id, tackT: entitled.lastTackT };
+    }
+    // Rule 18.2(b): 18.2(a) no longer applies once the entitled boat passes head to wind or leaves the zone.
+    const m = rec.mark;
+    if (m && !m.ended) {
+      const E = (m.overlapped ? m.inside : m.ahead) === A.id ? A : B;
+      if (E.lastTackT > (m.tackT ?? -Infinity) || dist(E, mk.p) > ZONE + 2) m.ended = true;
     }
     if (dA > ZONE * 2.2 && dB > ZONE * 2.2) { rec.mark = null; rec.r183 = null; }
   } else {
@@ -108,19 +137,22 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   rec.kc = r.kc.id; rec.rule = r.rule;
   if (rec.cool > ctx.t) return { verdict: r, incident: null };
 
-  // Rule 20: ignoring a hail for room to tack is a breach in itself
-  const ignored = hailIgnored(rec, A, B, ctx.t);
-  if (ignored) {
+  // Rule 20: not responding to a hail for room to tack is a breach in itself (and so is the hailing
+  // boat not tacking once the hailed boat has responded)
+  const breach = hailBreach(rec, A, B, ctx.t);
+  if (breach) {
     rec.hail = null; rec.cool = ctx.t + INCIDENT_COOLDOWN;
-    return { verdict: r, incident: { kind: 'hail', fouler: ignored, rule: '20', byWhy: null, verdict: r } };
+    return { verdict: r, incident: { kind: 'hail', fouler: breach.boat, rule: '20', byWhy: null, hailRole: breach.role, verdict: r } };
   }
-  // a hail is answered (or stale) once the hailed boat has tacked, or after half a minute; after a
-  // "You tack" reply, once the hailing boat has tacked and got going (or the room has run out)
+  // A hail is done once both boats have tacked (or after a "You tack" reply, once the hailing boat has tacked
+  // and got going, or the room has run out), and stale after half a minute.
   const hl = rec.hail;
-  if (hl && hl.replyAt != null) {
-    const hailer = hl.by === A.id ? A : B;
-    if (ctx.t > hl.replyAt + REPLY_ROOM || (hailer.lastTackT >= hl.replyAt && !hailer.tacking && ctx.t - hailer.lastTackT > 6)) rec.hail = null;
-  } else if (hl && (ctx.t > hl.at + 30 || [A, B].some(x => x.id !== hl.by && x.lastTackT >= hl.at + 0.01 && !x.tacking))) rec.hail = null;
+  if (hl) {
+    const hailer = hl.by === A.id ? A : B, hailed = hailer === A ? B : A;
+    const hailerDone = hailer.lastTackT >= hl.at && !hailer.tacking && ctx.t - hailer.lastTackT > 4;
+    if (hl.replyAt != null) { if (ctx.t > hl.replyAt + REPLY_ROOM || hailerDone) rec.hail = null; }
+    else if (ctx.t > hl.at + 30 || (hailerDone && hailed.lastTackT >= hl.at && !hailed.tacking)) rec.hail = null;
+  }
 
   let kind: 'contact' | 'swerve' | null = null;
   if (gap < CONTACT_GAP) kind = 'contact';
@@ -134,8 +166,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // Rule 15: she only just got right of way
     fouler = rec.by === A.id ? A : B; rule = '15'; byWhy = rec.byWhy;
   } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {
-    // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond
-    fouler = row; rule = '16.1';
+    // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond.
+    // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is passing astern of her.
+    fouler = row; rule = r.rule === '10' && boreAwayOnBeat(row, ctx) ? '16.2' : '16.1';
   } else if (r.rule === '11' && rec.r17 === row.id && ctx.t > 0 && row.aboveProper) {
     // Rule 17: overlapped from astern within two lengths, then sailed above her proper course
     fouler = row; rule = '17';

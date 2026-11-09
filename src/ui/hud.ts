@@ -116,6 +116,10 @@ export class Hud {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
         $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
+      } else if (hail.respondedAt != null) {
+        const left = Math.max(0, hail.respondedAt + HAIL_RESPONSE - w.t);
+        $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
+        el.className = u.lastTackT >= hail.at ? 'row' : 'kc alarm';
       } else {
         $('situMsg').textContent = `You hailed "Room to tack!" ${o.name} must tack or reply "You tack".`;
         el.className = 'row';

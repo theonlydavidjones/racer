@@ -42,7 +42,7 @@ describe('fixed timestep is reproducible', () => {
   });
 });
 
-describe('start line: OCS and Rule 22.1 return (through the real sim)', () => {
+describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
   const place = (w: World, d: number, heading: number) => {
     const u = w.user;
     u.x = w.center.x + w.N.x * d; u.y = w.center.y + w.N.y * d; u.h = heading; u.v = 0; u.prevD = null; u.luff = true;

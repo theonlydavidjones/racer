@@ -195,7 +195,7 @@ export class World {
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
       if (gun && d > 0 && Math.abs(a) < this.lineLen / 2 + 25) {
         b.ocs = true;
-        if (b.isUser) this.emit({ type: 'toast', msg: 'Over early! Return below the line, then start. Keep clear while you do (Rule 22.1).', ms: 4500 });
+        if (b.isUser) this.emit({ type: 'toast', msg: 'Over early! Return below the line, then start. Keep clear while you do (Rule 21.1).', ms: 4500 });
       }
       if (this.t >= 0 && b.prevD != null) {
         if (b.ocs && d < 0 && this.lineD(stern(b)) < 0) { b.ocs = false; if (b.isUser) this.emit({ type: 'toast', msg: 'Cleared. Now start properly.' }); }
@@ -338,7 +338,14 @@ export class World {
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
+      const answered = rec.hail?.respondedAt != null;
       const { incident } = assessPair(rec, A, B, ctx, { swerve: A.forced14 === B.id || B.forced14 === A.id });
+      const h = rec.hail;
+      if (h && h.kind === 'room' && !answered && h.respondedAt != null && h.replyAt == null) {
+        // the hailed boat tacked: now the hailing boat must tack too (Rule 20.2(d))
+        const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
+        if (hailer.isUser) this.emit({ type: 'toast', ms: 3500, msg: `${hailed.name} is tacking to give you room. Tack now (Rule 20.2(d)).` });
+      }
       if (!incident) continue;
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       if (incident.kind === 'contact') {

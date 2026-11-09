@@ -147,7 +147,20 @@ describe('Rule 13 · tacking too close', () => {
   });
 });
 
-describe('Rule 18.2(b) · mark-room at the zone', () => {
+describe('Rule 13 · both boats tacking at once', () => {
+  it('the one on the other\'s port side keeps clear', () => {
+    const red = boat('Red', { at: [0, 0], heading: 0, tacking: true, lastTackT: 9.5 });
+    const blue = boat('Blue', { at: [6, 0], heading: 0, tacking: true, lastTackT: 9.5 }); // Red is on Blue's port side
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '13' });
+  });
+  it('the one astern keeps clear', () => {
+    const red = boat('Red', { at: [0, -12], heading: 0, tacking: true, lastTackT: 9.5 });
+    const blue = boat('Blue', { at: [1, 0], heading: 0, tacking: true, lastTackT: 9.5 });
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '13' });
+  });
+});
+
+describe('Rule 18.2(a) · mark-room at the zone', () => {
   // Leeward mark at the origin, approached on a run (not a beat). Zone = 3 lengths = 22.9 m.
   const mark: RulesMark = { name: 'Leeward mark', p: { x: 0, y: 0 }, type: 'round', beat: false };
 
@@ -163,7 +176,7 @@ describe('Rule 18.2(b) · mark-room at the zone', () => {
     expect(p.at(100)).toMatchObject({ keepsClear: 'Blue', rule: '11' }); // outside the zone: plain Rule 11
     moveTo(blue, [2.5, 21]); moveTo(red, [8.5, 19.5]);
     expect(Math.hypot(blue.x, blue.y)).toBeLessThan(ZONE);
-    expect(p.at(101)).toMatchObject({ keepsClear: 'Red', rule: '18.2(b)' });
+    expect(p.at(101)).toMatchObject({ keepsClear: 'Red', rule: '18.2(a)' });
     expect(p.rec.mark).toMatchObject({ overlapped: true, inside: blue.id });
   });
 
@@ -174,7 +187,7 @@ describe('Rule 18.2(b) · mark-room at the zone', () => {
     p.at(100);
     moveTo(blue, [2.5, 21]); moveTo(red, [8.5, 19.5]); p.at(101);
     moveTo(blue, [2, 12]); moveTo(red, [4, 11]);
-    expect(p.at(104).foul).toMatchObject({ by: 'Red', rule: '18.2(b)', kind: 'contact' });
+    expect(p.at(104).foul).toMatchObject({ by: 'Red', rule: '18.2(a)', kind: 'contact' });
   });
 
   //      Blue ↙              Blue reaches the zone clear ahead...
@@ -183,10 +196,32 @@ describe('Rule 18.2(b) · mark-room at the zone', () => {
     const blue = boat('Blue', { at: [6, 22], heading: 190 });
     const red = boat('Red', { at: [9, 30.5], heading: 190 });
     const p = pair(blue, red, [mark]);
-    expect(p.at(100)).toMatchObject({ keepsClear: 'Red', rule: '18.2(b)' });
+    expect(p.at(100)).toMatchObject({ keepsClear: 'Red', rule: '18.2(a)' });
     expect(p.rec.mark).toMatchObject({ overlapped: false, ahead: blue.id });
     moveTo(blue, [5, 16]); moveTo(red, [2, 17]); // Red now inside and overlapped
-    expect(p.at(102)).toMatchObject({ keepsClear: 'Red', rule: '18.2(b)' });
+    expect(p.at(102)).toMatchObject({ keepsClear: 'Red', rule: '18.2(a)' });
+  });
+
+  it('18.2(b): mark-room ends when the entitled boat leaves the zone', () => {
+    const blue = boat('Blue', { at: [3, 26], heading: 190 });
+    const red = boat('Red', { at: [9, 24.5], heading: 190 });
+    const p = pair(blue, red, [mark]);
+    p.at(100);
+    moveTo(blue, [2.5, 21]); moveTo(red, [8.5, 19.5]);
+    expect(p.at(101).rule).toBe('18.2(a)');
+    moveTo(blue, [2.5, 28]); moveTo(red, [8.5, 26]); // both sailed back out of the zone (still on the same leg)
+    expect(p.at(105)).toMatchObject({ keepsClear: 'Blue', rule: '11' });
+  });
+
+  it('18.2(b): mark-room ends when the entitled boat passes head to wind', () => {
+    const blue = boat('Blue', { at: [3, 26], heading: 190 });
+    const red = boat('Red', { at: [9, 24.5], heading: 190 });
+    const p = pair(blue, red, [mark]);
+    p.at(100);
+    moveTo(blue, [2.5, 21]); moveTo(red, [8.5, 19.5]);
+    p.at(101);
+    blue.lastTackT = 101.5; blue.tacking = false;
+    expect(p.at(102).rule).not.toBe('18.2(a)');
   });
 
   it('mark-room ends once both boats have left the mark behind', () => {
@@ -270,6 +305,23 @@ describe('Rule 18.3 · tacking in the zone', () => {
     expect(p.at(110)).toMatchObject({ keepsClear: 'Blue', rule: '11' });
   });
 
+  it('if Blue tacked onto starboard inside the zone herself, 18.2 is off but Red owes her nothing extra under 18.3', () => {
+    const { blue, red, p } = (() => {
+      const blue = boat('Blue', { at: blueAt, heading: 45 }); // Blue enters the zone on port...
+      const redAt = ahead(4, 5), red = boat('Red', { at: redAt, heading: 8 });
+      const p = pair(blue, red, [mark]);
+      p.at(99);
+      moveTo(blue, blueAt, 315); blue.lastTackT = 99.5; // ...then tacks onto starboard, fetching
+      p.at(100);
+      red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; moveTo(red, redAt, 0); p.at(101);
+      red.tacking = false; moveTo(red, redAt, 315);
+      return { blue, red, p };
+    })();
+    expect(p.rec.r183).toMatchObject({ tacker: red.id, binds: false });
+    expect(p.at(110)).toMatchObject({ keepsClear: 'Blue', rule: '11' }); // plain windward/leeward
+    void blue;
+  });
+
   it('a mark to be left to starboard: no 18.3', () => {
     const { p } = scene({ markSide: 's' });
     expect(p.rec.r183).toBeNull();
@@ -319,14 +371,14 @@ describe('Barging at the committee boat', () => {
   });
 });
 
-describe('Rule 22.1 · returning after being over early', () => {
+describe('Rule 21.1 · returning after being over early', () => {
   //            wind ↓
   //    line · · · · · · · · · ·
   //        Red ↙ (OCS, dipping back on starboard)     Blue ↗ (port, started properly)
   it('a boat returning to start keeps clear, even on starboard', () => {
     const red = boat('Red', { at: [0, 0], heading: 225, ocs: true, started: false });
     const blue = boat('Blue', { at: [-8, -8], heading: 45 });
-    expect(verdict(red, blue, 10)).toEqual({ keepsClear: 'Red', rule: '22.1' });
+    expect(verdict(red, blue, 10)).toEqual({ keepsClear: 'Red', rule: '21.1' });
   });
 
   it('once she has returned (OCS cleared), normal rules apply again', () => {
@@ -342,11 +394,11 @@ describe('Rule 22.1 · returning after being over early', () => {
   });
 });
 
-describe('Rule 22.2 · taking a penalty', () => {
+describe('Rule 21.2 · taking a penalty', () => {
   it('a boat doing turns keeps clear of boats that are not', () => {
     const red = boat('Red', { at: [0, 0], heading: 315, penalty: 400 });
     const blue = boat('Blue', { at: [10, 0], heading: 45 });
-    expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '22.2' });
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '21.2' });
   });
 });
 
@@ -375,9 +427,15 @@ describe('Rule 16.1 · changing course', () => {
   //            wind ↓
   //      ↖ Blue (S)          Blue "hunts" the port boat: bears away toward Red as Red tries to duck
   //    ↗ Red (P)
-  it('starboard boat bears away into a port boat that is ducking her: starboard breaks 16.1', () => {
+  it('on a beat, a starboard boat that bears away onto a port boat ducking her breaks 16.2', () => {
     const red = boat('Red', { at: [0, 0], heading: 60 }); // port, footing to duck
     const blue = boat('Blue', { at: [3, 3.5], heading: 260, headingAgo: 315 }); // was close-hauled, bore away 55°
+    expect(pair(red, blue).at(60).foul).toMatchObject({ by: 'Blue', rule: '16.2' });
+  });
+
+  it('a starboard boat on a reach that turns toward a port boat breaks 16.1 (16.2 is only for beats)', () => {
+    const red = boat('Red', { at: [0, 0], heading: 100 }); // port, broad reach
+    const blue = boat('Blue', { at: [3, 2], heading: 220, headingAgo: 270 }); // starboard, was beam reaching, bore away toward Red
     expect(pair(red, blue).at(60).foul).toMatchObject({ by: 'Blue', rule: '16.1' });
   });
 
@@ -450,7 +508,18 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
-    expect(p.at(56)).toMatchObject({ keepsClear: 'Blue', rule: '20', foul: null }); // Blue now gives Red room to tack and avoid her
+    expect(p.at(54)).toMatchObject({ keepsClear: 'Blue', rule: '20', foul: null }); // Blue now gives Red room to tack and avoid her
+    red.tacking = true; red.lastTackT = 54.5; moveTo(red, [0, 0], 0);
+    expect(p.at(56).foul).toBeNull();
+  });
+
+  it('20.2(d): once the hailed boat responds, the hailing boat must tack as soon as possible', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315 }), blue = boat('Blue', { at: [-6, 13], heading: 315 });
+    const p = pair(red, blue);
+    p.at(50);
+    p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
+    expect(p.at(55).foul).toBeNull();
+    expect(p.at(56).foul).toEqual({ by: 'Red', rule: '20', kind: 'hail', why: null }); // Red never tacked
   });
 
   it('after "You tack", the boat that replied must give room: contact is her foul', () => {
@@ -480,7 +549,10 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room' };
     blue.lastTackT = 52; moveTo(blue, [3, 12], 45);
+    expect(p.at(53).foul).toBeNull(); // Blue responded at 52-53
+    red.lastTackT = 54; moveTo(red, [-1, 2], 45); // and Red tacks as soon as possible (20.2(d))
     expect(p.at(56).foul).toBeNull();
+    expect(p.at(59).foul).toBeNull();
     expect(p.rec.hail).toBeNull();
   });
 });

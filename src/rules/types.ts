@@ -38,7 +38,7 @@ export interface RulesContext {
   beat?: number;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '17' | '18.2(b)' | '18.3' | '20' | '22.1' | '22.2';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.3' | '20' | '21.1' | '21.2';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -46,6 +46,10 @@ export interface MarkRoomState {
   overlapped: boolean;
   inside?: number; // boat id entitled to mark-room when overlapped
   ahead?: number; // boat id clear ahead when not overlapped
+  /** Rule 18.2(b): the entitled boat has since passed head to wind or left the zone, so 18.2(a) no longer applies. */
+  ended?: boolean;
+  /** The entitled boat's lastTackT when mark-room began (to see her pass head to wind). */
+  tackT?: number;
 }
 
 /** Per-pair memory the engine carries between steps. */
@@ -61,10 +65,13 @@ export interface PairRecord {
   r17: number | null;
   /** A hail between the pair: who hailed, when, and what. */
   hail: Hail | null;
-  /** Rule 18.3: a boat that tacked from port to starboard in the zone of a port-hand windward mark, and the mark. */
-  r183: { tacker: number; idx: number } | null;
+  /** Rule 18.3: a boat that passed head to wind from port to starboard in the zone of a mark left to port, and the
+   * mark. `binds`: the other boat had been on starboard since entering the zone, so 18.3(a) and (b) apply. */
+  r183: { tacker: number; idx: number; binds: boolean } | null;
   /** Each boat's lastTackT at the previous step (to see a tack happen). */
   seenTack: Record<number, number>;
+  /** For each boat in the zone of the next mark: has she been on starboard tack since entering it? (Rule 18.3) */
+  stbdInZone: Record<number, boolean>;
 }
 
 /** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */
@@ -72,10 +79,12 @@ export interface Hail {
   by: number; at: number; kind: 'room' | 'starboard';
   /** Rule 20.2(c): the hailed boat replied "You tack" at this time, and now owes the hailing boat room to tack and avoid her. */
   replyAt?: number;
+  /** When the hailed boat responded (tacked, or replied "You tack"). Rule 20.2(d): the hailing boat must then tack as soon as possible. */
+  respondedAt?: number;
 }
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {} });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {} });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 
@@ -87,5 +96,7 @@ export interface Incident<B> {
   byWhy: 'tack' | 'overlap' | null;
   /** Rule 16.1: how far (deg) the right-of-way boat turned toward the other boat just before. */
   turned?: number;
+  /** Rule 20 hail incidents: whether the fouler was the hailed boat (didn't respond) or the hailing boat (didn't tack after the response). */
+  hailRole?: 'hailed' | 'hailer';
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }
