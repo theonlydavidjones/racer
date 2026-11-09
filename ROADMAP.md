@@ -20,21 +20,22 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Piano | Inboard (by the companionway) → outboard |
 |---|---|
 | Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats) |
-| Port | Vang · Outhaul · *main Cunningham / downhaul* · Jib Cunningham (three cam cleats, plus a fixed clam cleat set ~2 in forward, between the jib Cunningham and outhaul cams) |
+| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams. Also here: the main Cunningham (thin line, stopper knot in the end), the main downhaul (blue), and the jib halyard tail (uncleated) |
 
 | Control | Sail | Led to | Notes |
 |---|---|---|---|
 | Vang | Main | Piano, both sides, innermost | Dual-ended: pulling one tail pulls the other |
 | Outhaul | Main | Piano, both sides, middle | Dual-ended |
 | Jib Cunningham | Jib | Piano, both sides, outermost | Dual-ended |
-| Main Cunningham (downhaul) | Main | Port piano only, fixed clam cleat | Labelled "CUN" on the boat. Single-ended. What exactly it pulls: to confirm (see below) |
-| Main halyard | Main | Port side, tail parked | Set before racing, not adjusted under way |
-| Jib halyard | Jib | To confirm | |
+| Main Cunningham | Main | Port piano only | Its own line through a ring in the luff above the boom. Fine luff tension under way |
+| Main downhaul | Main | Port piano (blue line), via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Either a gooseneck downhaul or a halyard tensioner (see below) |
+| Main halyard | Main | Tail thrown down the companionway | Hoisted before racing, not touched under way |
+| Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
 | Mainsheet | Main | Boom end to the traveller car on the transom | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
 | Traveller | Main | Transom | Dual-ended |
 | Backstay | Rig | Both sides of the transom | Dual-ended |
 | Jib sheets | Jib | Along the side decks to the winches | The only lines on the winches. Winches are **not** self-tailing: one hand cranks, the other tails, so trimming in a breeze is slow and takes crew |
-| Jib cars | Jib | Tracks on the cabin top | Moved by hand, pin stop: a set of fixed positions, set before a leg, not adjusted while loaded |
+| Jib cars | Jib | H-shaped track on each side of the cabin top | Moved by hand with pin stops, both fore–aft (twist) and athwartships (sheeting angle: inboard to point, outboard to foot). Set before a leg, not adjusted while loaded. Best guess until counted: 7 fore–aft positions and 5 athwartships, 25 mm apart (the usual hole spacing) |
 
 ### What each one does (the physics to model)
 
@@ -44,7 +45,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - **Cunningham and halyards:** luff tension, which moves the draft forward and opens the leech. The fix when the draft blows aft as the breeze builds.
 - **Traveller:** sets the boom's angle to the centreline without changing twist, which sheet tension controls.
 - **Mainsheet:** angle and twist together. Trimming hard closes the leech.
-- **Jib sheet and cars:** sheet tension sets the angle; the car position sets twist. Car forward makes a deeper jib with a tighter leech, car aft a flatter jib with an open top.
+- **Jib sheet and cars:** sheet tension sets the angle. Car fore–aft sets twist: forward makes a deeper jib with a tighter leech, aft a flatter jib with an open top. Car in–out sets the sheeting angle: inboard points higher in flat water, outboard gives more power and speed in chop or when reaching.
+- **Downhaul vs. Cunningham:** both tension the main's luff. The downhaul (with its tackle) does the heavy lifting; the Cunningham fine-tunes it.
 - **Winches:** the jib sheet needs a winch to trim in a breeze, so trimming takes time and effort, while easing is quick.
 
 ### How it should play
@@ -56,10 +58,10 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ### Still to confirm
 
-1. **Main Cunningham vs. downhaul.** Follow the line from the port fixed clam cleat forward to the mast. If it ends at a ring in the mainsail's luff just above the boom, it's a Cunningham. If it ends at the gooseneck and pulls the boom down a track on the mast, it's a gooseneck downhaul. If it goes up inside the mast, it's the halyard tail with a tackle (a halyard tensioner). All three tension the luff and sail the same in the sim; they just look different.
-2. **Mainsheet purchase.** Count the parts of line running between the block on the boom and the block on the traveller car: that number is the purchase (4 parts = 4:1).
-3. **Jib halyard.** Where is it led and cleated?
-4. **Jib cars.** How many pin positions, and roughly how far apart?
+1. **Downhaul and main halyard.** They can't be one line: a halyard has one free end (the other is shackled to the head of the sail), and there are two blue tails, one on the piano and one down the companionway. Two likely set-ups: the tackle at the mast base hooks onto the gooseneck and pulls the boom down a track on the mast (a **gooseneck downhaul**), or it hooks onto the halyard where it comes out of the mast and pulls that down (a **halyard tensioner**). To tell: pull the downhaul and watch whether the boom slides down the mast. Same colour line is likely just one spool bought for both. Either way it sails the same in the sim.
+2. **Which port cleat holds what.** Which cleat do the main Cunningham and the blue downhaul use? (One of them is presumably the fixed clam cleat.)
+3. **Mainsheet purchase.** Count the parts of line running between the block on the boom and the block on the traveller car: that number is the purchase (4 parts = 4:1).
+4. **Jib car pin positions.** Count the holes, fore–aft and across.
 
 ## Later
 
