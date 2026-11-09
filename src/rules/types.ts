@@ -1,0 +1,65 @@
+import type { Vec } from '../core/math';
+import type { Tack } from '../boat/boat';
+
+/** The rules engine only sees this slice of a boat. */
+export interface RulesBoat {
+  id: number;
+  x: number; y: number;
+  h: number; // heading, deg
+  vx: number; vy: number; // velocity over the ground, m/s
+  tack: Tack;
+  tacking: boolean; // past head to wind, not yet close-hauled
+  lastTackT: number; // race time she last passed head to wind
+  penalty: number; // degrees of penalty turn still to do
+  ocs: boolean; // over early and not yet returned
+  started: boolean;
+  leg: number; // index of her next mark
+}
+
+export interface RulesMark {
+  name: string;
+  p: Vec;
+  type: 'round' | 'pass';
+  /** True if the leg to this mark is a beat (boats on opposite tacks there are outside the model). */
+  beat: boolean;
+}
+
+export interface RulesContext {
+  t: number; // race time, s (negative before the start signal)
+  windFrom: number; // true wind direction, deg
+  marks: RulesMark[]; // the course's mark sequence
+}
+
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '18.2(b)' | '22.1' | '22.2';
+
+/** Who was where when the first of two boats reached the zone. */
+export interface MarkRoomState {
+  idx: number; // mark index in the course sequence
+  overlapped: boolean;
+  inside?: number; // boat id entitled to mark-room when overlapped
+  ahead?: number; // boat id clear ahead when not overlapped
+}
+
+/** Per-pair memory the engine carries between steps. */
+export interface PairRecord {
+  kc: number | null; // id of the keep-clear boat at the last step
+  rule: RuleId | null;
+  grace: number; // Rule 15 grace lasts until this time
+  by: number | null; // id of the boat that just acquired right of way
+  byWhy: 'tack' | 'overlap' | null;
+  cool: number; // no new incident for this pair until this time
+  mark: MarkRoomState | null;
+}
+
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -1, by: null, byWhy: null, cool: -1, mark: null });
+
+export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
+
+export type IncidentKind = 'contact' | 'swerve';
+export interface Incident<B> {
+  kind: IncidentKind;
+  fouler: B;
+  rule: RuleId;
+  byWhy: 'tack' | 'overlap' | null;
+  verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
+}

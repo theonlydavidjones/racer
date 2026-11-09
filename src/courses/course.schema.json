@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Folkboat sim course",
+  "type": "object",
+  "required": ["id", "title", "windBase", "marks", "startLine", "legs"],
+  "properties": {
+    "id": { "type": "string" },
+    "order": { "type": "number", "description": "Sort order in the course picker." },
+    "title": { "type": "string" },
+    "area": { "type": "string" },
+    "source": { "type": "string" },
+    "notes": { "type": "string", "description": "Shown on the setup screen." },
+    "windBase": { "type": "number", "description": "Typical true wind direction (deg) for this course." },
+    "marks": {
+      "type": "object",
+      "description": "Physical marks, keyed by a short id. Either lat/lon, or an offset from the start line centre.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "lat": { "type": "number" }, "lon": { "type": "number" },
+          "from": { "const": "lineCenter" }, "bearing": { "type": "number" }, "distance": { "type": "number" },
+          "shape": { "enum": ["cylinder", "sphere"] }
+        }
+      }
+    },
+    "startLine": {
+      "description": "Either two fixed ends, or a line centre + bearing (committee end lies along the bearing).",
+      "type": "object",
+      "properties": {
+        "committee": { "$ref": "#/$defs/end" },
+        "pin": { "$ref": "#/$defs/end" },
+        "center": { "type": "object", "properties": { "lat": { "type": "number" }, "lon": { "type": "number" } } },
+        "bearing": { "type": "number" },
+        "length": { "oneOf": [{ "type": "number" }, { "type": "object", "properties": { "base": { "type": "number" }, "perBoat": { "type": "number" } } }] },
+        "biasAdjustable": { "type": "boolean" }
+      }
+    },
+    "finish": { "const": "startLine" },
+    "legs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mark", "type", "side"],
+        "properties": {
+          "mark": { "type": "string" },
+          "type": { "enum": ["round", "pass"], "description": "round = rounding mark; pass = leave on the given side without rounding." },
+          "side": { "enum": ["starboard", "port"] }
+        }
+      }
+    },
+    "obstructions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": { "enum": ["startFinishLine"] },
+          "when": { "enum": ["racing"] },
+          "penalty": { "enum": ["twoTurns"] },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "end": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": { "type": "string" },
+        "kind": { "enum": ["shore", "boat", "buoy"] },
+        "lat": { "type": "number" }, "lon": { "type": "number" },
+        "mark": { "type": "string", "description": "Use a mark from `marks` as this end." },
+        "verify": { "type": "string" }
+      }
+    }
+  }
+}

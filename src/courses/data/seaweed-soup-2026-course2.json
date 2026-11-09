@@ -1,0 +1,35 @@
+{
+  "$schema": "../course.schema.json",
+  "id": "ss2",
+  "order": 1,
+  "title": "Seaweed Soup · Course 2",
+  "area": "San Francisco Cityfront",
+  "source": "GGYC Seaweed Soup 2026–27, Addendum B. Mark positions from YRA (github.com/nkiesel/YRA-Marks).",
+  "notes": "GGYC Seaweed Soup 2026–27, Addendum B. About 3.2 nm. Start westward off the GGYC race deck. Pass X on the side shown to keep clear of the line; it is not a rounding mark. Crossing the line mid-race is a two-turn penalty. Marks are at YRA positions; the line runs from the race deck out to X, an assumption to check against the sailing instructions.",
+  "windBase": 275,
+  "marks": {
+    "A": { "name": "A", "lat": 37.810767, "lon": -122.446817, "shape": "sphere" },
+    "X": { "name": "X", "lat": 37.811667, "lon": -122.443333 },
+    "6": { "name": "6 · Fort Mason", "lat": 37.811667, "lon": -122.430000 }
+  },
+  "startLine": {
+    "committee": {
+      "label": "GGYC race deck", "kind": "shore", "lat": 37.80925, "lon": -122.44325,
+      "verify": "Line from the race deck to X is an assumption; the addendum does not define it. Check against the main sailing instructions."
+    },
+    "pin": { "label": "X", "mark": "X" }
+  },
+  "finish": "startLine",
+  "legs": [
+    { "mark": "A", "type": "round", "side": "starboard" },
+    { "mark": "X", "type": "pass", "side": "starboard" },
+    { "mark": "6", "type": "round", "side": "starboard" },
+    { "mark": "X", "type": "pass", "side": "port" },
+    { "mark": "A", "type": "round", "side": "starboard" },
+    { "mark": "X", "type": "pass", "side": "starboard" },
+    { "mark": "6", "type": "round", "side": "starboard" }
+  ],
+  "obstructions": [
+    { "kind": "startFinishLine", "when": "racing", "penalty": "twoTurns", "note": "The start/finish line is an obstruction once racing; crossing it costs a two-turn penalty." }
+  ]
+}

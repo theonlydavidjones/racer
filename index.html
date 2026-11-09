@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Folkboat Racing Sim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Saira+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<canvas id="gl" aria-label="3D view of the race course"></canvas>
+<div id="labels"></div>
+
+<header id="hud">
+  <div class="pod clock"><span class="lab" id="clockLab">Start in</span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
+  <div class="pod"><span class="lab">Boatspeed</span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0 kt</span></div>
+  <div class="pod"><span class="lab">Heading</span><span class="val" id="hdg">000</span><span class="sub" id="tackLab">Starboard</span></div>
+  <div class="pod"><span class="lab">Wind</span><span class="val" id="twd">270</span><span class="sub" id="shiftLab">12 kt</span></div>
+</header>
+<canvas id="dial" aria-label="Wind angle dial"></canvas>
+<canvas id="map" aria-label="Course map, tap to zoom"></canvas>
+<div id="mapHint">Tap map · zoom</div>
+<div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
+<div id="linebox" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div id="controls">
+  <div class="row1">
+    <button class="chip" id="bView" type="button">View · Cockpit</button>
+    <button class="chip" id="bFast" type="button">Speed 1×</button>
+    <button class="chip" id="bSound" type="button">Sound on</button>
+    <button class="chip" id="bPause" type="button">Pause</button>
+  </div>
+  <div class="row2">
+    <button class="big steer" id="bLeft" type="button" aria-label="Steer to port">◀</button>
+    <button class="big steer" id="bRight" type="button" aria-label="Steer to starboard">▶</button>
+    <span class="keys">← → steer · Space tack · ↓ luff · V view · drag to look</span>
+    <div class="spacer"></div>
+    <button class="big tack" id="bTack" type="button">Tack</button>
+    <button class="big" id="bLuff" type="button">Luff</button>
+  </div>
+</div>
+
+<div class="overlay" id="setup">
+  <div class="panel">
+    <div class="eyebrow">San Francisco Cityfront</div>
+    <h1>Folkboat Racing Sim</h1>
+    <p class="lede">Race Folkboats off a real start line with real current. Every foul pauses the race and replays it from overhead with the rule that applies.</p>
+    <div class="field"><span>Course</span>
+      <div class="seg" data-k="course"><!-- filled from src/courses/data/*.json --></div></div>
+    <div class="coursecard" id="courseCard"></div>
+    <div class="field"><span>Wind (westerly)</span>
+      <div class="seg" data-k="windKt"><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div></div>
+    <div class="field"><span>Current</span>
+      <div class="seg" data-k="current"><button type="button" data-v="slack">Slack</button><button type="button" data-v="flood">Flood 1.0</button><button type="button" data-v="ebb">Ebb 1.5</button><button type="button" data-v="bigebb">Ebb 2.5</button></div>
+      <small>Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small></div>
+    <div class="field" id="biasField"><span>Line set by the committee</span>
+      <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
+    <div class="field"><span>Opponents</span>
+      <div class="seg" data-k="fleet"><button type="button" data-v="1">1</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></div></div>
+    <div class="field"><span>Sequence</span>
+      <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
+    <div class="field"><span>Training aids</span>
+      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div></div>
+    <button class="cta" id="bGo" type="button">Start the sequence</button>
+    <div class="help">
+      <b>Steer</b><span>◀ ▶ buttons, arrow keys or A / D</span>
+      <b>Tack / gybe</b><span>Tack button or Space. Turns through the wind to the other close-hauled course.</span>
+      <b>Luff</b><span>Hold to ease the sails and slow down. This is how you burn time before the gun.</span>
+      <b>Look</b><span>Drag the view. Double-tap to look forward again.</span>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="replay" hidden>
+  <div class="panel">
+    <div class="eyebrow" id="rEyebrow">Incident</div>
+    <h2 id="rTitle">Rule 10</h2>
+    <canvas id="rcanvas"></canvas>
+    <p class="ruletext" id="rRule"></p>
+    <div class="verdict" id="rVerdict"><p id="rWhat"></p></div>
+    <p id="rTip"></p>
+    <p id="rPen" class="lede"></p>
+    <div class="btnrow"><button class="ghost" id="bReplay" type="button">Replay</button><button class="cta" id="bCont" type="button">Continue racing</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="panel">
+    <h2>Paused</h2>
+    <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
+    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Change course or conditions</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="results" hidden>
+  <div class="panel">
+    <div class="eyebrow">Race complete</div>
+    <h2 id="resTitle">Finish</h2>
+    <p id="resStart"></p>
+    <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th></tr></thead><tbody id="resBody"></tbody></table>
+    <p id="resFouls" class="lede"></p>
+    <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Change course or conditions</button></div>
+  </div>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
