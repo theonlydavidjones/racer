@@ -128,6 +128,10 @@ The port keeps the prototype's behaviour. These differences are deliberate:
 - AI decisions and boat placement use a seeded RNG instead of `Math.random`.
 - Added `[hidden]{display:none}` and `box-sizing` rules. The prototype relied on its host page for these; standalone, the hidden overlays covered the screen.
 
+## Build plan
+
+See [ROADMAP.md](ROADMAP.md) for what's planned, including full sail controls (backstay, vang, outhaul, Cunningham, halyards, traveller, jib cars and winches).
+
 ## Known gaps
 
 - Acceleration, slowing and turning are calibrated from physics and sailing judgement, not measured on a real Folkboat. If your boat feels different, the constants in `HANDLING` are the place to adjust.
