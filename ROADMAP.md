@@ -20,16 +20,16 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Piano | Inboard (by the companionway) → outboard |
 |---|---|
 | Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats) |
-| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams. Also here: the main Cunningham (thin line, stopper knot in the end), the main downhaul (blue), and the jib halyard tail (uncleated) |
+| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main downhaul and the jib halyard tail (uncleated) |
 
 | Control | Sail | Led to | Notes |
 |---|---|---|---|
 | Vang | Main | Piano, both sides, innermost | Dual-ended: pulling one tail pulls the other |
-| Outhaul | Main | Piano, both sides, middle | Dual-ended |
+| Outhaul | Main | Piano, both sides, middle | Dual-ended; blue line, its middle crosses behind the companionway from one side to the other |
 | Jib Cunningham | Jib | Piano, both sides, outermost | Dual-ended |
-| Main Cunningham | Main | Port piano only | Its own line through a ring in the luff above the boom. Fine luff tension under way |
-| Main downhaul | Main | Port piano (blue line), via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Either a gooseneck downhaul or a halyard tensioner (see below) |
-| Main halyard | Main | Tail thrown down the companionway | Hoisted before racing, not touched under way |
+| Main Cunningham | Main | Port piano only, fixed clam cleat | Its own line through a ring in the luff above the boom. Fine luff tension under way |
+| Main downhaul | Main | Port side, via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Modelled as a gooseneck downhaul (it sails the same as a halyard tensioner) |
+| Main halyard | Main | Not used under way | Hoisted before racing, not touched while racing |
 | Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
 | Mainsheet | Main | Boom end to the traveller car on the transom | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
 | Traveller | Main | Transom | Dual-ended |
@@ -56,12 +56,11 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Telltales, the leech, the draft position and the speed readout respond, so you learn by feel and by numbers.
 - Keyboard controls (rebindable) and a trim panel that groups the lines as they are on the boat: piano, transom, winches.
 
-### Still to confirm
+### Defaults until someone's aboard to check (easy to change later)
 
-1. **Downhaul and main halyard.** They can't be one line: a halyard has one free end (the other is shackled to the head of the sail), and there are two blue tails, one on the piano and one down the companionway. Two likely set-ups: the tackle at the mast base hooks onto the gooseneck and pulls the boom down a track on the mast (a **gooseneck downhaul**), or it hooks onto the halyard where it comes out of the mast and pulls that down (a **halyard tensioner**). To tell: pull the downhaul and watch whether the boom slides down the mast. Same colour line is likely just one spool bought for both. Either way it sails the same in the sim.
-2. **Which port cleat holds what.** Which cleat do the main Cunningham and the blue downhaul use? (One of them is presumably the fixed clam cleat.)
-3. **Mainsheet purchase.** Count the parts of line running between the block on the boom and the block on the traveller car: that number is the purchase (4 parts = 4:1).
-4. **Jib car pin positions.** Count the holes, fore–aft and across.
+- Mainsheet purchase: 4:1.
+- Jib car pin positions: 7 fore–aft and 5 across, 25 mm apart.
+- Downhaul: drawn as a gooseneck downhaul, cleat position approximate.
 
 ## Later
 
