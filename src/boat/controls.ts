@@ -123,12 +123,16 @@ export function mainShape(c: Controls, tws: number, rig: SailRig = STD_RIG, aws 
   // leech tension: the sheet (only when it's nearly in) and the vang (more effective as the sheet is eased)
   const sheetT = smooth((0.32 - c.mainsheet) / 0.32), vangT = c.vang * (0.12 + 0.88 * smooth(c.mainsheet / 0.4));
   const leech = Math.min(1.15, sheetT + 0.9 * vangT);
+  // a mast that bends more or less than the average (rig.bend: 1 for aluminium and an average wooden mast) has more
+  // or less pre-bend (flatter or fuller to start with), and bends more or less under the sail's load as the apparent
+  // wind's pressure rises, flattening the main and opening the upper leech by itself, at once, in a gust
+  const soft = rig.bend - 1, load = Math.min(3, (aws / 14) ** 2);
   return age({
     // (a hard vang with the sheet in pushes the boom into the gooseneck and bends the lower mast: a little flatter)
     // the backstay bends the mast and flattens the main: more with a mast that bends more (rig.bend)
-    depth: 0.145 - 0.05 * c.outhaul - 0.025 * rig.bend * c.backstay - 0.01 * luff - 0.012 * c.vang * sheetT,
+    depth: 0.145 - 0.05 * c.outhaul - 0.025 * rig.bend * c.backstay - 0.01 * luff - 0.012 * c.vang * sheetT - 0.03 * soft - 0.012 * soft * load,
     draft: clamp(0.5 - 0.1 * luff + 0.004 * (tws - 10) + 0.02 * c.backstay, 0.3, 0.6),
-    twist: clamp(19 - 12 * Math.min(1, leech) + 3 * c.backstay, 4, 24) // a bent mast opens the upper leech a little
+    twist: clamp(19 - 12 * Math.min(1, leech) + 3 * c.backstay + 5 * soft * load, 4, 24) // a bent mast opens the upper leech a little
   }, rig.wear, aws);
 }
 

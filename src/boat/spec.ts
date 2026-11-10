@@ -20,6 +20,7 @@ export interface BoatSpec {
     finish: 'race' | 'antifouling'; // the bottom paint's finish when clean: wet-sanded and burnished, or as rolled on
     mainAge: SailAge; jibAge: SailAge;
     mast: SparMaterial; boom: SparMaterial;
+    mastStiffness: 'soft' | 'average' | 'stiff'; // a wooden mast's own character (aluminium masts are all alike)
     outboard: 'none' | 'stowed' | 'bracket'; // left ashore, stowed below, or on its transom bracket (lifted)
     gearKg: number; // gear and stores beyond the racing minimum
   };
@@ -31,7 +32,7 @@ export const DEFAULT_BOAT: BoatSpec = {
   deck: '#8e9f7c',
   sails: { country: 'USA', number: '110', color: 'white' },
   flags: { burgee: '', ensign: '', special: '' },
-  perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', outboard: 'none', gearKg: 0 }
+  perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 
 /** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. */

@@ -63,6 +63,17 @@ describe('equipment the class rules make equal', () => {
     expect(benchSpeed(12, a, spec({ boom: 'wood' })).kt).toBeCloseTo(base, 6);
   });
 
+  it('mast stiffness: a soft mast flattens the main under load and depowers by itself in a gust; a stiff one keeps its shape', async () => {
+    const { mainShape, defaultControls, SAIL_WEAR } = await import('../src/boat/controls');
+    const c = defaultControls(), at = (bend: number, aws: number) => mainShape(c, aws / 1.4, { wear: SAIL_WEAR.new, bend }, aws);
+    expect(at(1.16, 28).depth).toBeLessThan(at(1, 28).depth - 0.005); // flatter in a gust
+    expect(at(1.16, 28).twist).toBeGreaterThan(at(1, 28).twist + 1.5); // upper leech opens
+    expect(at(0.84, 28).depth).toBeGreaterThan(at(1, 28).depth);
+    expect(Math.abs(at(1.16, 8).depth - at(1, 8).depth)).toBeLessThan(0.007); // in light air, only the pre-bend differs
+    // an aluminium mast and an average wooden one bend alike (the class's intent)
+    expect(at(1, 20).depth).toBe(mainShape(c, 20 / 1.4, { wear: SAIL_WEAR.new, bend: 1 }, 20).depth);
+  });
+
   it('a wooden mast is within a fraction of a percent: a little heavier aloft', () => {
     const a = benchAngles(20).up;
     expect(Math.abs(loss(20, a, { mast: 'wood' }))).toBeLessThan(0.006);

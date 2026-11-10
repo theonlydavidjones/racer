@@ -87,6 +87,7 @@ export class BoatPanel {
       case 'jibAge': this.set(b => { b.perf.jibAge = v as SailAge; }); return;
       case 'mast': this.set(b => { b.perf.mast = v as 'wood' | 'aluminium'; }); return;
       case 'boom': this.set(b => { b.perf.boom = v as 'wood' | 'aluminium'; }); return;
+      case 'stiff': this.set(b => { b.perf.mastStiffness = v as BoatSpec['perf']['mastStiffness']; }); return;
       case 'outboard': this.set(b => { b.perf.outboard = v as BoatSpec['perf']['outboard']; }); return;
       case 'finish': this.set(b => { b.perf.finish = v as BoatSpec['perf']['finish']; }); return;
     }
@@ -192,7 +193,8 @@ export class BoatPanel {
         <div class="field"><span>Bottom paint finish</span>${seg('finish', [['antifouling', 'As rolled on'], ['race', 'Wet-sanded, burnished']], b.perf.finish)}<small>${PERF_INFO.finish}</small></div>
         <div class="field"><span>Mainsail</span>${seg('mainAge', ages, b.perf.mainAge)}</div>
         <div class="field"><span>Jib</span>${seg('jibAge', ages, b.perf.jibAge)}<small>${PERF_INFO.sails}</small></div>
-        <div class="field"><span>Mast</span>${seg('mast', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.mast)}</div>
+        <div class="field"><span>Mast</span>${seg('mast', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.mast)}
+          ${b.perf.mast === 'wood' ? seg('stiff', [['soft', 'Soft'], ['average', 'Average'], ['stiff', 'Stiff']], b.perf.mastStiffness) : ''}</div>
         <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.boom)}<small>${PERF_INFO.spars}</small></div>
         <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}<small>${PERF_INFO.outboard}</small></div>
         <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label><small>${PERF_INFO.gear}</small></div>

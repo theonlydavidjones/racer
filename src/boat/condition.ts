@@ -13,9 +13,11 @@ import { dCfAt, fouling, type Fouling } from './fouling';
  *   estimates bounded by their examples (a main cut with the draft at 45% ends up at 55–60%) and by lift–camber data
  *   (Dayman 1953). See controls.ts SAIL_WEAR.
  * - **Mast:** the class designed the aluminium mast to bend like an average wooden one and to be no better than a
- *   good one (NFIA, 2000), so they race as equals. What differs: a wooden rig weighs about 9 kg more, high up (an
- *   aluminium-rigged boat at the class minimum carries those 9 kg as correctors in the bilge instead), and a wooden
- *   mast bends more in its middle, so the backstay flattens the main further.
+ *   good one (NFIA, 2000). Aluminium masts are all alike; wooden ones vary, soft to stiff. A softer mast starts flatter
+ *   (more pre-bend), flattens further under backstay, and bends more under the sail's load, so it depowers by itself
+ *   in a gust (the main flattens and its upper leech opens): an advantage in a gusty breeze, less power in moderate
+ *   air. A stiff mast holds its power, but heels her more in the gusts. A wooden rig also weighs about 9 kg more,
+ *   high up (an aluminium-rigged boat at the class minimum carries those 9 kg as correctors in the bilge instead).
  * - **Boom:** the class sets an aluminium boom's minimum weight (9 kg) about where a spruce boom comes out: no measured
  *   difference in speed. It changes her looks only.
  * - **Outboard:** about 13 kg (a 2.5 hp four-stroke). Stowed below, it's weight low and a little aft; on the transom
@@ -39,6 +41,12 @@ const G = 9.81;
 /** A wooden rig's extra weight aloft (kg) and how far above the bilge correctors it sits (m). */
 const WOOD_RIG = { kg: 9, dz: 5.3 };
 const OUTBOARD_KG = 13;
+/**
+ * How much a mast bends, relative to aluminium (all alike) and to the average wooden mast, which the aluminium mast
+ * was designed to match: in the class bend test (16 kg hung 4.8 m from the top), wooden masts measure about
+ * 105–145 mm and aluminium about 125 mm (folkebaad.dk), so a soft wooden mast bends ~16% more, a stiff one ~16% less.
+ */
+const MAST_BEND = { soft: 145 / 125, average: 1, stiff: 105 / 125 };
 /** Fore–aft stations in crewPhys units (0 at the helm, 1 at the mast): the transom, and a cockpit locker. */
 const STATION = { transom: -0.28, locker: 0.0 };
 
@@ -52,7 +60,7 @@ export function condition(s: BoatSpec, month = 9): Condition {
   const wood = s.perf.mast === 'wood';
   return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
-    main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? 1.2 : 1 },
+    main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1 },
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(Math.abs(h) * Math.PI / 180) : 0)
@@ -68,13 +76,13 @@ export const PERF_INFO = {
   weeks: 'Slime builds over the first weeks; copper antifouling holds off barnacles for about six, then they come fast (faster in late-summer water than in January). A slow boat feels it most: in light air, skin friction is most of her drag. Racing Folkboats are scrubbed every week or two.',
   finish: 'A burnished racing bottom has about 3% less skin friction than antifouling as it was rolled on (Schultz 2002). Worth a fraction of a percent; most in light air.',
   sails: 'Old Dacron sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
-  spars: 'The class built the aluminium mast to bend like an average wooden one. A wooden rig is about 9 kg heavier aloft (a little less stability), and bends more in the middle (the backstay flattens the main further). The boom makes no measured difference.',
+  spars: 'The class built the aluminium mast to bend like an average wooden one; wooden masts vary. A soft mast flattens the main and opens its leech by itself in a gust (good in a gusty breeze) but has less power in moderate air; a stiff one keeps its power but heels more in the gusts. A wooden rig is also about 9 kg heavier aloft. The boom makes no measured difference.',
   outboard: 'About 13 kg. On the transom bracket it\'s weight at the very stern (and against the class rules while racing); stowed below it costs less.',
   gear: 'Gear and stores, or an old wooden hull\'s soaked planking, over the class minimum of 1930 kg (wooden and fiberglass alike). Slower in light air; a little more stable in a breeze.'
 };
 
 /** The reference boat the costs are measured against: clean bottom, new sails, aluminium spars, nothing extra aboard. */
-export const referencePerf = (s: BoatSpec): BoatSpec => ({ ...s, perf: { ...s.perf, cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', outboard: 'none', gearKg: 0 } });
+export const referencePerf = (s: BoatSpec): BoatSpec => ({ ...s, perf: { ...s.perf, cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 } });
 
 /** Each thing about your boat that costs (or gains) speed, as a change from the reference boat. */
 export function conditionItems(s: BoatSpec, month = 9): { label: string; spec: BoatSpec }[] {
@@ -82,7 +90,7 @@ export function conditionItems(s: BoatSpec, month = 9): { label: string; spec: B
   const w = (label: string, perf: Partial<BoatSpec['perf']>) => items.push({ label, spec: { ...ref, perf: { ...ref.perf, ...perf } } });
   if (p.cleanedWeeks > 0 || p.finish !== 'antifouling') w(`Bottom (${p.cleanedWeeks ? fouling(p.cleanedWeeks, month).label : 'clean'}${p.finish === 'race' ? ', racing finish' : ''})`, { cleanedWeeks: p.cleanedWeeks, finish: p.finish });
   if (p.mainAge !== 'new' || p.jibAge !== 'new') w(`Sails (main ${AGE[p.mainAge]}, jib ${AGE[p.jibAge]})`, { mainAge: p.mainAge, jibAge: p.jibAge });
-  if (p.mast === 'wood') w('Wooden mast', { mast: 'wood' });
+  if (p.mast === 'wood') w(`Wooden mast${p.mastStiffness !== 'average' ? ` (${p.mastStiffness})` : ''}`, { mast: 'wood', mastStiffness: p.mastStiffness });
   if (p.outboard !== 'none') w(p.outboard === 'bracket' ? 'Outboard on the bracket' : 'Outboard stowed below', { outboard: p.outboard });
   if (p.gearKg > 0) w(`${Math.round(p.gearKg / 0.4536)} lb over the minimum`, { gearKg: p.gearKg });
   return items;
