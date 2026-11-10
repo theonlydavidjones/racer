@@ -27,11 +27,27 @@ const lam = (c: number) => new THREE.MeshLambertMaterial({ color: c });
 interface Porpoise { g: THREE.Group; home: Vec; p: Vec; h: number; t: number; rolls: number; dive: number; off: Vec }
 const POD_ZONES: [number, number, number][] = [[37.8285, -122.4745, 350], [37.8320, -122.4640, 400], [37.8395, -122.4650, 350], [37.8655, -122.4420, 300], [37.8170, -122.4760, 300]];
 
+/**
+ * A harbor porpoise: a small, stocky, torpedo-shaped body about 1.5 m long, dark grey above, with a low triangular fin
+ * a little behind the middle of the back. Head toward −z. Only the back ever shows as it rolls through the surface.
+ */
 function porpoiseMesh(): THREE.Group {
-  const g = new THREE.Group(), dark = lam(0x32373d);
-  const back = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), dark); back.scale.set(0.42, 0.36, 1.6); g.add(back);
-  const fin = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.12, 0.05), new THREE.Vector3(0, 0.36, 0.15), new THREE.Vector3(0, 0.12, 0.32)]), new THREE.MeshLambertMaterial({ color: 0x2a2e33, side: THREE.DoubleSide }));
-  fin.geometry.computeVertexNormals(); g.add(fin);
+  const g = new THREE.Group(), dark = lam(0x2f343a);
+  // the body, turned on a lathe: blunt head, deepest a third of the way back, tapering to the tail stock
+  const prof: THREE.Vector2[] = [];
+  for (let i = 0; i <= 16; i++) {
+    const f = i / 16, y = 0.75 - 1.5 * f; // head (+0.75) → tail (−0.75)
+    const r = f < 0.08 ? 0.12 + 0.9 * f : f < 0.35 ? 0.19 + 0.06 * Math.sin((f - 0.08) / 0.27 * Math.PI / 2) : 0.25 * Math.pow(1 - (f - 0.35) / 0.65, 0.9) + 0.025;
+    prof.push(new THREE.Vector2(i === 0 ? 0.001 : r, y));
+  }
+  prof.push(new THREE.Vector2(0.001, -0.76));
+  const geo = new THREE.LatheGeometry(prof, 12); geo.rotateX(-Math.PI / 2); geo.scale(1, 0.85, 1); // a little flatter than round
+  const body = new THREE.Mesh(geo, dark); g.add(body);
+  // the dorsal fin: low and triangular, just behind the middle
+  const fg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.17, -0.12), new THREE.Vector3(0, 0.33, 0.1), new THREE.Vector3(0, 0.17, 0.2)]);
+  fg.computeVertexNormals(); g.add(new THREE.Mesh(fg, new THREE.MeshLambertMaterial({ color: 0x262a2f, side: THREE.DoubleSide })));
+  // the flukes (they rarely show; the tail stock arches as it goes down)
+  const fl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.14), dark); fl.position.set(0, 0, 0.78); g.add(fl);
   return g;
 }
 
@@ -144,17 +160,23 @@ export class Wildlife {
       a.t += dt;
       if (a.t > 0 && near(a.p, 35)) { a.t = -a.dive; a.rolls = 0; a.h += 120 + r() * 120; } // spooked: down and away
       const u = { x: Math.sin(a.h * D2R), y: Math.cos(a.h * D2R) };
-      a.p.x += u.x * 1.4 * dt; a.p.y += u.y * 1.4 * dt; // cruising, mostly underwater
+      const speed = a.t > 0 ? 2.4 : 1.6; // swimming: quicker in a breathing bout, slower down below
+      a.p.x += u.x * speed * dt; a.p.y += u.y * speed * dt;
       if ((a.p.x - a.home.x) ** 2 + (a.p.y - a.home.y) ** 2 > 250 * 250) a.h = Math.atan2(a.home.x - a.p.x, a.home.y - a.p.y) / D2R + (r() - 0.5) * 40;
-      const cyc = a.t % 9; // within a bout, a roll every 9 s; each roll takes about 1.6 s
-      const rolling = a.t > 0 && cyc < 1.6 && this.isWater(a.p);
+      else if (r() < dt * 0.05) a.h += (r() - 0.5) * 50; // wandering as it feeds
+      // a breath every 7 s or so in a bout, each pod member a moment after the last (their offset)
+      const T = 1.45, cyc = (a.t - a.off.y * 0.12 + 20) % 7;
+      const rolling = a.t > 0 && cyc < T && this.isWater(a.p);
       a.g.visible = rolling;
       if (rolling) {
-        const ph = cyc / 1.6, x = a.p.x + a.off.x, y = a.p.y + a.off.y;
-        a.g.position.copy(P3(x, y, sea(x, y) - 0.38 + 0.42 * Math.sin(ph * Math.PI)));
-        a.g.rotation.set(0, -a.h * D2R, 0); a.g.rotateX(0.6 - 1.2 * ph); // the back rolls up and over
+        // the roll: the body runs along an arc in the vertical plane, like a wheel turning over through the surface:
+        // the head breaks first, the back and fin turn over, the tail stock slips under
+        const ph = cyc / T, ang = (ph - 0.5) * 1.75, Rc = 1.15, depth = 1.15;
+        const x = a.p.x + a.off.x * u.y + u.x * Rc * Math.sin(ang), y = a.p.y - a.off.x * u.x + u.y * Rc * Math.sin(ang);
+        a.g.position.copy(P3(x, y, sea(x, y) - depth + Rc * Math.cos(ang)));
+        a.g.rotation.set(0, -a.h * D2R, 0); a.g.rotateX(-ang); // nose up as it rises, down as it goes under
       }
-      if (a.t > 0 && a.t > 9 * (3 + (a.rolls % 2))) { a.t = -(a.dive = 50 + r() * 70); a.rolls++; } // then a long dive
+      if (a.t > 0 && a.t > 7 * (3 + (a.rolls % 3))) { a.t = -(a.dive = 45 + r() * 75); a.rolls++; } // then a long dive
     }
     // harbor seals: a head up for half a minute or so, then down for a couple of minutes; down at once if you come close
     for (const s of this.seals) {
