@@ -55,6 +55,7 @@
     <button class="chip" id="bCourse" type="button">Course</button>
     <button class="chip" id="bTrim" type="button" aria-pressed="false">Trim · crew</button>
     <button class="chip" id="bHail" type="button">Hail</button>
+    <button class="chip on" id="bPushOff" type="button" hidden title="The crew walks her back out of the slip and swings her bow round">Push off</button>
     <button class="chip" id="bExit" type="button" title="Leave and go back to the start page">Exit</button>
     <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
     <button class="chip" id="bOrient" type="button" hidden>North up</button>
@@ -77,7 +78,7 @@
     <div class="modes">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Pick a race day and start time, a course or the race committee's choice, the boats you race against, and your crew. The real weather, or adjust it.</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay: choose where to start and, if you like, where you're going. The same real conditions, or adjust them.</span></button>
-      <button type="button" class="modecard" data-home="marina"><b>Marina</b><span>Your boats: build, name, paint and set them up, and keep them in condition.</span></button>
+      <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats: their particulars, race records and who's sailed them. Build and set them up, and sail one.</span></button>
       <button type="button" class="modecard soon" data-home="club"><b>Yacht Club</b><span>Coming: your crew and skippers, and how well each boat in the fleet is sailed.</span></button>
     </div>
     <div class="btnrow"><button class="ghost" id="bKeys0" type="button">Keyboard settings</button></div>
@@ -148,6 +149,9 @@
       <small id="tideNote"></small></div>
     <div class="field" id="biasField"><span>Line set by the committee</span>
       <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
+    <div class="field" id="raceFromField"><span>Start from</span>
+      <div class="seg" data-k="raceFrom"><button type="button" data-v="water">On the water, by the line</button><button type="button" data-v="slip" id="raceFromSlip">Her slip</button></div>
+      <small id="raceFromNote"></small></div>
     <div class="field" id="fleetField"><span>Racing against <b id="oppCount"></b></span>
       <div class="opps" id="oppList"></div>
       <small>Tick the boats you'll race. Your own saved boats race as you set them up (a dirty bottom or tired sails slows them too). Make more under <i>Your boats…</i>.</small></div>
@@ -270,6 +274,9 @@
   </div>
 </div>
 <div id="boatPanel" class="boatpanel" hidden></div>
+<div class="overlay" id="fleet" hidden></div>
+<div id="fleetBoat" class="boatpanel" hidden></div>
+<div class="overlay" id="sailHer" hidden></div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

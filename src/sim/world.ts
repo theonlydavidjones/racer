@@ -21,8 +21,8 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { destMark, place as getPlace } from './places';
-import { slipById, type Slip } from '../geo/marina';
-import { sailNo } from '../boat/spec';
+import { pushOffPlan, slipById, type Slip } from '../geo/marina';
+import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
@@ -85,6 +85,12 @@ export interface WorldOptions {
   courseSignal?: { no: number; why: string };
 }
 
+/** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
+export function slipLeadTime(slip: Slip, line: Vec): number {
+  const d = Math.hypot(line.x - slip.p.x, line.y - slip.p.y) * 1.4 + 250; // not a straight line: the fairways, the entrance, tacking
+  return Math.min(60, Math.max(15, Math.ceil((d / 1.8 / 60 + 8) / 5) * 5)) * 60; // at about 3.5 kt, plus pushing off and getting the sails up
+}
+
 /** Your crew from the settings (0–2 crew besides you at the helm). */
 function userCrew(s: Settings): CrewSpec {
   const c = s.crew ?? { n: 2, helm: DEFAULT_CREW.helm, people: DEFAULT_CREW.crew };
@@ -142,6 +148,8 @@ export class World {
   fouls = 0;
   fouledBy = 0;
   finishShown = false;
+  /** This outing's gone into the boats' logbooks (boat/logbook.ts). */
+  logged = false;
   userFinishT: number | null = null;
   groundToast = { t: -99 };
   events: SimEvent[] = [];
@@ -174,6 +182,10 @@ export class World {
   homeSlip: Slip | null = null;
   /** Just sail: when you got there (sim time), or null. */
   arrivedT: number | null = null;
+  /** You start in her slip (Cruise, or Race with time to sail out to the line). */
+  readonly fromSlip: boolean = false;
+  /** How far you've sailed, over the ground, m. */
+  sailedM = 0;
 
   constructor(file: CourseFile, settings: Settings, seed: number, opts: WorldOptions = {}) {
     this.settings = { ...settings };
@@ -196,7 +208,10 @@ export class World {
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
     this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
-    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
+    this.homeSlip = slipById(settings.boat?.slip);
+    // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
+    this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
+    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
     this.t = -this.startAt;
     this.prepFlag = settings.prepFlag ?? 'P';
     this.sequence = this.freeSail ? [] : startSequence(settings.seq, this.prepFlag);
@@ -216,7 +231,6 @@ export class World {
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
     // cruising: from a place on the water or her slip in West Harbor, to another place or back to her slip
-    this.homeSlip = slipById(settings.boat?.slip);
     if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${this.homeSlip.id}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
     { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
       const from = (settings.sailFrom === 'slip' ? this.homeSlip?.p : null) ?? getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
@@ -253,14 +267,15 @@ export class World {
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
-    let p: Vec, h: number, startStill = false;
-    if (isUser && this.freeSail) {
+    let p: Vec, h: number, startStill = false, docked: Boat['docked'];
+    if (isUser && this.fromSlip) {
+      // in her slip, bow in (boats nose in here, never back in), made fast: push off to leave
+      const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
+      docked = { slip: slip.id, phase: 'fast', s: 0, plan: pushOffPlan(slip) };
+    } else if (isUser && this.freeSail) {
       // where you chose to start, on a beam reach: whichever way has more open water ahead
-      const at = getPlace(this.settings.sailFrom)?.p, slip = this.settings.sailFrom === 'slip' ? this.homeSlip : null;
-      if (slip) {
-        // in her slip, turned bow out (walked round on her lines), ready to sail off: no way on
-        const out = V(slip.heading + 180); p = { x: slip.p.x + out.x * 0.6, y: slip.p.y + out.y * 0.6 }; h = n360(slip.heading + 180); startStill = true;
-      } else if (at) {
+      const at = getPlace(this.settings.sailFrom)?.p;
+      if (at) {
         p = { ...at };
         const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
         const a = n360(this.windModel.base + 90), b = n360(this.windModel.base - 90);
@@ -286,14 +301,15 @@ export class World {
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name } } : { paint: F.paint }),
-      x: p.x, y: p.y, h, v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
+      x: p.x, y: p.y, h, docked, v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : DEFAULT_CREW, 'S'),
-      // flags come down for a race: they fly when you're just sailing
-      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.flags.burgee || undefined, ensign: spec.flags.ensign || undefined, special: spec.flags.special || undefined } : {}),
+      // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
+      // (officers' flags will go with skippers, in the Yacht Club)
+      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
         depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
@@ -458,7 +474,12 @@ export class World {
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
-    for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
+    for (const b of this.boats) {
+      if (b.docked) { this.dockStep(b, dt); continue; }
+      const x0 = b.x, y0 = b.y;
+      moveBoat(b, dt, this.t, this.emit, this.groundToast);
+      if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
+    }
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.log?.step(this, dt);
     this.trackCourses();
@@ -781,13 +802,57 @@ export class World {
     }
   }
 
+  /** In her slip and stopped, bow in? Then the crew steps onto the finger and makes her fast. */
+  private bowInTold = -Infinity;
+  private intoSlip(u: Boat, slip: Slip): boolean {
+    if (u.docked || dist(u, slip.p) > 2.5 || u.v > 0.6) return false;
+    if (Math.abs(wrap(u.h - slip.heading)) > 35) {
+      if (this.t - this.bowInTold > 20) { this.bowInTold = this.t; this.emit({ type: 'toast', msg: 'Boats lie bow in here: come into the slip bow first, toward the dock.', ms: 4000 }); }
+      return false;
+    }
+    Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, v: 0, vx: 0, vy: 0, steer: 0, turnTarget: null });
+    u.docked = { slip: slip.id, phase: 'fast', s: 0, plan: pushOffPlan(slip) };
+    return true;
+  }
+
+  /** Push off: the crew walks her back out of the slip, swings her bow toward the way out, and steps aboard with a shove. */
+  pushOff(): boolean {
+    const u = this.user, d = u.docked;
+    if (!d || d.phase !== 'fast') return false;
+    d.phase = 'walking'; d.s = 0;
+    this.emit({ type: 'toast', msg: 'Pushing off: the crew walks her back along the finger, then swings her bow round and steps aboard.', ms: 3500 });
+    return true;
+  }
+
+  /** A boat in her slip: held there; or being walked out (about 0.7 m/s, a walking pace) and swung round (about 15°/s). */
+  private dockStep(b: Boat, dt: number): void {
+    const d = b.docked!, slip = slipById(d.slip);
+    b.v = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    if (!slip || d.phase === 'fast') return;
+    const u = V(slip.heading);
+    if (d.phase === 'walking') {
+      d.s = Math.min(d.plan.back, d.s + 0.7 * dt);
+      b.x = slip.p.x - u.x * d.s; b.y = slip.p.y - u.y * d.s; b.vx = -u.x * 0.7; b.vy = -u.y * 0.7;
+      if (d.s >= d.plan.back) { d.phase = 'swinging'; d.s = 0; }
+    } else {
+      d.s = Math.min(1, d.s + 15 * dt / Math.abs(d.plan.turn));
+      b.h = n360(slip.heading + d.plan.turn * d.s);
+      if (d.s >= 1) {
+        // aboard, with a shove: about a knot, bow toward the fairway; the sails are hers to fill
+        b.docked = undefined; b.h = d.plan.h; b.desired = b.h; b.v = 0.5;
+        this.emit({ type: 'toast', msg: 'Off the dock, with a shove. Sail her out through the fairway to the entrance.', ms: 3500 });
+      }
+    }
+  }
+
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
     const d = this.dest, u = this.user;
-    if (d?.key === 'slip') { // home: in her slip and stopped (or as good as)
-      if (this.arrivedT != null || dist(u, d.p) > 2.5 || u.v > 0.6) return;
+    if (d?.key === 'slip') { // home: in her slip, bow in, and stopped (or as good as)
+      if (this.arrivedT != null || !this.homeSlip || !this.intoSlip(u, this.homeSlip)) return;
       this.arrivedT = this.t;
-      this.emit({ type: 'toast', msg: `Home: in her slip, ${this.homeSlip?.id}, after ${Math.floor(this.t / 60)} min. Nicely done.`, ms: 6000 });
+      this.emit({ type: 'toast', msg: `Home: nosed into her slip, ${this.homeSlip.id}, after ${Math.floor(this.t / 60)} min, and made fast. Nicely done.`, ms: 6000 });
       return;
     }
     if (!d || this.arrivedT != null || markDist(u, d) > 40) return;

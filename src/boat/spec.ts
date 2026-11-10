@@ -13,9 +13,17 @@ export interface BoatSpec {
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
+  /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
   sails: { country: string; number: string; color: 'white' | 'black' };
-  flags: { burgee: string; ensign: string; special: string }; // '' = none
-  /** Her slip in West Harbor (geo/marina.ts), if she has one. */
+  /** (Older saves: chosen flags. Now her club gives the burgee and her country the ensign; officers' flags go with skippers.) */
+  flags?: { burgee?: string; ensign?: string; special?: string };
+  // her particulars: who she belongs to and where she lives (they rarely change)
+  /** Her yacht club (a burgee id, render/burgees.ts): she flies its burgee. '' = none. */
+  club: string;
+  /** Who skippers her: you, or (until the Yacht Club has skippers) a generic AI skipper. */
+  skipper: 'you' | 'ai';
+  /** Her home marina (geo/marina.ts MARINAS), and her slip in it. */
+  marina?: string;
   slip?: string;
   perf: {
     cleanedWeeks: number; // weeks since the bottom was last cleaned (0 = just cleaned)
@@ -33,7 +41,7 @@ export const DEFAULT_BOAT: BoatSpec = {
   hull: { material: 'fiberglass', upper: '#f4f1e8', lower: '#2a2d33', stripe: '#24324f' },
   deck: '#8e9f7c',
   sails: { country: 'USA', number: '110', color: 'white' },
-  flags: { burgee: '', ensign: '', special: '' },
+  club: 'stfyc', skipper: 'you',
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 
@@ -55,12 +63,16 @@ export const BOTTOM_COLORS: [string, string][] = [
 /** Laid teak decks (wooden boats, and glassfibre ones with teak laid over): weathered silver-grey, or oiled and polished. */
 export const TEAK_DECKS: [string, string][] = [['Silvered teak', 'teak-silver'], ['Polished teak', 'teak-polished']];
 
-/** World Sailing national sail letters (RRS Appendix G), for the countries that sail Folkboats and a few more. */
+/**
+ * Her home country, by World Sailing national sail letters (RRS Appendix G): the countries with a national Nordic
+ * Folkboat association, and those with smaller fleets (Nordic Folkboat International Association, folkboat.com/worldwide).
+ */
 export const SAIL_COUNTRIES: [string, string][] = [
-  ['USA', 'United States'], ['CAN', 'Canada'], ['MEX', 'Mexico'], ['GBR', 'Great Britain'], ['IRL', 'Ireland'], ['DEN', 'Denmark'],
-  ['SWE', 'Sweden'], ['NOR', 'Norway'], ['FIN', 'Finland'], ['EST', 'Estonia'], ['GER', 'Germany'], ['NED', 'Netherlands'],
-  ['FRA', 'France'], ['ESP', 'Spain'], ['ITA', 'Italy'], ['SUI', 'Switzerland'], ['AUS', 'Australia'], ['NZL', 'New Zealand'], ['JPN', 'Japan']
+  ['USA', 'United States'], ['CAN', 'Canada'], ['DEN', 'Denmark'], ['EST', 'Estonia'], ['FIN', 'Finland'], ['GER', 'Germany'],
+  ['HUN', 'Hungary'], ['NED', 'Netherlands'], ['ESP', 'Spain'], ['SWE', 'Sweden'], ['GBR', 'Great Britain'],
+  ['LAT', 'Latvia'], ['ITA', 'Italy'], ['TUR', 'Türkiye'], ['AUS', 'Australia'], ['RSA', 'South Africa']
 ];
+export const countryName = (c: string) => SAIL_COUNTRIES.find(x => x[0] === c)?.[1] ?? c;
 
 /** Normalise a saved spec (older saves, bad values) to a complete one. */
 export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
@@ -69,8 +81,10 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     id: typeof x.id === 'string' && x.id ? x.id : newId(),
     name: typeof x.name === 'string' ? x.name.slice(0, 18) : d.name,
     hull: { ...d.hull, ...x.hull }, deck: x.deck ?? d.deck,
-    sails: { ...d.sails, ...x.sails }, flags: { ...d.flags, ...x.flags }, perf: { ...d.perf, ...x.perf },
-    ...(typeof x.slip === 'string' && x.slip ? { slip: x.slip } : {})
+    sails: { ...d.sails, ...x.sails }, perf: { ...d.perf, ...x.perf },
+    club: typeof x.club === 'string' ? x.club : x.flags?.burgee ?? '', // older saves: her burgee was her club
+    skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
+    ...(typeof x.slip === 'string' && x.slip ? { marina: x.marina || 'west-harbor', slip: x.slip } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
@@ -96,3 +110,18 @@ export function freeNumber(boats: BoatSpec[], from = 100): string {
   while (used.has(String(n))) n++;
   return String(n);
 }
+
+/**
+ * The ensign she wears, from her home country (render/flagArt.ts ENSIGNS). Her country's yacht ensign where any
+ * private yacht may wear one: the US yacht ensign (custom since the 1848 yacht signal; for US waters only), Denmark's
+ * yacht flag with "Y.F." (any Danish pleasure craft, since 1866), Spain's crowned yacht ensign. Elsewhere yacht ensigns
+ * are only for members of particular clubs, by warrant or permit (British, Finnish, Dutch, Australian), or there are
+ * none: she wears her country's civil ensign (the Red Ensign for a British or Australian yacht). Sources: FOTW
+ * (crwflags.com/fotw/flags: us~yte, dk-yacht, es~yacht, fi-jakt, and each country's page), Wikipedia "Yacht ensign".
+ */
+const ENSIGN_OF: Record<string, string> = {
+  USA: 'us-yacht', DEN: 'den-yacht', ESP: 'esp-yacht',
+  CAN: 'can', EST: 'est', FIN: 'fin', GER: 'ger', HUN: 'hun', NED: 'ned', SWE: 'swe', GBR: 'gbr', LAT: 'lat', ITA: 'ita', TUR: 'tur', AUS: 'aus', RSA: 'rsa',
+  NOR: 'nor', FRA: 'fra', NZL: 'nzl', JPN: 'jpn'
+};
+export const ensignFor = (country: string): string | undefined => ENSIGN_OF[country];

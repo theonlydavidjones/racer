@@ -1,3 +1,4 @@
+import type { PushOff } from '../geo/marina';
 import type { BoatSpec } from './spec';
 import type { Condition } from './condition';
 import type { CrewState } from './crewPhys';
@@ -42,6 +43,8 @@ export interface Boat {
   build: Build;
   // kinematics
   x: number; y: number; h: number; // position (m) and heading (deg)
+  /** In a slip (made fast, bow in), or being walked out of it by the crew (sim/world.ts pushOff). */
+  docked?: { slip: string; phase: 'fast' | 'walking' | 'swinging'; s: number; plan: PushOff };
   v: number; // speed through the water, m/s
   vx: number; vy: number; // velocity over the ground, m/s
   tack: Tack;

@@ -86,6 +86,29 @@ function mapleLeaf(g: CanvasRenderingContext2D, cx: number, cy: number, s: numbe
     [-0.05, 0.62], [-0.04, 0.18], [-0.48, 0.24], [-0.42, 0.08], [-0.75, -0.2], [-0.66, -0.27], [-0.73, -0.5], [-0.5, -0.46], [-0.45, -0.58], [-0.22, -0.32], [-0.27, -0.73], [-0.13, -0.66]];
   poly(g, c, pts.map(([x, y]) => [cx + x * s, cy + y * s]));
 }
+/** A royal crown, all in one colour: the band, five arches meeting under an orb and cross. */
+function crown(g: CanvasRenderingContext2D, cx: number, cy: number, s: number, c: string): void {
+  g.save(); g.translate(cx, cy); g.fillStyle = c; g.strokeStyle = c; g.lineWidth = s * 0.06;
+  g.fillRect(-s * 0.36, s * 0.22, s * 0.72, s * 0.14); // the rim
+  g.beginPath(); g.moveTo(-s * 0.36, s * 0.22); g.quadraticCurveTo(-s * 0.42, -s * 0.12, -s * 0.12, -s * 0.18); g.quadraticCurveTo(0, -s * 0.2, s * 0.12, -s * 0.18); g.quadraticCurveTo(s * 0.42, -s * 0.12, s * 0.36, s * 0.22); g.closePath(); g.fill();
+  g.globalAlpha = 0.35; g.fillStyle = '#ffffff'; for (const x of [-0.2, 0, 0.2]) { g.beginPath(); g.arc(x * s, s * 0.04, s * 0.05, 0, 7); g.fill(); } g.globalAlpha = 1; g.fillStyle = c;
+  g.beginPath(); g.arc(0, -s * 0.27, s * 0.08, 0, 7); g.fill(); // the orb
+  g.fillRect(-s * 0.02, -s * 0.48, s * 0.04, s * 0.16); g.fillRect(-s * 0.07, -s * 0.43, s * 0.14, s * 0.04); // the cross
+  g.restore();
+}
+/** The arms of the four maritime republics on a shield: Venice (gold lion on blue), Genoa (red cross on white), Amalfi (white cross on blue), Pisa (white cross on red). */
+function republics(g: CanvasRenderingContext2D, cx: number, cy: number, s: number): void {
+  g.save(); g.translate(cx - s / 2, cy - s / 2);
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(s, 0); g.lineTo(s, s * 0.6); g.quadraticCurveTo(s, s, s / 2, s * 1.08); g.quadraticCurveTo(0, s, 0, s * 0.6); g.closePath(); g.save(); g.clip();
+  const h = s * 0.54;
+  rect(g, '#2b4fa3', 0, 0, s / 2, h); rect(g, WHITE, s / 2, 0, s / 2, h); rect(g, '#2b4fa3', 0, h, s / 2, s); rect(g, '#cd212a', s / 2, h, s / 2, s);
+  g.fillStyle = '#e8b830'; g.beginPath(); g.ellipse(s * 0.25, h * 0.55, s * 0.13, s * 0.09, -0.3, 0, 7); g.fill(); g.beginPath(); g.arc(s * 0.33, h * 0.32, s * 0.06, 0, 7); g.fill(); // Venice's lion (in outline)
+  rect(g, '#cd212a', s * 0.71, 0, s * 0.08, h); rect(g, '#cd212a', s / 2, h * 0.43, s / 2, s * 0.08); // Genoa
+  g.fillStyle = WHITE; for (const [x, y] of [[0.25, h / s + 0.22]] as P[]) { g.save(); g.translate(x * s, y * s); for (let k = 0; k < 4; k++) { g.rotate(Math.PI / 2); g.beginPath(); g.moveTo(0, 0); g.lineTo(-s * 0.08, -s * 0.15); g.lineTo(s * 0.08, -s * 0.15); g.closePath(); g.fill(); } g.restore(); } // Amalfi's eight-pointed cross
+  rect(g, WHITE, s * 0.72, h + s * 0.06, s * 0.06, s * 0.36); rect(g, WHITE, s * 0.6, h + s * 0.2, s * 0.3, s * 0.06); // Pisa's cross
+  g.restore();
+  g.strokeStyle = '#d6b44a'; g.lineWidth = s * 0.03; g.stroke(); g.restore();
+}
 /** Australia's stars on the fly half (positions from the Flags Act, in hoist units from the centre of the fly half). */
 function southernCross(g: CanvasRenderingContext2D, W: number, H: number, c: string): void {
   const fx = W * 0.75, fy = H / 2;
@@ -122,6 +145,56 @@ export const ENSIGNS: FlagArt[] = [
   { id: 'fra', name: 'France (30:33:37 at sea)', ratio: 1.5, draw: (g, W, H) => { rect(g, '#002395', 0, 0, W * 0.3, H); rect(g, WHITE, W * 0.3, 0, W * 0.33, H); rect(g, '#ed2939', W * 0.63, 0, W * 0.37 + 1, H); } },
   { id: 'aus', name: 'Australia (Red Ensign)', ratio: 2, draw: (g, W, H) => { rect(g, UK_RED, 0, 0, W, H); union(g, 0, 0, W / 2, H / 2); southernCross(g, W, H, WHITE); } },
   { id: 'nzl', name: 'New Zealand (Red Ensign)', ratio: 2, draw: (g, W, H) => { rect(g, UK_RED, 0, 0, W, H); union(g, 0, 0, W / 2, H / 2); nzCross(g, W, H, WHITE); } },
+  // the yacht ensigns any private yacht of her country may wear (FOTW dk-yacht, es~yacht), and the civil ensigns of the
+  // other countries where Folkboats are sailed (FOTW and the national flag laws; club-only yacht ensigns aren't offered)
+  {
+    id: 'den-yacht', name: 'Danish yacht flag (Y.F.)', ratio: 107 / 56, shape: 'swallowtail',
+    // the Dannebrog split flag, 56 × 107: cross 24 + 8 + 24 high, 24 + 8 + 30 along to where the tails part; the notch
+    // runs from the end of the cross out to the fly corners, so the tails taper to points; "Y.F." in yellow in the upper hoist
+    draw: (g, W, H) => {
+      const u = H / 56; g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(62 * u, 24 * u); g.lineTo(62 * u, 32 * u); g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.clip();
+      rect(g, UK_RED, 0, 0, W, H); rect(g, WHITE, 24 * u, 0, 8 * u, H); rect(g, WHITE, 0, 24 * u, W, 8 * u); g.restore();
+      g.fillStyle = '#f2c230'; g.font = `bold ${Math.round(8.5 * u)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Y.F.', 12 * u, 7 * u);
+    }
+  },
+  {
+    id: 'esp-yacht', name: 'Spanish yacht ensign (crowned)', ratio: 1.5,
+    // red-yellow-red 1:2:1 with no coat of arms, and the royal crown in blue in the middle of the yellow
+    draw: (g, W, H) => { rect(g, '#ad1519', 0, 0, W, H); rect(g, '#fabd00', 0, H / 4, W, H / 2); crown(g, W / 2, H / 2, H * 0.36, '#1f3c88'); }
+  },
+  { id: 'est', name: 'Estonia', ratio: 11 / 7, draw: (g, W, H) => { rect(g, '#0072ce', 0, 0, W, H / 3); rect(g, '#000000', 0, H / 3, W, H / 3); rect(g, WHITE, 0, 2 * H / 3, W, H / 3 + 1); } },
+  { id: 'hun', name: 'Hungary (civil ensign, 2:3)', ratio: 1.5, draw: (g, W, H) => { rect(g, '#ce2939', 0, 0, W, H / 3); rect(g, WHITE, 0, H / 3, W, H / 3); rect(g, '#477050', 0, 2 * H / 3, W, H / 3 + 1); } },
+  { id: 'lat', name: 'Latvia', ratio: 2, draw: (g, W, H) => { rect(g, '#9d2235', 0, 0, W, H); rect(g, WHITE, 0, H * 0.4, W, H * 0.2); } },
+  {
+    id: 'ita', name: 'Italy (civil ensign)', ratio: 1.5,
+    // the tricolour with the arms of the four maritime republics, without a crown: Venice, Genoa, Amalfi, Pisa
+    draw: (g, W, H) => { rect(g, '#008c45', 0, 0, W / 3, H); rect(g, '#f4f5f0', W / 3, 0, W / 3, H); rect(g, '#cd212a', 2 * W / 3, 0, W / 3 + 1, H); republics(g, W / 2, H / 2, H * 0.42); }
+  },
+  {
+    id: 'tur', name: 'Türkiye', ratio: 1.5,
+    // the flag law's construction (G = hoist): crescent circles ½G and ⅖G across, centres 1/16 G apart, the outer ½G from
+    // the hoist; the star's circle ¼G across, ⅓G on from the inner circle's hoist side; a white hem 1/30 G at the hoist
+    draw: (g, W, H) => {
+      rect(g, '#e30a17', 0, 0, W, H); rect(g, WHITE, 0, 0, H / 30, H);
+      const x0 = H / 30 + H / 2; g.fillStyle = WHITE; g.beginPath(); g.arc(x0, H / 2, H / 4, 0, 7); g.fill();
+      g.fillStyle = '#e30a17'; g.beginPath(); g.arc(x0 + H / 16, H / 2, H / 5, 0, 7); g.fill();
+      star(g, x0 + H / 16 - H / 5 + H / 3 + H / 8, H / 2, H / 8, WHITE, 5, 0.382, -Math.PI / 2 + Math.PI * 0.1 + Math.PI); // (E is from the inner circle's hoist side)
+    }
+  },
+  {
+    id: 'rsa', name: 'South Africa', ratio: 1.5,
+    // red over blue, the green Y (1/5 of the hoist) edged white against the red and blue and gold against the black triangle
+    draw: (g, W, H) => {
+      rect(g, '#de3831', 0, 0, W, H / 2); rect(g, '#002395', 0, H / 2, W, H / 2);
+      const j = H / 2, band = (w: number, c: string) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'butt'; g.beginPath(); g.moveTo(-1, -H * 0.04); g.lineTo(j, H / 2); g.lineTo(-1, H * 1.04); g.moveTo(j, H / 2); g.lineTo(W + 2, H / 2); g.stroke(); };
+      band(H / 3, WHITE); band(H / 5, '#007a4d');
+      const t = H / 5 / 2 + H / 15; // the black triangle, edged in gold, inside the Y's arms
+      g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(j, H / 2); g.lineTo(0, H); g.closePath(); g.clip();
+      g.fillStyle = '#ffb612'; g.beginPath(); g.moveTo(0, H * 0.5 * (t / (H * 0.5)) * 1.5); g.lineTo(j - t * 1.6, H / 2); g.lineTo(0, H - H * 0.5 * (t / (H * 0.5)) * 1.5); g.closePath(); g.fill();
+      g.fillStyle = '#000000'; g.beginPath(); g.moveTo(0, H * 0.5 * ((t + H / 15) / (H * 0.5)) * 1.5); g.lineTo(j - (t + H / 15) * 1.6, H / 2); g.lineTo(0, H - H * 0.5 * ((t + H / 15) / (H * 0.5)) * 1.5); g.closePath(); g.fill();
+      g.restore();
+    }
+  },
   { id: 'jpn', name: 'Japan', ratio: 1.5, draw: (g, W, H) => { rect(g, WHITE, 0, 0, W, H); g.fillStyle = '#bc002d'; g.beginPath(); g.arc(W / 2, H / 2, 0.3 * H, 0, 7); g.fill(); } }
 ];
 

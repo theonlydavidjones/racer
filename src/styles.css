@@ -402,3 +402,33 @@ details.adjust > *{margin-top:8px}
 .adjrow b{font:600 13px/1 var(--f-inst);text-align:right;font-variant-numeric:tabular-nums}
 .realbtn{font:700 11px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border-radius:6px;border:1px solid var(--rule);background:var(--btn);color:var(--muted);cursor:pointer}
 .realbtn[aria-pressed=true]{background:var(--accent);color:#13202b;border-color:var(--accent)}
+/* the Fleet: your boats as a grid or a table; her page beside her in the showroom; Sail her */
+.panel.fleetpanel{max-width:1000px}
+.fhead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.fhead > div:first-child{flex:1}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.fcard{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px 12px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);cursor:pointer;font:inherit}
+.fcard:hover,.fcard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
+.fcard b{font:700 17px/1.15 var(--f-inst);letter-spacing:.04em}
+.fcard span{font:600 13px/1.2 var(--f-inst);color:var(--muted);font-variant-numeric:tabular-nums}
+.fprof{width:100%;height:auto;margin-bottom:6px;border-radius:6px;background:linear-gradient(#24384a,#1a2d3d 72%)}
+.ftable{overflow-x:auto}
+.ftable table,.flog,.ftab{width:100%;border-collapse:collapse;font:500 13px/1.35 var(--f-inst);color:var(--text)}
+.ftable th,.flog th{text-align:left;font:700 10px/1 var(--f-inst);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--rule)}
+.ftable td{padding:9px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.ftable tbody tr{cursor:pointer}
+.ftable tbody tr:hover td,.ftable tbody tr:focus-visible td{background:var(--btn-hi)}
+.fdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
+.fnote{color:var(--muted)}
+.ftab td{padding:4px 0;vertical-align:top}
+.ftab td:first-child{color:var(--muted);width:40%}
+.flog td{padding:5px 6px 5px 0;vertical-align:top;border-bottom:1px solid var(--rule)}
+.flog td small{display:block;color:var(--muted);font-size:11px}
+.frec{font:500 13px/1.4 var(--f-inst)}
+.frec b{color:var(--accent)}
+.fno{font:600 13px/1 var(--f-inst);color:var(--muted)}
+.boatpanel .bphead .linkbtn{padding:0;text-decoration:none;font-weight:600}
+.fslip{display:flex;gap:8px;align-items:center;font:600 14px/1.3 var(--f-inst);color:var(--text)}
+.fslip.off{color:var(--muted)}
+.fslip input{accent-color:var(--accent);width:18px;height:18px}
+.chip.on{border-color:var(--accent);color:var(--accent)}

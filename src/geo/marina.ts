@@ -52,3 +52,56 @@ export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
   }
   return true;
 });
+
+/** The marinas your boats can call home (only West Harbor is built so far). */
+export const MARINAS: { id: string; name: string }[] = [{ id: 'west-harbor', name: 'West Harbor, San Francisco Marina' }];
+export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
+
+/** Does a Folkboat (7.6 m by 2.2 m, a little to spare) fit here, at this heading, clear of every dock? */
+export function hullClear(c: Vec, h: number): boolean {
+  const u = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }, n = { x: u.y, y: -u.x };
+  for (const a of [-3.7, -1.85, 0, 1.85, 3.7]) for (const b of [-1.05, 0, 1.05]) {
+    const q = { x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b };
+    if (!inBasin(q) || hitsHarbor(q)) return false;
+  }
+  return true;
+}
+
+/**
+ * Leaving a slip she lies in bow first (boats nose in here, never back in): the crew walks her back along the finger
+ * until her bow is about at its end, then swings her bow round toward the way out of the harbor and steps aboard
+ * with a shove. `back` is how far she's walked astern (m), `turn` the swing (deg, + to starboard), `h` her heading
+ * after it. If there isn't room to swing where she'd usually be, she's walked back a little further first.
+ */
+export interface PushOff { back: number; turn: number; h: number }
+const plans = new Map<string, PushOff>();
+export function pushOffPlan(s: Slip): PushOff {
+  let p = plans.get(s.id); if (!p) { p = planPushOff(s); plans.set(s.id, p); }
+  return p;
+}
+function planPushOff(s: Slip): PushOff {
+  const u = { x: Math.sin(s.heading * Math.PI / 180), y: Math.cos(s.heading * Math.PI / 180) };
+  const exit = HARBOR.beacon ?? s.p;
+  const base = 0.45 * s.finger + 4.1; // her bow (3.8 m ahead of her middle) level with the end of the finger
+  const at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
+  const toward = (d: number) => { const c = at(base), v = { x: Math.sin((s.heading + d) * Math.PI / 180), y: Math.cos((s.heading + d) * Math.PI / 180) }; return v.x * (exit.x - c.x) + v.y * (exit.y - c.y); };
+  const dirs = toward(90) >= toward(-90) ? [90, -90] : [-90, 90];
+  for (const extra of [0, 1.5, 3, 4.5, 6]) {
+    const back = base + extra;
+    let ok = true;
+    for (let d = 1; d <= back && ok; d += 1) ok = hullClear(at(d), s.heading);
+    if (!ok) break; // walking her back any further runs her into something
+    // of the ways she can swing, the one with the most clear fairway ahead (not a dead end); about even, toward the entrance
+    const c = at(back), runs = dirs.map(turn => {
+      for (let k = 1; k <= 6; k++) if (!hullClear(c, s.heading + turn * k / 6)) return -1;
+      const h = s.heading + turn, v = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) };
+      let d = 0; while (d < 40 && hullClear({ x: c.x + v.x * (d + 2), y: c.y + v.y * (d + 2) }, h)) d += 2;
+      return d;
+    });
+    if (runs.some(r => r >= 0)) {
+      const i = runs[0] >= 0 && runs[0] >= runs[1] - 5 ? 0 : 1;
+      return { back, turn: dirs[i], h: (s.heading + dirs[i] + 360) % 360 };
+    }
+  }
+  return { back: base, turn: dirs[0], h: (s.heading + dirs[0] + 360) % 360 }; // tight: she'll bump on the way round
+}

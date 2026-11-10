@@ -22,8 +22,10 @@ describe('your boats: saved, named, chosen', () => {
   });
 
   it('older saves carry over: a single boat, or just a burgee', () => {
-    store.set(KEY, JSON.stringify({ burgee: 'stfyc' }));
-    expect(loadSettings().boat.flags.burgee).toBe('stfyc');
+    store.set(KEY, JSON.stringify({ burgee: 'ggyc' }));
+    expect(loadSettings().boat.club).toBe('ggyc'); // her burgee was her club
+    store.set(KEY, JSON.stringify({ boats: [{ id: 'a', name: 'A', flags: { burgee: 'ryc', ensign: 'den', special: 'vice' } }], boatId: 'a' }));
+    expect(loadSettings().boat.club).toBe('ryc'); expect(loadSettings().boat.skipper).toBe('you');
     store.set(KEY, JSON.stringify({ boat: { name: 'SKOL', hull: { material: 'wood' } } }));
     const s = loadSettings();
     expect(s.boats.length).toBe(1); expect(s.boat.name).toBe('SKOL'); expect(s.boat.hull.material).toBe('wood');

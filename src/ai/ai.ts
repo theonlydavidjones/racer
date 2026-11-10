@@ -171,7 +171,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (dist(b, wp) < 12) ai.wp = ai.wp ? 0 : 1;
       desired = sailable(b, brg(wp.x - b.x, wp.y - b.y));
       // dawdle, but keep enough way on to steer (about 2 kt)
-      luff = tl > 35 && Math.sin(w.t * 0.25 + b.id * 2) > 0.3 && b.v > 1.0;
+      // (but not when the current has set her down below her spot: then she works back up to it)
+      luff = tl > 35 && Math.sin(w.t * 0.25 + b.id * 2) > 0.3 && b.v > 1.0 && w.lineD(b) > -ai.depth - 20;
       // Time to get to the line from here: turn onto the approach (slowly, if we're slow), then sail
       // there accelerating, with the current. Leave when that plus a margin is all the time left.
       if (refresh || Number.isNaN(ai.plan.leave)) { // NaN: not worked out yet

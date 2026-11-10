@@ -200,3 +200,10 @@ export function burgeeCanvas(id: string): HTMLCanvasElement | null {
   b.draw(g, W, H); g.restore();
   return c;
 }
+
+/**
+ * The clubs a boat can belong to: those whose burgees are drawn, and South Beach Yacht Club (its burgee isn't drawn yet:
+ * the club's own image of it couldn't be fetched, and it isn't on Flags of the World).
+ */
+export const CLUBS: { id: string; club: string }[] = [...BURGEES.map(b => ({ id: b.id, club: b.club })), { id: 'sbyc', club: 'South Beach Yacht Club' }]
+  .sort((a, b) => a.club.localeCompare(b.club));

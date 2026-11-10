@@ -29,6 +29,7 @@ export interface Settings {
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
   sailFrom: string; // Just sail: where you start (a place id, sim/places.ts)
   sailTo: string; // Just sail: where you're heading ('' = nowhere in particular)
+  raceFrom?: 'water' | 'slip'; // Race: start on the water by the line, or in her slip in time to sail out to it
   burgee?: string; // (older saves: your burgee, now in boat.flags)
   /** Your boats (boat/spec.ts), and the one you're sailing. `boat` is that one (the same object as its entry in `boats`). */
   boats: BoatSpec[];
@@ -50,8 +51,9 @@ export function loadSettings(): Settings {
   s.crew = structuredClone(s.crew ?? DEFAULT_SETTINGS.crew); // a copy: editing your crew mustn't change the defaults
   // your boats: older saves had one boat (and before that, only a burgee)
   let boats = s.boats !== DEFAULT_SETTINGS.boats && s.boats?.length ? s.boats
-    : [s.boat === DEFAULT_BOAT ? { ...DEFAULT_BOAT, flags: { ...DEFAULT_BOAT.flags, burgee: s.burgee ?? '' } } : s.boat];
-  boats = structuredClone(boats).map(b => fixSpec(b));
+    : [s.boat === DEFAULT_BOAT ? { ...DEFAULT_BOAT, club: s.burgee ?? DEFAULT_BOAT.club } : s.boat];
+  // (older saves had no skipper: the boat you were sailing is yours to skipper, the rest have the AI's)
+  boats = structuredClone(boats).map(b => fixSpec({ ...b, skipper: b.skipper ?? (b.id === s.boatId ? 'you' : 'ai') }));
   const seen = new Set<string>(); for (const b of boats) { if (seen.has(b.id)) b.id += '-' + seen.size; seen.add(b.id); }
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
   // your opponents: older saves had only a number of stock boats
