@@ -307,3 +307,32 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 /* the tiller bar is gone: the cursor is the tiller (and A/D); the element stays for its accessibility label */
 #tiller{display:none}
 .row2{justify-content:flex-end;align-items:center}
+
+/* Your boat: the panel on the left, the boat in the showroom view on the right */
+.boatsum{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.boatsum span{color:var(--text);font:600 13px/1.3 var(--f-inst)}
+.boatpanel{position:fixed;left:0;top:0;bottom:0;width:min(440px,100vw);z-index:40;background:rgba(10,18,26,.94);border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;-webkit-user-select:text;user-select:text;box-shadow:8px 0 30px rgba(0,0,0,.35)}
+.bphead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px;border-bottom:1px solid var(--rule)}
+.bphead h2{margin:0;font:700 20px/1 var(--f-head,inherit);color:var(--text)}
+.bpbody{overflow-y:auto;padding:6px 18px 30px;display:flex;flex-direction:column;gap:6px}
+.bpbody section{display:flex;flex-direction:column;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.bpbody h3{margin:0;font:700 12px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.bpbody h3 em{font-style:normal;color:var(--muted);letter-spacing:.04em;text-transform:none}
+.swatches{display:flex;flex-wrap:wrap;gap:6px}
+.sw{width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.sw.none{width:auto;padding:0 8px;background:transparent;color:var(--muted);font:600 11px var(--f-inst)}
+.sw.teak-silver{background:repeating-linear-gradient(90deg,#a9a49a 0 5px,#3b3a37 5px 6px)}
+.sw.teak-polished{background:repeating-linear-gradient(90deg,#b07a45 0 5px,#17130f 5px 6px)}
+.row2{display:grid;grid-template-columns:1.6fr 1fr;gap:8px}
+.inline{display:flex;align-items:center;gap:8px;color:var(--muted);font:600 13px var(--f-inst)}
+.inline .pick{width:110px}
+.bpbody input[type=range]{width:100%;accent-color:var(--accent)}
+.bpreport{background:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;color:var(--text);font:500 12.5px/1.45 var(--f-inst)}
+.bpreport table{width:100%;border-collapse:collapse}
+.bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
+.bpreport small{color:var(--muted)}
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,
+body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}

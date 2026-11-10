@@ -1,3 +1,5 @@
+import type { BoatSpec } from './spec';
+import type { Condition } from './condition';
 import type { CrewState } from './crewPhys';
 import type { SeaHere } from '../environment/sea';
 import { HALF, V, type Vec } from '../core/math';
@@ -115,6 +117,14 @@ export interface Boat {
   ai: AiState | null;
   /** The club burgee she flies (an id from render/burgees.ts), if any. */
   burgee?: string;
+  /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */
+  ensign?: string; special?: string;
+  /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */
+  paint?: Paint;
+  /** How you've set her up (your boat only): looks and condition. */
+  spec?: BoatSpec;
+  /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
+  cond?: Condition;
 }
 
 export type PoleState = 'down' | 'setting' | 'set' | 'stowing';
@@ -124,7 +134,7 @@ export const stern = (b: Vec & { h: number }): Vec => { const u = V(b.h); return
 
 /** How a boat is built. Class rules give wooden and fiberglass Nordic Folkboats the same minimum
  * weight and they race on equal terms, so this changes looks, not speed. */
-export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood' }
+export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood'; boom?: 'aluminium' | 'wood' }
 const WOOD: Build = { hull: 'wood', spars: 'wood' };
 
 /** How a boat looks: hull topsides, boot stripe, bottom paint, deck, and the name on her quarters (if shown). */

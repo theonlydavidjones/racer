@@ -84,13 +84,12 @@ export function bestFore(twa: number, tws: number, pole: boolean): number {
 /**
  * Speed factor from where the weight is fore and aft: forward in light air and downwind lifts the wide transom
  * clear; aft in a big breeze downwind keeps the bow up. The helm can't leave the tiller, so with no crew she can't
- * be trimmed forward. Up to about 2.5% at worst. `fore`: the crew's position (0..1).
+ * be trimmed forward. Up to about 2.5% at worst. `fore`: the crew's position (0..1); `extra`: other weight's moment.
  */
-export function trimFactor(s: CrewSpec, fore: number, twa: number, tws: number, pole: boolean): number {
+export function trimFactor(s: CrewSpec, fore: number, twa: number, tws: number, pole: boolean, extra = 0): number {
   const crew = s.crew.reduce((a, p) => a + p.w, 0);
-  const moment = crew * (fore - 0.5) + s.helm.w * (0.05 - 0.5), best = 240 * (bestFore(twa, tws, pole) - 0.5) + 0 * 0;
+  const moment = crew * (fore - 0.5) + s.helm.w * (0.05 - 0.5) + extra; // `extra`: other weight's moment (an outboard aft)
   const ref = 160 * (bestFore(twa, tws, pole) - 0.5) + 80 * (0.05 - 0.5); // a standard crew in the right place
-  void best;
   return 1 - 0.025 * Math.min(1, ((moment - ref) / 110) ** 2);
 }
 

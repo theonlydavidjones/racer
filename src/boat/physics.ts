@@ -8,7 +8,8 @@ import { beatFor, seaDrag, waveYaw } from './seaway';
 import { FULL_RUDDER, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rudderDrag, sailForces } from './balance';
 import { DEFAULT_CREW, crewMoment, displacement, displacementFactor, handsFactor, newCrew, placeCrew, trimFactor } from './crewPhys';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls } from './controls';
+import { condition, foulingDrag } from './condition';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. */
 export const PENALTY_TURN_RATE = 10;
@@ -116,27 +117,37 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
   const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
+  // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
+  let wornDrive = 1;
+  if (cond && (b.shape.main.cd0 || b.shape.main.clMul || b.shape.jib?.cd0 || b.shape.jib?.clMul)) {
+    const sound = (sh: Shape): Shape => ({ depth: sh.depth, draft: sh.draft, twist: sh.twist, ceAft: sh.ceAft });
+    const s0 = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibOn ? { trim: jibOn.trim, shape: sound(jibOn.shape) } : null, b.luff);
+    const d0 = s0.main.drive + s0.jib.drive, d1 = sf.main.drive + sf.jib.drive;
+    if (d0 > 5) wornDrive = clamp(d1 / d0, 0.6, 1.05);
+  }
   // the crew: where they'd put their weight to hold her at her best heel (a little heel in light air, no more than
   // about 17° upwind, flat downwind), then where they actually are (they move at a human pace)
-  const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec), F = sf.main.heel + sf.jib.heel;
+  const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
+  const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
   const bestHeel = twa > 120 ? 1 : ww.kt < 7 ? 6 : 16;
-  const need = heelingMoment(F, sf.twist, bestHeel) - hullRighting(bestHeel, disp);
+  const need = heelingMoment(F, sf.twist, bestHeel) - hullRighting(bestHeel, disp) - rmExtra(bestHeel);
   placeCrew(cs, need, twa, ww.kt, b.pole === 'set', b.tack, dt);
-  const heelT = heelWithCrew(F, sf.twist, disp, h => crewMoment(cs, h)) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
+  const heelT = heelWithCrew(F, sf.twist, disp, h => crewMoment(cs, h) + rmExtra(h)) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
   b.heelMag = (b.heelMag ?? 0) + (heelT - (b.heelMag ?? 0)) * Math.min(1, dt * 2.2);
   b.heel = b.heelMag * (rel >= 0 ? 1 : -1);
   b.helmNeed = helmNeeded(sf, b.heelMag, b.sheets.main, b.v, sf.twist);
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
   // heel past her best; the weight aboard (displacement) and where it sits fore and aft
-  let target = polar(ww.kt, twa, plan) * heelFactor(b.heelMag) * displacementFactor(disp, ww.kt) * trimFactor(cs.spec, cs.fore, twa, ww.kt, b.pole === 'set');
+  let target = polar(ww.kt, twa, plan) * heelFactor(b.heelMag) * displacementFactor(disp, ww.kt) * trimFactor(cs.spec, cs.fore, twa, ww.kt, b.pole === 'set', cond?.extraMoment ?? 0);
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
-  else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff); // sheet angles, then the sails' shape
+  else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff * wornDrive); // sheet angles, the sails' shape, worn cloth
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
   // holding a lot of helm to keep her straight is a brake (the steady helm the sails demand; turning has its own cost)
   const helmDrag = Math.abs(rate) < 4 ? rudderDrag(clamp(b.helmNeed ?? 0, -12, 12), b.v) : 0;
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag, disp);
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0), disp);
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
@@ -186,7 +197,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   };
   const wantMain = optimalSheet('main', b.awaSlow), wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
-  if (!b.crewPlan || !(b.crewPlanT! > 0)) { b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewPlan ?? undefined); b.crewPlanT = 1; }
+  const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
+  if (!b.crewPlan || !(b.crewPlanT! > 0)) { b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT); b.crewPlanT = 1; }
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;
   const crewAll = !(you && b.trimAll);
@@ -211,7 +223,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.trim.main = sailTrim('main', awa, b.sheets.main);
   b.trim.jib = plan === 'jib' ? sailTrim('jib', awa, b.sheets.jib) : null; // poled out or down: the sheet isn't in play
   // shape
-  const ms = mainShape(c, tws), js = plan === 'jib' ? jibShape(c, tws, b.tack) : null;
+  const ms = mainShape(c, tws, cond?.main, b.aws / KT), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, b.aws / KT) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa)) : 1;
   b.shape = { main: ms, jib: js, eff: js ? SAILS.main.share * em + SAILS.jib.share * ej : em };
 }

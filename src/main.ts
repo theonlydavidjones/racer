@@ -5,7 +5,8 @@ import './styles.css';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
 import { PLACES } from './sim/places';
-import { BURGEES } from './render/burgees';
+import { BoatPanel } from './ui/boatPanel';
+import { HULL_COLORS, BRIGHT_FINISH, sailNo } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
@@ -46,7 +47,7 @@ let drillShown = false;
 let w!: World;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24 };
+const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0 };
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -63,7 +64,8 @@ function lookAhead(): void { setLook(0, 0); }
 let pendingPenalty: Boat | null = null;
 
 function newGame(seed = randomSeed()): void {
-  w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM } : S.mode === 'sail' ? { freeSail: true } : {});
+  const showFlags = !!boatPanel?.open; // setting up your boat: her flags fly so you can see them
+  w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags } : S.mode === 'sail' ? { freeSail: true } : { showFlags });
   acc = 0; drillShown = false;
   $('trimPanel').classList.toggle('manual', trimMode() >= 1); $('trimPanel').classList.toggle('all', trimMode() === 2);
   $('bTrim').textContent = TRIM_LABEL[trimMode()];
@@ -516,10 +518,6 @@ function buildSetupChoices(): void {
   from.innerHTML = opts(null); to.innerHTML = opts('Nowhere in particular');
   from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
   from.onchange = () => { S.sailFrom = from.value; newGame(); };
-  const bs = $('burgeeSel') as HTMLSelectElement;
-  bs.innerHTML = '<option value="">None</option>' + [...BURGEES].sort((a, b) => a.club.localeCompare(b.club)).map(b => `<option value="${b.id}">${b.club}</option>`).join('');
-  bs.value = S.burgee ?? '';
-  bs.onchange = () => { S.burgee = bs.value; newGame(); };
   to.onchange = () => { S.sailTo = to.value; newGame(); };
   $('setup').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
@@ -712,13 +710,26 @@ function frame(now: number): void {
   }
   for (const e of w.drainEvents()) handle(e);
   keyLook(dt); lookLabel(); tillerSpring(dt); showTiller(); showLines(); coachTick(dt);
-  view.render(w, dt, now, viewMode, look, over);
+  if (boatPanel.open) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
+  else view.render(w, dt, now, viewMode, look, over);
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
 }
 
+/* Your boat: the panel, with the boat in the showroom view beside it. */
+let boatPanel: BoatPanel;
+function boatSummary(): void {
+  const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '';
+  $('boatSum').textContent = `${b.name || 'Unnamed'} · ${sailNo(b)} · ${colour.toLowerCase()} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull`;
+}
+boatPanel = new BoatPanel(S, () => { saveSettings(S); newGame(); boatSummary(); }, () => {
+  boatPanel.hide(); document.body.classList.remove('showroom'); look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = 24;
+  newGame(); $('setup').hidden = false;
+});
+$('bBoat').onclick = () => { $('setup').hidden = true; document.body.classList.add('showroom'); look.yaw = 0.6; look.pitch = 0; boatPanel.show(); newGame(); };
+
 buildSetupChoices();
-newGame(); paintSeg(); crewRows(); courseCard(); tideBox();
+newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary();
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.

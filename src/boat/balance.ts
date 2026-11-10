@@ -36,6 +36,8 @@ const CREW = { kg: 240, reach: 1.05 };
 const CE_HEIGHT = 4.3;
 /** Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force. */
 const LEVER = { main: -0.62, jib: 1.55 };
+/** Chord of each sail at its centre of effort (m). */
+const CHORD = { main: 2.4, jib: 2.0 };
 /** Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m). */
 const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
 /** Full helm (deg of rudder) for the sim's fastest turn. */
@@ -43,11 +45,11 @@ export const FULL_RUDDER = 30;
 /** Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. */
 export const IDEAL_HELM = 2.5;
 
-export interface SailForce { heel: number; drive: number }
+export interface SailForce { heel: number; drive: number; ceAft?: number }
 
 /** Force coefficient (lift-ish) for a sail from its trim and shape. */
 function coef(t: SailTrim, s: Shape): number {
-  const cmax = 0.85 + 5.5 * s.depth; // fuller sail, more force: 0.10 → 1.4, 0.14 → 1.62
+  const cmax = (0.85 + 5.5 * s.depth) * (s.clMul ?? 1); // fuller sail, more force: 0.10 → 1.4, 0.14 → 1.62 (a porous old sail a little less)
   const twist = clamp(1 - 0.013 * (s.twist - 8), 0.7, 1.08);
   // angle of attack: rises to the best trim, holds on a little past it (stalling sails still push sideways)
   const aoa = t.flow === 'luffing' ? 1 - t.amount * 0.92 : t.flow === 'stalled' ? 1 - 0.18 * t.amount : 1;
@@ -59,9 +61,9 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   const q = 0.5 * RHO_AIR * aws * aws, a = Math.abs(awa) * D2R;
   const one = (area: number, t: SailTrim, s: Shape): SailForce => {
     if (luffing) return { heel: q * area * 0.06 * Math.cos(a), drive: 0 };
-    const cl = coef(t, s), cd = 0.07 + 0.11 * cl * cl;
+    const cl = coef(t, s), cd = (s.cd0 ?? 0.07) + 0.11 * cl * cl; // profile drag (more from an old sail's hooked leech) + induced
     const L = q * area * cl, D = q * area * cd;
-    return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a) };
+    return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
   };
   return { main: one(AREA.main, main.trim, main.shape), jib: jib ? one(AREA.jib, jib.trim, jib.shape) : { heel: 0, drive: 0 }, twist: main.shape.twist };
 }
@@ -110,7 +112,8 @@ export function equilibriumHeel(heelForce: number, twist: number): number {
 export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, v: number, twist: number): number {
   const h = Math.abs(heelDeg) * D2R, ce = CE_HEIGHT - 0.03 * (twist - 8);
   // side forces about the keel: the main aft (+ toward the wind), the jib forward (− away)
-  let m = -(f.main.heel * LEVER.main + f.jib.heel * LEVER.jib);
+  // (a stretched old sail's draft sits further aft, and its force with it, by a share of the chord at the centre of effort)
+  let m = -(f.main.heel * (LEVER.main - CHORD.main * 0.5 * (f.main.ceAft ?? 0)) + f.jib.heel * (LEVER.jib - CHORD.jib * 0.5 * (f.jib.ceAft ?? 0)));
   // drive pushed out to leeward by heel, and by the boom eased out: both turn her toward the wind
   m += (f.main.drive + f.jib.drive) * ce * 0.55 * Math.sin(h);
   m += Math.max(0, f.main.drive) * 1.6 * Math.sin(Math.abs(boomOut) * D2R) * 0.5;

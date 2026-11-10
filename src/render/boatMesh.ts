@@ -7,6 +7,7 @@ import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
 import { buildCrew, syncCrew, type Crew } from './crew';
 import { burgeeCanvas } from './burgees';
+import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { CABIN, COCKPIT, HEEL, L, RUDDER_RAKE, cabinGeometry, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
@@ -49,19 +50,22 @@ const RIG_LIFT = 0.18;
 
 /** Hull, deck, cabin, cockpit, rudder and tiller, painted for this boat. The rudder group turns about its hinge. */
 function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
-  const F = FLEET[b.id] ?? FLEET[1], glass = b.build.hull === 'fiberglass';
-  const C = (h: string) => new THREE.Color(h);
+  const F = FLEET[b.id] ?? FLEET[1], glass = b.build.hull === 'fiberglass', paint = b.paint ?? F.paint;
+  const C = (h: string) => new THREE.Color(h), boot = paint.boot || b.hullColor; // no boot stripe: the topsides run down to the bottom paint
   const hullMat = glass
     ? reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x777777, shininess: 75 }), 0.14) // glossy gelcoat, reflecting the sky
     : reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: b.hullColor === '#9a6a36' ? 60 : 25 }), b.hullColor === '#9a6a36' ? 0.08 : 0.04); // painted or varnished planking
-  grp.add(new THREE.Mesh(hullGeometry({ topsides: C(b.hullColor), boot: C(F.paint.boot), bottom: C(F.paint.bottom) }), hullMat));
-  // deck: non-skid on glassfibre boats, painted canvas on the wooden ones
-  const deckMat = new THREE.MeshLambertMaterial({ color: F.paint.deck, side: THREE.DoubleSide });
+  grp.add(new THREE.Mesh(hullGeometry({ topsides: C(b.hullColor), boot: C(boot), bottom: C(paint.bottom) }), hullMat));
+  // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
+  const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
+  const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
+  const flatMat = teak ? new THREE.MeshLambertMaterial({ color: silver ? 0xa6a197 : 0xa8723f, side: THREE.DoubleSide }) : deckMat; // cockpit sole (teak, no planking drawn)
+  const cabinTopMat = teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : deckMat; // a teak-decked boat's cabin top: painted canvas
   grp.add(new THREE.Mesh(deckGeometry(), deckMat));
   // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top
   const cab = cabinGeometry();
   grp.add(new THREE.Mesh(cab.sides, glass ? MAT.cream : MAT.mahogany));
-  grp.add(new THREE.Mesh(cab.top, deckMat));
+  grp.add(new THREE.Mesh(cab.top, cabinTopMat));
   const zc = (u: number) => -L / 2 + u * L;
   // portlights: two each side
   for (const s of [1, -1]) for (const u of [CABIN.u0 + 0.075, CABIN.u0 + 0.155]) {
@@ -80,7 +84,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     gr.position.set(s * (CABIN.w - 0.17), cab.topY((CABIN.u0 + CABIN.u1) / 2 + 0.03) + 0.06, zc((CABIN.u0 + CABIN.u1) / 2 + 0.03)); grp.add(gr);
   }
   // cockpit well, seats, and coamings
-  cockpitGeometry().forEach((g, i) => grp.add(new THREE.Mesh(g, i === 0 ? deckMat : MAT.cream))); // non-skid sole, cream sides
+  cockpitGeometry().forEach((g, i) => grp.add(new THREE.Mesh(g, i === 0 ? flatMat : MAT.cream))); // non-skid sole, cream sides
   for (const g of cockpitSeats()) grp.add(new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40, side: THREE.DoubleSide })));
   for (const s of [1, -1]) {
     const pts: THREE.Vector3[] = [];
@@ -95,16 +99,24 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const rg = rudderGeometry();
   // the blade: bottom paint below the boot stripe, topsides colour above (fixed paint line in the boat's frame)
   const pos = rg.blade.attributes.position, cols: number[] = [], cr = Math.cos(RUDDER_RAKE), sr = Math.sin(RUDDER_RAKE);
-  for (let i = 0; i < pos.count; i++) { const y = HEEL.y + pos.getY(i) * cr - pos.getZ(i) * sr, c = y < 0.04 ? C(F.paint.bottom) : y < 0.1 ? C(F.paint.boot) : C(b.hullColor); cols.push(c.r, c.g, c.b); }
+  for (let i = 0; i < pos.count; i++) { const y = HEEL.y + pos.getY(i) * cr - pos.getZ(i) * sr, c = y < 0.04 ? C(paint.bottom) : y < 0.1 ? C(boot) : C(b.hullColor); cols.push(c.r, c.g, c.b); }
   rg.blade.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   turn.add(new THREE.Mesh(rg.blade, hullMat));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
   grp.add(rud);
+  // an outboard on its transom bracket, tilted up (starboard quarter, clear of the rudder and tiller)
+  if (b.spec?.perf.outboard === 'bracket') {
+    const ob = new THREE.Group(), grey = new THREE.MeshPhongMaterial({ color: 0x9aa0a6, specular: 0x666666, shininess: 50 }), blk = MAT.dark;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.34), blk); head.position.set(0, 0.13, 0.12); ob.add(head);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.62), grey); leg.position.set(0, 0.0, -0.2); ob.add(leg); // tilted up: the leg lies forward along the bracket
+    const brk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.04), grey); brk.position.set(0, -0.05, -0.12); ob.add(brk);
+    ob.position.set(0.42, sheer(1) - 0.12, L / 2 + 0.12); ob.rotation.x = 0.35; grp.add(ob);
+  }
   // her name on both quarters
-  if (F.paint.boatName) for (const s of [1, -1]) {
+  if (paint.boatName) for (const s of [1, -1]) {
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
-    const ctx = cv.getContext('2d')!; ctx.fillStyle = F.paint.boot; ctx.font = 'italic 600 64px Georgia, "Times New Roman", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(F.paint.boatName, 256, 50);
+    const ctx = cv.getContext('2d')!; ctx.fillStyle = nameColor(b.hullColor, paint.boot); ctx.font = 'italic 600 64px Georgia, "Times New Roman", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(paint.boatName, 256, 50);
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     const fr = hullFrame(0.84, 0.13);
     const n = fr.normal.clone(); if (n.x < 0) n.negate(); n.x *= s; // outward on this side
@@ -116,6 +128,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   return turn;
 }
 
+interface FlyingFlag { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array; fly: number }
 interface Ribbon { geom: THREE.BufferGeometry; anchor: THREE.Vector3; phase: number }
 export interface BoatMesh {
   grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: Sail; jib: Sail;
@@ -124,8 +137,8 @@ export interface BoatMesh {
   rudder: THREE.Group; prevH: number; prevT: number;
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
-  /** The club burgee (streams in the apparent wind and flutters), if she flies one. */
-  burgee: { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array; fly: number } | null;
+  /** Her flags (stream in the apparent wind and flutter): ensign, burgee or officer's flag, courtesy flag. */
+  flags: FlyingFlag[];
   /** The crew, and whether to hide the helm (you're looking through their eyes in the cockpit view). */
   crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
@@ -206,8 +219,8 @@ const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
-  const alu = b.build.spars === 'aluminium';
-  const spar = alu ? MAT.sparAlu : MAT.spar;
+  const alu = b.build.spars === 'aluminium', aluBoom = (b.build.boom ?? b.build.spars) === 'aluminium';
+  const spar = alu ? MAT.sparAlu : MAT.spar, boomMat = aluBoom ? MAT.sparAlu : MAT.spar;
   const rudder = buildHull(b, grp);
   // the rig sits on the real deck height
   const rig = new THREE.Group(); rig.position.y = RIG_LIFT; grp.add(rig);
@@ -222,7 +235,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   });
   const sailMat = sm('front', true), sailBack = sm('back', true), jibMat = sm('front', false), jibBack = sm('back', false);
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, -0.6); rig.add(boomPivot);
-  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, alu ? 10 : 5), spar); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
   const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT, sailBack); boomPivot.add(main.mesh);
   const jibPivot = new THREE.Group(); jibPivot.position.set(0, 0.75, -3.7); rig.add(jibPivot);
   const jib = new Sail(JIB_DEF, jibMat, null, jibBack); jibPivot.add(jib.mesh);
@@ -257,15 +270,27 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
-  // the club burgee, on the flag halyard under the starboard spreader (the masthead has the windex)
-  let burgee: BoatMesh['burgee'] = null;
-  const bc = b.burgee ? burgeeCanvas(b.burgee) : null;
-  if (bc) {
-    const fly = 0.3 * bc.width / bc.height, geo = new THREE.PlaneGeometry(fly, 0.3, 8, 2); geo.translate(fly / 2, -0.15, 0); // a 12-inch hoist, hoisted at its top corner
-    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(bc), side: THREE.DoubleSide, alphaTest: 0.5, transparent: false }));
-    mesh.position.set(SPREADER.x - 0.06, SPREADER.y - 0.06, SPREADER.z); rig.add(mesh);
-    rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(SPREADER.x - 0.06, SPREADER.y - 0.36, SPREADER.z), new THREE.Vector3(SPREADER.x - 0.06, DECK_Y + 0.3, SPREADER.z)]), MAT.wire)); // the halyard's tail down to the deck
-    burgee = { mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly };
+  // her flags (yachting etiquette: render/flagArt.ts). Under way: the ensign on the backstay, a little over halfway up
+  // (no higher than two-thirds); the club burgee, or an officer's flag in its place, on the flag halyard under the
+  // starboard spreader (the masthead has the windex). Flying a foreign ensign on the Bay, she flies the US flag as a
+  // courtesy flag at the starboard spreader and moves her burgee to port.
+  const flags: FlyingFlag[] = [];
+  const hoist = (canvas: HTMLCanvasElement | null, at: THREE.Vector3, h: number, parent: THREE.Object3D, tail = true) => {
+    if (!canvas) return;
+    const fly = h * canvas.width / canvas.height, geo = new THREE.PlaneGeometry(fly, h, 10, 2); geo.translate(fly / 2, -h / 2, 0); // hoisted at its top corner
+    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, alphaTest: 0.5 }));
+    mesh.position.copy(at); parent.add(mesh);
+    if (tail) parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), new THREE.Vector3(at.x, DECK_Y + 0.3, at.z)]), MAT.wire)); // the halyard's tail
+    flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly });
+  };
+  const club = b.special ? flagArtCanvas(b.special) : b.burgee ? burgeeCanvas(b.burgee) : null;
+  const spreader = (side: number) => new THREE.Vector3(side * (SPREADER.x - 0.06), SPREADER.y - 0.06, SPREADER.z);
+  if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), spreader(1), 0.25, rig); hoist(club, spreader(-1), b.special ? 0.3 : 0.3, rig); }
+  else hoist(club, spreader(1), 0.3, rig);
+  if (b.ensign) {
+    // on the backstay (in the hull's frame, like the backstay itself): about 0.58 of the way up from its foot
+    const foot = new THREE.Vector3(0, sheer(1), 3.74), at = foot.clone().lerp(MASTHEAD, 0.58), ens = flagArtCanvas(b.ensign);
+    hoist(ens, at, ens && ens.width / ens.height > 1.7 ? 0.36 : 0.42, grp, false);
   }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, 9.45, -0.6); rig.add(windex);
@@ -294,7 +319,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, burgee, hideHelm: false };
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -312,12 +337,15 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
-  if (m.burgee) {
-    // the fly streams downwind of the halyard, fluttering harder in more wind
-    const bg = m.burgee, p = bg.mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array, k = Math.min(1, b.aws / 8);
-    bg.mesh.rotation.y = m.windex.rotation.y - Math.PI / 2;
-    for (let i = 0; i < a.length; i += 3) { const x = bg.base[i]; a[i + 2] = Math.sin(x * 14 - t * (8 + 6 * k)) * 0.035 * x / bg.fly * (0.4 + k); a[i + 1] = bg.base[i + 1] - (1 - k) * x * 0.5; }
-    p.needsUpdate = true;
+  if (m.flags.length) {
+    // the fly streams downwind of the halyard, fluttering harder in more wind; in light air it droops
+    const k = Math.min(1, b.aws / 8);
+    for (const f of m.flags) {
+      const p = f.mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array;
+      f.mesh.rotation.y = m.windex.rotation.y - Math.PI / 2;
+      for (let i = 0; i < a.length; i += 3) { const x = f.base[i]; a[i + 2] = Math.sin(x * 9 / f.fly * 1.4 - t * (8 + 6 * k)) * 0.035 * x / f.fly * (0.4 + k); a[i + 1] = f.base[i + 1] - (1 - k) * x * 0.5; }
+      p.needsUpdate = true;
+    }
   }
   m.card.rotation = b.h * D2R;
   // the crew on the windward side, hiking as hard as she needs
@@ -425,9 +453,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
 function sailTexture(color: string, no: string, mirror: boolean, main: boolean): THREE.CanvasTexture {
   const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
+  const dark = lum(color) < 0.3; // black sails: lighter seams, white numbers
   g.fillStyle = color; g.fillRect(0, 0, W, H);
   // crosscut panels: seams across the sail, roughly square to the leech
-  g.strokeStyle = 'rgba(120,115,100,.28)'; g.lineWidth = 2;
+  g.strokeStyle = dark ? 'rgba(200,200,200,.16)' : 'rgba(120,115,100,.28)'; g.lineWidth = 2;
   for (let i = 1; i < (main ? 12 : 8); i++) { const y = H - i * H / (main ? 12 : 8); g.beginPath(); g.moveTo(0, y + 10); g.lineTo(W, y - 6); g.stroke(); }
   if (main && no) {
     const put = (txt: string, v: number, size: number, col: string) => {
@@ -435,10 +464,41 @@ function sailTexture(color: string, no: string, mirror: boolean, main: boolean):
       g.fillStyle = col; g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText(txt, W * 0.42, H * (1 - v)); g.restore();
     };
-    put('F', 0.84, 58, '#1d3f8f'); // the class letter near the head
+    put('F', 0.84, 58, dark ? '#e8edf5' : '#1d3f8f'); // the class letter near the head
     // starboard side (the front of the cloth) carries the number higher than the port side
-    put(no.replace(/^US\s*/, 'USA '), mirror ? 0.5 : 0.6, 36, '#20242c');
+    put(no.replace(/^US\s+/, 'USA '), mirror ? 0.5 : 0.6, no.length > 8 ? 30 : 36, dark ? '#f2f2ee' : '#20242c');
   }
   const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
   return t;
+}
+
+/** Relative luminance of a hex colour (0 black .. 1 white). */
+function lum(hex: string): number { const c = new THREE.Color(hex); return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
+/** Her name on the quarters: in the boot stripe's colour, or whatever reads against the topsides. */
+function nameColor(hull: string, boot: string): string {
+  if (boot && Math.abs(lum(boot) - lum(hull)) > 0.25) return boot;
+  return lum(hull) > 0.45 ? '#1f2c4f' : '#f2eee4';
+}
+
+const teakCache = new Map<boolean, THREE.CanvasTexture>();
+/** Laid teak: planks with black caulked seams and grain; weathered silver-grey, or oiled and polished. */
+function teakTexture(silver: boolean): THREE.CanvasTexture {
+  const hit = teakCache.get(silver); if (hit) return hit;
+  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!, planks = 4, pw = W / planks;
+  let seed = silver ? 7 : 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < planks; i++) {
+    const base = silver ? [168, 163, 152] : [176, 116, 62], k = 0.9 + rnd() * 0.18;
+    g.fillStyle = `rgb(${base.map(v => Math.round(v * k)).join(',')})`; g.fillRect(i * pw, 0, pw, H);
+    for (let j = 0; j < 40; j++) { // grain: long thin streaks along the plank
+      const x = i * pw + 3 + rnd() * (pw - 6), a = (silver ? 0.1 : 0.14) * rnd();
+      g.strokeStyle = rnd() < 0.5 ? `rgba(60,40,20,${a})` : `rgba(255,240,210,${a * 0.7})`; g.lineWidth = 0.6 + rnd() * 1.2;
+      g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + (rnd() - 0.5) * 6, H * 0.33, x + (rnd() - 0.5) * 6, H * 0.66, x + (rnd() - 0.5) * 4, H); g.stroke();
+    }
+  }
+  g.fillStyle = silver ? '#3b3a37' : '#17130f';
+  for (let i = 0; i < planks; i++) g.fillRect(i * pw, 0, 2.5, H); // caulked seams
+  for (let i = 0; i < planks; i++) { const y = (rnd() * 0.8 + 0.1) * H; g.fillRect(i * pw, y, pw, 2); } // butt joints, staggered
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  teakCache.set(silver, t); return t;
 }

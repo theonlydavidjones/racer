@@ -19,6 +19,8 @@ import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { destMark, place as getPlace } from './places';
+import { sailNo } from '../boat/spec';
+import { condition } from '../boat/condition';
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
@@ -69,6 +71,8 @@ export interface WorldOptions {
   startAt?: number;
   /** Just sail: no race, no other boats, no start sequence. */
   freeSail?: boolean;
+  /** Fly your flags even though it's a race (to see them while setting up your boat). */
+  showFlags?: boolean;
 }
 
 /** Your crew from the settings (0–2 crew besides you at the helm). */
@@ -143,6 +147,7 @@ export class World {
   startTimes: (number | null)[] = [];
   readonly startAt: number;
   readonly freeSail: boolean;
+  private showFlags = false;
   /** Just sail: where you're heading (a mark in all but name: the dials measure to it), or null. */
   dest: CourseMark | null = null;
   /** Just sail: when you got there (sim time), or null. */
@@ -155,7 +160,7 @@ export class World {
     this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet });
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
     this.cvec = currentVector(this.cur);
-    this.freeSail = !!opts.freeSail;
+    this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
     this.t = -this.startAt;
     this.prepFlag = settings.prepFlag ?? 'P';
@@ -228,15 +233,20 @@ export class World {
       do { p = place(70 + r() * 60, (r() - 0.5) * this.lineLen * 0.8); tries++; } while ((onLand(p) || crowded(p)) && tries < 40);
       h = n360(lineH + (r() < 0.5 ? 0 : 180));
     }
+    const spec = isUser ? this.settings.boat : undefined; // your boat as you've set her up
     return {
-      id: i, isUser, name: F.name, no: F.no, color: F.tag, hullColor: F.hull, sailColor: F.sail, build: F.build,
+      id: i, isUser, name: F.name, no: spec ? sailNo(spec) : F.no, color: F.tag,
+      hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
+      build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name } } : {}),
       x: p.x, y: p.y, h, v: isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : DEFAULT_CREW, 'S'),
-      ...(isUser && this.freeSail && this.settings.burgee ? { burgee: this.settings.burgee } : {}), // a burgee comes down for a race
+      // flags come down for a race: they fly when you're just sailing
+      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.flags.burgee || undefined, ensign: spec.flags.ensign || undefined, special: spec.flags.special || undefined } : {}),
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
         depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity

@@ -520,7 +520,7 @@ export class SceneView {
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number }, over: Overhead): void {
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     this.ripAngle += (-w.windModel.base * D2R - this.ripAngle) * Math.min(1, dt * 0.2);
@@ -594,11 +594,19 @@ export class SceneView {
       const dist = look.chase ?? 24, hv = V(u.h - look.yaw / D2R), height = Math.max(1.2, (9 + look.pitch * 25) * dist / 24);
       camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
       camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
+    } else if (viewMode === 3) {
+      // the showroom (setting up your boat): a slow circle round her, from a little above the deck
+      const a = now * 0.00011 + look.yaw, d = look.chase ?? 10;
+      camera.position.set(P3(u.x, u.y).x + Math.sin(a) * d, 2.6 + look.pitch * 6, P3(u.x, u.y).z + Math.cos(a) * d);
+      camera.lookAt(P3(u.x, u.y, 2.8));
     } else {
       // overhead: straight down, north / bow / wind at the top, zoomed and panned as you like
       const up = V(overheadUp(over, w)), cx = u.x + over.off.x, cy = u.y + over.off.y;
       camera.position.copy(P3(cx, cy, over.height)); camera.up.set(up.x, 0, -up.y); camera.lookAt(P3(cx, cy, 0));
     }
+    // the showroom shifts the picture right, clear of the panel on the left
+    const shift = viewMode === 3 ? (look.shift ?? 0) : 0, size = this.renderer.getSize(new THREE.Vector2());
+    if (shift) camera.setViewOffset(size.x, size.y, -shift, 0, size.x, size.y); else if (camera.view?.enabled) camera.clearViewOffset();
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.renderer.render(this.scene, camera);
