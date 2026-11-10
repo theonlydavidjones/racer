@@ -79,6 +79,8 @@ export interface WorldOptions {
   freeSail?: boolean;
   /** Fly your flags even though it's a race (to see them while setting up your boat). */
   showFlags?: boolean;
+  /** The race committee chose this course: its number (flown in numeral pennants) and why. */
+  courseSignal?: { no: number; why: string };
 }
 
 /** Your crew from the settings (0–2 crew besides you at the helm). */
@@ -156,6 +158,8 @@ export class World {
   private showFlags = false;
   /** Just sail: where you're heading (a mark in all but name: the dials measure to it), or null. */
   dest: CourseMark | null = null;
+  /** The course number the committee is flying (numeral pennants), and why they chose it; null when you chose it. */
+  courseSignal: { no: number; why: string } | null = null;
   /** Racing: the tactics debrief's log of your race (null when just sailing). */
   log: RaceLog | null = null;
   /** Just sail: when you got there (sim time), or null. */
@@ -169,6 +173,7 @@ export class World {
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
+    this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
     this.t = -this.startAt;
     this.prepFlag = settings.prepFlag ?? 'P';

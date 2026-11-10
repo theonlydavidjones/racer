@@ -266,6 +266,9 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 #sigPanel .sig-lab{font:700 9px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px}
 #sigFlags{display:flex;gap:6px;min-height:22px;align-items:center}
 #sigFlags canvas{width:33px;height:22px;border-radius:2px}
+#sigFlags .pennants{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin-left:8px;padding-left:8px;border-left:1px solid var(--rule)}
+#sigFlags .pennants canvas{width:34px;height:17px;border-radius:0}
+#sigFlags .pennants small{font:600 10px/1 var(--f-inst);letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
 #sigText{margin-top:5px;line-height:1.35;color:var(--text)}
 
 .tp-balance{font-size:11px;color:var(--muted);margin-top:3px}
@@ -364,3 +367,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief .dbLost{font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap}
 .debrief li p{font-size:14px}
 .debrief .dbTip{color:var(--muted)}
+
+/* the race committee's choice of course */
+.coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.coursecard .rcpick b{font:600 14px/1.2 var(--f-inst);color:var(--accent)}

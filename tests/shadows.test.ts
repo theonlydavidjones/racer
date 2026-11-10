@@ -69,7 +69,7 @@ describe('ships, the committee boat, and the lee of the land', () => {
   });
 
   it('the cone east of Alcatraz: a lull right behind it, gone within a kilometre or so', () => {
-    const behind = LL(37.8265, -122.417), wellEast = LL(37.8265, -122.405);
+    const behind = LL(37.8265, -122.4188), wellEast = LL(37.8265, -122.405); // ~150 m behind its east shore; 1.3 km east
     expect(terrainLee(behind, 270)).toBeLessThan(0.5);
     expect(terrainLee(wellEast, 270)).toBeGreaterThan(0.75);
   });

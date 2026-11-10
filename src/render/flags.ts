@@ -34,6 +34,38 @@ export function flagCanvas(f: Flag): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * The International Code numeral pennants 0–9 (tapered; as drawn on Flags of the World, crwflags.com/fotw/flags/xf~ics0.html).
+ * The Seaweed Soup committee flies the course number in these (Addendum B1.4), top to bottom.
+ */
+const PW = 128, PH = 64;
+const pennants = new Map<string, HTMLCanvasElement>();
+export function pennantCanvas(digit: string): HTMLCanvasElement {
+  let c = pennants.get(digit);
+  if (c) return c;
+  c = document.createElement('canvas'); c.width = PW; c.height = PH;
+  const g = c.getContext('2d')!, RED = '#d21f26', BLUE = '#1d3f9a', YEL = '#f7d000', BLK = '#111', WHT = '#fff';
+  const fill = (col: string, x = 0, y = 0, w = PW, h = PH) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const disc = (col: string) => { g.fillStyle = col; g.beginPath(); g.arc(PW * 0.28, PH / 2, PH * 0.25, 0, Math.PI * 2); g.fill(); };
+  const crossOn = (col: string) => { fill(col, PW * 0.21, 0, PW * 0.14, PH); fill(col, 0, PH * 0.38, PW, PH * 0.24); };
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(PW, PH * 0.25); g.lineTo(PW, PH * 0.75); g.lineTo(0, PH); g.closePath(); g.clip(); // the taper
+  switch (digit) {
+    case '0': fill(YEL); fill(RED, PW / 3, 0, PW / 3); break; // yellow, red, yellow
+    case '1': fill(WHT); disc(RED); break; // white, red disc
+    case '2': fill(BLUE); disc(WHT); break; // blue, white disc
+    case '3': fill(RED); fill(WHT, PW / 3, 0, PW / 3); fill(BLUE, PW * 2 / 3, 0, PW / 3); break; // red, white, blue
+    case '4': fill(RED); crossOn(WHT); break; // red, white cross
+    case '5': fill(YEL); fill(BLUE, PW / 2, 0, PW / 2); break; // yellow at the hoist, blue at the fly
+    case '6': fill(WHT); fill(BLK, 0, 0, PW, PH / 2); break; // black over white
+    case '7': fill(RED); fill(YEL, 0, 0, PW, PH / 2); break; // yellow over red
+    case '8': fill(WHT); crossOn(RED); break; // white, red cross
+    case '9': fill(WHT, 0, 0, PW / 2, PH / 2); fill(BLK, PW / 2, 0, PW / 2, PH / 2); fill(RED, 0, PH / 2, PW / 2, PH / 2); fill(YEL, PW / 2, PH / 2, PW / 2, PH / 2); break; // quartered
+  }
+  g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 2; g.beginPath(); g.moveTo(1, 1); g.lineTo(PW - 1, PH * 0.25); g.lineTo(PW - 1, PH * 0.75); g.lineTo(1, PH - 1); g.closePath(); g.stroke();
+  pennants.set(digit, c);
+  return c;
+}
+
 /** Which halyard each flag flies from: class flag to port, preparatory flags to starboard, X in the middle. */
 const SLOT: Record<Flag, number> = { class: -1, P: 1, I: 1, Z: 1, U: 1, black: 1, X: 0 };
 const ALL: Flag[] = ['class', 'P', 'I', 'Z', 'U', 'black', 'X'];
@@ -42,10 +74,12 @@ export class SignalMast {
   readonly group = new THREE.Group();
   private flags = new Map<Flag, { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array; y: number }>();
   private yard: number;
+  private size: number;
+  private course: { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array }[] = [];
 
   /** `poleH`: height of the yardarm above the base; `pole`: draw a pole (false when mounting on an existing one). */
   constructor(poleH: number, pole: boolean, size = 1.2) {
-    this.yard = poleH;
+    this.yard = poleH; this.size = size;
     const mat = new THREE.MeshLambertMaterial({ color: 0xf2f2ee });
     if (pole) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, poleH + 1, 8), mat); m.position.y = (poleH + 1) / 2; this.group.add(m); }
     const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.2, 6), mat); yard.rotation.z = Math.PI / 2; yard.position.y = poleH; this.group.add(yard);
@@ -56,6 +90,21 @@ export class SignalMast {
       mesh.visible = false; this.group.add(mesh);
       this.flags.set(f, { mesh, base: (geo.attributes.position.array as Float32Array).slice(), y: 0 });
     }
+  }
+
+  /** The course number in numeral pennants, one above the other on the pole's own halyard (null: none). */
+  setCourse(no: number | null): void {
+    for (const p of this.course) { this.group.remove(p.mesh); p.mesh.geometry.dispose(); (p.mesh.material as THREE.Material).dispose(); }
+    this.course = [];
+    if (no == null) return;
+    const len = this.size * 1.7, h = this.size * 0.85;
+    [...String(no)].forEach((d, i) => {
+      const geo = new THREE.PlaneGeometry(len, h, 8, 2); geo.translate(len / 2, -h / 2, 0);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(pennantCanvas(d)), side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 }));
+      mesh.position.set(0, this.yard - this.size * 1.3 - i * (h + 0.12), 0); // below the yard (and the X flag's place)
+      this.group.add(mesh);
+      this.course.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice() });
+    });
   }
 
   /**
@@ -75,5 +124,11 @@ export class SignalMast {
       for (let i = 0; i < a.length; i += 3) { const x = s.base[i]; a[i + 2] = Math.sin(x * 3.2 - t * 9 + SLOT[f]) * 0.12 * x; }
       p.needsUpdate = true;
     }
+    this.course.forEach(({ mesh, base }, i) => {
+      mesh.rotation.y = toward + Math.PI / 2;
+      const p = mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array;
+      for (let k = 0; k < a.length; k += 3) { const x = base[k]; a[k + 2] = Math.sin(x * 3.6 - t * 10 + i) * 0.1 * x; }
+      p.needsUpdate = true;
+    });
   }
 }

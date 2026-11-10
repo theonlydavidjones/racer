@@ -1,6 +1,7 @@
 import { D2R, V, clamp, type Vec } from '../core/math';
 import { LAT0, LON0 } from '../geo/geo';
 import heights from './data/heights.json';
+import { landAt } from './sea';
 
 /**
  * Wind shadows: what the wind field from the NOAA records doesn't know about. Anything standing in the wind leaves a
@@ -153,12 +154,15 @@ export function terrainLee(p: Vec, from: number, skipGate = false): number {
     const u = V(from + off);
     let enter = -1, top = 0; // the island (stretch of land) the ray is crossing: where it met it, and its highest point
     const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), d = x < xr ? 0.8 : 0.8 * (xr / x) ** pe; worst = Math.max(worst, d * (off === 0 ? 1 : 0.85)); };
-    for (let d = 100; d <= 6000; d += 100) {
-      const q = { x: p.x + u.x * d, y: p.y + u.y * d }, h = skipGate && q.x < GATE_X ? 0 : groundHeight(q);
-      if (h > 8) { if (enter < 0) { enter = d; top = 0; } top = Math.max(top, h); }
-      else if (enter >= 0) { lee(enter - 100, top); enter = -1; }
+    let step = 50;
+    for (let d = 50; d <= 6000; d += step) {
+      step = d < 1000 ? 50 : 100; // finer close in, where it matters
+      // the heights are on a 200 m grid: check the 50 m land mask too, so water beside an island isn't counted as its hill
+      const q = { x: p.x + u.x * d, y: p.y + u.y * d }, h = skipGate && q.x < GATE_X ? 0 : landAt(q) === false ? 0 : groundHeight(q);
+      if (h > 8) { if (enter < 0) { enter = d - step / 2; top = 0; } top = Math.max(top, h); } // the shore is about half a step back
+      else if (enter >= 0) { lee(enter, top); enter = -1; }
     }
-    if (enter >= 0) lee(enter - 100, top);
+    if (enter >= 0) lee(enter, top);
   }
   return 1 - worst;
 }

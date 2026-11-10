@@ -4,6 +4,7 @@ import { describeSea } from './environment/sea';
 import './styles.css';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
+import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
 import { PLACES } from './sim/places';
 import { BoatPanel } from './ui/boatPanel';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo } from './boat/spec';
@@ -33,7 +34,8 @@ import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 
 const S: Settings = loadSettings();
-if (!COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
+if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
+S.raceLength ??= 'medium';
 
 const view = new SceneView($<HTMLCanvasElement>('gl'));
 const labels = new Labels($('labels'));
@@ -64,11 +66,22 @@ function setLook(yaw: number, pitch: number): void {
 function lookAhead(): void { setLook(0, 0); }
 let pendingPenalty: Boat | null = null;
 
+/** The race committee's choice of course for these conditions (worked out once per set of conditions). */
+let rcCache: { key: string; pick: CommitteeChoice | null } | null = null;
+function committee(s: Settings): CommitteeChoice | null {
+  const key = JSON.stringify([s.windKt, s.windDay, s.current, s.tideDate, s.tideTime, s.raceLength, s.fleet]);
+  if (rcCache?.key !== key) rcCache = { key, pick: chooseCourse(COURSES, s) };
+  return rcCache.pick;
+}
+
 function newGame(seed = randomSeed()): void {
   const showFlags = !!boatPanel?.open; // setting up your boat: her flags fly so you can see them
   // setting up one of your boats: she's the one in the showroom (it might be a rival you're preparing)
   const WS = showFlags && boatPanel.editing.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== boatPanel.editing.id); return { ...S, boat: boatPanel.editing, opponents: o, fleet: o.length }; })() : S;
-  w = new World(courseFile(S.course), WS, seed, S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags } : S.mode === 'sail' ? { freeSail: true } : { showFlags });
+  const rc = S.course === RC_COURSE ? committee(WS) : null;
+  const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
+  w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
+    S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' ? { freeSail: true } : { showFlags, courseSignal });
   acc = 0; drillShown = false;
   $('trimPanel').classList.toggle('manual', trimMode() >= 1); $('trimPanel').classList.toggle('all', trimMode() === 2);
   $('bTrim').textContent = TRIM_LABEL[trimMode()];
@@ -514,7 +527,7 @@ function buildSetupChoices(): void {
     return `${c.title.replace('Seaweed Soup · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
   };
   const sel = $('courseSel') as HTMLSelectElement;
-  sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
+  sel.innerHTML = `<option value="${RC_COURSE}">The race committee's choice (Seaweed Soup)</option>` + [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
   sel.value = S.course;
   sel.onchange = () => { S.course = sel.value; newGame(); courseCard(); tideBox(); };
   // Just sail: where from, and where to
@@ -532,7 +545,10 @@ function courseCard(): void {
   const chips = ['<span class="m">Start</span>']
     .concat(C.marks.map(m => `<span class="m ${m.type === 'pass' ? 'x' : m.side}">${m.name.split(' ')[0]}${m.type === 'pass' ? '' : ' ' + sideWord(m.side)}</span>`))
     .concat(['<span class="m">Finish</span>']);
-  $('courseCard').innerHTML = `<div class="legs">${chips.join('<span class="arr">→</span>')}</div><small>${C.notes}</small>`;
+  const sig = w.courseSignal;
+  $('courseCard').innerHTML = (sig ? `<div class="rcpick"><b>The committee will fly course ${sig.no}</b><small>${sig.why}</small></div>` : '')
+    + `<div class="legs">${chips.join('<span class="arr">→</span>')}</div><small>${C.notes}</small>`;
+  $('lengthField').hidden = S.mode === 'sail' || S.course !== RC_COURSE;
   $('biasField').hidden = !C.biasAdjustable;
   $('seqField').hidden = S.mode !== 'race';
   $('prepField').hidden = S.mode === 'sail';
@@ -624,7 +640,7 @@ document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListen
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewRows(); paintSeg(); newGame(); return; }
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag') ? v : Number(v);
+  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength') ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
 /* Crew: how many, and each person's height and weight (shown in feet and inches, and pounds). */
@@ -658,7 +674,8 @@ function beginRace(seed?: number): void {
     ? `Just sail${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}. Try the tiller, the trim and the pole.`
     : S.mode === 'drill'
     ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
-    : `${S.seq}-minute sequence. Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+    : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+  if (w.courseSignal && S.mode !== 'sail') logMessage(`Course ${w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signalled by the warning signal). ${w.courseSignal.why}`);
 }
 
 /* ---------------- start practice debrief ---------------- */

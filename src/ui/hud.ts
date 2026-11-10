@@ -10,7 +10,7 @@ import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap } from '../core/math
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
-import { flagCanvas } from '../render/flags';
+import { flagCanvas, pennantCanvas } from '../render/flags';
 import { FLAG_NAME } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
 import { transitOffset } from '../sim/transits';
@@ -148,12 +148,18 @@ export class Hud {
   private signals(w: World): void {
     const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd);
     const el = $('sigPanel'); el.hidden = !show; if (!show) return;
-    const key = w.flags.join(',');
+    const key = w.flags.join(',') + '|' + (w.courseSignal?.no ?? '');
     if (key !== this.sigKey) {
       this.sigKey = key;
       const box = $('sigFlags'); box.innerHTML = '';
       for (const f of w.flags) { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(flagCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; box.appendChild(c); }
       if (!w.flags.length) box.textContent = 'none';
+      if (w.courseSignal) { // the course number, in numeral pennants, top to bottom
+        const col = document.createElement('span'); col.className = 'pennants'; col.title = `Course ${w.courseSignal.no}`;
+        for (const d of String(w.courseSignal.no)) { const c = document.createElement('canvas'); c.width = 56; c.height = 28; c.getContext('2d')!.drawImage(pennantCanvas(d), 0, 0, 56, 28); col.appendChild(c); }
+        const lab = document.createElement('small'); lab.textContent = `Course ${w.courseSignal.no}`; col.appendChild(lab);
+        box.appendChild(col);
+      }
     }
     const next = w.sequence.find(s => s.t > w.t), u = w.user;
     const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;

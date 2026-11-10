@@ -56,17 +56,23 @@ export function aimPoint(w: World, b: Boat): Vec {
   const M = m.p;
   if (m.type === 'pass') return { x: M.x + m.sv.x * 24, y: M.y + m.sv.y * 24 };
   // an island: aim off its shore, with a good berth for the rocks
-  const off = (u: Vec, k: number) => { const r = m.reach ? markReach(m, { x: M.x + u.x, y: M.y + u.y }) + ISLAND_BERTH : k; return { x: M.x + u.x * r, y: M.y + u.y * r }; };
+  const off = (u: Vec, k: number) => { const r = m.reach ? markReach(m, { x: M.x + u.x, y: M.y + u.y }) + islandBerth(u, w.wind.from) : k; return { x: M.x + u.x * r, y: M.y + u.y * r }; };
   const d = markDist(b, m);
   let P: Vec;
   if (d > 35) {
     const e = dist(b, M), dx = (M.x - b.x) / e, dy = (M.y - b.y) / e;
     P = off(m.side === 's' ? { x: -dy, y: dx } : { x: dy, y: -dx }, 10);
   } else P = off(m.r, 12);
-  return m.reach ? aroundIsland(m, b, P) : P;
+  return m.reach ? aroundIsland(m, b, P, w.wind.from) : P;
 }
 
 const ISLAND_BERTH = 70;
+/**
+ * How far off an island's shore to pass (m), in direction u from it: a good berth for the rocks all round, and
+ * more on its downwind side, out of the worst of its wind shadow (the near-calm reaches about four island heights
+ * downwind; Alcatraz is ~40 m high).
+ */
+const islandBerth = (u: Vec, windFrom: number): number => ISLAND_BERTH + 230 * Math.max(0, dot(u, V(windFrom + 180)));
 /**
  * If land lies within the next 700 m toward P, the nearest heading either side of it with clear water (the side
  * that comes back toward P sooner wins a tie); null when the way is clear. Upwind, the beat logic tacks along it.
@@ -81,41 +87,50 @@ export function detour(b: Vec, P: Vec): Vec | null {
   }
   return null;
 }
-/** Clear water all the way from a to b, with some room either side? */
-function clearRun(a: Vec, b: Vec): boolean {
+/** Clear water all the way from a to b, with some room either side? With `lee` (the wind direction), out of any island's wind shadow too. */
+function clearRun(a: Vec, b: Vec, lee?: number): boolean {
   const L = dist(a, b), ux = (b.x - a.x) / (L || 1), uy = (b.y - a.y) / (L || 1);
-  for (let s = 0; s <= L; s += 15) for (const k of [0, -25, 25]) if (onLand({ x: a.x + ux * s - uy * k, y: a.y + uy * s + ux * k })) return false;
+  for (let s = 0; s <= L; s += 15) {
+    for (const k of [0, -25, 25]) if (onLand({ x: a.x + ux * s - uy * k, y: a.y + uy * s + ux * k })) return false;
+    if (lee != null && s > 40 && s % 30 === 0 && inIslandLee({ x: a.x + ux * s, y: a.y + uy * s }, lee)) return false;
+  }
   return true;
+}
+/** In an island's near-calm: land within ~220 m straight upwind (about five Alcatraz heights; shadows.ts has the full model). */
+function inIslandLee(q: Vec, from: number): boolean {
+  const u = V(from);
+  for (let d = 40; d <= 220; d += 45) if (onLand({ x: q.x + u.x * d, y: q.y + u.y * d })) return true;
+  return false;
 }
 /**
  * Round an island the way a sailor would: if the island is in the way of where she's heading, work round its shore
  * in the rounding direction (clockwise leaving it to starboard), steering for the furthest point off its shore she
  * can see with clear water between.
  */
-function aroundIsland(m: CourseMark, b: Vec, P: Vec): Vec {
-  if (clearRun(b, P)) return P;
+function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number): Vec {
+  if (clearRun(b, P, windFrom)) return P;
   const M = m.p, dir = m.side === 's' ? 1 : -1, b0 = brg(b.x - M.x, b.y - M.y), bP = brg(P.x - M.x, P.y - M.y);
   const span = ((dir * (bP - b0)) % 360 + 360) % 360; // how far round to the aim point
   let best: Vec | null = null;
   for (let a = 10; a <= Math.max(10, span); a += 10) {
-    const u = V(b0 + dir * a), r = markReach(m, { x: M.x + u.x, y: M.y + u.y }) + ISLAND_BERTH, q = { x: M.x + u.x * r, y: M.y + u.y * r };
-    if (clearRun(b, q)) best = q; else if (best) break;
+    const u = V(b0 + dir * a), r = markReach(m, { x: M.x + u.x, y: M.y + u.y }) + islandBerth(u, windFrom), q = { x: M.x + u.x * r, y: M.y + u.y * r };
+    if (clearRun(b, q, windFrom)) best = q; else if (best) break;
   }
   if (best) return best;
   // nothing in sight round the island: stand off it first
-  const u = V(b0), r = markReach(m, b) + ISLAND_BERTH * 1.5;
+  const u = V(b0), r = markReach(m, b) + islandBerth(u, windFrom) * 1.5;
   return { x: M.x + u.x * r, y: M.y + u.y * r };
 }
 
 /**
- * The fastest way to the start line from here: of close-hauled or a close reach on either tack, the
- * heading that gets to the line soonest, crossing it between its ends, counting a tack as lost time.
+ * The fastest way to the start line from here: of close-hauled, a reach or a run on either tack (a start to
+ * leeward, like the Seaweed Soup courses starting east in a westerly, comes in on a run), the heading that gets to the line soonest, crossing it between its ends, counting a tack as lost time.
  * Returns the heading and its component toward the line.
  */
 export function bestApproach(w: World, b: Boat): { h: number; along: number } {
   const ww = b.ww, N = w.N, beat = beatFor(b), d = w.lineD(bow(b)), a = w.lineA(b), half = w.lineLen / 2 - 8;
   let best = { h: b.h, along: 0 }, bestT = Infinity;
-  for (const tack of ['S', 'P'] as const) for (const twa of [beat + 1, 55, 70]) {
+  for (const tack of ['S', 'P'] as const) for (const twa of [beat + 1, 55, 70, 95, 120, 145, 165]) {
     const h = n360(tack === 'S' ? ww.from - twa : ww.from + twa), u = V(h), uN = u.x * N.x + u.y * N.y;
     if (uN < 0.2) continue;
     const vmg = targetFor(b, twa) * uN + (b.cur.x * N.x + b.cur.y * N.y);
@@ -206,7 +221,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
       P = { x: w.center.x + N.x * 10 + L.x * a, y: w.center.y + N.y * 10 + L.y * a }; void along;
     }
-    else P = aimPoint(w, b);
+    else {
+      P = aimPoint(w, b);
+      // just rounded an island: carry on round it the same way, with the same berth, until she's clear of it and its lee
+      const prev = b.leg > 0 && b.leg <= w.C.marks.length ? w.C.marks[b.leg - 1] : null;
+      if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from);
+    }
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)

@@ -1,7 +1,8 @@
 import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 export interface Settings {
   mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
-  course: string; // course id
+  course: string; // course id, or 'rc': the race committee chooses (courses/committee.ts)
+  raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
   windDay: 0 | 1 | 2; // with the westerly: a light, typical or windy day (25th, 50th, 75th percentile)
   current: string; // 'real' (NOAA predictions for tideDate/tideTime) or a uniform preset id

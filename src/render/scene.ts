@@ -369,6 +369,7 @@ export class SceneView {
       const mast = new SignalMast(12, false, 1.3); mast.group.position.copy(P3(C.committee.x, C.committee.y, 2.3)); add(mast.group);
       this.signal = { mast, heading: 0 };
     } else this.signal = null;
+    this.signal?.mast.setCourse(w.courseSignal?.no ?? null); // the committee's choice of course, in numeral pennants
     if (C.pinKind === 'buoy') {
       const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 1.8, 10), new THREE.MeshLambertMaterial({ color: 0xff7a1a })); pin.position.copy(P3(C.pin.x, C.pin.y, 0.6)); add(pin);
     }
