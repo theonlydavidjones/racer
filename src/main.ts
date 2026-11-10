@@ -336,7 +336,10 @@ $('bPreview').onclick = () => courseView.open(w);
 $('bCvClose').onclick = () => courseView.close();
 $('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1; $('bFast').textContent = 'Speed ' + w.speed + '×'; };
 $('bSound').onclick = () => { sound.on = !sound.on; $('bSound').textContent = sound.on ? 'Sound on' : 'Sound off'; };
-$('bPause').onclick = () => { if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false; };
+$('bPause').onclick = () => {
+  if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false;
+  const d = $('pauseDebrief'), html = w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
+};
 $('bResume').onclick = () => { $('pause').hidden = true; w.paused = false; };
 $('bRestart').onclick = () => { $('pause').hidden = true; beginRace(); };
 $('bSettings').onclick = () => { $('pause').hidden = true; openSetup(); };
@@ -680,6 +683,18 @@ $('bDKeep').onclick = () => { closeDrill(); w.paused = false; };
 $('bDSetup').onclick = () => { closeDrill(); openSetup(); };
 $('bGo').onclick = () => { courseView.close(); $('setup').hidden = true; beginRace(); };
 
+/** The tactics debrief: what cost you time, most first, and your place at each mark. */
+function debriefHtml(title: string): string {
+  const log = w.log;
+  if (!log || w.t <= 0) return '';
+  const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
+  const fs = log.findings(w), pl = log.places().filter(p => p.place != null);
+  const items = fs.map(f => `<li><div class="dbHead"><b>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
+  const marks = pl.length > 1 ? `<p class="lede">Your place at each mark: ${pl.map(p => `${esc(p.name)} ${nth(p.place!)}`).join(' → ')}.</p>` : '';
+  const total = fs.reduce((a, f) => a + f.lost, 0);
+  return `<div class="eyebrow">${title}</div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}`;
+}
+
 function showResults(): void {
   w.finishShown = true;
   const rows = w.boats.slice().sort((a, b) => (a.finished ? a.finishT! : 1e9) - (b.finished ? b.finishT! : 1e9));
@@ -690,6 +705,8 @@ function showResults(): void {
   const code = (b: Boat) => b.scoring === 'ZFP' ? ' · ZFP: 20% penalty (Rule 30.2)' : b.scoring ? ` · ${b.scoring}: disqualified (Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'})` : '';
   $('resBody').innerHTML = rows.map((b, i) => `<tr><td>${b.scoring === 'UFD' || b.scoring === 'BFD' ? 'DSQ' : b.finished ? i + 1 : '–'}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td></tr>`).join('');
   $('resFouls').textContent = `Fouls you committed: ${w.fouls}. Fouls against you: ${w.fouledBy}.`;
+  const db = debriefHtml('Your race, debriefed');
+  $('resDebrief').innerHTML = db; $('resDebrief').hidden = !db; $('resStart').hidden = !!db; // the debrief has the start in full
   $('results').hidden = false;
   w.paused = true;
 }

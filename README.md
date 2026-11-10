@@ -94,6 +94,20 @@ Setup → Mode → **Start practice**. You begin one minute before the gun, some
 
 **Same start again** replays the identical setup (same seed: same boats, wind and positions). **New start** draws a new one; **Keep racing** carries on with the race. The debrief logic is `src/sim/startDebrief.ts`.
 
+### The race debrief
+
+When you finish, the results show **what cost you time, most first**, in seconds, each with what happened and what to do instead. Pause mid-race for the same thing so far. The log runs as you race (`src/sim/debrief.ts`); every figure is an estimate from the sim's own physics and the usual racing arithmetic:
+
+- **The start:** how late you crossed, where you were and how fast at the gun, and which end was favored (by how many degrees).
+- **Wind shifts:** time on a header of more than 4° held for more than 15 s. On a header of θ° your progress upwind is cos(β+θ)/cos(β−θ) of what the other tack would give you (β the close-hauled angle): about a fifth less at 8°. Each tack made while lifted counts too.
+- **Laylines:** how far past the layline you went before tacking for each windward mark (from your ground track on the other tack, so the current counts); about 0.6 × the distance over your upwind speed.
+- **Tacks and gybes:** your speed lost against target speed for 20 s after each.
+- **Dirty air** (and whose) **and the lee of the land:** boat speed goes roughly as wind^0.7 in a Folkboat's range.
+- **Downwind:** your speed made good against the best angle, and sailing deep without the pole set.
+- **Heel** past her best, **your trim** (when you trim), **penalty turns**, **wide roundings**, and your place at each mark.
+
+Only items worth two seconds or more are listed.
+
 ### Rules
 
 Checked against the official 2025–2028 rulebook (World Sailing, with changes and corrections, July 2025). Implemented: 10, 11, 12, 13 (including two boats tacking at once), 15, 16.1, 16.2, 17, 18.1(a), 18.2(a) to (d), 18.3, 18.4, 19, 20 (hail, "You tack" reply, and the hailing boat tacking after the response), 21.1, 21.2, 21.3, 23, 31 (including the committee boat), 43.1(a) and 44.1(a), plus a right-of-way boat forced to swerve (14). Rule numbers follow the 2025 edition: returning to start and taking a penalty are now 21.1 and 21.2 (they were 22.1 and 22.2), and mark-room at the zone is 18.2(a), which ends under 18.2(b) when the entitled boat passes head to wind or leaves the zone.
@@ -267,5 +281,5 @@ See [ROADMAP.md](ROADMAP.md) for what's planned, including full sail controls (b
 - AI starts: on the Seaweed Soup line, median 5–11 s after the gun in slack and ebb, ~25 s in flood, almost never over early. On the short training line they're slower (crowding). The AI keeps clear, takes penalties in clear water, won't tack when too slow to make it, and doesn't sail on a broad reach expecting to slow down by easing sails.
 - Wind shifts are still a synthetic oscillation on top of the westerly; puffs are random (seeded), not forecast. Current between the six NOAA stations is interpolated, not modelled hydrodynamically.
 - The shoreline the boats sail against is hand-traced (Fort Point to North Beach); the terrain is real, and is fitted to it along the Cityfront. Fort Mason's piers in the sim's coastline sit 50–130 m east of the real ones. Marin, Angel Island and Alcatraz are scenery: you can't run aground on them yet.
-- Rules not modelled yet: 14 (beyond the swerve check), 18.1(a)(2) (opposite tacks when only one boat must tack at the mark), 19 with another boat as the obstruction, 20.3 (passing on a hail), 22 (capsized, anchored or aground), and 43.1(b) and (c) beyond what the precedence already gives. Interference by wind shadow isn't modelled (the boats don't blanket each other's wind yet), so Rule 23 only covers physical interference. Boats can't back their sails, so Rule 21.3 never comes up.
+- Rules not modelled yet: 14 (beyond the swerve check), 18.1(a)(2) (opposite tacks when only one boat must tack at the mark), 19 with another boat as the obstruction, 20.3 (passing on a hail), 22 (capsized, anchored or aground), and 43.1(b) and (c) beyond what the precedence already gives. Boats blanket each other's wind, but Rule 23's interference check only covers physical interference. Boats can't back their sails, so Rule 21.3 never comes up.
 - Fouls between two AI boats are penalized but not explained.

@@ -30,6 +30,7 @@ import { DEFAULT_CREW, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { FLAG_NAME, X_FLAG_MAX, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
+import { RaceLog } from './debrief';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
@@ -155,6 +156,8 @@ export class World {
   private showFlags = false;
   /** Just sail: where you're heading (a mark in all but name: the dials measure to it), or null. */
   dest: CourseMark | null = null;
+  /** Racing: the tactics debrief's log of your race (null when just sailing). */
+  log: RaceLog | null = null;
   /** Just sail: when you got there (sim time), or null. */
   arrivedT: number | null = null;
 
@@ -197,6 +200,7 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    if (!this.freeSail) this.log = new RaceLog(this);
   }
 
   get user(): Boat { return this.boats[0]; }
@@ -385,6 +389,7 @@ export class World {
     for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
+    this.log?.step(this, dt);
     this.trackCourses();
     this.shipEncounters();
     this.checkPairs();
@@ -539,6 +544,7 @@ export class World {
 
   private advance(b: Boat): void {
     const m = this.nextMark(b)!;
+    this.log?.onAdvance(this, b, b.leg);
     b.leg++; b.prevAng = null; b.prevPass = null; b.nearMin = 1e9;
     if (b.isUser) {
       const nm = this.nextMark(b);

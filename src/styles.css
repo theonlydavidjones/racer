@@ -355,3 +355,12 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .gsaved.on{opacity:1}
 .grole{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--text);font:600 13px var(--f-inst)}
 .ghost.on{border-color:var(--accent);color:var(--accent)}
+
+/* the tactics debrief */
+.debrief{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--rule);padding-top:14px}
+.debrief ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.debrief li{display:flex;flex-direction:column;gap:3px}
+.debrief .dbHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.debrief .dbLost{font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap}
+.debrief li p{font-size:14px}
+.debrief .dbTip{color:var(--muted)}
