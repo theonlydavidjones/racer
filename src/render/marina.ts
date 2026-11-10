@@ -13,24 +13,6 @@ import { boat } from './moored';
  */
 const DOCK_TOP = 0.45, DOCK_T = 0.35;
 
-/** The dock's centre line, with an end that's within a few metres of another dock's centre line moved to meet that dock's edge (trimmed back if it crossed it, run out to it if it stopped short). */
-function meetEdge(pts: Vec[], others: Vec[][], otherW: number): Vec[] {
-  const out = pts.map(p => ({ ...p }));
-  for (const [i, j] of [[0, 1], [out.length - 1, out.length - 2]]) {
-    const p = out[i], q = out[j], L = Math.hypot(p.x - q.x, p.y - q.y); if (L < 0.5) continue;
-    const t = { x: (p.x - q.x) / L, y: (p.y - q.y) / L }; // pointing out of the dock, toward the end
-    let best: { s: number; sin: number } | null = null;
-    for (const o of others) for (let k = 1; k < o.length; k++) {
-      const a = o[k - 1], b = o[k], dx = b.x - a.x, dy = b.y - a.y, den = t.x * dy - t.y * dx; if (Math.abs(den) < 1e-6) continue;
-      const s = ((a.x - p.x) * dy - (a.y - p.y) * dx) / den, r = ((a.x - p.x) * t.y - (a.y - p.y) * t.x) / den; // p + t·s meets a + (b−a)·r
-      if (r < -0.02 || r > 1.02 || Math.abs(s) > 4) continue;
-      const sin = Math.abs(den) / Math.hypot(dx, dy);
-      if (!best || Math.abs(s) < Math.abs(best.s)) best = { s, sin };
-    }
-    if (best) { const s = best.s - otherW / 2 / Math.max(0.3, best.sin); out[i] = { x: p.x + t.x * s, y: p.y + t.y * s }; }
-  }
-  return out;
-}
 /** A strip of dock along a centre line: its deck (UVs in metres, boards across) and its sides, mitred at the bends. */
 function strip(pts: Vec[], w: number): { top: THREE.BufferGeometry; side: THREE.BufferGeometry } {
   const n = pts.length, L: Vec[] = [], R: Vec[] = [], S: number[] = [];
@@ -99,14 +81,21 @@ export class Harbor {
   constructor(scene: THREE.Scene) {
     // the docks: each walkway one continuous strip with mitred corners; each finger a strip from the walkway's edge
     // (trimmed or extended to meet it) to its end; decked in boards laid across, with darker fascias down the sides
-    const walks = HARBOR.walkways.map(w => meetEdge(w, HARBOR.walkways.filter(o => o !== w), WALKWAY_W));
-    const fingers = HARBOR.fingers.map(f => meetEdge(f, HARBOR.walkways, WALKWAY_W));
+    const walks = HARBOR.walkways, fingers = HARBOR.fingers; // (their ends already meet the walkways' edges: geo/marina.ts)
     const tops: THREE.BufferGeometry[] = [], sides: THREE.BufferGeometry[] = [], piles: Vec[] = [];
     for (const w of walks) { const g = strip(w, WALKWAY_W); tops.push(g.top); sides.push(g.side); piles.push(...alongside(w, WALKWAY_W, 12)); }
     for (const f of fingers) {
       const g = strip(f, FINGER_W); tops.push(g.top); sides.push(g.side);
       const e = f[f.length - 1], d = f[f.length - 2], L = Math.hypot(e.x - d.x, e.y - d.y) || 1, u = { x: (e.x - d.x) / L, y: (e.y - d.y) / L };
       piles.push({ x: e.x - u.x * 0.3 + u.y * (FINGER_W / 2 + 0.2), y: e.y - u.y * 0.3 - u.x * (FINGER_W / 2 + 0.2) }); // a piling at the end, beside it
+    }
+    // the solid pier areas (a fuel dock, a platform): decked the same, on the same level
+    for (const a of HARBOR.areas) {
+      const sh = new THREE.Shape(); a.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y)); // (rotated flat below: shape y becomes −z, i.e. north)
+      const g = new THREE.ExtrudeGeometry(sh, { depth: DOCK_T, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, DOCK_TOP - DOCK_T, 0);
+      const pos = g.attributes.position, uv = g.attributes.uv as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / PLANK_TILE_W, pos.getZ(i) / PLANK_TILE_L);
+      tops.push(g.toNonIndexed()); g.dispose();
     }
     this.group.add(new THREE.Mesh(mergeGeometries(tops), new THREE.MeshLambertMaterial({ map: deckTexture(), side: THREE.DoubleSide })));
     this.group.add(new THREE.Mesh(mergeGeometries(sides), new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide })));

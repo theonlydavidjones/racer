@@ -1,5 +1,5 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { moveBoat } from '../boat/physics';
+import { crewRig, moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -271,7 +271,7 @@ export class World {
     if (isUser && this.fromSlip) {
       // in her slip, bow in (boats nose in here, never back in), made fast: push off to leave
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
-      docked = { slip: slip.id, phase: 'fast', s: 0, plan: pushOffPlan(slip) };
+      docked = { slip: slip.id };
     } else if (isUser && this.freeSail) {
       // where you chose to start, on a beam reach: whichever way has more open water ahead
       const at = getPlace(this.settings.sailFrom)?.p;
@@ -301,7 +301,7 @@ export class World {
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name } } : { paint: F.paint }),
-      x: p.x, y: p.y, h, docked, v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
+      x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
@@ -804,46 +804,51 @@ export class World {
 
   /** In her slip and stopped, bow in? Then the crew steps onto the finger and makes her fast. */
   private bowInTold = -Infinity;
+  /** She's been out of her slip (so coming back into it is coming home). */
+  private leftSlip = false;
   private intoSlip(u: Boat, slip: Slip): boolean {
-    if (u.docked || dist(u, slip.p) > 2.5 || u.v > 0.6) return false;
+    if (!u.docked && dist(u, slip.p) > 8) this.leftSlip = true;
+    if (u.docked || !this.leftSlip || dist(u, slip.p) > 2.5 || u.v > 0.6 || (u.astern ?? 0) > 0.05) return false;
     if (Math.abs(wrap(u.h - slip.heading)) > 35) {
       if (this.t - this.bowInTold > 20) { this.bowInTold = this.t; this.emit({ type: 'toast', msg: 'Boats lie bow in here: come into the slip bow first, toward the dock.', ms: 4000 }); }
       return false;
     }
-    Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, v: 0, vx: 0, vy: 0, steer: 0, turnTarget: null });
-    u.docked = { slip: slip.id, phase: 'fast', s: 0, plan: pushOffPlan(slip) };
+    Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, v: 0, vx: 0, vy: 0, astern: 0, steer: 0, turnTarget: null });
+    u.docked = { slip: slip.id }; this.leftSlip = false;
     return true;
   }
 
-  /** Push off: the crew walks her back out of the slip, swings her bow toward the way out, and steps aboard with a shove. */
+  /**
+   * Push off: the crew shoves her astern off the dock, hard enough that she coasts back clear of her finger (about
+   * walking pace, slowing as she goes). From then on she's under way: steer her with the tiller (going astern, the bow
+   * goes the way you push it), and get sail on her.
+   */
   pushOff(): boolean {
-    const u = this.user, d = u.docked;
-    if (!d || d.phase !== 'fast') return false;
-    d.phase = 'walking'; d.s = 0;
-    this.emit({ type: 'toast', msg: 'Pushing off: the crew walks her back along the finger, then swings her bow round and steps aboard.', ms: 3500 });
+    const u = this.user, d = u.docked; if (!d) return false;
+    const slip = slipById(d.slip), clear = slip ? pushOffPlan(slip).back + 1.5 : 8;
+    // coasting from v0 with the drag in physics.ts (dv/dt = −(0.01 + 0.06 v)) goes (v0 − (0.01/0.06)·ln(1 + 6 v0)) / 0.06 m
+    let lo = 0.1, hi = 1.4;
+    for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if ((m - (0.01 / 0.06) * Math.log(1 + 6 * m)) / 0.06 < clear) lo = m; else hi = m; }
+    u.docked = undefined; u.astern = lo; u.v = 0;
+    this.emit({ type: 'toast', msg: 'Pushed off: she\'s going astern. Steer with the tiller: going astern the bow goes the way you push it. Hoist the sails when you\'re clear.', ms: 5000 });
     return true;
   }
 
-  /** A boat in her slip: held there; or being walked out (about 0.7 m/s, a walking pace) and swung round (about 15°/s). */
+  /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */
+  setSail(sail: 'main' | 'jib', up: boolean): void {
+    const u = this.user, r = u.rig ??= { main: 1, jib: 1, mainUp: true, jibUp: true };
+    if (sail === 'main') r.mainUp = up; else r.jibUp = up;
+    if (!up && sail === 'jib') u.poleWant = false;
+    this.emit({ type: 'toast', msg: `${up ? 'Hoisting' : 'Striking'} the ${sail}.`, ms: 2000 });
+  }
+
+  /** A boat in her slip: made fast, she stays put; her crew can hoist or strike sail there. */
   private dockStep(b: Boat, dt: number): void {
-    const d = b.docked!, slip = slipById(d.slip);
-    b.v = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
+    b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
-    if (!slip || d.phase === 'fast') return;
-    const u = V(slip.heading);
-    if (d.phase === 'walking') {
-      d.s = Math.min(d.plan.back, d.s + 0.7 * dt);
-      b.x = slip.p.x - u.x * d.s; b.y = slip.p.y - u.y * d.s; b.vx = -u.x * 0.7; b.vy = -u.y * 0.7;
-      if (d.s >= d.plan.back) { d.phase = 'swinging'; d.s = 0; }
-    } else {
-      d.s = Math.min(1, d.s + 15 * dt / Math.abs(d.plan.turn));
-      b.h = n360(slip.heading + d.plan.turn * d.s);
-      if (d.s >= 1) {
-        // aboard, with a shove: about a knot, bow toward the fairway; the sails are hers to fill
-        b.docked = undefined; b.h = d.plan.h; b.desired = b.h; b.v = 0.5;
-        this.emit({ type: 'toast', msg: 'Off the dock, with a shove. Sail her out through the fairway to the entrance.', ms: 3500 });
-      }
-    }
+    const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
+    b.boom += (side * 75 - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
+    crewRig(b, dt, this.emit);
   }
 
   /** Just sail: tell her when she gets to where she was going. */

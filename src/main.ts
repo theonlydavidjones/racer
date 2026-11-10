@@ -9,7 +9,7 @@ import { PLACES } from './sim/places';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { addLog, type LogEntry } from './boat/logbook';
-import { HARBOR, slipById } from './geo/marina';
+import { HARBOR, inBasin, slipById } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { Labels } from './render/labels';
@@ -358,6 +358,20 @@ $('bHail').onclick = doHail;
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) w.pushOff(); }
 $('bPushOff').onclick = pushOff;
+/* Hoist or strike a sail (the crew does it at their pace: boat/physics.ts crewRig). */
+function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; w.setSail(sail, !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true)); }
+$('bJib').onclick = () => halyard('jib');
+$('bMain').onclick = () => halyard('main');
+/** The halyard buttons: a sail that's down (or on its way up or down) always has one; striking a sail is for the marina. */
+function sailButtons(): void {
+  const u = w.user, r = u.rig, inMarina = inBasin(u);
+  for (const [k, id] of [['jib', 'bJib'], ['main', 'bMain']] as const) {
+    const h = r ? r[k] : 1, up = r ? (k === 'main' ? r.mainUp : r.jibUp) : true, el = $(id);
+    el.hidden = !w.running || (up && h >= 1 && !inMarina);
+    el.textContent = up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
+    el.classList.toggle('on', !up && h === 0);
+  }
+}
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
@@ -452,6 +466,8 @@ addEventListener('keydown', e => {
     case 'pole': togglePole(); break;
     case 'hail': doHail(); break;
     case 'pushOff': pushOff(); break;
+    case 'jibHalyard': halyard('jib'); break;
+    case 'mainHalyard': halyard('main'); break;
     case 'viewCockpit': setView(0); break;
     case 'viewChase': setView(1); break;
     case 'viewOverhead': setView(2); break;
@@ -725,7 +741,7 @@ function beginRace(seed?: number): void {
   const m0 = w.C.marks[0];
   if (w.fromSlip) {
     const m = Math.round((w.startAt - S.seq * 60) / 60);
-    toast(`In her slip in ${HARBOR.name}, ${w.homeSlip!.id}, bow in and made fast. Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}), then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
+    toast(`In her slip in ${HARBOR.name}, ${w.homeSlip!.id}, bow in and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to shove her out astern, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
     return;
   }
   toast(S.mode === 'sail'
@@ -840,7 +856,7 @@ function frame(now: number): void {
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of w.drainEvents()) handle(e);
-  $('bPushOff').hidden = !(w.running && w.user.docked?.phase === 'fast');
+  $('bPushOff').hidden = !(w.running && !!w.user.docked); sailButtons();
   keyLook(dt); lookLabel(); tillerSpring(dt); showTiller(); showLines(); coachTick(dt);
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);

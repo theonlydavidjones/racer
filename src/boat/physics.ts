@@ -2,9 +2,11 @@ import { inBasin } from '../geo/marina';
 import { KT, V, brg, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand } from '../geo/shore';
 import type { Emit } from '../sim/events';
-import { bow, type Boat } from './boat';
+import { bow, stern, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
-import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
+import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
+import orc from './data/nordic-folkboat-orc.json';
+const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { FULL_RUDDER, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rudderDrag, sailForces } from './balance';
 import { DEFAULT_CREW, crewMoment, displacement, displacementFactor, handsFactor, newCrew, placeCrew, trimFactor } from './crewPhys';
@@ -28,6 +30,32 @@ export function sailPlan(b: Boat): SailPlan {
   if (b.pole === 'set') return b.poleTack === b.tack ? 'wing' : 'main';
   if (b.pole === 'down') return 'jib';
   return 'main'; // crew busy with the pole: jib not drawing
+}
+
+/**
+ * Hoisting and striking (dropping) the sails, at a crew's pace: the main takes about half a minute to hoist and the
+ * jib about 15 s; short-handed, longer. The main goes up easily head to wind; off the wind it fills, presses on the
+ * spreaders and shrouds and the slides bind, so it goes up far more slowly.
+ */
+export const HOIST = { main: 30, jib: 15, strikeMain: 15, strikeJib: 10 };
+export function crewRig(b: Boat, dt: number, emit: Emit): void {
+  const r = b.rig; if (!r) return;
+  const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg, ms: 3500 }); };
+  const hands = b.crew ? handsFactor(b.crew.spec) : 1;
+  const twa = Math.abs(wrap(b.ww.from - b.h)), offWind = twa <= 45 ? 1 : twa >= 120 ? 0.3 : 1 - 0.7 * (twa - 45) / 75;
+  const step = (k: 'main' | 'jib') => {
+    const up = k === 'main' ? r.mainUp : r.jibUp, was = r[k];
+    if (up && was < 1) {
+      r[k] = Math.min(1, was + dt * hands * (k === 'main' ? offWind : 1) / HOIST[k]);
+      if (k === 'main' && was === 0 && offWind < 0.7) say('Hoisting the main off the wind: it fills and catches on the spreaders. It goes up much more easily head to wind.');
+      if (r[k] === 1) say(k === 'main' ? 'Main up.' : 'Jib up.');
+    } else if (!up && was > 0) {
+      r[k] = Math.max(0, was - dt * hands / (k === 'main' ? HOIST.strikeMain : HOIST.strikeJib));
+      if (r[k] === 0) say(k === 'main' ? 'Main down and flaked on the boom.' : 'Jib down and bagged on the foredeck.');
+    }
+  };
+  step('main'); step('jib');
+  if (r.jib < 1 && b.poleWant) { b.poleWant = false; say('The pole goes out on the jib: hoist the jib first.'); }
 }
 
 /** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
@@ -66,6 +94,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tiller to starboard turns the bow to port; keys add a push of their own
       const helm = clamp(b.steer - b.tiller, -1, 1);
       rate = helm * maxRate; if (helm !== 0) b.turnTarget = null;
+      // going astern the rudder works backwards, and less well: the bow goes the way you push the tiller (with way on
+      // both ways at once, by which way the water mostly flows past the rudder)
+      if (b.astern) { const fwd = b.v / (b.v + b.astern); rate = helm * (maxRate * fwd - maxTurnRate(b.astern) * 0.7 * (1 - fwd)); }
     }
     rudder = rate / Math.max(1e-6, maxRate);
     if (b.turnTarget == null) rate += balRate; // let go of the tiller and she rounds up (or bears away)
@@ -111,6 +142,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; }
   if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled: Rule 13 ends
+  crewRig(b, dt, emit);
   crewPole(b, dt, emit);
   const plan = sailPlan(b);
   const ap = apparent(ww.from, ww.kt, b.h, b.v);
@@ -118,6 +150,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
   const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1; // how much of each sail is up: its force goes with its hoisted area
+  if (hm < 1 || hj < 1) { sf.main.heel *= hm; sf.main.drive *= hm; sf.jib.heel *= hj; sf.jib.drive *= hj; }
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
   // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
   let wornDrive = 1;
@@ -144,6 +178,13 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
   else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff * wornDrive); // sheet angles, the sails' shape, worn cloth
+  if (hm < 1 || hj < 1) {
+    // part of the sail plan up: speed with roughly the square root of the drive, which goes with the area hoisted
+    const je = jibEfficiency(plan, twa), full = SAIL_AREA.main + SAIL_AREA.jib * je, up = SAIL_AREA.main * hm + SAIL_AREA.jib * je * hj;
+    target *= full > 0 ? Math.sqrt(up / full) : 0;
+    // under bare poles she still drifts off downwind on the windage of her hull and rig (about a tenth of the wind)
+    target = Math.max(target, 0.1 * ww.kt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)));
+  }
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
   // holding a lot of helm to keep her straight is a brake (the steady helm the sails demand; turning has its own cost)
@@ -152,11 +193,18 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
-  b.vx = u.x * b.v + b.cur.x; b.vy = u.y * b.v + b.cur.y;
+  // sternway (pushed off astern): she coasts back, slowing on the water's drag (from a shove, about 20 s and a few lengths)
+  const ast = b.astern ?? 0;
+  if (ast > 0) { b.astern = ast - (0.01 + 0.06 * ast) * dt; if (b.astern < 0.02) b.astern = 0; }
+  b.vx = u.x * (b.v - ast) + b.cur.x; b.vy = u.y * (b.v - ast) + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
+  const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
   if (onLand(bow(b))) {
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0;
-    if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg: inBasin(b) ? 'Bump: you\'ve hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.' }); }
+    bump(inBasin(b) ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+  } else if (ast > 0 && onLand(stern(b))) {
+    b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
+    bump(inBasin(b) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it
   const aw = apparent(ww.from, ww.kt, b.h, b.v), awa = aw.awa;

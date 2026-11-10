@@ -157,6 +157,8 @@ interface FlyingFlag { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array
 interface Ribbon { geom: THREE.BufferGeometry; anchor: THREE.Vector3; phase: number }
 export interface BoatMesh {
   grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: Sail; jib: Sail;
+  /** The main flaked on the boom and the jib bagged on the foredeck, when they're down. */
+  mainFurl: THREE.Mesh; jibBag: THREE.Mesh;
   jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
   pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
@@ -305,6 +307,12 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     for (const zc of [z0 - 0.25, z1 + 0.25]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.06), MAT.dark); ch.position.set(x, deckY(uAtZ(zc), x) + 0.02, zc); stowed.add(ch); }
   }
   grp.add(stowed);
+  // sails down: the main flaked along the boom (tied with sail ties) and the jib in its bag on the foredeck
+  const clothMat = new THREE.MeshLambertMaterial({ color: b.sailColor });
+  const mainFurl = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 2.9, 10), clothMat); mainFurl.rotation.x = Math.PI / 2; mainFurl.position.set(0, 1.16, 1.55); mainFurl.visible = false; boomPivot.add(mainFurl);
+  for (const z of [0.5, 1.2, 1.9, 2.6]) { const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 4, 10), MAT.dark); tie.rotation.x = Math.PI / 2; tie.position.y = z - 1.55; mainFurl.add(tie); } // (along the cylinder's own axis)
+  const jibBag = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshLambertMaterial({ color: 0x2c3e66 })); jibBag.scale.set(0.2, 0.12, 0.45);
+  jibBag.position.set(-0.05, deckY(uAtZ(-2.9), 0.05) + 0.1, -2.9); jibBag.visible = false; grp.add(jibBag);
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
@@ -368,7 +376,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false };
+  return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -421,6 +429,17 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   m.main.update(mainShape); m.jib.update(jibShape);
   m.main.mesh.scale.x = Math.sign(b.boom || 1);
   m.jib.mesh.scale.x = Math.sign(b.jib || 1);
+  { // hoisting and striking: the main's head comes down its track to the boom; the jib's head down the forestay
+    const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
+    m.main.mesh.visible = hm > 0.02; m.main.mesh.scale.y = Math.max(0.02, hm); m.main.mesh.position.y = MAIN_DEF.tack.y * (1 - hm);
+    m.mainFurl.visible = hm < 0.98; m.mainFurl.scale.set(0.3 + 0.7 * (1 - hm), 1, 0.3 + 0.7 * (1 - hm));
+    m.jib.mesh.visible = hj > 0.02; m.jibBag.visible = hj < 0.98; m.jibBag.scale.set(0.2 * (0.4 + 0.6 * (1 - hj)), 0.12 * (0.4 + 0.6 * (1 - hj)), 0.45);
+    // squeeze the jib along the stay (and mirror it to its side): M = (I + (h − 1)·a·aᵀ)·diag(sx, 1, 1), a the forestay
+    const a = JIB_AXIS, k = hj - 1, sx = m.jib.mesh.scale.x, jm = m.jib.mesh;
+    jm.matrixAutoUpdate = false;
+    jm.matrix.set(sx * (1 + k * a.x * a.x), k * a.x * a.y, k * a.x * a.z, 0, sx * k * a.y * a.x, 1 + k * a.y * a.y, k * a.y * a.z, 0, sx * k * a.z * a.x, k * a.z * a.y, 1 + k * a.z * a.z, 0, 0, 0, 0, 1);
+    jm.matrixWorldNeedsUpdate = true;
+  }
   // the cloth's front face looks along the mesh's +x, which the mirroring turns to starboard (+1) or port (−1)
   for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, Math.sign(b.jib || 1)]] as const) {
     const mats = sail.mesh.material as THREE.MeshLambertMaterial[], pr = sailPics.get(mats[0]);

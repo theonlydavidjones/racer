@@ -36,25 +36,47 @@ describe('West Harbor', () => {
     }
     expect(found).toBe(true);
   });
-  it('Cruise from her slip: in it bow in, made fast; push off walks her out and swings her round; home again bow first', () => {
+  it('Cruise from her slip: bow in, made fast, sails down; push off shoves her clear astern, steerable; hoist; home bow first', () => {
     const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14' };
     const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
-    expect(w.homeSlip?.id).toBe(slip.id); expect(u.v).toBe(0); expect(u.docked?.phase).toBe('fast');
+    expect(w.homeSlip?.id).toBe(slip.id); expect(u.v).toBe(0); expect(u.docked).toBeTruthy();
+    expect(u.rig).toEqual({ main: 0, jib: 0, mainUp: false, jibUp: false }); // sails down at the dock
     expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01); expect(u.h).toBe(slip.heading); // bow in, toward the dock
     for (let i = 0; i < 300; i++) w.step(DT); // made fast: she stays put, wind or no wind
     expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01);
     expect(w.pushOff()).toBe(true);
-    const plan = pushOffPlan(slip);
-    for (let i = 0; i < 60 * 40 && u.docked; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
-    expect(u.docked).toBeUndefined(); expect(u.v).toBeGreaterThan(0.3);
-    expect(Math.abs(((u.h - plan.h + 540) % 360) - 180)).toBeLessThan(1);
-    expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeGreaterThan(slip.finger * 0.45 + 4);
+    expect(u.docked).toBeUndefined(); expect(u.astern).toBeGreaterThan(0.2); expect(u.astern).toBeLessThan(1.4);
+    // she coasts back clear of her finger, straight (tiller centred), without touching anything
+    const plan = pushOffPlan(slip), back = (q: { x: number; y: number }) => -((q.x - slip.p.x) * Math.sin(slip.heading * Math.PI / 180) + (q.y - slip.p.y) * Math.cos(slip.heading * Math.PI / 180));
+    for (let i = 0; i < 60 * 40 && (u.astern ?? 0) > 0; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(back(u)).toBeGreaterThan(plan.back);
+    // going astern the tiller still steers her (the bow goes the way the tiller's pushed)
+    w.pushOff(); Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, astern: 0.8 });
+    const h0 = u.h; u.tiller = -0.8; for (let i = 0; i < 120; i++) w.step(DT); u.tiller = 0;
+    expect(((u.h - h0 + 540) % 360) - 180).toBeLessThan(-3); // tiller to port: bow to port
+    // the crew hoists: the jib in about 15 s, the main in about 30 s (slower off the wind)
+    w.setSail('jib', true); w.setSail('main', true);
+    for (let i = 0; i < 60 * 20; i++) w.step(DT);
+    expect(u.rig!.jib).toBe(1); expect(u.rig!.main).toBeGreaterThan(0.2);
     // back in, stern first: not home; bow first and stopped: home, and made fast again
-    w.t = 300; Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 180, v: 0.2 }); w.step(DT);
+    w.t = 300; Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 180, v: 0.2, astern: 0 }); w.step(DT);
     expect(w.arrivedT).toBeNull();
     Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 10, v: 0.2 }); w.step(DT);
-    expect(w.arrivedT).not.toBeNull(); expect(u.docked?.phase).toBe('fast');
+    expect(w.arrivedT).not.toBeNull(); expect(u.docked).toBeTruthy();
+  });
+  it('sails down she barely moves; each sail drives in proportion to what is hoisted', () => {
+    const speedWith = (main: number, jib: number) => {
+      const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', tideDate: '2026-11-14', current: 'slack' };
+      const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
+      u.rig = { main, jib, mainUp: main > 0, jibUp: jib > 0 }; u.v = 0;
+      u.h = (w.wind.from + 90) % 360; // a beam reach
+      for (let i = 0; i < 60 * 40; i++) { u.h = (w.wind.from + 90) % 360; u.turnTarget = null; w.step(DT); }
+      return u.v;
+    };
+    const full = speedWith(1, 1), mainOnly = speedWith(1, 0), jibOnly = speedWith(0, 1), bare = speedWith(0, 0);
+    expect(bare).toBeLessThan(0.3); expect(jibOnly).toBeLessThan(mainOnly); expect(mainOnly).toBeLessThan(full);
+    expect(full).toBeGreaterThan(2);
   });
   it('room to push off and swing her round from nearly every slip', () => {
     let ok = 0;
@@ -71,12 +93,12 @@ describe('West Harbor', () => {
     const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'race', raceFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14' };
     const w = new World(COURSES[0], S, 1), u = w.user;
-    expect(u.docked?.phase).toBe('fast'); expect(w.fromSlip).toBe(true);
+    expect(u.docked).toBeTruthy(); expect(w.fromSlip).toBe(true);
     const lead = slipLeadTime(slip, w.C.center);
     expect(w.startAt).toBe(S.seq * 60 + lead); expect(lead).toBeGreaterThanOrEqual(15 * 60);
     expect(w.boats.length).toBe(1 + S.fleet); // the fleet's out by the line already
     for (const b of w.boats.slice(1)) expect(inBasin(b)).toBe(false);
     for (let i = 0; i < 60 * 30; i++) w.step(DT); // half a minute: no flags yet, still made fast
-    expect(w.flags.length).toBe(0); expect(u.docked?.phase).toBe('fast');
+    expect(w.flags.length).toBe(0); expect(u.docked).toBeTruthy();
   });
 });
