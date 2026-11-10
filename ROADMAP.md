@@ -33,6 +33,10 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - **More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
+- **Save or discard** after each race or cruise: asked when it ends, before it goes in the logbook.
+- **Heaving to, and the other seamanship manoeuvres** (a real-world stress test the sim fails today): each jib sheet on
+  its own, so the jib can be backed to windward; the tiller lashed at a set angle; the physics of a hove-to boat (backed
+  jib against a feathered main and the rudder, fore-reaching slowly and drifting to leeward) checked against real boats.
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
