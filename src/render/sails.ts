@@ -13,6 +13,8 @@ export interface SailDef {
   rows: number; cols: number;
   windows?: { t0: number; t1: number; s0: number; s1: number }[]; // clear windows (height and chord fractions)
   battens?: { t: number; len: number }[]; // height fraction and length (m) in from the leech
+  /** Draw the battens as lines on the surface too (off when the sail's own picture shows its batten pockets). */
+  battenLines?: boolean;
 }
 
 export interface SailShape {
@@ -66,7 +68,7 @@ export class Sail {
     this.mesh = new THREE.Mesh(this.geom, windowMat ? [sailMat, windowMat] : [sailMat]);
     this.mesh.frustumCulled = false;
     if (backMat) { this.back = new THREE.Mesh(this.geom, windowMat ? [backMat, windowMat] : [backMat]); this.back.frustumCulled = false; this.mesh.add(this.back); }
-    if (def.battens?.length) {
+    if (def.battens?.length && def.battenLines !== false) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(def.battens.length * 5 * 2 * 3), 3));
       this.battens = new THREE.LineSegments(g, BATTEN_MAT); this.battens.frustumCulled = false;

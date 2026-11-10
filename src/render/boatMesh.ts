@@ -14,21 +14,22 @@ import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type Tell
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
- * The sails, as Folkboat sails are made (crosscut Dacron; from photographs of San Francisco boats): the main with four
- * battens up the leech (the top one shorter) and a long, low window parallel to the boom; the jib with two battens and
- * a window low down, parallel to its foot.
+ * The sails, as Folkboat sails are made (crosscut Dacron; from photographs of San Francisco boats and Fritz Segel's
+ * drawings of their Folkboat main and jibs, fritz-segel.com): the main with four battens up the leech (the top one
+ * shorter), a long window low down parallel to the boom and a small upright spreader window near the luff (for watching
+ * the jib's leech); the jib with three battens, a window low down toward the luff, and a radially cut head.
  */
 const MAIN_LUFF = 8.25, MAIN_FOOT = 3.3, JIB_LUFF = 6.54, JIB_FOOT = 2.92;
 const MAIN_DEF: SailDef = {
   tack: V3(0, 1.05, 0), head: V3(0, 9.3, 0.05), clew: V3(0, 1.05, MAIN_FOOT), depth: 0.42, rows: 18, cols: 10,
-  windows: [{ t0: 0.3 / MAIN_LUFF, t1: 0.65 / MAIN_LUFF, s0: 0.18, s1: 0.18 + 1.8 / MAIN_FOOT }],
-  battens: [{ t: 0.19, len: 0.8 }, { t: 0.38, len: 0.8 }, { t: 0.59, len: 0.75 }, { t: 0.8, len: 0.5 }]
+  windows: [{ t0: 0.3 / MAIN_LUFF, t1: 0.65 / MAIN_LUFF, s0: 0.18, s1: 0.18 + 1.8 / MAIN_FOOT }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
+  battens: [{ t: 0.2, len: 1.0 }, { t: 0.41, len: 1.0 }, { t: 0.61, len: 1.0 }, { t: 0.82, len: 0.6 }], battenLines: false
 };
 /** Jib: hanked on the forestay. */
 const JIB_DEF: SailDef = {
-  tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0, 0.35, 2.9), depth: 0.36, rows: 12, cols: 8,
-  windows: [{ t0: 0.08, t1: 0.135, s0: 0.42, s1: 0.8 }],
-  battens: [{ t: 0.27, len: 0.45 }, { t: 0.53, len: 0.4 }]
+  tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0, 0.35, 2.9), depth: 0.36, rows: 14, cols: 8,
+  windows: [{ t0: 0.14, t1: 0.21, s0: 0.17, s1: 0.56 }],
+  battens: [{ t: 0.25, len: 0.7 }, { t: 0.51, len: 0.47 }, { t: 0.76, len: 0.37 }], battenLines: false
 };
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 const JIB_AXIS = new THREE.Vector3(0, 6.1, 2.35).normalize(); // the forestay: the jib swings around it, so its luff stays on the stay
@@ -578,18 +579,34 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
   const dark = lum(color) < 0.3; // black sails: light seams and stripes, white numbers
   g.fillStyle = color; g.fillRect(0, 0, W, H);
   const line = (pts: [number, number][], col: string, w: number) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach(([u, v], i) => i ? g.lineTo(X(u), Y(v)) : g.moveTo(X(u), Y(v))); g.stroke(); };
-  // crosscut panels, as sailmakers lay them: each seam runs from the leech square to it, so (the leech leaning forward up to
-  // the head) it slants down toward the luff, until it meets the luff or the foot; the panels are about 0.95 m wide along
-  // the leech. Worked out on the flat sail (luff up the mast, foot along the boom) and mapped to the picture's coordinates
-  const lLen = Math.hypot(FOOT, LUFF), dn = { x: -LUFF / lLen, y: -FOOT / lLen }; // square to the leech, toward the luff and down
-  const toUV = (x: number, y: number): [number, number] => [x / Math.max(0.05, FOOT * (1 - y / LUFF)), y / LUFF];
-  const across = (yL: number): [number, number][] => { // from the leech at height yL (m) to the luff or the foot
-    const x0 = FOOT * (1 - yL / LUFF), sMax = Math.min(x0 / -dn.x, yL / -dn.y), pts: [number, number][] = [];
-    for (let k = 0; k <= 14; k++) { const sv = sMax * k / 14; pts.push(toUV(x0 + dn.x * sv, yL + dn.y * sv)); }
+  // the sail flat, in its own plane (fore and aft z, up y), and where a point on it falls in the picture's coordinates
+  const P = (v: THREE.Vector3) => ({ z: v.z, y: v.y }), T = P(def.tack), Hd = P(def.head), C = P(def.clew);
+  const at = (s0: number, t0: number) => { const lz = T.z + (Hd.z - T.z) * t0, ly = T.y + (Hd.y - T.y) * t0, fz = C.z + (Hd.z - C.z) * t0, fy = C.y + (Hd.y - C.y) * t0; return { z: lz + (fz - lz) * s0, y: ly + (fy - ly) * s0 }; };
+  const uvOf = (q: { z: number; y: number }): [number, number] => { // (Newton's method on the bilinear map)
+    let sv = 0.5, tv = 0.5;
+    for (let k = 0; k < 12; k++) {
+      const p = at(sv, tv), e = 1e-4, ps = at(sv + e, tv), pt = at(sv, tv + e);
+      const a11 = (ps.z - p.z) / e, a12 = (pt.z - p.z) / e, a21 = (ps.y - p.y) / e, a22 = (pt.y - p.y) / e, det = a11 * a22 - a12 * a21 || 1e-9;
+      const dz = q.z - p.z, dy = q.y - p.y; sv += (a22 * dz - a12 * dy) / det; tv += (-a21 * dz + a11 * dy) / det;
+    }
+    return [sv, tv];
+  };
+  // square to the leech, pointing in toward the luff
+  const lz = Hd.z - C.z, ly = Hd.y - C.y, ll = Math.hypot(lz, ly); let nz = -ly / ll, ny = lz / ll;
+  { const mid = at(0.5, 0.5), lp = at(1, 0.5); if (nz * (mid.z - lp.z) + ny * (mid.y - lp.y) < 0) { nz = -nz; ny = -ny; } }
+  /** From the leech at height fraction t, square to it, in toward the luff: `len` m, or until it meets the luff or the foot. */
+  const fromLeech = (t: number, len = 99): [number, number][] => {
+    const o = at(1, t), pts: [number, number][] = [];
+    for (let d = 0; d <= len; d += 0.05) { const uv = uvOf({ z: o.z + nz * d, y: o.y + ny * d }); if (uv[0] < 0 || uv[1] < 0) break; pts.push(uv); }
     return pts;
   };
-  const seam = dark ? 'rgba(210,210,210,.2)' : 'rgba(100,96,86,.32)', panel = 0.95 * LUFF / lLen; // (0.95 m along the leech, in height)
-  for (let yL = panel; yL < LUFF - 0.3; yL += panel) line(across(yL), seam, main ? 3.5 : 3);
+  // crosscut panels, as sailmakers lay them: each seam runs from the leech square to it, about 0.95 m apart up the leech,
+  // to the luff or the foot (on the main that slants it down toward the mast; on the jib, whose leech is nearly upright,
+  // it runs nearly level)
+  const seam = dark ? 'rgba(210,210,210,.2)' : 'rgba(100,96,86,.32)', step = 0.95 / ll;
+  for (let t = step; t < 1 - 0.04; t += step) line(fromLeech(t), seam, main ? 3.5 : 3);
+  // the jib's head is cut radially: seams fanning down from the head to the first crosscut seam below it
+  if (!main) { const t1 = 1 - step * 1.15; for (const sv of [0.25, 0.6]) line([[0.02, 0.995], [sv, t1]], seam, 3); }
   // the draft stripes: dark lines along the chord, luff to leech at one height (a third and two-thirds of the way up), as
   // sailmakers put them on: what the trimmer reads the sail's depth and draft position against
   for (const v of [0.34, 0.67]) line([[0, v], [1, v]], dark ? 'rgba(235,235,235,.55)' : 'rgba(25,30,40,.75)', main ? 7 : 6);
@@ -597,12 +614,12 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
   g.fillStyle = dark ? 'rgba(120,120,120,.25)' : 'rgba(150,152,155,.28)';
   const patch = (u: number, v: number, r: number) => { g.beginPath(); g.ellipse(X(u), Y(v), r / FOOT * W, r / LUFF * H, 0, 0, Math.PI * 2); g.fill(); };
   patch(0, 0, main ? 0.75 : 0.55); patch(1, 0, main ? 0.85 : 0.7); patch(0, 1, 0.35);
-  // batten pockets: from the leech in, closed off with a pointed end
+  // batten pockets: from the leech in, square to it, ending in a rounded end
   for (const bt of def.battens ?? []) {
-    const chord = FOOT * (1 - bt.t), u0 = Math.max(0, 1 - bt.len / chord), tip = 0.07 / chord;
-    g.fillStyle = dark ? 'rgba(200,200,200,.4)' : 'rgba(110,112,118,.55)';
-    const h = 0.035 / LUFF; // the pocket's width
-    g.beginPath(); g.moveTo(X(1), Y(bt.t + h)); g.lineTo(X(u0 + tip), Y(bt.t + h)); g.lineTo(X(u0), Y(bt.t)); g.lineTo(X(u0 + tip), Y(bt.t - h)); g.lineTo(X(1), Y(bt.t - h)); g.closePath(); g.fill();
+    const pts = fromLeech(bt.t, bt.len); if (pts.length < 2) continue;
+    line(pts, dark ? 'rgba(200,200,200,.45)' : 'rgba(110,112,118,.6)', (main ? 0.05 : 0.045) / LUFF * H);
+    const [eu, ev] = pts[pts.length - 1]; g.fillStyle = dark ? 'rgba(200,200,200,.35)' : 'rgba(150,152,158,.45)';
+    g.beginPath(); g.ellipse(X(eu), Y(ev), 0.07 / (FOOT * Math.max(0.2, 1 - ev)) * W, 0.07 / LUFF * H, 0, 0, Math.PI * 2); g.fill();
   }
   if (main && no) {
     const pxV = H / MAIN_LUFF; // canvas px per metre up the sail
