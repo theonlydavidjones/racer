@@ -34,14 +34,29 @@ export function fogBankAmount(tMin: number): number {
 const PUFF_N = 160, PUFF_SPAN = 3200;
 /** Sea map resolution (samples per side). */
 const SEA_N = 24;
+/** Current map resolution (samples per side), for the flowing texture and tidelines. */
+const CUR_N = 56;
 
 /**
  * Water colour from the wind on it. Stronger wind roughens the surface: denser, higher-contrast ripples and a
  * darker look (rough water reflects less of the bright sky), whitecaps from about 12 kt. Lighter wind
  * leaves it smoother and paler. Outside the wind map the water looks as it does in the mean wind.
  */
+/** Value noise (for foam and debris patterns that don't repeat). */
+const VNOISE = `
+float vhash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(vhash(i), vhash(i + vec2(1.0, 0.0)), f.x), mix(vhash(i + vec2(0.0, 1.0)), vhash(i + vec2(1.0, 1.0)), f.x), f.y); }
+`;
 const WATER_FRAGMENT = `
-  vec4 texelColor = texture2D( map, vMapUv );
+  // the current where you are: the ripples drift with it (two-phase flow mapping), relative to the mean drift
+  vec2 cuv = ((vWaveP - uCurO) / uCurCell + 0.5) / ${CUR_N}.0;
+  float cIn = smoothstep(0.0, 0.08, min(min(cuv.x, 1.0 - cuv.x), min(cuv.y, 1.0 - cuv.y)));
+  vec4 cs = texture2D(uCur, clamp(cuv, 0.0, 1.0));
+  vec2 dflow = (mix(uCurMean, (cs.rg - 0.5) * 4.0, cIn) - uCurMean) * 6.0;
+  vec2 fuv = (uFlowM * vec3(dflow, 0.0)).xy;
+  float ph0 = fract(uTime / 6.0), ph1 = fract(uTime / 6.0 + 0.5);
+  vec4 texelColor = mix(texture2D( map, vMapUv - fuv * ph0 ), texture2D( map, vMapUv - fuv * ph1 + vec2(0.37, 0.21) ), abs(2.0 * ph0 - 1.0));
   vec2 puv = (vec2(vPuffXZ.x, -vPuffXZ.y) - uPuffO) / uPuffS;
   float edge = smoothstep(0.0, 0.1, min(min(puv.x, 1.0 - puv.x), min(puv.y, 1.0 - puv.y)));
   float kw = mix(1.0, 0.4 + 1.4 * texture2D(uPuff, clamp(puv, 0.0, 1.0)).r, edge);
@@ -50,6 +65,20 @@ const WATER_FRAGMENT = `
   float rough = clamp(0.85 + 0.55 * gust, 0.25, 1.4);
   diffuseColor.rgb *= mix(vec3(1.0), texelColor.rgb * mix(vec3(1.0), fine.rgb * 1.12, clamp(rough - 0.6, 0.0, 1.0)), rough);
   diffuseColor.rgb *= 1.0 - 0.38 * max(gust, 0.0) + 0.28 * max(-gust, 0.0);
+  // tidelines: where the current converges, a smooth slick band collects foam and debris (thinned to its ridge)
+  float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0;
+  float tlG = length(vec2(texture2D(uCur, cuv + vec2(tdx, 0.0)).b - texture2D(uCur, cuv - vec2(tdx, 0.0)).b, texture2D(uCur, cuv + vec2(0.0, tdx)).b - texture2D(uCur, cuv - vec2(0.0, tdx)).b));
+  // the front: a thin line where the convergence crosses ~4.5e-4 /s (distance to that level, in texels, from the
+  // local slope), a few metres of foam and debris; inside it the water is a little smoother (a slick)
+  float tlD = (tlI - 0.28) / max(0.5 * tlG, 1e-3), far = 1.0 - smoothstep(800.0, 2500.0, length(vPuffXZ - cameraPosition.xz));
+  float tl = (1.0 - smoothstep(0.015, 0.055, abs(tlD))) * step(0.004, tlG) * far;
+  float slick = smoothstep(0.24, 0.34, tlI) * far;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.05 + vec3(0.012), slick * 0.5);
+  // broken up along its length into patches of foam, weed and debris
+  float patchy = smoothstep(0.42, 0.68, vnoise(vWaveP / 22.0)) * smoothstep(0.25, 0.6, vnoise(vWaveP / 6.0 + 7.3));
+  float specks = smoothstep(0.62, 0.8, vnoise(vWaveP / 0.9 + 3.1));
+  float debris = tl * patchy * (0.35 + 0.65 * specks);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.83, 0.76), clamp(debris * 0.8, 0.0, 0.8));
   // the waves: their slope tilts the surface (light and reflections), whitecaps break on the crests
   float camDF = length(vPuffXZ - cameraPosition.xz);
   vec3 ws = waveSlope(vWaveP, vKW, vKS, camDF);
@@ -114,6 +143,10 @@ export class SceneView {
   private waveB = new Float32Array(N_WAVES * 4);
   private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
+  /** Current map: the current (m/s) and where it converges (tidelines), around the focus. */
+  private curData = new Uint8Array(CUR_N * CUR_N * 4);
+  private curTex = new THREE.DataTexture(this.curData, CUR_N, CUR_N, THREE.RGBAFormat);
+  private curUni = { uCur: { value: this.curTex as THREE.Texture }, uCurO: { value: new THREE.Vector2() }, uCurCell: { value: 50 }, uCurMean: { value: new THREE.Vector2() }, uFlowM: { value: new THREE.Matrix3() } };
   /** The race committee's signal flags, and the heading of whatever they're mounted on. */
   private signal: { mast: SignalMast; heading: number } | null = null;
   /** Marks, to lean and trail a wake in the current. */
@@ -176,11 +209,12 @@ export class SceneView {
     const WSIZE = 120000; this.tile = WSIZE / 4000; // 30 m tiles
     wtex.center.set(0.5, 0.5);
     this.puffTex.magFilter = this.puffTex.minFilter = THREE.LinearFilter;
+    this.curTex.magFilter = this.curTex.minFilter = THREE.LinearFilter;
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uHs; uniform float uWhiteRef;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -198,7 +232,7 @@ export class SceneView {
           vMapUv = (mapTransform * vec3(wuv, 1.0)).xy;
           vBumpMapUv = (bumpMapTransform * vec3(wuv, 1.0)).xy;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl)
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE)
         .replace('#include <map_fragment>', WATER_FRAGMENT)
         .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;');
     };
@@ -322,6 +356,17 @@ export class SceneView {
       v[o] = ref.hsW > 0.01 ? s.hsW / ref.hsW : 1; v[o + 1] = ref.hsS > 0.01 ? s.hsS / ref.hsS : 1; v[o + 2] = s.white;
     }
     this.seaGrid = { x0, y0, cell, v };
+    // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s
+    const cc = span / (CUR_N - 1), cx0 = at.x - span / 2, cy0 = at.y - span / 2, U = new Float32Array(CUR_N * CUR_N * 2);
+    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentAt({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
+    const d = this.curData, at2 = (i: number, j: number, k: number) => U[(Math.min(CUR_N - 1, Math.max(0, j)) * CUR_N + Math.min(CUR_N - 1, Math.max(0, i))) * 2 + k];
+    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) {
+      const o = (j * CUR_N + i) * 4, conv = -((at2(i + 1, j, 0) - at2(i - 1, j, 0)) + (at2(i, j + 1, 1) - at2(i, j - 1, 1))) / (2 * cc);
+      d[o] = Math.round(Math.min(1, Math.max(0, 0.5 + at2(i, j, 0) / 4)) * 255); d[o + 1] = Math.round(Math.min(1, Math.max(0, 0.5 + at2(i, j, 1) / 4)) * 255);
+      d[o + 2] = Math.round(Math.min(1, Math.max(0, conv / 1.6e-3)) * 255); d[o + 3] = 255; // unsaturated, so the shader can find the crest
+    }
+    this.curTex.needsUpdate = true;
+    this.curUni.uCurO.value.set(cx0, cy0); this.curUni.uCurCell.value = cc;
   }
 
   /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
@@ -439,6 +484,10 @@ export class SceneView {
     this.wtex.rotation = this.ripAngle;
     // the texture drifts with the current: offset in texture space is the rotated displacement
     this.wtex.offset.x -= (c * w.cvec.x + s * w.cvec.y) * k; this.wtex.offset.y -= (-s * w.cvec.x + c * w.cvec.y) * k;
+    // metres on the water → texture coordinates (the ripple texture's own transform), for the flow map
+    this.wtex.updateMatrix(); const fm = this.wtex.matrix.elements, sc = 1 / 120000;
+    this.curUni.uFlowM.value.set(fm[0] * sc, fm[3] * sc, 0, fm[1] * sc, fm[4] * sc, 0, 0, 0, 0);
+    this.curUni.uCurMean.value.set(w.cvec.x, w.cvec.y);
     this.skyAcc += dt;
     if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user); }
     this.puffAcc += dt;

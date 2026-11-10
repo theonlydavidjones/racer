@@ -25,11 +25,11 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
 ### What the water looks like (the cues sailors actually use)
 
 - **Puffs and lulls:** darker, rougher patches where the wind is stronger, moving downwind across the water toward you; lighter, smoother patches in the lulls; cat's paws in light air. Whitecaps starting around 12 kt, foam streaks lined up with the wind in a strong breeze. Their shape and speed come from the wind field, so you can see a puff coming and judge when it will reach you.
-- **Tidelines and current lines:** where currents of different speed or direction meet (along the edge of the Cityfront relief, off points like Fort Point and Blackaller), a line of foam, kelp and debris collects, the water texture changes across it, and sometimes the colour (brown, silty Bay water against clearer ocean water). Drawn where the current field converges, so the line is where the current actually changes.
+- ~~**Tidelines and current lines:**~~ (done, from the current field's convergence; colour change not yet) where currents of different speed or direction meet (along the edge of the Cityfront relief, off points like Fort Point and Blackaller), a line of foam, kelp and debris collects, the water texture changes across it, and sometimes the colour (brown, silty Bay water against clearer ocean water). Drawn where the current field converges, so the line is where the current actually changes.
 - ~~**Wind against tide on the surface:**~~ (done) visibly steeper, shorter, whiter chop where an ebb meets the westerly.
 - **Eddies and boils** behind points and shoals: swirling, glassy patches.
 - **Marks and moored boats:** ~~buoys lean and trail a wake downstream in the current~~ (done); anchored and moored boats swing to point into the current (or the wind, when it wins), as they do in the harbour before the start.
-- **The water texture moves with the current** (flow-mapped normals), so you can see the set over the bottom against the wind waves.
+- ~~**The water texture moves with the current**~~ (done) (flow-mapped), so you can see the set over the bottom against the wind waves.
 - **Rendering approach** (the waves and whitecaps are done; tidelines and eddies still to come): a sum of Gerstner waves (or an FFT ocean) built from the wave spectrum, with the wind sea and swell as separate components; a foam and whitecap layer driven by wave steepness; a current-convergence map for tidelines and debris; a puff map from the wind field darkening and roughening the surface. Phone-friendly fallbacks come later.
 
 ## Looks: the boats and the bay (requested)
