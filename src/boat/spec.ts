@@ -13,6 +13,10 @@ export interface BoatSpec {
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
+  /** The cabin top, painted or teak, if not like the deck ('' or absent: like the deck; on a teak deck, painted canvas). */
+  cabinTop?: string;
+  /** Which side deck the whisker pole is stowed on, alongside the toe rail. */
+  poleSide?: 'port' | 'starboard';
   /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
   sails: { country: string; number: string; color: 'white' | 'black' };
   /** (Older saves: chosen flags. Now her club gives the burgee and her country the ensign; officers' flags go with skippers.) */
@@ -83,6 +87,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     hull: { ...d.hull, ...x.hull }, deck: x.deck ?? d.deck,
     sails: { ...d.sails, ...x.sails }, perf: { ...d.perf, ...x.perf },
     club: typeof x.club === 'string' ? x.club : x.flags?.burgee ?? '', // older saves: her burgee was her club
+    ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
+    poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     ...(typeof x.slip === 'string' && x.slip ? { marina: x.marina || 'west-harbor', slip: x.slip } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };

@@ -29,7 +29,7 @@ function setup() {
 
 /** Her picture, as a data URL (cached by her looks). */
 export function boatThumb(spec: BoatSpec, S: Settings): string {
-  const key = JSON.stringify([spec.hull, spec.deck, spec.sails, spec.club, spec.name, spec.perf.mast, spec.perf.boom]);
+  const key = JSON.stringify([spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.sails, spec.club, spec.name, spec.perf.mast, spec.perf.boom]);
   const hit = cache.get(key); if (hit) return hit;
   gl ??= setup();
   // her, as the sim builds her: a quiet world with just her in it, sailing a gentle reach with her flags flying
