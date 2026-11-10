@@ -39,14 +39,20 @@ body{
 .tag.mk{background:rgba(9,22,33,.6);color:var(--accent);font-weight:500}
 .tag.mk.next{background:var(--accent);color:#1a1205;font-weight:700}
 
-#hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);
+#hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);
   left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
-  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;pointer-events:none;max-width:800px;margin:0 auto}
-.pod{background:var(--pod);border:1px solid var(--rule);border-radius:6px;padding:6px 8px 5px;min-width:0;display:flex;flex-direction:column;gap:1px}
-.lab{font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.val{font:700 24px/1.05 var(--f-inst);font-variant-numeric:tabular-nums;letter-spacing:.01em}
-.sub{font:600 11px/1 var(--f-inst);letter-spacing:.08em;color:var(--muted);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;pointer-events:none;max-width:600px;margin:0 auto}
+/* instrument displays: a dark face in a bezel, chunky tabular digits, the label and units in small caps */
+.pod{background:linear-gradient(#0d1216,#070a0d);border:2px solid #2a3137;box-shadow:inset 0 0 0 1px #000,0 1px 3px rgba(0,0,0,.4);border-radius:5px;
+  padding:3px 6px 3px;min-width:0;display:flex;flex-direction:column;gap:0;height:58px}
+.lab{font:700 8.5px/1.2 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:#7f949f;display:flex;justify-content:space-between}
+.lab i{font-style:normal;color:#5b6b74}
+.val{font:700 23px/1.05 var(--f-inst);font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#e9f1f3;text-align:right}
+.sub{font:600 9px/1.2 var(--f-inst);letter-spacing:.08em;color:#8ea2ac;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
 .pod.clock .val{color:var(--accent)}
+.pod.windex{align-items:center}
+.pod.windex .lab{align-self:stretch}
+#windexDial{width:40px;height:34px;display:block}
 .sub.lift{color:var(--row)} .sub.head{color:var(--giveway)}
 
 #dial{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);left:max(16px,env(safe-area-inset-left,0px));
@@ -275,7 +281,7 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .coach-item b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 
 /* the tactical compass tape, under the instrument pods */
-#compassTape{position:fixed;top:calc(env(safe-area-inset-top,0px) + 80px);left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 420px));height:48px;
+#compassTape{position:fixed;top:calc(env(safe-area-inset-top,0px) + 72px);left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 420px));height:48px;
   background:var(--pod);border:1px solid var(--rule);border-radius:6px;pointer-events:none}
 
 /* the transit hint, under the line box */
@@ -283,3 +289,10 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
   background:var(--pod);border:1px solid var(--rule);border-radius:14px;padding:3px 12px;font-size:11.5px;color:var(--muted);pointer-events:none;text-align:center}
 #transit b{color:var(--text);font-weight:600}
 #transit .on{color:#3fd197}
+
+.coach-acts{margin:4px 0 6px;padding:0;list-style:none}
+.coach-acts li{display:flex;align-items:baseline;gap:8px;font-size:15px;font-weight:600;padding:4px 0;border-bottom:1px solid var(--rule)}
+.coach-acts .gain{font:700 13px var(--f-inst);color:#ffb35c;min-width:44px;text-align:right}
+.coach-acts .who{font:700 9px var(--f-inst);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border:1px solid var(--rule);border-radius:3px;padding:1px 4px}
+.coach-ok{font-size:15px;font-weight:600;color:#3fd197;margin:6px 0}
+.coach-more{font-size:11px;color:var(--muted);margin:6px 0 0}

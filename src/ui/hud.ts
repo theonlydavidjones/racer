@@ -121,6 +121,25 @@ export class Hud {
     el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
   }
 
+  /**
+   * The windex, as you'd see it looking up at the masthead: the boat from above, bow up, the arrow pointing into the
+   * apparent wind, and the two reference tabs at the close-hauled angle.
+   */
+  private windex(u: Boat): void {
+    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('windexDial')), cx = W / 2, cy = H / 2 + 1, R = Math.min(W, H) / 2 - 1;
+    ctx.clearRect(0, 0, W, H);
+    // the boat, bow up
+    ctx.fillStyle = 'rgba(160,180,190,.25)'; ctx.beginPath(); ctx.moveTo(cx, cy - R * 0.85); ctx.quadraticCurveTo(cx + R * 0.32, cy - R * 0.1, cx + R * 0.2, cy + R * 0.8); ctx.lineTo(cx - R * 0.2, cy + R * 0.8); ctx.quadraticCurveTo(cx - R * 0.32, cy - R * 0.1, cx, cy - R * 0.85); ctx.fill();
+    // reference tabs, ±28° off the bow
+    ctx.strokeStyle = '#9fb3bf'; ctx.lineWidth = 2;
+    for (const s of [-1, 1]) { const a = (s * 28 - 90) * D2R; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55); ctx.lineTo(cx + Math.cos(a) * R * 0.95, cy + Math.sin(a) * R * 0.95); ctx.stroke(); }
+    // the vane: points into the apparent wind (arel: + from starboard)
+    const a = (u.arel - 90) * D2R, tip = { x: cx + Math.cos(a) * R * 0.95, y: cy + Math.sin(a) * R * 0.95 }, tail = { x: cx - Math.cos(a) * R * 0.6, y: cy - Math.sin(a) * R * 0.6 };
+    ctx.strokeStyle = '#ff5a3c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+    ctx.fillStyle = '#ff5a3c'; ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(tip.x - Math.cos(a - 0.45) * 6, tip.y - Math.sin(a - 0.45) * 6); ctx.lineTo(tip.x - Math.cos(a + 0.45) * 6, tip.y - Math.sin(a + 0.45) * 6); ctx.fill();
+    ctx.fillRect(tail.x - 2.5, tail.y - 2.5, 5, 5);
+  }
+
   private sigKey = '';
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
@@ -154,10 +173,10 @@ export class Hud {
     $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Just sail' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
       u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
-    $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1) + ' kt';
-    $('hdg').textContent = String(Math.round(u.h) % 360).padStart(3, '0');
+    $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
+    this.windex(u);
     const poleTxt = u.pole === 'set' ? (u.poleTack === u.tack ? ' · wing' : '') : u.pole === 'setting' ? ' · poling' : u.pole === 'stowing' ? ' · stowing' : '';
-    $('tackLab').textContent = (u.tack === 'S' ? 'Starboard' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt);
+    $('tackLab').textContent = (u.tack === 'S' ? 'Stbd' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt || ` · ${Math.round(Math.abs(u.awa))}°`);
     const bp = $('bPole');
     bp.textContent = u.pole === 'down' ? 'Pole out' : u.pole === 'set' ? 'Pole in' : u.pole === 'setting' ? 'Poling…' : 'Stowing…';
     bp.classList.toggle('on', u.pole === 'set' || u.pole === 'setting');
@@ -166,7 +185,7 @@ export class Hud {
     $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
     // the sea where you are: chop height (what slows you), and the swell
     { const s = u.sea, ft = (m: number) => (m / 0.3048).toFixed(1) + ' ft';
-      $('seaVal').textContent = s.hsW < 0.03 && s.hsS < 0.03 ? 'Flat' : ft(s.hsW);
+      $('seaVal').textContent = s.hsW < 0.03 && s.hsS < 0.03 ? 'Flat' : (s.hsW / 0.3048).toFixed(1);
       $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · swell ${ft(s.hsS)}` : ''); }
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
@@ -176,7 +195,7 @@ export class Hud {
       sl.textContent = ww.kt.toFixed(0) + ' kt on water' + (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : '');
       sl.className = 'sub' + (k > 1.08 ? ' lift' : '');
     }
-    this.situation(w, u); this.lineBox(w, u); this.dial(u); this.map(w, u);
+    this.situation(w, u); this.lineBox(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
   }
 
   /** How each sail is drawing, in words, with what to do about it. */

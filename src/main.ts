@@ -233,8 +233,14 @@ $('tpMore').onclick = () => openLines();
 let coachT = 0;
 function renderCoach(): void {
   const r = coach(w.user), esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  $('coachSum').textContent = r.summary;
-  $('coachBody').innerHTML = r.items.map(i => `<div class="coach-item${i.ok ? '' : ' fix'}"><b>${esc(i.head)}</b>${esc(i.text)}</div>`).join('');
+  const acts = r.actions, crew = !w.user.manualTrim;
+  $('coachSum').textContent = acts.length ? `${acts.length} thing${acts.length > 1 ? 's' : ''} worth fixing` : 'Nothing to fix';
+  // underway: short action items, biggest gain first; the full explanation only when paused (you can't read paragraphs and steer)
+  let html = acts.length
+    ? `<ol class="coach-acts">${acts.map(a => `<li><span class="gain">+${(a.gain * 100).toFixed(a.gain < 0.01 ? 1 : 0)}%</span>${a.who === 'crew' ? '<span class="who">crew</span>' : ''}${esc(a.text)}</li>`).join('')}</ol>`
+    : `<p class="coach-ok">Trim's right. ${crew ? 'The crew has it.' : 'Keep it there.'}</p>`;
+  html += w.paused ? r.items.map(i => `<div class="coach-item${i.ok ? '' : ' fix'}"><b>${esc(i.head)}</b>${esc(i.text)}</div>`).join('') : '<p class="coach-more">Pause (Esc) to read why.</p>';
+  $('coachBody').innerHTML = html;
 }
 $('bCoach').onclick = () => { const p = $('coachPanel'); p.hidden = !p.hidden; if (!p.hidden) renderCoach(); };
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };

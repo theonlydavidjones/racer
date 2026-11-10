@@ -15,10 +15,11 @@ export interface Settings {
   sea: 'real' | 'flat'; // waves: real (from the wind, the fetch, the current and the buoy swell) or flat water
   swellDay: 0 | 1 | 2;
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
-  traffic: 0 | 1; // ship traffic through the race area // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
+  traffic: 0 | 1; // ship traffic through the race area
+  windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one) // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1 };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0 };
 
 const KEY = 'fbsim-settings-v2';
 

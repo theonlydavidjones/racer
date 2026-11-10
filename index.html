@@ -15,11 +15,11 @@
 <div id="labels"></div>
 
 <header id="hud">
-  <div class="pod clock"><span class="lab" id="clockLab">Start in</span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
-  <div class="pod"><span class="lab">Boatspeed</span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0 kt</span></div>
-  <div class="pod"><span class="lab">Heading</span><span class="val" id="hdg">000</span><span class="sub" id="tackLab">Starboard</span></div>
-  <div class="pod"><span class="lab">Wind</span><span class="val" id="twd">270</span><span class="sub" id="shiftLab">12 kt</span></div>
-  <div class="pod"><span class="lab">Sea</span><span class="val" id="seaVal">Flat</span><span class="sub" id="seaSub">no waves</span></div>
+  <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
+  <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
+  <div class="pod windex"><span class="lab">Windex</span><canvas id="windexDial" aria-label="Windex: the apparent wind at the masthead"></canvas><span class="sub" id="tackLab">Starboard</span></div>
+  <div class="pod"><span class="lab">TWD <i>°T</i></span><span class="val" id="twd">270</span><span class="sub" id="shiftLab">12 kt</span></div>
+  <div class="pod"><span class="lab">Sea <i>ft</i></span><span class="val" id="seaVal">Flat</span><span class="sub" id="seaSub">no waves</span></div>
 </header>
 <canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas>
 <canvas id="dial" aria-label="Wind angle dial"></canvas>
@@ -109,7 +109,9 @@
       <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (rulebook)</button><button type="button" data-v="1">One turn</button></div>
       <small>The Racing Rules default is two turns (Rule 44.1). Some sailing instructions change it to one; check yours. Crossing the Seaweed Soup line mid-race is always two turns.</small></div>
     <div class="field"><span>Training aids</span>
-      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div></div>
+      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div>
+      <div class="seg" data-k="windDial"><button type="button" data-v="0">No wind-angle dial</button><button type="button" data-v="1">Show the wind-angle dial</button></div>
+      <small>The wind-angle dial (true and apparent wind around a boat outline) doesn't exist on a real boat; the windex and the telltales do. It's hidden by default.</small></div>
     <div class="btnrow"><button class="ghost" id="bPreview" type="button">View the course</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
     <div class="btnrow"><button class="ghost" id="bKeys1" type="button">Keyboard settings</button></div>
     <div class="help">

@@ -1,6 +1,6 @@
 import type { Boat } from './boat';
 import { IDEAL_HELM, heelFactor, rudderDrag } from './balance';
-import { CAR_FORE_PINS, CAR_IN_PINS, loadedCar, targetShape, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, loadedCar, shapeEfficiency, targetShape, type Shape } from './controls';
 import { hullResistance } from './dynamics';
 import { sailPlan } from './physics';
 import { SAILS } from './trim';
@@ -12,7 +12,9 @@ import { SAILS } from './trim';
  */
 
 export interface CoachItem { head: string; text: string; ok: boolean }
-export interface CoachReport { summary: string; items: CoachItem[] }
+/** A thing to do, with the speed it's worth (fraction: 0.02 = 2%). `who`: you, or the crew (what they're working on). */
+export interface CoachAction { text: string; gain: number; who: 'you' | 'crew' }
+export interface CoachReport { summary: string; items: CoachItem[]; actions: CoachAction[] }
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const deg = (x: number) => `${Math.round(x)}°`;
@@ -44,6 +46,43 @@ function shapeAdvice(sail: 'main' | 'jib', s: Shape, t: Shape, mineToFix: boolea
   else if (dt < -3) out.push({ ok: false, text: `Leech too tight: ${twTxt}; the top telltales stall. ${sail === 'main' ? verb(upwind ? (heavy ? 'Ease the mainsheet to open the leech, and drop the traveller rather than pull it up: in a breeze the twist and the lower boom both help.' : 'Ease the mainsheet a touch and pull the traveller up to keep the boom where it was, or ease the vang.') : 'Ease the vang.', 'The crew eases the sheet or vang.') : verb('Move the jib car aft a pin.', 'The crew moves the car aft.')}` });
   else out.push({ ok: true, text: `Twist is right: ${twTxt}.` });
   return out;
+}
+
+/**
+ * What to do now, ranked by the speed it's worth. Speed goes as the square root of drive, so a fraction of drive
+ * lost costs about half that fraction of speed.
+ */
+export function actions(b: Boat): CoachAction[] {
+  const out: CoachAction[] = [], you = b.manualTrim, all = b.trimAll && you, tws = b.ww.kt, awa = b.awa, upwind = b.twa < 70;
+  const who = (mine: boolean): 'you' | 'crew' => (mine ? 'you' : 'crew');
+  if (b.luff) return [{ text: 'Sails eased right out (luffing): trim in to go', gain: 0.5, who: 'you' }];
+  // steering: both sails luffing upwind means pinching
+  const tm = b.trim.main, tj = b.trim.jib;
+  if (upwind && tm.flow === 'luffing' && (!tj || tj.flow === 'luffing')) out.push({ text: `Bear away ~${Math.round(Math.max(3, -tm.err - 1))}°: both sails luffing`, gain: 0.5 * (1 - (SAILS.main.share * tm.eff + SAILS.jib.share * (tj?.eff ?? 1))), who: 'you' });
+  else for (const [name, t] of [['Main', tm], ['Jib', tj]] as const) {
+    if (!t || Math.abs(awa) > 115 || t.flow === 'good') continue;
+    const share = name === 'Main' ? SAILS.main.share : SAILS.jib.share, gain = 0.5 * share * (1 - t.eff);
+    out.push({ text: t.flow === 'luffing' ? `${name}: trim in ~${Math.round(-t.err - 1)}°` : `${name}: ease ~${Math.round(t.err - 2)}°`, gain, who: who(you) });
+  }
+  // shape, one dimension at a time: what fixing it is worth
+  const shapeItems = (sail: 'main' | 'jib', sh: Shape | null, share: number) => {
+    if (!sh) return;
+    const tg = targetShape(sail, tws, awa), now = shapeEfficiency(sh, tg), M = sail === 'main' ? 'Main' : 'Jib';
+    const fix = (k: keyof Shape) => 0.5 * share * (shapeEfficiency({ ...sh, [k]: tg[k] }, tg) - now);
+    const dd = sh.depth - tg.depth, dr = sh.draft - tg.draft, dt = sh.twist - tg.twist;
+    if (Math.abs(dd) > 0.008) out.push({ text: dd > 0 ? (sail === 'main' ? 'Flatten the main: outhaul, backstay on' : 'Flatten the jib: backstay on') : (sail === 'main' ? 'More power: ease outhaul, backstay' : 'Fuller jib: ease backstay'), gain: fix('depth'), who: who(all) });
+    if (Math.abs(dr) > 0.03) out.push({ text: dr > 0 ? `${M} draft aft: ${sail === 'main' ? 'Cunningham' : 'jib Cunningham'} on` : `${M} draft forward: ease ${sail === 'main' ? 'Cunningham' : 'jib Cunningham'}`, gain: fix('draft'), who: who(all) });
+    if (Math.abs(dt) > 2.5) out.push({ text: sail === 'main'
+      ? (dt > 0 ? (upwind ? 'Close the main leech: sheet in, traveller up' : 'Vang on: the main is twisting off') : (upwind ? (tws >= 13 ? 'Open the leech: ease sheet, traveller down' : 'Open the leech: ease sheet, traveller up') : 'Ease the vang'))
+      : (dt > 0 ? 'Jib car forward a pin (next tack)' : 'Jib car aft a pin (next tack)'), gain: fix('twist'), who: who(all) });
+  };
+  shapeItems('main', b.shape.main, SAILS.main.share); shapeItems('jib', b.shape.jib, SAILS.jib.share);
+  // balance
+  const v = Math.max(0.5, b.v), hn = b.helmNeed ?? 0, heel = b.heelMag ?? 0;
+  if (hn > 4) out.push({ text: `Weather helm ${Math.round(hn)}°: backstay on, traveller down`, gain: 0.5 * rudderDrag(Math.min(12, hn), v) / Math.max(1, hullResistance(v)) + 0.003, who: who(all) });
+  else if (hn < -1.5) out.push({ text: `Lee helm ${Math.round(-hn)}°: traveller up, ease backstay`, gain: 0.5 * rudderDrag(hn, v) / Math.max(1, hullResistance(v)) + 0.003, who: who(all) });
+  if (upwind && heel > 21) out.push({ text: `Heeling ${Math.round(heel)}°: depower`, gain: 1 - heelFactor(heel), who: who(all) });
+  return out.filter(a => a.gain > 0.002).sort((a, b2) => b2.gain - a.gain).slice(0, 5);
 }
 
 export function coach(b: Boat): CoachReport {
@@ -93,7 +132,7 @@ export function coach(b: Boat): CoachReport {
 
   const bad = items.filter(i => !i.ok).length;
   const summary = bad === 0 ? `${you ? 'Your trim' : 'The crew\'s trim'} is right for ${R.name}.` : `${bad} thing${bad > 1 ? 's' : ''} to look at.`;
-  return { summary, items };
+  return { summary, items, actions: actions(b) };
 }
 
 /** Why the crew chose their settings for this sail, in a sentence. */
