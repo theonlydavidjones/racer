@@ -158,7 +158,7 @@ interface Ribbon { geom: THREE.BufferGeometry; anchor: THREE.Vector3; phase: num
 export interface BoatMesh {
   grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: Sail; jib: Sail;
   jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
-  pole: THREE.Mesh; ribbons: Ribbon[];
+  pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
@@ -296,6 +296,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   }
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; rig.add(pole);
+  // ... and stowed when it isn't: on the foredeck, a little to starboard of the centreline, from abreast the mast
+  // forward, in two deck chocks (the usual place on a small keelboat without lifelines, clear of the jib's tack)
+  const stowed = new THREE.Group();
+  { const z0 = -1.22, z1 = -3.35, x = 0.18, yAt = (z: number) => deckY(uAtZ(z), x) + 0.035, len = Math.hypot(z1 - z0, yAt(z1) - yAt(z0));
+    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT); sp.rotation.x = Math.PI / 2 - Math.atan2(yAt(z1) - yAt(z0), z0 - z1);
+    sp.position.set(x, (yAt(z0) + yAt(z1)) / 2, (z0 + z1) / 2); stowed.add(sp);
+    for (const zc of [z0 - 0.25, z1 + 0.25]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.06), MAT.dark); ch.position.set(x, deckY(uAtZ(zc), x) + 0.02, zc); stowed.add(ch); }
+  }
+  grp.add(stowed);
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
@@ -352,7 +361,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false };
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -425,7 +434,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
 function syncPole(m: BoatMesh, on: boolean): void {
-  m.pole.visible = on;
+  m.pole.visible = on; m.stowedPole.visible = !on;
   if (!on) return;
   const clew = tmpA.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position);
   const d = tmpB.copy(clew).sub(POLE_INBOARD), len = d.length();
