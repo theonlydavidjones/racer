@@ -432,3 +432,5 @@ details.adjust > *{margin-top:8px}
 .fslip.off{color:var(--muted)}
 .fslip input{accent-color:var(--accent);width:18px;height:18px}
 .chip.on{border-color:var(--accent);color:var(--accent)}
+/* keyboard settings open from the pause screen (and the start page): always on top of them */
+#keysView{z-index:60}

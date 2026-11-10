@@ -395,12 +395,18 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
   if (m.flags.length) {
-    // the fly streams downwind of the halyard, fluttering harder in more wind; in light air it droops
-    const k = Math.min(1, b.aws / 8);
+    // the fly streams downwind of the halyard in gentle travelling waves (a little quicker as the breeze builds, never a
+    // flicker: about one wave a second at most, a long wavelength, a small amplitude); in light air it droops
+    const k = Math.min(1, b.aws / 10), kk = Math.min(1, b.aws / 25);
     for (const f of m.flags) {
       const p = f.mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array;
       f.mesh.rotation.y = m.windex.rotation.y - Math.PI / 2;
-      for (let i = 0; i < a.length; i += 3) { const x = f.base[i]; a[i + 2] = Math.sin(x * 9 / f.fly * 1.4 - t * (8 + 6 * k)) * 0.035 * x / f.fly * (0.4 + k); a[i + 1] = f.base[i + 1] - (1 - k) * x * 0.5; }
+      const ph = t * (3.5 + 3 * kk) + f.fly * 3; // (each flag its own phase)
+      for (let i = 0; i < a.length; i += 3) {
+        const x = f.base[i], u = x / f.fly;
+        a[i + 2] = (Math.sin(u * 4.2 - ph) * 0.8 + Math.sin(u * 2.3 - ph * 0.6 + 1.3) * 0.35) * 0.028 * u * (0.5 + 0.5 * k);
+        a[i + 1] = f.base[i + 1] - (1 - k) * x * 0.5;
+      }
       p.needsUpdate = true;
     }
   }
