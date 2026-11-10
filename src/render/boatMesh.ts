@@ -9,7 +9,7 @@ import { buildCrew, syncCrew, type Crew } from './crew';
 import { burgeeCanvas } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, HEEL, L, RUDDER_RAKE, cabinGeometry, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, HEEL, L, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cockpitLid, topsidesPatch, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -48,6 +48,29 @@ const MAT = {
 /** Rig points below were laid out for a deck 0.42 m above the water; the hull's real freeboard is about 0.18 m more. */
 const RIG_LIFT = 0.18;
 
+/**
+ * Paint by height, per pixel, so the lines are crisp: bottom paint, the boot stripe, the topsides (paintLines in
+ * hull.ts). The vertex colours carry only the light and shade of the laps. `rudder`: the blade's own frame is raked
+ * and turns, so its height is taken in the boat's frame.
+ */
+function paintMaterial(m: THREE.MeshPhongMaterial, top: THREE.Color, boot: THREE.Color, bottom: THREE.Color, rudder = false): THREE.MeshPhongMaterial {
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { uTop: { value: top }, uBoot: { value: boot }, uBottom: { value: bottom }, uL: { value: L }, uRake: { value: rudder ? RUDDER_RAKE : 0 }, uHeel: { value: new THREE.Vector2(HEEL.y, HEEL.z) },
+      uLines: { value: new THREE.Vector4(PAINT_LINES.wl, PAINT_LINES.wlRise, PAINT_LINES.stripe, PAINT_LINES.stripeRise) } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uRake; uniform vec2 uHeel; varying vec2 vPaint;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        ${rudder ? 'vPaint = vec2(uHeel.x + position.y * cos(uRake) - position.z * sin(uRake), uHeel.y + position.y * sin(uRake) + position.z * cos(uRake));' : 'vPaint = vec2(position.y, position.z);'}`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uTop; uniform vec3 uBoot; uniform vec3 uBottom; uniform float uL; uniform vec4 uLines; varying vec2 vPaint;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float e = pow(2.0 * vPaint.y / uL, 2.0), wl = uLines.x + uLines.y * e, tp = uLines.x + uLines.z + (uLines.y + uLines.w) * e;
+        float aw = max(fwidth(vPaint.x) * 0.6, 0.0006);
+        vec3 paintC = mix(uBottom, mix(uBoot, uTop, smoothstep(tp - aw, tp + aw, vPaint.x)), smoothstep(wl - aw, wl + aw, vPaint.x));
+        diffuseColor.rgb *= paintC;`);
+  };
+  m.customProgramCacheKey = () => 'hullpaint' + (rudder ? 'R' : 'H');
+  return m;
+}
+
 /** Hull, deck, cabin, cockpit, rudder and tiller, painted for this boat. The rudder group turns about its hinge. */
 function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const F = FLEET[b.id] ?? FLEET[1], glass = b.build.hull === 'fiberglass', paint = b.paint ?? F.paint;
@@ -55,7 +78,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const hullMat = glass
     ? reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x777777, shininess: 75 }), 0.14) // glossy gelcoat, reflecting the sky
     : reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: b.hullColor === '#9a6a36' ? 60 : 25 }), b.hullColor === '#9a6a36' ? 0.08 : 0.04); // painted or varnished planking
-  grp.add(new THREE.Mesh(hullGeometry({ topsides: C(b.hullColor), boot: C(boot), bottom: C(paint.bottom) }), hullMat));
+  paintMaterial(hullMat, C(b.hullColor), C(boot), C(paint.bottom));
+  grp.add(new THREE.Mesh(hullGeometry(), hullMat));
+  // the sea is never drawn inside the hull: a lid over the cockpit at deck level, in the depth buffer only (drawn after
+  // the boat and before the water, which scene.ts draws last of the solid things)
+  const lid = new THREE.Mesh(cockpitLid(), new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
   const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
@@ -98,10 +125,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const turn = new THREE.Group(); rud.add(turn);
   const rg = rudderGeometry();
   // the blade: bottom paint below the boot stripe, topsides colour above (fixed paint line in the boat's frame)
-  const pos = rg.blade.attributes.position, cols: number[] = [], cr = Math.cos(RUDDER_RAKE), sr = Math.sin(RUDDER_RAKE);
-  for (let i = 0; i < pos.count; i++) { const y = HEEL.y + pos.getY(i) * cr - pos.getZ(i) * sr, c = y < 0.04 ? C(paint.bottom) : y < 0.1 ? C(boot) : C(b.hullColor); cols.push(c.r, c.g, c.b); }
+  const cols = new Float32Array(rg.blade.attributes.position.count * 3).fill(1);
   rg.blade.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-  turn.add(new THREE.Mesh(rg.blade, hullMat));
+  turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
   grp.add(rud);
   // an outboard on its transom bracket, tilted up (port quarter, clear of the rudder, the tiller and the ensign staff)
@@ -118,12 +144,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     const ctx = cv.getContext('2d')!; ctx.fillStyle = nameColor(b.hullColor, paint.boot); ctx.font = 'italic 600 64px Georgia, "Times New Roman", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(paint.boatName, 256, 50);
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
-    const fr = hullFrame(0.84, 0.13);
-    const n = fr.normal.clone(); if (n.x < 0) n.negate(); n.x *= s; // outward on this side
-    const nm = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.17), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
-    const up = new THREE.Vector3(0, 1, 0), right = new THREE.Vector3().crossVectors(up, n).normalize(), up2 = new THREE.Vector3().crossVectors(n, right);
-    nm.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up2, n));
-    nm.position.set(s * fr.pos.x, fr.pos.y, fr.pos.z).addScaledVector(n, 0.03); grp.add(nm);
+    // painted on the planking: the patch follows the planks and their laps (it's built on the starboard side; mirrored to port, read the other way)
+    const y0 = hullFrame(0.84, 0.13).pos.y - 0.085, geo = topsidesPatch(0.84, y0, y0 + 0.17, 0.9);
+    if (s < 0) { geo.scale(-1, 1, 1); const uv = geo.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); geo.index!.array.reverse(); geo.computeVertexNormals(); }
+    const nm = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    grp.add(nm);
   }
   return turn;
 }
@@ -229,11 +254,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // Your own sails are slightly see-through, as Dacron is in daylight, so the leeward telltales show through.
   // Dacron sails: crosscut panel seams, the class letter, and the sail number on the main (starboard side higher, RRS
   // Appendix G), each side its own picture so the numbers read the right way round from both sides
-  const sm = (side: 'front' | 'back', main: boolean) => new THREE.MeshLambertMaterial({
-    map: sailTexture(b.sailColor, main ? b.no : '', side === 'back', main), side: side === 'front' ? THREE.FrontSide : THREE.BackSide,
-    transparent: b.isUser, opacity: b.isUser ? 0.86 : 1
+  // Each side of the cloth has its own picture, by which way it faces (the sail mesh is mirrored to the boom's side,
+  // which swaps the faces: syncBoatMesh puts the right picture on each face)
+  const pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true), mainPort: sailTexture(b.sailColor, b.no, 'port', true), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
+  const sm = (side: 'front' | 'back', map: THREE.Texture) => new THREE.MeshLambertMaterial({
+    map, side: side === 'front' ? THREE.FrontSide : THREE.BackSide, transparent: b.isUser, opacity: b.isUser ? 0.86 : 1
   });
-  const sailMat = sm('front', true), sailBack = sm('back', true), jibMat = sm('front', false), jibBack = sm('back', false);
+  const sailMat = sm('front', pics.mainStbd), sailBack = sm('back', pics.mainPort), jibMat = sm('front', pics.jibStbd), jibBack = sm('back', pics.jibPort);
+  sailPics.set(sailMat, { front: sailMat, back: sailBack, stbd: pics.mainStbd, port: pics.mainPort });
+  sailPics.set(jibMat, { front: jibMat, back: jibBack, stbd: pics.jibStbd, port: pics.jibPort });
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, -0.6); rig.add(boomPivot);
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
   const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT, sailBack); boomPivot.add(main.mesh);
@@ -376,6 +405,11 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   m.main.update(mainShape); m.jib.update(jibShape);
   m.main.mesh.scale.x = Math.sign(b.boom || 1);
   m.jib.mesh.scale.x = Math.sign(b.jib || 1);
+  // the cloth's front face looks along the mesh's +x, which the mirroring turns to starboard (+1) or port (−1)
+  for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, Math.sign(b.jib || 1)]] as const) {
+    const mats = sail.mesh.material as THREE.MeshLambertMaterial[], pr = sailPics.get(mats[0]);
+    if (pr) { const want = sgn > 0 ? pr.stbd : pr.port, other = sgn > 0 ? pr.port : pr.stbd; if (pr.front.map !== want) { pr.front.map = want; pr.back.map = other; } }
+  }
   if (b.isUser) {
     const st = b.luff ? { windward: 'lift' as TellState, leeward: 'hang' as TellState } : luffTellStates(plan === 'jib' ? tj : null, b.awa);
     const amt = tj?.amount ?? 0, mirJ = m.jib.mesh.scale.x < 0;
@@ -451,28 +485,50 @@ function syncLines(m: BoatMesh, b: Boat): void {
 }
 
 /**
- * A sail's picture (u: luff → leech, v: foot → head): sailcloth, crosscut seams, and on the main the class letter
- * near the head and the sail number, starboard side above port. `mirror` draws the other side's view.
+ * A sail's picture (u: luff → leech, v: foot → head): sailcloth, crosscut seams, and on the main the class insignia
+ * (the letter F), the national letters and the sail number, as the class rules lay them down (NFIA class rules 9.14:
+ * as in the Racing Rules' Appendix G): the insignia above the national letters, the national letters above the number,
+ * figures at least 300 mm high and 200 mm wide with a 40 mm stroke and 60 mm between them, in a sans-serif face, all
+ * above the arc 60% of the leech length from the head, and the starboard side's set higher than the port side's so
+ * they don't sit back to back. `side`: which side of the sail this picture is seen from. Sizes are in metres on the real sail.
  */
-function sailTexture(color: string, no: string, mirror: boolean, main: boolean): THREE.CanvasTexture {
-  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+/** Which picture goes on which face of a sail's cloth (by the front material). */
+const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
+function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean): THREE.CanvasTexture {
+  // seen from starboard the leech is on your left, so that side's picture is drawn mirrored to read the right way round
+  const mirror = side === 'stbd';
+  const W = main ? 512 : 256, H = main ? 2048 : 512, c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
   const dark = lum(color) < 0.3; // black sails: lighter seams, white numbers
   g.fillStyle = color; g.fillRect(0, 0, W, H);
   // crosscut panels: seams across the sail, roughly square to the leech
-  g.strokeStyle = dark ? 'rgba(200,200,200,.16)' : 'rgba(120,115,100,.28)'; g.lineWidth = 2;
-  for (let i = 1; i < (main ? 12 : 8); i++) { const y = H - i * H / (main ? 12 : 8); g.beginPath(); g.moveTo(0, y + 10); g.lineTo(W, y - 6); g.stroke(); }
+  g.strokeStyle = dark ? 'rgba(200,200,200,.16)' : 'rgba(120,115,100,.28)'; g.lineWidth = main ? 4 : 2;
+  for (let i = 1; i < (main ? 12 : 8); i++) { const y = H - i * H / (main ? 12 : 8); g.beginPath(); g.moveTo(0, y + 10 * H / 512); g.lineTo(W, y - 6 * H / 512); g.stroke(); }
   if (main && no) {
-    const put = (txt: string, v: number, size: number, col: string) => {
-      g.save(); g.translate(mirror ? W : 0, 0); g.scale(mirror ? -1 : 1, 1);
-      g.fillStyle = col; g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(txt, W * 0.42, H * (1 - v)); g.restore();
+    const pxV = H / MAIN_LUFF; // canvas px per metre up the sail
+    /** One line of figures, centred at height fraction t, each figure 0.30 m × 0.20 m (a "1" or "I" narrower), 0.06 m apart. */
+    const line = (txt: string, t: number, col: string) => {
+      const chord = MAIN_FOOT * (1 - t), pxU = W / chord; // px per metre across the sail at this height
+      const glyphs = [...txt].filter(ch => ch !== ' '), widths = glyphs.map(ch => (ch === '1' || ch === 'I' ? 0.09 : 0.2));
+      const total = widths.reduce((a, w) => a + w, 0) + 0.06 * (glyphs.length - 1) + (txt.includes(' ') ? 0.12 : 0);
+      let x = 0.46 * chord - total / 2; // metres from the luff: a little forward of the middle of the cloth at this height
+      g.fillStyle = col;
+      glyphs.forEach((ch, k) => {
+        const size = 0.3 * pxV * 1.37; // a bold sans-serif's cap height is about 0.73 of its em
+        g.save(); g.font = `bold ${size}px "Helvetica Neue", Arial, sans-serif`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+        const m = g.measureText(ch), sx = (widths[k] * pxU) / Math.max(1, m.width);
+        const cx = (x + widths[k] / 2) * pxU, xx = mirror ? W - cx : cx, y = H * (1 - t) + 0.15 * pxV;
+        g.translate(xx, y); g.scale(sx * (mirror ? -1 : 1), 1); g.fillText(ch, -m.width / 2, 0); g.restore();
+        x += widths[k] + 0.06;
+      });
     };
-    put('F', 0.84, 58, dark ? '#e8edf5' : '#1d3f8f'); // the class letter near the head
-    // starboard side (the front of the cloth) carries the number higher than the port side
-    put(no.replace(/^US\s+/, 'USA '), mirror ? 0.5 : 0.6, no.length > 8 ? 30 : 36, dark ? '#f2f2ee' : '#20242c');
+    const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
+    const step = 0.36 / MAIN_LUFF, top = side === 'stbd' ? 0.805 : 0.735; // the starboard set higher, the port set 0.58 m lower (RRS G1.3)
+    line('F', top, dark ? '#e8edf5' : '#1d3f8f'); // the class insignia
+    if (letters) line(letters, top - step, ink);
+    line(digits, top - step * (letters ? 2 : 1), ink);
   }
-  const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 8;
   return t;
 }
 

@@ -78,9 +78,17 @@ function hullPoint(u: number, p: number): THREE.Vector3 { const q = sectionPoint
 export interface HullPaint { topsides: THREE.Color; boot: THREE.Color; bottom: THREE.Color }
 
 /** The hull shell (both sides), clinker planked, painted: bottom paint below the waterline, a boot stripe, topsides. */
-export function hullGeometry(paint: HullPaint): THREE.BufferGeometry {
+/**
+ * The paint lines, struck level the way a yard marks them, with the usual slight rise toward the bow and the stern:
+ * the top of the bottom paint (just above the waterline), and the top of the boot stripe. y as a function of z.
+ */
+export const PAINT_LINES = { wl: 0.045, wlRise: 0.035, stripe: 0.065, stripeRise: 0.02 };
+export const paintLines = (z: number) => { const e = (2 * z / L) ** 2; return { wl: PAINT_LINES.wl + PAINT_LINES.wlRise * e, top: PAINT_LINES.wl + PAINT_LINES.stripe + (PAINT_LINES.wlRise + PAINT_LINES.stripeRise) * e }; };
+
+/** The shell's geometry; its vertex colours are only the light and shade of the laps (the paint is per pixel: boatMesh.ts). */
+export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
-  const colorAt = (y: number) => (y < 0.04 ? paint.bottom : y < 0.1 ? paint.boot : paint.topsides);
+  const white = new THREE.Color(1, 1, 1), colorAt = (_y: number) => white;
   // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel
   type Row = { p: number; lap: number; shade?: number }[];
   const strips: Row[] = [];
@@ -279,6 +287,44 @@ export function rudderGeometry(): { blade: THREE.BufferGeometry; tiller: THREE.B
 export function hullFrame(u: number, p: number): { pos: THREE.Vector3; normal: THREE.Vector3 } {
   const a = hullPoint(u, p), du = hullPoint(u + 0.005, p).sub(hullPoint(u - 0.005, p)), dp = hullPoint(u, p + 0.005).sub(hullPoint(u, Math.max(0, p - 0.005)));
   return { pos: a, normal: new THREE.Vector3().crossVectors(du, dp).normalize().multiplyScalar(-1) };
+}
+
+/** A point on the planked surface (with the lap of the plank it's on), for things that sit on the planking. */
+export function lappedPoint(u: number, p: number): THREE.Vector3 {
+  const pt = hullPoint(u, p);
+  if (p >= 0.8) return pt;
+  const k = Math.min(STRAKES - 1, Math.floor(p / 0.8 * STRAKES)), p0 = 0.8 * k / STRAKES, p1 = 0.8 * (k + 1) / STRAKES;
+  const f = u / Math.max(0.01, uMax(p)), lap = LAP * ((p - p0) / (p1 - p0)) * Math.min(1, f / 0.04, (1 - f) / 0.03);
+  if (lap > 0) { const q = hullPoint(u, Math.min(0.8, p + 0.01)), dx = pt.x - q.x, dy = pt.y - q.y, l = Math.hypot(dx, dy) || 1; pt.x += (-dy / l) * lap; pt.y += (dx / l) * lap; }
+  return pt;
+}
+/** p (girth position) at station u for a height y on the topsides (between the sheer and the turn of the bilge). */
+function pAtY(u: number, y: number): number {
+  let lo = 0, hi = 0.6;
+  for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (sectionPoint(u, m).y > y) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+/**
+ * A patch of the starboard topsides that follows the planking, laps and all, for paint on it (her name): centred at
+ * station uc, from height y0 to y1, `width` m long. UVs run 0..1 aft→forward-reading along it and bottom→top.
+ */
+export function topsidesPatch(uc: number, y0: number, y1: number, width: number, nu = 48, nv = 36): THREE.BufferGeometry {
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
+    const u = uc + (i / nu - 0.5) * width / L, y = y0 + (y1 - y0) * j / nv, pt = lappedPoint(u, pAtY(u, y));
+    const fr = hullFrame(u, pAtY(u, y)); pt.addScaledVector(fr.normal.x < 0 ? fr.normal.clone().negate() : fr.normal, 0.003); // a hair off the paint
+    pos.push(pt.x, pt.y, pt.z); uv.push(1 - i / nu, j / nv); // bow is −z: the text reads forward to aft on the starboard side
+  }
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+
+/** A lid over the cockpit at deck level (drawn into the depth buffer only): the sea is never drawn inside the hull. */
+export function cockpitLid(): THREE.BufferGeometry {
+  const { u0, u1 } = COCKPIT, N = 16, pos: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= N; i++) { const u = u0 + (u1 - u0) * i / N, w = cockpitHalf(u) + 0.02, y = deckY(u, w) + 0.01; pos.push(-w, y, zAt(u), w, y, zAt(u)); }
+  for (let i = 0; i < N; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3, a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); return g;
 }
 
 /** Station u for a z position (m, aft positive). */

@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person } from '../boat/crewPhys';
-import { COCKPIT, cabinTopY, cockpitHalf, deckY, halfBeam, uAtZ } from './hull';
+import { CABIN, COCKPIT, L, cabinTopY, cockpitHalf, deckY, halfBeam, uAtZ } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -105,8 +105,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       f.root.visible = true; return;
     }
     if (mode === 'foredeck' || mode === 'downwind') z = lerp(1.2, 0.5, fore) - i * 0.5;
-    u = uAtZ(Math.max(0.6, z)); z = Math.max(0.6, z);
-    const edge = halfBeam(u) - (mode === 'hike' ? 0.06 + 0.08 * (1 - hike) : 0.16), inCockpit = Math.abs(x) < 0.7;
+    // in the cockpit: between its forward end and the helm; up on the rail: anywhere along the side deck abreast the cabin
+    const inCockpit = Math.abs(x) < 0.7, zFwd = -L / 2 + COCKPIT.u0 * L + 0.32, zAft = 2.7 - 0.55 - 0.5 * i;
+    z = inCockpit ? Math.min(zAft, Math.max(zFwd, z)) : Math.min(zAft, Math.max(-L / 2 + CABIN.u0 * L, z)); u = uAtZ(z);
+    const edge = halfBeam(u) - (mode === 'hike' ? 0.06 + 0.08 * (1 - hike) : 0.16);
     px = x * edge * (inCockpit ? 0.85 : 1);
     py = inCockpit ? deckY(u, cockpitHalf(u)) - COCKPIT.sole * 0.45 : deckY(u, Math.abs(px)) + 0.04;
     face = (px >= 0 ? 1 : -1) * Math.PI / 2; // facing inboard

@@ -12,7 +12,7 @@ export interface BoatSpec {
   id: string; // stable, for your list of boats
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
-  deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (wooden boats)
+  deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
   sails: { country: string; number: string; color: 'white' | 'black' };
   flags: { burgee: string; ensign: string; special: string }; // '' = none
   perf: {
@@ -50,7 +50,7 @@ export const BOTTOM_COLORS: [string, string][] = [
   ['Black', '#2a2d33'], ['Dark blue', '#1f2a44'], ['Blue', '#2b4f8f'], ['Light blue', '#6a93c0'], ['Red', '#7a2420'], ['Bright red', '#a8322a'],
   ['Green', '#2f5a3a'], ['Copper', '#9a5a2e'], ['Grey', '#5d6168'], ['White', '#e8e6e0']
 ];
-/** Laid teak decks (wooden boats): weathered silver-grey, or oiled and polished. */
+/** Laid teak decks (wooden boats, and glassfibre ones with teak laid over): weathered silver-grey, or oiled and polished. */
 export const TEAK_DECKS: [string, string][] = [['Silvered teak', 'teak-silver'], ['Polished teak', 'teak-polished']];
 
 /** World Sailing national sail letters (RRS Appendix G), for the countries that sail Folkboats and a few more. */
@@ -71,7 +71,6 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
   };
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
-    if (spec.deck.startsWith('teak')) spec.deck = d.deck;
   }
   spec.sails.number = String(spec.sails.number).replace(/\D/g, '').slice(0, 5) || d.sails.number;
   spec.perf.cleanedWeeks = Math.max(0, Math.min(26, Math.round(Number(spec.perf.cleanedWeeks) || 0)));

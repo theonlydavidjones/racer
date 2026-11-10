@@ -265,7 +265,7 @@ export class SceneView {
     wgeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(wg.pos.length / 3 * 2), 2));
     wgeo.setIndex(new THREE.BufferAttribute(wg.index, 1));
     const water = this.water = new THREE.Mesh(wgeo, waterMat) as unknown as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>;
-    water.frustumCulled = false; water.receiveShadow = true; scene.add(water);
+    water.frustumCulled = false; water.receiveShadow = true; water.renderOrder = 2; scene.add(water); // after the boats and their cockpit lids (boatMesh.ts)
 
     this.wakes = new Wakes(scene);
     this.moorings = new Moorings(scene, p => landAt(p) === false);

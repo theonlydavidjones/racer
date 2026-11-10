@@ -176,7 +176,7 @@ export class BoatPanel {
     const seg = (act: string, opts: [string, string][], cur: string) => `<div class="seg">${opts.map(([v, n]) => `<button type="button" data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join('')}</div>`;
     const name = (list: [string, string][], c: string) => list.find(x => x[1] === c)?.[0] ?? '';
     const upperList = wood ? [...HULL_COLORS, BRIGHT_FINISH] : HULL_COLORS;
-    const deckList = wood ? [...TEAK_DECKS, ...HULL_COLORS] : HULL_COLORS;
+    const deckList = [...TEAK_DECKS, ...HULL_COLORS]; // laid teak on glassfibre decks too (a common refit)
     const opt = (cur: string, list: { id: string; name: string }[], none: string) => `<option value="">${none}</option>` + list.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${x.name}</option>`).join('');
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
     this.el.innerHTML = `
@@ -203,7 +203,7 @@ export class BoatPanel {
         <div class="field"><span>Bottom paint · ${name(BOTTOM_COLORS, b.hull.lower)}</span>${sw('lower', BOTTOM_COLORS, b.hull.lower)}</div>
       </section>
       <section><h3>Deck</h3>
-        <div class="field"><span>${name(deckList, b.deck)}</span>${sw('deck', deckList, b.deck)}${wood ? '' : '<small>Laid teak is for wooden boats.</small>'}</div>
+        <div class="field"><span>${name(deckList, b.deck)}</span>${sw('deck', deckList, b.deck)}${wood ? '' : '<small>Teak laid over the glassfibre deck, as many owners have done.</small>'}</div>
       </section>
       <section><h3>Sails</h3>
         <div class="field"><span>Sail number</span><div class="row2">
