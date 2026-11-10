@@ -5,6 +5,7 @@ import { bow, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
 import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. */
 export const PENALTY_TURN_RATE = 10;
@@ -103,7 +104,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let target = polar(ww.kt, twa, plan);
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
-  else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib));
+  else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff); // sheet angles, then the sails' shape
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)));
@@ -136,23 +137,53 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
 }
 
 /**
- * Work the sheets: the crew trims each sail toward its best sheet angle at a human pace, reacting to the
- * apparent wind with a short lag (so a quick luff or bear-away shows on the telltales before they catch
- * up); or you trim with the sheet buttons. Then work out how each sail is drawing.
+ * Work the sheets and every other control. The crew trims each sail toward its best sheet angle at a human
+ * pace, reacting to the apparent wind with a short lag (so a quick luff or bear-away shows on the telltales
+ * before they catch up), and sets the other controls for the conditions; or you do it yourself. The jib sheet
+ * comes in on a winch, slower as the breeze builds. Then work out each sail's angle of attack and shape.
  */
+type Ctl = Exclude<keyof Controls, 'car'>;
 function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
-  for (const name of ['main', 'jib'] as const) {
-    const spec = SAILS[name];
-    if (b.manualTrim && b.isUser) b.sheets[name] += b.sheetCmd[name] * spec.handRate * dt;
-    else {
-      const d = optimalSheet(name, b.awaSlow) - b.sheets[name];
-      b.sheets[name] += Math.sign(d) * Math.min(Math.abs(d), spec.crewRate * dt);
-    }
-    b.sheets[name] = clamp(b.sheets[name], spec.min, spec.max);
+  const c = b.ctl, tws = b.ww.kt, you = b.isUser;
+  const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const d = to - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * dt); };
+  const hand = (k: Ctl, rate = CONTROL_RATE[k]) => { const cmd = b.ctlCmd[k] ?? 0; c[k] = clamp(c[k] + cmd * rate * dt, k === 'traveller' ? -1 : 0, 1); };
+  const wantMain = optimalSheet('main', b.awaSlow), wantJib = optimalSheet('jib', b.awaSlow);
+  // the crew works out its settings about once a second, for the conditions as they see them
+  if (!b.crewPlan || !(b.crewPlanT! > 0)) { b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewPlan ?? undefined); b.crewPlanT = 1; }
+  b.crewPlanT = (b.crewPlanT ?? 0) - dt;
+  const t = b.crewPlan;
+  const crewAll = !(you && b.trimAll);
+  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) {
+    if (crewAll) move(k, t[k]); else hand(k);
   }
+  // the lazy (windward) jib car: the crew sets it for the next tack; you set it with the car controls
+  if (crewAll) { const lazy = c.car[b.tack]; lazy.fore = t.carFore; lazy.ins = t.carIn; }
+  // sheets: you, or the crew (traveller and mainsheet together, for the boom angle and the leech tension)
+  if (b.manualTrim && you) {
+    hand('mainsheet');
+    const j = b.ctlCmd.jibsheet ?? 0; hand('jibsheet', CONTROL_RATE.jibsheet * winchFactor(tws, j < 0));
+    if (crewAll) move('traveller', t.traveller); else hand('traveller');
+  } else {
+    move('traveller', t.traveller);
+    move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
+    const je = jibsheetFor(wantJib, c, b.tack);
+    move('jibsheet', je, CONTROL_RATE.jibsheet * winchFactor(tws, je < c.jibsheet));
+  }
+  b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);
+  b.sheets.jib = clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max);
   b.trim.main = sailTrim('main', awa, b.sheets.main);
   b.trim.jib = plan === 'jib' ? sailTrim('jib', awa, b.sheets.jib) : null; // poled out or down: the sheet isn't in play
+  // shape
+  const ms = mainShape(c, tws), js = plan === 'jib' ? jibShape(c, tws, b.tack) : null;
+  const em = shapeEfficiency(ms, targetShape('main', tws, awa)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa)) : 1;
+  b.shape = { main: ms, jib: js, eff: js ? SAILS.main.share * em + SAILS.jib.share * ej : em };
+}
+
+/** Move the lazy (windward) jib car one pin: fore–aft (+1 aft) or athwartships (+1 outboard). You can't move the loaded one. */
+export function moveLazyCar(b: Boat, fore: number, ins: number): void {
+  const lazy = b.ctl.car[b.tack];
+  lazy.fore = clamp(lazy.fore + fore, 0, CAR_FORE_PINS - 1); lazy.ins = clamp(lazy.ins + ins, 0, CAR_IN_PINS - 1);
 }
 
 /** Apparent wind: wind over the water minus the boat's motion through it. aws in m/s, arel signed (+ from starboard). */

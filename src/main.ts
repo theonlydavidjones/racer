@@ -248,8 +248,8 @@ function applyHeld(): void {
   u.steer = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0);
   u.luff = held.has('luff') || $('bLuff').classList.contains('on');
   if (u.manualTrim) {
-    u.sheetCmd.main = (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0);
-    u.sheetCmd.jib = (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0);
+    u.sheetCmd.main = u.ctlCmd.mainsheet = (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0);
+    u.sheetCmd.jib = u.ctlCmd.jibsheet = (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0);
   }
 }
 function setView(i: number): void {
