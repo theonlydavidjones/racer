@@ -1,5 +1,6 @@
 import { V, brg, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
+import { onLand } from '../geo/shore';
 import type { RulesMark } from '../rules/types';
 
 /* ---------- file format (see course.schema.json) ---------- */
@@ -7,8 +8,12 @@ export interface MarkDef {
   name: string;
   lat?: number; lon?: number;
   from?: 'lineCenter'; bearing?: number; distance?: number;
-  shape?: 'cylinder' | 'sphere';
+  /** How it's drawn: a racing inflatable (sphere, cylinder), a yellow column, a lighted navigation buoy, or an island. */
+  shape?: MarkShape;
+  /** Colours of a column or lighted buoy, top to bottom: R, G, Y (e.g. "RGR": red with a green band). */
+  look?: string;
 }
+export type MarkShape = 'cylinder' | 'sphere' | 'column' | 'lighted' | 'island';
 export interface LineEndDef { label: string; kind?: 'shore' | 'boat' | 'buoy'; lat?: number; lon?: number; mark?: string; verify?: string }
 export interface StartLineDef {
   committee: LineEndDef;
@@ -22,6 +27,9 @@ export interface LegDef { mark: string; type: 'round' | 'pass'; side: 'starboard
 export interface ObstructionDef { kind: 'startFinishLine'; when?: 'racing'; penalty?: 'twoTurns'; note?: string }
 export interface CourseFile {
   id: string; order?: number; title: string; area?: string; source?: string; notes?: string;
+  /** Heading in the course picker. */
+  group?: string;
+  distanceNm?: number;
   windBase: number;
   marks: Record<string, MarkDef>;
   startLine: StartLineDef;
@@ -35,7 +43,8 @@ export type Side = 's' | 'p';
 export interface CourseMark extends RulesMark {
   key: string; // mark id in the file, e.g. "X"
   side: Side;
-  shape: 'cylinder' | 'sphere';
+  shape: MarkShape;
+  look: string;
   leg: 'beat' | 'reach' | 'run'; // point of sail on the leg to this mark, for the course's typical wind
   prev: Vec; next: Vec; // where boats come from / go to
   dir: Vec; // pass marks: direction of travel
@@ -72,6 +81,20 @@ const markPos = (m: MarkDef, center: Vec | null): Vec => {
   return LL(m.lat, m.lon);
 };
 
+/** How far an island's shore runs out from a point on it, in 36 ten-degree sectors (the widest of three rays each). */
+function islandReach(p: Vec): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < 36; i++) {
+    let r = 0;
+    for (const db of [-5, 0, 5]) {
+      const u = V(i * 10 + db);
+      for (let d = 0; d < 1500; d += 10) if (onLand({ x: p.x + u.x * d, y: p.y + u.y * d })) r = Math.max(r, d + 10);
+    }
+    out.push(r);
+  }
+  return out;
+}
+
 /** Turn a course file into the runtime course. `fleet` is the number of opponents; `bias` rotates an adjustable line. */
 export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
   const sl = f.startLine;
@@ -97,7 +120,8 @@ export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
     const p = posCache[leg.mark] ??= markPos(def, lineCenter);
     return {
       key: leg.mark, name: def.name, p, type: leg.type, side: leg.side === 'starboard' ? 's' : 'p',
-      shape: def.shape ?? 'cylinder', beat: false, leg: 'reach',
+      shape: def.shape ?? 'cylinder', look: def.look ?? 'Y', beat: false, leg: 'reach',
+      ...(def.shape === 'island' ? { reach: islandReach(p) } : {}),
       prev: p, next: p, dir: { x: 0, y: 1 }, sv: { x: 0, y: 0 }, r: { x: 0, y: 0 }
     };
   });

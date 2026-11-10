@@ -75,9 +75,14 @@
     <div class="field"><span>Mode</span>
       <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button><button type="button" data-v="sail">Just sail</button></div>
       <small id="modeNote"></small></div>
-    <div class="field"><span>Course</span>
-      <div class="seg" data-k="course"><!-- filled from src/courses/data/*.json --></div></div>
+    <div class="field" id="courseField"><span>Course</span>
+      <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select></div>
     <div class="coursecard" id="courseCard"></div>
+    <div class="field" id="sailField" hidden><span>Start from</span>
+      <select id="sailFromSel" class="pick" aria-label="Start from"></select>
+      <span>Sail to</span>
+      <select id="sailToSel" class="pick" aria-label="Sail to"></select>
+      <small>The compass, laylines, map and the readout above the controls all measure to where you're heading.</small></div>
     <div class="field"><span>Wind (westerly)</span>
       <div class="seg" data-k="windKt"><button type="button" data-v="0">Afternoon westerly</button><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div>
       <div class="seg" data-k="windDay" id="windDaySeg"><button type="button" data-v="0">Light day</button><button type="button" data-v="1">Typical day</button><button type="button" data-v="2">Windy day</button></div>

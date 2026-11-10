@@ -1,5 +1,7 @@
 import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { bow, type Boat } from '../boat/boat';
+import type { CourseMark } from '../courses/course';
+import { PLACES } from '../sim/places';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
 import { sailPlan } from '../boat/physics';
@@ -91,7 +93,7 @@ export class Hud {
     }
     marker(from, '#6fb7ff', 'wind', true);
     const m = w.nextMark(u);
-    if (m) marker(brg(m.p.x - u.x, m.p.y - u.y), '#ffd21a', m.name.split(' ')[0], true);
+    if (m) marker(brg(m.p.x - u.x, m.p.y - u.y), '#ffd21a', m.key === 'dest' ? 'DEST' : m.name.split(' ')[0], true);
     // the lubber line and the heading
     ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
     ctx.fillStyle = '#ffb35c'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(Math.round(n360(h))).padStart(3, '0') + '°', cx + 22, 13);
@@ -298,7 +300,18 @@ export class Hud {
       const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
       el.hidden = false; el.className = '';
-      el.textContent = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%` + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
+      const speed = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%`;
+      const d = w.dest;
+      if (d && w.arrivedT == null) {
+        // to the destination: range and bearing, your speed made good toward it over the ground (with the current), and how long at that rate
+        const rng = dist(u, d.p), b = brg(d.p.x - u.x, d.p.y - u.y), vmc = (u.vx * (d.p.x - u.x) + u.vy * (d.p.y - u.y)) / Math.max(1, rng);
+        const eta = vmc > 0.1 ? rng / vmc : Infinity, nm = rng / 1852;
+        el.innerHTML = `<b>${d.name}</b> · ${nm < 0.2 ? Math.round(rng) + ' m' : nm.toFixed(2) + ' nm'} at ${String(Math.round(b)).padStart(3, '0')}° · `
+          + (vmc > 0.05 ? `making ${(vmc / KT).toFixed(1)} kt toward it${isFinite(eta) ? ` · ${eta < 60 ? 'under a minute' : eta < 3600 ? Math.round(eta / 60) + ' min' : (eta / 3600).toFixed(1) + ' h'}` : ''}` : 'sailing away from it')
+          + `<br><small>${speed}</small>`;
+        return;
+      }
+      el.textContent = speed + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
       return;
     }
     el.hidden = false;
@@ -354,6 +367,7 @@ export class Hud {
     const W = wd.C.base;
     let tf: Tf, scale: number, ctr = { x: u.x, y: u.y };
     if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
+    else if (wd.freeSail) { scale = Math.min(w, h) / 2800; tf = makeTf(u.x, u.y, W, scale, w, h); } // just sailing: the water around you, about 1.5 nm across
     else {
       const pts = [wd.pin, wd.committee].concat(wd.C.marks.map(m => m.p));
       const rot = (p: { x: number; y: number }) => { const r = Math.hypot(p.x, p.y), be = Math.atan2(p.x, p.y) - W * D2R; return { x: Math.sin(be) * r, y: Math.cos(be) * r }; };
@@ -371,8 +385,9 @@ export class Hud {
       const half = Math.max(w, h) / scale * 0.75, mid = ctr;
       drawCurrentArrows(ctx, tf, p => wd.currentAt(p), mid.x, mid.y, half, Math.max(60, half / 4), 9, onLand);
     }
-    drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1);
-    if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), 450);
+    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h);
+    else drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1);
+    if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), wd.freeSail ? 2500 : 450);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     for (const v of wd.vessels) {
       const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);
@@ -399,5 +414,29 @@ export class Hud {
       ctx.fillStyle = '#6fd0ff'; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
       ctx.textAlign = 'right'; ctx.fillText('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6);
     }
+  }
+}
+
+/**
+ * Just sailing, on the map: the buoys around you, and where you're heading. If that's off the map, an arrow at the
+ * edge points to it.
+ */
+function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number): void {
+  for (const pl of PLACES) if (pl.buoy) {
+    const s = tf(pl.p.x, pl.p.y);
+    ctx.fillStyle = 'rgba(255,210,26,.55)'; ctx.beginPath(); ctx.arc(s[0], s[1], 2.2, 0, 6.29); ctx.fill();
+  }
+  if (!dest) return;
+  const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
+  ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,210,26,.7)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+  if (inside) {
+    ctx.fillStyle = '#ffd21a'; ctx.beginPath(); ctx.moveTo(b[0], b[1] - 6); ctx.lineTo(b[0] + 5, b[1]); ctx.lineTo(b[0], b[1] + 6); ctx.lineTo(b[0] - 5, b[1]); ctx.closePath(); ctx.fill();
+  } else {
+    // pinned to the edge of the map, pointing the way
+    const dx = b[0] - a[0], dy = b[1] - a[1], k = Math.min((w / 2 - 12) / Math.abs(dx || 1e-6), (h / 2 - 12) / Math.abs(dy || 1e-6));
+    const ex = a[0] + dx * k, ey = a[1] + dy * k, ang = Math.atan2(dy, dx);
+    ctx.fillStyle = '#ffd21a'; ctx.beginPath(); ctx.moveTo(ex + Math.cos(ang) * 7, ey + Math.sin(ang) * 7);
+    ctx.lineTo(ex + Math.cos(ang + 2.5) * 7, ey + Math.sin(ang + 2.5) * 7); ctx.lineTo(ex + Math.cos(ang - 2.5) * 7, ey + Math.sin(ang - 2.5) * 7); ctx.closePath(); ctx.fill();
   }
 }

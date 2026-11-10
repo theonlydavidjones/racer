@@ -32,6 +32,8 @@ export interface RulesMark {
   beat: boolean;
   /** Side to leave it on: 's' starboard, 'p' port. */
   side?: 's' | 'p';
+  /** An island mark: how far its shore runs out from `p`, by ten-degree sector (see markDist). */
+  reach?: number[];
 }
 
 export interface RulesContext {

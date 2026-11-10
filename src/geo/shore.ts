@@ -1,5 +1,6 @@
 import { inPoly, segPt, type Vec } from '../core/math';
-import { LL } from './geo';
+import { LAT0, LL, LON0 } from './geo';
+import mask from './data/shore-mask.json';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation).
 // TODO: replace with clipped NOAA ENC / OpenStreetMap coastline data.
@@ -16,7 +17,33 @@ export const SHORE: Vec[] = SHORE_LL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
 export const LAND: Vec[] = SHORE.concat([LL(37.790, -122.4000), LL(37.790, -122.4790)]);
 
-export const onLand = (p: Vec): boolean => inPoly(p, LAND);
+const inCityfront = (p: Vec): boolean => inPoly(p, LAND);
+
+/*
+ * Beyond the Cityfront (Alcatraz, Angel Island, the Marin shore, Treasure Island, the city east of North Beach):
+ * the real coastline from the terrain, in 50 m cells. The Cityfront itself is the hand-drawn shore above, which
+ * has the marinas and breakwaters in it.
+ */
+const M = mask as { south: number; north: number; west: number; east: number; nx: number; ny: number; rows: number[][] };
+const GRID = (() => {
+  const g = new Uint8Array(M.nx * M.ny);
+  M.rows.forEach((runs, j) => { let i = 0, v = 0; for (const n of runs) { if (v) g.fill(1, j * M.nx + i, j * M.nx + i + n); i += n; v ^= 1; } });
+  return g;
+})();
+const MLAT = 111320, MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
+const CF = { x0: LL(0, -122.4800).x, x1: LL(0, -122.4000).x, y0: LL(37.780, 0).y, y1: LL(37.8150, 0).y };
+function inTerrain(p: Vec): boolean {
+  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
+  const i = Math.floor((lon - M.west) / (M.east - M.west) * M.nx), j = Math.floor((M.north - lat) / (M.north - M.south) * M.ny);
+  return i >= 0 && j >= 0 && i < M.nx && j < M.ny && GRID[j * M.nx + i] === 1;
+}
+
+/** The terrain land grid, for drawing maps: cells, bounds, and whether a cell is inside the hand-drawn Cityfront area. */
+export const landGrid = () => ({ ...M, grid: GRID, cityfront: { south: 37.79, north: 37.815, west: -122.48, east: -122.40 } });
+
+/** Is this point land a boat would run aground on? */
+export const onLand = (p: Vec): boolean =>
+  p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : inTerrain(p) || inCityfront(p);
 
 export function shoreDist(p: Vec): number {
   let m = 1e9;

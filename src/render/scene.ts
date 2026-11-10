@@ -2,6 +2,8 @@ import './three-setup';
 import * as THREE from 'three';
 import { D2R, V, ZONE } from '../core/math';
 import type { World } from '../sim/world';
+import type { MarkShape } from '../courses/course';
+import { PLACES } from '../sim/places';
 import { Puffs, TerrainGrid } from '../environment/wind';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { sunPosition } from '../environment/sun';
@@ -315,10 +317,41 @@ export class SceneView {
     this.buildCourse(w);
   }
 
+  /** A buoy on the water, leaning and trailing a wake in the current (see update). */
+  private addMark(add: (o: THREE.Object3D) => THREE.Object3D, p: { x: number; y: number }, shape: MarkShape, look: string): void {
+    if (!this.wakeTex) {
+      // a mark's wake: a V of foam trailing downstream, fading out
+      const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d')!;
+      for (let i = 0; i < 140; i++) {
+        const y = Math.random() * 128, spread = 4 + y * 0.42, side = Math.random() < 0.5 ? -1 : 1, x = 32 + side * spread * (0.75 + Math.random() * 0.3);
+        g.fillStyle = `rgba(255,255,255,${(0.75 * (1 - y / 128)).toFixed(2)})`; g.fillRect(x, y, 1.5 + Math.random() * 2, 1.5 + Math.random() * 3);
+      }
+      this.wakeTex = new THREE.CanvasTexture(c);
+    }
+    const float = markBody(shape, look);
+    float.position.copy(P3(p.x, p.y, 0)); add(float);
+    const big = shape === 'lighted' ? 1.6 : 1;
+    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshBasicMaterial({ map: this.wakeTex, transparent: true, depthWrite: false }));
+    wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(p.x, p.y, 0.12)); add(wake);
+    this.markObjs.push({ p, float, wake });
+  }
+
   private buildCourse(w: World): void {
     this.courseObjs.forEach(o => this.scene.remove(o)); this.courseObjs = [];
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.courseObjs.push(o); return o; };
     const C = w.C, aids = !!w.settings.aids;
+    this.markObjs = [];
+    if (w.freeSail) {
+      // just sailing: no race course, only the buoys that are really out there
+      this.signal = null;
+      for (const pl of PLACES) if (pl.buoy) this.addMark(add, pl.p, pl.buoy.shape, pl.buoy.look ?? 'Y');
+      if (w.dest && !PLACES.some(pl => pl.buoy && pl.p === w.dest!.p) && aids) {
+        // a spot rather than a buoy: a faint ring on the water where you're heading
+        const ring = new THREE.Mesh(new THREE.RingGeometry(38, 40, 64), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(w.dest.p.x, w.dest.p.y, 0.3)); add(ring);
+      }
+      return;
+    }
     if (C.committeeKind === 'boat') {
       const rc = new THREE.Group();
       const rh = new THREE.Mesh(new THREE.BoxGeometry(4, 1.6, 12), new THREE.MeshLambertMaterial({ color: 0xf0f0ea })); rh.position.y = 0.5; rc.add(rh);
@@ -336,27 +369,10 @@ export class SceneView {
       const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 1.8, 10), new THREE.MeshLambertMaterial({ color: 0xff7a1a })); pin.position.copy(P3(C.pin.x, C.pin.y, 0.6)); add(pin);
     }
     const drawn = new Set<string>();
-    this.markObjs = [];
-    if (!this.wakeTex) {
-      // a mark's wake: a V of foam trailing downstream, fading out
-      const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d')!;
-      for (let i = 0; i < 140; i++) {
-        const y = Math.random() * 128, spread = 4 + y * 0.42, side = Math.random() < 0.5 ? -1 : 1, x = 32 + side * spread * (0.75 + Math.random() * 0.3);
-        g.fillStyle = `rgba(255,255,255,${(0.75 * (1 - y / 128)).toFixed(2)})`; g.fillRect(x, y, 1.5 + Math.random() * 2, 1.5 + Math.random() * 3);
-      }
-      this.wakeTex = new THREE.CanvasTexture(c);
-    }
     C.marks.forEach(m => {
       if (drawn.has(m.name)) return; drawn.add(m.name);
-      const float = new THREE.Group();
-      const body = m.shape === 'sphere'
-        ? new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffd21a }))
-        : new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 2.4, 12), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
-      body.position.y = 0.8; float.add(body);
-      float.position.copy(P3(m.p.x, m.p.y, 0)); add(float);
-      const wake = new THREE.Mesh(new THREE.PlaneGeometry(4, 10), new THREE.MeshBasicMaterial({ map: this.wakeTex, transparent: true, depthWrite: false }));
-      wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(m.p.x, m.p.y, 0.12)); add(wake);
-      this.markObjs.push({ p: m.p, float, wake });
+      if (m.shape === 'island') return; // the island is the mark
+      this.addMark(add, m.p, m.shape, m.look);
       if (aids && m.type === 'round') {
         const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.25, ZONE + 0.25, 64), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
         ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(m.p.x, m.p.y, 0.3)); add(ring);
@@ -587,4 +603,32 @@ export class SceneView {
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.renderer.render(this.scene, camera);
   }
+}
+
+const MARK_COL: Record<string, number> = { R: 0xc8262b, G: 0x1f8a4c, Y: 0xffc21a };
+/**
+ * A mark as it looks on the water. Racing inflatables (a yellow sphere or cylinder); a yellow column (Blackaller,
+ * Hank Easom); or a lighted navigation buoy: a round float with a steel tower and a light on top, painted in its
+ * colours top to bottom (Harding Rock's red-green-red bands).
+ */
+function markBody(shape: string, look: string): THREE.Group {
+  const g = new THREE.Group(), lam = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+  const col = (i: number) => MARK_COL[look[Math.min(i, look.length - 1)]] ?? MARK_COL.Y;
+  if (shape === 'sphere') { const b = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), lam(0xffd21a)); b.position.y = 0.8; g.add(b); }
+  else if (shape === 'cylinder') { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 2.4, 12), lam(0xffc21a)); b.position.y = 0.8; g.add(b); }
+  else if (shape === 'column') {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 3.6, 14), lam(col(0))); b.position.y = 1.4; g.add(b);
+    const lt = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2b0 })); lt.position.y = 3.35; g.add(lt);
+  } else {
+    // the float, then a lattice tower drawn as four legs and the band panels, then the lantern
+    const n = look.length, H = 3.6;
+    const fl = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 1.1, 18), lam(col(n - 1))); fl.position.y = 0.3; g.add(fl);
+    for (let i = 0; i < n; i++) {
+      const h = H / n, pnl = new THREE.Mesh(new THREE.CylinderGeometry(0.55 + 0.35 * (i + 1) / n, 0.55 + 0.35 * (i + 2) / n, h, 4, 1, true), new THREE.MeshLambertMaterial({ color: col(i), side: THREE.DoubleSide }));
+      pnl.position.y = 0.85 + H - (i + 0.5) * h; pnl.rotation.y = Math.PI / 4; g.add(pnl);
+    }
+    const lt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.35, 8), new THREE.MeshBasicMaterial({ color: look[0] === 'G' ? 0xa8ffc0 : 0xffb0a8 })); lt.position.y = 0.85 + H + 0.2; g.add(lt);
+  }
+  g.traverse(o => { o.castShadow = true; });
+  return g;
 }

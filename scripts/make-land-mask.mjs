@@ -3,7 +3,8 @@
  * Make the land mask the wave model measures fetch against (open water upwind), from the terrain height map
  * (src/render/data/terrain.png, made by fetch-terrain.mjs): 100 m cells, land where any of the four 50 m
  * samples is above water. Rows run north to south, run-length encoded (alternating water and land counts,
- * starting with water). No network.
+ * starting with water). Also a 50 m mask (every terrain sample) for running aground beyond the Cityfront
+ * (src/geo/data/shore-mask.json). No network.
  *
  *   node scripts/make-land-mask.mjs
  */
@@ -48,3 +49,16 @@ await writeFile(new URL('../src/environment/data/land-mask.json', import.meta.ur
   note: 'land mask, ~100 m cells; rows north to south; run lengths alternating water, land, water, ... starting with water', rows
 }) + '\n');
 console.log(`land-mask.json ${nx}×${ny}, ${(100 * land / (nx * ny)).toFixed(0)}% land`);
+
+// the 50 m mask: what boats run aground on away from the Cityfront
+const rows50 = [];
+for (let y = 0; y < h; y++) {
+  const runs = []; let cur = 0, n = 0;
+  for (let x = 0; x < w; x++) { const v = px[y * w + x] > 0 ? 1 : 0; if (v === cur) n++; else { runs.push(n); cur = v; n = 1; } }
+  runs.push(n); rows50.push(runs);
+}
+await writeFile(new URL('../src/geo/data/shore-mask.json', import.meta.url), JSON.stringify({
+  source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx: w, ny: h,
+  note: 'land (above 0.5 m) in 50 m cells; rows north to south; run lengths alternating water, land, ... starting with water', rows: rows50
+}) + '\n');
+console.log(`shore-mask.json ${w}×${h}`);

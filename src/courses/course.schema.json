@@ -10,6 +10,8 @@
     "area": { "type": "string" },
     "source": { "type": "string" },
     "notes": { "type": "string", "description": "Shown on the setup screen." },
+    "group": { "type": "string", "description": "Heading in the course picker." },
+    "distanceNm": { "type": "number", "description": "Nominal length of the course." },
     "windBase": { "type": "number", "description": "Typical true wind direction (deg) for this course." },
     "marks": {
       "type": "object",
@@ -21,7 +23,8 @@
           "name": { "type": "string" },
           "lat": { "type": "number" }, "lon": { "type": "number" },
           "from": { "const": "lineCenter" }, "bearing": { "type": "number" }, "distance": { "type": "number" },
-          "shape": { "enum": ["cylinder", "sphere"] }
+          "shape": { "enum": ["cylinder", "sphere", "column", "lighted", "island"], "description": "island: the mark is land (rounding it, boats keep clear of its shore)." },
+          "look": { "type": "string", "description": "Colours top to bottom for column/lighted marks: R, G, Y, e.g. RGR." }
         }
       }
     },

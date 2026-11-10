@@ -1,4 +1,4 @@
-import { V, ZONE, brg, dist, wrap } from '../core/math';
+import { V, ZONE, brg, markDist, wrap } from '../core/math';
 import { clearAstern } from './geometry';
 import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
 
@@ -24,7 +24,7 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   if (r3 && A.leg === r3.idx && B.leg === r3.idx) {
     const mk = ctx.marks[r3.idx], z = ZONE * 1.4;
     const T = r3.tacker === A.id ? A : B, O = T === A ? B : A;
-    if (r3.binds && dist(A, mk.p) < z && dist(B, mk.p) < z && T.tack === 'S' && !T.tacking && O.tack === 'S' && !O.tacking && !clearAstern(A, B) && !clearAstern(B, A)) return { kc: T, rule: '18.3' };
+    if (r3.binds && markDist(A, mk) < z && markDist(B, mk) < z && T.tack === 'S' && !T.tacking && O.tack === 'S' && !O.tacking && !clearAstern(A, B) && !clearAstern(B, A)) return { kc: T, rule: '18.3' };
   }
   // Rule 18.2(a): fixed when the first boat reached the zone; ends (18.2(b)) once the entitled boat passes
   // head to wind or leaves the zone. Rule 18 doesn't apply on opposite tacks on a beat (18.1(a)(1)).
@@ -41,7 +41,7 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   // Rule 18.2(c): when 18.2(a) doesn't apply (it ended under 18.2(b)) and the boats are overlapped with at least one in
   // the zone, the outside boat gives the inside boat mark-room.
   if (rec && rec.mark?.ended && !rec.r183 && A.leg === rec.mark.idx && B.leg === rec.mark.idx) {
-    const mk = ctx.marks[rec.mark.idx], dA = dist(A, mk.p), dB = dist(B, mk.p);
+    const mk = ctx.marks[rec.mark.idx], dA = markDist(A, mk), dB = markDist(B, mk);
     if ((A.tack === B.tack || !mk.beat) && Math.min(dA, dB) < ZONE && !clearAstern(A, B) && !clearAstern(B, A)) {
       const inside = dA < dB ? A : B;
       if (!noRoom18(inside.id)) return { kc: inside === A ? B : A, rule: '18.2(c)', mr: { ...rec.mark, overlapped: true, inside: inside.id } };

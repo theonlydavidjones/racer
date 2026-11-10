@@ -1,5 +1,6 @@
 import { D2R, HALF, ZONE } from '../core/math';
-import { LAND } from '../geo/shore';
+import { LAND, landGrid } from '../geo/shore';
+import { LL } from '../geo/geo';
 import type { Course } from '../courses/course';
 import type { Laylines } from '../sim/laylines';
 
@@ -13,7 +14,33 @@ export function makeTf(cx: number, cy: number, W: number, scale: number, w: numb
   };
 }
 
+let landImg: HTMLCanvasElement | null = null;
+/** The bay's land beyond the Cityfront as an image: the 50 m grid smoothed to clean coastlines. */
+function bayLand(): HTMLCanvasElement {
+  if (landImg) return landImg;
+  const L = landGrid(), cf = L.cityfront, small = document.createElement('canvas'); small.width = L.nx; small.height = L.ny;
+  const sg = small.getContext('2d')!, id = sg.createImageData(L.nx, L.ny);
+  for (let j = 0; j < L.ny; j++) for (let i = 0; i < L.nx; i++) {
+    const lat = L.north - (j + 0.5) / L.ny * (L.north - L.south), lon = L.west + (i + 0.5) / L.nx * (L.east - L.west);
+    const inCf = lat > cf.south && lat < cf.north && lon > cf.west && lon < cf.east; // drawn from the Cityfront shore instead
+    if (L.grid[j * L.nx + i] && !inCf) id.data[(j * L.nx + i) * 4 + 3] = 255;
+  }
+  sg.putImageData(id, 0, 0);
+  const k = 4, big = document.createElement('canvas'); big.width = L.nx * k; big.height = L.ny * k;
+  const bg = big.getContext('2d', { willReadFrequently: true })!; bg.imageSmoothingEnabled = true; bg.imageSmoothingQuality = 'high'; bg.filter = `blur(${k * 0.9}px)`; bg.drawImage(small, 0, 0, big.width, big.height); bg.filter = 'none';
+  const d = bg.getImageData(0, 0, big.width, big.height), px = d.data;
+  for (let q = 0; q < px.length; q += 4) { const on = px[q + 3] >= 128; px[q] = 0x4d; px[q + 1] = 0x5f; px[q + 2] = 0x4b; px[q + 3] = on ? 255 : 0; }
+  bg.putImageData(d, 0, 0);
+  return landImg = big;
+}
+
 export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
+  { // the rest of the bay: an image placed with the map's own transform
+    const L = landGrid(), img = bayLand(), at = (lat: number, lon: number) => { const p = LL(lat, lon); return tf(p.x, p.y); };
+    const p0 = at(L.north, L.west), p1 = at(L.north, L.east), p2 = at(L.south, L.west);
+    ctx.save(); ctx.transform((p1[0] - p0[0]) / img.width, (p1[1] - p0[1]) / img.width, (p2[0] - p0[0]) / img.height, (p2[1] - p0[1]) / img.height, p0[0], p0[1]);
+    ctx.drawImage(img, 0, 0); ctx.restore();
+  }
   ctx.fillStyle = '#4d5f4b'; ctx.beginPath();
   LAND.forEach((p, i) => { const s = tf(p.x, p.y); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
   ctx.closePath(); ctx.fill();

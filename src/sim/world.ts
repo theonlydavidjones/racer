@@ -1,7 +1,7 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, cross, dist, dot, n360, segPt, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
@@ -18,6 +18,7 @@ import { aiThink } from '../ai/ai';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
+import { destMark, place as getPlace } from './places';
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
@@ -142,6 +143,10 @@ export class World {
   startTimes: (number | null)[] = [];
   readonly startAt: number;
   readonly freeSail: boolean;
+  /** Just sail: where you're heading (a mark in all but name: the dials measure to it), or null. */
+  dest: CourseMark | null = null;
+  /** Just sail: when you got there (sim time), or null. */
+  arrivedT: number | null = null;
 
   constructor(file: CourseFile, settings: Settings, seed: number, opts: WorldOptions = {}) {
     this.settings = { ...settings };
@@ -170,7 +175,13 @@ export class World {
     }
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
-    this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), this.C.center);
+    if (this.freeSail) this.dest = destMark(getPlace(settings.sailTo));
+    { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
+      const from = getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
+      const c = this.freeSail ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
+      const half = this.freeSail ? Math.max(3000, dist(from, to) / 2 + 1500) : 3000;
+      this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2));
+    }
     this.updateBreeze();
     this.wind = windAt(this.windModel, this.t);
     this.avgFrom = this.windModel.base;
@@ -195,9 +206,17 @@ export class World {
     const lineH = brg(this.L.x, this.L.y);
     let p: Vec, h: number;
     if (isUser && this.freeSail) {
-      // open water out on the course, on a beam reach
-      p = place(-220, 0); h = n360(lineH + 180);
-      for (let k = 0; onLand(p) && k < 20; k++) p = place(-220 - 40 * k, 0);
+      // where you chose to start, on a beam reach: whichever way has more open water ahead
+      const at = getPlace(this.settings.sailFrom)?.p;
+      if (at) {
+        p = { ...at };
+        const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
+        const a = n360(this.windModel.base + 90), b = n360(this.windModel.base - 90);
+        h = room(a) >= room(b) ? a : b;
+      } else {
+        p = place(-220, 0); h = n360(lineH + 180);
+        for (let k = 0; onLand(p) && k < 20; k++) p = place(-220 - 40 * k, 0);
+      }
     } else if (isUser && this.startAt < 120) {
       // start practice: somewhere below the line, reaching along it, with a minute or so to go
       p = place(55 + r() * 45, (r() - 0.5) * this.lineLen * 0.6); h = n360(lineH + (r() < 0.5 ? 0 : 180));
@@ -258,7 +277,7 @@ export class World {
   lineD(p: Vec): number { return (p.x - this.center.x) * this.N.x + (p.y - this.center.y) * this.N.y; }
   /** Position along the line from its centre; positive toward the committee end. */
   lineA(p: Vec): number { return (p.x - this.center.x) * this.L.x + (p.y - this.center.y) * this.L.y; }
-  nextMark(b: Boat): CourseMark | null { return b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
+  nextMark(b: Boat): CourseMark | null { return this.freeSail ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   currentAt(p: Vec): Vec {
@@ -326,6 +345,7 @@ export class World {
     this.shipEncounters();
     this.checkPairs();
     if (!this.freeSail) this.signals(prevT);
+    else this.checkArrival();
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
@@ -382,12 +402,14 @@ export class World {
     const pinMark = C.marks.find(m => dist(m.p, C.pin) < 1);
     const pin: Touchable | null = C.pinKind === 'buoy' ? { name: C.pinLabel, p: C.pin, r: 0.9 }
       : pinMark ? { name: pinMark.name, p: C.pin, r: pinMark.shape === 'sphere' ? 1.2 : 1.0 } : null;
-    const mk = (i: number): Touchable => ({ name: C.marks[i].name, p: C.marks[i].p, r: C.marks[i].shape === 'sphere' ? 1.2 : 1.0 });
+    const R = { sphere: 1.2, cylinder: 1.0, column: 1.0, lighted: 1.6, island: 0 };
+    const mk = (i: number): Touchable | null => C.marks[i].shape === 'island' ? null : { name: C.marks[i].name, p: C.marks[i].p, r: R[C.marks[i].shape] }; // an island is land: boats run aground on it instead
     const cb = this.committeeHull; // the committee boat is a starting mark too (and a finishing mark)
     if (!b.started) { if (pin) out.push(pin); if (cb) out.push(cb); return out; } // a starting mark (the line begins the first leg)
     if (b.leg === 0) { if (pin) out.push(pin); if (cb) out.push(cb); }
-    if (b.leg >= 1) out.push(mk(b.leg - 1));
-    if (b.leg < n) out.push(mk(b.leg));
+    const push = (t: Touchable | null) => { if (t) out.push(t); };
+    if (b.leg >= 1) push(mk(b.leg - 1));
+    if (b.leg < n) push(mk(b.leg));
     else { if (pin) out.push(pin); if (cb) out.push(cb); } // finishing marks
     return out;
   }
@@ -442,9 +464,9 @@ export class World {
   private markProgress(b: Boat): void {
     const m = this.nextMark(b);
     if (!b.started || !m) return;
-    const md = dist(b, m.p);
+    const md = markDist(b, m);
     if (m.type === 'round') {
-      if (md < 75) {
+      if (md < (m.reach ? 250 : 75)) { // an island: anywhere off its shore counts
         // angle of the boat around the mark, measured from the outside of the rounding
         const ang = wrap((Math.atan2(b.y - m.p.y, b.x - m.p.x) - Math.atan2(m.r.y, m.r.x)) / D2R);
         if (b.prevAng != null && Math.abs(ang) < 75 && Math.abs(b.prevAng) < 75) {
@@ -636,6 +658,16 @@ export class World {
         else this.emit({ type: 'toast', ms: 3000, msg: `${b.name} was in the triangle in the last minute: ${b.scoring}.` });
       }
     }
+  }
+
+  /** Just sail: tell her when she gets to where she was going. */
+  private checkArrival(): void {
+    const d = this.dest, u = this.user;
+    if (!d || this.arrivedT != null || markDist(u, d) > 40) return;
+    this.arrivedT = this.t;
+    const m = Math.floor(this.t / 60), s = Math.round(this.t % 60);
+    this.emit({ type: 'toast', msg: `Arrived: ${d.name}, in ${m} min ${s} s. Choose somewhere new in Setup, or keep sailing.`, ms: 6000 });
+    this.emit({ type: 'horn', dur: 0.4 });
   }
 
   /* ---------- hails ---------- */

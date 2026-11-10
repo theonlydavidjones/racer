@@ -1,4 +1,4 @@
-import { LOA, V, ZONE, brg, dist, dot, segPt, wrap, type Vec } from '../core/math';
+import { LOA, V, ZONE, brg, markDist, dot, segPt, wrap, type Vec } from '../core/math';
 import { clearAstern, hullGap } from './geometry';
 import { rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
@@ -67,7 +67,7 @@ export function wideOfGybe(b: RulesBoat, idx: number, ctx: RulesContext): boolea
   const course = brg(next.p.x - mk.p.x, next.p.y - mk.p.y);
   const mustGybe = twaOf(b, ctx.windFrom) > 90 && Math.abs(wrap(ctx.windFrom - course)) > 60 && tackFor(course, ctx.windFrom) !== b.tack;
   if (!mustGybe) return false;
-  const d = dist(b, mk.p), away = d > 0 ? ((b.x - mk.p.x) * b.vx + (b.y - mk.p.y) * b.vy) / d : 0;
+  const d = markDist(b, mk), away = d > 0 ? ((b.x - mk.p.x) * b.vx + (b.y - mk.p.y) * b.vy) / d : 0;
   return d > 1.2 * LOA && away > 0.3;
 }
 
@@ -115,7 +115,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   const n = ctx.marks.length;
   // Mark-room (Rule 18.2(a)): fixed when the first boat reaches the zone (three lengths from the mark).
   if (A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round' && A.started && B.started) {
-    const mk = ctx.marks[A.leg], dA = dist(A, mk.p), dB = dist(B, mk.p);
+    const mk = ctx.marks[A.leg], dA = markDist(A, mk), dB = markDist(B, mk);
     // Rule 18.3 needs to know who has been on starboard since entering the zone.
     for (const [X, d] of [[A, dA], [B, dB]] as const) {
       if (d >= ZONE) delete rec.stbdInZone[X.id];
@@ -126,7 +126,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // Rule 18.2 then doesn't apply between her and a starboard-tack boat fetching the mark.
     for (const [T, O] of [[A, B], [B, A]] as const) {
       const seen = rec.seenTack[T.id];
-      if (seen != null && T.lastTackT > seen && T.tack === 'S' && mk.side === 'p' && dist(T, mk.p) < ZONE
+      if (seen != null && T.lastTackT > seen && T.tack === 'S' && mk.side === 'p' && markDist(T, mk) < ZONE
         && O.tack === 'S' && !O.tacking && fetching(O, mk, ctx)) {
         rec.r183 = { tacker: T.id, idx: A.leg, binds: rec.stbdInZone[O.id] === true }; rec.mark = null;
       }
@@ -142,7 +142,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     const m = rec.mark;
     if (m && !m.ended) {
       const E = (m.overlapped ? m.inside : m.ahead) === A.id ? A : B;
-      if (E.lastTackT > (m.tackT ?? -Infinity) || dist(E, mk.p) > ZONE + 2) m.ended = true;
+      if (E.lastTackT > (m.tackT ?? -Infinity) || markDist(E, mk) > ZONE + 2) m.ended = true;
     }
     if (dA > ZONE * 2.2 && dB > ZONE * 2.2) { rec.mark = null; rec.r183 = null; }
   } else {
@@ -157,7 +157,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     const tacker = ctx.t - A.lastTackT < JUST_TACKED + 1 ? A.id : ctx.t - B.lastTackT < JUST_TACKED + 1 ? B.id : null;
     let insideMark: number | null = null, markUnable = false, insideObst: number | null = null, obstUnable = false;
     if (A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
-      const mk = ctx.marks[A.leg], ins = dist(A, mk.p) < dist(B, mk.p) ? A : B, out = ins === A ? B : A;
+      const mk = ctx.marks[A.leg], ins = markDist(A, mk) < markDist(B, mk) ? A : B, out = ins === A ? B : A;
       insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
     }
     const com = ctx.t > 0 && A.started && B.started, oA = ctx.obstacle?.(A, com), oB = ctx.obstacle?.(B, com);

@@ -45,3 +45,14 @@ export function segCross(p1: Vec, p2: Vec, q1: Vec, q2: Vec): boolean {
   const d = (a: Vec, b: Vec, c: Vec) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
   return d(p1, p2, q1) * d(p1, p2, q2) < 0 && d(q1, q2, p1) * d(q1, q2, p2) < 0;
 }
+
+/**
+ * Distance from a point to a mark's edge. A buoy is a point; an island mark (Alcatraz) carries `reach`: how far its
+ * shore runs out from the mark's position, in 36 ten-degree sectors (bearing from the mark).
+ */
+export function markReach(mk: { p: Vec; reach?: number[] }, q: Vec): number {
+  if (!mk.reach) return 0;
+  const b = (Math.atan2(q.x - mk.p.x, q.y - mk.p.y) * 180 / Math.PI + 360) % 360, i = Math.floor(b / 10) % 36, f = b / 10 - Math.floor(b / 10);
+  return mk.reach[i] * (1 - f) + mk.reach[(i + 1) % 36] * f;
+}
+export const markDist = (q: Vec, mk: { p: Vec; reach?: number[] }): number => Math.max(0, Math.hypot(q.x - mk.p.x, q.y - mk.p.y) - markReach(mk, q));

@@ -8,7 +8,8 @@ What's planned, roughly in order. Done work is described in the README.
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). Later: wind bending along the shore, the AI sailing to the pressure, real wind for a past race day.
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail.
 - **GGYC and StFYC, and the start line.** Dial in the clubs' buildings and the GGYC flagpole (the inner end of the start line) on the spot. The course file has the flagpole at 37.80925 N; the city's building data puts the GGYC clubhouse at 37.8077 N.
-- **Real shoreline.** Replace the hand-traced Cityfront outline with real coastline data, and make Marin, Angel Island and Alcatraz solid (today they're scenery). The terrain is already real; Fort Mason's piers in the sim sit 50–130 m east of the real ones.
+- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (Fort Mason's piers in the sim sit 50–130 m east of the real ones), and Rule 20 hails at the islands (today only at the Cityfront).
+- **The Seaweed Soup courses** (done: all 41). Later: the race committee choosing the course from the wind and the tide on the day, and the numeric course flags (B1.4); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)
 

@@ -1,8 +1,9 @@
 import type { PrepFlag } from '../sim/signals';
 import { bow, type Boat } from '../boat/boat';
+import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatFor, targetFor } from '../boat/seaway';
-import { V, brg, clamp, cross, dist, dot, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
+import { V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
 import type { World } from '../sim/world';
@@ -54,13 +55,56 @@ export function aimPoint(w: World, b: Boat): Vec {
   }
   const M = m.p;
   if (m.type === 'pass') return { x: M.x + m.sv.x * 24, y: M.y + m.sv.y * 24 };
-  const d = dist(b, M);
+  // an island: aim off its shore, with a good berth for the rocks
+  const off = (u: Vec, k: number) => { const r = m.reach ? markReach(m, { x: M.x + u.x, y: M.y + u.y }) + ISLAND_BERTH : k; return { x: M.x + u.x * r, y: M.y + u.y * r }; };
+  const d = markDist(b, m);
+  let P: Vec;
   if (d > 35) {
-    const dx = (M.x - b.x) / d, dy = (M.y - b.y) / d;
-    const s = m.side === 's' ? { x: -dy, y: dx } : { x: dy, y: -dx };
-    return { x: M.x + s.x * 10, y: M.y + s.y * 10 };
+    const e = dist(b, M), dx = (M.x - b.x) / e, dy = (M.y - b.y) / e;
+    P = off(m.side === 's' ? { x: -dy, y: dx } : { x: dy, y: -dx }, 10);
+  } else P = off(m.r, 12);
+  return m.reach ? aroundIsland(m, b, P) : P;
+}
+
+const ISLAND_BERTH = 70;
+/**
+ * If land lies within the next 700 m toward P, the nearest heading either side of it with clear water (the side
+ * that comes back toward P sooner wins a tie); null when the way is clear. Upwind, the beat logic tacks along it.
+ */
+export function detour(b: Vec, P: Vec): Vec | null {
+  const D = dist(b, P), L = Math.min(D, 700), bP = brg(P.x - b.x, P.y - b.y);
+  const ray = (h: number, l: number) => { const u = V(h); return { x: b.x + u.x * l, y: b.y + u.y * l }; };
+  if (clearRun(b, ray(bP, L))) return null;
+  for (let dev = 10; dev <= 150; dev += 10) {
+    const c = [1, -1].map(s => ray(bP + s * dev, Math.min(L, 500))).filter(q => clearRun(b, q));
+    if (c.length) return c.sort((a, z) => dist(a, P) - dist(z, P))[0];
   }
-  return { x: M.x + m.r.x * 12, y: M.y + m.r.y * 12 };
+  return null;
+}
+/** Clear water all the way from a to b, with some room either side? */
+function clearRun(a: Vec, b: Vec): boolean {
+  const L = dist(a, b), ux = (b.x - a.x) / (L || 1), uy = (b.y - a.y) / (L || 1);
+  for (let s = 0; s <= L; s += 15) for (const k of [0, -25, 25]) if (onLand({ x: a.x + ux * s - uy * k, y: a.y + uy * s + ux * k })) return false;
+  return true;
+}
+/**
+ * Round an island the way a sailor would: if the island is in the way of where she's heading, work round its shore
+ * in the rounding direction (clockwise leaving it to starboard), steering for the furthest point off its shore she
+ * can see with clear water between.
+ */
+function aroundIsland(m: CourseMark, b: Vec, P: Vec): Vec {
+  if (clearRun(b, P)) return P;
+  const M = m.p, dir = m.side === 's' ? 1 : -1, b0 = brg(b.x - M.x, b.y - M.y), bP = brg(P.x - M.x, P.y - M.y);
+  const span = ((dir * (bP - b0)) % 360 + 360) % 360; // how far round to the aim point
+  let best: Vec | null = null;
+  for (let a = 10; a <= Math.max(10, span); a += 10) {
+    const u = V(b0 + dir * a), r = markReach(m, { x: M.x + u.x, y: M.y + u.y }) + ISLAND_BERTH, q = { x: M.x + u.x * r, y: M.y + u.y * r };
+    if (clearRun(b, q)) best = q; else if (best) break;
+  }
+  if (best) return best;
+  // nothing in sight round the island: stand off it first
+  const u = V(b0), r = markReach(m, b) + ISLAND_BERTH * 1.5;
+  return { x: M.x + u.x * r, y: M.y + u.y * r };
 }
 
 /**
@@ -157,6 +201,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
     else if (!b.started) P = { x: w.center.x + N.x * 10 + L.x * along, y: w.center.y + N.y * 10 + L.y * along }; // haven't started yet: cross the line between its ends
     else P = aimPoint(w, b);
+    if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
+      // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
+      // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
+      if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
+      if (ai.detour) P = ai.detour;
+    } else ai.detour = null;
     const bP = brg(P.x - b.x, P.y - b.y);
     if (Math.abs(wrap(ww.from - bP)) < 44 && !b.ocs) {
       beating = true;
@@ -228,7 +278,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   desired = sailable(b, avoidMarks(w, b, desired));
   b.desired = desired; b.luff = luff;
   // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
-  const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && dist(b, nm.p) < 45;
+  const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   if (w.t < 0 || nearMark || b.twa < 146) b.poleWant = false;
   else if (b.twa > 156) b.poleWant = true;
 }

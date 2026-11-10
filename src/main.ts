@@ -4,6 +4,7 @@ import { describeSea } from './environment/sea';
 import './styles.css';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
+import { PLACES } from './sim/places';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
@@ -494,7 +495,27 @@ addEventListener('pointercancel', () => { drag = null; });
 
 /* ---------------- setup + flow ---------------- */
 function buildSetupChoices(): void {
-  $('setup').querySelector('[data-k="course"]')!.innerHTML = COURSES.map(c => `<button type="button" data-v="${c.id}">${c.title}</button>`).join('');
+  // the course picker, grouped (Seaweed Soup starting west / east, practice), each with its marks and length
+  const groups = new Map<string, typeof COURSES>();
+  for (const c of COURSES) { const g = c.group ?? 'Practice'; if (!groups.has(g)) groups.set(g, []); groups.get(g)!.push(c); }
+  const shortMark = (k: string) => k === 'X' ? '' : k;
+  const label = (c: typeof COURSES[number]) => {
+    if (!c.group) return c.title;
+    const route = c.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
+    return `${c.title.replace('Seaweed Soup · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
+  };
+  const sel = $('courseSel') as HTMLSelectElement;
+  sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
+  sel.value = S.course;
+  sel.onchange = () => { S.course = sel.value; newGame(); courseCard(); tideBox(); };
+  // Just sail: where from, and where to
+  const opts = (blank: string | null) => (blank ? `<option value="">${blank}</option>` : '') + (['Spots', 'Marks and buoys'] as const)
+    .map(g => `<optgroup label="${g}">${PLACES.filter(p => p.group === g).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup>`).join('');
+  const from = $('sailFromSel') as HTMLSelectElement, to = $('sailToSel') as HTMLSelectElement;
+  from.innerHTML = opts(null); to.innerHTML = opts('Nowhere in particular');
+  from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
+  from.onchange = () => { S.sailFrom = from.value; newGame(); };
+  to.onchange = () => { S.sailTo = to.value; newGame(); };
   $('setup').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
 function courseCard(): void {
@@ -508,6 +529,7 @@ function courseCard(): void {
   $('prepField').hidden = S.mode === 'sail';
   $('prepNote').textContent = PREP_MEANING[S.prepFlag ?? 'P'];
   $('fleetField').hidden = S.mode === 'sail';
+  $('courseField').hidden = S.mode === 'sail'; $('courseCard').hidden = S.mode === 'sail'; $('sailField').hidden = S.mode !== 'sail';
   $('penaltyField').hidden = S.mode === 'sail';
   $('modeNote').textContent = S.mode === 'drill'
     ? 'Starts one minute before the gun. Fifteen seconds after it you get a debrief and an overhead replay, and can try the same start again.'
@@ -614,17 +636,17 @@ function crewRows(): void {
     saveSettings(S); newGame();
   });
 }
-function openSetup(): void { courseView.close(); w.running = false; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
+function openSetup(): void { courseView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
 function beginRace(seed?: number): void {
   saveSettings(S);
   newGame(seed);
-  logMessage(`— ${S.mode === 'sail' ? 'Just sail' : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${w.C.title}`);
+  logMessage(`— ${S.mode === 'sail' ? `Just sail · ${PLACES.find(p => p.id === S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
   w.running = true; w.paused = false;
   $('bFast').textContent = 'Speed 1×';
   horn(1.0);
   const m0 = w.C.marks[0];
   toast(S.mode === 'sail'
-    ? `Just sail: open water, no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}. Try the tiller, the trim and the pole.`
+    ? `Just sail${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}. Try the tiller, the trim and the pole.`
     : S.mode === 'drill'
     ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
     : `${S.seq}-minute sequence. Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);

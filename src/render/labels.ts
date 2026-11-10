@@ -24,6 +24,10 @@ export class Labels {
     const mk = (txt: string) => { const d = document.createElement('div'); d.className = 'tag mk'; d.textContent = txt; this.root.appendChild(d); return d; };
     this.markTags = [];
     const seen: Record<string, number> = {};
+    if (w.freeSail) { // just sailing: only where you're heading
+      if (w.dest) this.markTags.push({ el: mk(w.dest.name), p: w.dest.p, z: 6, idx: [] });
+      return;
+    }
     w.C.marks.forEach((m, i) => {
       if (seen[m.name] == null) { seen[m.name] = this.markTags.length; this.markTags.push({ el: mk(m.name), p: m.p, z: 4, idx: [i] }); }
       else this.markTags[seen[m.name]].idx.push(i);
