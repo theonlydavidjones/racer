@@ -18,6 +18,7 @@ import { SignalMast } from './flags';
 import { Wakes } from './wake';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
+import { Harbor } from './marina';
 import { VesselView } from './vessels';
 import { landAt } from '../environment/sea';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
@@ -269,6 +270,7 @@ export class SceneView {
 
     this.wakes = new Wakes(scene);
     this.moorings = new Moorings(scene, p => landAt(p) === false);
+    this.harbor = new Harbor(scene); // West Harbor: docks, breakwaters, boats in their slips
     this.wildlife = new Wildlife(scene, p => landAt(p) === false);
     this.vesselView = new VesselView(scene);
     this.landMonth = new Date().getMonth() + 1;
@@ -304,7 +306,9 @@ export class SceneView {
   }
 
   /** Rebuild boats and course objects for a new race. */
+  private harbor!: Harbor;
   setWorld(w: World): void {
+    this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
     this.wakes.reset(w.boats);

@@ -24,7 +24,7 @@ const FIELDS: { lat: number; lon: number; r: number; n: number; seed: number }[]
 function rng(seed: number) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
 
 /** A small cruising boat at rest: hull, cabin and mast, sails furled. Bow toward −z. */
-function boat(len: number, r: () => number): THREE.Group {
+export function boat(len: number, r: () => number): THREE.Group {
   const g = new THREE.Group(), hullCol = [0xf3f1ea, 0xeae7df, 0x1f3550, 0x8a2a24, 0xdedcd3][Math.floor(r() * 5)];
   const shape = new THREE.Shape(); const B = len * 0.17;
   shape.moveTo(0, -len / 2); shape.quadraticCurveTo(B, -len * 0.2, B * 0.85, len / 2); shape.lineTo(-B * 0.85, len / 2); shape.quadraticCurveTo(-B, -len * 0.2, 0, -len / 2);

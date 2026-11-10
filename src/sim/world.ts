@@ -21,6 +21,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { destMark, place as getPlace } from './places';
+import { slipById, type Slip } from '../geo/marina';
 import { sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 
@@ -169,6 +170,8 @@ export class World {
   courseSignal: { no: number; why: string } | null = null;
   /** Racing: the tactics debrief's log of your race (null when just sailing). */
   log: RaceLog | null = null;
+  /** Your boat's slip in West Harbor (geo/marina.ts), if she has one. */
+  homeSlip: Slip | null = null;
   /** Just sail: when you got there (sim time), or null. */
   arrivedT: number | null = null;
 
@@ -212,9 +215,11 @@ export class World {
     }
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
-    if (this.freeSail) this.dest = destMark(getPlace(settings.sailTo));
+    // cruising: from a place on the water or her slip in West Harbor, to another place or back to her slip
+    this.homeSlip = slipById(settings.boat?.slip);
+    if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${this.homeSlip.id}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
     { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
-      const from = getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
+      const from = (settings.sailFrom === 'slip' ? this.homeSlip?.p : null) ?? getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
       const c = this.freeSail ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
       const half = this.freeSail ? Math.max(3000, dist(from, to) / 2 + 1500) : 3000;
       this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2));
@@ -248,11 +253,14 @@ export class World {
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
-    let p: Vec, h: number;
+    let p: Vec, h: number, startStill = false;
     if (isUser && this.freeSail) {
       // where you chose to start, on a beam reach: whichever way has more open water ahead
-      const at = getPlace(this.settings.sailFrom)?.p;
-      if (at) {
+      const at = getPlace(this.settings.sailFrom)?.p, slip = this.settings.sailFrom === 'slip' ? this.homeSlip : null;
+      if (slip) {
+        // in her slip, turned bow out (walked round on her lines), ready to sail off: no way on
+        const out = V(slip.heading + 180); p = { x: slip.p.x + out.x * 0.6, y: slip.p.y + out.y * 0.6 }; h = n360(slip.heading + 180); startStill = true;
+      } else if (at) {
         p = { ...at };
         const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
         const a = n360(this.windModel.base + 90), b = n360(this.windModel.base - 90);
@@ -278,7 +286,7 @@ export class World {
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name } } : { paint: F.paint }),
-      x: p.x, y: p.y, h, v: isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
+      x: p.x, y: p.y, h, v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
@@ -776,6 +784,12 @@ export class World {
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
     const d = this.dest, u = this.user;
+    if (d?.key === 'slip') { // home: in her slip and stopped (or as good as)
+      if (this.arrivedT != null || dist(u, d.p) > 2.5 || u.v > 0.6) return;
+      this.arrivedT = this.t;
+      this.emit({ type: 'toast', msg: `Home: in her slip, ${this.homeSlip?.id}, after ${Math.floor(this.t / 60)} min. Nicely done.`, ms: 6000 });
+      return;
+    }
     if (!d || this.arrivedT != null || markDist(u, d) > 40) return;
     this.arrivedT = this.t;
     const m = Math.floor(this.t / 60), s = Math.round(this.t % 60);

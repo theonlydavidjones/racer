@@ -545,7 +545,8 @@ function buildSetupChoices(): void {
   const opts = (blank: string | null) => (blank ? `<option value="">${blank}</option>` : '') + (['Spots', 'Marks and buoys'] as const)
     .map(g => `<optgroup label="${g}">${PLACES.filter(p => p.group === g).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup>`).join('');
   const from = $('sailFromSel') as HTMLSelectElement, to = $('sailToSel') as HTMLSelectElement;
-  from.innerHTML = opts(null); to.innerHTML = opts('Nowhere in particular');
+  from.innerHTML = '<option value="slip" id="optSlipFrom">Her slip, West Harbor</option>' + opts(null);
+  to.innerHTML = opts('Nowhere in particular').replace('</option>', '</option><option value="slip" id="optSlipTo">Back to her slip, West Harbor</option>');
   from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
   from.onchange = () => { S.sailFrom = from.value; newGame(); };
   to.onchange = () => { S.sailTo = to.value; newGame(); };
@@ -565,6 +566,12 @@ function courseCard(): void {
   $('prepField').hidden = S.mode === 'sail';
   $('prepNote').textContent = PREP_MEANING[S.prepFlag ?? 'P'];
   $('fleetField').hidden = S.mode === 'sail';
+  { // her slip, if she has one (Marina)
+    const sl = S.boat.slip, f = $<HTMLOptionElement>('optSlipFrom'), t = $<HTMLOptionElement>('optSlipTo');
+    f.textContent = sl ? `Her slip, West Harbor (${sl})` : 'Her slip, West Harbor (give her one in the Marina)'; f.disabled = !sl;
+    t.textContent = sl ? `Back to her slip, West Harbor (${sl})` : 'Back to her slip (give her one in the Marina)'; t.disabled = !sl;
+    if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom; ($('sailToSel') as HTMLSelectElement).value = S.sailTo; }
+  }
   $('courseField').hidden = S.mode === 'sail'; $('courseCard').hidden = S.mode === 'sail'; $('sailField').hidden = S.mode !== 'sail';
   $('penaltyField').hidden = S.mode === 'sail';
   $('modeNote').textContent = S.mode === 'drill'

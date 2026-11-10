@@ -15,6 +15,8 @@ export interface BoatSpec {
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
   sails: { country: string; number: string; color: 'white' | 'black' };
   flags: { burgee: string; ensign: string; special: string }; // '' = none
+  /** Her slip in West Harbor (geo/marina.ts), if she has one. */
+  slip?: string;
   perf: {
     cleanedWeeks: number; // weeks since the bottom was last cleaned (0 = just cleaned)
     finish: 'race' | 'antifouling'; // the bottom paint's finish when clean: wet-sanded and burnished, or as rolled on
@@ -67,7 +69,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     id: typeof x.id === 'string' && x.id ? x.id : newId(),
     name: typeof x.name === 'string' ? x.name.slice(0, 18) : d.name,
     hull: { ...d.hull, ...x.hull }, deck: x.deck ?? d.deck,
-    sails: { ...d.sails, ...x.sails }, flags: { ...d.flags, ...x.flags }, perf: { ...d.perf, ...x.perf }
+    sails: { ...d.sails, ...x.sails }, flags: { ...d.flags, ...x.flags }, perf: { ...d.perf, ...x.perf },
+    ...(typeof x.slip === 'string' && x.slip ? { slip: x.slip } : {})
   };
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;

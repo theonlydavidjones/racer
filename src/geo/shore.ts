@@ -1,6 +1,7 @@
 import { inPoly, segPt, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
+import { hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation).
 // TODO: replace with clipped NOAA ENC / OpenStreetMap coastline data.
@@ -41,9 +42,9 @@ function inTerrain(p: Vec): boolean {
 /** The terrain land grid, for drawing maps: cells, bounds, and whether a cell is inside the hand-drawn Cityfront area. */
 export const landGrid = () => ({ ...M, grid: GRID, cityfront: { south: 37.79, north: 37.815, west: -122.48, east: -122.40 } });
 
-/** Is this point land a boat would run aground on? */
+/** Is this point land a boat would run aground on? (In the West Harbor basin: only its docks and breakwaters.) */
 export const onLand = (p: Vec): boolean =>
-  p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : inTerrain(p) || inCityfront(p);
+  inBasin(p) ? hitsHarbor(p) : p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : inTerrain(p) || inCityfront(p);
 
 export function shoreDist(p: Vec): number {
   let m = 1e9;

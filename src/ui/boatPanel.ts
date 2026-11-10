@@ -4,6 +4,7 @@ import { BURGEES } from '../render/burgees';
 import { ENSIGNS, SPECIAL_FLAGS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
+import { HARBOR, SLIPS } from '../geo/marina';
 
 /**
  * The Boat panel: set up your boat. Looks on the left half of the list, condition (what changes her speed) at the
@@ -126,6 +127,7 @@ export class BoatPanel {
       case 'burgee': this.set(b => { b.flags.burgee = t.value; }); return;
       case 'ensign': this.set(b => { b.flags.ensign = t.value; }); return;
       case 'special': this.set(b => { b.flags.special = t.value; }); return;
+      case 'slip': this.set(b => { if (t.value) b.slip = t.value; else delete b.slip; }); return;
       case 'weeks': { const out = this.el.querySelector('#bpWeeksV'); if (out) out.textContent = weeksLabel(Number(t.value)); if (final) this.set(b => { b.perf.cleanedWeeks = Number(t.value); }, false); return; }
       case 'gear': if (final) this.set(b => { b.perf.gearKg = Number(t.value) * 0.4536; }, false); return;
     }
@@ -194,6 +196,10 @@ export class BoatPanel {
           : `<small>Every change is saved as you make it.<span class="gsaved" id="bpSaved">Saved ✓</span>${this.edited ? ' <button type="button" class="linkbtn" data-act="discard">Discard changes</button>' : ''}</small>`}
       </div>
       <div class="bpbody">
+      <section><h3>Berth</h3>
+        <div class="field"><span>Her slip in ${HARBOR.name}</span><select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>
+          <small>${b.slip ? `Cruise can start from her slip (bow out, ready to sail off) and end there.` : 'Give her a slip to sail out of and back into in Cruise.'} The docks are mapped from OpenStreetMap; the dock letters and slip numbers are this sim's.</small></div>
+      </section>
       <section><h3>Hull</h3>
         <div class="field"><span>Built in</span>${seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood (clinker)']], b.hull.material)}
           <small>The class weighs wooden and fiberglass Folkboats to the same minimum, so they race as equals.</small></div>
@@ -235,6 +241,13 @@ export class BoatPanel {
   }
 }
 
+/** The slips, by dock; those other boats of yours have are shown as taken. */
+function slipOptions(b: BoatSpec, boats: BoatSpec[]): string {
+  const taken = new Map(boats.filter(x => x.id !== b.id && x.slip).map(x => [x.slip!, x.name]));
+  const docks = [...new Set(SLIPS.map(s => s.dock))];
+  return '<option value="">No slip</option>' + docks.map(d => `<optgroup label="Dock ${d}">${SLIPS.filter(s => s.dock === d).map(s =>
+    `<option value="${s.id}"${s.id === b.slip ? ' selected' : ''}${taken.has(s.id) ? ' disabled' : ''}>${s.id}${taken.has(s.id) ? ` · ${esc(taken.get(s.id)!)}` : ''}</option>`).join('')}</optgroup>`).join('');
+}
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
 function flagNote(b: BoatSpec): string {

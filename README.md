@@ -140,6 +140,12 @@ Four ways in: **Race** (race day and start time, a course or the race committee'
 
 Race and Cruise sail the real day (below). **Adjust conditions** changes any of it: wind speed, wind direction, the current, the chop (× the real chop, down to glassy), the swell outside the Gate, rain (light or heavy: overcast light, rain streaks, less visibility) and fog (the real summer fog bank, none, patchy or thick). Each starts as Real; Real puts it back.
 
+### West Harbor
+
+San Francisco Marina's West Harbor, by the St. Francis and Golden Gate yacht clubs, from OpenStreetMap (`scripts/make-west-harbor.mjs` → `src/geo/data/west-harbor.json`, `src/geo/marina.ts`): the basin, the stone breakwaters, the entrance at the east end by its red beacon (Q R), 22 main walkways and 165 slip fingers. The basin is water you can sail in; the docks and breakwaters are solid (you bump the dock). Slips aren't mapped, so they're worked out from the fingers: 278 that a Folkboat fits in (her length and beam clear of every dock). The dock letters and slip numbers are this sim's, not the harbor's. Floating concrete docks, steel pilings and generic boats in about three-quarters of the slips.
+
+In the **Marina**, give any of your boats a slip. In **Cruise**, start from her slip (turned bow out, ready to sail off) and/or sail back to it: you're home when she's in it and stopped.
+
 ### The real day: observed, forecast, or from the records
 
 Setup → Weather → **The real day** (the default) races in the weather the race day really had or will have (`src/environment/weather.ts`, data from `scripts/fetch-real-days.mjs`):

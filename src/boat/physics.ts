@@ -1,3 +1,4 @@
+import { inBasin } from '../geo/marina';
 import { KT, V, brg, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand } from '../geo/shore';
 import type { Emit } from '../sim/events';
@@ -155,7 +156,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.x += b.vx * dt; b.y += b.vy * dt;
   if (onLand(bow(b))) {
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0;
-    if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg: 'Aground! Steer back out to open water.' }); }
+    if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg: inBasin(b) ? 'Bump: you\'ve hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.' }); }
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it
   const aw = apparent(ww.from, ww.kt, b.h, b.v), awa = aw.awa;

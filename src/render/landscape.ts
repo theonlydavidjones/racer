@@ -2,6 +2,7 @@ import './three-setup';
 import * as THREE from 'three';
 import { LL } from '../geo/geo';
 import { LAND, onLand, shoreDist } from '../geo/shore';
+import { HARBOR } from '../geo/marina';
 import { buildTerrain, region, type Terrain } from './terrain';
 import { P3 } from './coords';
 
@@ -35,6 +36,8 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   {
     const s = new THREE.Shape();
     LAND.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
+    // West Harbor's basin is water (geo/marina.ts): cut out of the apron
+    const hole = new THREE.Path(); HARBOR.basin.forEach((p, i) => i ? hole.lineTo(p.x, p.y) : hole.moveTo(p.x, p.y)); s.holes.push(hole);
     const g = new THREE.ExtrudeGeometry(s, { depth: 2.3, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
     scene.add(new THREE.Mesh(g, lam(0x93a079)));
   }

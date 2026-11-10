@@ -1,5 +1,7 @@
 # Build plan
 
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips). Later: the East Harbor and the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the harbor's real dock letters and slip numbers; boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+
 What's planned, roughly in order. Done work is described in the README.
 
 ## Next up

@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { V, brg } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
+import { inBasin } from '../src/geo/marina';
 
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', ...o });
@@ -201,7 +202,7 @@ describe('hails at the Cityfront shore (Rule 20)', () => {
     let p = { x: 0, y: 0 };
     search: for (let x = -1200; x < 300; x += 10) for (let y = -900; y < 100; y += 4) {
       const q = { x, y }, hit = { x: x + hv.x * 30, y: y + hv.y * 30 };
-      if (!onLand(q) && shoreDist(q) > 22 && onLand(hit)) { p = q; break search; }
+      if (!onLand(q) && shoreDist(q) > 22 && onLand(hit) && !inBasin(q) && !inBasin(hit)) { p = q; break search; } // the open beach, not West Harbor's docks
     }
     Object.assign(red, { x: p.x, y: p.y, h, v: 2.4, desired: h, tack: 'S' as const, lastTackT: w.t - 3 }); // just tacked onto starboard toward the shore
     Object.assign(u, { x: p.x + wv.x * 9, y: p.y + wv.y * 9, h, v: 2.4, tack: 'S' as const, lastTackT: -999, turnTarget: null });
