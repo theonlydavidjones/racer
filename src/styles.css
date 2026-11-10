@@ -434,5 +434,5 @@ details.adjust > *{margin-top:8px}
 #keysView{z-index:60}
 .fthumb{width:100%;aspect-ratio:400/300;object-fit:cover;border-radius:6px;margin-bottom:6px;background:linear-gradient(#9fc6e3,#9fc6e3 55%,#2c6488 55%)}
 .fslot{display:inline-flex;align-items:center;justify-content:flex-start;width:30px;height:14px;margin-right:8px;vertical-align:-2px;flex:none}
-.fflag{max-height:13px;max-width:30px;width:auto;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.fflag{max-height:13px;max-width:30px;width:auto}
 .fcard span{display:flex;align-items:center}

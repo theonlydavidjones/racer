@@ -310,6 +310,8 @@ export class SceneView {
   setWorld(w: World): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
+    this.ripAngle = -w.windModel.base * D2R; this.wtex.offset.set(0, 0);
     this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
     this.wakes.reset(w.boats);
     const month = +w.raceDate.slice(5, 7) || new Date().getMonth() + 1; // the grass: gold in summer and autumn, green after the rains
@@ -569,7 +571,8 @@ export class SceneView {
   render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number; spin?: boolean }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
-    this.ripAngle += (-w.windModel.base * D2R - this.ripAngle) * Math.min(1, dt * 0.2);
+    { const d = Math.atan2(Math.sin(-w.windModel.base * D2R - this.ripAngle), Math.cos(-w.windModel.base * D2R - this.ripAngle)); // the short way round
+      this.ripAngle += d * Math.min(1, dt * 0.2); }
     const c = Math.cos(this.ripAngle), s = Math.sin(this.ripAngle);
     this.wtex.rotation = this.ripAngle;
     // the texture drifts with the current: offset in texture space is the rotated displacement

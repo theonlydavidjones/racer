@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person } from '../boat/crewPhys';
-import { CABIN, COCKPIT, L, cabinTopY, cockpitHalf, deckY, halfBeam, uAtZ } from './hull';
+import { COCKPIT, L, cabinTopY, cockpitHalf, deckY, halfBeam, uAtZ } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -94,9 +94,15 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   // where the weight is across the boat, from the physics: −1 to leeward … +1 on the windward rail (beyond 1: hiking)
   const sit = 0.95, armN = c ? c.arm / sit : 1;
   const x = windward * Math.max(-1, Math.min(1, armN)), crossing = Math.abs(armN) < 0.35 && mode !== 'downwind' && mode !== 'foredeck';
+  // where each sits fore and aft: abreast the cockpit, forward of the helm, never alongside the cabin (there's no room
+  // on the side deck there), at least a shoulder-width apart; the whole crew slides fore and aft with the weight
+  const zFwd = -L / 2 + COCKPIT.u0 * L + 0.32, zAftMost = 2.7 - 0.6, gap = 0.6, n = cr.crew.length;
+  const zs: number[] = [];
+  for (let i = 0; i < n; i++) zs.push(Math.min(zAftMost - i * gap, lerp(zAftMost, zFwd + (n - 1) * gap, Math.min(1, fore / 0.8)) - i * gap));
+  const short = zFwd - zs[n - 1]; if (n && short > 0) for (let i = 0; i < n; i++) zs[i] = Math.min(zAftMost - i * gap * 0.92, zs[i] + short);
   // the crew
   cr.crew.forEach((f, i) => {
-    let z = lerp(1.75, 0.15, fore) - i * 0.62, u = uAtZ(z), px: number, py: number, face: number;
+    let z = zs[i], u = uAtZ(z), px: number, py: number, face: number;
     if (mode === 'foredeck' && i === 0) {
       // the pole hand: kneeling on the cabin top by the mast
       z = -0.95; u = uAtZ(z); px = windward * 0.22; py = cabinTopY(u) + 0.02; face = 0;
@@ -104,10 +110,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       seat(f, { lean: -0.25, kneel: true, arms: [1.9, 0.6], elbows: 0.4 });
       f.root.visible = true; return;
     }
-    if (mode === 'foredeck' || mode === 'downwind') z = lerp(1.2, 0.5, fore) - i * 0.5;
-    // in the cockpit: between its forward end and the helm; up on the rail: anywhere along the side deck abreast the cabin
-    const inCockpit = Math.abs(x) < 0.7, zFwd = -L / 2 + COCKPIT.u0 * L + 0.32, zAft = 2.7 - 0.55 - 0.5 * i;
-    z = inCockpit ? Math.min(zAft, Math.max(zFwd, z)) : Math.min(zAft, Math.max(-L / 2 + CABIN.u0 * L, z)); u = uAtZ(z);
+    // (in the cockpit or up on the rail, abreast the cockpit either way)
+    const inCockpit = Math.abs(x) < 0.7; u = uAtZ(z);
     const edge = halfBeam(u) - (mode === 'hike' ? 0.06 + 0.08 * (1 - hike) : 0.16);
     px = x * edge * (inCockpit ? 0.85 : 1);
     py = inCockpit ? deckY(u, cockpitHalf(u)) - COCKPIT.sole * 0.45 : deckY(u, Math.abs(px)) + 0.04;
