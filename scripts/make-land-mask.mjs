@@ -62,3 +62,22 @@ await writeFile(new URL('../src/geo/data/shore-mask.json', import.meta.url), JSO
   note: 'land (above 0.5 m) in 50 m cells; rows north to south; run lengths alternating water, land, ... starting with water', rows: rows50
 }) + '\n');
 console.log(`shore-mask.json ${w}×${h}`);
+
+// the hills and islands for the wind's lee (src/environment/data/heights.json): the highest point in each 200 m cell,
+// in 4 m steps, base64
+{
+  const k = 4, hx = Math.ceil(w / k), hy = Math.ceil(h / k), out = new Uint8Array(hx * hy);
+  for (let j = 0; j < hy; j++) for (let i = 0; i < hx; i++) {
+    let m = 0;
+    for (let dj = 0; dj < k; dj++) for (let di = 0; di < k; di++) {
+      const x = Math.min(w - 1, i * k + di), y = Math.min(h - 1, j * k + dj), g = px[y * w + x];
+      if (g > 0) m = Math.max(m, (g - 1) * meta.scale);
+    }
+    out[j * hx + i] = Math.min(255, Math.round(m / 4));
+  }
+  await writeFile(new URL('../src/environment/data/heights.json', import.meta.url), JSON.stringify({
+    source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx: hx, ny: hy, step: 4,
+    note: 'highest ground in each ~200 m cell, in units of `step` metres; rows north to south; base64 bytes', data: Buffer.from(out).toString('base64')
+  }) + '\n');
+  console.log(`heights.json ${hx}×${hy}`);
+}

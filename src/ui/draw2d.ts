@@ -1,4 +1,5 @@
-import { D2R, HALF, ZONE } from '../core/math';
+import { D2R, HALF, V, ZONE } from '../core/math';
+import { BOAT_WAKE } from '../environment/shadows';
 import { LAND, landGrid } from '../geo/shore';
 import { LL } from '../geo/geo';
 import type { Course } from '../courses/course';
@@ -139,4 +140,20 @@ export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: num
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
   ctx.restore();
+}
+
+/**
+ * A boat's wind shadow on the map (a training aid): the wake of her sails streaming off along the apparent wind she
+ * sails in, out to where it has mostly mixed out (environment/shadows.ts).
+ */
+export function drawWindShadow(ctx: CanvasRenderingContext2D, tf: Tf, b: { x: number; y: number; h: number; arel: number; awa: number }): void {
+  // out to about six mast heights upwind (eight in light air), much the same downwind, where the deficit is mostly gone
+  const H = BOAT_WAKE.mast, len = H * 7, d = V(b.h + b.arel + 180), n = { x: d.y, y: -d.x };
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= 8; i++) { const a = len * i / 8, half = 2 * (0.05 * a + 0.22 * BOAT_WAKE.d0); pts.push(tf(b.x + d.x * a + n.x * half, b.y + d.y * a + n.y * half)); }
+  for (let i = 8; i >= 0; i--) { const a = len * i / 8, half = 2 * (0.05 * a + 0.22 * BOAT_WAKE.d0); pts.push(tf(b.x + d.x * a - n.x * half, b.y + d.y * a - n.y * half)); }
+  const s0 = tf(b.x, b.y), s1 = tf(b.x + d.x * len, b.y + d.y * len), gr = ctx.createLinearGradient(s0[0], s0[1], s1[0], s1[1]);
+  const a0 = b.awa > 120 ? 0.42 : 0.3;
+  gr.addColorStop(0, `rgba(10,20,30,${a0})`); gr.addColorStop(1, 'rgba(10,20,30,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill();
 }

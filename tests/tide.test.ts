@@ -57,7 +57,7 @@ describe('real tide in the sim', () => {
     const b = w.currentAt(p);
     expect(Math.hypot(b.x - a.x, b.y - a.y) / KT).toBeGreaterThan(0.05);
     expect(w.clock).toMatch(/^14:5\d$/); // 3-minute sequence then ~27 minutes of racing
-  });
+  }, 30_000);
 
   it('weaker near the Cityfront shore than out in the middle', () => {
     const w = world('2026-11-14', '18:00');

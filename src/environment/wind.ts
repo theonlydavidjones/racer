@@ -2,6 +2,7 @@ import { KT, V, clamp, n360, type Vec } from '../core/math';
 import type { Rng } from '../core/rng';
 import { LL } from '../geo/geo';
 import { shoreDist } from '../geo/shore';
+import { terrainLee } from './shadows';
 import clim from './data/sf-wind-climate.json';
 
 /** True wind over the ground. `from` is a compass direction, `kt` is speed in knots. */
@@ -69,10 +70,26 @@ const GATE = LL(37.8186, -122.4783), SLOT_DIR = V(78), SLOT_WIDTH = 1300, SLOT_B
  * How much stronger or lighter the wind is here than the open-water mean, from the lie of the land:
  * up to 20% more in the slot, down to 80% at the shore (friction and shelter), full strength ~400 m off.
  */
-export function windTerrain(p: Vec): number {
+/** How much of the slot jet is here (0..1): the air that came in through the Gate. */
+export function slotWeight(p: Vec): number {
   const dx = p.x - GATE.x, dy = p.y - GATE.y;
   const along = dx * SLOT_DIR.x + dy * SLOT_DIR.y, across = dx * SLOT_DIR.y - dy * SLOT_DIR.x;
-  const slot = along < -800 ? 0 : Math.exp(-((across / SLOT_WIDTH) ** 2)) * (along > 6000 ? Math.exp(-(along - 6000) / 3000) : 1);
+  return along < -800 ? 0 : Math.exp(-((across / SLOT_WIDTH) ** 2)) * (along > 6000 ? Math.exp(-(along - 6000) / 3000) : 1);
+}
+
+/**
+ * The lee of the land (environment/shadows.ts). Where the slot jet blows, the air came in through the gap in the Gate,
+ * not over the hills either side of it, so they don't shelter it there; islands in the jet (Alcatraz) still do.
+ */
+export function landLee(p: Vec, from: number): number {
+  const lee = terrainLee(p, from);
+  if (lee >= 1) return 1;
+  const w = slotWeight(p); if (w < 0.02) return lee;
+  return lee + (terrainLee(p, from, true) - lee) * w; // in the jet, the hills flanking the Gate don't shelter it (islands in it still do)
+}
+
+export function windTerrain(p: Vec): number {
+  const slot = slotWeight(p);
   const shore = 0.8 + 0.2 * clamp(shoreDist(p) / 400, 0, 1);
   return (1 + SLOT_BOOST * slot) * shore;
 }
@@ -145,10 +162,21 @@ export class Puffs {
 export class TerrainGrid {
   private g: Float32Array;
   private readonly n: number;
-  constructor(readonly cx: number, readonly cy: number, readonly half = 5000, readonly cell = 50) {
+  /** `from`: the wind direction, for the lee of the land (environment/shadows.ts); omitted, no lee. */
+  constructor(readonly cx: number, readonly cy: number, readonly half = 5000, readonly cell = 50, from?: number) {
     this.n = Math.round(2 * half / cell) + 1;
     this.g = new Float32Array(this.n * this.n);
-    for (let j = 0; j < this.n; j++) for (let i = 0; i < this.n; i++) this.g[j * this.n + i] = windTerrain({ x: cx - half + i * cell, y: cy - half + j * cell });
+    // the lee of the land changes slowly across the water: worked out every 200 m and interpolated
+    const lc = 200, ln = Math.round(2 * half / lc) + 1, lee = new Float32Array(ln * ln).fill(1);
+    if (from != null) for (let j = 0; j < ln; j++) for (let i = 0; i < ln; i++) lee[j * ln + i] = landLee({ x: cx - half + i * lc, y: cy - half + j * lc }, from);
+    const leeAt = (x: number, y: number) => {
+      const fx = Math.min(ln - 1.001, Math.max(0, (x - cx + half) / lc)), fy = Math.min(ln - 1.001, Math.max(0, (y - cy + half) / lc)), i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+      return (lee[j * ln + i] * (1 - u) + lee[j * ln + i + 1] * u) * (1 - v) + (lee[(j + 1) * ln + i] * (1 - u) + lee[(j + 1) * ln + i + 1] * u) * v;
+    };
+    for (let j = 0; j < this.n; j++) for (let i = 0; i < this.n; i++) {
+      const p = { x: cx - half + i * cell, y: cy - half + j * cell };
+      this.g[j * this.n + i] = windTerrain(p) * leeAt(p.x, p.y);
+    }
   }
   at(x: number, y: number): number {
     const fx = (x - this.cx + this.half) / this.cell, fy = (y - this.cy + this.half) / this.cell;

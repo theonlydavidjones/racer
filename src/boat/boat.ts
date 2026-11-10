@@ -22,6 +22,8 @@ export interface AiState {
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
+  /** How long she's been in another boat's dirty air on this beat, s. */
+  dirtyT?: number;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
@@ -123,6 +125,8 @@ export interface Boat {
   paint?: Paint;
   /** How you've set her up (your boat only): looks and condition. */
   spec?: BoatSpec;
+  /** Wind shadows on her (environment/shadows.ts): the lee of the land (cached) and everything together (1 = clear air). */
+  leeK?: number; shadowK?: number;
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
   cond?: Condition;
 }

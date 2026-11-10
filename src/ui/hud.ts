@@ -36,7 +36,7 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCourse, drawCurrentArrows, drawLand, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
 import { laylinesFor } from '../sim/laylines';
 
@@ -193,9 +193,10 @@ export class Hud {
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
     else {
       // in a puff or a lull?
-      const k = w.puffs.at(u).k;
-      sl.textContent = ww.kt.toFixed(0) + ' kt on water' + (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : '');
-      sl.className = 'sub' + (k > 1.08 ? ' lift' : '');
+      const k = w.puffs.at(u).k, lee = u.leeK ?? 1, dirty = (u.shadowK ?? 1) / lee; // the land's lee, and other boats' and ships' wakes
+      const blanket = dirty < 0.95 ? ` · dirty air −${Math.round((1 - dirty) * 100)}%` : lee < 0.92 ? ` · in the lee −${Math.round((1 - lee) * 100)}%` : '';
+      sl.textContent = ww.kt.toFixed(0) + ' kt on water' + (blanket || (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : ''));
+      sl.className = 'sub' + (blanket ? ' head' : k > 1.08 ? ' lift' : '');
     }
     this.situation(w, u); this.lineBox(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
   }
@@ -396,6 +397,7 @@ export class Hud {
       if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = 'rgba(230,230,225,.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); }
       if (this.mapZoom) { ctx.fillStyle = 'rgba(230,230,225,.85)'; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
     }
+    if (wd.settings.aids && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
     for (const b of wd.boats) {
       const p = tf(b.x, b.y), s = b.isUser ? 5 : 4;
       ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R);

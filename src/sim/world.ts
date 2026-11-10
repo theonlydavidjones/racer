@@ -7,7 +7,7 @@ import { buildCourse, type Course, type CourseFile, type CourseMark } from '../c
 import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, swellFor, type SeaHere } from '../environment/sea';
-import { Puffs, breezeAt, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindModel } from '../environment/wind';
+import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
@@ -18,6 +18,7 @@ import { aiThink } from '../ai/ai';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
+import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { destMark, place as getPlace } from './places';
 import { sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
@@ -308,9 +309,32 @@ export class World {
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
    */
-  windHere(p: Vec): Wind {
-    const q = this.puffs.at(p);
-    return { from: n360(this.wind.from + q.veer), kt: this.wind.kt * windTerrain(p) * q.k };
+  windHere(p: Vec, self?: Boat): Wind {
+    const q = this.puffs.at(p), sh = this.shadowAt(p, self);
+    if (self) self.shadowK = sh.k;
+    return { from: n360(this.wind.from + q.veer + sh.shift), kt: this.wind.kt * windTerrain(p) * q.k * sh.k };
+  }
+
+  /**
+   * What stands in the wind upwind of a point and isn't in the wind records (environment/shadows.ts): the lee of the
+   * islands and hills, and the wakes of boats (their sails), ships and the committee boat. `self`: the boat asking
+   * (her own wake doesn't count; her land lee is cached, refreshed every half second).
+   */
+  shadowAt(p: Vec, self?: Boat): Shadow {
+    const sum = new WindSum(), kt = this.wind.kt, from = this.wind.from;
+    const lee = self?.leeK ?? landLee(p, from);
+    for (const o of this.boats) {
+      if (o === self) continue;
+      const dx = p.x - o.x, dy = p.y - o.y; if (dx * dx + dy * dy > 120 * 120) continue;
+      addBoatWake(sum, o, p, kt * lee);
+    }
+    for (const v of this.vessels) {
+      const ty = VESSEL[v.kind], dx = p.x - v.x, dy = p.y - v.y, r = ty.len + 30 * SHIP_AIR[v.kind]; if (dx * dx + dy * dy > r * r) continue;
+      addShipWake(sum, from, kt, v, SHIP_AIR[v.kind], ty.len, ty.beam, p);
+    }
+    if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
+    const r = sum.result(from);
+    return { k: r.k * lee, shift: r.shift };
   }
 
   /** The sea at any point, for the wind and current there. */
@@ -350,7 +374,8 @@ export class World {
     this.puffs.step(dt, this.wind);
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
-    for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b), b.cur); }
+    if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
+    for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur); }
     this.vessels = this.traffic.vessels(this.trafficT);
     if (this.steps % 30 === 1) for (const b of this.boats) {
       b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));

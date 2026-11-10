@@ -306,8 +306,8 @@ export class SceneView {
     this.wakes.reset(w.boats);
     const month = +w.raceDate.slice(5, 7) || new Date().getMonth() + 1; // the grass: gold in summer and autumn, green after the rains
     if (month !== this.landMonth) { this.landMonth = month; this.land?.setSeason(month); }
-    const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)}`;
-    if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y); this.terrainKey = key; }
+    const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)},${Math.round(w.C.base)}`;
+    if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y, 5000, 50, w.C.base); this.terrainKey = key; } // with the lee of the land
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => {
       const m = buildBoatMesh(b); this.scene.add(m.grp);

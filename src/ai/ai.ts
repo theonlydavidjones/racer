@@ -177,6 +177,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         ai.plan.coast = coastDistance(b.v, tl, ww.kt, b.twa) * (V(b.h).x * N.x + V(b.h).y * N.y);
       }
       desired = goH;
+      // in another boat's dirty air on the way in: bear away a little, out of her wake to leeward, and build speed
+      if ((b.shadowK ?? 1) / (b.leeK ?? 1) < 0.94) desired = sailable(b, goH + (b.tack === 'S' ? -12 : 12));
       // aim to hit the line 1–3 s after the gun at full speed (the bolder the boat, the closer)
       // (later still under the I, Z, U and black flags: being over in the last minute costs more)
       if (ai.plan.tReach < tl + 3 - ai.aggr * 0.33 + FLAG_CAUTION[w.prepFlag]) {
@@ -199,7 +201,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const s = w.lineA(b) >= 0 ? 1 : -1, half = w.lineLen / 2, out = Math.abs(w.lineA(b)) > half + 8;
       P = { x: w.center.x + L.x * s * (half + 20) + N.x * (out ? -20 : 8), y: w.center.y + L.y * s * (half + 20) + N.y * (out ? -20 : 8) };
     } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
-    else if (!b.started) P = { x: w.center.x + N.x * 10 + L.x * along, y: w.center.y + N.y * 10 + L.y * along }; // haven't started yet: cross the line between its ends
+    else if (!b.started) {
+      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on)
+      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
+      P = { x: w.center.x + N.x * 10 + L.x * a, y: w.center.y + N.y * 10 + L.y * a }; void along;
+    }
     else P = aimPoint(w, b);
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
@@ -211,6 +217,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (Math.abs(wrap(ww.from - bP)) < 44 && !b.ocs) {
       beating = true;
       desired = b.tack === 'S' ? csS : csP;
+      const dirty = (b.shadowK ?? 1) / (b.leeK ?? 1) < 0.9; // in another boat's (or a ship's) wind shadow
+      ai.dirtyT = dirty ? (ai.dirtyT ?? 0) + dt : 0;
       if (w.t - b.lastTackT > 9) {
         const d = sub(P, b), vs = targetFor(b, beat);
         // can we fetch P on tack tk, allowing for current?
@@ -229,6 +237,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
           const lat = (b.x - P.x) * sv.x + (b.y - P.y) * sv.y;
           const width = ai.width * Math.min(1, Math.hypot(d.x, d.y) / 500) + 25;
           if (headed && w.rng() < dt * 0.35) doTack = true; // tack on headers
+          else if ((ai.dirtyT ?? 0) > 6 && w.t - b.lastTackT > 15) doTack = true; // stuck in another boat's dirty air: tack for clear air
           else if (Math.abs(lat) > width && dot(V(b.h), sv) * lat > 0) doTack = true; // don't sail too far off the rhumb line
         }
         if (doTack) desired = b.tack === 'S' ? csP : csS;
