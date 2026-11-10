@@ -32,6 +32,20 @@ npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both
   both sides on both tacks, not from one view.
 - Dev handles on `window` (dev server only): `sim()`, `__look(yaw, pitch, dist)`, `__view`, `__twa(angle)` (showroom tack).
 
+## Helpers (.claude/agents)
+
+Use them; they're cheaper than doing it all yourself and catch what the author misses.
+
+- **researcher** (lighter model, read-only): any "what's true in real life" question before building: data, specs,
+  class rules, RRS text, places. It returns facts with sources. Run several in parallel for independent questions.
+- **visual-checker** (lighter model): after any change to what's drawn, before publishing. It renders both tacks from
+  both sides and checks against a sailor's checklist.
+- **physics-reviewer** (strongest model, read-only): before publishing any change under src/boat, src/environment,
+  src/sim, src/ai or src/rules. An independent review against the science and the RRS; fix what it confirms.
+
+Keep the core simulation work (physics, world, main loop) in the main session: those files are shared, so splitting
+them across agents makes conflicting edits.
+
 ## Conventions
 
 - Boat frame: bow toward −z, starboard +x. Traveller: −1 windward … +1 leeward.
