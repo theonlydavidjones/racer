@@ -39,7 +39,7 @@ describe('San Francisco local time', () => {
 });
 
 describe('real tide in the sim', () => {
-  const world = (date: string, time: string) => new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, current: 'real', tideDate: date, tideTime: time, fleet: 0 }, 1);
+  const world = (date: string, time: string) => new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', current: 'real', tideDate: date, tideTime: time, fleet: 0 }, 1);
   const along = (c: { x: number; y: number }, dir: number) => (c.x * V(dir).x + c.y * V(dir).y) / KT;
 
   it('Sat 14 Nov 2026: flood around 12:45, big ebb around 18:00 local (as NOAA predicts)', () => {

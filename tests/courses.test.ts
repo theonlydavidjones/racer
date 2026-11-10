@@ -6,7 +6,7 @@ import { DT, World } from '../src/sim/world';
 import { brg, dist, markDist, wrap } from '../src/core/math';
 import { onLand } from '../src/geo/shore';
 
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKt: 12, current: 'slack', tideDate: '2026-11-14', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, current: 'slack', tideDate: '2026-11-14', ...o });
 const ss = COURSES.filter(c => c.id.startsWith('ss'));
 const byId = (id: string) => COURSES.find(c => c.id === id) as CourseFile;
 

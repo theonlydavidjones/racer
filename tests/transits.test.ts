@@ -20,7 +20,7 @@ describe('Transits', () => {
   });
   it('every course has a line transit, a landmark or a point on the far shore', () => {
     for (const c of [ss2, train]) {
-      const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKt: 12, tideDate: '2026-11-14', fleet: 0 }, 1);
+      const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', fleet: 0 }, 1);
       const T = w.lineTransit;
       expect(T).not.toBeNull();
       expect(T!.name.length).toBeGreaterThan(3);

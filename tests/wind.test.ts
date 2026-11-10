@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { OPEN_WATER, Puffs, breezeAt, windTerrain } from '../src/environment/wind';
+import { OPEN_WATER, Puffs, breezeAt, slotFlow, windKindFor, windKindFreq, windTerrain } from '../src/environment/wind';
+import { buildCourse } from '../src/courses/course';
+import train from '../src/courses/data/training-windward-return.json';
+import { brg, wrap } from '../src/core/math';
 import { sfLocalToUtcMin } from '../src/environment/tide';
 import { LL } from '../src/geo/geo';
 import { makeRng } from '../src/core/rng';
@@ -17,9 +20,10 @@ describe('the afternoon westerly (NOAA records at Crissy Field, 2021–2025)', (
   it('summer afternoons are windier than winter ones', () => {
     expect(at('2027-07-10', '15:00').kt).toBeGreaterThan(at('2026-11-14', '15:00').kt + 3);
   });
-  it('a westerly blows on nearly every July afternoon, about half of November ones', () => {
-    expect(at('2027-07-10', '15:00').west).toBeGreaterThan(0.9);
-    expect(at('2026-11-14', '15:00').west).toBeLessThan(0.75);
+  it('a westerly blows on nearly every July race day, under half of November ones and a fifth of December ones', () => {
+    expect(windKindFreq(6).west).toBeGreaterThan(0.95);
+    expect(windKindFreq(10).west).toBeLessThan(0.5);
+    expect(windKindFreq(11).west).toBeLessThan(0.3);
   });
   it('it comes from the WSW, through the Golden Gate', () => {
     const d = at('2027-07-10', '15:00').from;
@@ -28,6 +32,53 @@ describe('the afternoon westerly (NOAA records at Crissy Field, 2021–2025)', (
   it('light, typical and windy days are the 25th, 50th and 75th percentile', () => {
     const [l, t, w] = ([0, 1, 2] as const).map(d => at('2027-07-10', '15:00', d).kt);
     expect(l).toBeLessThan(t); expect(t).toBeLessThan(w);
+  });
+});
+
+describe('the other winds: winter on the Bay', () => {
+  it('in December the commonest wind is a northerly; light and variable days and southerlies come too', () => {
+    const f = windKindFreq(11);
+    expect(f.north).toBeGreaterThan(0.35); expect(f.north).toBeGreaterThan(f.west);
+    expect(f.light).toBeGreaterThan(0.1); expect(f.south).toBeGreaterThan(0.05);
+  });
+  it('a northerly comes from about north, a southerly from about south', () => {
+    const n = breezeAt(sfLocalToUtcMin('2026-12-05', '13:00'), 1, 'north'), s = breezeAt(sfLocalToUtcMin('2026-12-05', '13:00'), 1, 'south');
+    expect(Math.abs(wrap(n.from - 10))).toBeLessThan(35); expect(Math.abs(wrap(s.from - 165))).toBeLessThan(35);
+    expect(n.kt).toBeGreaterThan(6);
+  });
+  it('a light and variable day is light and doesn\'t hold a direction', () => {
+    const l = breezeAt(sfLocalToUtcMin('2026-12-05', '13:00'), 1, 'light');
+    expect(l.kt).toBeLessThan(6); expect(l.steady).toBeLessThan(0.6);
+  });
+  it('each race date draws its weather from its month, the same every time', () => {
+    const dec = Array.from({ length: 31 }, (_, i) => windKindFor(`2026-12-${String(i + 1).padStart(2, '0')}`));
+    expect(dec.filter(k => k === 'north').length).toBeGreaterThan(6);
+    expect(dec.filter(k => k === 'west').length).toBeLessThan(15);
+    expect(windKindFor('2026-12-05')).toBe(windKindFor('2026-12-05'));
+    const jul = Array.from({ length: 31 }, (_, i) => windKindFor(`2027-07-${String(i + 1).padStart(2, '0')}`));
+    expect(jul.filter(k => k === 'west').length).toBeGreaterThan(27);
+    expect(windKindFor('2026-12-05', 'south')).toBe('south');
+  });
+  it('a kind of wind that never blows that month gives the westerly', () => {
+    expect(breezeAt(sfLocalToUtcMin('2027-07-10', '13:00'), 1, 'north').kind).toBe('west');
+  });
+  it('the slot is the westerly coming through the Gate: no slot in a northerly', () => {
+    expect(slotFlow(255)).toBeCloseTo(1, 5); expect(slotFlow(10)).toBe(0);
+    const slot = LL(37.8235, -122.448);
+    expect(windTerrain(slot, 10)).toBeLessThan(windTerrain(slot, 255) - 0.1);
+  });
+  it('a course laid from its line is set to the day\'s wind; fixed marks stay put and their legs change', () => {
+    const t = train as unknown as CourseFile, w = buildCourse(t, { bias: 0, fleet: 3 }), n = buildCourse(t, { bias: 0, fleet: 3, windFrom: 10 });
+    const leg = (c: typeof w) => brg(c.marks[0].p.x - c.center.x, c.marks[0].p.y - c.center.y);
+    expect(Math.abs(wrap(leg(w) - 260))).toBeLessThan(2); expect(Math.abs(wrap(leg(n) - 10))).toBeLessThan(2);
+    expect(n.marks[0].beat).toBe(true);
+    const s = ss2 as unknown as CourseFile, sw = buildCourse(s, { bias: 0, fleet: 3 }), sn = buildCourse(s, { bias: 0, fleet: 3, windFrom: 10 });
+    expect(sn.marks[0].p).toEqual(sw.marks[0].p);
+    expect(sw.marks[0].leg).toBe('beat'); expect(sn.marks[0].leg).toBe('reach'); // A is west of the line: upwind in a westerly, a reach in a northerly
+  });
+  it('the race world takes the day\'s wind: a northerly day blows from the north', () => {
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKt: 0, windKind: 'north', tideDate: '2026-12-05', tideTime: '13:00', fleet: 1, opponents: ['stock:1'] }, 1);
+    expect(w.windKind).toBe('north'); expect(Math.abs(wrap(w.wind.from - 10))).toBeLessThan(40);
   });
 });
 
@@ -66,15 +117,15 @@ describe('puffs and lulls', () => {
 
 describe('in the race', () => {
   it('boats in different places feel different wind', () => {
-    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, tideDate: '2027-07-10', tideTime: '15:00', fleet: 5 }, 2);
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', tideDate: '2027-07-10', tideTime: '15:00', fleet: 5 }, 2);
     for (let i = 0; i < 600; i++) w.step();
     const kts = w.boats.map(b => b.ww.kt.toFixed(2));
     expect(new Set(kts).size).toBeGreaterThan(2);
   });
   it('the westerly builds during a summer race', () => {
-    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, tideDate: '2027-07-10', tideTime: '13:00', fleet: 0 }, 2);
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', tideDate: '2027-07-10', tideTime: '13:00', fleet: 0 }, 2);
     const k0 = w.windModel.kt;
-    for (let i = 0; i < 60 * 60 * 45; i++) w.step(); // ~45 minutes
+    for (let i = 0; i < 60 * 60 * 75; i++) w.step(); // 75 minutes
     expect(w.windModel.kt).toBeGreaterThan(k0 + 1);
-  }, 30000);
+  }, 60000);
 });

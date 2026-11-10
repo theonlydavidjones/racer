@@ -7,7 +7,7 @@ import { dist } from '../src/core/math';
 import { onLand } from '../src/geo/shore';
 import { laylinesFor } from '../src/sim/laylines';
 
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, mode: 'sail', windKt: 12, current: 'slack', tideDate: '2026-11-14', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', windKt: 12, current: 'slack', tideDate: '2026-11-14', ...o });
 const sail = (o: Partial<Settings>) => new World(COURSES[0], settings(o), 1, { freeSail: true });
 
 describe('Just sail: where from and where to', () => {

@@ -7,7 +7,7 @@ import { D2R, V } from '../src/core/math';
 import { beatAngle } from '../src/boat/polar';
 
 const TRAIN = train as unknown as CourseFile;
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKt: 12, current: 'slack', traffic: 0, tideDate: '2026-11-14', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, current: 'slack', traffic: 0, tideDate: '2026-11-14', ...o });
 
 /** A world mid-beat: you've started, on starboard, close-hauled, the wind steady from `from`. */
 function midBeat(from = 260) {

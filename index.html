@@ -86,10 +86,13 @@
       <span>Sail to</span>
       <select id="sailToSel" class="pick" aria-label="Sail to"></select>
       <small>The compass, laylines, map and the readout above the controls all measure to where you're heading.</small></div>
-    <div class="field"><span>Wind (westerly)</span>
-      <div class="seg" data-k="windKt"><button type="button" data-v="0">Afternoon westerly</button><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div>
+    <div class="field"><span>Weather</span>
+      <div class="seg" data-k="windKind"><button type="button" data-v="auto">From the records</button><button type="button" data-v="west">Westerly</button><button type="button" data-v="north">Northerly</button><button type="button" data-v="south">Southerly</button><button type="button" data-v="light">Light &amp; variable</button></div>
+      <small id="windKindNote"></small></div>
+    <div class="field"><span>Wind</span>
+      <div class="seg" data-k="windKt"><button type="button" data-v="0">From the records</button><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div>
       <div class="seg" data-k="windDay" id="windDaySeg"><button type="button" data-v="0">Light day</button><button type="button" data-v="1">Typical day</button><button type="button" data-v="2">Windy day</button></div>
-      <small id="windNote">The sea breeze for the race day and time, from five years of NOAA wind records at Crissy Field. Puffs and lulls drift across the course either way.</small></div>
+      <small id="windNote">How hard it blows, hour by hour, for the race day and time and the kind of wind, from five years of NOAA wind records at Fort Point. Puffs and lulls drift across the course either way.</small></div>
     <div class="field"><span>Current</span>
       <div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div>
       <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small></div>

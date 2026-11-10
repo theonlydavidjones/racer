@@ -4,6 +4,7 @@ export interface Settings {
   course: string; // course id, or 'rc': the race committee chooses (courses/committee.ts)
   raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
+  windKind?: 'auto' | 'west' | 'north' | 'south' | 'light'; // the kind of wind: drawn from the records for the race day's month, or chosen
   windDay: 0 | 1 | 2; // with the westerly: a light, typical or windy day (25th, 50th, 75th percentile)
   current: string; // 'real' (NOAA predictions for tideDate/tideTime) or a uniform preset id
   tideDate: string; // race day, YYYY-MM-DD, San Francisco local ('' = the coming Saturday)

@@ -9,7 +9,7 @@ import { V, brg } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
 
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKt: 12, tideDate: '2026-11-14', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', ...o });
 
 describe('courses load from JSON', () => {
   it('Seaweed Soup course 2: seven legs, X is a pass mark, line is an obstruction', () => {

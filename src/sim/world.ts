@@ -7,7 +7,7 @@ import { buildCourse, type Course, type CourseFile, type CourseMark } from '../c
 import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, swellFor, type SeaHere } from '../environment/sea';
-import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindModel } from '../environment/wind';
+import { Puffs, breezeAt, landLee, windAt, windKindFor, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
@@ -108,6 +108,8 @@ export class World {
   /** The afternoon westerly from the NOAA records (Settings.windKt 0), and which kind of day. */
   readonly seaBreeze: boolean;
   readonly windDay: WindDay;
+  /** The kind of wind the day brings: the westerly, a northerly, a southerly, or light and variable. */
+  readonly windKind: WindKind;
   breeze: Breeze | null = null;
   /** Puffs and lulls drifting across the course. */
   readonly puffs: Puffs;
@@ -169,7 +171,17 @@ export class World {
     this.settings = { ...settings };
     this.seed = seed;
     this.rng = makeRng(seed);
-    this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet });
+    // the race day and clock, and the kind of wind the day brings (from the records for the month, or as chosen)
+    this.raceDate = settings.tideDate || nextSaturday();
+    this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
+    this.windKind = windKindFor(this.raceDate, settings.windKind ?? 'auto');
+    this.windDay = settings.windDay ?? 1;
+    const atGun = breezeAt(this.gunUtc, this.windDay, this.windKind);
+    this.windKind = atGun.kind;
+    // a westerly at a set strength blows from the course's own westerly (as it runs over the race area); other winds from the records
+    if (settings.windKt !== 0 && this.windKind === 'west') { atGun.from = file.windBase; atGun.steady = 1; atGun.gust = 1.5; }
+    // the course for the day's wind: a laid course is set to it; fixed marks stay put, and its legs are whatever the wind makes them
+    this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: atGun.from });
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
@@ -180,11 +192,8 @@ export class World {
     this.sequence = this.freeSail ? [] : startSequence(settings.seq, this.prepFlag);
     this.flags = flagsAt(this.sequence, this.t);
     this.seaBreeze = settings.windKt === 0;
-    this.windDay = settings.windDay ?? 1;
     this.realTime = settings.current === 'real' || this.seaBreeze;
     // the race day and clock: they drive the real tide and westerly, and always the sun
-    this.raceDate = settings.tideDate || nextSaturday();
-    this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
     this.traffic = new Traffic(settings.traffic !== 0, seed);
     this.sea = new SeaField(settings.sea === 'flat' ? null : swellFor(this.raceDate, settings.swellDay ?? 1));
     if (settings.current === 'real') {
@@ -192,7 +201,7 @@ export class World {
       this.updateTide();
     }
     const r = this.rng;
-    this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28] };
+    this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
     if (this.freeSail) this.dest = destMark(getPlace(settings.sailTo));
     { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
       const from = getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
@@ -321,7 +330,7 @@ export class World {
   windHere(p: Vec, self?: Boat): Wind {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
-    return { from: n360(this.wind.from + q.veer + sh.shift), kt: this.wind.kt * windTerrain(p) * q.k * sh.k };
+    return { from: n360(this.wind.from + q.veer + sh.shift), kt: this.wind.kt * windTerrain(p, this.wind.from) * q.k * sh.k };
   }
 
   /**
@@ -354,8 +363,12 @@ export class World {
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
-    if (!this.seaBreeze) { this.puffs.setGust(1.5); return; }
-    const b = this.breeze = breezeAt(this.clockUtc, this.windDay);
+    const b = this.breeze = breezeAt(this.clockUtc, this.windDay, this.windKind);
+    if (!this.seaBreeze) { // a set strength: the direction stays where it was at the gun
+      if (this.windKind !== 'west') { this.windModel.steady = b.steady; this.puffs.setGust(Math.max(1.5, b.gust)); } else this.puffs.setGust(1.5);
+      return;
+    }
+    this.windModel.steady = b.steady;
     this.windModel.base = b.from; this.windModel.kt = b.kt;
     this.puffs.setGust(b.gust);
   }

@@ -6,7 +6,7 @@ import { D2R, KT, V } from '../src/core/math';
 import { beatAngle, polar, runAngle } from '../src/boat/polar';
 import { TARGET_MIN, chooseCourse, legTime } from '../src/courses/committee';
 
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '13:00', traffic: 0, ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', tideDate: '2026-11-14', tideTime: '13:00', traffic: 0, ...o });
 const NM = 1852, still = { x: 0, y: 0 };
 
 describe('how long a leg takes', () => {

@@ -24,7 +24,7 @@ import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
 import { POLE, moveLazyCar } from './boat/physics';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { shoreRelief } from './environment/current';
-import { breezeAt, windTerrain } from './environment/wind';
+import { WIND_KINDS, WIND_KIND_LABEL, breezeAt, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
@@ -36,6 +36,7 @@ import { CourseView } from './ui/courseView';
 const S: Settings = loadSettings();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
 S.raceLength ??= 'medium';
+S.windKind ??= 'auto';
 
 const view = new SceneView($<HTMLCanvasElement>('gl'));
 const labels = new Labels($('labels'));
@@ -69,10 +70,18 @@ let pendingPenalty: Boat | null = null;
 /** The race committee's choice of course for these conditions (worked out once per set of conditions). */
 let rcCache: { key: string; pick: CommitteeChoice | null } | null = null;
 function committee(s: Settings): CommitteeChoice | null {
-  const key = JSON.stringify([s.windKt, s.windDay, s.current, s.tideDate, s.tideTime, s.raceLength, s.fleet]);
+  const key = JSON.stringify([s.windKt, s.windDay, s.windKind, s.current, s.tideDate, s.tideTime, s.raceLength, s.fleet]);
   if (rcCache?.key !== key) rcCache = { key, pick: chooseCourse(COURSES, s) };
   return rcCache.pick;
 }
+
+/** What each kind of wind is like on the Bay. */
+const KIND_NOTE: Record<WindKind, string> = {
+  west: 'The sea breeze through the Gate: it builds through the afternoon and blows hardest in the slot toward Alcatraz.',
+  north: 'Behind a cold front, or the dry offshore wind: it comes down off the Marin hills and Angel Island, gusty and shifty in their lee, steadier out in the middle.',
+  south: 'Ahead of a storm: it comes over the city, gusty, often with rain; it can veer quickly to the west as the front passes.',
+  light: 'Hardly any wind and no settled direction: patches of breeze come and go. Keep the boat moving and sail to the pressure.'
+};
 
 function newGame(seed = randomSeed()): void {
   const showFlags = !!boatPanel?.open; // setting up your boat: her flags fly so you can see them
@@ -567,6 +576,11 @@ function courseCard(): void {
 function tideBox(): void {
   $('tideBox').hidden = false; $('currentNote').hidden = S.current === 'real';
   $('windDaySeg').hidden = !w.seaBreeze;
+  { // the kind of wind: what the records say for the month, and what today is
+    const mo = Number(w.raceDate.slice(5, 7)) - 1, f = windKindFreq(mo), month = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' });
+    const odds = WIND_KINDS.filter(k => f[k] >= 0.01).map(k => `${WIND_KIND_LABEL[k].toLowerCase()} ${Math.round(f[k] * 100)}%`).join(', ');
+    $('windKindNote').textContent = `${month} race days at Fort Point, 2021–25: ${odds}. ${(S.windKind ?? 'auto') === 'auto' ? `This race day: ${WIND_KIND_LABEL[w.windKind].toLowerCase()}.` : `You chose ${WIND_KIND_LABEL[w.windKind].toLowerCase()}${f[w.windKind] < 0.02 ? ' (it almost never blows in ' + month + '; you get the westerly)' : ''}.`} ${KIND_NOTE[w.windKind]}`;
+  }
   $('swellDaySeg').hidden = w.sea.flat;
   const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
   d.value = w.raceDate; tm.value = S.tideTime || '12:00';
@@ -603,14 +617,14 @@ function drawTideGraph(): void {
   if (w.seaBreeze) {
     // the westerly in the open water near the line, kt, on its own scale (right)
     const kts: number[] = [];
-    for (let i = 0; i <= n; i++) kts.push(breezeAt(from + (to - from) * i / n, w.windDay).kt * windTerrain(p));
+    for (let i = 0; i <= n; i++) { const b = breezeAt(from + (to - from) * i / n, w.windDay, w.windKind); kts.push(b.kt * windTerrain(p, b.from)); }
     const kmax = Math.max(10, Math.ceil(Math.max(...kts) / 5) * 5), yk = (v: number) => bot - v / kmax * (bot - top);
     ctx.strokeStyle = '#7fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); kts.forEach((v, i) => (i ? ctx.lineTo(x(i), yk(v)) : ctx.moveTo(x(i), yk(v)))); ctx.stroke();
     ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = '#7fe0a8'; ctx.textAlign = 'right';
     ctx.fillText(`WIND ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
-    const b = breezeAt(w.gunUtc, w.windDay), b2 = breezeAt(w.gunUtc + 90, w.windDay);
-    const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * windTerrain(p))} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * windTerrain(p))} kt` : 'steady';
-    notes.push(`wind ${Math.round(b.kt * windTerrain(p))} kt from ${Math.round(b.from)}° near the line, ${trend} over the next 90 minutes (more out in the slot); a westerly blows on about ${Math.round(b.west * 100)}% of ${new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' })} days at this hour`);
+    const b = breezeAt(w.gunUtc, w.windDay, w.windKind), b2 = breezeAt(w.gunUtc + 90, w.windDay, w.windKind), k = windTerrain(p, b.from);
+    const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * k)} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * k)} kt` : 'steady';
+    notes.push(`${WIND_KIND_LABEL[w.windKind].toLowerCase()} ${Math.round(b.kt * k)} kt from ${w.windKind === 'light' ? 'all over' : Math.round(b.from) + '°'} near the line, ${trend} over the next 90 minutes${w.windKind === 'west' ? ' (more out in the slot)' : ''}`);
   }
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(w.gunUtc * 60000), sp = sunPosition(w.gunUtc * 60000);
@@ -640,7 +654,7 @@ document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListen
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewRows(); paintSeg(); newGame(); return; }
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength') ? v : Number(v);
+  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'windKind') ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
 /* Crew: how many, and each person's height and weight (shown in feet and inches, and pounds). */

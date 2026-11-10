@@ -69,12 +69,13 @@ export interface Course {
   finishSign: 1 | -1; // +1: finish by crossing toward the course side
 }
 
-export interface CourseOptions { bias: number; fleet: number }
+/** `windFrom`: the day's wind (a course laid from the line is set to it; otherwise it only decides which legs are beats). */
+export interface CourseOptions { bias: number; fleet: number; windFrom?: number }
 
-const markPos = (m: MarkDef, center: Vec | null): Vec => {
+const markPos = (m: MarkDef, center: Vec | null, turn = 0): Vec => {
   if (m.from === 'lineCenter') {
     if (!center) throw new Error(`Mark ${m.name}: lineCenter offsets need a centred start line`);
-    const u = V(m.bearing ?? 0);
+    const u = V((m.bearing ?? 0) + turn);
     return { x: center.x + u.x * (m.distance ?? 0), y: center.y + u.y * (m.distance ?? 0) };
   }
   if (m.lat == null || m.lon == null) throw new Error(`Mark ${m.name} needs lat/lon`);
@@ -99,9 +100,11 @@ function islandReach(p: Vec): number[] {
 export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
   const sl = f.startLine;
   let committee: Vec, pin: Vec, lineCenter: Vec | null = null;
+  // a course laid from its line (the committee sets the line and the marks): turned to the day's wind
+  const turn = sl.center && opt.windFrom != null ? wrap(opt.windFrom - f.windBase) : 0;
   if (sl.center) {
     lineCenter = LL(sl.center.lat, sl.center.lon);
-    const Lv = V((sl.bearing ?? 0) + (sl.biasAdjustable ? opt.bias : 0));
+    const Lv = V((sl.bearing ?? 0) + turn + (sl.biasAdjustable ? opt.bias : 0));
     const len = typeof sl.length === 'number' ? sl.length : (sl.length?.base ?? 100) + (sl.length?.perBoat ?? 0) * (opt.fleet + 1);
     committee = { x: lineCenter.x + Lv.x * len / 2, y: lineCenter.y + Lv.y * len / 2 };
     pin = { x: lineCenter.x - Lv.x * len / 2, y: lineCenter.y - Lv.y * len / 2 };
@@ -117,7 +120,7 @@ export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
   const marks = f.legs.map((leg): CourseMark => {
     const def = f.marks[leg.mark];
     if (!def) throw new Error(`Leg refers to unknown mark ${leg.mark}`);
-    const p = posCache[leg.mark] ??= markPos(def, lineCenter);
+    const p = posCache[leg.mark] ??= markPos(def, lineCenter, turn);
     return {
       key: leg.mark, name: def.name, p, type: leg.type, side: leg.side === 'starboard' ? 's' : 'p',
       shape: def.shape ?? 'cylinder', look: def.look ?? 'Y', beat: false, leg: 'reach',
@@ -126,7 +129,7 @@ export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
     };
   });
   const C: Course = {
-    id: f.id, title: f.title, notes: f.notes ?? '', base: f.windBase,
+    id: f.id, title: f.title, notes: f.notes ?? '', base: opt.windFrom ?? f.windBase,
     obstruction: (f.obstructions ?? []).some(o => o.kind === 'startFinishLine'),
     committee, pin, committeeLabel: sl.committee.label, pinLabel: sl.pin.label,
     committeeKind: sl.committee.kind ?? 'boat', pinKind: sl.pin.mark ? 'mark' : (sl.pin.kind ?? 'buoy'),

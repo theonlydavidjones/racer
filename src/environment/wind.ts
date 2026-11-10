@@ -12,20 +12,32 @@ export interface Wind { from: number; kt: number }
  * The course-wide wind: a mean direction and speed with oscillating shifts on top (a 120 s and a 41 s direction
  * oscillation and a 63 s pressure pulse). With the sea breeze, `base` and `kt` follow the time of day.
  */
-export interface WindModel { base: number; kt: number; phase: [number, number, number] }
+export interface WindModel { base: number; kt: number; phase: [number, number, number]; steady?: number }
 
 export function windAt(m: WindModel, t: number): Wind {
   const p = m.phase;
-  const from = m.base + 6 * Math.sin(2 * Math.PI * t / 120 + p[0]) + 2.5 * Math.sin(2 * Math.PI * t / 41 + p[1]);
+  // an unsteady wind (light and variable: steady ~0.3) swings further, and wanders over ten minutes or so
+  const swing = clamp(0.75 / (m.steady ?? 1), 1, 2.5), wander = (swing - 1) * 22 * Math.sin(2 * Math.PI * t / 640 + p[0] * 1.7);
+  const from = m.base + wander + swing * (6 * Math.sin(2 * Math.PI * t / 120 + p[0]) + 2.5 * Math.sin(2 * Math.PI * t / 41 + p[1]));
   return { from: n360(from), kt: m.kt * (1 + 0.08 * Math.sin(2 * Math.PI * t / 63 + p[2])) };
 }
 
-/* ---------- the afternoon westerly, from five years of NOAA records ---------- */
+/* ---------- the day's wind, from five years of NOAA records ---------- */
 
-interface ClimCell { kt: number[]; ktW: number[]; dir: number; west: number; gust: number }
-const MONTHS = (clim as unknown as { months: ClimCell[][] }).months;
+/**
+ * The kind of day: the westerly sea breeze; a northerly (behind a cold front, or the dry offshore wind; the
+ * commonest winter wind); a southerly (ahead of a storm); or light and variable. From April to September it's
+ * nearly always the westerly; from November to February the westerly comes on only a fifth to a half of days.
+ */
+export type WindKind = 'west' | 'north' | 'south' | 'light';
+export const WIND_KINDS: WindKind[] = ['west', 'north', 'south', 'light'];
+export const WIND_KIND_LABEL: Record<WindKind, string> = { west: 'Westerly', north: 'Northerly', south: 'Southerly', light: 'Light and variable' };
 
-/** Which kind of westerly day: a light one, a typical one or a windy one (25th, 50th, 75th percentile). */
+interface ClimCell { kt: number[]; dir: number; steady: number; gust: number }
+interface ClimMonth { days: number; freq: Record<WindKind, number>; kinds: Record<WindKind, ClimCell[] | null> }
+const MONTHS = (clim as unknown as { months: ClimMonth[] }).months;
+
+/** Which kind of day of its kind: a light one, a typical one or a windy one (25th, 50th, 75th percentile). */
 export type WindDay = 0 | 1 | 2;
 export const WIND_DAY_LABEL = ['Light day', 'Typical day', 'Windy day'] as const;
 
@@ -39,25 +51,45 @@ export const OPEN_WATER = 1.25;
 const fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', month: 'numeric', hour: 'numeric', minute: 'numeric' });
 
 export interface Breeze {
-  from: number; // mean direction of the westerly at this hour
+  kind: WindKind;
+  from: number; // mean direction at this hour
   kt: number; // open-water speed for the chosen kind of day
   gust: number; // typical gust / mean ratio
-  west: number; // how often it's a westerly at this hour of this month (0–1)
+  steady: number; // how steady the direction is (1 = always the same; light days ~0.3)
+  freq: number; // how often this kind of day comes in this month (0–1)
 }
 
-/** The westerly for a time (minutes since epoch, UTC) and kind of day, interpolated between the hourly records. */
-export function breezeAt(tMin: number, day: WindDay): Breeze {
+/** How often each kind of day comes in a month (0 = January). */
+export const windKindFreq = (month: number): Record<WindKind, number> => MONTHS[((month % 12) + 12) % 12].freq;
+
+const hash = (s: string) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+/**
+ * The kind of day for a race date ('YYYY-MM-DD'): drawn from that month's records (the same date always gives the
+ * same weather), or the one you chose.
+ */
+export function windKindFor(date: string, choice: WindKind | 'auto' = 'auto'): WindKind {
+  if (choice !== 'auto') return choice;
+  const f = windKindFreq(Number(date.slice(5, 7)) - 1);
+  let u = hash('wx' + date);
+  for (const k of WIND_KINDS) { if (u < f[k]) return k; u -= f[k]; }
+  return 'west';
+}
+
+/** The wind for a time (minutes since epoch, UTC), kind of day, and light/typical/windy, interpolated between the hourly records. */
+export function breezeAt(tMin: number, day: WindDay, kind: WindKind = 'west'): Breeze {
   const parts = Object.fromEntries(fmt.formatToParts(new Date(tMin * 60000)).map(p => [p.type, p.value]));
   const m = (+parts.month - 1 + 12) % 12, h = (+parts.hour % 24) + +parts.minute / 60;
+  const cells = MONTHS[m].kinds[kind] ?? MONTHS[m].kinds.west!; // a kind that (almost) never comes this month: the westerly
   const h0 = Math.floor(h) % 24, h1 = (h0 + 1) % 24, f = h - Math.floor(h);
-  const a = MONTHS[m][h0], b = MONTHS[m][h1];
+  const a = cells[h0], b = cells[h1];
   const lerp = (x: number, y: number) => x + (y - x) * f;
-  const dirA = a.dir || 255, dirB = b.dir || dirA;
   return {
-    from: n360(dirA + ((((dirB - dirA) % 360) + 540) % 360 - 180) * f),
-    kt: lerp(a.ktW[day], b.ktW[day]) * OPEN_WATER,
+    kind: MONTHS[m].kinds[kind] ? kind : 'west',
+    from: n360(a.dir + ((((b.dir - a.dir) % 360) + 540) % 360 - 180) * f),
+    kt: lerp(a.kt[day], b.kt[day]) * OPEN_WATER,
     gust: lerp(a.gust, b.gust),
-    west: lerp(a.west, b.west)
+    steady: lerp(a.steady, b.steady),
+    freq: MONTHS[m].freq[kind]
   };
 }
 
@@ -84,12 +116,15 @@ export function slotWeight(p: Vec): number {
 export function landLee(p: Vec, from: number): number {
   const lee = terrainLee(p, from);
   if (lee >= 1) return 1;
-  const w = slotWeight(p); if (w < 0.02) return lee;
+  const w = slotWeight(p) * slotFlow(from); if (w < 0.02) return lee;
   return lee + (terrainLee(p, from, true) - lee) * w; // in the jet, the hills flanking the Gate don't shelter it (islands in it still do)
 }
 
-export function windTerrain(p: Vec): number {
-  const slot = slotWeight(p);
+/** How much the wind comes in through the Gate (the slot): all of a westerly, none of a northerly or southerly. */
+export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 255) * Math.PI / 180)) ** 2;
+
+export function windTerrain(p: Vec, from = 255): number {
+  const slot = slotWeight(p) * slotFlow(from);
   const shore = 0.8 + 0.2 * clamp(shoreDist(p) / 400, 0, 1);
   return (1 + SLOT_BOOST * slot) * shore;
 }
@@ -175,7 +210,7 @@ export class TerrainGrid {
     };
     for (let j = 0; j < this.n; j++) for (let i = 0; i < this.n; i++) {
       const p = { x: cx - half + i * cell, y: cy - half + j * cell };
-      this.g[j * this.n + i] = windTerrain(p) * leeAt(p.x, p.y);
+      this.g[j * this.n + i] = windTerrain(p, from ?? 255) * leeAt(p.x, p.y);
     }
   }
   at(x: number, y: number): number {

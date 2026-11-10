@@ -7,7 +7,7 @@ import { DT, World } from '../src/sim/world';
 import { flagsAt, inTriangle, startSequence } from '../src/sim/signals';
 
 const TRAIN = train as unknown as CourseFile, SS2 = ss2 as unknown as CourseFile;
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKt: 12, tideDate: '2026-11-14', current: 'slack', sea: 'flat', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', current: 'slack', sea: 'flat', ...o });
 
 describe('Starting signals (RRS 26)', () => {
   it('3-minute sequence: class flag at 3, P at 2, P down with a long sound at 1, class flag down at the gun', () => {

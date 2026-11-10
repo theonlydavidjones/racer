@@ -2,7 +2,7 @@ import { D2R, KT, V, brg, cross, dot, sub, wrap, type Vec } from '../core/math';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { CURRENTS, currentAt, currentVector, shoreRelief } from '../environment/current';
 import { CurrentField, nextSaturday, sfLocalToUtcMin, stationsFor } from '../environment/tide';
-import { breezeAt, windTerrain, type WindDay } from '../environment/wind';
+import { WIND_KIND_LABEL, breezeAt, windKindFor, windTerrain, type WindDay, type WindKind } from '../environment/wind';
 import type { Settings } from '../settings';
 import { buildCourse, type CourseFile } from './course';
 
@@ -18,8 +18,9 @@ import { buildCourse, type CourseFile } from './course';
  * when the fleet gets there.
  *
  * The Seaweed Soup sheet has courses starting west and starting east; it doesn't say when each is used. Here the
- * committee starts west (to windward) in the westerly, and only sends the fleet east when a beat to the west
- * won't work: light air against a strong flood, say. That's our inference, not the sheet's.
+ * committee starts to windward when it can (west in the westerly; east when there's east in the wind), and off the
+ * wind only when the beat won't work (light air against a strong tide). That's our inference, not the sheet's. The
+ * line is fixed (the GGYC flagpole to X, running north), so in a northerly or southerly every start is a reach.
  */
 
 export type RaceLength = 'short' | 'medium' | 'long';
@@ -35,21 +36,27 @@ export interface RaceDay {
   current(p: Vec, min: number): Vec;
   /** Minutes since epoch UTC at the gun. */
   gunUtc: number;
+  /** The kind of wind the day brings, and where it's from at the gun. */
+  kind: WindKind; fromAtGun: number;
 }
 
-export function raceDay(S: Settings, windBase: number): RaceDay {
+/** The day's wind and tide, as the World will have them (sim/world.ts). */
+export function raceDay(S: Settings, windBase = 275): RaceDay {
   const date = S.tideDate || nextSaturday(), gunUtc = sfLocalToUtcMin(date, S.tideTime || '12:00');
-  const sea = S.windKt === 0;
+  const sea = S.windKt === 0, day = (S.windDay ?? 1) as WindDay;
+  const g = breezeAt(gunUtc, day, windKindFor(date, S.windKind ?? 'auto')), kind = g.kind;
+  if (!sea && kind === 'west') g.from = windBase; // as the World does
   const wind = (p: Vec, min: number) => {
-    const b = sea ? breezeAt(gunUtc + min, (S.windDay ?? 1) as WindDay) : { kt: S.windKt, from: windBase };
-    return { kt: b.kt * windTerrain(p), from: b.from };
+    const b = sea ? breezeAt(gunUtc + min, day, kind) : { kt: S.windKt, from: g.from };
+    return { kt: b.kt * windTerrain(p, b.from), from: b.from };
   };
+  const base = { gunUtc, wind, kind, fromAtGun: g.from };
   if (S.current === 'real') {
     const f = new CurrentField(stationsFor(gunUtc - 30, gunUtc + 6 * 60));
-    return { gunUtc, wind, current: (p, min) => { f.setTime(gunUtc + min); const c = f.at(p), k = shoreRelief(p); return { x: c.x * k, y: c.y * k }; } };
+    return { ...base, current: (p, min) => { f.setTime(gunUtc + min); const c = f.at(p), k = shoreRelief(p); return { x: c.x * k, y: c.y * k }; } };
   }
   const open = currentVector(CURRENTS[S.current] ?? CURRENTS.slack);
-  return { gunUtc, wind, current: p => currentAt(p, open) };
+  return { ...base, current: p => currentAt(p, open) };
 }
 
 export type LegKind = 'beat' | 'reach' | 'run';
@@ -58,6 +65,12 @@ export interface CourseEstimate { file: CourseFile; no: number; minutes: number;
 
 /** Seconds lost in each tack or gybe, and at each mark. */
 const MANOEUVRE_S = 8, ROUNDING_S = 10;
+/**
+ * Calibrated against the sim's own fleet sailing the courses (12 kt slack, the real tide and ebb; courses 1, 3, 5,
+ * 41): the leaders take about 15% longer than the polar arithmetic (puffs and lulls, tacks, each other's wind), and
+ * rounding Alcatraz costs about six minutes more (the wide berth, and the patchy air in its lee).
+ */
+const FLEET_FACTOR = 1.15, ISLAND_ROUNDING_S = 360;
 
 /** Time (s) to sail from a to b, and how: tacking or gybing on the best angles, or straight there (crabbing across the current). */
 export function legTime(a: Vec, b: Vec, w: { kt: number; from: number }, c: Vec): { s: number; kind: LegKind } | null {
@@ -92,7 +105,7 @@ export function legTime(a: Vec, b: Vec, w: { kt: number; from: number }, c: Vec)
 
 /** How long the course takes the leading Folkboat on the day (minutes), leg by leg. */
 export function estimateCourse(file: CourseFile, day: RaceDay, fleet = 3): CourseEstimate {
-  const C = buildCourse(file, { bias: 0, fleet });
+  const C = buildCourse(file, { bias: 0, fleet, windFrom: day.fromAtGun });
   const pts = [C.center, ...C.marks.map(m => m.p), C.center], names = [...C.marks.map(m => m.name), 'Finish'];
   const legs: LegEstimate[] = [];
   let t = 0, slowest = Infinity;
@@ -107,8 +120,9 @@ export function estimateCourse(file: CourseFile, day: RaceDay, fleet = 3): Cours
     t += s + (i < pts.length - 1 && C.marks[i - 1].type === 'round' ? ROUNDING_S : 0);
   }
   const w0 = day.wind(C.center, 0), first = sub(C.marks[0].p, C.center);
-  const upwindStart = Math.abs(wrap(brg(first.x, first.y) - w0.from)) < 70;
-  return { file, no: Number(file.id.replace(/\D/g, '')) || 0, minutes: t / 60, legs, slowestKt: slowest, upwindStart };
+  const upwindStart = Math.abs(wrap(brg(first.x, first.y) - w0.from)) < 55; // a beat, as course.ts counts one
+  const islands = C.marks.filter(m => m.reach).length;
+  return { file, no: Number(file.id.replace(/\D/g, '')) || 0, minutes: (t * FLEET_FACTOR + islands * ISLAND_ROUNDING_S) / 60, legs, slowestKt: slowest, upwindStart };
 }
 
 export interface CommitteeChoice { est: CourseEstimate; target: number; why: string; considered: number }
@@ -128,9 +142,9 @@ export function chooseCourse(courses: CourseFile[], S: Settings): CommitteeChoic
   const ranked = pool.map(f => estimateCourse(f, day, S.fleet)).map(e => ({ e, s: score(e) })).sort((a, b) => a.s - b.s);
   const near = ranked.filter(r => r.s <= ranked[0].s + 0.05);
   const pick = near[hash(`${S.tideDate}|${S.tideTime}|${S.windKt}|${S.current}|${S.raceLength}`) % near.length].e;
-  const w = day.wind(buildCourse(pick.file, { bias: 0, fleet: S.fleet }).center, 0), c = day.current(buildCourse(pick.file, { bias: 0, fleet: S.fleet }).center, 0);
+  const at = buildCourse(pick.file, { bias: 0, fleet: S.fleet, windFrom: day.fromAtGun }).center, w = day.wind(at, 0), c = day.current(at, 0);
   const ckt = Math.hypot(c.x, c.y) / KT, ebb = dot(c, V(270)) > 0;
   const tide = ckt < 0.2 ? 'slack water' : `${ebb ? 'an ebb' : 'a flood'} of ${ckt.toFixed(1)} kt at the line`;
-  const why = `${Math.round(w.kt)} kt from ${Math.round(w.from)}° and ${tide}: course ${pick.no} (${pick.file.distanceNm ?? '?'} nm) should take the leaders about ${Math.round(pick.minutes)} min, for a ${target}-minute race${pick.upwindStart ? ', starting to windward' : ''}.${!pick.upwindStart && ranked.some(r => r.e.upwindStart) ? ' A beat to the west would leave the fleet stuck against the tide, so the start is to the east.' : ''}`;
+  const why = `${WIND_KIND_LABEL[day.kind]}, ${Math.round(w.kt)} kt from ${Math.round(w.from)}°, and ${tide}: course ${pick.no} (${pick.file.distanceNm ?? '?'} nm) should take the leaders about ${Math.round(pick.minutes)} min, for a ${target}-minute race${pick.upwindStart ? ', starting to windward' : ''}.${!pick.upwindStart && ranked.some(r => r.e.upwindStart) ? ' The beat would leave the fleet stuck against the tide, so the first leg is off the wind.' : !pick.upwindStart ? ' The line runs north from the club and can\'t be moved, so in this wind no course starts to windward: it\'s a reaching start.' : ''}`;
   return { est: pick, target, why, considered: pool.length };
 }
