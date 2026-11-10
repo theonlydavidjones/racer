@@ -6,7 +6,7 @@ import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
 import { sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
-import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap } from '../core/math';
+import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
@@ -395,6 +395,55 @@ export class Hud {
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
+    this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom);
+    ctx.fillStyle = '#94abb7'; ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('WIND ↓', 6, 12);
+    const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
+    if (ckt > 0.05) {
+      // the current where you are
+      const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w - 18, oy = 16;
+      ctx.strokeStyle = '#6fd0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
+      ctx.fillStyle = '#6fd0ff'; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
+      ctx.textAlign = 'right'; ctx.fillText('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6);
+    }
+  }
+
+  /**
+   * The full-screen chart (ui/chart.ts): north up, centred on (cx, cy) at `scale` px/m, with the places' names, and the
+   * spot you've picked. Same picture as the inset map: land, wind, puffs, current, the course or your destination, boats, ships.
+   */
+  drawChart(c: HTMLCanvasElement, wd: World, cx: number, cy: number, scale: number, pick: Vec | null): void {
+    const [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h);
+    ctx.fillStyle = '#123247'; ctx.fillRect(0, 0, w, h);
+    this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true);
+    // the places, by name
+    ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+    for (const pl of PLACES) {
+      const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
+      if (!pl.buoy) { ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }
+      if (scale > 0.12 || !pl.buoy) { ctx.fillStyle = pl.buoy ? 'rgba(255,214,90,.85)' : 'rgba(233,242,245,.85)'; ctx.fillText(pl.name, q[0] + 6, q[1] + 4); }
+    }
+    if (pick) { // the spot you've picked: a ring, and the line from you to it
+      const a = tf(u.x, u.y), b = tf(pick.x, pick.y);
+      ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b[0], b[1], 9, 0, 6.29); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(b[0] - 14, b[1]); ctx.lineTo(b[0] + 14, b[1]); ctx.moveTo(b[0], b[1] - 14); ctx.lineTo(b[0], b[1] + 14); ctx.stroke();
+    }
+    // north, the wind, and a scale bar
+    ctx.fillStyle = '#e9f2f5'; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('N', w - 28, 22); ctx.beginPath(); ctx.moveTo(w - 28, 28); ctx.lineTo(w - 23, 42); ctx.lineTo(w - 33, 42); ctx.closePath(); ctx.fill();
+    const wf = wd.wind.from * D2R, ox = w - 28, oy = 80;
+    ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(ox + Math.sin(wf) * 18, oy - Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 12, oy + Math.cos(wf) * 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
+    ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(`WIND ${Math.round(wd.wind.kt)} KT`, ox - 6, oy + 34);
+    const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
+    ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
+  }
+
+  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     if (wd.settings.aids) { // the wind across the course: where it blows harder and lighter, and which way
       const half = Math.max(w, h) / scale * 0.75, spacing = Math.max(250, half / 7);
@@ -415,7 +464,7 @@ export class Hud {
       ctx.strokeStyle = 'rgba(230,230,225,.9)'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(3, ty.beam * scale);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); ctx.lineCap = 'butt';
       if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = 'rgba(230,230,225,.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); }
-      if (this.mapZoom) { ctx.fillStyle = 'rgba(230,230,225,.85)'; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
+      if (labels) { ctx.fillStyle = 'rgba(230,230,225,.85)'; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
     }
     if (wd.settings.aids && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
     for (const b of wd.boats) {
@@ -426,16 +475,6 @@ export class Hud {
       ctx.restore();
     }
     ctx.restore();
-    ctx.fillStyle = '#94abb7'; ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('WIND ↓', 6, 12);
-    const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
-    if (ckt > 0.05) {
-      // the current where you are
-      const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w - 18, oy = 16;
-      ctx.strokeStyle = '#6fd0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
-      ctx.fillStyle = '#6fd0ff'; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
-      ctx.textAlign = 'right'; ctx.fillText('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6);
-    }
   }
 }
 

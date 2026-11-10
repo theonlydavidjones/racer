@@ -1,7 +1,7 @@
 /** Keyboard bindings: every action, its keys, and saving your changes in this browser. */
 export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'luff'
-  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard'
+  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
@@ -25,6 +25,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'ctlDown', label: 'Selected line: less (ease the vang, outhaul…; trim a sheet in; car forward/in)', group: 'Sails' },
   { id: 'ctlUp', label: 'Selected line: more (tighten; ease a sheet; car aft/out)', group: 'Sails' },
   { id: 'pole', label: 'Whisker pole out / in', group: 'Sails' },
+  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby (cruising only)', group: 'Helm' },
   { id: 'pushOff', label: 'Push off from the slip (the crew shoves her off astern)', group: 'Helm' },
   { id: 'jibHalyard', label: 'Hoist or strike the jib', group: 'Sails' },
   { id: 'mainHalyard', label: 'Hoist or strike the main', group: 'Sails' },
@@ -50,7 +51,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'],
-  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], pushOff: ['g'], jibHalyard: ['j'], mainHalyard: ['u'],
+  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], pushOff: ['g'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],

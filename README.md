@@ -27,6 +27,8 @@ Every key can be changed: Setup → **Keyboard settings**, or **K** in the game.
 - **Overhead.** **N** switches between north up, bow up and wind up (saved). Scroll or **+**/**−** to zoom, drag to move the map, **B** (or the "Back to boat" chip) recentres on your boat.
 - **Sails.** **S** luffs (hold), **O** whisker pole, Z/X and , / . work the sheets when you trim.
 - **Other.** **H** hail, **M** course view, **L** message log, **P** pause.
+- **Chart.** Tap the map at the top right: it opens full screen and the sail pauses. North up; drag to move, scroll to zoom, **Back to boat** recentres. Cruising, tap the water or a named place to see how far it is, its bearing, what point of sail it'll be and the current there now, then **Sail here** to make it your destination. **Esc** closes it.
+- **Autopilot (cruising).** **Y** (or the Autopilot chip) engages a tiller pilot holding her heading. Its control head, beside the tiller: **Auto** holds a compass course; **Wind** holds the apparent wind angle; **Nav** sails to your destination, tacking on the laylines (allowing for the current), tacking off the shore, and steering round land in the way. **−10/−1/+1/+10** (or **A**/**D** held) turn the set course; **Tack** turns 100° through the wind in Auto, or puts the same wind angle on the other side in Wind. Taking the tiller (**T**, a click on the water, the tiller bar) puts it on standby. There's none when racing: RRS 52 says a racing boat's rudder is worked only by her crew's own power.
 - **Messages.** Notices stay up longer than before, the last few stay in the Messages panel at the right, and **All** (or **L**) opens the whole session's log, including incident explanations.
 
 ## Modes
@@ -139,6 +141,10 @@ Checked against the official 2025–2028 rulebook (World Sailing, with changes a
 Four ways in: **Race** (race day and start time, a course or the race committee's choice, the boats you race against, your crew; Full race or Start practice), **Cruise** (sail anywhere: where you start and, if you like, where you're going), **Marina** (your boats: build, paint and set them up) and **Yacht Club** (coming: crew and skippers, and how well each boat is sailed). **Exit** (in the controls, and in the pause menu) leaves any mode for the start page.
 
 Race and Cruise sail the real day (below). **Adjust conditions** changes any of it: wind speed, wind direction, the current, the chop (× the real chop, down to glassy), the swell outside the Gate, rain (light or heavy: overcast light, rain streaks, less visibility) and fog (the real summer fog bank, none, patchy or thick). Each starts as Real; Real puts it back.
+
+### The tiller pilot
+
+`src/boat/autopilot.ts`: an electric ram on the tiller, modelled on the common Raymarine ST2000+ (hard over to hard over in 4 s, no load), so it can't correct faster than that, and in a seaway it works all the time. It steers a turn rate proportional to the heading error; its AutoTrim learns the standing helm (weather helm) she needs and carries it. In Wind mode it reads the masthead unit damped over 2.5 s, as a pilot's response setting does. Nav is the pilot plus a navigator calling the tacks. It keeps no lookout: other boats, ships and the shore ahead on a reach are still yours. Tested: holding course on a beam reach in a real seaway (within 3°, tiller within 17% of its travel), no standing error close-hauled in 20 kt, and beating to Crissy Field from the Cityfront in 11 minutes with two tacks.
 
 ### West Harbor
 

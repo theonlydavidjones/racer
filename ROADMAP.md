@@ -33,6 +33,8 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - **More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
+- **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
+  session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
 ## Next up
 

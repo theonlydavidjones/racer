@@ -346,6 +346,9 @@ export class SceneView {
     this.markObjs.push({ p, float, wake });
   }
 
+  /** The course or destination changed (a new destination picked on the chart): build its marks again. */
+  refreshCourse(w: World): void { this.buildCourse(w); }
+
   private buildCourse(w: World): void {
     this.courseObjs.forEach(o => this.scene.remove(o)); this.courseObjs = [];
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.courseObjs.push(o); return o; };

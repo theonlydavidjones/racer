@@ -29,6 +29,7 @@ import { condition } from '../boat/condition';
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../boat/crewPhys';
+import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { FLAG_NAME, X_FLAG_MAX, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -187,6 +188,8 @@ export class World {
   private showFlags = false;
   /** Just sail: where you're heading (a mark in all but name: the dials measure to it), or null. */
   dest: CourseMark | null = null;
+  /** Your tiller pilot (cruising only: RRS 52 says a racing boat's rudder is worked by the crew's own power). */
+  readonly pilot: Pilot = newPilot();
   /** The course number the committee is flying (numeral pennants), and why they chose it; null when you chose it. */
   courseSignal: { no: number; why: string } | null = null;
   /** Racing: the tactics debrief's log of your race (null when just sailing). */
@@ -490,6 +493,7 @@ export class World {
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
       const x0 = b.x, y0 = b.y;
+      if (b.isUser && this.freeSail && this.pilot.mode !== 'off') pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
@@ -902,6 +906,14 @@ export class World {
     crewRig(b, dt, this.emit);
   }
 
+  /** Just sail: a new destination, a place or a spot picked on the chart. */
+  setDest(p: Vec, name: string): void {
+    if (!this.freeSail) return;
+    this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
+    this.arrivedT = null;
+    this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
+  }
+
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
     const d = this.dest, u = this.user;
@@ -913,6 +925,7 @@ export class World {
     }
     if (!d || this.arrivedT != null || markDist(u, d) > 40) return;
     this.arrivedT = this.t;
+    if (this.pilot.mode === 'nav') { this.pilot.mode = 'auto'; this.pilot.course = n360(u.h); } // at the waypoint the pilot holds her heading, as a real one does
     const m = Math.floor(this.t / 60), s = Math.round(this.t % 60);
     this.emit({ type: 'toast', msg: `Arrived: ${d.name}, in ${m} min ${s} s. Choose somewhere new in Setup, or keep sailing.`, ms: 6000 });
     this.emit({ type: 'horn', dur: 0.4 });

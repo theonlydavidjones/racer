@@ -22,7 +22,9 @@ const COAST = (marinaCoast as unknown as { coast: [number, number][] }).coast.fi
 const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > COAST[COAST.length - 1][1])];
 export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
-export const LAND: Vec[] = SHORE.concat([LL(37.790, -122.4000), LL(37.790, -122.4790)]);
+// (closed round the far side of the city, out to the edges of the area the Cityfront shore governs (onLand's CF box), so
+// the Presidio's edge and the city behind the waterfront are land, not a channel or a lake a boat could sail into)
+export const LAND: Vec[] = SHORE.concat([LL(37.7795, -122.3995), LL(37.7795, -122.4805), LL(37.8058, -122.4805)]);
 
 const inCityfront = (p: Vec): boolean => inPoly(p, LAND);
 

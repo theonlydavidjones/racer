@@ -34,6 +34,8 @@ import { $ } from './ui/dom';
 import { horn, logMessage, messageLog, setLogClock, sound, toast } from './ui/feedback';
 import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
+import { Chart } from './ui/chart';
+import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
@@ -177,6 +179,7 @@ let barDrag = false;
   let start: { x: number; t: number } | null = null;
   pad.addEventListener('pointerdown', e => {
     e.preventDefault(); pad.setPointerCapture?.(e.pointerId);
+    pilotOff('Pilot on standby: you have the tiller.');
     start = { x: e.clientX, t: w.user.tiller }; barDrag = true;
   });
   pad.addEventListener('pointermove', e => { if (start) setTiller(start.t + (e.clientX - start.x) / (pad.clientWidth * 0.45)); });
@@ -194,6 +197,7 @@ let lastCursorX: number | undefined;
 function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN)); }
 function takeTiller(x?: number): void {
   if (!w.running || w.paused || tillerHeld) return;
+  pilotOff('Pilot on standby: you have the tiller.');
   tillerHeld = true; document.body.classList.add('tiller-held'); $('tiller').classList.add('held');
   if (x != null) tillerFromCursor(x);
   if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's centre line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
@@ -208,6 +212,7 @@ addEventListener('blur', releaseTiller);
 /** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
 function tillerSpring(dt: number): void {
   if (tillerHeld && (!w.running || w.paused)) releaseTiller(); // paused or stopped: hands off
+  if (w.pilot.mode !== 'off') return; // the pilot's ram has it
   if (tillerHeld || barDrag || !w.running || w.paused) return;
   const t = w.user.tiller; if (t !== 0) setTiller(t - Math.sign(t) * Math.min(Math.abs(t), 2.5 * dt));
 }
@@ -365,6 +370,46 @@ for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
   $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); halyard(sail); });
   $(id).addEventListener('click', e => { if (e.detail === 0) halyard(sail); }); // keyboard activation only
 }
+/* The tiller pilot (boat/autopilot.ts): cruising only, since RRS 52 says a racing boat's rudder is worked by her
+ * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
+function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
+  if (!w.running || w.paused) return;
+  if (!w.freeSail) { toast('No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.', 5000); return; }
+  const u = w.user;
+  if (u.docked || u.pushing || (u.astern ?? 0) > 0.1 || u.v < 0.5) { toast('Get her sailing first: a tiller pilot needs way on to steer.', 3500); return; }
+  if (mode === 'nav' && (!w.dest || w.arrivedT != null)) { toast('Nav needs somewhere to go: tap the map and pick a destination.', 4000); return; }
+  releaseTiller(); pilotEngage(u, w.pilot, mode);
+}
+function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; pilotStandby(w.pilot); if (msg) toast(msg, 2500); }
+let pilotShown = '';
+/** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
+function pilotTick(dt: number): void {
+  const p = w.pilot, on = p.mode !== 'off' && w.running;
+  if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) pilotAdjust(w.user, p, d * 20 * dt); }
+  const chip = $('bPilot'), hide = !w.running || !w.freeSail;
+  if (chip.hidden !== hide) chip.hidden = hide;
+  chip.classList.toggle('on', on);
+  const panel = $('pilot'); if (panel.hidden === on) { panel.hidden = !on; document.body.classList.toggle('pilot-on', on); }
+  if (!on) return;
+  const u = w.user, side = (a: number) => `${Math.abs(Math.round(a))}° ${a >= 0 ? 'stbd' : 'port'}`;
+  let txt: string;
+  if (p.mode === 'auto') txt = `Holding ${String(Math.round(p.course) % 360).padStart(3, '0')}°`;
+  else if (p.mode === 'wind') txt = `Apparent wind ${side(p.awa)}`;
+  else {
+    const d = w.dest; const nm = d ? Math.hypot(d.p.x - u.x, d.p.y - u.y) / 1852 : 0;
+    txt = d ? `→ ${d.name.replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
+  }
+  if (txt !== pilotShown) { $('pilotRead').textContent = txt; pilotShown = txt; }
+  for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
+}
+$('bPilot').onclick = () => { if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); };
+for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pm]')) b.onclick = () => pilotOn(b.dataset.pm as Exclude<PilotMode, 'off'>);
+for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pa]')) b.onclick = () => {
+  const a = b.dataset.pa!, p = w.pilot;
+  if (a === 'off') pilotOff('Pilot on standby: you have the tiller.');
+  else if (a === 'tack') { if (p.mode === 'nav') toast('Nav calls its own tacks, on the laylines. Switch to Auto or Wind to tack when you choose.', 3500); else pilotTack(w.user, p); }
+  else pilotAdjust(w.user, p, +a);
+};
 /** The halyard buttons: a sail that's down (or on its way up or down) always has one; striking a sail is for the marina. */
 function sailButtons(): void {
   const u = w.user, r = u.rig, inMarina = inBasin(u);
@@ -393,7 +438,10 @@ $('bRestart').onclick = () => { $('pause').hidden = true; beginRace(); };
 $('bSettings').onclick = () => { $('pause').hidden = true; openSetup(); };
 $('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
 $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
-$('map').addEventListener('click', () => { hud.mapZoom = !hud.mapZoom; $('mapHint').textContent = hud.mapZoom ? 'Tap map · course' : 'Tap map · zoom'; });
+// Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
+let chartDest: unknown = null;
+const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); });
+$('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
 /* ---------------- message log ---------------- */
@@ -424,7 +472,7 @@ $('bKeys2').onclick = () => keysView.open();
 /** Helm and sheets follow whatever is held. */
 function applyHeld(): void {
   const u = w.user;
-  u.steer = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0);
+  u.steer = w.pilot.mode !== 'off' ? 0 : (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); // (on the pilot, the steering keys turn its course: pilotTick)
   u.luff = held.has('luff');
   // the lines you're working: sheet keys, the selected line's keys, and the panel's buttons
   const cmd: Partial<Record<CtlKey, number>> = { ...btnCmd };
@@ -441,12 +489,14 @@ function setView(i: number): void {
   $('bView').textContent = 'View · ' + VIEWS[viewMode];
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
+const anyOverlay = () => chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
+  if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
   const a = keymap.actionFor(e.key);
   if (e.key === 'Escape') {
     if (courseView.isOpen) { courseView.close(); return; }
+    if (chart.isOpen) { chart.close(); return; }
     if (!$('logView').hidden) { $('logView').hidden = true; return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
     if (!$('pause').hidden) { $('bResume').click(); return; }
@@ -466,7 +516,8 @@ addEventListener('keydown', e => {
     case 'ctlPrev': ctlSel = (ctlSel + CTL_UI.length - 1) % CTL_UI.length; openLines(true); break;
     case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; openLines(true); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
-    case 'centreTiller': centreTiller(); break;
+    case 'centreTiller': pilotOff('Pilot on standby.'); centreTiller(); break;
+    case 'autopilot': if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); break;
     case 'pole': togglePole(); break;
     case 'hail': doHail(); break;
     case 'pushOff': pushOff(); break;
@@ -868,7 +919,7 @@ function frame(now: number): void {
   }
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && !!w.user.docked); sailButtons();
-  keyLook(dt); lookLabel(); tillerSpring(dt); showTiller(); showLines(); coachTick(dt);
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
   labels.update(w, view.camera, viewMode);

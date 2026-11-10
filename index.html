@@ -25,7 +25,15 @@
 <canvas id="dial" aria-label="Wind angle dial"></canvas>
 <div id="sigPanel" hidden><div class="sig-lab">Signals</div><div id="sigFlags"></div><div id="sigText"></div></div>
 <canvas id="map" aria-label="Course map, tap to zoom"></canvas>
-<div id="mapHint">Tap map · zoom</div>
+<div id="mapHint">Tap map · chart</div>
+<div id="chart" hidden role="dialog" aria-modal="true" aria-labelledby="chartTitle">
+  <div class="ch-head">
+    <div><h2 id="chartTitle">Chart</h2><p class="ch-sub" id="chartSub"></p></div>
+    <div class="ch-btns"><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
+  </div>
+  <canvas id="chartC" aria-label="Chart of the Bay: drag to move, scroll to zoom, tap to pick a destination"></canvas>
+  <div class="ch-info"><div id="chartInfo"></div><button class="cta" type="button" id="bChartGo" hidden>Sail here</button></div>
+</div>
 <div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
 <div id="linebox" hidden></div>
 <div id="transit" hidden></div>
@@ -58,6 +66,7 @@
     <button class="chip on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern">Push off</button>
     <button class="chip" id="bJib" type="button" hidden>Hoist jib</button>
     <button class="chip" id="bMain" type="button" hidden>Hoist main</button>
+    <button class="chip" id="bPilot" type="button" hidden title="Tiller pilot: steers for you (cruising only)">Autopilot</button>
     <button class="chip" id="bExit" type="button" title="Leave and go back to the start page">Exit</button>
     <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
     <button class="chip" id="bOrient" type="button" hidden>North up</button>
@@ -67,6 +76,17 @@
     <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
       <div class="tiller-track"></div><div class="tiller-mid"></div><div class="tiller-handle" id="tillerHandle"></div>
       <span class="tiller-lab" id="tillerLab">Tiller · centred</span>
+    </div>
+    <div class="pilot" id="pilot" hidden role="group" aria-label="Tiller pilot">
+      <span class="pl-lab">Pilot</span>
+      <button class="tp-btn" type="button" data-pm="auto" title="Hold a compass course">Auto</button>
+      <button class="tp-btn" type="button" data-pm="wind" title="Hold the apparent wind angle (masthead unit)">Wind</button>
+      <button class="tp-btn" type="button" data-pm="nav" title="Sail to the destination, tacking on the laylines">Nav</button>
+      <span class="pl-read" id="pilotRead"></span>
+      <button class="tp-btn" type="button" data-pa="-10">−10</button><button class="tp-btn" type="button" data-pa="-1">−1</button>
+      <button class="tp-btn" type="button" data-pa="1">+1</button><button class="tp-btn" type="button" data-pa="10">+10</button>
+      <button class="tp-btn" type="button" data-pa="tack" title="Auto: turn 100° through the wind · Wind: the same angle on the other tack">Tack</button>
+      <button class="tp-btn" type="button" data-pa="off" title="Hand the tiller back to you">Standby</button>
     </div>
     <span class="keys" id="keysHint"></span>
   </div>
