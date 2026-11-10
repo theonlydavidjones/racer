@@ -156,7 +156,7 @@ export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood
 const WOOD: Build = { hull: 'wood', spars: 'wood' };
 
 /** How a boat looks: hull topsides, boot stripe, bottom paint, deck, and the name on her quarters (if shown). */
-export interface Paint { deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard' }
+export interface Paint { deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic' }
 export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
   // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom

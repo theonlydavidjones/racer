@@ -313,7 +313,7 @@ export class World {
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? OPP_TAGS[(i - 1) % OPP_TAGS.length] : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide } } : { paint: F.paint }),
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, hatch: spec.hatch } } : { paint: F.paint }),
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
@@ -866,6 +866,23 @@ export class World {
     p.moved += step;
     if (p.jump > 0) { p.jump += dt / 0.7; if (p.jump >= 1) b.pushing = undefined; }
     else if (p.moved >= p.clear || (b.astern ?? 0) < 0.05) p.jump = 1e-3;
+  }
+
+  /**
+   * While nothing's running (the start page, setting up, the showroom): your boat still sails, in the real wind and
+   * physics (her trim, heel, the apparent wind her flags and windex show), held on her heading, or on `twa` (deg, to
+   * starboard of the wind) if given; the race clock doesn't move and nothing else happens.
+   */
+  idle(dt: number, twa?: number): void {
+    const u = this.user;
+    if (u.docked) { this.dockStep(u, dt); return; }
+    const h = twa != null ? n360(this.wind.from + twa) : u.h;
+    u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.luff = false;
+    u.cur = this.currentAt(u); u.ww = windOnWater(this.windHere(u, u), u.cur);
+    if (this.steps % 30 === 0) u.sea = this.sea.at(u, u.ww, u.cur, q => this.currentAt(q));
+    this.steps++;
+    moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
+    u.h = h; // held there
   }
 
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */

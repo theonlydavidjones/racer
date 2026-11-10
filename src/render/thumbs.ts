@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { Settings } from '../settings';
 import type { BoatSpec } from '../boat/spec';
 import { COURSES } from '../courses/registry';
-import { World } from '../sim/world';
+import { DT, World } from '../sim/world';
 import { buildBoatMesh, syncBoatMesh } from './boatMesh';
 
 /**
@@ -29,17 +29,19 @@ function setup() {
 
 /** Her picture, as a data URL (cached by her looks). */
 export function boatThumb(spec: BoatSpec, S: Settings): string {
-  const key = JSON.stringify([spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.sails, spec.club, spec.name, spec.perf.mast, spec.perf.boom]);
+  const key = JSON.stringify([spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.hatch, spec.sails, spec.club, spec.name, spec.perf.mast, spec.perf.boom]);
   const hit = cache.get(key); if (hit) return hit;
   gl ??= setup();
   // her, as the sim builds her: a quiet world with just her in it, sailing a gentle reach with her flags flying
   const w = new World(COURSES[0], { ...S, boat: spec, boatId: spec.id, boats: [spec], opponents: [], fleet: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', windKind: 'west', windKt: 10, traffic: 0 }, 1, { freeSail: true, showFlags: true });
   const b = w.user;
-  Object.assign(b, { x: 0, y: 0, h: 0, heel: -9, heelMag: 9, boom: -24, jib: -18, rel: -110, twa: 110, awa: 80, arel: -80, aws: 4, tack: 'P', v: 2.5 });
-  b.crew = undefined; // just the boat
-  const m = buildBoatMesh(b); syncBoatMesh(m, b, 0);
-  for (let i = 0; i < 3; i++) syncBoatMesh(m, b, 0.02 * i); // let the sails and flags settle
-  m.crew.group.visible = false;
+  // she sails: twenty seconds on a close reach, port tack, in the real physics (the crew trimming), so her sails, heel and
+  // flags all answer the same apparent wind; then the picture, from off her starboard bow (her leeward side)
+  for (let i = 0; i < 60 * 20; i++) w.idle(DT, -55);
+  const m = buildBoatMesh(b);
+  for (let i = 0; i < 90; i++) syncBoatMesh(m, b, i / 30); // (the windex and flags swing round to the wind as they would)
+  m.crew.group.visible = false; // just the boat
+  m.grp.position.set(0, m.grp.position.y, 0); m.grp.rotation.y = 0; // turned to face the camera's way, at the origin
   gl.scene.add(m.grp);
   const cam = gl.camera; cam.position.set(17, 3.8, -16); cam.lookAt(0, 4.3, -0.2); // off her starboard bow, far enough for the whole boat and rig
   gl.renderer.render(gl.scene, cam);

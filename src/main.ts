@@ -858,6 +858,11 @@ function frame(now: number): void {
     }
     if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
+  } else if (!w.running) {
+    // nothing running (the start page, setup, the showroom): she still sails, in the real wind and physics, so her sails,
+    // heel and flags agree; in the showroom on a close reach
+    const showing = boatPanel.open || fleet.boatOpen;
+    acc += dt; while (acc >= DT) { w.idle(DT, showing ? 55 : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && !!w.user.docked); sailButtons();

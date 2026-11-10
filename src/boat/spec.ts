@@ -17,6 +17,9 @@ export interface BoatSpec {
   cabinTop?: string;
   /** Which side deck the whisker pole is stowed on, alongside the toe rail. */
   poleSide?: 'port' | 'starboard';
+  /** The forehatch: a varnished teak cover on a wooden frame, or a smoked acrylic lid in an aluminium frame (the usual
+   * modern production hatch, as Lewmar's). */
+  hatch?: 'teak' | 'acrylic';
   /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
   sails: { country: string; number: string; color: 'white' | 'black' };
   /** (Older saves: chosen flags. Now her club gives the burgee and her country the ensign; officers' flags go with skippers.) */
@@ -89,6 +92,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     club: typeof x.club === 'string' ? x.club : x.flags?.burgee ?? '', // older saves: her burgee was her club
     ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
+    hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     ...(typeof x.slip === 'string' && x.slip ? { marina: x.marina || 'west-harbor', slip: x.slip } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };

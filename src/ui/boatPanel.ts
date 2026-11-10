@@ -87,6 +87,7 @@ export class BoatPanel {
       case 'deck': this.set(b => { b.deck = v; }); return;
       case 'cabinTop': this.set(b => { if (v) b.cabinTop = v; else delete b.cabinTop; }); return;
       case 'poleSide': this.set(b => { b.poleSide = v === 'starboard' ? 'starboard' : 'port'; }); return;
+      case 'hatch': this.set(b => { b.hatch = v === 'acrylic' ? 'acrylic' : 'teak'; }); return;
       case 'sailColor': this.set(b => { b.sails.color = v as 'white' | 'black'; }); return;
       case 'mainAge': this.set(b => { b.perf.mainAge = v as SailAge; }); return;
       case 'jibAge': this.set(b => { b.perf.jibAge = v as SailAge; }); return;
@@ -191,6 +192,7 @@ export class BoatPanel {
       <section><h3>Deck</h3>
         <div class="field"><span>${name(deckList, b.deck)}</span>${sw('deck', deckList, b.deck)}${wood ? '' : '<small>Teak laid over the glassfibre deck, as many owners have done.</small>'}</div>
         <div class="field"><span>Cabin top · ${b.cabinTop ? name(deckList, b.cabinTop) : b.deck.startsWith('teak') ? 'painted canvas' : 'like the deck'}</span>${sw('cabinTop', deckList, b.cabinTop ?? '', 'Like the deck')}</div>
+        <div class="field"><span>Forehatch</span>${seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic (smoked, aluminium frame)']], b.hatch ?? 'teak')}</div>
         <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}<small>Flat alongside the toe rail, by the cabin.</small></div>
       </section>
       <section><h3>Sails</h3>

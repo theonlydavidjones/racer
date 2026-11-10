@@ -187,6 +187,8 @@ interface Lines {
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
+/** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
+const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82 });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
 const carPos = (side: number, fore: number, ins: number) => { const z = -0.15 + 0.025 * fore, x = side * (0.34 + 0.025 * ins); return new THREE.Vector3(x, cabinTopY(uAtZ(z)) + 0.065, z); };
@@ -325,11 +327,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   { const hz = -1.75, open = 0.5, wall = 0.04, out = open + 2 * wall, rise = 0.055;
     const yC = deckY(uAtZ(hz), 0), tilt = Math.atan2(deckY(uAtZ(hz - 0.3), 0) - deckY(uAtZ(hz + 0.3), 0), 0.6);
     const hatch = new THREE.Group(); hatch.position.set(0, yC, hz); hatch.rotation.x = tilt; grp.add(hatch);
-    const frameMat = new THREE.MeshLambertMaterial({ color: b.spec?.deck?.startsWith('#') ? b.spec.deck : 0xb0a58f });
+    // teak: a wooden frame and a varnished teak cover; acrylic: an anodised aluminium frame round a smoked acrylic lid
+    const acrylic = b.paint?.hatch === 'acrylic';
+    const frameMat = acrylic ? STEEL : new THREE.MeshLambertMaterial({ color: b.spec?.deck?.startsWith('#') ? b.spec.deck : 0xb0a58f });
     for (const [w, d, x, z] of [[out, wall, 0, (open + wall) / 2], [out, wall, 0, -(open + wall) / 2], [wall, open, (open + wall) / 2, 0], [wall, open, -(open + wall) / 2, 0]]) {
       const f = new THREE.Mesh(new THREE.BoxGeometry(w, rise + 0.03, d), frameMat); f.position.set(x, (rise - 0.03) / 2, z); hatch.add(f); // (its foot set into the deck's camber)
     }
-    const cover = new THREE.Mesh(new THREE.BoxGeometry(out + 0.02, 0.032, out + 0.02), MAT.wood); cover.position.y = rise + 0.016; hatch.add(cover);
+    const cover = new THREE.Mesh(new THREE.BoxGeometry(out + 0.02, acrylic ? 0.02 : 0.032, out + 0.02), acrylic ? ACRYLIC : MAT.wood); cover.position.y = rise + (acrylic ? 0.01 : 0.016); hatch.add(cover);
+    if (acrylic) { const rim = new THREE.Mesh(new THREE.BoxGeometry(out + 0.04, 0.012, out + 0.04), STEEL); rim.position.y = rise + 0.004; hatch.add(rim); } // the lid's aluminium rim
     for (const x of [-0.17, 0.17]) { const hg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.012, 0.05), STEEL); hg.position.set(x, rise + 0.034, -(out / 2) + 0.02); hatch.add(hg); } // hinges, forward
     const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.04), STEEL); hasp.position.set(0, rise + 0.034, out / 2 - 0.01); hatch.add(hasp); // the hasp, aft
   }
@@ -573,13 +578,21 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
   const dark = lum(color) < 0.3; // black sails: light seams and stripes, white numbers
   g.fillStyle = color; g.fillRect(0, 0, W, H);
   const line = (pts: [number, number][], col: string, w: number) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach(([u, v], i) => i ? g.lineTo(X(u), Y(v)) : g.moveTo(X(u), Y(v))); g.stroke(); };
-  // crosscut panels: seams across the sail about a metre apart, square to the leech (rising a touch toward the luff)
-  const seam = dark ? 'rgba(210,210,210,.14)' : 'rgba(110,105,95,.22)', n = Math.round(LUFF / 0.95);
-  for (let i = 1; i < n; i++) { const v = i / n; line([[0, v + 0.012], [1, v - 0.008]], seam, main ? 3 : 2.5); }
-  // radial seams fanning out from the clew (the high-load corner)
-  for (let i = 0; i < 9; i++) { const v = 0.06 + 0.4 * (i / 8) ** 1.4; line([[1, 0], [i < 4 ? 0.55 - i * 0.1 : 0.12, v]], seam, 2); }
-  // the draft stripes: two dark lines right across, a third and two-thirds of the way up (the trimmer's reference)
-  for (const v of [0.34, 0.67]) line([[0, v], [1, v - 0.01]], dark ? 'rgba(235,235,235,.55)' : 'rgba(25,30,40,.75)', main ? 7 : 6);
+  // crosscut panels, as sailmakers lay them: each seam runs from the leech square to it, so (the leech leaning forward up to
+  // the head) it slants down toward the luff, until it meets the luff or the foot; the panels are about 0.95 m wide along
+  // the leech. Worked out on the flat sail (luff up the mast, foot along the boom) and mapped to the picture's coordinates
+  const lLen = Math.hypot(FOOT, LUFF), dn = { x: -LUFF / lLen, y: -FOOT / lLen }; // square to the leech, toward the luff and down
+  const toUV = (x: number, y: number): [number, number] => [x / Math.max(0.05, FOOT * (1 - y / LUFF)), y / LUFF];
+  const across = (yL: number): [number, number][] => { // from the leech at height yL (m) to the luff or the foot
+    const x0 = FOOT * (1 - yL / LUFF), sMax = Math.min(x0 / -dn.x, yL / -dn.y), pts: [number, number][] = [];
+    for (let k = 0; k <= 14; k++) { const sv = sMax * k / 14; pts.push(toUV(x0 + dn.x * sv, yL + dn.y * sv)); }
+    return pts;
+  };
+  const seam = dark ? 'rgba(210,210,210,.2)' : 'rgba(100,96,86,.32)', panel = 0.95 * LUFF / lLen; // (0.95 m along the leech, in height)
+  for (let yL = panel; yL < LUFF - 0.3; yL += panel) line(across(yL), seam, main ? 3.5 : 3);
+  // the draft stripes: dark lines along the chord, luff to leech at one height (a third and two-thirds of the way up), as
+  // sailmakers put them on: what the trimmer reads the sail's depth and draft position against
+  for (const v of [0.34, 0.67]) line([[0, v], [1, v]], dark ? 'rgba(235,235,235,.55)' : 'rgba(25,30,40,.75)', main ? 7 : 6);
   // reinforcement patches at the corners: overlapped cloth, a little greyer and more opaque
   g.fillStyle = dark ? 'rgba(120,120,120,.25)' : 'rgba(150,152,155,.28)';
   const patch = (u: number, v: number, r: number) => { g.beginPath(); g.ellipse(X(u), Y(v), r / FOOT * W, r / LUFF * H, 0, 0, Math.PI * 2); g.fill(); };
@@ -593,21 +606,31 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
   }
   if (main && no) {
     const pxV = H / MAIN_LUFF; // canvas px per metre up the sail
-    /** One line of figures, centred at height fraction t, each figure 0.30 m × 0.20 m (a "1" or "I" narrower), 0.06 m apart. */
-    const figures = (txt: string, t: number, col: string, mir: boolean) => {
+    /**
+     * One line of figures at height fraction t, its leech end 0.15 m in from the leech (as sailmakers set them: each line
+     * follows the leech down, so a lower line sits a little further aft). Each figure 0.30 m × 0.20 m, 0.06 m apart, in a
+     * plain bold sans-serif; a 1 is a single straight bar, as on the sails. `flip` draws the figures back to front (the
+     * other side's, seen through the cloth); where they sit is this side's.
+     */
+    const figures = (txt: string, t: number, col: string, flip: boolean) => {
       const chord = MAIN_FOOT * (1 - t), pxU = W / chord; // px per metre across the sail at this height
-      const glyphs = [...txt].filter(ch => ch !== ' '), widths = glyphs.map(ch => (ch === '1' || ch === 'I' ? 0.09 : 0.2));
+      const glyphs = [...txt].filter(ch => ch !== ' '), widths = glyphs.map(ch => (ch === '1' || ch === 'I' ? 0.07 : 0.2));
       const total = widths.reduce((a, w) => a + w, 0) + 0.06 * (glyphs.length - 1);
-      let x = 0.5 * chord - total / 2; // metres from the luff: the middle of the cloth at this height
+      let x = chord - 0.15 - total; // metres from the luff
       g.fillStyle = col;
-      glyphs.forEach((ch, k) => {
-        const size = 0.3 * pxV * 1.37; // a bold sans-serif's cap height is about 0.73 of its em
-        g.save(); g.font = `bold ${size}px "Helvetica Neue", Arial, sans-serif`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-        const m = g.measureText(ch), sx = (widths[k] * pxU) / Math.max(1, m.width);
-        const cx = (x + widths[k] / 2) * pxU, xx = mir ? W - cx : cx, y = H * (1 - t) + 0.15 * pxV;
-        g.translate(xx, y); g.scale(sx * (mir ? -1 : 1), 1); g.fillText(ch, -m.width / 2, 0); g.restore();
+      const size = 0.3 * pxV * 1.37; // a bold sans-serif's cap height is about 0.73 of its em
+      // in reading order from this side: the figures run luff to leech, or leech to luff when they're the far side's
+      const order = flip ? glyphs.map((_, k) => glyphs.length - 1 - k) : glyphs.map((_, k) => k);
+      for (const k of order) {
+        const ch = glyphs[k], cxM = x + widths[k] / 2, cx = (mirror ? chord - cxM : cxM) * pxU, y = H * (1 - t) + 0.15 * pxV;
+        if (ch === '1' || ch === 'I') g.fillRect(cx - 0.035 * pxU, y - 0.3 * pxV, 0.07 * pxU, 0.3 * pxV); // a plain bar
+        else {
+          g.save(); g.font = `bold ${Math.round(size)}px "Helvetica Neue", Helvetica, Arial, "Liberation Sans", "DejaVu Sans", sans-serif`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+          const m = g.measureText(ch), sx = (widths[k] * pxU) / Math.max(1, m.width), back = mirror !== flip;
+          g.translate(cx, y); g.scale(sx * (back ? -1 : 1), 1); g.fillText(ch, -m.width / 2, 0); g.restore();
+        }
         x += widths[k] + 0.06;
-      });
+      }
     };
     const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
     // each side carries its own: the F up near the head and the numbers below, the starboard set higher (RRS G1.3);

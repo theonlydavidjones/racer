@@ -108,3 +108,16 @@ describe('West Harbor', () => {
     expect(w.flags.length).toBe(0); expect(u.docked).toBeTruthy();
   });
 });
+
+describe('idle (the start page, setup, the showroom): she still sails, in the real physics', () => {
+  it('on a close reach her apparent wind, boom and heel agree, and the race clock stands still', () => {
+    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 14, tideDate: '2026-11-14' };
+    const w = new World(COURSES[0], S, 2), u = w.user, t0 = w.t;
+    for (let i = 0; i < 60 * 20; i++) w.idle(DT, 55); // starboard of the wind: the wind over her port bow, port tack
+    expect(w.t).toBe(t0);
+    expect(u.tack).toBe('P');
+    expect(u.arel).toBeLessThan(0); expect(u.arel).toBeGreaterThan(-60); // the flags and windex: wind forward of the beam, to port
+    expect(u.boom).toBeGreaterThan(5); // the boom out to starboard, to leeward
+    expect(u.v).toBeGreaterThan(2); expect(Math.abs(u.heel)).toBeGreaterThan(3);
+  });
+});
