@@ -363,7 +363,8 @@ export class SceneView {
       this.camLocal.set(Math.max(0.35, 0.8 - (aft - 3.3) * 0.06) * this.camSide, 1.6 + Math.max(0, aft - 3.3) * 0.25, aft);
       um.grp.updateMatrixWorld();
       camera.position.copy(this.camLocal).applyMatrix4(um.grp.matrixWorld);
-      camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, u.heel * 0.6 * D2R * Math.cos(look.yaw));
+      // the eye rides with the hull (heel and waves move it), but the view stays level: the horizon never tilts
+      camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, 0);
     } else if (viewMode === 1) {
       // chase: orbit the boat with the look direction
       const dist = look.chase ?? 24, hv = V(u.h - look.yaw / D2R), height = Math.max(1.2, (9 + look.pitch * 25) * dist / 24);
