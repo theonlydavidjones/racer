@@ -11,6 +11,7 @@ import { $ } from './dom';
 import { flagCanvas } from '../render/flags';
 import { FLAG_NAME } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
+import { transitOffset } from '../sim/transits';
 import { targetShape, type Shape } from '../boat/controls';
 
 /** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
@@ -96,6 +97,30 @@ export class Hud {
     ctx.fillStyle = '#ffb35c'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(Math.round(n360(h))).padStart(3, '0') + '°', cx + 22, 13);
   }
 
+  private trCache: { key: string; t: ReturnType<World['laylineTransit']> } = { key: '', t: null };
+  /**
+   * Transits: before the start, what the far end of the line lines up with (in line = on the line); on a beat, what
+   * the mark lines up with along your layline (in line = on the layline).
+   */
+  private transit(w: World, u: Boat): void {
+    const el = $('transit');
+    if (w.freeSail || u.finished || !w.settings.aids) { el.hidden = true; return; }
+    const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
+    if (w.t < 0 || !u.started) {
+      const T = w.lineTransit; if (!T) { el.hidden = true; return; }
+      el.hidden = false;
+      el.innerHTML = `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`;
+      return;
+    }
+    const m = w.nextMark(u), L = laylinesFor(w, u);
+    if (!m || !L || L.kind !== 'up' || u.twa > 70) { el.hidden = true; return; }
+    const i = u.tack === 'S' ? 0 : 1, g = L.tracks[i], key = `${m.name}:${Math.round(Math.atan2(g.x, g.y) * 30)}`;
+    if (key !== this.trCache.key) this.trCache = { key, t: w.laylineTransit(L.mark.p, g) };
+    const T = this.trCache.t; if (!T) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
+  }
+
   private sigKey = '';
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
@@ -120,6 +145,7 @@ export class Hud {
 
   update(w: World, dt: number): void {
     this.signals(w);
+    this.transit(w, w.user);
     this.compass(w, w.user, dt);
     this.acc += dt; if (this.acc < 0.1) return; this.acc = 0;
     const u = w.user, ww = u.ww, m = w.nextMark(u);

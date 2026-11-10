@@ -61,7 +61,9 @@ export class VesselView {
   private wakes = new Map<number, Wakes>();
   constructor(private scene: THREE.Scene) {}
 
+  private acc = 0;
   sync(vs: Vessel[], t: number, dt: number, sea: (x: number, y: number) => number): void {
+    this.acc += dt; const wakeNow = this.acc >= 0.1 || dt === 0, wdt = this.acc; if (wakeNow) this.acc = 0;
     for (const v of vs) {
       let m = this.meshes.get(v.id);
       if (!m) {
@@ -70,7 +72,7 @@ export class VesselView {
         wk.reset([{ x: v.x, y: v.y, h: v.h, v: v.v, rel: 0 }]); this.wakes.set(v.id, wk);
       }
       m.position.set(v.x, sea(v.x, v.y) * 0.3, -v.y); m.rotation.y = -v.h * D2R;
-      this.wakes.get(v.id)!.update([{ x: v.x, y: v.y, h: v.h, v: v.v, rel: 0 }], t, dt, sea, [0]);
+      if (wakeNow) this.wakes.get(v.id)!.update([{ x: v.x, y: v.y, h: v.h, v: v.v, rel: 0 }], t, wdt, sea, [0]); // ten times a second is plenty for a ship's wake
     }
   }
 }

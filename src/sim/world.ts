@@ -17,6 +17,9 @@ import type { Settings } from '../settings';
 import { aiThink } from '../ai/ai';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
+import { lineTransit } from './transits';
+import { landAt } from '../environment/sea';
+import { toLL } from '../geo/geo';
 import { FLAG_NAME, X_FLAG_MAX, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
@@ -519,6 +522,10 @@ export class World {
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
   private signals(prevT: number): void {
+    if (this.steps === 1 && this.t < 0) {
+      const T = this.lineTransit;
+      if (T) this.emit({ type: 'toast', ms: 6000, msg: `Sight the line: from the ${this.C.committeeLabel} end, ${this.C.pinLabel} lines up with ${T.name}. Near the line, when ${this.C.pinLabel} and ${T.name} are in line, you're on it.` });
+    }
     for (const sg of this.sequence) if (prevT < sg.t && this.t >= sg.t && !this.horns[sg.t]) {
       this.horns[sg.t] = true;
       this.emit({ type: 'horn', dur: sg.sound === 'long' ? 2.2 : 0.8 });
@@ -541,6 +548,17 @@ export class World {
     if (this.xUntil > 0) this.flags.push('X');
     // Rule 30, in the last minute
     if (this.t >= -60 && this.t < 0 && this.prepFlag !== 'P') this.lastMinute();
+  }
+
+  /** The start line's transit, sighted from the committee end past the pin (what you line up to know you're on the line). */
+  private _transit: ReturnType<typeof lineTransit> | undefined;
+  get lineTransit(): ReturnType<typeof lineTransit> {
+    if (this._transit === undefined) this._transit = lineTransit(this.C.committee, this.C.pin, p => landAt(p), toLL);
+    return this._transit;
+  }
+  /** The transit on a layline: what the mark lines up with as you sail up it. */
+  laylineTransit(mark: Vec, track: Vec): ReturnType<typeof lineTransit> {
+    return lineTransit({ x: mark.x - track.x * 1000, y: mark.y - track.y * 1000 }, mark, p => landAt(p), toLL);
   }
 
   /** The traffic's clock: seconds since midnight UTC of the race day, so the ships keep their schedule through the day. */

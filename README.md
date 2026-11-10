@@ -206,6 +206,7 @@ Setup → Current → **Real tide** (the default), then pick the race day and th
 ### Instruments
 
 - **Tactical compass** under the instrument pods: a tape of headings around yours, with the bearing to the next mark (yellow), the wind direction (blue), the heading you'd sail on the other tack (or gybe) after you turn, and your average close-hauled heading on this tack ("avg"). Sailing higher than your average on starboard (lower on port) means you're lifted; the tape says "lifted 6°" or "headed 4°". That's how racers spot shifts on the compass: tack on the headers.
+- **Transits** (with training aids on): how racers sight the line and the laylines. Before the start, the far end of the line lines up with something ashore (a landmark if one is in line, otherwise the point where the line runs onto the far shore, e.g. "the shore of Angel Island" for the Seaweed Soup line); when they're in line, you're on the line. On a beat, the mark lines up with something behind it along your layline. The hint under the line box says what to line up and how far off you are ("X is 3° left of it" or "in line now"), and a faint dashed line on the water shows the line's transit.
 - **The bulkhead compass** on the boat has a card that turns with the heading (you can read it from the cockpit view).
 - **Windex** on the masthead: it swings into the apparent wind, with two reference tabs set at the close-hauled angle either side of the bow.
 

@@ -277,3 +277,9 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 /* the tactical compass tape, under the instrument pods */
 #compassTape{position:fixed;top:calc(env(safe-area-inset-top,0px) + 80px);left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 420px));height:48px;
   background:var(--pod);border:1px solid var(--rule);border-radius:6px;pointer-events:none}
+
+/* the transit hint, under the line box */
+#transit{position:fixed;top:calc(env(safe-area-inset-top,0px) + 266px);left:50%;transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));
+  background:var(--pod);border:1px solid var(--rule);border-radius:14px;padding:3px 12px;font-size:11.5px;color:var(--muted);pointer-events:none;text-align:center}
+#transit b{color:var(--text);font-weight:600}
+#transit .on{color:#3fd197}

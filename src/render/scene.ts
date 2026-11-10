@@ -366,6 +366,13 @@ export class SceneView {
       const lg = new THREE.BufferGeometry().setFromPoints([P3(C.pin.x, C.pin.y, 0.3), P3(C.committee.x, C.committee.y, 0.3)]);
       const line = new THREE.Line(lg, new THREE.LineDashedMaterial({ color: 0xffd84a, dashSize: 2.5, gapSize: 2.5, transparent: true, opacity: 0.8 }));
       line.computeLineDistances(); add(line);
+      // the line's transit: its extension beyond the pin to what it lines up with ashore
+      const T = w.lineTransit;
+      if (T) {
+        const tg = new THREE.BufferGeometry().setFromPoints([P3(C.pin.x, C.pin.y, 0.3), P3(T.p.x, T.p.y, T.landmark ? 0.3 : 2)]);
+        const tl = new THREE.Line(tg, new THREE.LineDashedMaterial({ color: 0xffd84a, dashSize: 12, gapSize: 18, transparent: true, opacity: 0.35 }));
+        tl.computeLineDistances(); add(tl);
+      }
     }
   }
 
