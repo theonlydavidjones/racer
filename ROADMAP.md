@@ -4,6 +4,36 @@
 
 What's planned, roughly in order. Done work is described in the README.
 
+## The owner's list (November 2026, to prioritise)
+
+In progress: the full-screen chart (tap the inset map: the sim pauses, pick a destination) and a tiller pilot (cruising only; RRS 52).
+Then the skipper/crew model (calibration data first; Yacht Club sliders; crew skill driving trim, pole and puff calls; AI
+skippers acting on what they believe; cheating, protests and hearings). Also asked for:
+
+- **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
+- **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
+  conditions and how they'll change, the favoured side and course options (one plan, or several when it's uncertain), the
+  competition, and trim and tuning by phase ("it starts light, so…; it'll build late, so watch…"), with specifics.
+- **A navigator** in cruising, doing the same for the route: timeliness and safety (current gates, the slot, shipping lanes).
+- **Easier sail controls:** bigger targets; adjusting one line takes only that line off auto, and it's easy to put it
+  back. Longer term: working the lines on the boat itself.
+- **Crew weight in the physics:** the low side in light air, hiking in a breeze, body-tacking, moving forward downwind; the AI
+  crew doing it by skill; the boat answering every shift; an option to move the crew yourself.
+- **Real timing and sequencing of adjustments:** cars rarely moved (it takes time, means leaving the cockpit, which moves
+  weight, and the working car usually can't be moved under load); the order and pace of every adjustment set by the number
+  of crew and their skill.
+- **A deep pass on sail and boat physics:** every crew move, wave, puff and line adjustment makes a response, from real
+  science and maths.
+- **Cleaner start screens.** Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
+  start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
+  pared back. First an audit of every start-state screen for redundancy and friction.
+- **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
+- **The Bay, in depth:** bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
+  Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
+- **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
+- **More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.
+- **Sam's, Sausalito:** dock at Sam's (and have a beer).
+
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
