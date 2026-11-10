@@ -21,11 +21,11 @@ function shapeWords(u: Boat): string {
   const tws = u.ww.kt, parts: string[] = [];
   const one = (name: 'main' | 'jib', s: Shape | null) => {
     if (!s) return;
-    const t = targetShape(name, tws, u.awa), out: string[] = [];
-    const main = name === 'main';
-    if (s.depth > t.depth + 0.012) out.push(`too full (${main ? 'outhaul, backstay' : 'backstay'} on)`);
+    const t = targetShape(name, tws, u.awa, u.depower), out: string[] = [], c = u.ctl;
+    const main = name === 'main', maxed = (...ks: (keyof typeof c)[]) => ks.every(k => (c[k] as number) >= 0.97);
+    if (s.depth > t.depth + 0.012) out.push(maxed(...(main ? ['outhaul', 'backstay'] as const : ['backstay'] as const)) ? 'too full (flattening lines all on)' : `too full (${main ? 'outhaul, backstay' : 'backstay'} on)`);
     else if (s.depth < t.depth - 0.012) out.push(`too flat (ease ${main ? 'outhaul, backstay' : 'backstay'})`);
-    if (s.draft > t.draft + 0.04) out.push(`draft aft (${main ? 'Cunningham, downhaul' : 'jib Cunningham'} on)`);
+    if (s.draft > t.draft + 0.04) out.push(maxed(...(main ? ['cunningham', 'downhaul'] as const : ['jibCunningham'] as const)) ? 'draft aft (the mast bend: Cunningham all on)' : `draft aft (${main ? 'Cunningham, downhaul' : 'jib Cunningham'} on)`);
     else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib Cunningham'})`);
     if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveller up') : 'jib car forward next tack'})`);
     else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : u.ww.kt >= 13 ? 'ease the sheet, traveller down' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
@@ -228,7 +228,11 @@ export class Hud {
     // heel and helm balance: what the boat feels like on the tiller
     { const heel = Math.round(u.heelMag ?? 0), hn = u.helmNeed ?? 0, up = u.twa < 70;
       const helm = Math.abs(hn) < 0.8 ? 'neutral' : hn > 0 ? `${hn.toFixed(0)}° weather` : `${(-hn).toFixed(0)}° lee`;
-      const advice = u.luff ? '' : hn > 5 ? (up ? ' · overpowered: backstay on, traveller down, flatten' : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveller up, ease backstay, fuller sails' : heel > 24 && up ? ' · heeling too far: depower' : '';
+      // who's trimming: the crew depowers on their own (controls.ts depowerLimits); when they've done all they can, it's the helm's job
+      const crewTrims = !u.trimAll, dp = u.depower ?? 0;
+      const overUp = crewTrims ? (dp < 0.95 ? ' · overpowered: the crew is depowering' : ' · overpowered with everything on: feather (sail a touch higher, letting the main lift) or ease the main in the puffs')
+        : ' · overpowered: backstay on, vang on, traveller down, flatten';
+      const advice = u.luff ? '' : hn > 5 ? (up ? overUp : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveller up, ease backstay, fuller sails' : heel > 24 && up ? (crewTrims && dp < 0.95 ? ' · heeling too far: the crew is depowering' : ' · heeling too far: depower') : '';
       if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveller down (Trim coach explains).`, 6000); }
       $('tpBalance').innerHTML = `Heel <b>${heel}°</b> · Helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b><span class="warn">${advice}</span>`; }
     const bad = [u.trim.jib, u.trim.main].find(t => t && t.flow !== 'good' && t.amount > 0.1);

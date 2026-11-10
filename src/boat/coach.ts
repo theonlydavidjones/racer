@@ -67,7 +67,7 @@ export function actions(b: Boat): CoachAction[] {
   // shape, one dimension at a time: what fixing it is worth
   const shapeItems = (sail: 'main' | 'jib', sh: Shape | null, share: number) => {
     if (!sh) return;
-    const tg = targetShape(sail, tws, awa), now = shapeEfficiency(sh, tg), M = sail === 'main' ? 'Main' : 'Jib';
+    const tg = targetShape(sail, tws, awa, b.depower), now = shapeEfficiency(sh, tg), M = sail === 'main' ? 'Main' : 'Jib';
     const fix = (k: keyof Shape) => 0.5 * share * (shapeEfficiency({ ...sh, [k]: tg[k] }, tg) - now);
     const dd = sh.depth - tg.depth, dr = sh.draft - tg.draft, dt = sh.twist - tg.twist;
     if (Math.abs(dd) > 0.008) out.push({ text: dd > 0 ? (sail === 'main' ? 'Flatten the main: outhaul, backstay on' : 'Flatten the jib: backstay on') : (sail === 'main' ? 'More power: ease outhaul, backstay' : 'Fuller jib: ease backstay'), gain: fix('depth'), who: who(all) });
@@ -106,11 +106,11 @@ export function coach(b: Boat): CoachReport {
   }
 
   // shape
-  const tm = targetShape('main', tws, awa);
+  const tm = targetShape('main', tws, awa, b.depower);
   const ms = shapeAdvice('main', b.shape.main, tm, all, upwind, tws >= 13);
   items.push({ head: `Main: shape (${all ? 'your lines' : 'the crew\'s lines'})`, text: ms.map(x => x.text).join(' ') + (all ? '' : ` ${crewWhy('main', b)}`), ok: ms.every(x => x.ok) });
   if (b.shape.jib) {
-    const tj = targetShape('jib', tws, awa), js = shapeAdvice('jib', b.shape.jib, tj, all, upwind, tws >= 13), car = loadedCar(b.ctl, b.tack);
+    const tj = targetShape('jib', tws, awa, b.depower), js = shapeAdvice('jib', b.shape.jib, tj, all, upwind, tws >= 13), car = loadedCar(b.ctl, b.tack);
     items.push({ head: `Jib: shape (${all ? 'your lines' : 'the crew\'s lines'})`, text: js.map(x => x.text).join(' ') + ` The loaded car is on fore–aft pin ${car.fore + 1} of ${CAR_FORE_PINS} and in–out pin ${car.ins + 1} of ${CAR_IN_PINS}: ${car.ins <= 1 ? 'well inboard, to point high in flat water' : car.ins >= 3 ? 'outboard, for power and speed in chop or on a reach' : 'in the middle'}.`, ok: js.every(x => x.ok) });
   }
   items.push({ head: 'What the shape costs', text: `Shape efficiency ${pct(b.shape.eff)} of the best shape's drive${b.shape.eff > 0.985 ? ': as good as it gets.' : '.'}`, ok: b.shape.eff > 0.97 });

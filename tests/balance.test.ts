@@ -6,13 +6,14 @@ import type { Boat } from '../src/boat/boat';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 
 /** Beat at `windKt` with the crew's settings, then (optionally) change the controls yourself and settle again. */
-function beat(windKt: number, change?: (c: Controls) => void): Boat {
+/** Sail her close-hauled; `full`: the crew held at full power (no depowering of their own), so one line's own effect shows. */
+function beat(windKt: number, change?: (c: Controls) => void, full = !!change): Boat {
   const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt });
-  sail(b, 20, () => { b.h = 360 - twa; });
+  sail(b, 20, () => { b.h = 360 - twa; if (full) b.depower = 0; });
   if (change) {
     const base = JSON.parse(JSON.stringify(b.ctl));
     b.manualTrim = true; b.trimAll = true; b.ctl = base; change(b.ctl);
-    sail(b, 12, () => { b.h = 360 - twa; });
+    sail(b, 12, () => { b.h = 360 - twa; if (full) b.depower = 0; });
   }
   return b;
 }
@@ -32,20 +33,20 @@ describe('Heel from the forces on the sails', () => {
     expect(b.heelMag!).toBeGreaterThan(before + 3);
   });
   it('depowering stands her up once the crew are hiking flat out: backstay, outhaul and traveller down all reduce heel', () => {
-    const base = beat(22).heelMag!;
+    const base = beat(22, undefined, true).heelMag!;
     expect(beat(22, c => { c.backstay = 1; }).heelMag!).toBeLessThan(base);
     expect(beat(22, c => { c.outhaul = 1; }).heelMag!).toBeLessThan(base);
     expect(beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); }).heelMag!).toBeLessThan(base - 4);
     expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 1); // fuller: more power, more heel
   });
   it('in a moderate breeze the crew hike to hold her; depowering lets them hike less', () => {
-    const full = beat(16), flat = beat(16, c => { c.backstay = 1; c.outhaul = 1; });
+    const full = beat(16, undefined, true), flat = beat(16, c => { c.backstay = 1; c.outhaul = 1; });
     expect(full.crew!.mode).toBe('hike');
     expect(flat.crew!.hike).toBeLessThan(full.crew!.hike);
   });
   it('vang-sheeting: easing the main with the vang on keeps the leech closed while she comes upright', () => {
     const on = beat(16, c => { c.vang = 1; c.mainsheet += 0.08; }), off = beat(16, c => { c.vang = 0; c.mainsheet += 0.08; });
-    expect(on.heelMag!).toBeLessThan(beat(16).heelMag!);
+    expect(on.heelMag!).toBeLessThan(beat(16, undefined, true).heelMag!);
     expect(on.shape.main.twist).toBeLessThan(off.shape.main.twist - 4);
   });
 });
@@ -57,7 +58,7 @@ describe('Helm balance (weather helm)', () => {
     expect(h20).toBeGreaterThan(h12 + 2);
   });
   it('the traveller down and the backstay on take weather helm off; easing the main can give lee helm', () => {
-    const base = beat(16).helmNeed!;
+    const base = beat(16, undefined, true).helmNeed!;
     expect(beat(16, c => { c.traveller = Math.min(1, c.traveller + 0.6); }).helmNeed!).toBeLessThan(base - 2);
     expect(beat(16, c => { c.backstay = 1; }).helmNeed!).toBeLessThan(base);
     expect(beat(16, c => { c.mainsheet += 0.2; }).helmNeed!).toBeLessThan(0);
@@ -69,7 +70,7 @@ describe('Helm balance (weather helm)', () => {
     expect(b.twa).toBeLessThan(twa0 - 5);
   });
   it('carrying a lot of helm is slower than sailing balanced', () => {
-    const balanced = beat(18, c => { c.backstay = 1; c.traveller = Math.min(1, c.traveller + 0.3); });
+    const balanced = beat(18); // the crew's own trim: they depower to take the helm off her
     const loaded = beat(18, c => { c.backstay = 0; c.traveller = -0.6; c.mainsheet = 0; });
     expect(loaded.helmNeed!).toBeGreaterThan(balanced.helmNeed! + 2);
     expect(loaded.v).toBeLessThan(balanced.v);
@@ -88,11 +89,11 @@ describe('The crew', () => {
     expect(b.crew!.mode).toBe('foredeck');
     expect(b.crew!.fore).toBeGreaterThan(0.85);
   });
-  it('sailing alone in a breeze she heels more and goes slower than with two crew', () => {
+  it('sailing alone in a breeze she goes slower than with two crew: she heels more, or has to be depowered more', () => {
     const two = beat(20), solo = testBoat({ heading: 360 - beatAngle(20), kt: 4.5, windKt: 20 });
     solo.crew = newCrew({ ...DEFAULT_CREW, crew: [] }, 'S');
     sail(solo, 30, () => { solo.h = 360 - beatAngle(20); });
-    expect(solo.heelMag!).toBeGreaterThan(two.heelMag! + 3);
+    expect(solo.heelMag! > two.heelMag! + 3 || (solo.depower ?? 0) > (two.depower ?? 0) + 0.1).toBe(true);
     expect(solo.v).toBeLessThan(two.v);
   });
 });

@@ -148,13 +148,15 @@ export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = 
 }
 
 /** The fastest shape for a sail in this wind (kt) and apparent wind angle. */
-export function targetShape(sail: 'main' | 'jib', tws: number, awa: number): Shape {
+export function targetShape(sail: 'main' | 'jib', tws: number, awa: number, overpowered?: number): Shape {
   const a = Math.abs(awa), reach = smooth((a - 55) / 45), run = smooth((a - 120) / 40);
-  // upwind: power up to the middle of the range, then depower
-  const powerUp = smooth((tws - 4) / 6), depower = smooth((tws - 12) / 8);
+  // upwind: power up to the middle of the range, then depower: by how overpowered she is (heel and helm, when known:
+  // a heavier crew or a stiffer boat carries full power longer), or else by the wind
+  const powerUp = smooth((tws - 4) / 6), depower = overpowered ?? smooth((tws - 12) / 8);
   const base = sail === 'main'
-    ? { depth: lerp(0.14, 0.125, powerUp) - 0.04 * depower, draft: lerp(0.48, 0.46, powerUp) - 0.04 * depower, twist: lerp(13, 7, powerUp) + 8 * depower }
-    : { depth: lerp(0.135, 0.12, powerUp) - 0.035 * depower, draft: lerp(0.42, 0.4, powerUp) - 0.03 * depower, twist: lerp(12, 9, powerUp) + 6 * depower };
+    // (fully depowered, as flat as the rig will make them: the main to about 6% camber, the jib about 7.5%)
+    ? { depth: lerp(0.14, 0.125, powerUp) - 0.065 * depower, draft: lerp(0.48, 0.46, powerUp) - 0.04 * depower, twist: lerp(13, 7, powerUp) + 8 * depower }
+    : { depth: lerp(0.135, 0.12, powerUp) - 0.045 * depower, draft: lerp(0.42, 0.4, powerUp) - 0.03 * depower, twist: lerp(12, 9, powerUp) + 6 * depower };
   // off the wind: fuller; twist held near 10–12° (the vang's job)
   return {
     depth: lerp(base.depth, sail === 'main' ? 0.14 : 0.135, reach),
@@ -185,12 +187,30 @@ export const winchFactor = (tws: number, hauling: boolean) => (hauling ? clamp(1
  * controls; the jib car's fore–aft pin is searched too (it's set on the lazy side, before the tack).
  */
 export interface CrewSettings { traveller: number; vang: number; outhaul: number; cunningham: number; downhaul: number; backstay: number; jibCunningham: number; carFore: number; carIn: number }
-export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws): CrewSettings {
-  const tm = targetShape('main', tws, awa), tj = targetShape('jib', tws, awa);
+/**
+ * Depowering, in the usual order as she gets overpowered upwind (`depower` 0 … 1, from her heel and helm: physics.ts):
+ * flatten first (outhaul, then backstay, with the Cunningham and downhaul pulling the draft forward again as the mast
+ * bends), the vang on hard (so the leech holds when the main is eased), the jib cars aft (twisting off the jib's top),
+ * and last the traveller down to leeward. Each line's least setting at that level.
+ */
+export function depowerLimits(depower: number, awa: number): { min: Partial<Record<keyof CrewSettings, number>>; carAft: number } {
+  const d = Math.abs(awa) < 70 ? depower : 0, st = (a: number, b: number) => smooth((d - a) / (b - a));
+  return {
+    // (the traveller: −1 hard to windward … +1 hard to leeward; down means to leeward)
+    min: { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibCunningham: st(0.25, 0.8), vang: 0.9 * st(0.3, 0.8), traveller: -1 + 1.6 * st(0.6, 1) },
+    carAft: Math.round(2 * st(0.4, 0.8))
+  };
+}
+
+export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number): CrewSettings {
+  const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa);
+  const lo = (k: keyof CrewSettings) => lim.min[k] ?? (k === 'traveller' ? -1 : 0), hi = (_k: keyof CrewSettings) => 1;
   // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle
   const carIn = clamp(Math.floor((jibAng - 1 - 8) / 1.25), 0, CAR_IN_PINS - 1);
   const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, carFore: 3, carIn, ...from };
   const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const;
+  for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
+  const carMin = Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft); x.carFore = Math.max(x.carFore, carMin);
   const score = (v: CrewSettings) => {
     const c: Controls = { mainsheet: mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
       backstay: v.backstay, jibsheet: 0, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
@@ -202,10 +222,10 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   let best = score(x);
   for (const step of [0.25, 0.1, 0.04]) for (let pass = 0; pass < 3; pass++) {
     for (const k of keys) for (const d of [-step, step]) {
-      const v = { ...x, [k]: clamp(x[k] + d, k === 'traveller' ? -1 : 0, 1) }, sc = score(v);
+      const v = { ...x, [k]: clamp(x[k] + d, lo(k), hi(k)) }, sc = score(v);
       if (sc > best) { best = sc; Object.assign(x, v); }
     }
-    for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, 0, CAR_FORE_PINS - 1) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
+    for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, carMin, CAR_FORE_PINS - 1) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
   }
   return x;
 }

@@ -244,10 +244,19 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (cmd !== 0 && b.ctlTarget) delete b.ctlTarget[k];
     c[k] = clamp(c[k] + cmd * rate * dt, k === 'traveller' ? -1 : 0, 1);
   };
-  const wantMain = optimalSheet('main', b.awaSlow), wantJib = optimalSheet('jib', b.awaSlow);
+  // overpowered upwind: the crew works down the depowering steps (controls.ts depowerLimits), more while she heels past
+  // about 18° or carries heavy weather helm, back off once she's under about 13° with an easy helm (a half-minute or so
+  // end to end); starting out, from the wind
+  const up = Math.abs(b.awaSlow) < 70, heel = b.heelMag ?? 0, helmLoad = b.helmNeed ?? 0;
+  b.depower ??= up ? clamp((tws - 14) / 10, 0, 1) : 0;
+  const over = !up ? -1 : heel > 18 || helmLoad > 6 ? 1 : heel < 13 && helmLoad < 3.5 ? -1 : 0;
+  b.depower = clamp(b.depower + over * dt / 30, 0, 1);
+  // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
+  const easeBoom = up ? 7 * clamp((b.depower - 0.6) / 0.4, 0, 1) : 0;
+  const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
-  if (!b.crewPlan || !(b.crewPlanT! > 0)) { b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT); b.crewPlanT = 1; }
+  if (!b.crewPlan || !(b.crewPlanT! > 0)) { b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT, b.depower); b.crewPlanT = 1; }
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;
   const crewAll = !(you && b.trimAll);
@@ -273,7 +282,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.trim.jib = plan === 'jib' ? sailTrim('jib', awa, b.sheets.jib) : null; // poled out or down: the sheet isn't in play
   // shape
   const ms = mainShape(c, tws, cond?.main, b.aws / KT), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, b.aws / KT) : null;
-  const em = shapeEfficiency(ms, targetShape('main', tws, awa)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa)) : 1;
+  const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;
   b.shape = { main: ms, jib: js, eff: js ? SAILS.main.share * em + SAILS.jib.share * ej : em };
 }
 
