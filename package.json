@@ -15,7 +15,8 @@
     "data:wind": "node scripts/fetch-wind-climate.mjs",
     "data:terrain": "node scripts/fetch-terrain.mjs && node scripts/make-land-mask.mjs",
     "data:swell": "node scripts/fetch-swell.mjs",
-    "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs"
+    "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs",
+    "test:fast": "vitest run --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts'"
   },
   "dependencies": {
     "three": "^0.186.1"

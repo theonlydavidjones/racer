@@ -75,47 +75,6 @@ describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
   });
 });
 
-describe('AI fleet sails the course', () => {
-  const race = (file: CourseFile, s: Partial<Settings>, seed: number, minutes: number) => {
-    const w = new World(file, settings(s), seed);
-    const end = minutes * 60;
-    while (w.t < end && !w.boats.slice(1).every(b => b.finished)) w.step(DT);
-    return w;
-  };
-
-  it('training course: every AI boat starts, rounds and finishes', () => {
-    const w = race(TRAIN, { fleet: 5, current: 'ebb' }, 7, 20);
-    for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
-  }, 60_000);
-
-  it('Seaweed Soup course 2 in an ebb: every AI boat finishes', () => {
-    const w = race(SS2, { fleet: 3, current: 'ebb' }, 11, 90); // (the real jetty pushes the last beat out from the Marina shore)
-    for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
-  }, 180_000);
-});
-
-describe('AI starts (regression guard, 8 races × 5 boats)', () => {
-  const starts = (cur: string) => {
-    const delays: number[] = []; let ocs = 0;
-    for (let seed = 1; seed <= 8; seed++) {
-      const w = new World(SS2, settings({ fleet: 5, current: cur }), seed), ai = w.boats.slice(1), st = new Map<number, number>();
-      while (w.t < 90) {
-        w.step(DT);
-        if (Math.abs(w.t) < DT) ocs += ai.filter(b => b.ocs).length;
-        for (const b of ai) if (b.started && !st.has(b.id)) st.set(b.id, w.t);
-      }
-      for (const b of ai) delays.push(st.get(b.id) ?? 90);
-    }
-    delays.sort((a, b) => a - b);
-    return { median: delays[delays.length >> 1], ocsRate: ocs / delays.length };
-  };
-  for (const cur of ['slack', 'ebb']) it(`Seaweed Soup line, ${cur}: few OCS, median start within 18 s of the gun`, () => {
-    const r = starts(cur);
-    expect(r.ocsRate).toBeLessThan(0.1);
-    expect(r.median).toBeLessThan(18);
-  }, 150_000);
-});
-
 describe('laylines and course description', () => {
   it('before the start, laylines point at the first mark (a beat) and straddle the wind', async () => {
     const { laylinesFor } = await import('../src/sim/laylines');
