@@ -4,6 +4,30 @@
 
 What's planned, roughly in order. Done work is described in the README.
 
+## Priorities (owner's ranking, November 2026)
+
+Estimates are focused build hours including tests, review and publishing, ±50%.
+
+1. ~~Saves kept with your account; save or discard after each sail~~ (done, v53).
+2. **Hands-on boat handling**, in order:
+   a. Easier sail controls: adjusting one line takes only that line off auto; one tap puts it back; bigger targets (4–6 h).
+   b. Heaving to: each jib sheet on its own, the tiller lashed at an angle, hove-to physics checked against real boats (4–6 h).
+   c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
+      skill; an option to place the crew yourself (6–10 h).
+   d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).
+3. **Race strategist** in the course view, and a **navigator** for cruising (8–12 h).
+
+Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
+and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
+in depth (12–20 h); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda
+and Richmond (10–16 h); Gashouse Cove, South Beach and Corinthian marinas (9–15 h); Sam's (3–5 h); accounts for other
+players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip numbers and nicer moored boats (4–6 h); real
+past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
+phone layout (on hold, 8–12 h).
+
+Open check: the tiller pilot's specs from primary sources (the ST2000+ may be 4.5 s lock to lock, not 4.0 s; AutoTrim
+and the RRS 52 wording unconfirmed). Needs docs.raymarine.com and www.sailing.org allowed.
+
 ## The owner's list (November 2026, to prioritise)
 
 In progress: the full-screen chart (tap the inset map: the sim pauses, pick a destination) and a tiller pilot (cruising only; RRS 52).

@@ -27,6 +27,9 @@ npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both
 
 - Publish by republishing artifact/folkboat-racing-sim.html to the existing artifact
   (https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m), never as a new one.
+  Don't pass `capabilities` when publishing: the artifact already declares `db` and `user` (players' saves,
+  store/cloud.ts), and leaving the field out keeps them. Passing `{}` would switch saves off.
+- The plan lives in ROADMAP.md ("Priorities", at the top): work the next item there, and mark it done when it's published.
 - Commit and push after each finished piece, on the session's branch.
 - Anything that should look the same from either side of the boat (sails, numbers, flags, crew) must be checked from
   both sides on both tacks, not from one view.
