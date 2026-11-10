@@ -247,10 +247,11 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   m.grp.position.copy(P3(b.x, b.y, heave));
   m.grp.rotation.y = -b.h * D2R; m.grp.rotation.z = b.heel * D2R + (wave ? wave.roll : 0); m.grp.rotation.x = pitch;
   // rudder and tiller: the helm. Turning to port (heading falling) means the tiller is pushed to starboard.
-  const dt = m.prevT < 0 ? 0 : t - m.prevT; m.prevT = t;
-  const rate = dt > 0 ? (((b.h - m.prevH + 540) % 360) - 180) / dt : 0; m.prevH = b.h; // deg/s
-  const want = Math.max(-0.5, Math.min(0.5, rate / 22 * 0.5)); // full helm (~0.5 rad) at the fastest turn
-  m.rudder.rotation.y += (want - m.rudder.rotation.y) * 0.25;
+  // rudder and tiller follow the helm the sim is using (steady, not estimated from frame-to-frame heading changes,
+  // which jitter with the frame rate); eased so it swings like a real tiller
+  const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
+  const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
+  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);

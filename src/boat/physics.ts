@@ -82,6 +82,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     }
     rate = clamp(err * 1.6, -maxRate, maxRate);
   }
+  b.helm = clamp(rate / Math.max(1, maxRate), -1, 1); // how hard the helm is over (for drawing the rudder and tiller)
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
   const dh = rate * dt;
   b.h = n360(b.h + dh);
@@ -149,7 +150,16 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
   const c = b.ctl, tws = b.ww.kt, you = b.isUser;
   const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const d = to - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * dt); };
-  const hand = (k: Ctl, rate = CONTROL_RATE[k]) => { const cmd = b.ctlCmd[k] ?? 0; c[k] = clamp(c[k] + cmd * rate * dt, k === 'traveller' ? -1 : 0, 1); };
+  const hand = (k: Ctl, rate = CONTROL_RATE[k]) => {
+    const cmd = b.ctlCmd[k] ?? 0, tg = b.ctlTarget?.[k];
+    if (cmd === 0 && tg != null) { // dragged to a setting: work the line there at the usual pace
+      const d = tg - c[k];
+      if (Math.abs(d) < 0.003) { delete b.ctlTarget![k]; return; }
+      c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * dt); return;
+    }
+    if (cmd !== 0 && b.ctlTarget) delete b.ctlTarget[k];
+    c[k] = clamp(c[k] + cmd * rate * dt, k === 'traveller' ? -1 : 0, 1);
+  };
   const wantMain = optimalSheet('main', b.awaSlow), wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   if (!b.crewPlan || !(b.crewPlanT! > 0)) { b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewPlan ?? undefined); b.crewPlanT = 1; }
@@ -164,7 +174,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // sheets: you, or the crew (traveller and mainsheet together, for the boom angle and the leech tension)
   if (b.manualTrim && you) {
     hand('mainsheet');
-    const j = b.ctlCmd.jibsheet ?? 0; hand('jibsheet', CONTROL_RATE.jibsheet * winchFactor(tws, j < 0));
+    const tj = b.ctlTarget?.jibsheet, j = b.ctlCmd.jibsheet ?? (tj != null ? tj - c.jibsheet : 0); hand('jibsheet', CONTROL_RATE.jibsheet * winchFactor(tws, j < 0));
     if (crewAll) move('traveller', t.traveller); else hand('traveller');
   } else {
     move('traveller', t.traveller);

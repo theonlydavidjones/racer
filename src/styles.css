@@ -241,6 +241,9 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .ctl-lab{font:600 11px/1.1 var(--f-body);color:var(--text);white-space:nowrap}
 .ctl-bar{position:relative;height:6px;border-radius:3px;background:var(--rule)}
 .ctl-fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.ctl-row.can .ctl-bar{height:10px;cursor:ew-resize;touch-action:none}
+.ctl-row.can .ctl-bar:hover,.ctl-bar.drag{outline:1px solid var(--accent);outline-offset:2px}
+.ctl-tgt{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
 .ctl-val{font:600 10px/1 var(--f-inst);color:var(--muted);min-width:44px;text-align:right}
 .ctl-btns{display:flex;gap:3px;align-items:center}
 .ctl-btns button{font:700 12px/1 var(--f-inst);width:22px;height:20px;padding:0;color:var(--text);background:var(--btn);border:1px solid var(--rule);border-radius:5px;cursor:pointer}

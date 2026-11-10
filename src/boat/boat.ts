@@ -80,6 +80,8 @@ export interface Boat {
   /** Every line on the boat (see controls.ts), and what you're doing on each: +1 raises the value (eases a sheet; tightens the vang, outhaul, backstay…), −1 lowers it. */
   ctl: Controls;
   ctlCmd: Partial<Record<Exclude<keyof Controls, 'car'>, number>>;
+  /** Where you've dragged a control to: the crew (or you) haul or ease it there at the usual pace. */
+  ctlTarget?: Partial<Record<Exclude<keyof Controls, 'car'>, number>>;
   /** The sails' shape and how much drive it gives (1 = the best shape for the conditions). */
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
@@ -94,6 +96,8 @@ export interface Boat {
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
+  /** Helm: −1 hard over turning to port .. +1 hard over turning to starboard (the rudder and tiller follow it). */
+  helm?: number;
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */

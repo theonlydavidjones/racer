@@ -213,7 +213,7 @@ function trimMode(): 0 | 1 | 2 { return (S.manualTrim ?? 0) as 0 | 1 | 2; }
 const mayWork = (it: CtlItem) => (it.only === 'sheets' ? trimMode() >= 1 : trimMode() === 2);
 function setTrimMode(mode: 0 | 1 | 2): void {
   S.manualTrim = mode; saveSettings(S);
-  const u = w.user; u.manualTrim = mode >= 1; u.trimAll = mode === 2; u.sheetCmd.main = u.sheetCmd.jib = 0; u.ctlCmd = {};
+  const u = w.user; u.manualTrim = mode >= 1; u.trimAll = mode === 2; u.sheetCmd.main = u.sheetCmd.jib = 0; u.ctlCmd = {}; u.ctlTarget = {};
   $('bTrim').textContent = TRIM_LABEL[mode];
   $('bTrim').setAttribute('aria-pressed', String(mode > 0));
   $('trimPanel').classList.toggle('manual', mode >= 1); $('trimPanel').classList.toggle('all', mode === 2);
@@ -234,8 +234,24 @@ $('tpMore').onclick = () => openLines();
   CTL_UI.forEach((it, i) => {
     if (it.group !== group) { group = it.group; const g = document.createElement('div'); g.className = 'ctl-group'; g.textContent = group; list.appendChild(g); }
     const row = document.createElement('div'); row.className = 'ctl-row'; row.dataset.i = String(i);
-    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar"><span class="ctl-fill"></span></span><span class="ctl-btns"><span class="ctl-val"></span><button type="button" data-only="${it.only}" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-only="${it.only}" data-d="1" aria-label="${it.label}: more">+</button></span>`;
+    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar" title="Drag to set"><span class="ctl-fill"></span><span class="ctl-tgt"></span></span><span class="ctl-btns"><span class="ctl-val"></span><button type="button" data-only="${it.only}" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-only="${it.only}" data-d="1" aria-label="${it.label}: more">+</button></span>`;
     row.onclick = () => { ctlSel = i; };
+    // drag the bar to where you want the line: it's hauled or eased there at the usual pace (winches, tackles, crew)
+    const bar = row.querySelector('.ctl-bar') as HTMLElement;
+    const setFrom = (e: PointerEvent) => {
+      const r = bar.getBoundingClientRect(), fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), u = w.user;
+      if (it.key === 'carFore' || it.key === 'carIn') {
+        const lazy = u.ctl.car[u.tack], n = it.key === 'carFore' ? CAR_FORE_PINS : CAR_IN_PINS, cur = it.key === 'carFore' ? lazy.fore : lazy.ins, want = Math.round(fx * (n - 1));
+        if (want !== cur) stepCar(it.key, want - cur);
+        return;
+      }
+      const k = it.key as CtlKey, v = k === 'mainsheet' || k === 'jibsheet' ? 1 - fx : k === 'traveller' ? 1 - 2 * fx : fx;
+      (u.ctlTarget ??= {})[k] = v;
+    };
+    bar.addEventListener('pointerdown', e => { if (!mayWork(it) || !w.running) return; e.preventDefault(); ctlSel = i; bar.setPointerCapture(e.pointerId); bar.classList.add('drag'); setFrom(e); });
+    bar.addEventListener('pointermove', e => { if (bar.hasPointerCapture(e.pointerId)) setFrom(e); });
+    const endDrag = (e: PointerEvent) => { if (bar.hasPointerCapture(e.pointerId)) bar.releasePointerCapture(e.pointerId); bar.classList.remove('drag'); };
+    bar.addEventListener('pointerup', endDrag); bar.addEventListener('pointercancel', endDrag);
     row.querySelectorAll<HTMLButtonElement>('button').forEach(bt => {
       const d = Number(bt.dataset.d);
       if (it.key === 'carFore' || it.key === 'carIn') { bt.onclick = () => stepCar(it.key as 'carFore' | 'carIn', d); return; }
@@ -266,6 +282,11 @@ function showLines(): void {
       default: f = c[it.key]; txt = `${Math.round(f * 100)}%`;
     }
     (row.querySelector('.ctl-fill') as HTMLElement).style.width = `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`;
+    // where you've dragged it to, while the line is still on its way there
+    const tg = it.key === 'carFore' || it.key === 'carIn' ? undefined : u.ctlTarget?.[it.key as CtlKey], tgEl = row.querySelector('.ctl-tgt') as HTMLElement;
+    tgEl.hidden = tg == null;
+    if (tg != null) tgEl.style.left = `${Math.round((it.key === 'mainsheet' || it.key === 'jibsheet' ? 1 - tg : it.key === 'traveller' ? (1 - tg) / 2 : tg) * 100)}%`;
+    row.classList.toggle('can', mayWork(it));
     (row.querySelector('.ctl-val') as HTMLElement).textContent = txt;
     row.classList.toggle('sel', i === ctlSel && trimMode() > 0);
   });
