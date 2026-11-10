@@ -14,6 +14,8 @@ import { REFLECTIVE } from './boatMesh';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
+import { Moorings } from './moored';
+import { landAt } from '../environment/sea';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
 import type { SeaHere } from '../environment/sea';
 
@@ -151,6 +153,8 @@ export class SceneView {
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
   private wakes!: Wakes;
+  /** Boats at anchor and on moorings, lying to the current and wind. */
+  private moorings!: Moorings;
   private pitches: number[] = [];
   /** Current map: the current (m/s) and where it converges (tidelines), around the focus. */
   private curData = new Uint8Array(CUR_N * CUR_N * 4);
@@ -256,6 +260,7 @@ export class SceneView {
     water.frustumCulled = false; water.receiveShadow = true; scene.add(water);
 
     this.wakes = new Wakes(scene);
+    this.moorings = new Moorings(scene, p => landAt(p) === false);
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
 
@@ -539,6 +544,7 @@ export class SceneView {
       this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
+    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => this.waves.height(p, tw, 0.7, 0.4));
     this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];

@@ -28,7 +28,7 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
 - ~~**Tidelines and current lines:**~~ (done, from the current field's convergence; colour change not yet) where currents of different speed or direction meet (along the edge of the Cityfront relief, off points like Fort Point and Blackaller), a line of foam, kelp and debris collects, the water texture changes across it, and sometimes the colour (brown, silty Bay water against clearer ocean water). Drawn where the current field converges, so the line is where the current actually changes.
 - ~~**Wind against tide on the surface:**~~ (done) visibly steeper, shorter, whiter chop where an ebb meets the westerly.
 - **Eddies and boils** behind points and shoals: swirling, glassy patches.
-- **Marks and moored boats:** ~~buoys lean and trail a wake downstream in the current~~ (done); anchored and moored boats swing to point into the current (or the wind, when it wins), as they do in the harbour before the start.
+- **Marks and moored boats:** ~~buoys lean and trail a wake downstream in the current~~ (done); ~~anchored and moored boats swing to point into the current (or the wind, when it wins)~~ (done, in the anchorages).
 - ~~**The water texture moves with the current**~~ (done) (flow-mapped), so you can see the set over the bottom against the wind waves.
 - **Rendering approach** (the waves and whitecaps are done; tidelines and eddies still to come): a sum of Gerstner waves (or an FFT ocean) built from the wave spectrum, with the wind sea and swell as separate components; a foam and whitecap layer driven by wave steepness; a current-convergence map for tidelines and debris; a puff map from the wind field darkening and roughening the surface. Phone-friendly fallbacks come later.
 
@@ -49,7 +49,7 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 3. ~~**Landmarks you steer and sight by:**~~ (done; transits for the start line and laylines still to come) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. ~~**Marks and the committee boat:**~~ (done; no general recall yet) real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
 5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
-6. **Moored boats and marina life** in the harbour behind the line; traffic (see below).
+6. ~~**Moored boats**~~ (done: the anchorages; marinas need the real shoreline) **and marina life** in the harbour behind the line; traffic (see below).
 
 ## Ship traffic and wakes (later)
 
