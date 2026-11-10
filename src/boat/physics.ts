@@ -22,6 +22,11 @@ export const SLOW_TACK = 1.3;
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
 
+/** Slowing while she goes astern: dv/dt = −(c0 + c1·v), m/s². */
+export const ASTERN_DRAG = { c0: 0.005, c1: 0.035 };
+/** How far she coasts astern from `v0` m/s (to a stop) with that drag, m. */
+export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c1) * Math.log(1 + ASTERN_DRAG.c1 * v0 / ASTERN_DRAG.c0)) / ASTERN_DRAG.c1;
+
 /** Crew timings for the whisker pole, s. */
 export const POLE = { set: 8, stow: 5, gybe: 8 };
 
@@ -193,9 +198,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
-  // sternway (pushed off astern): she coasts back, slowing on the water's drag (from a shove, about 20 s and a few lengths)
+  // sternway (pushed off astern): she coasts back, slowing on the water's drag, which is slight at a walking pace (a
+  // two-tonne boat glides a long way: from a shove, three or four lengths in most of a minute)
   const ast = b.astern ?? 0;
-  if (ast > 0) { b.astern = ast - (0.01 + 0.06 * ast) * dt; if (b.astern < 0.02) b.astern = 0; }
+  if (ast > 0) { b.astern = ast - (ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast) * dt; if (b.astern < 0.02) b.astern = 0; }
   b.vx = u.x * (b.v - ast) + b.cur.x; b.vy = u.y * (b.v - ast) + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };

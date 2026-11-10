@@ -1,5 +1,5 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { crewRig, moveBoat } from '../boat/physics';
+import { asternCoast, crewRig, moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -21,7 +21,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { destMark, place as getPlace } from './places';
-import { HARBOR, pushOffPlan, slipById, type Slip } from '../geo/marina';
+import { HARBOR, hitsHarbor, inBasin, pushOffPlan, slipById, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 
@@ -83,6 +83,19 @@ export interface WorldOptions {
   showFlags?: boolean;
   /** The race committee chose this course: its number (flown in numeral pennants) and why. */
   courseSignal?: { no: number; why: string };
+}
+
+/**
+ * How far astern a boat in this slip goes to lie in the middle of the fairway behind it: halfway between the ends of the
+ * fingers (0.45 of the finger's length astern of her middle) and the docks on the far side (8 m out, if open water),
+ * and at least far enough that her bow is clear of her own finger.
+ */
+export function midFairway(slip: Slip): number {
+  const u = V(slip.heading), tip = 0.45 * slip.finger;
+  let far = tip + 1;
+  while (far < tip + 24) { const q = { x: slip.p.x - u.x * far, y: slip.p.y - u.y * far }; if (!inBasin(q) || hitsHarbor(q)) break; far += 0.5; }
+  const mid = far >= tip + 24 ? tip + 8 : (tip + far) / 2; // (no dock across within a fairway's width: open water, so where a fairway's middle would be)
+  return Math.max(mid, pushOffPlan(slip).back + 0.5);
 }
 
 /** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
@@ -820,16 +833,16 @@ export class World {
   }
 
   /**
-   * Push off: the crew shoves her astern off the dock, hard enough that she coasts back clear of her finger (about
-   * walking pace, slowing as she goes). From then on she's under way: steer her with the tiller (going astern, the bow
+   * Push off: the crew shoves her astern off the dock, hard enough that she coasts back out to the middle of the fairway
+   * (about walking pace, slowing as she goes). From then on she's under way: steer her with the tiller (going astern, the bow
    * goes the way you push it), and get sail on her.
    */
   pushOff(): boolean {
     const u = this.user, d = u.docked; if (!d) return false;
-    const slip = slipById(d.slip), clear = slip ? pushOffPlan(slip).back + 1.5 : 8;
-    // coasting from v0 with the drag in physics.ts (dv/dt = −(0.01 + 0.06 v)) goes (v0 − (0.01/0.06)·ln(1 + 6 v0)) / 0.06 m
-    let lo = 0.1, hi = 1.4;
-    for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if ((m - (0.01 / 0.06) * Math.log(1 + 6 * m)) / 0.06 < clear) lo = m; else hi = m; }
+    const slip = slipById(d.slip), clear = slip ? midFairway(slip) : 8;
+    // the shove that coasts her just that far with the drag in physics.ts (a firm push: up to a brisk walk)
+    let lo = 0.1, hi = 1.5;
+    for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < clear) lo = m; else hi = m; }
     u.docked = undefined; u.astern = lo; u.v = 0;
     // the finger she lay against: the nearest one, and which side of her it's on
     if (slip && (u.crew?.spec.crew.length ?? 0) > 0) {
@@ -839,7 +852,9 @@ export class World {
         const d = segPt(slip.p, fg[k - 1], fg[k]);
         if (d < best.d) { const m = { x: (fg[k - 1].x + fg[k].x) / 2 - slip.p.x, y: (fg[k - 1].y + fg[k].y) / 2 - slip.p.y }; const along = m.x * r.x + m.y * r.y; best = { d, lat: Math.min(2.6, d), side: along >= 0 ? 1 : -1 }; }
       }
-      u.pushing = { side: best.side, lat: best.lat, moved: 0, clear: clear - 1.5, jump: 0 };
+      // the crew member walks her back by the shroud (about half a metre forward of her middle) and has to jump aboard
+      // before the finger runs out under them: her middle lies 0.55 of the finger's length out from the walkway
+      u.pushing = { side: best.side, lat: best.lat, moved: 0, clear: 0.45 * slip.finger + 0.25, jump: 0 };
     }
     this.emit({ type: 'toast', msg: 'Pushed off: your crew walks her back off the dock and jumps aboard. She\'s going astern: steer with the tiller (going astern the bow goes the way you push it). Hoist the sails when you\'re clear.', ms: 5000 });
     return true;

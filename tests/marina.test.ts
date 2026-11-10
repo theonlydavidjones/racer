@@ -5,7 +5,7 @@ import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
-import { DT, World, slipLeadTime } from '../src/sim/world';
+import { DT, World, midFairway, slipLeadTime } from '../src/sim/world';
 
 describe('West Harbor', () => {
   it('a basin you can sail in, with its docks and breakwaters solid', () => {
@@ -41,7 +41,7 @@ describe('West Harbor', () => {
   });
   it('Cruise from her slip: bow in, made fast, sails down; push off shoves her clear astern, steerable; hoist; home bow first', () => {
     const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
-    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14' };
+    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
     const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
     expect(w.homeSlip?.id).toBe(slip.id); expect(u.v).toBe(0); expect(u.docked).toBeTruthy();
     expect(u.rig).toEqual({ main: 0, jib: 0, mainUp: false, jibUp: false }); // sails down at the dock
@@ -49,12 +49,13 @@ describe('West Harbor', () => {
     for (let i = 0; i < 300; i++) w.step(DT); // made fast: she stays put, wind or no wind
     expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01);
     expect(w.pushOff()).toBe(true);
-    expect(u.docked).toBeUndefined(); expect(u.astern).toBeGreaterThan(0.2); expect(u.astern).toBeLessThan(1.4);
+    expect(u.docked).toBeUndefined(); expect(u.astern).toBeGreaterThan(0.2); expect(u.astern).toBeLessThan(1.3); // a shove, about walking pace
     expect(u.pushing?.jump).toBe(0); expect(Math.abs(u.pushing!.lat - 2)).toBeLessThan(0.6); // a crew member on the finger, walking her out
     // she coasts back clear of her finger, straight (tiller centred), without touching anything
     const plan = pushOffPlan(slip), back = (q: { x: number; y: number }) => -((q.x - slip.p.x) * Math.sin(slip.heading * Math.PI / 180) + (q.y - slip.p.y) * Math.cos(slip.heading * Math.PI / 180));
     for (let i = 0; i < 60 * 40 && (u.astern ?? 0) > 0; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
     expect(back(u)).toBeGreaterThan(plan.back);
+    expect(Math.abs(back(u) - midFairway(slip))).toBeLessThan(1.5); // she comes to rest in the middle of the fairway
     expect(u.pushing).toBeUndefined(); // the crew member who pushed her off has jumped aboard
     // going astern the tiller still steers her (the bow goes the way the tiller's pushed)
     w.pushOff(); Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, astern: 0.8 });
