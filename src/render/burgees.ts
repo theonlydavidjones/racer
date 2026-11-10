@@ -202,8 +202,18 @@ export function burgeeCanvas(id: string): HTMLCanvasElement | null {
 }
 
 /**
+ * Where a flag officer's flag flies on a single-masted boat, by the club's own rule: in place of the burgee (the US
+ * Power Squadrons' rule, and most US clubs': usps.org/f_stuff/etiquett.html), or on the same halyard just below the
+ * burgee (e.g. Plymouth Yacht Club's). Clubs whose own rule isn't known follow the usual one.
+ */
+export type OfficerRule = 'replace' | 'below';
+const OFFICER_RULE: Record<string, { rule: OfficerRule; source: string }> = {};
+
+/**
  * The clubs a boat can belong to: those whose burgees are drawn, and South Beach Yacht Club (its burgee isn't drawn yet:
  * the club's own image of it couldn't be fetched, and it isn't on Flags of the World).
  */
-export const CLUBS: { id: string; club: string }[] = [...BURGEES.map(b => ({ id: b.id, club: b.club })), { id: 'sbyc', club: 'South Beach Yacht Club' }]
+export const CLUBS: { id: string; club: string; officer: OfficerRule; officerSource: string }[] = [...BURGEES.map(b => ({ id: b.id, club: b.club })), { id: 'sbyc', club: 'South Beach Yacht Club' }]
+  .map(c => ({ ...c, officer: OFFICER_RULE[c.id]?.rule ?? 'replace', officerSource: OFFICER_RULE[c.id]?.source ?? 'the usual US rule (USPS): in place of the burgee' }))
   .sort((a, b) => a.club.localeCompare(b.club));
+export const officerRule = (club: string | undefined): OfficerRule => CLUBS.find(c => c.id === club)?.officer ?? 'replace';

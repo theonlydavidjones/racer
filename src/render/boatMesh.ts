@@ -6,7 +6,7 @@ import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
 import { buildCrew, syncCrew, type Crew } from './crew';
-import { burgeeCanvas } from './burgees';
+import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { CABIN, COCKPIT, HEEL, L, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cockpitLid, topsidesPatch, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
@@ -320,10 +320,17 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     if (tail) parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), new THREE.Vector3(at.x, DECK_Y + 0.3, at.z)]), MAT.wire)); // the halyard's tail
     flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly });
   };
-  const club = b.special ? flagArtCanvas(b.special) : b.burgee ? burgeeCanvas(b.burgee) : null;
+  // an officer's flag (her skipper's, when he or she is a flag officer of her club) flies by the club's rule: in place of
+  // the burgee, or on the same halyard just below it
+  const burgee = b.burgee ? burgeeCanvas(b.burgee) : null, officer = b.special ? flagArtCanvas(b.special) : null;
+  const below = !!officer && officerRule(b.burgee) === 'below';
   const spreader = (side: number) => new THREE.Vector3(side * (SPREADER.x - 0.06), SPREADER.y - 0.06, SPREADER.z);
-  if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), spreader(1), 0.25, rig); hoist(club, spreader(-1), b.special ? 0.3 : 0.3, rig); }
-  else hoist(club, spreader(1), 0.3, rig);
+  const clubHoist = (side: number) => {
+    if (!below) { hoist(officer ?? burgee, spreader(side), 0.3, rig); return; }
+    hoist(burgee, spreader(side), 0.3, rig, false); hoist(officer, spreader(side).add(new THREE.Vector3(0, -0.36, 0)), 0.3, rig);
+  };
+  if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), spreader(1), 0.25, rig); clubHoist(-1); }
+  else clubHoist(1);
   if (b.ensign) {
     // on an ensign staff in a socket on the starboard quarter, close to the centreline (the backstay and tiller have the
     // middle of the transom), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly)
