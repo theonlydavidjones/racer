@@ -16,7 +16,7 @@ const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
  * The sails, as Folkboat sails are made (crosscut Dacron; from photographs of San Francisco boats): the main with four
  * battens up the leech (the top one shorter) and a long, low window parallel to the boom; the jib with two battens and
- * a pair of narrow windows low down, parallel to its foot.
+ * a window low down, parallel to its foot.
  */
 const MAIN_LUFF = 8.25, MAIN_FOOT = 3.3, JIB_LUFF = 6.54, JIB_FOOT = 2.92;
 const MAIN_DEF: SailDef = {
@@ -27,7 +27,7 @@ const MAIN_DEF: SailDef = {
 /** Jib: hanked on the forestay. */
 const JIB_DEF: SailDef = {
   tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0, 0.35, 2.9), depth: 0.36, rows: 12, cols: 8,
-  windows: [{ t0: 0.075, t1: 0.1, s0: 0.42, s1: 0.8 }, { t0: 0.125, t1: 0.15, s0: 0.42, s1: 0.8 }],
+  windows: [{ t0: 0.08, t1: 0.135, s0: 0.42, s1: 0.8 }],
   battens: [{ t: 0.27, len: 0.45 }, { t: 0.53, len: 0.4 }]
 };
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
