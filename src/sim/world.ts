@@ -21,7 +21,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { destMark, place as getPlace } from './places';
-import { pushOffPlan, slipById, type Slip } from '../geo/marina';
+import { HARBOR, pushOffPlan, slipById, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 
@@ -479,6 +479,7 @@ export class World {
       const x0 = b.x, y0 = b.y;
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
+      if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
     }
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.log?.step(this, dt);
@@ -830,8 +831,26 @@ export class World {
     let lo = 0.1, hi = 1.4;
     for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if ((m - (0.01 / 0.06) * Math.log(1 + 6 * m)) / 0.06 < clear) lo = m; else hi = m; }
     u.docked = undefined; u.astern = lo; u.v = 0;
-    this.emit({ type: 'toast', msg: 'Pushed off: she\'s going astern. Steer with the tiller: going astern the bow goes the way you push it. Hoist the sails when you\'re clear.', ms: 5000 });
+    // the finger she lay against: the nearest one, and which side of her it's on
+    if (slip && (u.crew?.spec.crew.length ?? 0) > 0) {
+      const f = V(slip.heading), r = { x: f.y, y: -f.x }; // forward, and to starboard
+      let best = { d: Infinity, lat: 2, side: 1 };
+      for (const fg of HARBOR.fingers) for (let k = 1; k < fg.length; k++) {
+        const d = segPt(slip.p, fg[k - 1], fg[k]);
+        if (d < best.d) { const m = { x: (fg[k - 1].x + fg[k].x) / 2 - slip.p.x, y: (fg[k - 1].y + fg[k].y) / 2 - slip.p.y }; const along = m.x * r.x + m.y * r.y; best = { d, lat: Math.min(2.6, d), side: along >= 0 ? 1 : -1 }; }
+      }
+      u.pushing = { side: best.side, lat: best.lat, moved: 0, clear: clear - 1.5, jump: 0 };
+    }
+    this.emit({ type: 'toast', msg: 'Pushed off: your crew walks her back off the dock and jumps aboard. She\'s going astern: steer with the tiller (going astern the bow goes the way you push it). Hoist the sails when you\'re clear.', ms: 5000 });
     return true;
+  }
+
+  /** The crew member walking her out: jumps aboard as her bow comes level with the end of the finger (or she stops). */
+  private walkOut(b: Boat, step: number, dt: number): void {
+    const p = b.pushing!;
+    p.moved += step;
+    if (p.jump > 0) { p.jump += dt / 0.7; if (p.jump >= 1) b.pushing = undefined; }
+    else if (p.moved >= p.clear || (b.astern ?? 0) < 0.05) p.jump = 1e-3;
   }
 
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */

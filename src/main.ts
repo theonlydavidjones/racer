@@ -360,15 +360,19 @@ function pushOff(): void { if (w.running && !w.paused) w.pushOff(); }
 $('bPushOff').onclick = pushOff;
 /* Hoist or strike a sail (the crew does it at their pace: boat/physics.ts crewRig). */
 function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; w.setSail(sail, !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true)); }
-$('bJib').onclick = () => halyard('jib');
-$('bMain').onclick = () => halyard('main');
+// (on press, like the pole button: the label changes as the crew works, and a click needs the same thing under the pointer at both ends)
+for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
+  $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); halyard(sail); });
+  $(id).addEventListener('click', e => { if (e.detail === 0) halyard(sail); }); // keyboard activation only
+}
 /** The halyard buttons: a sail that's down (or on its way up or down) always has one; striking a sail is for the marina. */
 function sailButtons(): void {
   const u = w.user, r = u.rig, inMarina = inBasin(u);
   for (const [k, id] of [['jib', 'bJib'], ['main', 'bMain']] as const) {
     const h = r ? r[k] : 1, up = r ? (k === 'main' ? r.mainUp : r.jibUp) : true, el = $(id);
-    el.hidden = !w.running || (up && h >= 1 && !inMarina);
-    el.textContent = up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
+    const hide = !w.running || (up && h >= 1 && !inMarina), txt = up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
+    if (el.hidden !== hide) el.hidden = hide;
+    if (el.textContent !== txt) el.textContent = txt; // (only when it changes)
     el.classList.toggle('on', !up && h === 0);
   }
 }

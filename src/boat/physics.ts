@@ -199,7 +199,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.vx = u.x * (b.v - ast) + b.cur.x; b.vy = u.y * (b.v - ast) + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
-  if (onLand(bow(b))) {
+  if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
+  else if (onLand(bow(b))) {
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0;
     bump(inBasin(b) ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {

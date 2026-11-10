@@ -46,6 +46,12 @@ export interface Boat {
   docked?: { slip: string };
   /** Sternway, m/s: pushed off astern, she coasts back, slowing, and steers backwards. */
   astern?: number;
+  /**
+   * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
+   * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
+   * `moved` how far she's gone back, `clear` how far before the finger ends; `jump` the jump's progress (0 not yet … 1 aboard).
+   */
+  pushing?: { side: number; lat: number; moved: number; clear: number; jump: number };
   /** Her sails: how far each is hoisted (0 down … 1 up) and whether the crew is hoisting (true) or striking (false) it. Absent: both up. */
   rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean };
   v: number; // speed through the water, m/s

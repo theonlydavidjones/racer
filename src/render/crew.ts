@@ -128,3 +128,28 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   seat(h, { lean: mode === 'hike' ? 0.15 + 0.3 * hike : 0.05, thigh: 1.35, knee: 1.4, arms: [-0.6, 0.6], elbows: 0.4 }); // aft arm back to the tiller
   h.root.visible = !hideHelm;
 }
+
+/**
+ * Pushing off: the bow crew member standing on the finger beside her (the shrouds), leaning in with both hands on her
+ * and walking her back; then, as her bow comes level with the end of the finger, a jump across onto her side deck.
+ * `p.side` +1 starboard / −1 port, `p.lat` m out to the finger's middle, `p.jump` 0 … 1; `dockY` the finger's top
+ * above her waterline, `deckY` her side deck's, `t` s for the walking.
+ */
+export function dockhand(cr: Crew, p: { side: number; lat: number; jump: number }, dockY: number, deckY: number, t: number): void {
+  const f = cr.crew[cr.crew.length - 1]; if (!f) return;
+  const stand = 0.93 * f.scale, z = -0.55, xDock = p.side * Math.max(1.4, p.lat - 0.35), xDeck = p.side * 0.78;
+  const face = p.side * Math.PI / 2; // facing the boat
+  if (p.jump <= 0) {
+    const step = Math.sin(t * 5.5) * 0.35; // walking her back, hands on the shroud and the rail
+    f.root.position.set(xDock, dockY + stand, z); f.root.rotation.set(0, face, 0);
+    seat(f, { lean: 0.35, thigh: 0.05, knee: 0.1, spread: 0.06, arms: [1.25, 1.05], elbows: 0.25 });
+    f.leg[0].root.rotation.x = step; f.leg[1].root.rotation.x = -step; f.leg[0].mid.rotation.x = -Math.max(0, -step) * 0.6; f.leg[1].mid.rotation.x = -Math.max(0, step) * 0.6;
+  } else {
+    // across: up off the dock, over the gap and down onto the side deck, knees tucked, then crouching to land
+    const k = Math.min(1, p.jump), e = k * k * (3 - 2 * k), arc = Math.sin(Math.PI * k) * 0.55;
+    f.root.position.set(xDock + (xDeck - xDock) * e, dockY + stand + (deckY + 0.55 - dockY - stand) * e + arc, z);
+    f.root.rotation.set(0, face, 0);
+    seat(f, { lean: 0.3 + 0.3 * Math.sin(Math.PI * k), thigh: 0.6 + 0.9 * Math.sin(Math.PI * k), knee: 0.8 + 0.7 * Math.sin(Math.PI * k), arms: [1.6, 1.6], elbows: 0.4 });
+  }
+  f.root.visible = true;
+}
