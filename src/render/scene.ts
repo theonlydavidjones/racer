@@ -17,6 +17,7 @@ import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
 import { Moorings } from './moored';
+import { Wildlife } from './wildlife';
 import { VesselView } from './vessels';
 import { landAt } from '../environment/sea';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
@@ -158,6 +159,8 @@ export class SceneView {
   private wakes!: Wakes;
   /** Boats at anchor and on moorings, lying to the current and wind. */
   private moorings!: Moorings;
+  /** Porpoises, seals and sea lions, and the birds. */
+  private wildlife!: Wildlife;
   /** Ships, ferries and tour boats. */
   private vesselView!: VesselView;
   private pitches: number[] = [];
@@ -266,6 +269,7 @@ export class SceneView {
 
     this.wakes = new Wakes(scene);
     this.moorings = new Moorings(scene, p => landAt(p) === false);
+    this.wildlife = new Wildlife(scene, p => landAt(p) === false);
     this.vesselView = new VesselView(scene);
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
@@ -572,6 +576,8 @@ export class SceneView {
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
     this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => this.waves.height(p, tw, 0.7, 0.4));
+    this.wildlife.setMonth(+w.raceDate.slice(5, 7) || new Date().getMonth() + 1);
+    this.wildlife.update(w.running && !w.paused ? dt * w.speed : 0, tw, w.user, w.boats, (x, y) => this.waves.height({ x, y }, tw, 1, 1));
     this.vesselView.sync(w.vessels, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1));
     this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
     this.updateLaylines(w, dt);
