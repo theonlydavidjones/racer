@@ -113,6 +113,8 @@ export interface Boat {
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;
+  /** The club burgee she flies (an id from render/burgees.ts), if any. */
+  burgee?: string;
 }
 
 export type PoleState = 'down' | 'setting' | 'set' | 'stowing';

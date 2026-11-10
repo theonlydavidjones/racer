@@ -6,6 +6,7 @@ import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
 import { buildCrew, syncCrew, type Crew } from './crew';
+import { burgeeCanvas } from './burgees';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { CABIN, COCKPIT, HEEL, L, RUDDER_RAKE, cabinGeometry, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
@@ -123,6 +124,8 @@ export interface BoatMesh {
   rudder: THREE.Group; prevH: number; prevT: number;
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
+  /** The club burgee (streams in the apparent wind and flutters), if she flies one. */
+  burgee: { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array } | null;
   /** The crew, and whether to hide the helm (you're looking through their eyes in the cockpit view). */
   crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
@@ -191,6 +194,8 @@ const TRAVELLER = new THREE.Vector3(0, 0.78, 3.62);
 // Rig points in the boat group's frame: x to starboard, y up, z aft (the bow is at z = −3.82).
 const HOUNDS = new THREE.Vector3(0, 7.2, -0.6); // where the forestay and upper shrouds meet the mast
 const CHAINPLATE_Z = -0.45, CHAINPLATE_X = 1.0, DECK_Y = 0.42;
+/** The spreaders: one pair, about half way up, pushing the shrouds out (tip, starboard side). */
+const SPREADER = new THREE.Vector3(0.68, 4.5, -0.56);
 const POLE_INBOARD = new THREE.Vector3(0, 1.5, -0.6); // pole fitting on the front of the mast
 const JIB_CLEW = new THREE.Vector3(0, 0.35, 2.9); // in the jib pivot's frame
 // Cassette-tape telltales: old audio tape tied to the shrouds, about 1.4 m above the deck (low enough to
@@ -234,9 +239,11 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // upper shrouds, each with a cassette-tape telltale tied on low enough to see from the cockpit
   const ribbons: Ribbon[] = [];
   for (const sx of [-1, 1]) {
-    const foot = new THREE.Vector3(sx * CHAINPLATE_X, DECK_Y, CHAINPLATE_Z);
-    rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, HOUNDS]), MAT.wire));
-    const anchor = foot.clone().lerp(HOUNDS, TAPE_HEIGHT / (HOUNDS.y - DECK_Y));
+    const foot = new THREE.Vector3(sx * CHAINPLATE_X, DECK_Y, CHAINPLATE_Z), tip = new THREE.Vector3(sx * SPREADER.x, SPREADER.y, SPREADER.z);
+    // the spreader, and the shroud over its tip to the hounds
+    const spr = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, tip.x * sx, 5), spar); spr.rotation.z = Math.PI / 2; spr.position.set(tip.x / 2, SPREADER.y, (SPREADER.z + -0.6) / 2); rig.add(spr);
+    rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, tip, HOUNDS]), MAT.wire));
+    const anchor = foot.clone().lerp(tip, TAPE_HEIGHT / (tip.y - DECK_Y));
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RIBBON_N * 2 * 3), 3));
     const idx: number[] = [];
@@ -250,6 +257,16 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
+  // the club burgee, on the flag halyard under the starboard spreader (the masthead has the windex)
+  let burgee: BoatMesh['burgee'] = null;
+  const bc = b.burgee ? burgeeCanvas(b.burgee) : null;
+  if (bc) {
+    const geo = new THREE.PlaneGeometry(0.45, 0.3, 8, 2); geo.translate(0.225, -0.15, 0); // hoisted at its top corner
+    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(bc), side: THREE.DoubleSide, alphaTest: 0.5, transparent: false }));
+    mesh.position.set(SPREADER.x - 0.06, SPREADER.y - 0.06, SPREADER.z); rig.add(mesh);
+    rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(SPREADER.x - 0.06, SPREADER.y - 0.36, SPREADER.z), new THREE.Vector3(SPREADER.x - 0.06, DECK_Y + 0.3, SPREADER.z)]), MAT.wire)); // the halyard's tail down to the deck
+    burgee = { mesh, base: (geo.attributes.position.array as Float32Array).slice() };
+  }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, 9.45, -0.6); rig.add(windex);
   { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });
@@ -277,7 +294,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, hideHelm: false };
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, burgee, hideHelm: false };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -295,6 +312,13 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
+  if (m.burgee) {
+    // the fly streams downwind of the halyard, fluttering harder in more wind
+    const bg = m.burgee, p = bg.mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array, k = Math.min(1, b.aws / 8);
+    bg.mesh.rotation.y = m.windex.rotation.y - Math.PI / 2;
+    for (let i = 0; i < a.length; i += 3) { const x = bg.base[i]; a[i + 2] = Math.sin(x * 14 - t * (8 + 6 * k)) * 0.035 * x / 0.45 * (0.4 + k); a[i + 1] = bg.base[i + 1] - (1 - k) * x * 0.5; }
+    p.needsUpdate = true;
+  }
   m.card.rotation = b.h * D2R;
   // the crew on the windward side, hiking as hard as she needs
   syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm);

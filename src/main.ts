@@ -5,6 +5,7 @@ import './styles.css';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
 import { PLACES } from './sim/places';
+import { BURGEES } from './render/burgees';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
@@ -515,6 +516,10 @@ function buildSetupChoices(): void {
   from.innerHTML = opts(null); to.innerHTML = opts('Nowhere in particular');
   from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
   from.onchange = () => { S.sailFrom = from.value; newGame(); };
+  const bs = $('burgeeSel') as HTMLSelectElement;
+  bs.innerHTML = '<option value="">None</option>' + BURGEES.map(b => `<option value="${b.id}">${b.club}</option>`).join('');
+  bs.value = S.burgee ?? '';
+  bs.onchange = () => { S.burgee = bs.value; newGame(); };
   to.onchange = () => { S.sailTo = to.value; newGame(); };
   $('setup').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
