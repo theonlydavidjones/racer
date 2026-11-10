@@ -273,3 +273,7 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .coach-item{border-left:3px solid #3fd197;padding:3px 0 3px 9px;margin:7px 0}
 .coach-item.fix{border-left-color:#ffb35c}
 .coach-item b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+
+/* the tactical compass tape, under the instrument pods */
+#compassTape{position:fixed;top:calc(env(safe-area-inset-top,0px) + 80px);left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 420px));height:48px;
+  background:var(--pod);border:1px solid var(--rule);border-radius:6px;pointer-events:none}

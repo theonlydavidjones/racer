@@ -193,6 +193,12 @@ Setup → Current → **Real tide** (the default), then pick the race day and th
 - **Telltales** on your boat: three pairs on the jib luff (red on the port side of the sail, green on starboard, as on real sails), and one on the main leech at each batten. Windward ones lift and dance when you're luffing; leeward ones droop when stalled; leech telltales curl behind the main when it's over-trimmed; downwind they hang. Your sails are slightly see-through so the leeward telltales show through, as on real Dacron.
 - **Sail shape detail.** A luff bubble when under-trimmed, flogging when let go, three battens, and a long, low rectangular window in the main parallel to the boom (1.8 m × 0.35 m, 0.3 m above it).
 
+### Instruments
+
+- **Tactical compass** under the instrument pods: a tape of headings around yours, with the bearing to the next mark (yellow), the wind direction (blue), the heading you'd sail on the other tack (or gybe) after you turn, and your average close-hauled heading on this tack ("avg"). Sailing higher than your average on starboard (lower on port) means you're lifted; the tape says "lifted 6°" or "headed 4°". That's how racers spot shifts on the compass: tack on the headers.
+- **The bulkhead compass** on the boat has a card that turns with the heading (you can read it from the cockpit view).
+- **Windex** on the masthead: it swings into the apparent wind, with two reference tabs set at the close-hauled angle either side of the bow.
+
 ### Heel, helm balance and the trim coach
 
 - **Heel comes from the forces on the sails** (`src/boat/balance.ts`): each sail's force from the apparent wind, its area, its angle of attack (sheet and traveller), its depth (outhaul, backstay, Cunningham, and the vang bending the lower mast a little) and its twist (sheet tension and vang). The part across the boat, high up the rig, heels her until the hull's righting moment and three crew hiking balance it. A gust heels her at once; depowering stands her up. About 9° at 10 kt upwind, 15° at 14 kt, 20° at 18 kt with the crew's settings; past about 20° she slows (leeway, the rudder fighting).

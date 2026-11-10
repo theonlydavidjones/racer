@@ -67,7 +67,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // companionway, sliding hatch and the compass on the aft end of the cabin (as on Josephine)
   const cw = new THREE.Mesh(new THREE.PlaneGeometry(0.5, CABIN.h * 0.8), MAT.dark); cw.position.set(0, topAft - CABIN.h * 0.45, zAft + 0.004); grp.add(cw);
   const hatch = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.06, 0.62), MAT.wood); hatch.position.set(0, topAft + 0.08, zAft - 0.28); grp.add(hatch);
-  const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); grp.add(compass);
+  const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
   // wooden grab rails on the cabin top
   for (const s of [1, -1]) {
     const gr = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 1.2), MAT.wood);
@@ -116,6 +116,8 @@ export interface BoatMesh {
   jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
   pole: THREE.Mesh; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
+  /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
+  windex: THREE.Group; card: THREE.CanvasTexture;
   mainsheet: THREE.Line;
   lines: Lines;
 }
@@ -237,7 +239,31 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines };
+  // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
+  const windex = new THREE.Group(); windex.position.set(0, 9.45, -0.6); rig.add(windex);
+  { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.55, 5), blk); rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.12, -0.05); windex.add(rod);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 6), red); head.rotation.x = -Math.PI / 2; head.position.set(0, 0.12, -0.35); windex.add(head);
+    const fin = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.09), red); fin.rotation.y = Math.PI / 2; fin.position.set(0, 0.12, 0.2); windex.add(fin);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 5), blk); post.position.set(0, 0.06, 0); windex.add(post);
+    // the fixed reference tabs, set to the close-hauled apparent wind angle either side of the bow
+    for (const sx of [-1, 1]) { const tab = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.03, 0.22), blk); const a = sx * 28 * Math.PI / 180; tab.position.set(Math.sin(a) * 0.14, 0.05, -Math.cos(a) * 0.14).add(windex.position); tab.rotation.y = -a; rig.add(tab); }
+  }
+  // a compass card behind the glass of the bulkhead compass
+  const cc = document.createElement('canvas'); cc.width = cc.height = 256; const g = cc.getContext('2d')!;
+  g.fillStyle = '#10161c'; g.beginPath(); g.arc(128, 128, 128, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#e8e4d8'; g.fillStyle = '#e8e4d8'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let d = 0; d < 360; d += 5) {
+    const a = d * Math.PI / 180, r0 = d % 30 === 0 ? 92 : d % 10 === 0 ? 100 : 106;
+    g.lineWidth = d % 30 === 0 ? 3 : 1.5; g.beginPath(); g.moveTo(128 + Math.sin(a) * r0, 128 - Math.cos(a) * r0); g.lineTo(128 + Math.sin(a) * 118, 128 - Math.cos(a) * 118); g.stroke();
+    if (d % 30 === 0) { g.save(); g.translate(128 + Math.sin(a) * 74, 128 - Math.cos(a) * 74); g.rotate(a); g.font = `bold ${d % 90 === 0 ? 30 : 22}px sans-serif`; g.fillStyle = d === 0 ? '#ff5a3c' : '#e8e4d8'; g.fillText(({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' } as Record<number, string>)[d] ?? String(d / 10), 0, 0); g.restore(); }
+  }
+  const card = new THREE.CanvasTexture(cc); card.center.set(0.5, 0.5);
+  const cmp = grp.getObjectByName('compass')!;
+  const face = new THREE.Mesh(new THREE.CircleGeometry(0.068, 32), new THREE.MeshBasicMaterial({ map: card }));
+  face.position.copy(cmp.position); face.position.z += 0.017; grp.add(face);
+  const lubber = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.03), new THREE.MeshBasicMaterial({ color: 0xffb35c })); lubber.position.copy(face.position); lubber.position.y += 0.055; lubber.position.z += 0.001; grp.add(lubber);
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -252,6 +278,10 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
   m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);
+  // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
+  const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
+  m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
+  m.card.rotation = b.h * D2R;
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);

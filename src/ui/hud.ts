@@ -4,7 +4,7 @@ import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
 import { sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
-import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
+import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
@@ -51,6 +51,50 @@ export class Hud {
   private dialC = $<HTMLCanvasElement>('dial');
   private mapC = $<HTMLCanvasElement>('map');
 
+  /** Mean close-hauled heading on each tack over the last couple of minutes (the reference for lifts and headers). */
+  private meanHdg: Record<'S' | 'P', number | null> = { S: null, P: null };
+  /**
+   * The tactical compass: a tape of headings around yours, with the bearing to the next mark, the wind, the heading
+   * you'd sail on the other tack (or gybe), and your average close-hauled heading on this tack. Steer above the
+   * average and you're lifted; below it, headed.
+   */
+  private compass(w: World, u: Boat, dt: number): void {
+    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), cx = W / 2, span = 70, px = W / (2 * span);
+    ctx.clearRect(0, 0, W, H);
+    const h = u.h, x = (b: number) => cx + wrap(b - h) * px;
+    // ticks and numbers
+    ctx.strokeStyle = 'rgba(150,196,218,.45)'; ctx.fillStyle = '#c9dbe4'; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+    for (let d = Math.ceil((h - span) / 5) * 5; d <= h + span; d += 5) {
+      const X = x(d), big = d % 10 === 0;
+      ctx.beginPath(); ctx.moveTo(X, H - 1); ctx.lineTo(X, H - (big ? 12 : 7)); ctx.stroke();
+      if (d % 30 === 0) { const n = ((d % 360) + 360) % 360; ctx.fillText(({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' } as Record<number, string>)[n] ?? String(n).padStart(3, '0'), X, H - 16); }
+    }
+    const marker = (b: number, col: string, label: string, top: boolean) => {
+      let X = x(b); const off = X < 8 || X > W - 8; X = Math.max(8, Math.min(W - 8, X));
+      ctx.fillStyle = col; ctx.beginPath();
+      if (top) { ctx.moveTo(X - 5, 2); ctx.lineTo(X + 5, 2); ctx.lineTo(X, 9); } else { ctx.moveTo(X - 4, 13); ctx.lineTo(X, 9); ctx.lineTo(X + 4, 13); }
+      ctx.fill(); ctx.font = '700 10px system-ui, sans-serif'; ctx.fillText(off ? (X < cx ? '◂ ' : '') + label + (X > cx ? ' ▸' : '') : label, Math.max(26, Math.min(W - 26, X)), top ? 20 : 24);
+    };
+    const upwind = u.twa < 80, from = u.ww.from;
+    // the other tack (or gybe): where you'd point after turning
+    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * beatFor(u)) : n360(from + wrap(from - h)); // the mirror image across the wind
+    marker(other, '#9fb3bf', upwind ? 'tack' : 'gybe', false);
+    // average close-hauled heading on this tack: a slow running mean while you're close-hauled
+    if (upwind && Math.abs(u.twa - beatFor(u)) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
+    const mean = this.meanHdg[u.tack];
+    if (upwind && mean != null) {
+      marker(mean, '#e8e8e8', 'avg', false);
+      const d = wrap(h - mean) * (u.tack === 'S' ? -1 : 1); // starboard: lifted when heading is higher (smaller) than the mean
+      if (Math.abs(d) >= 3) { ctx.fillStyle = d > 0 ? '#3fd197' : '#ff6a5c'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`, cx - 34, 13); }
+    }
+    marker(from, '#6fb7ff', 'wind', true);
+    const m = w.nextMark(u);
+    if (m) marker(brg(m.p.x - u.x, m.p.y - u.y), '#ffd21a', m.name.split(' ')[0], true);
+    // the lubber line and the heading
+    ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = '#ffb35c'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(Math.round(n360(h))).padStart(3, '0') + '°', cx + 22, 13);
+  }
+
   private sigKey = '';
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
@@ -75,6 +119,7 @@ export class Hud {
 
   update(w: World, dt: number): void {
     this.signals(w);
+    this.compass(w, w.user, dt);
     this.acc += dt; if (this.acc < 0.1) return; this.acc = 0;
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
