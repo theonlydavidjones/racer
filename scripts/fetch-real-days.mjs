@@ -12,8 +12,11 @@
  *    direction, and the gust), 10:00–17:54 local.
  *  - Swell observed: NDBC 46237 (San Francisco Bar, CDIP 142): significant height, dominant period and mean direction,
  *    averaged over 11:00–16:59 local.
+ *  - Wind across the Bay, observed: NOAA CO-OPS shore stations Pier 1 (9414311), Oakland Middle Harbor (9414769),
+ *    Point Potrero (9414847) and Richmond (9414863), hourly vector means 10:00–17:59 local.
  *  - Forecast: NWS gridded forecast (api.weather.gov): wind on the 2.5 km grid cell over the Cityfront race area
- *    (MTR 84,107), hourly; swell at the cell by the Bar buoy (MTR 77,107).
+ *    (MTR 84,107), hourly; the wind on every cell over the race area (MTR x 81–88, y 105–111), 09:00–18:00; swell at
+ *    the cell by the Bar buoy (MTR 77,107).
  *
  * Output: src/environment/data/sf-real-days.json
  */
@@ -76,6 +79,38 @@ for (let t = new Date(start); t <= yesterday;) {
   t = new Date(end.getTime() + 86400e3);
 }
 for (const [date, a] of raw) if (a.filter((v, i) => i % 3 === 0 && v !== 255).length >= SLOTS / 2) wind[date] = Buffer.from(a).toString('base64');
+
+/* ---------- the other wind stations around the Bay, hourly (for the wind across the course) ---------- */
+// Shore stations (NOAA CO-OPS): the Embarcadero, Oakland, Point Potrero and Richmond. Each day, how each differed from
+// Fort Point compared with how it usually does (its siting makes some read low every day), shapes the wind across the course.
+const STATIONS = [
+  { id: '9414311', name: 'Pier 1 (Embarcadero)', lat: 37.798, lon: -122.393 },
+  { id: '9414769', name: 'Oakland Middle Harbor', lat: 37.8, lon: -122.33 },
+  { id: '9414847', name: 'Point Potrero (Richmond)', lat: 37.9058, lon: -122.365 },
+  { id: '9414863', name: 'Richmond', lat: 37.9283, lon: -122.4 }
+];
+const HOURS = [10, 11, 12, 13, 14, 15, 16, 17]; // hourly vector means over :00–:54
+const stationsData = Object.fromEntries(STATIONS.map(st => [st.id, { ...(prev?.stations?.[st.id]?.days ?? {}) }]));
+for (const st of STATIONS) {
+  const acc = new Map(); // date → per hour [sum speed, sum vx, sum vy, n]
+  for (let t = new Date(start); t <= yesterday;) {
+    const end = new Date(Math.min(t.getTime() + 30 * 86400e3, yesterday.getTime() + 86400e3));
+    const j = await fetchRetry(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=wind&station=${st.id}&begin_date=${ymd(t)}&end_date=${ymd(end)}&time_zone=gmt&units=english&format=json&application=folkboat-sim`);
+    for (const r of j?.data ?? []) {
+      const sp = parseFloat(r.s), d = parseFloat(r.d); if (!Number.isFinite(sp) || !Number.isFinite(d)) continue;
+      const L = local(Date.parse(r.t.replace(' ', 'T') + ':00Z')), h = HOURS.indexOf(Math.floor(L.min / 60)); if (h < 0) continue;
+      if (!acc.has(L.date)) acc.set(L.date, HOURS.map(() => [0, 0, 0, 0]));
+      const c = acc.get(L.date)[h]; c[0] += sp; c[1] += Math.sin(d * Math.PI / 180) * sp; c[2] += Math.cos(d * Math.PI / 180) * sp; c[3]++;
+    }
+    t = new Date(end.getTime() + 86400e3);
+  }
+  for (const [date, hrs] of acc) {
+    const a = new Uint8Array(HOURS.length * 2).fill(255);
+    hrs.forEach((c, h) => { if (c[3] >= 5) { a[h * 2] = Math.min(254, Math.round(c[0] / c[3] * 4)); a[h * 2 + 1] = Math.round(((Math.atan2(c[1], c[2]) * 180 / Math.PI + 360) % 360) / 2) % 180; } });
+    stationsData[st.id][date] = Buffer.from(a).toString('base64');
+  }
+  console.log(`${st.name}: ${Object.keys(stationsData[st.id]).length} days`);
+}
 
 /* ---------- observed swell, NDBC 46237 ---------- */
 const swell = { ...(prev?.swell ?? {}) }; // date → [hs m, dominant period s, mean direction deg (from)]
@@ -141,10 +176,31 @@ for (const date of Object.keys(ws)) {
 }
 console.log(`forecast: ${Object.keys(forecast).join(', ')} (issued ${g.updateTime})`);
 
+/* ---------- the NWS forecast grid over the race area (2.5 km cells), for the wind across the course ---------- */
+const GRID_X = [81, 82, 83, 84, 85, 86, 87, 88], GRID_Y = [105, 106, 107, 108, 109, 110, 111], GRID_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const cells = [], gridDays = {};
+for (const gx of GRID_X) for (const gy of GRID_Y) {
+  const j = await fetchRetry(`https://api.weather.gov/gridpoints/MTR/${gx},${gy}`, 'json', { Accept: 'application/geo+json' });
+  if (!j?.properties) continue;
+  const ring = j.geometry?.coordinates?.[0] ?? [], n = Math.max(1, ring.length - 1);
+  const lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n, lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n;
+  const i = cells.push([Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]) - 1;
+  const cs = hourly(j.properties.windSpeed, v => r1(v * KMH)), cd = hourly(j.properties.windDirection, v => Math.round(v));
+  for (const date of Object.keys(cs)) {
+    if (date < today) continue;
+    const day = gridDays[date] ??= { kt: [], from: [] };
+    day.kt[i] = GRID_HOURS.map(h => cs[date]?.[h] ?? null); day.from[i] = GRID_HOURS.map(h => cd[date]?.[h] ?? null);
+  }
+}
+console.log(`forecast grid: ${cells.length} cells, ${Object.keys(gridDays).length} days`);
+
 await writeFile(OUT, JSON.stringify({
   source: `Observed wind: NOAA CO-OPS ${WIND_STATION} (Fort Point), 6-minute, 10:00–17:54 local, base64 of [speed kt ×4, direction from /2, gust kt ×4] per slot, 255 = missing. Observed swell: NDBC ${BUOY}, mean over 11:00–16:59 local, [Hs m, dominant period s, mean direction from]. Forecast: NWS gridded forecast, MTR 84,107 (wind, kt, hourly by local hour 0–23) and MTR 77,107 (swell at 13:00).`,
   updated: new Date(now).toISOString(), forecastIssued: g.updateTime,
   slot0: SLOT0, slotMin: SLOT_MIN, slots: SLOTS,
-  wind: Object.fromEntries(Object.entries(wind).sort()), swell: Object.fromEntries(Object.entries(swell).sort()), forecast
+  wind: Object.fromEntries(Object.entries(wind).sort()), swell: Object.fromEntries(Object.entries(swell).sort()), forecast,
+  stationHours: HOURS,
+  stations: Object.fromEntries(STATIONS.map(st => [st.id, { name: st.name, lat: st.lat, lon: st.lon, days: Object.fromEntries(Object.entries(stationsData[st.id]).sort()) }])),
+  grid: { hours: GRID_HOURS, cells, days: gridDays }
 }) + '\n');
 console.log(`Wrote ${OUT.pathname}: ${Object.keys(wind).length} days of wind, ${Object.keys(swell).length} of swell, ${Object.keys(forecast).length} forecast days`);

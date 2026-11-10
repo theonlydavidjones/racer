@@ -123,6 +123,30 @@ export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p:
   ctx.restore();
 }
 
+/**
+ * The wind across the course (a training aid): darker where it blows harder than the course-wide wind, paler where it's
+ * lighter, as cells a few hundred metres across, with a tick showing which way it's blowing there.
+ */
+export function drawWindField(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x: number; y: number }) => { k: number; from: number },
+  cx: number, cy: number, half: number, spacing: number, onLand: (p: { x: number; y: number }) => boolean): void {
+  ctx.save();
+  const x0 = Math.floor((cx - half) / spacing) * spacing, y0 = Math.floor((cy - half) / spacing) * spacing;
+  for (let x = x0; x <= cx + half; x += spacing) for (let y = y0; y <= cy + half; y += spacing) {
+    const p = { x: x + spacing / 2, y: y + spacing / 2 };
+    if (onLand(p)) continue;
+    const f = at(p), d = f.k - 1;
+    if (Math.abs(d) > 0.04) {
+      const a = tf(x, y), b = tf(x + spacing, y + spacing), c = tf(x + spacing, y), e = tf(x, y + spacing);
+      ctx.fillStyle = d > 0 ? `rgba(10,30,60,${Math.min(0.32, d * 0.9)})` : `rgba(200,230,245,${Math.min(0.25, -d * 0.8)})`;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(e[0], e[1]); ctx.closePath(); ctx.fill();
+    }
+    // which way it blows here (downwind tick)
+    const q = tf(p.x, p.y), r = tf(p.x - Math.sin(f.from * Math.PI / 180) * spacing * 0.35, p.y - Math.cos(f.from * Math.PI / 180) * spacing * 0.35);
+    ctx.strokeStyle = 'rgba(232,238,246,.28)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(r[0], r[1]); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** Puffs (dark) and lulls (pale) as soft streaks along the wind, as you'd see them on the water from aloft. */
 export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: number; y: number; r: number; amp: number; age: number; life: number }[],
   dir: { x: number; y: number }, gustiness: number): void {

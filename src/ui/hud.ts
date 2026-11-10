@@ -36,7 +36,7 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawCurrentArrows, drawLand, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCourse, drawCurrentArrows, drawWindField, drawLand, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
 import { laylinesFor } from '../sim/laylines';
 
@@ -386,6 +386,10 @@ export class Hud {
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
+    if (wd.settings.aids) { // the wind across the course: where it blows harder and lighter, and which way
+      const half = Math.max(w, h) / scale * 0.75, spacing = Math.max(250, half / 7);
+      drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, spacing, onLand);
+    }
     drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness);
     drawLand(ctx, tf);
     { // the current across the water around you, from the sim's own current field

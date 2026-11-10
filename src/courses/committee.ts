@@ -1,8 +1,8 @@
 import { D2R, KT, V, brg, cross, dot, sub, wrap, type Vec } from '../core/math';
 import { beatAngle, polar, runAngle } from '../boat/polar';
-import { CURRENTS, currentAt, currentVector, shoreRelief } from '../environment/current';
+import { CURRENTS, currentAt, currentVector } from '../environment/current';
 import { CurrentField, nextSaturday, sfLocalToUtcMin, stationsFor } from '../environment/tide';
-import { WIND_KIND_LABEL, windTerrain, type WindDay, type WindKind } from '../environment/wind';
+import { WIND_KIND_LABEL, type WindDay, type WindKind } from '../environment/wind';
 import { dayWeather } from '../environment/weather';
 import type { Settings } from '../settings';
 import { buildCourse, type CourseFile } from './course';
@@ -49,13 +49,13 @@ export function raceDay(S: Settings, windBase = 275): RaceDay {
   const g = wx.at(gunUtc), kind = wx.kind;
   if (!sea && kind === 'west' && !real) g.from = windBase; // as the World does
   const wind = (p: Vec, min: number) => {
-    const b = sea ? wx.at(gunUtc + min) : { kt: S.windKt, from: g.from };
-    return { kt: b.kt * windTerrain(p, b.from), from: b.from };
+    const b = sea ? wx.at(gunUtc + min) : { kt: S.windKt, from: g.from }, f = wx.field(p, gunUtc + min, b.from); // the wind across the course
+    return { kt: b.kt * f.k, from: (b.from + f.turn + 360) % 360 };
   };
   const base = { gunUtc, wind, kind, fromAtGun: g.from };
   if (S.current === 'real') {
     const f = new CurrentField(stationsFor(gunUtc - 30, gunUtc + 6 * 60));
-    return { ...base, current: (p, min) => { f.setTime(gunUtc + min); const c = f.at(p), k = shoreRelief(p); return { x: c.x * k, y: c.y * k }; } };
+    return { ...base, current: (p, min) => { f.setTime(gunUtc + min); return f.atShore(p); } };
   }
   const open = currentVector(CURRENTS[S.current] ?? CURRENTS.slack);
   return { ...base, current: p => currentAt(p, open) };

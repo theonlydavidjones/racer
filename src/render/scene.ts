@@ -433,7 +433,8 @@ export class SceneView {
     }
     const tg = this.terrain, d = this.puffData;
     for (let j = 0; j < PUFF_N; j++) for (let i = 0; i < PUFF_N; i++) {
-      const kk = Math.min(1.8, Math.max(0.4, (1 + sum[j * PUFF_N + i]) * (tg ? tg.at(x0 + (i + 0.5) * cell, y0 + (j + 0.5) * cell) : 1)));
+      const px = x0 + (i + 0.5) * cell, py = y0 + (j + 0.5) * cell; // the land's effect, and the day's wind across the course
+      const kk = Math.min(1.8, Math.max(0.4, (1 + sum[j * PUFF_N + i]) * (tg ? tg.at(px, py) : 1) * w.fieldAt({ x: px, y: py }).extra));
       const o = (j * PUFF_N + i) * 4;
       d[o] = Math.round((kk - 0.4) / 1.4 * 255);
       const sg = this.seaGrid;

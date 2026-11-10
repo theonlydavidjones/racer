@@ -53,3 +53,31 @@ describe('the real day: the forecast, and the records', () => {
     expect(Math.abs(wrap(w.wind.from - 350))).toBeLessThan(35);
   });
 });
+
+describe('the wind across the course', () => {
+  const near = (la: number, lo: number) => ({ la, lo });
+  it('a forecast day takes the National Weather Service grid: stronger in the middle of the Bay than along the city shore', async () => {
+    const { LL } = await import('../src/geo/geo');
+    const date = Object.keys(R.forecast).find(d => !R.wind[d] && (real as any).grid.days[d]);
+    if (!date) return;
+    const wx = dayWeather(date), t = at(date, '14:00'), b = wx.at(t);
+    const ks = [near(37.823, -122.445), near(37.838, -122.446), near(37.812, -122.43), near(37.814, -122.41)].map(q => wx.field(LL(q.la, q.lo), t, b.from).k);
+    expect(Math.max(...ks) - Math.min(...ks)).toBeGreaterThan(0.03); // the grid has structure
+    for (const k of ks) { expect(k).toBeGreaterThan(0.3); expect(k).toBeLessThan(2); }
+  });
+  it('a past day is anchored on Fort Point and nudged by the other stations, within limits', async () => {
+    const { LL } = await import('../src/geo/geo');
+    const { windTerrain } = await import('../src/environment/wind');
+    const wx = dayWeather('2025-07-12'), t = at('2025-07-12', '14:00'), b = wx.at(t), fp = LL(37.8063, -122.4659);
+    expect(wx.field(fp, t, b.from).k / windTerrain(fp, b.from)).toBeGreaterThan(0.9); // at the station itself, little nudging
+    expect(wx.field(fp, t, b.from).k / windTerrain(fp, b.from)).toBeLessThan(1.15);
+    const e = wx.field(LL(37.818, -122.403), t, b.from); // off Blossom Rock, near Pier 1
+    expect(e.k / windTerrain(LL(37.818, -122.403), b.from)).toBeGreaterThan(0.55); expect(e.k / windTerrain(LL(37.818, -122.403), b.from)).toBeLessThan(1.6);
+    expect(Math.abs(e.turn)).toBeLessThanOrEqual(30);
+  });
+  it('the race sails in it: the wind differs across the course', () => {
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKt: 0, windKind: 'auto', tideDate: '2025-07-12', tideTime: '14:00', fleet: 1, opponents: ['stock:1'] }, 1);
+    const a = w.fieldAt({ x: w.C.center.x, y: w.C.center.y }), c = w.fieldAt({ x: w.C.center.x + 3000, y: w.C.center.y + 800 });
+    expect(Math.abs(a.k - c.k) + Math.abs(a.turn - c.turn) / 20).toBeGreaterThan(0.05);
+  });
+});

@@ -4,7 +4,7 @@ import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
-import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
+import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
@@ -214,9 +214,11 @@ export class World {
       const c = this.freeSail ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
       const half = this.freeSail ? Math.max(3000, dist(from, to) / 2 + 1500) : 3000;
       this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2));
+      this.fieldArea = { c, half: half + 600 };
     }
     this.updateBreeze();
     this.wind = windAt(this.windModel, this.t);
+    this.buildField();
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
@@ -326,8 +328,7 @@ export class World {
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   currentAt(p: Vec): Vec {
     if (!this.tide) return currentAt(p, this.cvec);
-    const c = this.tide.at(p), k = shoreRelief(p);
-    return { x: c.x * k, y: c.y * k };
+    return this.tide.atShore(p);
   }
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
@@ -336,7 +337,40 @@ export class World {
   windHere(p: Vec, self?: Boat): Wind {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
-    return { from: n360(this.wind.from + q.veer + sh.shift), kt: this.wind.kt * windTerrain(p, this.wind.from) * q.k * sh.k };
+    const f = this.fieldAt(p);
+    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift), kt: this.wind.kt * f.k * q.k * sh.k };
+  }
+
+  /* ---------- the wind across the course (environment/weather.ts), cached on a grid ---------- */
+  private fieldArea: { c: Vec; half: number } = { c: { x: 0, y: 0 }, half: 3600 };
+  private field: { x0: number; y0: number; step: number; n: number; k: Float32Array; turn: Float32Array; extra: Float32Array } | null = null;
+  /** Work out the wind across the course for now (every 30 s of race time). */
+  private buildField(): void {
+    const { c, half } = this.fieldArea, step = Math.max(250, 2 * half / 40), n = Math.ceil(2 * half / step) + 1;
+    const x0 = c.x - half, y0 = c.y - half, k = new Float32Array(n * n), turn = new Float32Array(n * n), extra = new Float32Array(n * n);
+    const t = this.clockUtc, from = this.wind.from;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const p = { x: x0 + i * step, y: y0 + j * step }, f = this.weather.field(p, t, from), idx = j * n + i;
+      k[idx] = f.k; turn[idx] = f.turn; extra[idx] = f.k / Math.max(0.05, windTerrain(p, from));
+    }
+    this.field = { x0, y0, step, n, k, turn, extra };
+    let sum = 0, cnt = 0; // the average over the water, for the map's shading
+    for (let j = 0; j < n; j += 2) for (let i = 0; i < n; i += 2) { const p = { x: x0 + i * step, y: y0 + j * step }; if (!onLand(p)) { sum += k[j * n + i]; cnt++; } }
+    this.fieldMeanK = cnt ? sum / cnt : 1;
+  }
+  /** The average wind factor over the water around the course (the map shades relative to it). */
+  fieldMeanK = 1;
+  /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
+  fieldAt(p: Vec): { k: number; turn: number; extra: number } {
+    const g = this.field;
+    if (!g) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
+    const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
+    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
+    const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n;
+    const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
+    // the day's pattern (smooth over kilometres) from the grid; the shore and the slot exactly, here
+    const extra = bl(g.extra);
+    return { k: windTerrain(p, this.wind.from) * extra, turn: bl(g.turn), extra };
   }
 
   /**
@@ -398,6 +432,7 @@ export class World {
     this.t += dt;
     this.steps++;
     if (this.steps % 60 === 0) this.updateBreeze();
+    if (this.steps % 1800 === 0) this.buildField();
     this.wind = windAt(this.windModel, this.t);
     this.puffs.step(dt, this.wind);
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
@@ -829,9 +864,9 @@ export class World {
  * current there (blended stations, eased near the shore), measured along the nearest station's flood/ebb axis.
  */
 export function describeTide(f: CurrentField, p: Vec, now: number): { label: string; button: string } {
-  const st = f.stations.reduce((a, s) => (dist(s.p, p) < dist(a.p, p) ? s : a)), ax = V(st.flood), k = shoreRelief(p);
+  const st = f.stations.reduce((a, s) => (dist(s.p, p) < dist(a.p, p) ? s : a)), ax = V(st.flood);
   const g = new CurrentField(f.stations);
-  const at = (m: number) => { g.setTime(m); const c = g.at(p); return (c.x * ax.x + c.y * ax.y) * k / KT; };
+  const at = (m: number) => { g.setTime(m); const c = g.atShore(p); return (c.x * ax.x + c.y * ax.y) / KT; };
   const v = at(now), later = at(now + 15);
   let slack = '';
   for (let m = 5; m <= 8 * 60; m += 5) if (Math.sign(at(now + m)) !== Math.sign(v)) { slack = sfClock(now + m); break; }

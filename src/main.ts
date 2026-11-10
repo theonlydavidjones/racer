@@ -23,7 +23,6 @@ import { DT, World, describeTide } from './sim/world';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
 import { POLE, moveLazyCar } from './boat/physics';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
-import { shoreRelief } from './environment/current';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
@@ -585,7 +584,7 @@ function tideBox(): void {
       : wx.source === 'forecast' ? `The National Weather Service forecast for ${day} (issued ${new Date(wx.issued!).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', minute: '2-digit' })}): ${WIND_KIND_LABEL[wx.kind].toLowerCase()}, ${span} around the race${wx.realSwell ? ', and its swell forecast outside the Gate' : ''}. Hour by hour; the shifts and puffs within the hour are the sim's.`
       : wx.source === 'records' ? `No observations or forecast for ${day} yet: a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day, drawn from the ${month} records.`
       : `You chose a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day${f[w.windKind] < 0.02 ? ` (it almost never blows in ${month}; you get the westerly)` : ''}, from the ${month} records.`;
-    $('windKindNote').textContent = `${src} ${month} race days at Fort Point, 2021–25: ${odds}. ${KIND_NOTE[w.windKind]}`;
+    $('windKindNote').textContent = `${src} Across the course: ${wx.fieldSource}${S.aids ? ' (shaded on the map)' : ''}. ${month} race days at Fort Point, 2021–25: ${odds}. ${KIND_NOTE[w.windKind]}`;
   }
 
   $('swellDaySeg').hidden = w.sea.flat || w.weather.realSwell;
@@ -606,9 +605,9 @@ function drawTideGraph(): void {
   const notes: string[] = [];
   if (w.tide) {
     // signed current at the line: + flood (east, into the Bay), − ebb
-    const f = new CurrentField(w.tide.stations), k = shoreRelief(p), fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
+    const f = new CurrentField(w.tide.stations), fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
     const pts: number[] = [];
-    for (let i = 0; i <= n; i++) { f.setTime(from + (to - from) * i / n); const c = f.at(p); pts.push((c.x * fl.x + c.y * fl.y) * k / 0.5144); }
+    for (let i = 0; i <= n; i++) { f.setTime(from + (to - from) * i / n); const c = f.atShore(p); pts.push((c.x * fl.x + c.y * fl.y) / 0.5144); }
     const max = Math.max(1, ...pts.map(Math.abs)), y = (v: number) => mid - v / max * (bot - top) / 2;
     ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, mid); ctx.lineTo(W - 8, mid); ctx.stroke();
     for (const [sign, col] of [[1, 'rgba(111,168,255,.40)'], [-1, 'rgba(255,140,90,.40)']] as const) {

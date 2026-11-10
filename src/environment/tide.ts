@@ -1,3 +1,4 @@
+import { shoreRelief } from './current';
 import { KT, V, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
 import { predict, type Constituents } from './harmonics';
@@ -90,10 +91,20 @@ export class CurrentField {
     let wx = 0, wy = 0, ws = 0;
     for (let i = 0; i < this.stations.length; i++) {
       const s = this.stations[i].p, d2 = (p.x - s.x) ** 2 + (p.y - s.y) ** 2;
-      const w = 1 / (d2 + 200 * 200); // smooth near a station instead of a spike
+      const w = 1 / (d2 + 150 * 150) ** 1.5; // the nearest stations count most; smooth near a station instead of a spike
       wx += this.vecs[i].x * w; wy += this.vecs[i].y * w; ws += w;
     }
     return ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
+  }
+  /**
+   * The current at a point, with the slack water along the Cityfront beach: the shore relief (current.ts) applies
+   * only where no station is close by to say what the water there does (a station near the shore already measures it).
+   */
+  atShore(p: Vec): Vec {
+    let dn = Infinity;
+    for (const s of this.stations) dn = Math.min(dn, Math.hypot(p.x - s.p.x, p.y - s.p.y));
+    const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600), c = this.at(p);
+    return { x: c.x * k, y: c.y * k };
   }
 }
 
