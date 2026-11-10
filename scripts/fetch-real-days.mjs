@@ -5,7 +5,7 @@
  * otherwise the climatology in sf-wind-climate.json and sf-swell-climate.json).
  *
  *   NODE_USE_ENV_PROXY=1 node scripts/fetch-real-days.mjs            # everything, 2021 to yesterday, and the forecast
- *   NODE_USE_ENV_PROXY=1 node scripts/fetch-real-days.mjs --update   # the last 45 days and the forecast (the daily refresh)
+ *   NODE_USE_ENV_PROXY=1 node scripts/fetch-real-days.mjs --update   # since the newest day in the file (at least 45 days), and the forecast (the daily refresh)
  *
  * Sources (public domain):
  *  - Wind observed: NOAA CO-OPS station 9414290 (San Francisco, Fort Point), 6-minute wind (2-minute mean speed and
@@ -50,7 +50,9 @@ const ymd = d => d.toISOString().slice(0, 10).replace(/-/g, '');
 let prev = null;
 if (UPDATE) { try { prev = JSON.parse(await readFile(OUT, 'utf8')); } catch { console.warn('No existing file: fetching everything.'); } }
 const now = Date.now(), yesterday = new Date(now - 86400e3);
-const start = prev ? new Date(now - 45 * 86400e3) : new Date(Date.UTC(FROM_YEAR, 0, 1));
+// updating: from a few days before the newest observed day in the file (or 45 days back, whichever is earlier)
+const lastWind = prev ? Object.keys(prev.wind ?? {}).sort().pop() : null;
+const start = prev ? new Date(Math.min(now - 45 * 86400e3, lastWind ? Date.parse(lastWind) - 3 * 86400e3 : now)) : new Date(Date.UTC(FROM_YEAR, 0, 1));
 
 /* ---------- observed wind, 6-minute ---------- */
 const wind = { ...(prev?.wind ?? {}) }; // date → base64 of SLOTS × [speed×4, dir/2, gust×4], 255 = missing
@@ -79,13 +81,16 @@ for (const [date, a] of raw) if (a.filter((v, i) => i % 3 === 0 && v !== 255).le
 const swell = { ...(prev?.swell ?? {}) }; // date → [hs m, dominant period s, mean direction deg (from)]
 const buoyLines = [];
 const lastYear = new Date(now).getUTCFullYear() - 1;
-if (!prev) for (let y = FROM_YEAR; y <= lastYear; y++) {
+// updating: only the years and months since the newest swell day in the file (the last 45 days come from realtime2)
+const lastSwell = prev ? Object.keys(prev.swell ?? {}).sort().pop() : null;
+const swellFrom = lastSwell ? new Date(Date.parse(lastSwell) - 3 * 86400e3) : new Date(Date.UTC(FROM_YEAR, 0, 1));
+for (let y = swellFrom.getUTCFullYear(); y <= lastYear; y++) {
   const b = await fetchRetry(`https://www.ndbc.noaa.gov/data/historical/stdmet/${BUOY}h${y}.txt.gz`, 'buf');
   if (b) buoyLines.push(...gunzipSync(b).toString('ascii').split('\n'));
   console.log(`swell ${y}: ${b ? 'ok' : 'missing'}`);
 }
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-if (!prev) for (let m = 0; m < new Date(now).getUTCMonth(); m++) { // this year's finished months
+for (let m = swellFrom.getUTCFullYear() > lastYear ? swellFrom.getUTCMonth() : 0; m < new Date(now).getUTCMonth(); m++) { // this year's finished months
   const b = await fetchRetry(`https://www.ndbc.noaa.gov/data/stdmet/${MON[m]}/${BUOY}${(m + 1).toString(16)}${lastYear + 1}.txt.gz`, 'buf');
   if (b) buoyLines.push(...gunzipSync(b).toString('ascii').split('\n'));
 }

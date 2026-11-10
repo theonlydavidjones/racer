@@ -141,7 +141,7 @@ Setup → Weather → **The real day** (the default) races in the weather the ra
 - **A past day** (every day since January 2021): the wind observed at Fort Point every 6 minutes from 10:00 to 18:00 (NOAA CO-OPS 9414290: the 2-minute mean speed and direction, and the gust), so you sail that day's actual shifts, lulls and gustiness; and the swell observed at the San Francisco Bar buoy (NDBC 46237). On 6 December 2025, a Seaweed Soup day, that's a 10–14 kt northerly.
 - **The coming week:** the National Weather Service gridded forecast, hour by hour: the wind on the 2.5 km grid cell over the Cityfront race area, and the swell at the cell by the Bar buoy. The shifts and puffs within each hour are the sim's own.
 - **Any other day:** a day drawn from the five years of records for its month (below).
-- **Keeping it current:** a scheduled task refreshes the last 45 days of observations and the forecast every morning, commits the data and republishes the sim. The setup note says where the day's weather comes from (and when the forecast was issued).
+- **Keeping it current:** a scheduled task fetches the observations since the newest day in the repository's data and the latest forecast every morning, and republishes the sim (the repository's copy of the data is brought up to date whenever it's next committed). The setup note says where the day's weather comes from (and when the forecast was issued).
 - The tide and current are NOAA's own predictions for any date (below), from every NOAA current station in the race area.
 
 ### The day's wind: the westerly, the winter winds, puffs and lulls
