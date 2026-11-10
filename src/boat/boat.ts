@@ -7,6 +7,9 @@ import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
 import type { Controls, CrewSettings, Shape } from './controls';
 
+/** A line you can work: every control, plus the lazy jib car's pins. */
+export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
+
 export type Tack = 'S' | 'P';
 
 export interface AiState {
@@ -94,8 +97,22 @@ export interface Boat {
   aws: number; // apparent wind speed, m/s
   // sail trim: sheet angles (deg from centreline), who trims, and how each sail is drawing
   sheets: { main: number; jib: number };
-  manualTrim: boolean; // you trim the sheets (otherwise the crew does)
-  trimAll: boolean; // you also work every other control (otherwise the crew does)
+  manualTrim: boolean; // you trim the sheets (otherwise the crew does): the starting state, until you touch a line (`hand`)
+  trimAll: boolean; // you also work every other control (otherwise the crew does): likewise
+  /**
+   * Who has each line, once you've touched it (true: you; false: back with the crew). Adjusting a line takes only that
+   * line off the crew; one tap gives it back. Lines not listed follow `manualTrim` (sheets) and `trimAll` (the rest).
+   * The windward jib sheet is only ever yours once you've worked it.
+   */
+  hand?: Partial<Record<LineKey, boolean>>;
+  /** The tiller lashed at this position (−1..1, as `tiller`): it stays there, hands off, until you take it again. */
+  lashed?: number | null;
+  /** Sideways speed through the water, m/s, + to leeward: slipping away to leeward when hove to (physics.ts heaveTo). */
+  drift?: number;
+  /** Turn rate, deg/s, + toward the wind, while the forces on her steer her (hove to). */
+  yawRate?: number;
+  /** How far the jib is backed (aback): 0 drawing normally … 1 clew held well to windward. */
+  jibBacked?: number;
   /** Every line on the boat (see controls.ts), and what you're doing on each: +1 raises the value (eases a sheet; tightens the vang, outhaul, backstay…), −1 lowers it. */
   ctl: Controls;
   ctlCmd: Partial<Record<Exclude<keyof Controls, 'car'>, number>>;

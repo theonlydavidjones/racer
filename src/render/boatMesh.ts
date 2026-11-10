@@ -468,7 +468,9 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   };
   m.main.update(mainShape); m.jib.update(jibShape);
   m.main.mesh.scale.x = Math.sign(b.boom || 1);
-  m.jib.mesh.scale.x = Math.sign(b.jib || 1);
+  // a backed jib lies to windward, but the wind still presses its belly to leeward, toward the mast
+  const jibSgn = (b.jibBacked ?? 0) > 0 ? Math.sign(b.boom || 1) : Math.sign(b.jib || 1);
+  m.jib.mesh.scale.x = jibSgn;
   { // hoisting and striking: the main's head comes down its track to the boom; the jib's head down the forestay
     const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
     m.main.mesh.visible = hm > 0.02; m.main.mesh.scale.y = Math.max(0.02, hm); m.main.mesh.position.y = MAIN_DEF.tack.y * (1 - hm);
@@ -481,7 +483,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     jm.matrixWorldNeedsUpdate = true;
   }
   // the cloth's front face looks along the mesh's +x, which the mirroring turns to starboard (+1) or port (−1)
-  for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, Math.sign(b.jib || 1)]] as const) {
+  for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, jibSgn]] as const) {
     const mats = sail.mesh.material as THREE.MeshLambertMaterial[], pr = sailPics.get(mats[0]);
     if (pr) { const want = sgn > 0 ? pr.stbd : pr.port, other = sgn > 0 ? pr.port : pr.stbd; if (pr.front.map !== want) { pr.front.map = want; pr.back.map = other; } }
   }
@@ -550,7 +552,8 @@ function syncLines(m: BoatMesh, b: Boat): void {
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
     const pin = c.car[tk], car = carPos(side, pin.fore, pin.ins);
     L2.cars[tk].position.copy(car);
-    const wv = L2.winches[tk], q = L2.jibSheets[tk].geometry.attributes.position as THREE.BufferAttribute, loaded = side === lee;
+    // (backed, it's the windward sheet that holds the clew)
+    const wv = L2.winches[tk], q = L2.jibSheets[tk].geometry.attributes.position as THREE.BufferAttribute, loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0);
     const sag = loaded ? 0 : 0.25;
     const mid1 = tmpD.copy(clew).lerp(car, 0.5); mid1.y -= sag;
     q.setXYZ(0, clew.x, clew.y, clew.z); q.setXYZ(1, mid1.x, mid1.y, mid1.z); q.setXYZ(2, car.x, car.y + 0.03, car.z);

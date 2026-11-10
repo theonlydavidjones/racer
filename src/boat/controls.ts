@@ -29,6 +29,12 @@ export interface Controls {
   downhaul: number; // main downhaul (coarse luff tension), 0 .. 1
   backstay: number; // 0 off .. 1 bar tight
   jibsheet: number; // 0 hard in .. 1 eased (on the leeward winch)
+  /**
+   * The other jib sheet, on the windward winch: 0 hauled hard in .. 1 slack (lazy, as it is sailing normally). Haul it
+   * in with the leeward sheet eased and it pulls the clew across to windward: the jib is backed (aback), as when
+   * heaving to. The sheets belong to their sides: at a tack the one you're holding stays where you left it.
+   */
+  jibsheetW: number;
   jibCunningham: number; // 0 .. 1
   /** Jib car pin per side: fore–aft (0 = forward .. CAR_FORE_PINS−1 = aft) and athwartships (0 = inboard ..). */
   car: Record<Tack, { fore: number; ins: number }>;
@@ -39,7 +45,7 @@ export const CAR_FORE_PINS = 7, CAR_IN_PINS = 5;
 
 export const defaultControls = (): Controls => ({
   mainsheet: 0.1, traveller: 0, vang: 0.2, outhaul: 0.5, cunningham: 0.2, downhaul: 0.3, backstay: 0.3,
-  jibsheet: 0.1, jibCunningham: 0.3, car: { S: { fore: 3, ins: 1 }, P: { fore: 3, ins: 1 } }
+  jibsheet: 0.1, jibsheetW: 1, jibCunningham: 0.3, car: { S: { fore: 3, ins: 1 }, P: { fore: 3, ins: 1 } }
 });
 
 /* ---------- from controls to sheet angles ---------- */
@@ -63,6 +69,21 @@ export function jibAngle(c: Controls, tack: Tack): number {
 export function jibsheetFor(angle: number, c: Controls, tack: Tack): number {
   const lead = 8 + 1.25 * c.car[tack === 'S' ? 'P' : 'S'].ins;
   return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - lead) / 70, 1 / 1.4)));
+}
+/**
+ * Where the jib's clew sits (deg off the centreline, + to leeward, − to windward: backed). The wind pushes the clew to
+ * leeward until a sheet stops it: the leeward sheet through its car (jibAngle), or the windward sheet through the
+ * windward car. That one runs across in front of the mast, so it only comes tight once it's hauled well in; hauled
+ * hard home it holds the clew at its own car, as far to windward as the leeward car is to leeward.
+ */
+export function jibClew(c: Controls, tack: Tack): number {
+  const lee = jibAngle(c, tack), wlead = 8 + 1.25 * c.car[tack].ins; // the windward car is on the tack's own side
+  return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
+}
+/** Windward-sheet setting that holds the clew `angle` deg to windward (inverse of jibClew's windward stop). */
+export function jibsheetWFor(angle: number, c: Controls, tack: Tack): number {
+  const wlead = 8 + 1.25 * c.car[tack].ins;
+  return clamp(Math.pow(Math.max(0, wlead - angle) / 140, 1 / 1.4), 0, 1);
 }
 /** The leeward (loaded) jib car. */
 export const loadedCar = (c: Controls, tack: Tack) => c.car[tack === 'S' ? 'P' : 'S'];
@@ -175,7 +196,7 @@ export function shapeEfficiency(s: Shape, t: Shape): number {
 
 /** How fast the crew (or you) can work each control, in full range per second. Hauling in a loaded line is slower. */
 export const CONTROL_RATE: Record<Exclude<keyof Controls, 'car'>, number> = {
-  mainsheet: 0.12, traveller: 0.6, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibCunningham: 0.3
+  mainsheet: 0.12, traveller: 0.6, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3
 };
 
 /** Winch: hauling the jib sheet in gets slower as the breeze builds (one hand cranks, the other tails). Easing is quick. */
@@ -213,7 +234,7 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const carMin = Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft); x.carFore = Math.max(x.carFore, carMin);
   const score = (v: CrewSettings) => {
     const c: Controls = { mainsheet: mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
-      backstay: v.backstay, jibsheet: 0, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+      backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
     c.jibsheet = jibsheetFor(jibAng, c, tack);
     // a hair of preference for easy settings, so the crew doesn't haul on lines that make no difference
     let ease = 0; for (const k of keys) ease += (v[k] - (k === 'traveller' ? 0 : 0.2)) ** 2;
