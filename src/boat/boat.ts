@@ -98,6 +98,9 @@ export interface Boat {
   heel: number; boom: number; jib: number;
   /** Helm: −1 hard over turning to port .. +1 hard over turning to starboard (the rudder and tiller follow it). */
   helm?: number;
+  /** Heel (deg, magnitude), the rudder angle she needs to sail straight (+ weather helm), the weather helm actually held,
+   * and the sails' heeling and driving forces (N). See balance.ts. */
+  heelMag?: number; helmNeed?: number; weatherHeld?: number; forces?: { heel: number; drive: number };
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */

@@ -24,7 +24,7 @@ function shapeWords(u: Boat): string {
     if (s.draft > t.draft + 0.04) out.push(`draft aft (${main ? 'Cunningham, downhaul' : 'jib Cunningham'} on)`);
     else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib Cunningham'})`);
     if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveller up') : 'jib car forward next tack'})`);
-    else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
+    else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : u.ww.kt >= 13 ? 'ease the sheet, traveller down' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
     parts.push(`<b>${main ? 'Main' : 'Jib'}:</b> ${out.length ? out.join(', ') : 'shape good'}`);
   };
   if (u.luff) return '';
@@ -52,6 +52,7 @@ export class Hud {
   private mapC = $<HTMLCanvasElement>('map');
 
   private sigKey = '';
+  private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
   private signals(w: World): void {
     const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd);
@@ -118,6 +119,12 @@ export class Hud {
     // the sails' shape against the best shape for the conditions, and which line fixes it
     const sw = shapeWords(u);
     $('tpShape').innerHTML = sw;
+    // heel and helm balance: what the boat feels like on the tiller
+    { const heel = Math.round(u.heelMag ?? 0), hn = u.helmNeed ?? 0, up = u.twa < 70;
+      const helm = Math.abs(hn) < 0.8 ? 'neutral' : hn > 0 ? `${hn.toFixed(0)}° weather` : `${(-hn).toFixed(0)}° lee`;
+      const advice = u.luff ? '' : hn > 5 ? (up ? ' · overpowered: backstay on, traveller down, flatten' : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveller up, ease backstay, fuller sails' : heel > 24 && up ? ' · heeling too far: depower' : '';
+      if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveller down (Trim coach explains).`, 6000); }
+      $('tpBalance').innerHTML = `Heel <b>${heel}°</b> · Helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b><span class="warn">${advice}</span>`; }
     const bad = [u.trim.jib, u.trim.main].find(t => t && t.flow !== 'good' && t.amount > 0.1);
     $('tpHint').textContent = u.luff || u.awa > 115 || !bad ? ''
       : bad.flow === 'luffing' ? (u.manualTrim ? 'Windward telltales lifting: trim in, or bear away.' : 'Windward telltales lifting: bear away a little.')

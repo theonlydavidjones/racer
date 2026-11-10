@@ -82,7 +82,8 @@ export function mainShape(c: Controls, tws: number): Shape {
   const sheetT = smooth((0.32 - c.mainsheet) / 0.32), vangT = c.vang * (0.12 + 0.88 * smooth(c.mainsheet / 0.4));
   const leech = Math.min(1.15, sheetT + 0.9 * vangT);
   return {
-    depth: 0.145 - 0.05 * c.outhaul - 0.025 * c.backstay - 0.01 * luff,
+    // (a hard vang with the sheet in pushes the boom into the gooseneck and bends the lower mast: a little flatter)
+    depth: 0.145 - 0.05 * c.outhaul - 0.025 * c.backstay - 0.01 * luff - 0.012 * c.vang * sheetT,
     draft: clamp(0.5 - 0.1 * luff + 0.004 * (tws - 10) + 0.02 * c.backstay, 0.3, 0.6),
     twist: clamp(19 - 12 * Math.min(1, leech) + 3 * c.backstay, 4, 24) // a bent mast opens the upper leech a little
   };

@@ -1,3 +1,4 @@
+import { coach } from './boat/coach';
 import { PREP_MEANING } from './sim/signals';
 import { describeSea } from './environment/sea';
 import './styles.css';
@@ -228,6 +229,16 @@ function openLines(open = $('ctlList').hidden): void {
   $('ctlList').hidden = !open; $('tpMore').textContent = open ? 'Lines ▾' : 'Lines ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
 }
 $('tpMore').onclick = () => openLines();
+/* The trim coach: opens beside the trim panel and updates live, so you can work a line and watch what it does. */
+let coachT = 0;
+function renderCoach(): void {
+  const r = coach(w.user), esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  $('coachSum').textContent = r.summary;
+  $('coachBody').innerHTML = r.items.map(i => `<div class="coach-item${i.ok ? '' : ' fix'}"><b>${esc(i.head)}</b>${esc(i.text)}</div>`).join('');
+}
+$('bCoach').onclick = () => { const p = $('coachPanel'); p.hidden = !p.hidden; if (!p.hidden) renderCoach(); };
+$('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
+function coachTick(dt: number): void { if ($('coachPanel').hidden) return; coachT += dt; if (coachT > 0.6) { coachT = 0; renderCoach(); } }
 /** Build the rows once: label, a bar, and −/+ buttons (hold to keep pulling or easing). */
 {
   const list = $('ctlList'); let group = '';
@@ -647,7 +658,7 @@ function frame(now: number): void {
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of w.drainEvents()) handle(e);
-  keyLook(dt); lookLabel(); tillerSpring(dt); showTiller(); showLines();
+  keyLook(dt); lookLabel(); tillerSpring(dt); showTiller(); showLines(); coachTick(dt);
   view.render(w, dt, now, viewMode, look, over);
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);

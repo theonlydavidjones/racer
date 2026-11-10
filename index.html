@@ -29,6 +29,7 @@
 <div id="linebox" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
+<div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
   <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
     <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button></div>
@@ -36,7 +37,8 @@
     <button class="tp-btn" id="bJibIn" type="button" aria-label="Trim the jib in">Trim</button><button class="tp-btn" id="bJibOut" type="button" aria-label="Ease the jib">Ease</button></div>
   <div class="tp-hint" id="tpHint"></div>
   <div class="tp-shape" id="tpShape"></div>
-  <button class="tp-more" id="tpMore" type="button" aria-expanded="false">Lines ▸</button>
+  <div class="tp-balance" id="tpBalance"></div>
+  <div class="tp-btnrow"><button class="tp-more" id="tpMore" type="button" aria-expanded="false">Lines ▸</button><button class="tp-more" id="bCoach" type="button">Trim coach</button></div>
   <div class="ctl-list" id="ctlList" hidden></div>
 </div>
 

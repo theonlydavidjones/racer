@@ -5,6 +5,7 @@ import { bow, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
 import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
 import { beatFor, seaDrag, waveYaw } from './seaway';
+import { FULL_RUDDER, equilibriumHeel, heelFactor, helmNeeded, rudderDrag, sailForces } from './balance';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls } from './controls';
 
@@ -49,7 +50,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const ww = b.ww;
   // turn rate falls off at low speed: a Folkboat needs water flowing over the rudder
   const maxRate = maxTurnRate(b.v);
-  let rate: number;
+  // helm balance: with weather helm she turns toward the wind unless the rudder holds her (balance.ts)
+  const toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * toWind;
+  let rate: number, rudder: number; // rudder: fraction of full, in the turn-rate sense (+ turns to starboard)
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
@@ -60,9 +63,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       const helm = clamp(b.steer - b.tiller, -1, 1);
       rate = helm * maxRate; if (helm !== 0) b.turnTarget = null;
     }
+    rudder = rate / Math.max(1e-6, maxRate);
+    if (b.turnTarget == null) rate += balRate; // let go of the tiller and she rounds up (or bears away)
   } else if (b.penalty > 0 && !b.ai?.clearing) {
     // penalty turns: the crew backs the sails to spin the boat even when slow
-    rate = Math.max(maxRate, PENALTY_TURN_RATE);
+    rate = Math.max(maxRate, PENALTY_TURN_RATE); rudder = 1;
   } else {
     let err = wrap(b.desired - b.h);
     const ai = b.ai;
@@ -81,8 +86,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       if (Math.abs(long) > 330) ai.turnCommit = 0; else err = long; // target moved: drop the commitment
     }
     rate = clamp(err * 1.6, -maxRate, maxRate);
+    rudder = (rate - balRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
   }
-  b.helm = clamp(rate / Math.max(1, maxRate), -1, 1); // how hard the helm is over (for drawing the rudder and tiller)
+  b.helm = clamp(rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller)
+  b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
   const dh = rate * dt;
   b.h = n360(b.h + dh);
@@ -104,13 +111,23 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const plan = sailPlan(b);
   const ap = apparent(ww.from, ww.kt, b.h, b.v);
   trimSails(b, ap.awa, plan, dt);
-  let target = polar(ww.kt, twa, plan);
+  // heel and helm balance from the forces on the sails (balance.ts)
+  const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
+  const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  const heelT = equilibriumHeel(sf.main.heel + sf.jib.heel, sf.twist) * (twa > 100 ? 0.6 : 1); // off the wind she rolls less
+  b.heelMag = (b.heelMag ?? 0) + (heelT - (b.heelMag ?? 0)) * Math.min(1, dt * 2.2);
+  b.heel = b.heelMag * (rel >= 0 ? 1 : -1);
+  b.helmNeed = helmNeeded(sf, b.heelMag, b.sheets.main, b.v, sf.twist);
+  b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
+  let target = polar(ww.kt, twa, plan) * heelFactor(b.heelMag);
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
   else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff); // sheet angles, then the sails' shape
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v));
+  // holding a lot of helm to keep her straight is a brake (the steady helm the sails demand; turning has its own cost)
+  const helmDrag = Math.abs(rate) < 4 ? rudderDrag(clamp(b.helmNeed ?? 0, -12, 12), b.v) : 0;
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag);
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
@@ -133,10 +150,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   void awa;
   b.boom += (side * boomT - b.boom) * k;
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
-  // heel: less when the sails are luffing, a little more when they're over-trimmed and stalled
-  const trimHeel = b.luff ? 0.25 : 0.4 + 0.6 * trimDrive(b.trim.main, b.trim.jib) + (b.trim.main.flow === 'stalled' ? 0.15 * b.trim.main.amount : 0);
-  const heelT = trimHeel * Math.min(24, ww.kt * 1.25) * (twa < 35 ? 0.2 : twa < 100 ? 1 : 0.45) * (rel >= 0 ? 1 : -1);
-  b.heel += (heelT - b.heel) * Math.min(1, dt * 1.5);
+
 }
 
 /**

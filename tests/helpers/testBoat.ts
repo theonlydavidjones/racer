@@ -1,7 +1,8 @@
 import { FLAT_SEA } from '../../src/environment/sea';
 import type { Boat } from '../../src/boat/boat';
 import { moveBoat, tackTarget } from '../../src/boat/physics';
-import { V, KT } from '../../src/core/math';
+import { V, KT, wrap } from '../../src/core/math';
+import { FULL_RUDDER } from '../../src/boat/balance';
 import { defaultControls } from '../../src/boat/controls';
 
 /** A lone user-steered boat in open water, far from shore, with steady wind on the water and no current. */
@@ -25,6 +26,11 @@ export function sail(b: Boat, seconds: number, each?: (t: number) => boolean | v
   for (let i = 0; i < seconds * 60; i++) {
     const t = i * DT;
     if (each && each(t) === true) return t;
+    // a helmsman holding her straight: the tiller to windward just enough to cancel the weather helm
+    if (b.turnTarget == null && b.steer === 0 && !(b as Boat & { handsOff?: boolean }).handsOff) {
+      const toWind = wrap(b.ww.from - b.h) >= 0 ? 1 : -1;
+      b.tiller = (b.helmNeed ?? 0) / FULL_RUDDER * toWind;
+    }
     moveBoat(b, DT, t, noop, g);
   }
   return seconds;
