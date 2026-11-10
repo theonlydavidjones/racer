@@ -155,8 +155,8 @@ export const FLAT_SEA: SeaHere = { hsW: 0, tpW: 1, fromW: 0, hsS: 0, tpS: 10, fr
 
 export class SeaField {
   private cache = new Map<string, number>();
-  /** `swell` outside the Gate; null for flat water (no waves at all). */
-  constructor(readonly swell: Swell | null) {}
+  /** `swell` outside the Gate; null for flat water (no waves at all). `chop`: the wind sea × this (the conditions adjuster). */
+  constructor(readonly swell: Swell | null, readonly chop = 1) {}
 
   get flat(): boolean { return !this.swell; }
 
@@ -186,7 +186,7 @@ export class SeaField {
     // ... then steepened (or eased) by the change in current since the water the waves came through, ~1 km upwind
     const up = currentAt({ x: p.x - to.x * 1000, y: p.y - to.y * 1000 });
     const wc = onCurrent(w.hs, w.tp, Uc - dot(up, to));
-    let hsW = wc.H * clamp((U - 1) / 2, 0, 1); // glassy below ~2 m/s
+    let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * this.chop; // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     const s = this.swell, reach = swellReach(p), sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));

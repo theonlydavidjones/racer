@@ -5,6 +5,11 @@ export interface Settings {
   raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
   windKind?: 'auto' | 'west' | 'north' | 'south' | 'light'; // the kind of wind: drawn from the records for the race day's month, or chosen
+  windDir?: number | null; // conditions adjuster: the wind from this direction (deg) instead of the day's; null = real
+  chop?: number; // conditions adjuster: the wind's chop × this (1 = real, 0 = glassy)
+  swellHs?: number | null; // conditions adjuster: the ocean swell outside the Gate, m; null = real
+  rain?: 0 | 1 | 2; // none, light, heavy
+  fog?: 'real' | 0 | 1 | 2; // the real summer fog bank, or none, patchy, thick
   windDay: 0 | 1 | 2; // with the westerly: a light, typical or windy day (25th, 50th, 75th percentile)
   current: string; // 'real' (NOAA predictions for tideDate/tideTime) or a uniform preset id
   tideDate: string; // race day, YYYY-MM-DD, San Francisco local ('' = the coming Saturday)

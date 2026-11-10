@@ -486,7 +486,7 @@ export class SceneView {
   }
 
   /** Sun, sky light, haze and fog bank for the moment `tMin` (minutes since epoch, UTC). */
-  private updateSky(tMin: number, focus: { x: number; y: number }): void {
+  private updateSky(tMin: number, focus: { x: number; y: number }, rain: 0 | 1 | 2 = 0, fog: 'real' | 0 | 1 | 2 = 'real'): void {
     const sp = sunPosition(tMin * 60000), el = sp.el, D = Math.PI / 180;
     const dir = new THREE.Vector3(Math.sin(sp.az * D) * Math.cos(el * D), Math.sin(el * D), -Math.cos(sp.az * D) * Math.cos(el * D)); // x east, y up, −z north
     const sm = this.sky.material as THREE.ShaderMaterial;
@@ -510,19 +510,53 @@ export class SceneView {
     this.hemi.color.setRGB(0.91 - 0.4 * (1 - day), 0.95 - 0.35 * (1 - day), 1 - 0.25 * (1 - day));
     // haze toward the horizon: blue-grey by day, warm near sunset, deep blue at dusk
     const haze = new THREE.Color('#b4cfdf').lerp(new THREE.Color('#d9b9a0'), warm * up).lerp(new THREE.Color('#2a3350'), 1 - day).lerp(new THREE.Color('#0d1424'), 1 - ss(-12, -6, el));
+    // rain and fog (the conditions adjuster): overcast light, grey haze, and you see less far
+    const murk = Math.max(rain === 2 ? 0.75 : rain === 1 ? 0.45 : 0, fog === 2 ? 0.85 : fog === 1 ? 0.5 : 0);
+    if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
+    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3500 : rain === 1 ? 12000 : 70000;
+    Object.assign(this.scene.fog as THREE.Fog, { near: fogN, far: fogF });
     (this.scene.fog as THREE.Fog).color.copy(haze);
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
     (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up);
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
     if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
-    const fogAmt = fogBankAmount(tMin);
+    const fogAmt = fog === 'real' ? fogBankAmount(tMin) : 0; // set fog replaces the summer fog bank
     for (const sprite of this.fogBank) {
       sprite.visible = fogAmt > 0.05;
       const m = sprite.material as THREE.SpriteMaterial;
       m.opacity = Math.min(1, fogAmt * 1.25) * (0.35 + 0.65 * day);
       m.color.setRGB(0.55 + 0.45 * day, 0.55 + 0.45 * day - 0.06 * warm * up, 0.6 + 0.4 * day - 0.15 * warm * up);
     }
+  }
+
+  /** Rain (the conditions adjuster): streaks falling round the camera, slanting with the wind. */
+  private rain: { mesh: THREE.LineSegments; drops: Float32Array } | null = null;
+  private updateRain(w: World, dt: number, camera: THREE.Camera): void {
+    const level = w.settings.rain ?? 0;
+    if (!level) { if (this.rain) this.rain.mesh.visible = false; return; }
+    const N = 2400, R = 45, H = 30;
+    if (!this.rain) {
+      const drops = new Float32Array(N * 3);
+      for (let i = 0; i < N; i++) { drops[i * 3] = (Math.random() * 2 - 1) * R; drops[i * 3 + 1] = Math.random() * H; drops[i * 3 + 2] = (Math.random() * 2 - 1) * R; }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3));
+      const mesh = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xc8d2da, transparent: true, opacity: 0.35, depthWrite: false }));
+      mesh.frustumCulled = false; this.scene.add(mesh); this.rain = { mesh, drops };
+    }
+    const { mesh, drops } = this.rain, pos = mesh.geometry.attributes.position as THREE.BufferAttribute, a = pos.array as Float32Array;
+    mesh.visible = true; (mesh.material as THREE.LineBasicMaterial).opacity = level === 2 ? 0.45 : 0.28;
+    const n = level === 2 ? N : N / 3, fall = 8.5, wv = V(w.wind.from + 180), wk = w.wind.kt * 0.5144 * 0.6;
+    const vx = wv.x * wk, vz = -wv.y * wk, len = 0.06 * (1 + level); // streak: the drop's path over a sixtieth of a second, stretched for the eye
+    const c = camera.position;
+    for (let i = 0; i < N; i++) {
+      const o = i * 3;
+      drops[o] += vx * dt; drops[o + 1] -= fall * dt; drops[o + 2] += vz * dt;
+      if (drops[o + 1] < -2) { drops[o + 1] += H; drops[o] = (Math.random() * 2 - 1) * R; drops[o + 2] = (Math.random() * 2 - 1) * R; }
+      const x = c.x + drops[o], y = c.y - 8 + drops[o + 1], z = c.z + drops[o + 2], q = i * 6;
+      if (i >= n) { a[q] = a[q + 3] = x; a[q + 1] = a[q + 4] = -100; a[q + 2] = a[q + 5] = z; continue; }
+      a[q] = x; a[q + 1] = y; a[q + 2] = z; a[q + 3] = x - vx * len; a[q + 4] = y + fall * len; a[q + 5] = z - vz * len;
+    }
+    pos.needsUpdate = true;
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
@@ -541,7 +575,7 @@ export class SceneView {
     this.curUni.uFlowM.value.set(fm[0] * sc, fm[3] * sc, 0, fm[1] * sc, fm[4] * sc, 0, 0, 0, 0);
     this.curUni.uCurMean.value.set(w.cvec.x, w.cvec.y);
     this.skyAcc += dt;
-    if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user); }
+    if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user, w.settings.rain ?? 0, w.settings.fog ?? 'real'); }
     this.envAcc += dt;
     if (this.envAcc > 30) {
       this.envAcc = 0; this.envCam.update(this.renderer, this.scene);
@@ -618,6 +652,7 @@ export class SceneView {
     // the showroom shifts the picture right, clear of the panel on the left
     const shift = viewMode === 3 ? (look.shift ?? 0) : 0, size = this.renderer.getSize(new THREE.Vector2());
     if (shift) camera.setViewOffset(size.x, size.y, -shift, 0, size.x, size.y); else if (camera.view?.enabled) camera.clearViewOffset();
+    this.updateRain(w, dt, camera);
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.renderer.render(this.scene, camera);

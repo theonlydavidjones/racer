@@ -134,6 +134,12 @@ Checked against the official 2025–2028 rulebook (World Sailing, with changes a
 - **Marks** heel over downstream on their moorings in the current and trail a wake, so you can read the current at the mark.
 - Incidents before the start signal now count. (In the prototype, a timer started at −1 s, so collisions before the gun were never judged.)
 
+### The start page
+
+Four ways in: **Race** (race day and start time, a course or the race committee's choice, the boats you race against, your crew; Full race or Start practice), **Cruise** (sail anywhere: where you start and, if you like, where you're going), **Marina** (your boats: build, paint and set them up) and **Yacht Club** (coming: crew and skippers, and how well each boat is sailed). **Exit** (in the controls, and in the pause menu) leaves any mode for the start page.
+
+Race and Cruise sail the real day (below). **Adjust conditions** changes any of it: wind speed, wind direction, the current, the chop (× the real chop, down to glassy), the swell outside the Gate, rain (light or heavy: overcast light, rain streaks, less visibility) and fog (the real summer fog bank, none, patchy or thick). Each starts as Real; Real puts it back.
+
 ### The real day: observed, forecast, or from the records
 
 Setup → Weather → **The real day** (the default) races in the weather the race day really had or will have (`src/environment/weather.ts`, data from `scripts/fetch-real-days.mjs`):

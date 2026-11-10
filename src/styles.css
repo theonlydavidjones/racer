@@ -378,3 +378,27 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .coach-why{background:none;border:0;padding:4px 0;color:var(--accent);font:600 12px/1.2 var(--f-inst);letter-spacing:.04em;text-decoration:underline;cursor:pointer;text-align:left}
 #trimPanel .tp-btn.tp-pole{display:block;min-width:112px} /* the pole is the crew's job: there whoever trims */
 .tp-btn.tp-pole.on{background:var(--accent);color:#13202b;border-color:var(--accent)}
+
+/* the start page */
+.panel.home{max-width:760px}
+.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.modecard{display:flex;flex-direction:column;gap:6px;text-align:left;padding:16px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);cursor:pointer;font:inherit}
+.modecard b{font:700 20px/1.1 var(--f-inst);letter-spacing:.04em;color:var(--accent)}
+.modecard span{font-size:13px;line-height:1.45;color:var(--muted)}
+.modecard:hover,.modecard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
+.modecard.soon b{color:var(--muted)}
+.panel .linkbtn.back{align-self:flex-start;background:none;border:0;padding:0;color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;cursor:pointer}
+/* the conditions adjuster */
+details.adjust{border:1px solid var(--rule);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+details.adjust[open]{display:flex}
+details.adjust summary{cursor:pointer;font:700 12px/1.2 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--text)}
+details.adjust summary small{margin-left:8px;text-transform:none;letter-spacing:.02em;color:var(--accent);font-weight:600}
+details.adjust > *{margin-top:8px}
+.adjrow{display:grid;grid-template-columns:96px auto 1fr 64px;gap:8px;align-items:center}
+.adjrow > span{font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.adjrow .seg{grid-column:2 / span 3}
+.adjrow input[type=range]{width:100%;accent-color:var(--accent)}
+.adjrow input.dim{opacity:.45}
+.adjrow b{font:600 13px/1 var(--f-inst);text-align:right;font-variant-numeric:tabular-nums}
+.realbtn{font:700 11px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border-radius:6px;border:1px solid var(--rule);background:var(--btn);color:var(--muted);cursor:pointer}
+.realbtn[aria-pressed=true]{background:var(--accent);color:#13202b;border-color:var(--accent)}

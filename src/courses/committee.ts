@@ -48,8 +48,9 @@ export function raceDay(S: Settings, windBase = 275): RaceDay {
   const wx = dayWeather(date, S.windKind ?? 'auto', day), real = wx.source === 'observed' || wx.source === 'forecast';
   const g = wx.at(gunUtc), kind = wx.kind;
   if (!sea && kind === 'west' && !real) g.from = windBase; // as the World does
+  if (S.windDir != null) g.from = S.windDir;
   const wind = (p: Vec, min: number) => {
-    const b = sea ? wx.at(gunUtc + min) : { kt: S.windKt, from: g.from }, f = wx.field(p, gunUtc + min, b.from); // the wind across the course
+    const b0 = sea ? wx.at(gunUtc + min) : { kt: S.windKt, from: g.from }, b = S.windDir != null ? { ...b0, from: S.windDir } : b0, f = wx.field(p, gunUtc + min, b.from); // the wind across the course
     return { kt: b.kt * f.k, from: (b.from + f.turn + 360) % 360 };
   };
   const base = { gunUtc, wind, kind, fromAtGun: g.from };

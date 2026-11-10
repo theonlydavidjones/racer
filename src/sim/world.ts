@@ -186,6 +186,7 @@ export class World {
     const atGun = this.weather.at(this.gunUtc);
     // a westerly at a set strength (not a real day) blows from the course's own westerly (as it runs over the race area)
     if (settings.windKt !== 0 && this.windKind === 'west' && !this.realWind) { atGun.from = file.windBase; atGun.steady = 1; atGun.gust = 1.5; }
+    if (settings.windDir != null) atGun.from = settings.windDir; // the conditions adjuster: the wind from here
     // the course for the day's wind: a laid course is set to it; fixed marks stay put, and its legs are whatever the wind makes them
     this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: atGun.from });
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
@@ -201,7 +202,10 @@ export class World {
     this.realTime = settings.current === 'real' || this.seaBreeze;
     // the race day and clock: they drive the real tide and westerly, and always the sun
     this.traffic = new Traffic(settings.traffic !== 0, seed);
-    this.sea = new SeaField(settings.sea === 'flat' ? null : this.weather.swell(settings.swellDay ?? 1));
+    { // the sea: the day's swell (or the adjuster's), and its chop × the adjuster's
+      const sw = this.weather.swell(settings.swellDay ?? 1);
+      this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs } : sw, settings.chop ?? 1);
+    }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
       this.updateTide();
@@ -409,7 +413,7 @@ export class World {
       return;
     }
     this.windModel.steady = b.steady;
-    this.windModel.base = b.from; this.windModel.kt = b.kt;
+    this.windModel.base = this.settings.windDir ?? b.from; this.windModel.kt = b.kt;
     this.puffs.setGust(b.gust);
   }
 

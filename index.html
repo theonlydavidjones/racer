@@ -55,6 +55,7 @@
     <button class="chip" id="bCourse" type="button">Course</button>
     <button class="chip" id="bTrim" type="button" aria-pressed="false">Trim · crew</button>
     <button class="chip" id="bHail" type="button">Hail</button>
+    <button class="chip" id="bExit" type="button" title="Leave and go back to the start page">Exit</button>
     <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
     <button class="chip" id="bOrient" type="button" hidden>North up</button>
     <button class="chip" id="bRecentre" type="button" hidden>Back to boat</button>
@@ -68,13 +69,38 @@
   </div>
 </div>
 
-<div class="overlay" id="setup">
-  <div class="panel">
-    <div class="eyebrow">San Francisco Cityfront</div>
+<div class="overlay" id="home">
+  <div class="panel wide home">
+    <div class="eyebrow">San Francisco Bay</div>
     <h1>Folkboat Racing Sim</h1>
-    <p class="lede">Race Folkboats off a real start line with real current. Every foul pauses the race and replays it from overhead with the rule that applies.</p>
-    <div class="field"><span>Mode</span>
-      <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button><button type="button" data-v="sail">Just sail</button></div>
+    <p class="lede">Nordic Folkboats on the real Bay: real wind, tide, current and sea, observed or forecast for the day you choose.</p>
+    <div class="modes">
+      <button type="button" class="modecard" data-home="race"><b>Race</b><span>Pick a race day and start time, a course or the race committee's choice, the boats you race against, and your crew. The real weather, or adjust it.</span></button>
+      <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay: choose where to start and, if you like, where you're going. The same real conditions, or adjust them.</span></button>
+      <button type="button" class="modecard" data-home="marina"><b>Marina</b><span>Your boats: build, name, paint and set them up, and keep them in condition.</span></button>
+      <button type="button" class="modecard soon" data-home="club"><b>Yacht Club</b><span>Coming: your crew and skippers, and how well each boat in the fleet is sailed.</span></button>
+    </div>
+    <div class="btnrow"><button class="ghost" id="bKeys0" type="button">Keyboard settings</button></div>
+  </div>
+</div>
+<div class="overlay" id="club" hidden>
+  <div class="panel">
+    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
+    <div class="eyebrow">Yacht Club</div>
+    <h2>Coming next</h2>
+    <p>The club is where you'll keep your crew and skippers: who sails with you, and who skippers each boat you race against. A skipper's skill (starts, shifts, laylines, boat handling) will decide how well the AI sails, on top of the boat's own condition.</p>
+    <div class="btnrow"><button class="cta" type="button" data-home="home">Back</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="setup" hidden>
+  <div class="panel">
+    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
+    <div class="eyebrow" id="setupEyebrow">Race</div>
+    <h1 id="setupTitle">Race</h1>
+    <p class="lede" id="setupLede">Race Folkboats off a real start line with real current. Every foul pauses the race and replays it from overhead with the rule that applies.</p>
+    <div class="field" id="modeField"><span>Race or practise the start</span>
+      <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button></div>
       <small id="modeNote"></small></div>
     <div class="field" id="courseField"><span>Course</span>
       <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select></div>
@@ -90,17 +116,21 @@
     <div class="field"><span>Weather</span>
       <div class="seg" data-k="windKind"><button type="button" data-v="auto">The real day</button><button type="button" data-v="west">Westerly</button><button type="button" data-v="north">Northerly</button><button type="button" data-v="south">Southerly</button><button type="button" data-v="light">Light &amp; variable</button></div>
       <small id="windKindNote"></small></div>
-    <div class="field"><span>Wind</span>
-      <div class="seg" data-k="windKt"><button type="button" data-v="0">The day's wind</button><button type="button" data-v="8">8 kt</button><button type="button" data-v="12">12 kt</button><button type="button" data-v="18">18 kt</button></div>
+    <details class="adjust" id="adjust">
+      <summary>Adjust conditions <small id="adjSum">all real</small></summary>
+      <small>Everything starts as the real day. Move anything to try something else; press Real to put it back.</small>
+      <div class="adjrow"><span>Wind speed</span><button type="button" class="realbtn" data-real="windKt">Real</button><input type="range" id="adjWindKt" min="2" max="30" step="1"><b id="adjWindKtV"></b></div>
       <div class="seg" data-k="windDay" id="windDaySeg"><button type="button" data-v="0">Light day</button><button type="button" data-v="1">Typical day</button><button type="button" data-v="2">Windy day</button></div>
-      <small id="windNote">The real day: what was observed on a past day, the National Weather Service forecast for the coming week, otherwise a day drawn from five years of NOAA records at Fort Point. Or practise in a kind of day you choose. A set strength keeps the direction and changes only how hard it blows. Puffs and lulls drift across the course either way.</small></div>
-    <div class="field"><span>Current</span>
-      <div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div>
-      <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small></div>
-    <div class="field"><span>Sea</span>
-      <div class="seg" data-k="sea"><button type="button" data-v="real">Real waves</button><button type="button" data-v="flat">Flat water</button></div>
+      <div class="adjrow"><span>Wind from</span><button type="button" class="realbtn" data-real="windDir">Real</button><input type="range" id="adjWindDir" min="0" max="355" step="5"><b id="adjWindDirV"></b></div>
+      <div class="adjrow"><span>Current</span><div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div></div>
+      <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small>
+      <div class="adjrow"><span>Chop</span><button type="button" class="realbtn" data-real="chop">Real</button><input type="range" id="adjChop" min="0" max="3" step="0.1"><b id="adjChopV"></b></div>
+      <div class="adjrow"><span>Swell outside</span><button type="button" class="realbtn" data-real="swellHs">Real</button><input type="range" id="adjSwell" min="0" max="5" step="0.1"><b id="adjSwellV"></b></div>
       <div class="seg" data-k="swellDay" id="swellDaySeg"><button type="button" data-v="0">Small swell</button><button type="button" data-v="1">Typical swell</button><button type="button" data-v="2">Big swell</button></div>
-      <small id="seaNote">Chop from the wind over the water and the open water upwind; an ebb against the westerly makes it bigger and steeper. Ocean swell from the San Francisco Bar buoy's records for the month, dying away inside the Gate. Chop slows you most upwind, so foot a little to keep her going.</small></div>
+      <div class="adjrow"><span>Rain</span><div class="seg" data-k="rain"><button type="button" data-v="0">None</button><button type="button" data-v="1">Light</button><button type="button" data-v="2">Heavy</button></div></div>
+      <div class="adjrow"><span>Fog</span><div class="seg" data-k="fog"><button type="button" data-v="real">Real</button><button type="button" data-v="0">None</button><button type="button" data-v="1">Patchy</button><button type="button" data-v="2">Thick</button></div></div>
+      <small id="seaNote">Chop comes from the wind over the water and the open water upwind (an ebb against the wind makes it bigger and steeper); the swell is the ocean's, from the San Francisco Bar buoy, dying away inside the Gate. Real fog is the summer fog bank at the Gate, by month and hour.</small>
+    </details>
     <div class="field" id="crewField"><span>Crew</span>
       <div class="seg" data-k="crewN"><button type="button" data-v="0">Just you</button><button type="button" data-v="1">You + 1</button><button type="button" data-v="2">You + 2</button></div>
       <div class="crewrows" id="crewRows"></div>
@@ -224,6 +254,7 @@
     <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
     <div id="pauseDebrief" class="debrief" hidden></div>
     <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Change course or conditions</button><button class="ghost" id="bKeys2" type="button">Keyboard settings</button></div>
+    <div class="btnrow"><button class="ghost" id="bExit2" type="button">Exit to the start page</button></div>
   </div>
 </div>
 
