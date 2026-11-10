@@ -194,7 +194,7 @@ type CtlItem = { key: CtlKey | 'carFore' | 'carIn'; label: string; group: string
 const CTL_UI: CtlItem[] = [
   { group: 'Cockpit thwart', key: 'mainsheet', label: 'Mainsheet', only: 'sheets' },
   { group: 'Cockpit thwart', key: 'traveller', label: 'Traveller', only: 'all' },
-  { group: 'Transom', key: 'backstay', label: 'Backstay', only: 'all' },
+  { group: 'Cockpit thwart', key: 'backstay', label: 'Backstay', only: 'all' },
   { group: 'Piano', key: 'vang', label: 'Vang', only: 'all' },
   { group: 'Piano', key: 'outhaul', label: 'Outhaul', only: 'all' },
   { group: 'Piano', key: 'cunningham', label: 'Cunningham', only: 'all' },

@@ -10,6 +10,7 @@ import { laylinesFor } from '../sim/laylines';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
+import type { Terrain } from './terrain';
 
 export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
 
@@ -65,7 +66,7 @@ export function overheadUp(o: Overhead, w: World): number {
 export class SceneView {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(62, 1, 0.1, 16000);
+  readonly camera = new THREE.PerspectiveCamera(62, 1, 0.1, 90000);
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
@@ -92,15 +93,18 @@ export class SceneView {
   private skyUni = { uSkyCol: { value: new THREE.Color('#aecbdb') }, uDay: { value: 1 } };
   private fogBank: THREE.Sprite[] = [];
   private skyAcc = 1;
+  /** The land (real terrain), once it has loaded, and the month to colour it for. */
+  private land: Terrain | null = null;
+  private landMonth = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;
     const SKY = new THREE.Color('#aecbdb');
     scene.background = SKY;
-    scene.fog = new THREE.Fog(SKY, 600, 9000);
+    scene.fog = new THREE.Fog(SKY, 1500, 70000); // a clear day on the bay: Tamalpais hazy but plain at 25 km
     this.camera.rotation.order = 'YXZ';
     // light intensities ×π: r155+ dropped the legacy light units the prototype was tuned for
     scene.add(this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
@@ -111,7 +115,7 @@ export class SceneView {
     Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 10, far: 1200 });
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
     // the sky: a physical sky dome (Preetham), scaled for this renderer's untonemapped output
-    const sky = this.sky; sky.scale.setScalar(14000);
+    const sky = this.sky; sky.scale.setScalar(80000);
     const sm = sky.material as THREE.ShaderMaterial;
     // Twilight: the analytic sky goes black once the sun is down, but the real one doesn't: a glow on the
     // horizon toward the sun and deep blue overhead, fading over the next half hour or so.
@@ -138,9 +142,9 @@ export class SceneView {
       c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + l / 2, y - 2, x + l, y); c.stroke();
     }
     const wtex = this.wtex = new THREE.CanvasTexture(wtc);
-    wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(600, 600);
+    wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(4000, 4000);
     wtex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    const WSIZE = 18000; this.tile = WSIZE / 600;
+    const WSIZE = 120000; this.tile = WSIZE / 4000; // 30 m tiles
     wtex.center.set(0.5, 0.5);
     this.puffTex.magFilter = this.puffTex.minFilter = THREE.LinearFilter;
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
@@ -154,10 +158,11 @@ export class SceneView {
         .replace('#include <common>', '#include <common>\nuniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec3 uSkyCol; uniform float uDay; varying vec2 vPuffXZ;')
         .replace('#include <map_fragment>', WATER_FRAGMENT);
     };
-    const water = this.water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), waterMat);
+    const water = this.water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE, 120, 120), waterMat); // 1 km tiles: one huge quad loses depth precision across its diagonal
     water.rotation.x = -Math.PI / 2; water.receiveShadow = true; scene.add(water);
 
-    addLandscape(scene);
+    this.landMonth = new Date().getMonth() + 1;
+    void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
 
     // laylines on the water: starboard-tack (green) and port-tack (red), redrawn as the wind shifts
     for (const color of [0x3fd197, 0xff6a5c]) {
@@ -191,6 +196,8 @@ export class SceneView {
   /** Rebuild boats and course objects for a new race. */
   setWorld(w: World): void {
     this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1;
+    const month = +w.raceDate.slice(5, 7) || new Date().getMonth() + 1; // the grass: gold in summer and autumn, green after the rains
+    if (month !== this.landMonth) { this.landMonth = month; this.land?.setSeason(month); }
     const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)}`;
     if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y); this.terrainKey = key; }
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
@@ -318,6 +325,7 @@ export class SceneView {
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
     (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up);
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
+    if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
     const fogAmt = fogBankAmount(tMin);
     for (const sprite of this.fogBank) {

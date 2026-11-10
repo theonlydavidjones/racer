@@ -7,7 +7,7 @@ What's planned, roughly in order. Done work is described in the README.
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). Later: wind bending along the shore, the AI sailing to the pressure, real wind for a past race day.
 - **Remaining rules.** 18.4 (gybing at a mark), 19 (room at obstructions other than through a Rule 20 hail), 18.2(c)/(d), 21.3, 23, exoneration (43) and 44.1(a). Also detect touching the committee boat.
-- **Real shoreline.** Replace the hand-traced Cityfront outline with real coastline data.
+- **Real shoreline.** Replace the hand-traced Cityfront outline with real coastline data, and make Marin, Angel Island and Alcatraz solid (today they're scenery). The terrain is already real; Fort Mason's piers in the sim sit 50–130 m east of the real ones.
 
 ## Sea state, and reading the water (requested)
 
@@ -44,8 +44,8 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 
 ### The bay
 1. ~~**Sky and sun for the race day and time**~~ (done, with the Golden Gate Bridge modelled): the sun where it really is (we already know the date and time), glare and glitter on the water, and the summer fog bank pouring in through the Gate in the afternoon.
-2. **Real terrain:** elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
-3. **Landmarks you steer and sight by:** the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
+2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
+3. ~~**Landmarks you steer and sight by:**~~ (done; transits for the start line and laylines still to come) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. **Marks and the committee boat:** real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
 5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
 6. **Moored boats and marina life** in the harbour behind the line; traffic (see below).
@@ -80,7 +80,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
 | Mainsheet | Main | Boom end to the traveller car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
 | Traveller | Main | Wooden thwart across the cockpit | Dual-ended |
-| Backstay | Rig | Both sides of the transom | Dual-ended |
+| Backstay | Rig | Each end of the cockpit thwart, where it meets the hull | Dual-ended; the bridle is on the transom |
 | Jib sheets | Jib | Along the side decks to the winches | The only lines on the winches. Winches are **not** self-tailing: one hand cranks, the other tails, so trimming in a breeze is slow and takes crew |
 | Jib cars | Jib | H-shaped track on each side of the cabin top | Moved by hand with pin stops, both fore–aft (twist) and athwartships (sheeting angle: inboard to point, outboard to foot). Set before a leg, not adjusted while loaded. Best guess until counted: 7 fore–aft positions and 5 athwartships, 25 mm apart (the usual hole spacing) |
 
@@ -98,10 +98,10 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ### How it should play
 
-- See each line in 3D: the piano, the transom controls, the winches, the cars on the cabin-top tracks. Dual-ended lines show both tails moving together.
+- See each line in 3D: the piano, the thwart controls, the winches, the cars on the cabin-top tracks. Dual-ended lines show both tails moving together.
 - Settings per sail, with crew defaults for each wind strength, and the option to work every line yourself (like today's trim switch).
 - Telltales, the leech, the draft position and the speed readout respond, so you learn by feel and by numbers.
-- Keyboard controls (rebindable) and a trim panel that groups the lines as they are on the boat: piano, transom, winches.
+- Keyboard controls (rebindable) and a trim panel that groups the lines as they are on the boat: piano, thwart, winches.
 
 ### Defaults until someone's aboard to check (easy to change later)
 

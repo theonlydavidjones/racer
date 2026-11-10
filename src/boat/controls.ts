@@ -3,7 +3,7 @@
  *
  * Layout (from Josephine): the piano on the aft end of the cabin carries the vang, outhaul and jib Cunningham
  * (dual-ended, both sides), the main Cunningham (port) and the downhaul; the mainsheet and traveller are on a
- * wooden thwart across the cockpit, in front of the helmsman; the backstay (dual-ended) is on the transom; the jib sheets run along the side decks to the winches (not self-tailing),
+ * wooden thwart across the cockpit, in front of the helmsman, with the backstay's dual-ended control cleated at each end of it, where it meets the hull; the jib sheets run along the side decks to the winches (not self-tailing),
  * through cars on H-shaped tracks on the cabin top (pins, fore–aft and athwartships, one car each side).
  * The halyards are set before the race and left alone.
  *

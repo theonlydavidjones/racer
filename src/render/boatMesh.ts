@@ -142,6 +142,14 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
+  // its dual-ended control line: from the blocks on the quarters, forward along the inside of the hull to a cam
+  // cleat at each end of the thwart, where the thwart meets the hull
+  for (const side of [1, -1]) {
+    const x = side * (tw - 0.02), foot = new THREE.Vector3(side * 0.3, sheer(1) - 0.05, 3.62);
+    const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.06), BLACK); cl.position.set(x, ty + 0.01, TRAV_Z + 0.06); grp.add(cl);
+    grp.add(line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.02, TRAV_Z + 0.06)]));
+    grp.add(line([new THREE.Vector3(x, ty + 0.02, TRAV_Z + 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.04)])); // the tail
+  }
   // vang: a tackle from the boom down to the foot of the mast
   for (const dx of [-0.03, 0.03]) boomPivot.add(line([new THREE.Vector3(dx, 1.0, 0.7), new THREE.Vector3(dx * 0.5, 0.82, 0.07)]));
   // winches on the cockpit coamings, near the forward end

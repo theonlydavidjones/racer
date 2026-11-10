@@ -1,0 +1,13 @@
+{
+ "source": "AWS open terrain tiles (Terrarium; USGS 3DEP/NED, SRTM), zoom 13",
+ "fetched": "2026-11-10",
+ "south": 37.745,
+ "north": 37.935,
+ "west": -122.61,
+ "east": -122.345,
+ "nx": 467,
+ "ny": 424,
+ "cell": 50,
+ "scale": 3.2,
+ "note": "grey 0 = water (≤ 0.5 m), else 1 + height / scale; row 0 is the north edge"
+}
