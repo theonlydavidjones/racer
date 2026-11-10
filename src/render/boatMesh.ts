@@ -13,16 +13,23 @@ import { CABIN, COCKPIT, HEEL, L, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cockp
 import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-/** Main: on the mast and boom, three battens, and a long, low rectangular window parallel to the boom
- * (about 1.8 m by 0.35 m, starting about 0.3 m above the boom), as on most Folkboat mains. */
-const MAIN_LUFF = 8.25, MAIN_FOOT = 3.3;
+/**
+ * The sails, as Folkboat sails are made (crosscut Dacron; from photographs of San Francisco boats): the main with four
+ * battens up the leech (the top one shorter) and a long, low window parallel to the boom; the jib with two battens and
+ * a pair of narrow windows low down, parallel to its foot.
+ */
+const MAIN_LUFF = 8.25, MAIN_FOOT = 3.3, JIB_LUFF = 6.54, JIB_FOOT = 2.92;
 const MAIN_DEF: SailDef = {
-  tack: V3(0, 1.05, 0), head: V3(0, 9.3, 0.05), clew: V3(0, 1.05, MAIN_FOOT), depth: 0.42, rows: 16, cols: 10,
-  window: { t0: 0.3 / MAIN_LUFF, t1: 0.65 / MAIN_LUFF, s0: 0.18, s1: 0.18 + 1.8 / MAIN_FOOT },
-  battens: [{ t: 0.3, len: 0.75 }, { t: 0.55, len: 0.75 }, { t: 0.8, len: 0.5 }]
+  tack: V3(0, 1.05, 0), head: V3(0, 9.3, 0.05), clew: V3(0, 1.05, MAIN_FOOT), depth: 0.42, rows: 18, cols: 10,
+  windows: [{ t0: 0.3 / MAIN_LUFF, t1: 0.65 / MAIN_LUFF, s0: 0.18, s1: 0.18 + 1.8 / MAIN_FOOT }],
+  battens: [{ t: 0.19, len: 0.8 }, { t: 0.38, len: 0.8 }, { t: 0.59, len: 0.75 }, { t: 0.8, len: 0.5 }]
 };
 /** Jib: hanked on the forestay. */
-const JIB_DEF: SailDef = { tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0, 0.35, 2.9), depth: 0.36, rows: 8, cols: 6 };
+const JIB_DEF: SailDef = {
+  tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0, 0.35, 2.9), depth: 0.36, rows: 12, cols: 8,
+  windows: [{ t0: 0.075, t1: 0.1, s0: 0.42, s1: 0.8 }, { t0: 0.125, t1: 0.15, s0: 0.42, s1: 0.8 }],
+  battens: [{ t: 0.27, len: 0.45 }, { t: 0.53, len: 0.4 }]
+};
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 const JIB_AXIS = new THREE.Vector3(0, 6.1, 2.35).normalize(); // the forestay: the jib swings around it, so its luff stays on the stay
 
@@ -269,7 +276,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
   const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT, sailBack); boomPivot.add(main.mesh);
   const jibPivot = new THREE.Group(); jibPivot.position.set(0, 0.75, -3.7); rig.add(jibPivot);
-  const jib = new Sail(JIB_DEF, jibMat, null, jibBack); jibPivot.add(jib.mesh);
+  const jib = new Sail(JIB_DEF, jibMat, WINDOW_MAT, jibBack); jibPivot.add(jib.mesh);
   // Telltales on your own boat: three pairs on the jib luff, one at each batten on the main leech.
   const jibTells = { windward: [] as Telltale[], leeward: [] as Telltale[] }, leechTells: Telltale[] = [];
   if (b.isUser) {
@@ -553,38 +560,64 @@ function syncLines(m: BoatMesh, b: Boat): void {
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
 function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean): THREE.CanvasTexture {
-  // seen from starboard the leech is on your left, so that side's picture is drawn mirrored to read the right way round
-  const mirror = side === 'stbd';
-  const W = main ? 512 : 256, H = main ? 2048 : 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
+  // (v 1). Seen from starboard the leech is on your left, so that side's picture is drawn mirrored
+  const mirror = side === 'stbd', def = main ? MAIN_DEF : JIB_DEF, LUFF = main ? MAIN_LUFF : JIB_LUFF, FOOT = main ? MAIN_FOOT : JIB_FOOT;
+  const W = main ? 512 : 384, H = main ? 2048 : 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
-  const dark = lum(color) < 0.3; // black sails: lighter seams, white numbers
+  const X = (u: number) => (mirror ? 1 - u : u) * W, Y = (v: number) => (1 - v) * H;
+  const dark = lum(color) < 0.3; // black sails: light seams and stripes, white numbers
   g.fillStyle = color; g.fillRect(0, 0, W, H);
-  // crosscut panels: seams across the sail, roughly square to the leech
-  g.strokeStyle = dark ? 'rgba(200,200,200,.16)' : 'rgba(120,115,100,.28)'; g.lineWidth = main ? 4 : 2;
-  for (let i = 1; i < (main ? 12 : 8); i++) { const y = H - i * H / (main ? 12 : 8); g.beginPath(); g.moveTo(0, y + 10 * H / 512); g.lineTo(W, y - 6 * H / 512); g.stroke(); }
+  const line = (pts: [number, number][], col: string, w: number) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach(([u, v], i) => i ? g.lineTo(X(u), Y(v)) : g.moveTo(X(u), Y(v))); g.stroke(); };
+  // crosscut panels: seams across the sail about a metre apart, square to the leech (rising a touch toward the luff)
+  const seam = dark ? 'rgba(210,210,210,.14)' : 'rgba(110,105,95,.22)', n = Math.round(LUFF / 0.95);
+  for (let i = 1; i < n; i++) { const v = i / n; line([[0, v + 0.012], [1, v - 0.008]], seam, main ? 3 : 2.5); }
+  // radial seams fanning out from the clew (the high-load corner)
+  for (let i = 0; i < 9; i++) { const v = 0.06 + 0.4 * (i / 8) ** 1.4; line([[1, 0], [i < 4 ? 0.55 - i * 0.1 : 0.12, v]], seam, 2); }
+  // the draft stripes: two dark lines right across, a third and two-thirds of the way up (the trimmer's reference)
+  for (const v of [0.34, 0.67]) line([[0, v], [1, v - 0.01]], dark ? 'rgba(235,235,235,.55)' : 'rgba(25,30,40,.75)', main ? 7 : 6);
+  // reinforcement patches at the corners: overlapped cloth, a little greyer and more opaque
+  g.fillStyle = dark ? 'rgba(120,120,120,.25)' : 'rgba(150,152,155,.28)';
+  const patch = (u: number, v: number, r: number) => { g.beginPath(); g.ellipse(X(u), Y(v), r / FOOT * W, r / LUFF * H, 0, 0, Math.PI * 2); g.fill(); };
+  patch(0, 0, main ? 0.75 : 0.55); patch(1, 0, main ? 0.85 : 0.7); patch(0, 1, 0.35);
+  // batten pockets: from the leech in, closed off with a pointed end
+  for (const bt of def.battens ?? []) {
+    const chord = FOOT * (1 - bt.t), u0 = Math.max(0, 1 - bt.len / chord), tip = 0.07 / chord;
+    g.fillStyle = dark ? 'rgba(200,200,200,.4)' : 'rgba(110,112,118,.55)';
+    const h = 0.035 / LUFF; // the pocket's width
+    g.beginPath(); g.moveTo(X(1), Y(bt.t + h)); g.lineTo(X(u0 + tip), Y(bt.t + h)); g.lineTo(X(u0), Y(bt.t)); g.lineTo(X(u0 + tip), Y(bt.t - h)); g.lineTo(X(1), Y(bt.t - h)); g.closePath(); g.fill();
+  }
   if (main && no) {
     const pxV = H / MAIN_LUFF; // canvas px per metre up the sail
     /** One line of figures, centred at height fraction t, each figure 0.30 m × 0.20 m (a "1" or "I" narrower), 0.06 m apart. */
-    const line = (txt: string, t: number, col: string) => {
+    const figures = (txt: string, t: number, col: string, mir: boolean) => {
       const chord = MAIN_FOOT * (1 - t), pxU = W / chord; // px per metre across the sail at this height
       const glyphs = [...txt].filter(ch => ch !== ' '), widths = glyphs.map(ch => (ch === '1' || ch === 'I' ? 0.09 : 0.2));
-      const total = widths.reduce((a, w) => a + w, 0) + 0.06 * (glyphs.length - 1) + (txt.includes(' ') ? 0.12 : 0);
-      let x = 0.46 * chord - total / 2; // metres from the luff: a little forward of the middle of the cloth at this height
+      const total = widths.reduce((a, w) => a + w, 0) + 0.06 * (glyphs.length - 1);
+      let x = 0.5 * chord - total / 2; // metres from the luff: the middle of the cloth at this height
       g.fillStyle = col;
       glyphs.forEach((ch, k) => {
         const size = 0.3 * pxV * 1.37; // a bold sans-serif's cap height is about 0.73 of its em
         g.save(); g.font = `bold ${size}px "Helvetica Neue", Arial, sans-serif`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
         const m = g.measureText(ch), sx = (widths[k] * pxU) / Math.max(1, m.width);
-        const cx = (x + widths[k] / 2) * pxU, xx = mirror ? W - cx : cx, y = H * (1 - t) + 0.15 * pxV;
-        g.translate(xx, y); g.scale(sx * (mirror ? -1 : 1), 1); g.fillText(ch, -m.width / 2, 0); g.restore();
+        const cx = (x + widths[k] / 2) * pxU, xx = mir ? W - cx : cx, y = H * (1 - t) + 0.15 * pxV;
+        g.translate(xx, y); g.scale(sx * (mir ? -1 : 1), 1); g.fillText(ch, -m.width / 2, 0); g.restore();
         x += widths[k] + 0.06;
       });
     };
     const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
-    const step = 0.36 / MAIN_LUFF, top = side === 'stbd' ? 0.805 : 0.735; // the starboard set higher, the port set 0.58 m lower (RRS G1.3)
-    line('F', top, dark ? '#e8edf5' : '#1d3f8f'); // the class insignia
-    if (letters) line(letters, top - step, ink);
-    line(digits, top - step * (letters ? 2 : 1), ink);
+    // each side carries its own: the F up near the head and the numbers below, the starboard set higher (RRS G1.3);
+    // this side's reads crisply, the other side's shows through the cloth mirrored, a little softer
+    const set = (s: 'stbd' | 'port', mir: boolean, alpha: number) => {
+      const hi = s === 'stbd', fT = hi ? 0.835 : 0.765, nT = hi ? 0.665 : 0.565, step = 0.42 / MAIN_LUFF;
+      g.globalAlpha = alpha;
+      figures('F', fT, ink, mir); // the class insignia, in the same ink as the numbers (as on San Francisco boats' sails)
+      if (letters) figures(letters, nT, ink, mir);
+      figures(digits, nT - (letters ? step : 0), ink, mir);
+      g.globalAlpha = 1;
+    };
+    set(side === 'stbd' ? 'port' : 'stbd', !mirror, dark ? 0.35 : 0.72);
+    set(side, mirror, 1);
   }
   const t = new THREE.CanvasTexture(c); t.anisotropy = 8;
   return t;

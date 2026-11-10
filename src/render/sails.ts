@@ -11,7 +11,7 @@ export interface SailDef {
   tack: THREE.Vector3; head: THREE.Vector3; clew: THREE.Vector3;
   depth: number; // camber at mid height, m
   rows: number; cols: number;
-  window?: { t0: number; t1: number; s0: number; s1: number }; // clear window (height and chord fractions)
+  windows?: { t0: number; t1: number; s0: number; s1: number }[]; // clear windows (height and chord fractions)
   battens?: { t: number; len: number }[]; // height fraction and length (m) in from the leech
 }
 
@@ -42,9 +42,9 @@ export class Sail {
   constructor(readonly def: SailDef, sailMat: THREE.Material, windowMat: THREE.Material | null, backMat: THREE.Material | null = null) {
     // grid lines: evenly spaced, plus the window's edges so its corners come out square
     const grid = (n: number, extra: number[]) => [...new Set([...Array(n + 1).keys()].map(i => i / n).concat(extra))].sort((a, b) => a - b);
-    const w = def.window;
-    this.tVals = grid(def.rows, w ? [w.t0, w.t1] : []);
-    this.sVals = grid(def.cols, w ? [w.s0, w.s1] : []);
+    const ws = def.windows ?? [];
+    this.tVals = grid(def.rows, ws.flatMap(w => [w.t0, w.t1]));
+    this.sVals = grid(def.cols, ws.flatMap(w => [w.s0, w.s1]));
     const R = this.tVals.length - 1, C = this.sVals.length - 1;
     this.pos = new Float32Array((R + 1) * (C + 1) * 3);
     this.geom.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
@@ -57,7 +57,7 @@ export class Sail {
     for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) {
       const a = i * (C + 1) + j, b = a + 1, c = a + C + 1, d = c + 1;
       const t = (this.tVals[i] + this.tVals[i + 1]) / 2, sm = (this.sVals[j] + this.sVals[j + 1]) / 2;
-      const inWin = !!w && t > w.t0 && t < w.t1 && sm > w.s0 && sm < w.s1;
+      const inWin = ws.some(w => t > w.t0 && t < w.t1 && sm > w.s0 && sm < w.s1);
       (inWin ? win : cloth).push(a, c, b, b, c, d);
     }
     this.geom.setIndex(cloth.concat(win));
