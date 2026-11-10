@@ -301,12 +301,12 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // ... and stowed when it isn't: on the foredeck, a little to starboard of the centreline, from abreast the mast
   // forward, in two deck chocks (the usual place on a small keelboat without lifelines, clear of the jib's tack)
   const stowed = new THREE.Group();
-  // (angled from outboard aft to inboard forward, so it lies clear of the forehatch)
-  { const z0 = -1.22, z1 = -3.35, x0 = 0.47, x1 = 0.14, xAt = (z: number) => x0 + (x1 - x0) * (z - z0) / (z1 - z0), yAt = (z: number) => deckY(uAtZ(z), xAt(z)) + 0.035;
-    const a = new THREE.Vector3(x0, yAt(z0), z0), c = new THREE.Vector3(x1, yAt(z1), z1), len = a.distanceTo(c);
+  // (on the port side deck, flat, just inboard of the toe rail, alongside the cabin: clear of the foredeck and the hatch)
+  { const z0 = -1.35, z1 = 0.72, xAt = (z: number) => -(halfBeam(uAtZ(z)) - 0.11), yAt = (z: number) => deckY(uAtZ(z), -xAt(z)) + 0.024;
+    const a = new THREE.Vector3(xAt(z0), yAt(z0), z0), c = new THREE.Vector3(xAt(z1), yAt(z1), z1), len = a.distanceTo(c);
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT);
     sp.position.copy(a).lerp(c, 0.5); sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize()); stowed.add(sp);
-    for (const zc of [z0 - 0.25, z1 + 0.25]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.06), MAT.dark); ch.position.set(xAt(zc), deckY(uAtZ(zc), xAt(zc)) + 0.02, zc); ch.rotation.y = Math.atan2(x1 - x0, z1 - z0); stowed.add(ch); }
+    for (const t of [0.12, 0.88]) { const p = a.clone().lerp(c, t), ch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.03, 0.06), MAT.dark); ch.position.set(p.x, p.y - 0.01, p.z); stowed.add(ch); } // its chocks
   }
   // the forehatch (class rule 3.31: one hatch forward of the mast, a clear opening no more than 500 mm square, properly
   // framed, with a hinged cover): on the centreline a little forward of the cabin, its cover varnished teak, hinged at

@@ -2,7 +2,7 @@
  * Bay Area yacht club burgees, drawn on a canvas: a triangular pennant, hoist on the left, fly to the right.
  *
  * Drawn from the images and descriptions on Flags of the World (crwflags.com/fotw/flags/us~yc*.html), and the
- * St. Francis Yacht Club's bylaws (2.1) for theirs. FOTW notes that GGYC's own website shows its burgee "somewhat
+ * St. Francis Yacht Club's bylaws (2.1) for theirs; South Beach Yacht Club's from the club's own image of it. FOTW notes that GGYC's own website shows its burgee "somewhat
  * different" from their image, so GGYC's may not match the cloth exactly. Swallowtail burgees with detailed artwork
  * (Alameda, Ballena Bay, Sierra Point) aren't drawn yet.
  */
@@ -160,6 +160,17 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
+    id: 'sbyc', club: 'South Beach Yacht Club', ratio: 1.47,
+    // navy blue, with a white wave of two breaking crests running from the hoist to the fly (traced from the club's own
+    // image of it, southbeachyachtclub.org)
+    draw: (g, W, H) => {
+      field(g, W, H, '#0d2d84');
+      const top: P[] = [[0.002,0.511],[0.013,0.508],[0.024,0.505],[0.036,0.498],[0.047,0.492],[0.058,0.485],[0.069,0.479],[0.080,0.469],[0.091,0.459],[0.102,0.449],[0.114,0.439],[0.125,0.426],[0.136,0.413],[0.147,0.400],[0.158,0.387],[0.169,0.370],[0.180,0.351],[0.192,0.331],[0.203,0.308],[0.214,0.279],[0.225,0.282],[0.236,0.325],[0.247,0.354],[0.258,0.377],[0.269,0.397],[0.281,0.413],[0.292,0.430],[0.303,0.443],[0.314,0.456],[0.325,0.466],[0.336,0.475],[0.347,0.485],[0.359,0.495],[0.370,0.502],[0.381,0.508],[0.392,0.511],[0.403,0.518],[0.414,0.521],[0.425,0.521],[0.437,0.525],[0.448,0.525],[0.459,0.525],[0.470,0.521],[0.481,0.521],[0.492,0.518],[0.503,0.511],[0.514,0.508],[0.526,0.498],[0.537,0.492],[0.548,0.482],[0.559,0.472],[0.570,0.462],[0.581,0.449],[0.592,0.433],[0.604,0.416],[0.615,0.400],[0.626,0.380],[0.637,0.361],[0.648,0.384],[0.659,0.407],[0.670,0.423],[0.682,0.439],[0.693,0.449],[0.704,0.462],[0.715,0.472],[0.726,0.479],[0.737,0.485],[0.748,0.492],[0.759,0.495],[0.771,0.498],[0.782,0.502],[0.793,0.505],[0.804,0.505],[0.815,0.505],[0.826,0.505],[0.837,0.505],[0.849,0.502],[0.860,0.502],[0.927,0.479],[0.938,0.472],[0.949,0.466],[0.960,0.459],[0.971,0.452]], bot: P[] = [[0.002,0.590],[0.013,0.587],[0.024,0.584],[0.036,0.580],[0.047,0.574],[0.058,0.564],[0.069,0.557],[0.080,0.548],[0.091,0.538],[0.102,0.528],[0.114,0.515],[0.125,0.505],[0.136,0.492],[0.147,0.479],[0.158,0.466],[0.169,0.452],[0.180,0.436],[0.192,0.423],[0.203,0.407],[0.214,0.390],[0.225,0.413],[0.236,0.439],[0.247,0.462],[0.258,0.482],[0.269,0.498],[0.281,0.511],[0.292,0.525],[0.303,0.534],[0.314,0.544],[0.325,0.554],[0.336,0.561],[0.347,0.567],[0.359,0.574],[0.370,0.577],[0.381,0.580],[0.392,0.584],[0.403,0.587],[0.414,0.590],[0.425,0.590],[0.437,0.590],[0.448,0.590],[0.459,0.590],[0.470,0.587],[0.481,0.584],[0.492,0.580],[0.503,0.577],[0.514,0.574],[0.526,0.567],[0.537,0.561],[0.548,0.554],[0.559,0.548],[0.570,0.538],[0.581,0.528],[0.592,0.515],[0.604,0.502],[0.615,0.489],[0.626,0.472],[0.637,0.452],[0.648,0.462],[0.659,0.475],[0.670,0.489],[0.682,0.495],[0.693,0.505],[0.704,0.511],[0.715,0.518],[0.726,0.525],[0.737,0.531],[0.748,0.534],[0.759,0.538],[0.771,0.541],[0.782,0.544],[0.793,0.544],[0.804,0.544],[0.815,0.544],[0.826,0.541],[0.837,0.538],[0.849,0.538],[0.860,0.534],[0.927,0.498],[0.938,0.489],[0.949,0.479],[0.960,0.469],[0.971,0.456]];
+      g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); g.closePath(); g.clip();
+      poly(g, WHITE, ...[...top, ...bot.slice().reverse()].map(([x, y]) => [x * W, y * H] as P)); g.restore();
+    }
+  },
+  {
     id: 'stfyc', club: 'St. Francis Yacht Club',
     // Bylaws 2.1: two-thirds as wide as long; two white triangles at the hoist, each half the width and half the length,
     // with a red star 22% of the hoist across, a third of the way along the field; navy between them; red at the fly
@@ -213,11 +224,8 @@ export function burgeeCanvas(id: string): HTMLCanvasElement | null {
 export type OfficerRule = 'replace' | 'below';
 const OFFICER_RULE: Record<string, { rule: OfficerRule; source: string }> = {};
 
-/**
- * The clubs a boat can belong to: those whose burgees are drawn, and South Beach Yacht Club (its burgee isn't drawn yet:
- * the club's own image of it couldn't be fetched, and it isn't on Flags of the World).
- */
-export const CLUBS: { id: string; club: string; officer: OfficerRule; officerSource: string }[] = [...BURGEES.map(b => ({ id: b.id, club: b.club })), { id: 'sbyc', club: 'South Beach Yacht Club' }]
+/** The clubs a boat can belong to (each with its burgee drawn above). */
+export const CLUBS: { id: string; club: string; officer: OfficerRule; officerSource: string }[] = BURGEES.map(b => ({ id: b.id, club: b.club }))
   .map(c => ({ ...c, officer: OFFICER_RULE[c.id]?.rule ?? 'replace', officerSource: OFFICER_RULE[c.id]?.source ?? 'the usual US rule (USPS): in place of the burgee' }))
   .sort((a, b) => a.club.localeCompare(b.club));
 export const officerRule = (club: string | undefined): OfficerRule => CLUBS.find(c => c.id === club)?.officer ?? 'replace';
