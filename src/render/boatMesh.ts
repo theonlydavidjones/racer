@@ -128,16 +128,17 @@ const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff,
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
 const carPos = (side: number, fore: number, ins: number) => { const z = -0.15 + 0.025 * fore, x = side * (0.34 + 0.025 * ins); return new THREE.Vector3(x, cabinTopY(uAtZ(z)) + 0.065, z); };
-const TRAV_Z = 3.66, TRAV_HALF = 0.32, MASTHEAD = new THREE.Vector3(0, 9.4 + 0.18, -0.58);
+const TRAV_Z = 2.35, TRAV_HALF = 0.5, MASTHEAD = new THREE.Vector3(0, 9.4 + 0.18, -0.58);
 function line(points: THREE.Vector3[], mat: THREE.Material = LINE_MAT): THREE.Line {
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat); l.frustumCulled = false; return l;
 }
 
 /** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
 function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
-  // traveller: a track across the aft deck, and its car
-  const ty = sheer(1) + 0.03;
-  const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.06, 0.025, 0.04), STEEL); track.position.set(0, ty, TRAV_Z); grp.add(track);
+  // traveller: a wooden thwart across the cockpit in front of the helmsman, the track on top, and its car
+  const tu = uAtZ(TRAV_Z), tw = cockpitHalf(tu), ty = deckY(tu, tw) + 0.03;
+  const thwart = new THREE.Mesh(new THREE.BoxGeometry(tw * 2 + 0.12, 0.05, 0.22), MAT.wood); thwart.position.set(0, ty - 0.03, TRAV_Z); grp.add(thwart);
+  const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.08, 0.02, 0.035), STEEL); track.position.set(0, ty + 0.005, TRAV_Z); grp.add(track);
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);

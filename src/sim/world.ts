@@ -118,10 +118,9 @@ export class World {
     this.seaBreeze = settings.windKt === 0;
     this.windDay = settings.windDay ?? 1;
     this.realTime = settings.current === 'real' || this.seaBreeze;
-    if (this.realTime) {
-      this.raceDate = settings.tideDate || nextSaturday();
-      this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
-    }
+    // the race day and clock: they drive the real tide and westerly, and always the sun
+    this.raceDate = settings.tideDate || nextSaturday();
+    this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
       this.updateTide();

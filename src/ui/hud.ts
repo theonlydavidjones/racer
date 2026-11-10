@@ -53,7 +53,7 @@ export class Hud {
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
-    $('clockSub').textContent = (w.tide ? w.clock + ' · ' : '') + (w.freeSail ? 'Just sail' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
+    $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Just sail' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
       u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1) + ' kt';

@@ -43,7 +43,7 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 5. **Rigging detail:** blocks, sheets and control lines (comes with the full sail controls), sail numbers and the class insignia.
 
 ### The bay
-1. **Sky and sun for the race day and time:** the sun where it really is (we already know the date and time), glare and glitter on the water, and the summer fog bank pouring in through the Gate in the afternoon.
+1. ~~**Sky and sun for the race day and time**~~ (done, with the Golden Gate Bridge modelled): the sun where it really is (we already know the date and time), glare and glitter on the water, and the summer fog bank pouring in through the Gate in the afternoon.
 2. **Real terrain:** elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
 3. **Landmarks you steer and sight by:** the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. **Marks and the committee boat:** real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
@@ -78,8 +78,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Main downhaul | Main | Port side, via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Modelled as a gooseneck downhaul (it sails the same as a halyard tensioner) |
 | Main halyard | Main | Not used under way | Hoisted before racing, not touched while racing |
 | Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
-| Mainsheet | Main | Boom end to the traveller car on the transom | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
-| Traveller | Main | Transom | Dual-ended |
+| Mainsheet | Main | Boom end to the traveller car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
+| Traveller | Main | Wooden thwart across the cockpit | Dual-ended |
 | Backstay | Rig | Both sides of the transom | Dual-ended |
 | Jib sheets | Jib | Along the side decks to the winches | The only lines on the winches. Winches are **not** self-tailing: one hand cranks, the other tails, so trimming in a breeze is slow and takes crew |
 | Jib cars | Jib | H-shaped track on each side of the cabin top | Moved by hand with pin stops, both fore–aft (twist) and athwartships (sheeting angle: inboard to point, outboard to foot). Set before a leg, not adjusted while loaded. Best guess until counted: 7 fore–aft positions and 5 athwartships, 25 mm apart (the usual hole spacing) |

@@ -17,6 +17,7 @@ import { moveLazyCar } from './boat/physics';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { shoreRelief } from './environment/current';
 import { breezeAt, windTerrain } from './environment/wind';
+import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
@@ -191,8 +192,8 @@ type CtlKey = Exclude<keyof Controls, 'car'>;
 type CtlItem = { key: CtlKey | 'carFore' | 'carIn'; label: string; group: string; only: 'sheets' | 'all' };
 /** The lines, grouped as they are on Josephine. */
 const CTL_UI: CtlItem[] = [
-  { group: 'Transom', key: 'mainsheet', label: 'Mainsheet', only: 'sheets' },
-  { group: 'Transom', key: 'traveller', label: 'Traveller', only: 'all' },
+  { group: 'Cockpit thwart', key: 'mainsheet', label: 'Mainsheet', only: 'sheets' },
+  { group: 'Cockpit thwart', key: 'traveller', label: 'Traveller', only: 'all' },
   { group: 'Transom', key: 'backstay', label: 'Backstay', only: 'all' },
   { group: 'Piano', key: 'vang', label: 'Vang', only: 'all' },
   { group: 'Piano', key: 'outhaul', label: 'Outhaul', only: 'all' },
@@ -469,9 +470,8 @@ function courseCard(): void {
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
 function tideBox(): void {
-  $('tideBox').hidden = !w.realTime; $('currentNote').hidden = S.current === 'real';
+  $('tideBox').hidden = false; $('currentNote').hidden = S.current === 'real';
   $('windDaySeg').hidden = !w.seaBreeze;
-  if (!w.realTime) return;
   const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
   d.value = w.raceDate; tm.value = S.tideTime || '12:00';
   drawTideGraph();
@@ -516,12 +516,19 @@ function drawTideGraph(): void {
     const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * windTerrain(p))} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * windTerrain(p))} kt` : 'steady';
     notes.push(`wind ${Math.round(b.kt * windTerrain(p))} kt from ${Math.round(b.from)}° near the line, ${trend} over the next 90 minutes (more out in the slot); a westerly blows on about ${Math.round(b.west * 100)}% of ${new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' })} days at this hour`);
   }
+  { // the sun: when it's up, and where it is at the gun
+    const st = sunTimes(w.gunUtc * 60000), sp = sunPosition(w.gunUtc * 60000);
+    ctx.fillStyle = 'rgba(8,14,30,.35)';
+    if (Number.isFinite(st.set)) { const xs = tx(st.set / 60000); if (xs < W - 8) ctx.fillRect(Math.max(8, xs), top - 6, W - 8 - Math.max(8, xs), bot - top + 12); }
+    if (Number.isFinite(st.rise)) { const xr = tx(st.rise / 60000); if (xr > 8) ctx.fillRect(8, top - 6, Math.min(W - 16, xr - 8), bot - top + 12); }
+    notes.push(sp.el > 0 ? `sun ${Math.round(sp.el)}° up in the ${compass(sp.az)}, sets ${sfClock(st.set / 60000)}` : `after sunset (${sfClock(st.set / 60000)}): racing in the dusk`);
+  }
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
   ctx.fillStyle = '#ffb627'; ctx.fillText('gun', tx(w.gunUtc), 10);
   const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  $('tideNote').textContent = `${day}, gun at ${sfClock(w.gunUtc)}: ${notes.join('; ')}. Shaded: about the length of a race. Sources: NOAA current predictions and wind records.`;
+  $('tideNote').textContent = `${day}, gun at ${sfClock(w.gunUtc)}: ${notes.join('; ')}. Shaded: about the length of a race; dark: after sunset. Sources: NOAA current predictions and wind records.`;
 }
 $<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); newGame(); tideBox(); });
 $<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); newGame(); tideBox(); });
@@ -618,4 +625,4 @@ newGame(); paintSeg(); courseCard(); tideBox();
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view });

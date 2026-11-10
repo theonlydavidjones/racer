@@ -2,8 +2,8 @@
  * Sail controls: every line on the boat, what it does to the sails' shape, and what shape is fast.
  *
  * Layout (from Josephine): the piano on the aft end of the cabin carries the vang, outhaul and jib Cunningham
- * (dual-ended, both sides), the main Cunningham (port) and the downhaul; the mainsheet, traveller and backstay
- * (dual-ended) are on the transom; the jib sheets run along the side decks to the winches (not self-tailing),
+ * (dual-ended, both sides), the main Cunningham (port) and the downhaul; the mainsheet and traveller are on a
+ * wooden thwart across the cockpit, in front of the helmsman; the backstay (dual-ended) is on the transom; the jib sheets run along the side decks to the winches (not self-tailing),
  * through cars on H-shaped tracks on the cabin top (pins, fore–aft and athwartships, one car each side).
  * The halyards are set before the race and left alone.
  *
@@ -46,12 +46,14 @@ export const defaultControls = (): Controls => ({
 
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
-  const car = 3 + 7 * c.traveller; // the traveller is short: −4° (car to windward) .. +10° (to leeward)
+  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:
+  // the car's ±0.5 m of travel swings the boom about ±9.5°; centred, the boom is on the centreline
+  const car = 9.5 * c.traveller;
   return Math.min(85, Math.max(-2, car + 80 * Math.pow(c.mainsheet, 1.5)));
 }
 /** Sheet length that puts the boom at an angle, for a traveller position (inverse of boomAngle). */
 export function mainsheetFor(angle: number, traveller: number): number {
-  return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - (3 + 7 * traveller)) / 80, 1 / 1.5)));
+  return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - 9.5 * traveller) / 80, 1 / 1.5)));
 }
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). */
 export function jibAngle(c: Controls, tack: Tack): number {

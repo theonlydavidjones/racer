@@ -3,12 +3,28 @@ import * as THREE from 'three';
 import { D2R, V, ZONE } from '../core/math';
 import type { World } from '../sim/world';
 import { Puffs, TerrainGrid } from '../environment/wind';
+import { Sky } from 'three/examples/jsm/objects/Sky.js';
+import { sunPosition } from '../environment/sun';
+import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
-import { addLandscape } from './landscape';
+import { addLandscape, bridgeLights } from './landscape';
 
 export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
+
+/**
+ * How much of the summer fog bank is piled up at the Golden Gate, 0..1, by month and local hour. An estimate,
+ * not data: the marine layer is a summer thing (June–September), thickest from mid-afternoon into the night,
+ * often still there in the morning; thinner in spring and autumn; rare in winter.
+ */
+export function fogBankAmount(tMin: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'numeric', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(tMin * 60000));
+  const mo = +parts.find(p => p.type === 'month')!.value, h = +parts.find(p => p.type === 'hour')!.value;
+  const season = [0.05, 0.05, 0.1, 0.2, 0.4, 0.7, 0.85, 0.85, 0.6, 0.3, 0.1, 0.05][mo - 1];
+  const daily = h < 10 ? 0.7 : h < 13 ? 0.35 : h < 15 ? 0.6 : h < 21 ? 1 : 0.9; // burns back by midday, pours in again from mid-afternoon
+  return season * daily;
+}
 
 /** Wind map on the water: PUFF_N × PUFF_N texels over PUFF_SPAN metres around the camera. */
 const PUFF_N = 160, PUFF_SPAN = 3200;
@@ -31,6 +47,9 @@ const WATER_FRAGMENT = `
   float caps = smoothstep(12.0, 21.0, uMeanKt * kw);
   float speck = smoothstep(0.9 - 0.1 * caps, 0.98, fine.r * texelColor.r);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), speck * caps * 0.75);
+  // the sky reflected in the water, strongest at a glancing angle (toward the horizon)
+  float fres = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 4.0);
+  totalEmissiveRadiance += uSkyCol * fres * 0.55 * uDay * (1.0 - 0.35 * max(gust, 0.0));
 `;
 
 /** Overhead view state: which way is up, how high the camera is (m), and how far it's panned from the boat (m). */
@@ -65,6 +84,14 @@ export class SceneView {
   private terrainKey = '';
   private ripAngle = 0;
   private laylineAcc = 1;
+  /* sun and sky, for the race day and the clock */
+  private sky = new Sky();
+  private sun!: THREE.DirectionalLight;
+  private hemi!: THREE.HemisphereLight;
+  private water!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>;
+  private skyUni = { uSkyCol: { value: new THREE.Color('#aecbdb') }, uDay: { value: 1 } };
+  private fogBank: THREE.Sprite[] = [];
+  private skyAcc = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -76,8 +103,29 @@ export class SceneView {
     scene.fog = new THREE.Fog(SKY, 600, 9000);
     this.camera.rotation.order = 'YXZ';
     // light intensities ×π: r155+ dropped the legacy light units the prototype was tuned for
-    scene.add(new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
-    const sun = new THREE.DirectionalLight(0xfff3dd, 0.75 * Math.PI); sun.position.set(-300, 500, 200); scene.add(sun);
+    scene.add(this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
+    const sun = this.sun = new THREE.DirectionalLight(0xfff3dd, 0.75 * Math.PI); sun.position.set(-300, 500, 200); scene.add(sun); scene.add(sun.target);
+    // shadows from the sun: a small, sharp shadow map that follows your boat (sails on the deck and the water)
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 10, far: 1200 });
+    sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+    // the sky: a physical sky dome (Preetham), scaled for this renderer's untonemapped output
+    const sky = this.sky; sky.scale.setScalar(14000);
+    const sm = sky.material as THREE.ShaderMaterial;
+    // Twilight: the analytic sky goes black once the sun is down, but the real one doesn't: a glow on the
+    // horizon toward the sun and deep blue overhead, fading over the next half hour or so.
+    Object.assign(sm.uniforms, { skyExposure: { value: 1.25 }, uTwi: { value: 0 }, uTwiHor: { value: new THREE.Color() }, uTwiZen: { value: new THREE.Color() } });
+    sm.fragmentShader = 'uniform float skyExposure; uniform float uTwi; uniform vec3 uTwiHor; uniform vec3 uTwiZen;\n' + sm.fragmentShader
+      .replace('gl_FragColor = vec4( texColor, 1.0 );', `vec3 outC = 1.0 - exp( -texColor * skyExposure );
+      vec3 dirT = normalize( vWorldPosition - cameraPosition );
+      float toward = max( 0.0, dot( normalize( dirT.xz + 1e-5 ), normalize( vSunDirection.xz + 1e-5 ) ) );
+      vec3 tw = mix( uTwiHor * ( 0.55 + 0.6 * toward * toward ), uTwiZen, pow( clamp( dirT.y, 0.0, 1.0 ), 0.45 ) );
+      gl_FragColor = vec4( max( outC, tw * uTwi ), 1.0 );`);
+    Object.assign(sm.uniforms, { turbidity: { value: 2.0 }, rayleigh: { value: 2.6 }, mieCoefficient: { value: 0.004 } });
+    sm.uniforms.mieDirectionalG.value = 0.8; sm.uniforms.cloudCoverage.value = 0.18; sm.uniforms.cloudDensity.value = 0.35;
+    scene.add(sky); scene.background = null;
+    this.buildFogBank();
 
     // water: a streaky texture that drifts with the current
     const wtc = document.createElement('canvas'); wtc.width = wtc.height = 256;
@@ -95,18 +143,19 @@ export class SceneView {
     const WSIZE = 18000; this.tile = WSIZE / 600;
     wtex.center.set(0.5, 0.5);
     this.puffTex.magFilter = this.puffTex.minFilter = THREE.LinearFilter;
-    const waterMat = new THREE.MeshLambertMaterial({ color: 0x3b6d84, map: wtex });
+    // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
+    const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni);
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni);
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec2 vPuffXZ;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPuffXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; varying vec2 vPuffXZ;')
+        .replace('#include <common>', '#include <common>\nuniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec3 uSkyCol; uniform float uDay; varying vec2 vPuffXZ;')
         .replace('#include <map_fragment>', WATER_FRAGMENT);
     };
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), waterMat);
-    water.rotation.x = -Math.PI / 2; scene.add(water);
+    const water = this.water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), waterMat);
+    water.rotation.x = -Math.PI / 2; water.receiveShadow = true; scene.add(water);
 
     addLandscape(scene);
 
@@ -141,11 +190,15 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   setWorld(w: World): void {
-    this.laylineAcc = 1; this.puffAcc = 1;
+    this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1;
     const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)}`;
     if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y); this.terrainKey = key; }
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
-    this.boatMeshes = w.boats.map(b => { const m = buildBoatMesh(b); this.scene.add(m.grp); return m; });
+    this.boatMeshes = w.boats.map(b => {
+      const m = buildBoatMesh(b); this.scene.add(m.grp);
+      m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      return m;
+    });
     this.buildCourse(w);
   }
 
@@ -205,6 +258,76 @@ export class SceneView {
     this.puffUni.uMeanKt.value = w.wind.kt;
   }
 
+  /**
+   * The summer fog bank: the marine layer pouring in through the Golden Gate on summer afternoons, over the
+   * Marin Headlands and the Presidio. How thick it is by month and hour is an estimate (no fog records are
+   * reachable from here): common on summer afternoons and evenings, often lingering on summer mornings,
+   * rare in winter. It's scenery only.
+   */
+  private buildFogBank(): void {
+    // a lumpy, billowing texture: many soft blobs, brighter on top, greyer underneath
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
+    const c = cv.getContext('2d')!, rnd = (() => { let a = 7; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
+    for (let i = 0; i < 70; i++) {
+      const x = 30 + rnd() * 196, y = 40 + rnd() * 60, r = 18 + rnd() * 34, g = c.createRadialGradient(x, y, 2, x, y, r);
+      const shade = Math.round(222 + 33 * (1 - y / 128));
+      g.addColorStop(0, `rgba(${shade},${shade},${shade + 6},0.55)`); g.addColorStop(1, `rgba(${shade},${shade},${shade + 6},0)`);
+      c.fillStyle = g; c.fillRect(0, 0, 256, 128);
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    // along the Gate, from Point Bonita and Lands End to the bridge, banked up over the Marin Headlands and the Presidio
+    const spots: [number, number, number, number][] = [
+      [37.8155, -122.53, 900, 110], [37.822, -122.508, 850, 120], [37.808, -122.51, 800, 100], [37.816, -122.493, 760, 90],
+      [37.828, -122.488, 700, 170], [37.834, -122.502, 900, 220], [37.803, -122.488, 700, 140], [37.812, -122.482, 560, 70],
+      [37.84, -122.477, 800, 240], [37.797, -122.473, 650, 170], [37.824, -122.52, 1000, 70], [37.846, -122.495, 1000, 280],
+      [37.82, -122.484, 600, 150], [37.8, -122.5, 900, 120]
+    ];
+    for (const [lat, lon, size, h] of spots) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, opacity: 0 }));
+      const p = LL(lat, lon); sp.position.set(p.x, h, -p.y); sp.scale.set(size * 1.7, size * 0.75, 1); sp.visible = false;
+      this.scene.add(sp); this.fogBank.push(sp);
+    }
+  }
+
+  /** Sun, sky light, haze and fog bank for the moment `tMin` (minutes since epoch, UTC). */
+  private updateSky(tMin: number, focus: { x: number; y: number }): void {
+    const sp = sunPosition(tMin * 60000), el = sp.el, D = Math.PI / 180;
+    const dir = new THREE.Vector3(Math.sin(sp.az * D) * Math.cos(el * D), Math.sin(el * D), -Math.cos(sp.az * D) * Math.cos(el * D)); // x east, y up, −z north
+    const sm = this.sky.material as THREE.ShaderMaterial;
+    sm.uniforms.sunPosition.value.copy(dir);
+    const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const day = ss(-8, 8, el), up = ss(-1, 14, el), warm = 1 - ss(2, 25, el);
+    // the sun: warm and weak near the horizon, gone below it
+    this.sun.color.setRGB(1, 0.95 - 0.33 * warm, 0.87 - 0.5 * warm);
+    this.sun.intensity = 0.75 * Math.PI * up;
+    const f = focus;
+    this.sun.target.position.set(f.x, 0, -f.y); this.sun.position.copy(this.sun.target.position).addScaledVector(dir.y > 0.05 ? dir : new THREE.Vector3(0, 1, 0), 500);
+    this.sun.castShadow = up > 0.05;
+    // twilight sky colours: civil twilight (sun 0–6° down) still glows; darker through nautical twilight
+    const tw = 1 - ss(-12, -1, el), glow = ss(-10, -2, el);
+    sm.uniforms.uTwi.value = 1 - ss(-1, 4, el);
+    sm.uniforms.uTwiHor.value.setRGB(0.05 + 0.75 * glow, 0.06 + 0.42 * glow, 0.12 + 0.3 * glow);
+    sm.uniforms.uTwiZen.value.setRGB(0.03 + 0.17 * glow, 0.05 + 0.25 * glow, 0.12 + 0.38 * glow);
+    void tw;
+    // the sky's light: daylight blue, dimming and cooling through dusk (never fully dark: you still need to see)
+    this.hemi.intensity = Math.PI * (0.3 + 0.55 * day + 0.12 * glow * (1 - day));
+    this.hemi.color.setRGB(0.91 - 0.4 * (1 - day), 0.95 - 0.35 * (1 - day), 1 - 0.25 * (1 - day));
+    // haze toward the horizon: blue-grey by day, warm near sunset, deep blue at dusk
+    const haze = new THREE.Color('#b4cfdf').lerp(new THREE.Color('#d9b9a0'), warm * up).lerp(new THREE.Color('#2a3350'), 1 - day).lerp(new THREE.Color('#0d1424'), 1 - ss(-12, -6, el));
+    (this.scene.fog as THREE.Fog).color.copy(haze);
+    this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
+    (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up);
+    for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
+    // the fog bank
+    const fogAmt = fogBankAmount(tMin);
+    for (const sprite of this.fogBank) {
+      sprite.visible = fogAmt > 0.05;
+      const m = sprite.material as THREE.SpriteMaterial;
+      m.opacity = Math.min(1, fogAmt * 1.25) * (0.35 + 0.65 * day);
+      m.color.setRGB(0.55 + 0.45 * day, 0.55 + 0.45 * day - 0.06 * warm * up, 0.6 + 0.4 * day - 0.15 * warm * up);
+    }
+  }
+
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
   render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
@@ -214,6 +337,8 @@ export class SceneView {
     this.wtex.rotation = this.ripAngle;
     // the texture drifts with the current: offset in texture space is the rotated displacement
     this.wtex.offset.x -= (c * w.cvec.x + s * w.cvec.y) * k; this.wtex.offset.y -= (-s * w.cvec.x + c * w.cvec.y) * k;
+    this.skyAcc += dt;
+    if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user); }
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     w.boats.forEach((b, i) => syncBoatMesh(this.boatMeshes[i], b, t));
