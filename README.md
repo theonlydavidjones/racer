@@ -142,6 +142,12 @@ Four ways in: **Race** (race day and start time, a course or the race committee'
 
 Race and Cruise sail the real day (below). **Adjust conditions** changes any of it: wind speed, wind direction, the current, the chop (× the real chop, down to glassy), the swell outside the Gate, rain (light or heavy: overcast light, rain streaks, less visibility) and fog (the real summer fog bank, none, patchy or thick). Each starts as Real; Real puts it back.
 
+### Your saves
+
+Your boats, settings, keys and logbook are saved as you go. On the published sim they're also kept with your claude.ai account, in a private part of the artifact's database that only you can read (`src/store/cloud.ts`), so a new version of the sim, another browser or another device brings them back. The newer copy of each save wins; nothing is written to your account until it has been read, so a browser that has lost its storage can't overwrite your saves with a fresh start. Outside claude.ai (the dev server, a saved copy) they stay in the browser. The start page says which.
+
+When a race or a cruise ends (you leave it, start another, or go to setup), you're asked whether to **save** it to her logbook (her race record and crew history) or **discard** it.
+
 ### The tiller pilot
 
 `src/boat/autopilot.ts`: an electric ram on the tiller, modelled on the common Raymarine ST2000+ (hard over to hard over in 4 s, no load), so it can't correct faster than that, and in a seaway it works all the time. It steers a turn rate proportional to the heading error; its AutoTrim learns the standing helm (weather helm) she needs and carries it. In Wind mode it reads the masthead unit damped over 2.5 s, as a pilot's response setting does. Nav is the pilot plus a navigator calling the tacks. It keeps no lookout: other boats, ships and the shore ahead on a reach are still yours. Tested: holding course on a beam reach in a real seaway (within 3°, tiller within 17% of its travel), no standing error close-hauled in 20 kt, and beating to Crissy Field from the Cityfront in 11 minutes with two tacks.

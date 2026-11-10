@@ -37,6 +37,11 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Heaving to, and the other seamanship manoeuvres** (a real-world stress test the sim fails today): each jib sheet on
   its own, so the jib can be backed to windward; the tiller lashed at a set angle; the physics of a hove-to boat (backed
   jib against a feathered main and the rudder, fore-reaching slowly and drifting to leeward) checked against real boats.
+- **Real nautical charts on the map:** NOAA's official charts (the US nautical charts are NOAA's; USGS makes land maps):
+  chart 18649 (Entrance to San Francisco Bay) and its neighbours, as raster tiles or drawn from the ENC vector data
+  (depths, channels, buoys, lights, restricted areas), on the inset map and the full-screen chart.
+- **The Bay to Berkeley, Alameda and Richmond:** the shores, harbors and marks east and north, with the wind and current
+  fields extended over them (NOAA current stations and the NWS grid already reach there).
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 

@@ -53,14 +53,42 @@ describe('the tiller pilot', () => {
     standby(w.pilot); u.tiller = 0.3; run(w, 1); expect(u.tiller).toBe(0.3);
   });
 
-  it('Nav beats to a waypoint upwind, tacking on the layline, and holds her heading when she gets there', () => {
+  it('Nav beats to a waypoint upwind, tacking on its own call (the layline), and holds her heading when she gets there', () => {
     const w = new World(COURSES[0], S({ sea: 'flat' }), 8, { freeSail: true }), u = w.user;
     const to = place('crissy')!; w.setDest(to.p, to.name);
     engage(u, w.pilot, 'nav');
-    let tacks = 0, lastTack = u.tack;
-    for (let i = 0; i < 60 * 60 * 25 && w.arrivedT == null; i++) { w.step(DT); if (u.tack !== lastTack) { tacks++; lastTack = u.tack; } }
+    let tacks = 0, called = 0, lastTack = u.tack, was: string | null = null;
+    for (let i = 0; i < 60 * 60 * 25 && w.arrivedT == null; i++) {
+      w.step(DT);
+      if (u.tack !== lastTack) { tacks++; lastTack = u.tack; }
+      if (w.pilot.goTack && w.pilot.goTack !== was) called++;
+      was = w.pilot.goTack;
+    }
     expect(w.arrivedT, `still ${Math.round(dist(u, to.p))} m away`).not.toBeNull();
-    expect(tacks).toBeGreaterThanOrEqual(1);
+    expect(called).toBeGreaterThanOrEqual(1); // it called a tack itself (not only by finding it could lay the mark)
+    expect(tacks).toBeGreaterThanOrEqual(called);
     expect(w.pilot.mode).toBe('auto');
+  }, 120_000);
+
+  it('Nav tacks off a lee shore instead of running aground', () => {
+    // starboard tack in a westerly heads her for the city shore; the destination is out under the Gate
+    const w = new World(COURSES[0], S({ sea: 'flat' }), 3, { freeSail: true }), u = w.user;
+    u.h = n360(w.wind.from - 45); u.v = 2.5;
+    const to = place('gate')!; w.setDest(to.p, to.name);
+    engage(u, w.pilot, 'nav');
+    let aground = 0;
+    for (let i = 0; i < 60 * 900 && w.arrivedT == null; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast' && /Aground/.test(e.msg)) aground++; }
+    expect(aground).toBe(0);
+    expect(w.pilot.mode).not.toBe('off');
+  }, 120_000);
+
+  it('Nav allows for the current: in a cross-current she makes good the bearing instead of being set off it', () => {
+    const w = new World(COURSES[0], S({ sea: 'flat', current: 'ebb' }), 9, { freeSail: true }), u = w.user;
+    const to = place('alcatraz')!; w.setDest(to.p, to.name);
+    u.h = 60; u.v = 2.5; engage(u, w.pilot, 'nav');
+    const start = { x: u.x, y: u.y }, L = dist(start, to.p), ux = (to.p.x - start.x) / L, uy = (to.p.y - start.y) / L;
+    let worst = 0;
+    for (let i = 0; i < 60 * 600 && w.arrivedT == null; i++) { w.step(DT); worst = Math.max(worst, Math.abs((u.x - start.x) * uy - (u.y - start.y) * ux)); }
+    expect(worst).toBeLessThan(150); // off the straight track, m, over a mile of it
   }, 120_000);
 });

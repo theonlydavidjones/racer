@@ -104,6 +104,7 @@
       <button type="button" class="modecard soon" data-home="club"><b>Yacht Club</b><span>Coming: your crew and skippers, and how well each boat in the fleet is sailed.</span></button>
     </div>
     <div class="btnrow"><button class="ghost" id="bKeys0" type="button">Keyboard settings</button></div>
+    <p class="savenote" id="saveNote"></p>
   </div>
 </div>
 <div class="overlay" id="club" hidden>
@@ -299,6 +300,13 @@
 <div class="overlay" id="fleet" hidden></div>
 <div id="fleetBoat" class="boatpanel" hidden></div>
 <div class="overlay" id="sailHer" hidden></div>
+<div class="overlay" id="keepAsk" hidden role="dialog" aria-modal="true" aria-labelledby="keepTitle">
+  <div class="panel">
+    <h2 id="keepTitle">Keep this sail?</h2>
+    <p id="keepWhat"></p>
+    <div class="btnrow"><button class="cta" type="button" id="bKeep">Save to her logbook</button><button class="ghost" type="button" id="bDiscard">Discard</button></div>
+  </div>
+</div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

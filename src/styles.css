@@ -457,3 +457,7 @@ details.adjust > *{margin-top:8px}
 .ch-info p{margin:0 0 4px;font:500 13px/1.4 var(--f-body)}
 .ch-info #chartInfo:empty{display:none}
 #map{cursor:zoom-in}
+
+/* save or discard the sail just ended; where your saves are kept */
+#keepAsk{z-index:70}
+.savenote{margin:14px 0 0;color:var(--muted);font:500 12px/1.4 var(--f-body)}

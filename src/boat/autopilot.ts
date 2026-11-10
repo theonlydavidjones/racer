@@ -1,7 +1,7 @@
 import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
 import { beatFor, targetFor } from './seaway';
-import { V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
+import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
 import { onLand } from '../geo/shore';
 import { detour } from '../ai/ai';
 
@@ -36,11 +36,19 @@ export interface Pilot {
   lastTackT: number; detour: Vec | null; detourT: number;
   /** Nav: the heading it's steering now, for the display. */
   navH: number;
+  /** Nav: the tack it has decided to go onto, held until she's round. */
+  goTack: 'S' | 'P' | null;
+  /** The tack she was on last step (AutoTrim's standing helm swaps sides when she tacks). */
+  lastTack: 'S' | 'P' | null;
+  /** Something the pilot can't handle: it sounds its alarm and goes to standby (the World says so and clears it). */
+  alarm: string | null;
 }
 
 /** Tiller travel per second: hard over to hard over (2 units) in 4 s. */
 const RAM_RATE = 0.5;
-/** How briskly it asks to turn: deg/s of turn per degree off course. */
+/** How briskly it asks to turn: deg/s of turn per degree off course. A tuning choice, not a measured figure: it settles a
+ * heading error with a time constant of about 2 s, about as quickly as a good helmsman, and well inside what the ram can
+ * deliver; much higher and it chases every wave (a real pilot's "response" setting trades the same thing). */
 const GAIN = 0.45;
 /** Damping on the masthead reading, s (a pilot's "response" setting: low, to save the battery and not chase every wave). */
 const AWA_TAU = 2.5;
@@ -48,13 +56,13 @@ const AWA_TAU = 2.5;
 export const AUTO_TACK = 100;
 
 export function newPilot(): Pilot {
-  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, navH: 0 };
+  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, navH: 0, goTack: null, lastTack: null, alarm: null };
 }
 
 /** Engage in a mode, taking up where she is now: Auto holds her heading, Wind her apparent wind angle. */
 export function engage(b: Boat, p: Pilot, mode: Exclude<PilotMode, 'off'>): void {
   if (p.mode === 'off') { p.trim = 0; p.ram = b.tiller; p.lastH = b.h; p.awaSeen = { s: Math.sin(b.arel * Math.PI / 180), c: Math.cos(b.arel * Math.PI / 180) }; }
-  p.mode = mode; p.course = n360(b.h); p.awa = b.arel; p.navH = b.h;
+  p.mode = mode; p.course = n360(b.h); p.awa = b.arel; p.navH = b.h; p.goTack = null; p.lastTack = b.tack; p.alarm = null;
 }
 
 /** Back to standby: the ram lets go and the tiller is yours, where it is. */
@@ -74,31 +82,49 @@ export function tack(b: Boat, p: Pilot): void {
   else if (p.mode === 'wind') p.awa = -p.awa;
 }
 
-/** What Nav steers for: the course to the waypoint, close-hauled on the right tack when it's upwind, round land in the way. */
+/**
+ * The heading that makes good a track along bearing `brgT` through the current: the course to steer, as a navigator
+ * works it (the boat's water speed `v` crossed with the current's set across the track). Null when the current across
+ * the track is more than she can stem.
+ */
+function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
+  const n = V(brgT + 90), across = cur.x * n.x + cur.y * n.y, k = across / Math.max(v, 0.5);
+  return Math.abs(k) > 0.9 ? null : n360(brgT - Math.asin(k) / D2R);
+}
+
+/** Land within `d` m ahead on heading h? */
+const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); for (let s = 20; s <= d; s += 20) if (onLand({ x: b.x + u.x * s, y: b.y + u.y * s })) return true; return false; };
+
+/** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
 function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   const from = b.ww.from, beat = beatFor(b) + 1, csS = n360(from - beat), csP = n360(from + beat), c = b.cur;
+  const close = (tk: 'S' | 'P') => tk === 'S' ? csS : csP;
+  // a tack it has decided on: steer for the new tack's close-hauled course until she's round
+  if (p.goTack) { if (b.tack === p.goTack && !b.tacking) p.goTack = null; else return close(p.goTack); }
   let P = dest;
   const bP0 = brg(P.x - b.x, P.y - b.y);
   if (Math.abs(wrap(from - bP0)) > 50) { // reaching or running: round any land in the way
     if (t - p.detourT > 2) { p.detour = detour(b, P); p.detourT = t; }
     if (p.detour) P = p.detour;
   } else p.detour = null;
-  const bP = brg(P.x - b.x, P.y - b.y);
-  if (Math.abs(wrap(from - bP)) >= beat + 2) return bP; // she can lay it: straight there
+  const bP = brg(P.x - b.x, P.y - b.y), vs = Math.max(b.v, targetFor(b, Math.abs(wrap(from - bP))) * 0.8);
+  const cts = courseToSteer(bP, vs, c);
+  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) return cts; // she can lay it: steer the course that makes good the bearing
   // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
-  const onS = b.tack === 'S', cur = onS ? csS : csP;
+  const onS = b.tack === 'S', other = onS ? 'P' : 'S', cur = close(b.tack);
   if (t - p.lastTackT > 12 && !b.tacking) {
-    const d = sub(P, b), vs = targetFor(b, beat);
+    const d = sub(P, b), vb = targetFor(b, beat);
     const fetch = (tk: 'S' | 'P') => {
-      const u = V(tk === 'S' ? csS : csP), g = unit({ x: u.x * vs + c.x, y: u.y * vs + c.y });
+      const u = V(close(tk)), g = unit({ x: u.x * vb + c.x, y: u.y * vb + c.y });
       if (dot(g, d) <= 0) return false;
       const lat = cross(g, d);
       return tk === 'S' ? lat > 3 : lat < -3;
     };
-    const u = V(cur), look = 40 + b.v * 15, shore = onLand({ x: b.x + u.x * look, y: b.y + u.y * look });
-    if ((fetch(onS ? 'P' : 'S') && !fetch(b.tack)) || shore) { p.lastTackT = t; return onS ? csP : csS; }
+    const look = 40 + b.v * 15, shore = landAhead(b, cur, look);
+    if (shore && landAhead(b, close(other), look)) { p.alarm = 'Pilot alarm: land ahead on both tacks. Pilot on standby: you have the tiller.'; return cur; }
+    if ((fetch(other) && !fetch(b.tack)) || shore) { p.lastTackT = t; p.goTack = other; return close(other); }
   }
-  return b.tacking ? (onS ? csS : csP) : cur;
+  return cur;
 }
 
 /**
@@ -107,6 +133,9 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
  */
 export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: number): void {
   if (p.mode === 'off') return;
+  if ((b.astern ?? 0) > 0.1) { p.alarm = 'Pilot alarm: she\'s going astern, and a pilot can\'t steer backwards. Pilot on standby: you have the tiller.'; return; }
+  if (p.lastTack && b.tack !== p.lastTack && !b.tacking) { p.trim = -p.trim; p.lastTack = b.tack; } // weather helm is now on the other side
+  else if (!p.lastTack) p.lastTack = b.tack;
   const k = Math.min(1, dt / AWA_TAU), ar = b.arel * Math.PI / 180;
   p.awaSeen.s += (Math.sin(ar) - p.awaSeen.s) * k; p.awaSeen.c += (Math.cos(ar) - p.awaSeen.c) * k;
   const seen = Math.atan2(p.awaSeen.s, p.awaSeen.c) * 180 / Math.PI;

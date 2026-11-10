@@ -493,7 +493,10 @@ export class World {
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
       const x0 = b.x, y0 = b.y;
-      if (b.isUser && this.freeSail && this.pilot.mode !== 'off') pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
+      if (b.isUser && this.freeSail && this.pilot.mode !== 'off') {
+        pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
+        if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
+      }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
