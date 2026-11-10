@@ -188,6 +188,7 @@ export class Hud {
     const bp = $('bPole');
     bp.textContent = u.pole === 'down' ? 'Pole out' : u.pole === 'set' ? 'Pole in' : u.pole === 'setting' ? 'Poling…' : 'Stowing…';
     bp.classList.toggle('on', u.pole === 'set' || u.pole === 'setting');
+    $('tpPole').textContent = u.pole === 'set' ? (u.poleTack === u.tack ? 'Wing' : 'Set') : u.pole === 'down' ? 'Stowed' : '…';
     this.poleHints(w, u);
     this.trimPanel(u);
     $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
@@ -200,8 +201,11 @@ export class Hud {
     else {
       // in a puff or a lull?
       const k = w.puffs.at(u).k, lee = u.leeK ?? 1, dirty = (u.shadowK ?? 1) / lee; // the land's lee, and other boats' and ships' wakes
-      const blanket = dirty < 0.95 ? ` · dirty air −${Math.round((1 - dirty) * 100)}%` : lee < 0.92 ? ` · in the lee −${Math.round((1 - lee) * 100)}%` : '';
-      sl.textContent = ww.kt.toFixed(0) + ' kt on water' + (blanket || (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : ''));
+      // short enough for the box; the full words on hover
+      const blanket = dirty < 0.95 ? ` · dirty −${Math.round((1 - dirty) * 100)}%` : lee < 0.92 ? ` · lee −${Math.round((1 - lee) * 100)}%` : '';
+      const why = dirty < 0.95 ? `in another boat's or a ship's dirty air (${Math.round((1 - dirty) * 100)}% less wind)` : lee < 0.92 ? `in the lee of the land (${Math.round((1 - lee) * 100)}% less wind)` : k > 1.08 ? 'in a puff' : k < 0.92 ? 'in a lull' : '';
+      sl.textContent = ww.kt.toFixed(0) + ' kt' + (blanket || (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : ' on water'));
+      sl.title = `${ww.kt.toFixed(1)} kt of wind on the water here${why ? ', ' + why : ''}`;
       sl.className = 'sub' + (blanket ? ' head' : k > 1.08 ? ' lift' : '');
     }
     this.situation(w, u); this.lineBox(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);

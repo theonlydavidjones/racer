@@ -526,7 +526,9 @@ export class SceneView {
   }
 
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number }, over: Overhead): void {
+  /** The showroom camera's angle round the boat (it turns slowly unless paused). */
+  private showroomA = 0;
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number; spin?: boolean }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     this.ripAngle += (-w.windModel.base * D2R - this.ripAngle) * Math.min(1, dt * 0.2);
@@ -604,7 +606,8 @@ export class SceneView {
       camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
     } else if (viewMode === 3) {
       // the showroom (setting up your boat): a slow circle round her, from a little above the deck
-      const a = now * 0.00011 + look.yaw, d = look.chase ?? 10;
+      if (look.spin !== false) this.showroomA += dt * 0.11; // a slow turn (paused from the panel)
+      const a = this.showroomA + look.yaw, d = look.chase ?? 10;
       camera.position.set(P3(u.x, u.y).x + Math.sin(a) * d, 2.6 + look.pitch * 6, P3(u.x, u.y).z + Math.cos(a) * d);
       camera.lookAt(P3(u.x, u.y, 2.8));
     } else {

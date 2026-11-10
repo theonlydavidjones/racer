@@ -50,7 +50,7 @@ let drillShown = false;
 let w!: World;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0 };
+const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0, spin: true };
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -258,7 +258,7 @@ function openLines(open = $('ctlList').hidden): void {
 }
 $('tpMore').onclick = () => openLines();
 /* The trim coach: opens beside the trim panel and updates live, so you can work a line and watch what it does. */
-let coachT = 0;
+let coachT = 0, coachWhy = false;
 function renderCoach(): void {
   const r = coach(w.user), esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const acts = r.actions, crew = !w.user.manualTrim;
@@ -267,11 +267,14 @@ function renderCoach(): void {
   let html = acts.length
     ? `<ol class="coach-acts">${acts.map(a => `<li><span class="gain">+${(a.gain * 100).toFixed(a.gain < 0.01 ? 1 : 0)}%</span>${a.who === 'crew' ? '<span class="who">crew</span>' : ''}${esc(a.text)}</li>`).join('')}</ol>`
     : `<p class="coach-ok">Trim's right. ${crew ? 'The crew has it.' : 'Keep it there.'}</p>`;
-  html += w.paused ? r.items.map(i => `<div class="coach-item${i.ok ? '' : ' fix'}"><b>${esc(i.head)}</b>${esc(i.text)}</div>`).join('') : '<p class="coach-more">Pause (Esc) to read why.</p>';
+  html += coachWhy || w.paused ? r.items.map(i => `<div class="coach-item${i.ok ? '' : ' fix'}"><b>${esc(i.head)}</b>${esc(i.text)}</div>`).join('') + (w.paused ? '' : '<button type="button" class="linkbtn coach-why" data-why="0">Hide why</button>')
+    : '<button type="button" class="linkbtn coach-why" data-why="1">Why? Show the reasons</button>';
   $('coachBody').innerHTML = html;
 }
 $('bCoach').onclick = () => { const p = $('coachPanel'); p.hidden = !p.hidden; if (!p.hidden) renderCoach(); };
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
+// the reasons, on a click (no need to pause: they update live, like the rest of the coach)
+$('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-why]'); if (!b) return; coachWhy = b.dataset.why === '1'; renderCoach(); });
 function coachTick(dt: number): void { if ($('coachPanel').hidden) return; coachT += dt; if (coachT > 0.6) { coachT = 0; renderCoach(); } }
 /** Build the rows once: label, a bar, and −/+ buttons (hold to keep pulling or easing). */
 {
@@ -813,6 +816,7 @@ boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(
   boatPanel.hide(); document.body.classList.remove('showroom'); look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = 24;
   newGame(); $('setup').hidden = false;
 });
+boatPanel.onSpin = () => (look.spin = !look.spin);
 $('bBoat').onclick = () => { $('setup').hidden = true; document.body.classList.add('showroom'); look.yaw = 0.6; look.pitch = 0; boatPanel.show(); newGame(); };
 
 buildSetupChoices();

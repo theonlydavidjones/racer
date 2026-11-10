@@ -20,7 +20,18 @@ export class BoatPanel {
   }
 
   get open(): boolean { return !this.el.hidden; }
-  show(): void { this.editId = this.S.boatId; this.render(); this.el.hidden = false; }
+  show(): void {
+    this.editId = this.S.boatId; this.confirmDiscard = false;
+    this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); // for "Discard changes"
+    this.render(); this.el.hidden = false;
+  }
+  /** Your boats as they were when you opened the panel. */
+  private snap: { boats: BoatSpec[]; boatId: string; opponents: string[] } | null = null;
+  private confirmDiscard = false;
+  private get edited(): boolean { return !!this.snap && JSON.stringify(this.snap) !== JSON.stringify({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
+  /** The showroom's slow turn: pause it to look at her from one side (set by main; returns whether she's turning now). */
+  onSpin: (() => boolean) | null = null;
+  private spinning = true;
   hide(): void { this.el.hidden = true; }
 
   /** The boat being set up (shown in the showroom): the one you sail, or one of your others (a rival, perhaps). */
@@ -36,7 +47,7 @@ export class BoatPanel {
     if (i >= 0) this.S.boats[i] = b; else this.S.boats.push(b);
     if (b.id === this.S.boatId) this.S.boat = b;
     this.editId = b.id; this.confirmDelete = false;
-    this.changed(); if (rerender) this.render(); else this.report();
+    this.changed(); if (rerender) this.render(); else { this.report(); if (!this.el.querySelector('[data-act="discard"]') && this.edited) this.render(); }
     this.flashSaved();
   }
   private flashSaved(): void {
@@ -56,6 +67,18 @@ export class BoatPanel {
     const v = t.dataset.v ?? '';
     switch (t.dataset.act) {
       case 'done': this.done(); return;
+      case 'spin': if (this.onSpin) { this.spinning = this.onSpin(); t.textContent = this.spinning ? 'Pause turning' : 'Turn her'; t.setAttribute('aria-pressed', String(!this.spinning)); } return;
+      case 'discard': this.confirmDiscard = true; this.render(); return;
+      case 'discardNo': this.confirmDiscard = false; this.render(); return;
+      case 'discardYes': {
+        if (!this.snap) return;
+        const s0 = structuredClone(this.snap);
+        this.S.boats = s0.boats; this.S.boatId = s0.boatId; this.S.opponents = s0.opponents;
+        this.S.boat = this.S.boats.find(x => x.id === s0.boatId) ?? this.S.boats[0];
+        if (!this.S.boats.some(x => x.id === this.editId)) this.editId = this.S.boatId;
+        this.confirmDiscard = false; this.confirmDelete = false;
+        this.changed(); this.render(); return;
+      }
       case 'newBoat': case 'copyBoat': {
         const nb = t.dataset.act === 'newBoat' ? newBoat(this.uniqueName('NEW BOAT')) : newBoat(this.uniqueName(this.b.name || 'BOAT'), this.b);
         nb.sails.number = freeNumber(this.S.boats, +this.b.sails.number || 100); this.use(nb); return;
@@ -141,6 +164,11 @@ export class BoatPanel {
   }
 
   private render(): void {
+    const scroller = this.el.querySelector<HTMLElement>('.bpbody'), keep = scroller?.scrollTop ?? 0; // redrawing mustn't jump you back to the top
+    this.draw();
+    const sc2 = this.el.querySelector<HTMLElement>('.bpbody'); if (sc2) sc2.scrollTop = keep;
+  }
+  private draw(): void {
     const b = this.b, wood = b.hull.material === 'wood';
     const sw = (act: string, list: [string, string][], cur: string, none?: string) =>
       `<div class="swatches">${none ? `<button type="button" class="sw none" data-act="${act}" data-v="" aria-pressed="${cur === ''}" title="${none}">${none}</button>` : ''}`
@@ -152,7 +180,7 @@ export class BoatPanel {
     const opt = (cur: string, list: { id: string; name: string }[], none: string) => `<option value="">${none}</option>` + list.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${x.name}</option>`).join('');
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
     this.el.innerHTML = `
-      <div class="bphead"><h2>Your boats</h2><button type="button" class="cta" data-act="done">Done</button></div>
+      <div class="bphead"><h2>Your boats</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button><button type="button" class="cta" data-act="done">Done</button></div>
       <div class="garage">
         <select data-k="pick" class="pick" aria-label="Your boats">${this.S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${esc(x.name || 'Unnamed')} · ${esc(sailNo(x))}${x.id === this.S.boatId ? ' (you sail her)' : this.S.opponents.includes(x.id) ? ' (racing you)' : ''}</option>`).join('')}</select>
         ${this.confirmDelete
@@ -161,7 +189,9 @@ export class BoatPanel {
         <div class="grole">${b.id === this.S.boatId
           ? `<span>You sail this boat.</span>`
           : `<button type="button" class="ghost" data-act="sailHer">Sail this boat</button><button type="button" class="ghost${this.S.opponents.includes(b.id) ? ' on' : ''}" data-act="raceHer" aria-pressed="${this.S.opponents.includes(b.id)}">${this.S.opponents.includes(b.id) ? '✓ Racing against you' : 'Race against her'}</button>`}</div>
-        <small>Every change is saved as you make it.<span class="gsaved" id="bpSaved">Saved ✓</span></small>
+        ${this.confirmDiscard
+          ? `<div class="gconfirm">Undo every change since you opened this panel (all your boats)? <button type="button" class="ghost danger" data-act="discardYes">Discard changes</button><button type="button" class="ghost" data-act="discardNo">Keep them</button></div>`
+          : `<small>Every change is saved as you make it.<span class="gsaved" id="bpSaved">Saved ✓</span>${this.edited ? ' <button type="button" class="linkbtn" data-act="discard">Discard changes</button>' : ''}</small>`}
       </div>
       <div class="bpbody">
       <section><h3>Hull</h3>

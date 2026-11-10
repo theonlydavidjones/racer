@@ -153,7 +153,9 @@ export function terrainLee(p: Vec, from: number, skipGate = false): number {
   for (const off of [-8, 0, 8]) {
     const u = V(from + off);
     let enter = -1, top = 0; // the island (stretch of land) the ray is crossing: where it met it, and its highest point
-    const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), d = x < xr ? 0.8 : 0.8 * (xr / x) ** pe; worst = Math.max(worst, d * (off === 0 ? 1 : 0.85)); };
+    // the near-calm behind a low, steep island (Alcatraz: 80% less wind) eases behind high ground, where the air comes
+    // down the slopes in gusts (the NWS's 2.5 km model has the lee of the Marin hills at about 60% of the open-bay wind)
+    const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), cav = 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1), d = x < xr ? cav : cav * (xr / x) ** pe; worst = Math.max(worst, d * (off === 0 ? 1 : 0.85)); };
     let step = 50;
     for (let d = 50; d <= 6000; d += step) {
       step = d < 1000 ? 50 : 100; // finer close in, where it matters

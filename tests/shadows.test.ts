@@ -61,14 +61,14 @@ describe('ships, the committee boat, and the lee of the land', () => {
     expect(k(12)).toBeLessThan(0.9); expect(k(60)).toBeGreaterThan(0.97);
   });
 
-  it('the lee of Angel Island in a westerly: a hole close downwind, still felt 2–3 km away', () => {
+  it('the lee of Angel Island in a westerly: about half the wind close downwind (high ground: the air comes down in gusts), still felt 2–3 km away', () => {
     const near = LL(37.866, -122.418), far = LL(37.866, -122.392), clear = LL(37.835, -122.43); // ENE of the island; and out in the middle
-    expect(terrainLee(near, 270)).toBeLessThan(0.35);
+    expect(terrainLee(near, 270)).toBeLessThan(0.6);
     expect(terrainLee(far, 270)).toBeLessThan(0.9);
     expect(terrainLee(clear, 270)).toBeGreaterThan(0.9); // Harding Rock: the slot, fed through the gap in the Gate, not from over the Headlands
   });
 
-  it('the cone east of Alcatraz: a lull right behind it, gone within a kilometre or so', () => {
+  it('the cone east of Alcatraz (low and steep): a near-calm right behind it, gone within a kilometre or so', () => {
     const behind = LL(37.8265, -122.4188), wellEast = LL(37.8265, -122.405); // ~150 m behind its east shore; 1.3 km east
     expect(terrainLee(behind, 270)).toBeLessThan(0.5);
     expect(terrainLee(wellEast, 270)).toBeGreaterThan(0.75);
