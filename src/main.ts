@@ -847,6 +847,8 @@ function resize(): void { view.resize(innerWidth, innerHeight); }
 addEventListener('resize', resize); resize();
 
 let last = performance.now();
+/** The showroom's point of sail: a close reach, port tack (the wind 55° on her port bow); negative: starboard tack. */
+let showroomTwa = 55;
 function frame(now: number): void {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -862,7 +864,7 @@ function frame(now: number): void {
     // nothing running (the start page, setup, the showroom): she still sails, in the real wind and physics, so her sails,
     // heel and flags agree; in the showroom on a close reach
     const showing = boatPanel.open || fleet.boatOpen;
-    acc += dt; while (acc >= DT) { w.idle(DT, showing ? 55 : undefined); acc -= DT; }
+    acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && !!w.user.docked); sailButtons();
@@ -990,4 +992,4 @@ newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRo
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });

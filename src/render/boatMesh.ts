@@ -571,11 +571,12 @@ function syncLines(m: BoatMesh, b: Boat): void {
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
 function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
-  // (v 1). Seen from starboard the leech is on your left, so that side's picture is drawn mirrored
-  const mirror = side === 'stbd', def = main ? MAIN_DEF : JIB_DEF, LUFF = main ? MAIN_LUFF : JIB_LUFF, FOOT = main ? MAIN_FOOT : JIB_FOOT;
+  // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
+  // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture
+  const def = main ? MAIN_DEF : JIB_DEF, LUFF = main ? MAIN_LUFF : JIB_LUFF, FOOT = main ? MAIN_FOOT : JIB_FOOT;
   const W = main ? 512 : 384, H = main ? 2048 : 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
-  const X = (u: number) => (mirror ? 1 - u : u) * W, Y = (v: number) => (1 - v) * H;
+  const X = (u: number) => u * W, Y = (v: number) => (1 - v) * H;
   const dark = lum(color) < 0.3; // black sails: light seams and stripes, white numbers
   g.fillStyle = color; g.fillRect(0, 0, W, H);
   const line = (pts: [number, number][], col: string, w: number) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach(([u, v], i) => i ? g.lineTo(X(u), Y(v)) : g.moveTo(X(u), Y(v))); g.stroke(); };
@@ -626,24 +627,25 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
     /**
      * One line of figures at height fraction t, its leech end 0.15 m in from the leech (as sailmakers set them: each line
      * follows the leech down, so a lower line sits a little further aft). Each figure 0.30 m × 0.20 m, 0.06 m apart, in a
-     * plain bold sans-serif; a 1 is a single straight bar, as on the sails. `flip` draws the figures back to front (the
-     * other side's, seen through the cloth); where they sit is this side's.
+     * plain bold sans-serif; a 1 is a single straight bar, as on the sails. `stbd`: the starboard side's set, which is
+     * read with the leech on your left, so in the picture (luff on the left) it runs, and each figure faces, back to front.
+     * The same ink shows through the cloth on the other side, at the same place, so both pictures draw both sets alike.
      */
-    const figures = (txt: string, t: number, col: string, flip: boolean) => {
+    const figures = (txt: string, t: number, col: string, stbd: boolean) => {
       const chord = MAIN_FOOT * (1 - t), pxU = W / chord; // px per metre across the sail at this height
       const glyphs = [...txt].filter(ch => ch !== ' '), widths = glyphs.map(ch => (ch === '1' || ch === 'I' ? 0.07 : 0.2));
       const total = widths.reduce((a, w) => a + w, 0) + 0.06 * (glyphs.length - 1);
       let x = chord - 0.15 - total; // metres from the luff
       g.fillStyle = col;
       const size = 0.3 * pxV * 1.37; // a bold sans-serif's cap height is about 0.73 of its em
-      // in reading order from this side: the figures run luff to leech, or leech to luff when they're the far side's
-      const order = flip ? glyphs.map((_, k) => glyphs.length - 1 - k) : glyphs.map((_, k) => k);
+      // luff to leech in the picture: in reading order for the port side's, the other way for the starboard side's
+      const order = stbd ? glyphs.map((_, k) => glyphs.length - 1 - k) : glyphs.map((_, k) => k);
       for (const k of order) {
-        const ch = glyphs[k], cxM = x + widths[k] / 2, cx = (mirror ? chord - cxM : cxM) * pxU, y = H * (1 - t) + 0.15 * pxV;
+        const ch = glyphs[k], cxM = x + widths[k] / 2, cx = cxM * pxU, y = H * (1 - t) + 0.15 * pxV;
         if (ch === '1' || ch === 'I') g.fillRect(cx - 0.035 * pxU, y - 0.3 * pxV, 0.07 * pxU, 0.3 * pxV); // a plain bar
         else {
           g.save(); g.font = `bold ${Math.round(size)}px "Helvetica Neue", Helvetica, Arial, "Liberation Sans", "DejaVu Sans", sans-serif`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-          const m = g.measureText(ch), sx = (widths[k] * pxU) / Math.max(1, m.width), back = mirror !== flip;
+          const m = g.measureText(ch), sx = (widths[k] * pxU) / Math.max(1, m.width), back = stbd;
           g.translate(cx, y); g.scale(sx * (back ? -1 : 1), 1); g.fillText(ch, -m.width / 2, 0); g.restore();
         }
         x += widths[k] + 0.06;
@@ -652,7 +654,8 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
     const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
     // each side carries its own: the F up near the head and the numbers below, the starboard set higher (RRS G1.3);
     // this side's reads crisply, the other side's shows through the cloth mirrored, a little softer
-    const set = (s: 'stbd' | 'port', mir: boolean, alpha: number) => {
+    const set = (s: 'stbd' | 'port', alpha: number) => {
+      const mir = s === 'stbd';
       const hi = s === 'stbd', fT = hi ? 0.835 : 0.765, nT = hi ? 0.665 : 0.565, step = 0.42 / MAIN_LUFF;
       g.globalAlpha = alpha;
       figures('F', fT, ink, mir); // the class insignia, in the same ink as the numbers (as on San Francisco boats' sails)
@@ -660,8 +663,8 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
       figures(digits, nT - (letters ? step : 0), ink, mir);
       g.globalAlpha = 1;
     };
-    set(side === 'stbd' ? 'port' : 'stbd', !mirror, dark ? 0.35 : 0.72);
-    set(side, mirror, 1);
+    set(side === 'stbd' ? 'port' : 'stbd', dark ? 0.35 : 0.72);
+    set(side, 1);
   }
   const t = new THREE.CanvasTexture(c); t.anisotropy = 8;
   return t;
