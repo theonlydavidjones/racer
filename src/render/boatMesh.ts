@@ -5,6 +5,7 @@ import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
+import { buildCrew, syncCrew, type Crew } from './crew';
 import { CABIN, COCKPIT, HEEL, L, RUDDER_RAKE, cabinGeometry, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
 
@@ -118,6 +119,8 @@ export interface BoatMesh {
   rudder: THREE.Group; prevH: number; prevT: number;
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
+  /** The crew, and whether to hide the helm (you're looking through their eyes in the cockpit view). */
+  crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
   lines: Lines;
 }
@@ -263,7 +266,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.068, 32), new THREE.MeshBasicMaterial({ map: card }));
   face.position.copy(cmp.position); face.position.z += 0.017; grp.add(face);
   const lubber = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.03), new THREE.MeshBasicMaterial({ color: 0xffb35c })); lubber.position.copy(face.position); lubber.position.y += 0.055; lubber.position.z += 0.001; grp.add(lubber);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card };
+  const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
+  const crew = buildCrew(JACKETS[b.id % JACKETS.length]); grp.add(crew.group);
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, hideHelm: false };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -282,6 +287,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
   m.card.rotation = b.h * D2R;
+  // the crew on the windward side, hiking as hard as she needs
+  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, Math.max(0, Math.min(1, ((b.heelMag ?? 0) - 4) / 8)), dt, m.hideHelm);
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);

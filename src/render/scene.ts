@@ -525,6 +525,7 @@ export class SceneView {
     w.boats.forEach((b, i) => {
       const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
       const mo = boatOnWaves(this.waves, b, b.h, tw, kW, kS); this.pitches[i] = mo.pitch;
+      this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
     this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
