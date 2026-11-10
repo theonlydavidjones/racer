@@ -2,7 +2,8 @@ import { D2R, KT, V, brg, cross, dot, sub, wrap, type Vec } from '../core/math';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { CURRENTS, currentAt, currentVector, shoreRelief } from '../environment/current';
 import { CurrentField, nextSaturday, sfLocalToUtcMin, stationsFor } from '../environment/tide';
-import { WIND_KIND_LABEL, breezeAt, windKindFor, windTerrain, type WindDay, type WindKind } from '../environment/wind';
+import { WIND_KIND_LABEL, windTerrain, type WindDay, type WindKind } from '../environment/wind';
+import { dayWeather } from '../environment/weather';
 import type { Settings } from '../settings';
 import { buildCourse, type CourseFile } from './course';
 
@@ -44,10 +45,11 @@ export interface RaceDay {
 export function raceDay(S: Settings, windBase = 275): RaceDay {
   const date = S.tideDate || nextSaturday(), gunUtc = sfLocalToUtcMin(date, S.tideTime || '12:00');
   const sea = S.windKt === 0, day = (S.windDay ?? 1) as WindDay;
-  const g = breezeAt(gunUtc, day, windKindFor(date, S.windKind ?? 'auto')), kind = g.kind;
-  if (!sea && kind === 'west') g.from = windBase; // as the World does
+  const wx = dayWeather(date, S.windKind ?? 'auto', day), real = wx.source === 'observed' || wx.source === 'forecast';
+  const g = wx.at(gunUtc), kind = wx.kind;
+  if (!sea && kind === 'west' && !real) g.from = windBase; // as the World does
   const wind = (p: Vec, min: number) => {
-    const b = sea ? breezeAt(gunUtc + min, day, kind) : { kt: S.windKt, from: g.from };
+    const b = sea ? wx.at(gunUtc + min) : { kt: S.windKt, from: g.from };
     return { kt: b.kt * windTerrain(p, b.from), from: b.from };
   };
   const base = { gunUtc, wind, kind, fromAtGun: g.from };
