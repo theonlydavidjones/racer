@@ -1,10 +1,11 @@
 import { inPoly, segPt, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
+import marinaCoast from './data/marina-coast.json';
 import { hitsHarbor, inBasin } from './marina';
 
-// Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation).
-// TODO: replace with clipped NOAA ENC / OpenStreetMap coastline data.
+// Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); the stretch past the
+// Marina is replaced below by the real one.
 const SHORE_LL: [number, number][] = [
   [37.8108, -122.4785], [37.8065, -122.4720], [37.8045, -122.4620], [37.8040, -122.4520], [37.8055, -122.4490],
   [37.8078, -122.4475], [37.8082, -122.4462], [37.8079, -122.4450], [37.8088, -122.4441], [37.8093, -122.4434],
@@ -14,7 +15,12 @@ const SHORE_LL: [number, number][] = [
   [37.8086, -122.4214], [37.8080, -122.4180], [37.8062, -122.4100], [37.8045, -122.4000]
 ];
 
-export const SHORE: Vec[] = SHORE_LL.map(p => LL(p[0], p[1]));
+// From Crissy Field past the Marina to Fort Mason, the real shoreline (OpenStreetMap, scripts/make-marina-coast.mjs):
+// the Marina Green seawall, the West Harbor's basin and its jetty out to the entrance beacon, in place of the hand-drawn one
+// (only as far east as Gashouse Cove: OpenStreetMap's coastline leaves out the Fort Mason piers, which the hand-drawn shore has)
+const COAST = (marinaCoast as unknown as { coast: [number, number][] }).coast.filter(p => p[1] <= -122.4345);
+const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > COAST[COAST.length - 1][1])];
+export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
 export const LAND: Vec[] = SHORE.concat([LL(37.790, -122.4000), LL(37.790, -122.4790)]);
 

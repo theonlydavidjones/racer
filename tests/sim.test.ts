@@ -89,9 +89,9 @@ describe('AI fleet sails the course', () => {
   }, 60_000);
 
   it('Seaweed Soup course 2 in an ebb: every AI boat finishes', () => {
-    const w = race(SS2, { fleet: 3, current: 'ebb' }, 11, 75);
+    const w = race(SS2, { fleet: 3, current: 'ebb' }, 11, 90); // (the real jetty pushes the last beat out from the Marina shore)
     for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
-  }, 60_000);
+  }, 180_000);
 });
 
 describe('AI starts (regression guard, 8 races × 5 boats)', () => {
@@ -200,7 +200,8 @@ describe('hails at the Cityfront shore (Rule 20)', () => {
     // a spot about 30 m off the beach where the starboard close-hauled course runs straight at it
     const h = (from - 41 + 360) % 360, wv = V(from), hv = V(h);
     let p = { x: 0, y: 0 };
-    search: for (let x = -1200; x < 300; x += 10) for (let y = -900; y < 100; y += 4) {
+    // (along the Marina Green seawall, east of the harbor: a straight stretch the starboard course meets squarely)
+    search: for (let x = 100; x < 1200; x += 10) for (let y = -900; y < 100; y += 4) {
       const q = { x, y }, hit = { x: x + hv.x * 30, y: y + hv.y * 30 };
       if (!onLand(q) && shoreDist(q) > 22 && onLand(hit) && !inBasin(q) && !inBasin(hit)) { p = q; break search; } // the open beach, not West Harbor's docks
     }
@@ -215,6 +216,7 @@ describe('hails at the Cityfront shore (Rule 20)', () => {
     let hailed = false, foul: string | null = null;
     for (let i = 0; i < 60 * 12 && !foul; i++) {
       w.step(DT);
+
       if (w.pairRecord(u, red)?.hail?.by === red.id) hailed = true;
       for (const e of w.drainEvents()) if (e.type === 'incident') foul = e.incident.rule;
     }

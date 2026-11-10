@@ -21,20 +21,23 @@ describe('West Harbor', () => {
     expect(new Set(SLIPS.map(s => s.id)).size).toBe(SLIPS.length);
     for (const s of SLIPS) expect(onLand(s.p)).toBe(false);
   });
-  it('the entrance is open: from the Bay you can reach a slip without crossing land (a coarse path search)', () => {
-    const start = LL(37.8095, -122.4385), goal = slipById(SLIPS[Math.floor(SLIPS.length / 2)].id)!.p, step = 8;
+  it('the way out is where it really is: east past the jetty\'s tip (a fine path search from a slip on the west side)', () => {
+    const start = slipById('E15')!.p, goal = LL(37.8100, -122.4385), step = 2; // E15, and the open Bay off the entrance beacon
     const key = (p: { x: number; y: number }) => `${Math.round(p.x / step)},${Math.round(p.y / step)}`;
     const seen = new Set([key(start)]); let frontier = [start], found = false;
-    for (let it = 0; it < 400 && frontier.length && !found; it++) {
+    for (let it = 0; it < 3000 && frontier.length && !found; it++) {
       const next: typeof frontier = [];
       for (const p of frontier) for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
         const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
-        if (seen.has(k) || onLand(q) || Math.hypot(q.x - start.x, q.y - start.y) > 1500) continue;
-        seen.add(k); next.push(q); if (Math.hypot(q.x - goal.x, q.y - goal.y) < step * 1.5) found = true;
+        if (seen.has(k) || onLand(q) || Math.hypot(q.x - start.x, q.y - start.y) > 1600) continue;
+        seen.add(k); next.push(q); if (Math.hypot(q.x - goal.x, q.y - goal.y) < step * 2) found = true;
       }
       frontier = next;
     }
     expect(found).toBe(true);
+    // the jetty itself is solid (Yacht Road and the clubs), and the entrance between its tip and the Marina Green is water
+    expect(onLand(LL(37.8079, -122.4430))).toBe(true);
+    expect(onLand(LL(37.8080, -122.4393))).toBe(false);
   });
   it('Cruise from her slip: bow in, made fast, sails down; push off shoves her clear astern, steerable; hoist; home bow first', () => {
     const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
