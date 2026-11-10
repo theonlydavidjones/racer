@@ -13,7 +13,7 @@ import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
-import { moveLazyCar } from './boat/physics';
+import { POLE, moveLazyCar } from './boat/physics';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { shoreRelief } from './environment/current';
 import { breezeAt, windTerrain } from './environment/wind';
@@ -269,8 +269,14 @@ function showLines(): void {
 const sheetBtn = (id: string, key: 'mainsheet' | 'jibsheet', dir: -1 | 1) =>
   holdBtn(id, () => { btnCmd[key] = dir; applyHeld(); }, () => { if (btnCmd[key] === dir) delete btnCmd[key]; applyHeld(); });
 sheetBtn('bMainIn', 'mainsheet', -1); sheetBtn('bMainOut', 'mainsheet', 1); sheetBtn('bJibIn', 'jibsheet', -1); sheetBtn('bJibOut', 'jibsheet', 1);
-function togglePole(): void { if (!w.running || w.paused) return; w.user.poleWant = !w.user.poleWant; }
-$('bPole').addEventListener('click', togglePole);
+function togglePole(): void {
+  if (!w.running || w.paused) return;
+  const u = w.user; u.poleWant = !u.poleWant;
+  toast(u.poleWant ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+}
+// act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
+$('bPole').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); togglePole(); });
+$('bPole').addEventListener('click', e => { if (e.detail === 0) togglePole(); }); // keyboard activation only
 function doHail(): void { if (w.running && !w.paused) w.userHail(); }
 $('bHail').onclick = doHail;
 $('bView').onclick = () => setView((viewMode + 1) % 3);
