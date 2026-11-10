@@ -10,6 +10,7 @@ import type { World } from '../sim/world';
 import { $ } from './dom';
 import { flagCanvas } from '../render/flags';
 import { FLAG_NAME } from '../sim/signals';
+import { VESSEL } from '../sim/traffic';
 import { targetShape, type Shape } from '../boat/controls';
 
 /** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
@@ -327,6 +328,14 @@ export class Hud {
     }
     drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1);
     if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), 450);
+    // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
+    for (const v of wd.vessels) {
+      const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);
+      ctx.strokeStyle = 'rgba(230,230,225,.9)'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(3, ty.beam * scale);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); ctx.lineCap = 'butt';
+      if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = 'rgba(230,230,225,.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); }
+      if (this.mapZoom) { ctx.fillStyle = 'rgba(230,230,225,.85)'; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
+    }
     for (const b of wd.boats) {
       const p = tf(b.x, b.y), s = b.isUser ? 5 : 4;
       ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R);

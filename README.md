@@ -156,6 +156,12 @@ Setup → Current → **Real tide** (the default), then pick the race day and th
 - **Settings:** real waves or flat water, and the swell day. The HUD shows the chop and swell where you are.
 - Data: `scripts/fetch-swell.mjs` (`npm run data:swell`) for the buoy climatology; `scripts/make-land-mask.mjs` makes the coastline mask from the terrain.
 
+### Ship traffic
+
+- **Ships, ferries and tour boats** on approximate real tracks (`src/sim/traffic.ts`): a container ship and a tanker in the deep water from the Gate across the Central Bay toward Oakland; the Sausalito ferry from the Ferry Building; the Alcatraz ferry from Pier 33; two bay-cruise boats from Pier 39, out along the Cityfront, under the bridge and back; and a Coast Guard boat out of Horseshoe Bay. Built to their real lengths and speeds; they keep their schedule through the day, and they're on the course map with a line showing where they'll be in a minute.
+- **Their wakes** are the Kelvin pattern: two arms at 19.47° either side of the track, the same angle for any vessel at any speed. The waves are bigger for bigger, faster vessels, die away slowly as the arms spread, and arrive well after the vessel has passed. When an arm reaches you it's a short burst of steep waves: you slow and the bow gets knocked about, through the same wave physics as the chop.
+- **The collision regulations.** The racing rules don't apply between you and a ship; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9). As one closes on you, a message says so; if you're standing into her way she sounds five short blasts, the danger signal. Hitting one stops you dead. The AI boats keep clear by passing astern. Switch traffic off in Setup.
+
 ### Sun, sky, the land and the landmarks
 
 - **The sun where it really is** for the race day and the clock (NOAA's solar position algorithm, for the Cityfront; `src/environment/sun.ts`, tested against noon heights and sunset times). It sets the light's direction, colour (warm and low late in the day) and strength, and the shadows: sails shade the deck and the water.

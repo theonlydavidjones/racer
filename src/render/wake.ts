@@ -11,9 +11,7 @@ import { D2R } from '../core/math';
  * her bow comes down into a wave.
  */
 
-const SAMPLE = 0.15, N = 110; // trail samples (s apart), about 16 s of trail
 const KELVIN = Math.tan(19.47 * D2R);
-const HALF = 3.82;
 
 interface Trail { pts: { x: number; y: number; v: number; t: number }[]; acc: number; mesh: THREE.Mesh; bow: THREE.Mesh; spray: THREE.Points; drops: { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number }[]; lastPitch: number }
 
@@ -27,11 +25,19 @@ function foam(): THREE.CanvasTexture {
   return foamTex;
 }
 
+/** Anything that leaves a wake: a boat, or a ship. */
+export interface Mover { x: number; y: number; h: number; v: number; rel: number; sea?: { hsW: number } }
+
 export class Wakes {
   private trails: Trail[] = [];
-  constructor(private scene: THREE.Scene) {}
+  private SAMPLE: number; private N: number; private scale: number; private HALF: number;
+  /** `sample` s between trail points, `n` points; `scale` widens the wash and bow wave (ships); `len` the hull length. */
+  constructor(private scene: THREE.Scene, opt: { sample?: number; n?: number; scale?: number; len?: number } = {}) {
+    this.SAMPLE = opt.sample ?? 0.15; this.N = opt.n ?? 110; this.scale = opt.scale ?? 1; this.HALF = (opt.len ?? 7.64) / 2;
+  }
 
-  reset(boats: Boat[]): void {
+  reset(boats: Mover[] | Boat[]): void {
+    const N = this.N;
     for (const t of this.trails) { this.scene.remove(t.mesh, t.bow, t.spray); t.mesh.geometry.dispose(); }
     this.trails = boats.map(() => {
       // three strips (centre wash and the two Kelvin arms), N samples × 2 edges each
@@ -55,8 +61,9 @@ export class Wakes {
   }
 
   /** `t` race time (s), `dt` frame time; `sea(x, y)` the water height there; `pitch` each boat's pitch now (rad, bow up). */
-  update(boats: Boat[], t: number, dt: number, sea: (x: number, y: number) => number, pitch: number[]): void {
-    boats.forEach((b, k) => {
+  update(boats: (Mover | Boat)[], t: number, dt: number, sea: (x: number, y: number) => number, pitch: number[]): void {
+    const N = this.N, SAMPLE = this.SAMPLE, HALF = this.HALF, sc = this.scale;
+    (boats as Mover[]).forEach((b, k) => {
       const tr = this.trails[k]; if (!tr) return;
       const u = { x: Math.sin(b.h * D2R), y: Math.cos(b.h * D2R) }, stern = { x: b.x - u.x * HALF, y: b.y - u.y * HALF };
       tr.acc += dt;
@@ -70,8 +77,8 @@ export class Wakes {
         const nx = dy, ny = -dx; // to starboard of the track
         const spd = Math.min(1, p.v / 3);
         let off = 0, half: number, alpha: number;
-        if (s === 0) { half = 0.6 + age * 0.18; alpha = spd * 0.8 * Math.exp(-age / 7); } // the turbulent wash behind the stern
-        else { off = (s === 1 ? 1 : -1) * Math.min(14, p.v * age * KELVIN); half = 0.18 + age * 0.03; alpha = spd * spd * 0.55 * Math.exp(-age / 5) * Math.min(1, age * 2); } // the Kelvin arms
+        if (s === 0) { half = (0.6 + age * 0.18) * sc; alpha = spd * 0.8 * Math.exp(-age / (7 * Math.sqrt(sc))); } // the turbulent wash behind the stern
+        else { off = (s === 1 ? 1 : -1) * Math.min(14 * sc * sc, p.v * age * KELVIN); half = (0.18 + age * 0.03) * sc; alpha = spd * spd * 0.55 * Math.exp(-age / (5 * sc)) * Math.min(1, age * 2); } // the Kelvin arms
         if (i >= n) alpha = 0;
         const cx = p.x + nx * off, cy = p.y + ny * off;
         for (const e of [0, 1]) {
@@ -83,16 +90,16 @@ export class Wakes {
       }
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.attributes.uv.needsUpdate = true;
       // bow wave
-      const bx = b.x + u.x * (HALF - 0.6), by = b.y + u.y * (HALF - 0.6), sz = Math.min(1.3, b.v / 2.6);
+      const bx = b.x + u.x * (HALF - 0.6 * sc), by = b.y + u.y * (HALF - 0.6 * sc), sz = Math.min(1.3, b.v / 2.6);
       tr.bow.visible = b.v > 0.6;
-      tr.bow.position.set(bx, sea(bx, by) + 0.06, -by); tr.bow.rotation.y = -b.h * D2R; tr.bow.scale.set(0.5 + 0.6 * sz, 1, 0.5 + 0.7 * sz);
+      tr.bow.position.set(bx, sea(bx, by) + 0.06, -by); tr.bow.rotation.y = -b.h * D2R; tr.bow.scale.set((0.5 + 0.6 * sz) * sc, 1, (0.5 + 0.7 * sz) * sc);
       (tr.bow.material as THREE.MeshBasicMaterial).opacity = Math.min(0.85, sz * 0.9);
       // spray: when the bow drops into a wave at speed, in a chop
-      const dp = pitch[k] - tr.lastPitch; tr.lastPitch = pitch[k];
-      if (b.v > 2 && dp < -0.004 && (b.sea?.hsW ?? 0) > 0.25 && tr.drops.length < 60) {
-        const n2 = Math.min(60 - tr.drops.length, Math.round(-dp * 1500 * (b.sea.hsW)));
+      const dp = (pitch[k] ?? 0) - tr.lastPitch; tr.lastPitch = pitch[k] ?? 0;
+      if (sc === 1 && b.v > 2 && dp < -0.004 && (b.sea?.hsW ?? 0) > 0.25 && tr.drops.length < 60) {
+        const n2 = Math.min(60 - tr.drops.length, Math.round(-dp * 1500 * (b.sea?.hsW ?? 0)));
         const lee = (b.rel >= 0 ? -1 : 1), sx = { x: u.y * lee, y: -u.x * lee };
-        for (let i = 0; i < n2; i++) tr.drops.push({ x: bx, y: by, z: 0.6, vx: sx.x * (1 + Math.random() * 2) + u.x * b.v * 0.6 - (b.ww ? 0 : 0), vy: sx.y * (1 + Math.random() * 2) + u.y * b.v * 0.6, vz: 1.5 + Math.random() * 2.5, life: 0.7 + Math.random() * 0.6 });
+        for (let i = 0; i < n2; i++) tr.drops.push({ x: bx, y: by, z: 0.6, vx: sx.x * (1 + Math.random() * 2) + u.x * b.v * 0.6, vy: sx.y * (1 + Math.random() * 2) + u.y * b.v * 0.6, vz: 1.5 + Math.random() * 2.5, life: 0.7 + Math.random() * 0.6 });
       }
       const SP = tr.spray.geometry.attributes.position.array as Float32Array;
       tr.drops = tr.drops.filter(d => (d.life -= dt) > 0);

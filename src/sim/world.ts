@@ -12,10 +12,11 @@ import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
-import { aimPoint } from '../ai/ai';
+import { aimPoint, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink } from '../ai/ai';
 import type { SimEvent } from './events';
+import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { FLAG_NAME, X_FLAG_MAX, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
@@ -88,6 +89,10 @@ export class World {
   /** Puffs and lulls drifting across the course. */
   readonly puffs: Puffs;
   readonly windModel: WindModel;
+  /** Ship traffic, and where the vessels are now. */
+  readonly traffic: Traffic;
+  vessels: Vessel[] = [];
+  private warned = new Map<number, number>();
   /** The waves: chop from the wind and current, swell through the Gate (or flat water). */
   readonly sea: SeaField;
 
@@ -147,6 +152,7 @@ export class World {
     // the race day and clock: they drive the real tide and westerly, and always the sun
     this.raceDate = settings.tideDate || nextSaturday();
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
+    this.traffic = new Traffic(settings.traffic !== 0, seed);
     this.sea = new SeaField(settings.sea === 'flat' ? null : swellFor(this.raceDate, settings.swellDay ?? 1));
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -297,11 +303,17 @@ export class World {
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b), b.cur); }
-    if (this.steps % 30 === 1) for (const b of this.boats) b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));
-    for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
+    this.vessels = this.traffic.vessels(this.trafficT);
+    if (this.steps % 30 === 1) for (const b of this.boats) {
+      b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));
+      const wk = this.traffic.wakeAt(b, this.trafficT);
+      if (wk) b.sea = { ...b.sea, wake: wk };
+    }
+    for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.trackCourses();
+    this.shipEncounters();
     this.checkPairs();
     if (!this.freeSail) this.signals(prevT);
     if (this.steps % RECORD_EVERY_STEPS === 0) {
@@ -529,6 +541,54 @@ export class World {
     if (this.xUntil > 0) this.flags.push('X');
     // Rule 30, in the last minute
     if (this.t >= -60 && this.t < 0 && this.prepFlag !== 'P') this.lastMinute();
+  }
+
+  /** The traffic's clock: seconds since midnight UTC of the race day, so the ships keep their schedule through the day. */
+  get trafficT(): number { return (this.clockUtc * 60) % 86400; }
+
+  /** AI boats keep well clear of ships and ferries: they pass astern of anything that would come close. */
+  private keepClearOfShips(b: Boat): void {
+    for (const v of this.vessels) {
+      if (!v.moving) continue;
+      const ty = VESSEL[v.kind], u = V(v.h), c = cpa(b, { x: v.x, y: v.y, vx: u.x * v.v, vy: u.y * v.v });
+      if (c.d > ty.len / 2 + 70 || dist(b, v) > 900) continue;
+      const aim = { x: v.x - u.x * (ty.len * 0.8 + 60), y: v.y - u.y * (ty.len * 0.8 + 60) }; // behind her stern
+      b.desired = sailable(b, brg(aim.x - b.x, aim.y - b.y)); b.luff = false;
+    }
+  }
+
+  /** You and the traffic: warnings under the collision regulations, the danger signal, and being run down. */
+  private shipEncounters(): void {
+    const u = this.user;
+    for (const v of this.vessels) {
+      const ty = VESSEL[v.kind], hv = vesselHull(v), uv = V(v.h);
+      // contact with a vessel: for any boat, pushed clear and stopped
+      for (const b of this.boats) {
+        const gap = Math.min(segPt(bow(b), hv.a, hv.b), segPt(stern(b), hv.a, hv.b), segPt(b, hv.a, hv.b)) - hv.r - 0.8;
+        if (gap < 0) {
+          const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
+          const cx = hv.a.x + (hv.b.x - hv.a.x) * k, cy = hv.a.y + (hv.b.y - hv.a.y) * k, l = Math.hypot(b.x - cx, b.y - cy) || 1;
+          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0;
+          if (b.isUser && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
+        }
+      }
+      if (!v.moving) continue;
+      const c = cpa(u, { x: v.x, y: v.y, vx: uv.x * v.v, vy: uv.y * v.v }), close = ty.len / 2 + 60, last = this.warned.get(v.id) ?? -Infinity;
+      if (dist(u, v) > 1500 || c.d > close + 120) continue;
+      if (this.t - last > 90) {
+        this.warned.set(v.id, this.t);
+        const big = v.kind === 'container' || v.kind === 'tanker';
+        this.emit({ type: 'toast', ms: 7000, msg: big
+          ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
+          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
+      }
+      // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
+      if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
+        this.warned.set(-1 - v.id, this.t);
+        for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
+        this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+      }
+    }
   }
 
   /** The triangle formed by the ends of the starting line and the first mark (RRS 30.2–30.4). */

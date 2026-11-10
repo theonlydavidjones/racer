@@ -148,6 +148,8 @@ export interface SeaHere {
   white: number;
   /** Fetch upwind, m. */
   fetch: number;
+  /** A passing vessel's wake, if one is under her now: height (m), period (s), the direction it comes from (deg). */
+  wake?: { h: number; t: number; from: number };
 }
 export const FLAT_SEA: SeaHere = { hsW: 0, tpW: 1, fromW: 0, hsS: 0, tpS: 10, fromS: 270, steep: 0, white: 0, fetch: 0 };
 

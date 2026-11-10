@@ -34,7 +34,8 @@ export function addedResistance(H: number, T: number, enc: number, v: number): n
 
 /** Added resistance from the whole sea (chop from the wind's direction, swell from its own) for heading h, at speed v. */
 export function seaDrag(s: SeaHere, h: number, v: number): number {
-  return addedResistance(s.hsW, s.tpW, Math.abs(wrap(s.fromW - h)), v) + addedResistance(s.hsS, s.tpS, Math.abs(wrap(s.fromS - h)), v);
+  return addedResistance(s.hsW, s.tpW, Math.abs(wrap(s.fromW - h)), v) + addedResistance(s.hsS, s.tpS, Math.abs(wrap(s.fromS - h)), v)
+    + (s.wake ? addedResistance(s.wake.h, s.wake.t, Math.abs(wrap(s.wake.from - h)), v) : 0);
 }
 
 /** Steady speed (m/s) when the sails would drive her at `vt` in flat water and the sea adds `drag(v)` newtons. */
@@ -78,7 +79,7 @@ export function waveYaw(s: SeaHere, h: number, v: number, t: number, seed: numbe
     const side = Math.sin(enc) ** 2 * (0.5 + 0.5 * (1 - Math.cos(enc)) / 2); // on the quarter most
     return 7 * H * side * (Math.sin(we * t + ph) + 0.5 * Math.sin(1.7 * we * t + 2 * ph));
   };
-  return one(s.hsW, s.tpW, s.fromW, seed * 1.7) + one(s.hsS, s.tpS, s.fromS, seed * 2.9 + 1);
+  return one(s.hsW, s.tpW, s.fromW, seed * 1.7) + one(s.hsS, s.tpS, s.fromS, seed * 2.9 + 1) + (s.wake ? 1.6 * one(s.wake.h, s.wake.t, s.wake.from, seed * 4.1 + 2) : 0);
 }
 
 /** Speed lost to the sea (fraction), for messages. */

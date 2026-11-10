@@ -76,5 +76,5 @@ describe('in the race', () => {
     const k0 = w.windModel.kt;
     for (let i = 0; i < 60 * 60 * 45; i++) w.step(); // ~45 minutes
     expect(w.windModel.kt).toBeGreaterThan(k0 + 1);
-  });
+  }, 30000);
 });

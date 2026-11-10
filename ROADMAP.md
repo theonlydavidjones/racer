@@ -51,7 +51,7 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
 6. ~~**Moored boats**~~ (done: the anchorages; marinas need the real shoreline) **and marina life** in the harbour behind the line; traffic (see below).
 
-## Ship traffic and wakes (later)
+## Ship traffic and wakes — done (see README, Ship traffic)
 
 - Vessels passing through the race area on realistic routes: container ships and tankers in the Central Bay traffic lanes, Alcatraz and Sausalito ferries and Blue & Gold / Red and White tour boats from Piers 39–41, Coast Guard boats, pilot boats.
 - **Wakes** with the real Kelvin pattern (about 19.5° each side of the track), arriving well after the ship has passed, and hitting the boat as a short burst of steep waves (slowing her and knocking her off course).
