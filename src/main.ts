@@ -11,7 +11,7 @@ import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, type Incident } from './rules';
-import { loadSettings, saveSettings, type Settings } from './settings';
+import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from './settings';
 import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
@@ -585,16 +585,36 @@ $<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg').forEach(seg => {
     const k = seg.dataset.k as keyof Settings;
-    seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(String(S[k]) === b.dataset.v)));
+    const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
+    seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
   });
 }
 document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
+  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewRows(); paintSeg(); newGame(); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag') ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
-function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; tideBox(); }
+/* Crew: how many, and each person's height and weight (shown in feet and inches, and pounds). */
+const LB = 0.4536, IN = 0.0254;
+const fmtHeight = (m: number) => { const t = Math.round(m / IN); return `${Math.floor(t / 12)}'${t % 12}"`; };
+const parseHeight = (s: string): number | null => {
+  const ft = s.match(/^\s*(\d)\s*['’ ]\s*(\d{1,2})?\s*("|”)?\s*$/), cm = s.match(/^\s*(\d{3})\s*cm\s*$/i), inches = s.match(/^\s*(\d{2})\s*(in|")?\s*$/);
+  if (ft) return (Number(ft[1]) * 12 + Number(ft[2] ?? 0)) * IN; if (cm) return Number(cm[1]) / 100; if (inches) return Number(inches[1]) * IN; return null;
+};
+function crewRows(): void {
+  const c = S.crew ??= { ...DEFAULT_SETTINGS.crew }, rows = $('crewRows');
+  const people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, c.n).map((p, i) => ({ who: `Crew ${i + 1}`, p }))];
+  rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>`).join('');
+  rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
+    const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
+    if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
+    else { const lb = Number(inp.value); if (lb > 70 && lb < 400) p.w = lb * LB; inp.value = String(Math.round(p.w / LB)); }
+    saveSettings(S); newGame();
+  });
+}
+function openSetup(): void { courseView.close(); w.running = false; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
 function beginRace(seed?: number): void {
   saveSettings(S);
   newGame(seed);
@@ -671,7 +691,7 @@ function frame(now: number): void {
 }
 
 buildSetupChoices();
-newGame(); paintSeg(); courseCard(); tideBox();
+newGame(); paintSeg(); crewRows(); courseCard(); tideBox();
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.

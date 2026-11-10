@@ -296,3 +296,11 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .coach-acts .who{font:700 9px var(--f-inst);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border:1px solid var(--rule);border-radius:3px;padding:1px 4px}
 .coach-ok{font-size:15px;font-weight:600;color:#3fd197;margin:6px 0}
 .coach-more{font-size:11px;color:var(--muted);margin:6px 0 0}
+
+.crewrows{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 10px;align-items:center;margin:8px 0 4px;font-size:13px}
+.crewrows label{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.crewrows input{width:70px;background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:5px 7px;font:inherit}
+
+/* the tiller bar is gone: the cursor is the tiller (and A/D); the element stays for its accessibility label */
+#tiller{display:none}
+.row2{justify-content:flex-end;align-items:center}

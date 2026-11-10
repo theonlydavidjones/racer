@@ -89,6 +89,10 @@
       <div class="seg" data-k="sea"><button type="button" data-v="real">Real waves</button><button type="button" data-v="flat">Flat water</button></div>
       <div class="seg" data-k="swellDay" id="swellDaySeg"><button type="button" data-v="0">Small swell</button><button type="button" data-v="1">Typical swell</button><button type="button" data-v="2">Big swell</button></div>
       <small id="seaNote">Chop from the wind over the water and the open water upwind; an ebb against the westerly makes it bigger and steeper. Ocean swell from the San Francisco Bar buoy's records for the month, dying away inside the Gate. Chop slows you most upwind, so foot a little to keep her going.</small></div>
+    <div class="field" id="crewField"><span>Crew</span>
+      <div class="seg" data-k="crewN"><button type="button" data-v="0">Just you</button><button type="button" data-v="1">You + 1</button><button type="button" data-v="2">You + 2</button></div>
+      <div class="crewrows" id="crewRows"></div>
+      <small>Your weight and your crew's goes into the physics: displacement, how far out they can hike (taller reaches further), and where the weight sits fore and aft. Fewer hands means slower pole sets and line handling. Folkboats usually race with three.</small></div>
     <div class="field"><span>Ship traffic</span>
       <div class="seg" data-k="traffic"><button type="button" data-v="1">Ships, ferries &amp; tour boats</button><button type="button" data-v="0">None</button></div>
       <small>Container ships and tankers in the channel, the Sausalito and Alcatraz ferries, bay-cruise boats and the Coast Guard, on their usual tracks. The racing rules don't apply between you and them; the collision regulations do. Their wakes hit you as a burst of steep waves.</small></div>
@@ -115,7 +119,7 @@
     <div class="btnrow"><button class="ghost" id="bPreview" type="button">View the course</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
     <div class="btnrow"><button class="ghost" id="bKeys1" type="button">Keyboard settings</button></div>
     <div class="help">
-      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also drag the tiller bar, or hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
+      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
       <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
       <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>

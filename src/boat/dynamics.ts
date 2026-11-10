@@ -104,8 +104,8 @@ export function flogAmount(twa: number, beat: number, noGo: number, luffing: boo
 }
 
 /** Surge acceleration, m/s². */
-export function surgeAccel(v: number, vt: number, windageN: number): number {
-  return (drive(v, vt) - hullResistance(v) - windageN) / HANDLING.mass;
+export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HULL.displacement): number {
+  return (drive(v, vt) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
 }
 
 /** Fastest the helm can turn the boat at speed v (m/s), deg/s. Rudder authority comes from water flow. */

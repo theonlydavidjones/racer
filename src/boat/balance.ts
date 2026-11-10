@@ -67,10 +67,28 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
 }
 
 /** Righting moment (N·m) at a heel angle (deg), with the crew hiking as hard as needed (`hike` 0..1). */
-export function rightingMoment(heelDeg: number, hike = 1): number {
+export function rightingMoment(heelDeg: number, hike = 1, disp = DISP): number {
+  return hullRighting(heelDeg, disp) + CREW.kg * G * CREW.reach * hike * Math.cos(Math.abs(heelDeg) * D2R);
+}
+/** The hull's own righting moment (N·m): displacement (people included, sitting on the centreline) × righting arm. */
+export function hullRighting(heelDeg: number, disp = DISP): number {
   const t = Math.abs(heelDeg) * D2R;
-  const gz = GM * Math.sin(t) * (1 - 0.3 * Math.sin(t) ** 2); // the arm grows, then levels off
-  return DISP * G * gz + CREW.kg * G * CREW.reach * hike * Math.cos(t);
+  return disp * G * GM * Math.sin(t) * (1 - 0.3 * Math.sin(t) ** 2); // the arm grows, then levels off
+}
+/** The heeling moment (N·m) at heel `heelDeg` from a side force, with the centre of effort lowered by twist. */
+export const heelingMoment = (heelForce: number, twist: number, heelDeg: number) => heelForce * (CE_HEIGHT - 0.03 * (twist - 8)) * Math.cos(heelDeg * D2R);
+
+/**
+ * Heel (deg, ≥ 0 to leeward) with the crew where they are: the sails' heeling moment plus the crew's weight to
+ * leeward (or minus it to windward) against the hull's righting moment. `crewMoment(h)`: + to windward, N·m.
+ */
+export function heelWithCrew(heelForce: number, twist: number, disp: number, crewMoment: (h: number) => number): number {
+  let lo = 0, hi = 75;
+  for (let i = 0; i < 30; i++) {
+    const h = (lo + hi) / 2;
+    if (heelingMoment(heelForce, twist, h) - crewMoment(h) > hullRighting(h, disp)) lo = h; else hi = h;
+  }
+  return (lo + hi) / 2;
 }
 
 /** Heel (deg, ≥ 0) where the heeling moment balances the righting moment. The crew hike once she's heeling. */

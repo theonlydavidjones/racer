@@ -5,7 +5,8 @@ import { bow, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
 import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { FULL_RUDDER, equilibriumHeel, heelFactor, helmNeeded, rudderDrag, sailForces } from './balance';
+import { FULL_RUDDER, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rudderDrag, sailForces } from './balance';
+import { DEFAULT_CREW, crewMoment, displacement, displacementFactor, handsFactor, newCrew, placeCrew, trimFactor } from './crewPhys';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls } from './controls';
 
@@ -30,8 +31,9 @@ export function sailPlan(b: Boat): SailPlan {
 /** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
 function crewPole(b: Boat, dt: number, emit: Emit): void {
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg }); };
-  if (b.poleWant && (b.pole === 'down' || b.pole === 'stowing')) { b.pole = 'setting'; b.poleT = POLE.set; b.poleTack = b.tack; }
-  else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow; }
+  const hands = b.crew ? handsFactor(b.crew.spec) : 1; // short-handed, the pole takes longer
+  if (b.poleWant && (b.pole === 'down' || b.pole === 'stowing')) { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+  else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
   else if (b.pole === 'set' && b.tack !== b.poleTack) {
     b.pole = 'setting'; b.poleT = POLE.gybe; b.poleTack = b.tack;
     say('Gybing the pole end-for-end. The jib is down for a few seconds.');
@@ -114,12 +116,19 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
   const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
-  const heelT = equilibriumHeel(sf.main.heel + sf.jib.heel, sf.twist) * (twa > 100 ? 0.6 : 1); // off the wind she rolls less
+  // the crew: where they'd put their weight to hold her at her best heel (a little heel in light air, no more than
+  // about 17° upwind, flat downwind), then where they actually are (they move at a human pace)
+  const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec), F = sf.main.heel + sf.jib.heel;
+  const bestHeel = twa > 120 ? 1 : ww.kt < 7 ? 6 : 16;
+  const need = heelingMoment(F, sf.twist, bestHeel) - hullRighting(bestHeel, disp);
+  placeCrew(cs, need, twa, ww.kt, b.pole === 'set', b.tack, dt);
+  const heelT = heelWithCrew(F, sf.twist, disp, h => crewMoment(cs, h)) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
   b.heelMag = (b.heelMag ?? 0) + (heelT - (b.heelMag ?? 0)) * Math.min(1, dt * 2.2);
   b.heel = b.heelMag * (rel >= 0 ? 1 : -1);
   b.helmNeed = helmNeeded(sf, b.heelMag, b.sheets.main, b.v, sf.twist);
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
-  let target = polar(ww.kt, twa, plan) * heelFactor(b.heelMag);
+  // heel past her best; the weight aboard (displacement) and where it sits fore and aft
+  let target = polar(ww.kt, twa, plan) * heelFactor(b.heelMag) * displacementFactor(disp, ww.kt) * trimFactor(cs.spec, cs.fore, twa, ww.kt, b.pole === 'set');
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
   else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff); // sheet angles, then the sails' shape
@@ -127,7 +136,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const beat = beatAngle(ww.kt);
   // holding a lot of helm to keep her straight is a brake (the steady helm the sails demand; turning has its own cost)
   const helmDrag = Math.abs(rate) < 4 ? rudderDrag(clamp(b.helmNeed ?? 0, -12, 12), b.v) : 0;
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag);
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag, disp);
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
@@ -163,7 +172,8 @@ type Ctl = Exclude<keyof Controls, 'car'>;
 function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
   const c = b.ctl, tws = b.ww.kt, you = b.isUser;
-  const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const d = to - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * dt); };
+  const hands = b.crew ? handsFactor(b.crew.spec) : 1; // fewer crew, slower line handling
+  const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const d = to - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * hands * dt); };
   const hand = (k: Ctl, rate = CONTROL_RATE[k]) => {
     const cmd = b.ctlCmd[k] ?? 0, tg = b.ctlTarget?.[k];
     if (cmd === 0 && tg != null) { // dragged to a setting: work the line there at the usual pace

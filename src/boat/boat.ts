@@ -1,3 +1,4 @@
+import type { CrewState } from './crewPhys';
 import type { SeaHere } from '../environment/sea';
 import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
@@ -101,6 +102,8 @@ export interface Boat {
   /** Heel (deg, magnitude), the rudder angle she needs to sail straight (+ weather helm), the weather helm actually held,
    * and the sails' heeling and driving forces (N). See balance.ts. */
   heelMag?: number; helmNeed?: number; weatherHeld?: number; forces?: { heel: number; drive: number };
+  /** The people aboard and where their weight is (crewPhys.ts). */
+  crew?: CrewState;
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
