@@ -202,9 +202,13 @@ export function burgeeCanvas(id: string): HTMLCanvasElement | null {
 }
 
 /**
- * Where a flag officer's flag flies on a single-masted boat, by the club's own rule: in place of the burgee (the US
- * Power Squadrons' rule, and most US clubs': usps.org/f_stuff/etiquett.html), or on the same halyard just below the
- * burgee (e.g. Plymouth Yacht Club's). Clubs whose own rule isn't known follow the usual one.
+ * Where a flag officer's flag flies on a single-masted boat, by the club's own rule: in place of the burgee, or on the
+ * same halyard just below it (some clubs elsewhere, e.g. Plymouth YC). The US rule is "in place": USPS ("on ...
+ * single-masted sailboats, ... flown at the masthead in place of the club burgee", usps.org/f_stuff/etiquett.html) and
+ * Chapman ("flown in place of the club burgee at the masthead"). None of the Bay Area clubs here publishes a rule of its
+ * own (checked Nov 2026: their bylaws and traditions as far as reachable, and Flags of the World), so all follow it;
+ * Coyote Point's constitution has its officers fly "the regulation flag of their office", the standard US flags.
+ * A club found to differ goes in OFFICER_RULE.
  */
 export type OfficerRule = 'replace' | 'below';
 const OFFICER_RULE: Record<string, { rule: OfficerRule; source: string }> = {};
