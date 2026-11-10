@@ -12,6 +12,8 @@ import { loadSettings, saveSettings, type Settings } from './settings';
 import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
+import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
+import { moveLazyCar } from './boat/physics';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { shoreRelief } from './environment/current';
 import { breezeAt, windTerrain } from './environment/wind';
@@ -57,8 +59,8 @@ let pendingPenalty: Boat | null = null;
 function newGame(seed = randomSeed()): void {
   w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM } : S.mode === 'sail' ? { freeSail: true } : {});
   acc = 0; drillShown = false;
-  $('trimPanel').classList.toggle('manual', !!S.manualTrim);
-  $('bTrim').textContent = S.manualTrim ? 'Trim · you' : 'Trim · crew';
+  $('trimPanel').classList.toggle('manual', trimMode() >= 1); $('trimPanel').classList.toggle('all', trimMode() === 2);
+  $('bTrim').textContent = TRIM_LABEL[trimMode()];
   view.setWorld(w);
   labels.build(w);
 }
@@ -184,18 +186,90 @@ gl.addEventListener('wheel', e => {
   else look.chase = Math.max(8, Math.min(90, look.chase * Math.exp(e.deltaY * 0.0015))); // chase: closer or farther
 }, { passive: false });
 
-// Sheets: hold Trim/Ease (or Z/X for the main, , and . for the jib) when you're trimming.
-function setTrimMode(manual: boolean): void {
-  S.manualTrim = manual ? 1 : 0; saveSettings(S);
-  w.user.manualTrim = manual; w.user.sheetCmd.main = w.user.sheetCmd.jib = 0;
-  $('bTrim').textContent = manual ? 'Trim · you' : 'Trim · crew';
-  $('bTrim').setAttribute('aria-pressed', String(manual));
-  $('trimPanel').classList.toggle('manual', manual);
+/* ---------------- sail trim: who trims, the sheets, and every other line ---------------- */
+type CtlKey = Exclude<keyof Controls, 'car'>;
+type CtlItem = { key: CtlKey | 'carFore' | 'carIn'; label: string; group: string; only: 'sheets' | 'all' };
+/** The lines, grouped as they are on Josephine. */
+const CTL_UI: CtlItem[] = [
+  { group: 'Transom', key: 'mainsheet', label: 'Mainsheet', only: 'sheets' },
+  { group: 'Transom', key: 'traveller', label: 'Traveller', only: 'all' },
+  { group: 'Transom', key: 'backstay', label: 'Backstay', only: 'all' },
+  { group: 'Piano', key: 'vang', label: 'Vang', only: 'all' },
+  { group: 'Piano', key: 'outhaul', label: 'Outhaul', only: 'all' },
+  { group: 'Piano', key: 'cunningham', label: 'Cunningham', only: 'all' },
+  { group: 'Piano', key: 'downhaul', label: 'Downhaul', only: 'all' },
+  { group: 'Piano', key: 'jibCunningham', label: 'Jib Cunningham', only: 'all' },
+  { group: 'Winch', key: 'jibsheet', label: 'Jib sheet', only: 'sheets' },
+  { group: 'Cabin top: the lazy jib car', key: 'carFore', label: 'Car fore–aft', only: 'all' },
+  { group: 'Cabin top: the lazy jib car', key: 'carIn', label: 'Car in–out', only: 'all' }
+];
+let ctlSel = 0;
+const btnCmd: Partial<Record<CtlKey, number>> = {};
+const TRIM_LABEL = ['Trim · crew', 'Trim · sheets', 'Trim · all'];
+function trimMode(): 0 | 1 | 2 { return (S.manualTrim ?? 0) as 0 | 1 | 2; }
+const mayWork = (it: CtlItem) => (it.only === 'sheets' ? trimMode() >= 1 : trimMode() === 2);
+function setTrimMode(mode: 0 | 1 | 2): void {
+  S.manualTrim = mode; saveSettings(S);
+  const u = w.user; u.manualTrim = mode >= 1; u.trimAll = mode === 2; u.sheetCmd.main = u.sheetCmd.jib = 0; u.ctlCmd = {};
+  $('bTrim').textContent = TRIM_LABEL[mode];
+  $('bTrim').setAttribute('aria-pressed', String(mode > 0));
+  $('trimPanel').classList.toggle('manual', mode >= 1); $('trimPanel').classList.toggle('all', mode === 2);
 }
-$('bTrim').onclick = () => { setTrimMode(!w.user.manualTrim); toast(w.user.manualTrim ? 'You have the sheets. Watch the telltales.' : 'The crew is trimming.', 2000); };
-const sheetBtn = (id: string, sail: 'main' | 'jib', dir: -1 | 1) =>
-  holdBtn(id, () => { w.user.sheetCmd[sail] = dir; }, () => { if (w.user.sheetCmd[sail] === dir) w.user.sheetCmd[sail] = 0; });
-sheetBtn('bMainIn', 'main', -1); sheetBtn('bMainOut', 'main', 1); sheetBtn('bJibIn', 'jib', -1); sheetBtn('bJibOut', 'jib', 1);
+$('bTrim').onclick = () => {
+  const m = ((trimMode() + 1) % 3) as 0 | 1 | 2; setTrimMode(m);
+  toast(m === 0 ? 'The crew is trimming everything.' : m === 1 ? 'You have the sheets; the crew works the other lines. Watch the telltales.'
+    : 'You work every line: sheets, traveller, backstay, the piano and the lazy jib car. Open "Lines" to see them all.', 3500);
+  if (m === 2) openLines(true);
+};
+function openLines(open = $('ctlList').hidden): void {
+  $('ctlList').hidden = !open; $('tpMore').textContent = open ? 'Lines ▾' : 'Lines ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
+}
+$('tpMore').onclick = () => openLines();
+/** Build the rows once: label, a bar, and −/+ buttons (hold to keep pulling or easing). */
+{
+  const list = $('ctlList'); let group = '';
+  CTL_UI.forEach((it, i) => {
+    if (it.group !== group) { group = it.group; const g = document.createElement('div'); g.className = 'ctl-group'; g.textContent = group; list.appendChild(g); }
+    const row = document.createElement('div'); row.className = 'ctl-row'; row.dataset.i = String(i);
+    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar"><span class="ctl-fill"></span></span><span class="ctl-btns"><span class="ctl-val"></span><button type="button" data-only="${it.only}" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-only="${it.only}" data-d="1" aria-label="${it.label}: more">+</button></span>`;
+    row.onclick = () => { ctlSel = i; };
+    row.querySelectorAll<HTMLButtonElement>('button').forEach(bt => {
+      const d = Number(bt.dataset.d);
+      if (it.key === 'carFore' || it.key === 'carIn') { bt.onclick = () => stepCar(it.key as 'carFore' | 'carIn', d); return; }
+      bt.addEventListener('pointerdown', e => { e.preventDefault(); if (!mayWork(it)) return; btnCmd[it.key as CtlKey] = d; bt.classList.add('on'); applyHeld(); });
+      const end = () => { if (btnCmd[it.key as CtlKey] === d) delete btnCmd[it.key as CtlKey]; bt.classList.remove('on'); applyHeld(); };
+      bt.addEventListener('pointerup', end); bt.addEventListener('pointerleave', end); bt.addEventListener('pointercancel', end);
+    });
+    list.appendChild(row);
+  });
+}
+function stepCar(k: 'carFore' | 'carIn', d: number): void {
+  if (trimMode() !== 2 || !w.running || w.paused) return;
+  moveLazyCar(w.user, k === 'carFore' ? d : 0, k === 'carIn' ? d : 0);
+}
+/** Show every line's setting (you can watch the crew work them too). */
+function showLines(): void {
+  if ($('ctlList').hidden) return;
+  const u = w.user, c = u.ctl, lazy = c.car[u.tack], loaded = c.car[u.tack === 'S' ? 'P' : 'S'];
+  document.querySelectorAll<HTMLElement>('#ctlList .ctl-row').forEach(row => {
+    const i = Number(row.dataset.i), it = CTL_UI[i];
+    let f = 0, txt = '';
+    switch (it.key) {
+      case 'mainsheet': f = 1 - c.mainsheet; txt = `boom ${Math.round(u.sheets.main)}°`; break;
+      case 'jibsheet': f = 1 - c.jibsheet; txt = `${Math.round(u.sheets.jib)}°`; break;
+      case 'traveller': f = (1 - c.traveller) / 2; txt = c.traveller < -0.05 ? 'to windward' : c.traveller > 0.05 ? 'to leeward' : 'centred'; break;
+      case 'carFore': f = lazy.fore / (CAR_FORE_PINS - 1); txt = `pin ${lazy.fore + 1} (on ${loaded.fore + 1})`; break;
+      case 'carIn': f = lazy.ins / (CAR_IN_PINS - 1); txt = `pin ${lazy.ins + 1} (on ${loaded.ins + 1})`; break;
+      default: f = c[it.key]; txt = `${Math.round(f * 100)}%`;
+    }
+    (row.querySelector('.ctl-fill') as HTMLElement).style.width = `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`;
+    (row.querySelector('.ctl-val') as HTMLElement).textContent = txt;
+    row.classList.toggle('sel', i === ctlSel && trimMode() > 0);
+  });
+}
+const sheetBtn = (id: string, key: 'mainsheet' | 'jibsheet', dir: -1 | 1) =>
+  holdBtn(id, () => { btnCmd[key] = dir; applyHeld(); }, () => { if (btnCmd[key] === dir) delete btnCmd[key]; applyHeld(); });
+sheetBtn('bMainIn', 'mainsheet', -1); sheetBtn('bMainOut', 'mainsheet', 1); sheetBtn('bJibIn', 'jibsheet', -1); sheetBtn('bJibOut', 'jibsheet', 1);
 function togglePole(): void { if (!w.running || w.paused) return; w.user.poleWant = !w.user.poleWant; }
 $('bPole').addEventListener('click', togglePole);
 function doHail(): void { if (w.running && !w.paused) w.userHail(); }
@@ -247,10 +321,15 @@ function applyHeld(): void {
   const u = w.user;
   u.steer = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0);
   u.luff = held.has('luff') || $('bLuff').classList.contains('on');
-  if (u.manualTrim) {
-    u.sheetCmd.main = u.ctlCmd.mainsheet = (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0);
-    u.sheetCmd.jib = u.ctlCmd.jibsheet = (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0);
-  }
+  // the lines you're working: sheet keys, the selected line's keys, and the panel's buttons
+  const cmd: Partial<Record<CtlKey, number>> = { ...btnCmd };
+  const add = (k: CtlKey, d: number) => { if (d) cmd[k] = Math.max(-1, Math.min(1, (cmd[k] ?? 0) + d)); };
+  add('mainsheet', (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0));
+  add('jibsheet', (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0));
+  const sel = CTL_UI[ctlSel];
+  if (sel.key !== 'carFore' && sel.key !== 'carIn') add(sel.key, (held.has('ctlUp') ? 1 : 0) - (held.has('ctlDown') ? 1 : 0));
+  for (const k of Object.keys(cmd) as CtlKey[]) if (!mayWork(CTL_UI.find(it => it.key === k)!)) delete cmd[k];
+  u.ctlCmd = cmd; u.sheetCmd.main = cmd.mainsheet ?? 0; u.sheetCmd.jib = cmd.jibsheet ?? 0;
 }
 function setView(i: number): void {
   viewMode = i; lookAhead();
@@ -275,9 +354,12 @@ addEventListener('keydown', e => {
   if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
   if (anyOverlay() || !a) return;
   if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
+  if ((a === 'ctlUp' || a === 'ctlDown') && !e.repeat) { const k = CTL_UI[ctlSel].key; if (k === 'carFore' || k === 'carIn') { stepCar(k, a === 'ctlUp' ? 1 : -1); return; } }
   if (HELD.has(a)) { if (!e.repeat) { held.add(a); applyHeld(); } return; }
   if (e.repeat) return;
   switch (a) {
+    case 'ctlPrev': ctlSel = (ctlSel + CTL_UI.length - 1) % CTL_UI.length; openLines(true); break;
+    case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; openLines(true); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': centreTiller(); break;
     case 'pole': togglePole(); break;
@@ -525,7 +607,7 @@ function frame(now: number): void {
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of w.drainEvents()) handle(e);
-  keyLook(dt); lookLabel(); tillerSpring(dt); showTiller();
+  keyLook(dt); lookLabel(); tillerSpring(dt); showTiller(); showLines();
   view.render(w, dt, now, viewMode, look, over);
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
@@ -536,4 +618,4 @@ newGame(); paintSeg(); courseCard(); tideBox();
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over });

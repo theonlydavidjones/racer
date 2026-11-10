@@ -170,9 +170,12 @@ function cabinHalf(u: number): number {
   return CABIN.w;
 }
 
+/** Height of the cabin top (at its sides' top edge) at station u. */
+export const cabinTopY = (u: number) => deckY(u, CABIN.w) + CABIN.h + 0.02 * (u - CABIN.u1) / (CABIN.u0 - CABIN.u1);
+
 /** The cabin trunk: sides from below the deck up to a cambered top with rounded edges. Returns [sides, top]. */
 export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; topY: (u: number) => number } {
-  const N = 40, topY = (u: number) => deckY(u, CABIN.w) + CABIN.h + 0.02 * (u - CABIN.u1) / (CABIN.u0 - CABIN.u1);
+  const N = 40, topY = cabinTopY;
   const outline: { u: number; x: number }[] = [];
   for (let i = 0; i <= N; i++) { const u = CABIN.u0 + (CABIN.u1 - CABIN.u0) * i / N; outline.push({ u, x: cabinHalf(u) }); }
   const sides: number[] = [], sIdx: number[] = [];
@@ -274,3 +277,6 @@ export function hullFrame(u: number, p: number): { pos: THREE.Vector3; normal: T
   const a = hullPoint(u, p), du = hullPoint(u + 0.005, p).sub(hullPoint(u - 0.005, p)), dp = hullPoint(u, p + 0.005).sub(hullPoint(u, Math.max(0, p - 0.005)));
   return { pos: a, normal: new THREE.Vector3().crossVectors(du, dp).normalize().multiplyScalar(-1) };
 }
+
+/** Station u for a z position (m, aft positive). */
+export const uAtZ = (z: number) => (z + L / 2) / L;

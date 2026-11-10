@@ -1,10 +1,11 @@
 import './three-setup';
 import * as THREE from 'three';
 import { D2R } from '../core/math';
-import { FLEET, type Boat } from '../boat/boat';
+import { FLEET, type Boat, type Tack } from '../boat/boat';
+import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
-import { CABIN, COCKPIT, HEEL, L, RUDDER_RAKE, cabinGeometry, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, HEEL, L, RUDDER_RAKE, cabinGeometry, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { Sail, Telltale, luffTellStates, type SailDef, type SailShape, type TellState } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -116,6 +117,54 @@ export interface BoatMesh {
   pole: THREE.Mesh; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
   mainsheet: THREE.Line;
+  lines: Lines;
+}
+/** The working lines drawn on the boat: they move with the controls. */
+interface Lines {
+  travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; jibSheets: Record<Tack, THREE.Line>; winches: Record<Tack, THREE.Vector3>;
+}
+const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
+const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
+const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
+/** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
+const carPos = (side: number, fore: number, ins: number) => { const z = -0.15 + 0.025 * fore, x = side * (0.34 + 0.025 * ins); return new THREE.Vector3(x, cabinTopY(uAtZ(z)) + 0.065, z); };
+const TRAV_Z = 3.66, TRAV_HALF = 0.32, MASTHEAD = new THREE.Vector3(0, 9.4 + 0.18, -0.58);
+function line(points: THREE.Vector3[], mat: THREE.Material = LINE_MAT): THREE.Line {
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat); l.frustumCulled = false; return l;
+}
+
+/** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
+function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
+  // traveller: a track across the aft deck, and its car
+  const ty = sheer(1) + 0.03;
+  const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.06, 0.025, 0.04), STEEL); track.position.set(0, ty, TRAV_Z); grp.add(track);
+  const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
+  // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
+  const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
+  // vang: a tackle from the boom down to the foot of the mast
+  for (const dx of [-0.03, 0.03]) boomPivot.add(line([new THREE.Vector3(dx, 1.0, 0.7), new THREE.Vector3(dx * 0.5, 0.82, 0.07)]));
+  // winches on the cockpit coamings, near the forward end
+  const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
+  for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
+    const u = 0.66, zw = -L / 2 + u * L, wx = side * (cockpitHalf(u) + 0.06), wy = deckY(u, cockpitHalf(u)) + 0.13 + 0.07;
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.13, 16), STEEL); w.position.set(wx, wy, zw); grp.add(w);
+    winches[tk] = new THREE.Vector3(wx, wy + 0.04, zw);
+    // H-shaped car track on the cabin top: two short fore–aft rails and the cross rail
+    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1);
+    for (const x of [a.x, b2.x]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, b2.z - a.z + 0.06), STEEL); r.position.set(x, a.y - 0.05, (a.z + b2.z) / 2); grp.add(r); }
+    const cr = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(b2.x - a.x) + 0.025, 0.02, 0.025), STEEL); cr.position.set((a.x + b2.x) / 2, a.y - 0.05, (a.z + b2.z) / 2); grp.add(cr);
+    const car = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.07), BLACK); grp.add(car); cars[tk] = car;
+    const js = line(Array.from({ length: 5 }, () => new THREE.Vector3())); grp.add(js); jibSheets[tk] = js;
+  }
+  // the piano: three cam cleats a side on the aft end of the cabin, and the lines running forward to the mast
+  const zA = -L / 2 + CABIN.u1 * L, yA = cabinTopY(CABIN.u1) - 0.06;
+  for (const side of [1, -1]) for (let i = 0; i < 3; i++) {
+    const x = side * (0.33 + 0.07 * i);
+    const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.set(x, yA, zA + 0.03); grp.add(cl);
+    grp.add(line([new THREE.Vector3(x, yA + 0.02, zA + 0.03), new THREE.Vector3(x * 0.6, cabinTopY(0.5) + 0.075, -0.2), new THREE.Vector3(side * 0.06, cabinTopY(0.42) + 0.075, -0.52)]));
+    grp.add(line([new THREE.Vector3(x, yA - 0.01, zA + 0.05), new THREE.Vector3(x + side * 0.02, yA - 0.2 - 0.04 * i, zA + 0.07)])); // the tail
+  }
+  return { travCar, backstay, cars, jibSheets, winches };
 }
 /** Mainsheet: from the end of the boom down to the traveller on the transom. */
 const BOOM_END = { y: 1.05 + 0.18, r: 3.2 }; // height (with the rig lift) and distance from the gooseneck
@@ -177,8 +226,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; rig.add(pole);
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
-  const mainsheet = new THREE.Line(new THREE.BufferGeometry().setFromPoints([TRAVELLER, TRAVELLER]), MAT.wire); mainsheet.frustumCulled = false; grp.add(mainsheet);
-  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet };
+  const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
+  const lines = buildLines(grp, boomPivot);
+  return { grp, boomPivot, jibPivot, main, jib, jibTells, leechTells, pole, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -195,16 +245,16 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number): void {
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);
   const plan = sailPlan(b), headToWind = b.twa < 32;
   // main: twists more as the sheet is eased; bubbles at the luff when under-trimmed; flogs when let go
-  const tm = b.trim.main, sheetM = Math.abs(b.boom);
+  const tm = b.trim.main;
   const mainShape: SailShape = {
-    twist: 5 + 12 * Math.min(1, sheetM / 50), time: t + b.id,
+    twist: b.shape.main.twist, depth: b.shape.main.depth, draft: b.shape.main.draft, time: t + b.id,
     bubble: tm.flow === 'luffing' ? Math.min(1, tm.amount * 1.4) : 0,
     flog: b.luff || headToWind ? 0.85 : tm.flow === 'luffing' ? Math.max(0, tm.amount - 0.6) * 2 : 0
   };
   // jib: full when poled out; hangs while the crew handles the pole; collapses behind the main dead downwind
   const tj = b.trim.jib;
   const jibShape: SailShape = {
-    twist: 4 + 10 * Math.min(1, Math.abs(b.jib) / 40), time: t * 1.1 + b.id,
+    twist: b.shape.jib?.twist ?? 4 + 10 * Math.min(1, Math.abs(b.jib) / 40), depth: b.shape.jib?.depth, draft: b.shape.jib?.draft, time: t * 1.1 + b.id,
     bubble: tj && tj.flow === 'luffing' ? Math.min(1, tj.amount * 1.6) : 0,
     flog: plan === 'main' ? 0.7 : b.luff || headToWind ? 0.85 : plan === 'jib' && b.awa > 160 ? 0.35 + 0.35 * Math.abs(Math.sin(t * 1.7 + b.id))
       : tj && tj.flow === 'luffing' ? Math.max(0, tj.amount - 0.6) * 2 : 0
@@ -221,9 +271,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number): void {
     m.leechTells.forEach(tt => tt.update(mainShape, leech, tm.amount, m.main.mesh.scale.x < 0));
   }
   syncPole(m, plan === 'wing');
-  // mainsheet follows the boom
-  { const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
-    p.setXYZ(1, Math.sin(a) * BOOM_END.r, BOOM_END.y, -0.6 + Math.cos(a) * BOOM_END.r); p.needsUpdate = true; }
+  syncLines(m, b);
   for (const r of m.ribbons) syncRibbon(r, b, t);
 }
 
@@ -258,4 +306,32 @@ function syncRibbon(r: Ribbon, b: Boat, t: number): void {
     arr[k + 3] = x + px * RIBBON_W / 2; arr[k + 4] = y; arr[k + 5] = z + pz * RIBBON_W / 2;
   }
   pos.needsUpdate = true;
+}
+
+const tmpC = new THREE.Vector3(), tmpD = new THREE.Vector3();
+/** Move the traveller car, tension the backstay, set the jib cars on their pins and run the jib sheets. */
+function syncLines(m: BoatMesh, b: Boat): void {
+  const L2 = m.lines, c = b.ctl, lee = b.tack === 'S' ? -1 : 1; // the leeward side (x sign)
+  // traveller car: +1 is to leeward; the mainsheet runs from the boom end down to it
+  const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
+  const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
+  p.setXYZ(0, cx, L2.travCar.position.y + 0.02, TRAV_Z);
+  p.setXYZ(1, Math.sin(a) * BOOM_END.r, BOOM_END.y, -0.6 + Math.cos(a) * BOOM_END.r); p.needsUpdate = true;
+  // backstay: the bridle's apex is pulled down as the backstay goes on
+  { const q = L2.backstay.geometry.attributes.position as THREE.BufferAttribute, foot = new THREE.Vector3(0, sheer(1), 3.74);
+    const ay = 2.7 - 1.3 * c.backstay, f = (MASTHEAD.y - ay) / (MASTHEAD.y - foot.y), apex = MASTHEAD.clone().lerp(foot, f);
+    q.setXYZ(0, MASTHEAD.x, MASTHEAD.y, MASTHEAD.z); q.setXYZ(1, apex.x, apex.y, apex.z);
+    q.setXYZ(2, 0.3, foot.y + 0.02, foot.z - 0.1); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, -0.3, foot.y + 0.02, foot.z - 0.1); q.needsUpdate = true; }
+  // jib cars and sheets: the leeward sheet runs taut from the clew through its car to the winch; the lazy one hangs slack
+  const clew = tmpC.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position); clew.y += 0.18; // rig lift
+  for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
+    const pin = c.car[tk], car = carPos(side, pin.fore, pin.ins);
+    L2.cars[tk].position.copy(car);
+    const wv = L2.winches[tk], q = L2.jibSheets[tk].geometry.attributes.position as THREE.BufferAttribute, loaded = side === lee;
+    const sag = loaded ? 0 : 0.25;
+    const mid1 = tmpD.copy(clew).lerp(car, 0.5); mid1.y -= sag;
+    q.setXYZ(0, clew.x, clew.y, clew.z); q.setXYZ(1, mid1.x, mid1.y, mid1.z); q.setXYZ(2, car.x, car.y + 0.03, car.z);
+    const mid2 = car.clone().lerp(wv, 0.5); mid2.y -= loaded ? 0 : 0.1;
+    q.setXYZ(3, mid2.x, mid2.y, mid2.z); q.setXYZ(4, wv.x, wv.y, wv.z); q.needsUpdate = true;
+  }
 }

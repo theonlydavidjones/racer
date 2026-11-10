@@ -227,3 +227,22 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .tiderow label{display:flex;flex-direction:column;gap:4px;font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .tiderow input{font:500 15px/1.2 var(--f-ui, inherit);color:var(--ink, #fff);background:var(--btn);border:1px solid var(--rule);border-radius:8px;padding:6px 8px;color-scheme:dark}
 #tideGraph{display:block;width:100%;height:120px;margin:4px 0 2px;border-radius:8px;background:rgba(255,255,255,.03)}
+
+/* sail controls: every line, grouped as on the boat */
+.tp-shape{font:600 11px/1.35 var(--f-body);color:var(--text);max-width:260px}
+.tp-shape:empty{display:none}
+.tp-shape b{color:var(--muted);font-weight:600}
+.tp-more{align-self:flex-start;font:700 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);background:none;border:0;padding:4px 0;cursor:pointer}
+.ctl-list{display:flex;flex-direction:column;gap:3px;min-width:270px}
+.ctl-group{font:600 9px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+.ctl-row{display:grid;grid-template-columns:96px 1fr auto;align-items:center;gap:6px;padding:1px 3px;border-radius:5px}
+.ctl-row.sel{background:rgba(255,182,39,.14);outline:1px solid rgba(255,182,39,.5)}
+.ctl-lab{font:600 11px/1.1 var(--f-body);color:var(--text);white-space:nowrap}
+.ctl-bar{position:relative;height:6px;border-radius:3px;background:var(--rule)}
+.ctl-fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.ctl-val{font:600 10px/1 var(--f-inst);color:var(--muted);min-width:44px;text-align:right}
+.ctl-btns{display:flex;gap:3px;align-items:center}
+.ctl-btns button{font:700 12px/1 var(--f-inst);width:22px;height:20px;padding:0;color:var(--text);background:var(--btn);border:1px solid var(--rule);border-radius:5px;cursor:pointer}
+.ctl-btns button:active,.ctl-btns button.on{border-color:var(--accent);background:var(--btn-hi)}
+#trimPanel:not(.all) .ctl-btns button[data-only="all"]{visibility:hidden}
+#trimPanel:not(.manual) .ctl-btns button[data-only="sheets"]{visibility:hidden}

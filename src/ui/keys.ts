@@ -1,14 +1,14 @@
 /** Keyboard bindings: every action, its keys, and saving your changes in this browser. */
 export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'luff'
-  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'pole' | 'hail'
+  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'hail'
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
   | 'course' | 'log' | 'pause' | 'keys';
 
 /** Actions that last while the key is held (the rest fire once per press). */
-export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut']);
+export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
 
 export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'takeTiller', label: 'Take or let go of the tiller (then the cursor steers)', group: 'Helm' },
@@ -20,6 +20,10 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'mainOut', label: 'Ease the main', group: 'Sails' },
   { id: 'jibIn', label: 'Trim the jib in', group: 'Sails' },
   { id: 'jibOut', label: 'Ease the jib', group: 'Sails' },
+  { id: 'ctlPrev', label: 'Select the previous line (sail controls)', group: 'Sails' },
+  { id: 'ctlNext', label: 'Select the next line', group: 'Sails' },
+  { id: 'ctlDown', label: 'Selected line: less (ease the vang, outhaul…; trim a sheet in; car forward/in)', group: 'Sails' },
+  { id: 'ctlUp', label: 'Selected line: more (tighten; ease a sheet; car aft/out)', group: 'Sails' },
   { id: 'pole', label: 'Whisker pole out / in', group: 'Sails' },
   { id: 'hail', label: 'Hail ("Room to tack!", "Starboard!", or reply "You tack")', group: 'Racing' },
   { id: 'course', label: 'Course view', group: 'Racing' },
@@ -43,7 +47,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'],
-  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], pole: ['o'],
+  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'],
   hail: ['h'], course: ['m'],
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],

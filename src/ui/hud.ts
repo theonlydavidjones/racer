@@ -7,6 +7,27 @@ import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
+import { targetShape, type Shape } from '../boat/controls';
+
+/** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
+function shapeWords(u: Boat): string {
+  const tws = u.ww.kt, parts: string[] = [];
+  const one = (name: 'main' | 'jib', s: Shape | null) => {
+    if (!s) return;
+    const t = targetShape(name, tws, u.awa), out: string[] = [];
+    const main = name === 'main';
+    if (s.depth > t.depth + 0.012) out.push(`too full (${main ? 'outhaul, backstay' : 'backstay'} on)`);
+    else if (s.depth < t.depth - 0.012) out.push(`too flat (ease ${main ? 'outhaul, backstay' : 'backstay'})`);
+    if (s.draft > t.draft + 0.04) out.push(`draft aft (${main ? 'Cunningham, downhaul' : 'jib Cunningham'} on)`);
+    else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib Cunningham'})`);
+    if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveller up') : 'jib car forward next tack'})`);
+    else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
+    parts.push(`<b>${main ? 'Main' : 'Jib'}:</b> ${out.length ? out.join(', ') : 'shape good'}`);
+  };
+  if (u.luff) return '';
+  one('main', u.shape.main); one('jib', u.shape.jib);
+  return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
+}
 import { toast } from './feedback';
 import { drawCourse, drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
@@ -65,6 +86,9 @@ export class Hud {
     const tm = $('tpMain'), tj = $('tpJib');
     tm.textContent = mw; tm.className = 'tp-state ' + mc;
     tj.textContent = jw; tj.className = 'tp-state ' + jc;
+    // the sails' shape against the best shape for the conditions, and which line fixes it
+    const sw = shapeWords(u);
+    $('tpShape').innerHTML = sw;
     const bad = [u.trim.jib, u.trim.main].find(t => t && t.flow !== 'good' && t.amount > 0.1);
     $('tpHint').textContent = u.luff || u.awa > 115 || !bad ? ''
       : bad.flow === 'luffing' ? (u.manualTrim ? 'Windward telltales lifting: trim in, or bear away.' : 'Windward telltales lifting: bear away a little.')

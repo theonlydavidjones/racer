@@ -20,6 +20,8 @@ export interface SailShape {
   bubble: number; // 0..1 luff bubble (front of the sail backing as it starts to luff)
   flog: number; // 0..1 the whole sail flogging
   time: number; // s, for the flapping
+  /** Camber (depth / chord) and where the deepest point is (fraction of the chord from the luff), from the sail controls. */
+  depth?: number; draft?: number;
 }
 
 const tmp = new THREE.Vector3();
@@ -75,8 +77,10 @@ export class Sail {
   point(t: number, s: number, sh: SailShape, out = new THREE.Vector3()): THREE.Vector3 {
     const [L, F] = this.edges(t);
     out.copy(L).lerp(F, s);
-    // camber: deepest a third of the way back, flatter toward the head
-    let x = this.def.depth * Math.sin(Math.PI * Math.pow(s, 0.8)) * (1 - 0.7 * t);
+    // camber: depth and draft position from the controls (or the sail's default), flatter toward the head
+    const k = sh.draft ? Math.log(0.5) / Math.log(sh.draft) : 0.8; // sin(π s^k) is deepest where s^k = ½, i.e. at s = draft
+    const amp = sh.depth ? sh.depth * this.chord(t) * (1 - 0.3 * t) : this.def.depth * (1 - 0.7 * t);
+    let x = amp * Math.sin(Math.PI * Math.pow(s, k));
     // luff bubble: the front of the sail backs in as it starts to luff
     if (sh.bubble > 0 && s < 0.45) x -= sh.bubble * this.def.depth * 1.7 * Math.sin(Math.PI * s / 0.45) * (1 - 0.5 * t);
     // flogging: the whole sail shakes

@@ -10,7 +10,7 @@ export interface Settings {
   fleet: number; // number of opponents
   seq: number; // start sequence, minutes
   aids: 0 | 1; // line, zones and laylines drawn
-  manualTrim: 0 | 1; // you trim the sheets (otherwise the crew does)
+  manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2; // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
