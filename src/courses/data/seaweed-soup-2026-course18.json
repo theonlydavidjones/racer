@@ -1,0 +1,92 @@
+{
+  "$schema": "../course.schema.json",
+  "id": "ss18",
+  "order": 18,
+  "title": "Seaweed Soup · Course 18",
+  "area": "San Francisco Central Bay",
+  "group": "Seaweed Soup · starting west",
+  "distanceNm": 6.8,
+  "source": "GGYC Manuel Fagundes Seaweed Soup Regatta 2026–27, Addendum B: Courses and Marks, Revision 1 (2026-11-05). Mark positions from the YRA (github.com/nkiesel/YRA-Marks). Main sailing instructions not available.",
+  "notes": "GGYC Seaweed Soup 2026–27, course 18. About 6.8 nm. Start heading west: Blackaller to starboard, pass X to starboard, Fort Mason to starboard, pass X to port, Blackaller to starboard, pass X to starboard, Fort Mason to starboard, then finish. The start line runs from the flagpole on the GGYC deck out to X. X is not a rounding mark: just pass it on the side shown, which keeps you off the line. Crossing the start/finish line in the middle of the race costs a two-turn penalty.",
+  "windBase": 275,
+  "marks": {
+    "6": {
+      "name": "6 · Fort Mason",
+      "lat": 37.811667,
+      "lon": -122.43,
+      "shape": "cylinder"
+    },
+    "16": {
+      "name": "16 · Blackaller",
+      "lat": 37.81,
+      "lon": -122.465,
+      "shape": "column",
+      "look": "Y"
+    },
+    "X": {
+      "name": "X",
+      "lat": 37.811667,
+      "lon": -122.443333,
+      "shape": "cylinder"
+    }
+  },
+  "startLine": {
+    "committee": {
+      "label": "GGYC flagpole",
+      "kind": "shore",
+      "lat": 37.80925,
+      "lon": -122.44325,
+      "verify": "Flagpole on the GGYC deck to X. The addendum doesn't define the line; X is ~300 yd north of GGYC and exists to keep boats off the line mid-race, so it is the outer end."
+    },
+    "pin": {
+      "label": "X",
+      "mark": "X"
+    }
+  },
+  "finish": "startLine",
+  "legs": [
+    {
+      "mark": "16",
+      "type": "round",
+      "side": "starboard"
+    },
+    {
+      "mark": "X",
+      "type": "pass",
+      "side": "starboard"
+    },
+    {
+      "mark": "6",
+      "type": "round",
+      "side": "starboard"
+    },
+    {
+      "mark": "X",
+      "type": "pass",
+      "side": "port"
+    },
+    {
+      "mark": "16",
+      "type": "round",
+      "side": "starboard"
+    },
+    {
+      "mark": "X",
+      "type": "pass",
+      "side": "starboard"
+    },
+    {
+      "mark": "6",
+      "type": "round",
+      "side": "starboard"
+    }
+  ],
+  "obstructions": [
+    {
+      "kind": "startFinishLine",
+      "when": "racing",
+      "penalty": "twoTurns",
+      "note": "Addendum B1.1: the start/finish line is an obstruction for boats not in their starting sequence or on their first or last leg; crossing it is a two-turn penalty (SI 7.x)."
+    }
+  ]
+}

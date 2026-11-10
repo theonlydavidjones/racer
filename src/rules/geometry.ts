@@ -1,0 +1,29 @@
+import { HALF, V, clamp, segPt, type Vec } from '../core/math';
+
+interface Hull extends Vec { h: number }
+interface Moving extends Vec { vx: number; vy: number }
+
+const ends = (b: Hull): [Vec, Vec] => {
+  const u = V(b.h);
+  return [{ x: b.x + u.x * HALF, y: b.y + u.y * HALF }, { x: b.x - u.x * HALF, y: b.y - u.y * HALF }];
+};
+
+/** Gap between two hulls, each modelled as a bow-to-stern segment. */
+export function hullGap(A: Hull, B: Hull): number {
+  const [p1, p2] = ends(A), [q1, q2] = ends(B);
+  return Math.min(segPt(p1, q1, q2), segPt(p2, q1, q2), segPt(q1, p1, p2), segPt(q2, p1, p2));
+}
+
+/** Closest point of approach over the next 12 s: time (s) and distance between centres (m). */
+export function cpa(A: Moving, B: Moving): { t: number; d: number } {
+  const rx = B.x - A.x, ry = B.y - A.y, ux = B.vx - A.vx, uy = B.vy - A.vy, uu = ux * ux + uy * uy;
+  const t = clamp(uu > 1e-4 ? -(rx * ux + ry * uy) / uu : 0, 0, 12);
+  return { t, d: Math.hypot(rx + ux * t, ry + uy * t) };
+}
+
+/** A is clear astern of B: A's bow is behind a line abeam from B's stern. (RRS Definitions: Clear Astern.) */
+export function clearAstern(A: Hull, B: Hull): boolean {
+  const u = V(B.h), sbx = B.x - u.x * HALF, sby = B.y - u.y * HALF;
+  const ua = V(A.h), abx = A.x + ua.x * HALF, aby = A.y + ua.y * HALF;
+  return (abx - sbx) * u.x + (aby - sby) * u.y < 0;
+}

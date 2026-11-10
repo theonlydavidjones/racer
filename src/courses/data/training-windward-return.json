@@ -1,0 +1,25 @@
+{
+  "$schema": "../course.schema.json",
+  "id": "train",
+  "order": 2,
+  "title": "Training · windward–return",
+  "area": "Open water north of the Marina",
+  "notes": "Open water north of the Marina. Beat to the windward mark, leave it to port, run back to finish.",
+  "windBase": 260,
+  "marks": {
+    "W": { "name": "Windward mark", "from": "lineCenter", "bearing": 260, "distance": 620 }
+  },
+  "startLine": {
+    "center": { "lat": 37.8160, "lon": -122.4400 },
+    "bearing": 350,
+    "length": { "base": 70, "perBoat": 14 },
+    "biasAdjustable": true,
+    "committee": { "label": "Committee", "kind": "boat" },
+    "pin": { "label": "Pin", "kind": "buoy" }
+  },
+  "finish": "startLine",
+  "legs": [
+    { "mark": "W", "type": "round", "side": "port" }
+  ],
+  "obstructions": []
+}

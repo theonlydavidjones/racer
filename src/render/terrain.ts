@@ -1,0 +1,136 @@
+import './three-setup';
+import * as THREE from 'three';
+import terrainPng from './data/terrain.png?inline';
+import meta from './data/terrain.json';
+import { LL } from '../geo/geo';
+import { onLand } from '../geo/shore';
+
+/**
+ * The land around the race area from real elevation data (scripts/fetch-terrain.mjs: USGS-derived open terrain
+ * tiles, 50 m grid): the Presidio and the city's hills, the Marin Headlands and Mt Tamalpais, Angel Island and
+ * Alcatraz. Along the San Francisco shore, where the boats sail, the land follows the sim's own coastline (the
+ * one boats run aground on); elsewhere it follows the elevation data. Coloured by what's there (city, the
+ * Presidio's woods, grassland, chaparral, beach and rock), and by season: the grass is gold from late spring
+ * to the first rains, green through winter.
+ */
+
+export interface Terrain {
+  /** Height of the land (m) at a point in course coordinates; ≤ 0 over water. */
+  heightAt(x: number, y: number): number;
+  mesh: THREE.Mesh;
+  /** Warm points where the city is, lit at dusk. */
+  lights: THREE.Points;
+  /** Recolour for the season (month 1–12). */
+  setSeason(month: number): void;
+}
+
+const M = meta as { south: number; north: number; west: number; east: number; nx: number; ny: number; scale: number };
+
+async function loadHeights(): Promise<Float32Array> {
+  const img = new Image(); img.src = terrainPng; await img.decode();
+  const cv = document.createElement('canvas'); cv.width = M.nx; cv.height = M.ny;
+  const ctx = cv.getContext('2d', { willReadFrequently: true })!; ctx.drawImage(img, 0, 0);
+  const d = ctx.getImageData(0, 0, M.nx, M.ny).data, h = new Float32Array(M.nx * M.ny);
+  for (let i = 0; i < h.length; i++) { const g = d[i * 4]; h[i] = g === 0 ? -1 : (g - 1) * M.scale; }
+  return h;
+}
+
+/** Simple deterministic noise for colour variation. */
+const hash = (i: number, j: number) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
+
+export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock';
+export function region(lat: number, lon: number, h: number): Region {
+  if (lat > 37.8235 && lat < 37.8295 && lon > -122.4265 && lon < -122.418) return 'rock'; // Alcatraz
+  if (lat > 37.787 && lat < 37.811 && lon > -122.486 && lon < -122.447) return 'woods'; // the Presidio
+  if (lat > 37.8013 && lat < 37.8034 && lon > -122.4074 && lon < -122.4043) return 'woods'; // Pioneer Park, round Coit Tower
+  if (lat > 37.764 && lat < 37.7745 && lon > -122.511 && lon < -122.454) return 'woods'; // Golden Gate Park
+  if (lat > 37.853 && lat < 37.875 && lon > -122.447 && lon < -122.415) return lat > 37.866 && h > 120 ? 'grass' : 'woods'; // Angel Island
+  if (lat < 37.812 && lon > -122.515) return lon > -122.4545 && lat < 37.7755 && h > 150 ? 'grass' : 'city'; // San Francisco (Twin Peaks grassy on top)
+  if (lat > 37.845 && h < 90 && lon > -122.51) return 'suburb'; // Sausalito, Tiburon, Belvedere, Mill Valley
+  return 'grass';
+}
+
+export async function buildTerrain(scene: THREE.Scene, month: number): Promise<Terrain> {
+  const H = await loadHeights(), { nx, ny } = M;
+  const corner = LL(M.north, M.west), far = LL(M.south, M.east);
+  const dx = (far.x - corner.x) / (nx - 1), dy = (far.y - corner.y) / (ny - 1); // dy < 0: rows run south
+  // fit the San Francisco shore to the sim's coastline
+  // (only near that shore: the sim's land polygon is cut off straight to the south, west and east, inland)
+  const cityShore = (lat: number, lon: number) => lat < 37.8135 && lat > 37.7925 && lon > -122.4775 && lon < -122.4015;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1);
+    if (!cityShore(lat, lon)) continue;
+    const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+    H[k] = onLand(p) ? Math.max(H[k], 2.5) : -30;
+  }
+  const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i, h = H[k];
+    pos[k * 3] = corner.x + i * dx; pos[k * 3 + 1] = h > 0 ? h : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy);
+  }
+  const idx: number[] = [];
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+    if (H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) continue; // open water: no triangles
+    idx.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  scene.add(mesh);
+  const nrm = geo.attributes.normal as THREE.BufferAttribute;
+
+  const C = (h: string) => new THREE.Color(h);
+  const PAL = {
+    city: [C('#a9a796'), C('#bdb9a8'), C('#8f8f82'), C('#c6c0ae')], woods: [C('#45603f'), C('#3b5236'), C('#56704a')],
+    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')]
+  };
+  const setSeason = (mo: number) => {
+    // how golden the grass is: gold from late spring to the first rains (May–Nov), green Dec–Apr
+    const gold = [0.15, 0.1, 0.1, 0.3, 0.6, 0.85, 1, 1, 1, 0.95, 0.7, 0.35][(mo - 1 + 12) % 12];
+    const grass = PAL.green.clone().lerp(PAL.gold, gold), tmp = new THREE.Color();
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, h = H[k]; if (h <= 0) continue;
+      const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1);
+      const n = hash(i, j), slope = 1 - nrm.getY(k), northFacing = nrm.getZ(k) < -0.15; // −z is north
+      const r = region(lat, lon, h);
+      if (r === 'city') tmp.copy(PAL.city[Math.floor(n * 4) % 4]);
+      else if (r === 'woods') tmp.copy(PAL.woods[Math.floor(n * 3) % 3]);
+      else if (r === 'rock') tmp.copy(PAL.stone).lerp(PAL.scrub, n < 0.5 ? 0.7 : 0.1); // Alcatraz: grey rock and concrete, patches of scrub and garden
+      else if (r === 'suburb') tmp.copy(PAL.suburb[0]).lerp(PAL.suburb[1], n);
+      else {
+        // grassland, with scrub on north-facing slopes and in the gullies, chaparral up high on Tamalpais
+        tmp.copy(grass);
+        if (northFacing || slope > 0.35) tmp.lerp(PAL.scrub, 0.55 + 0.3 * n);
+        if (h > 380) tmp.lerp(PAL.chaparral, 0.6);
+        tmp.offsetHSL(0, 0, (n - 0.5) * 0.06);
+      }
+      if (h < 5 && r !== 'city') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      else if (slope > 0.55) tmp.lerp(PAL.rock, 0.6); // cliffs
+      col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
+    }
+    (geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+  };
+  setSeason(month);
+
+  // city lights: a scatter of warm points over the city and the towns, for dusk
+  const lp: number[] = [];
+  for (let j = 0; j < ny; j += 1) for (let i = 0; i < nx; i += 1) {
+    const k = j * nx + i, h = H[k]; if (h <= 0) continue;
+    const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1), r = region(lat, lon, h);
+    if ((r === 'city' && hash(j, i) < 0.55) || (r === 'suburb' && hash(j, i) < 0.25)) lp.push(pos[k * 3] + (hash(i, j) - 0.5) * 40, h + 6, pos[k * 3 + 2] + (hash(j + 3, i) - 0.5) * 40);
+  }
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+  const lights = new THREE.Points(lg, new THREE.PointsMaterial({ color: 0xffd28a, size: 1.6, sizeAttenuation: false, fog: true, transparent: true, opacity: 0.85 }));
+  lights.visible = false; scene.add(lights);
+
+  const heightAt = (x: number, y: number) => {
+    const fi = (x - corner.x) / dx, fj = (y - corner.y) / dy, i = Math.floor(fi), j = Math.floor(fj);
+    if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return -1;
+    const u = fi - i, v = fj - j, at = (a: number, b: number) => Math.max(0, H[b * nx + a]);
+    return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+  };
+  return { heightAt, mesh, lights, setSeason };
+}

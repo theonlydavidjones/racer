@@ -1,0 +1,30 @@
+{
+  "name": "folkboat-racing-sim",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "data:polar": "node scripts/fetch-orc-polar.mjs",
+    "data:currents": "node scripts/fetch-currents.mjs",
+    "data:wind": "node scripts/fetch-wind-climate.mjs",
+    "data:terrain": "node scripts/fetch-terrain.mjs && node scripts/make-land-mask.mjs",
+    "data:swell": "node scripts/fetch-swell.mjs",
+    "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs",
+    "test:fast": "vitest run --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts'"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
+  }
+}
