@@ -86,3 +86,10 @@ const newId = () => 'b' + Date.now().toString(36) + Math.floor(Math.random() * 1
 export function newBoat(name: string, from: BoatSpec = DEFAULT_BOAT): BoatSpec {
   return fixSpec({ ...structuredClone(from), id: newId(), name: name.toUpperCase().slice(0, 18) });
 }
+
+/** A sail number none of your boats has (so a fleet doesn't race two of the same). */
+export function freeNumber(boats: BoatSpec[], from = 100): string {
+  const used = new Set(boats.map(b => b.sails.number)); let n = from;
+  while (used.has(String(n))) n++;
+  return String(n);
+}

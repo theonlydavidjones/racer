@@ -14,7 +14,8 @@ import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, type Incident } from './rules';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from './settings';
+import { DEFAULT_SETTINGS, MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './settings';
+import { FLEET } from './boat/boat';
 import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
@@ -65,7 +66,9 @@ let pendingPenalty: Boat | null = null;
 
 function newGame(seed = randomSeed()): void {
   const showFlags = !!boatPanel?.open; // setting up your boat: her flags fly so you can see them
-  w = new World(courseFile(S.course), S, seed, S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags } : S.mode === 'sail' ? { freeSail: true } : { showFlags });
+  // setting up one of your boats: she's the one in the showroom (it might be a rival you're preparing)
+  const WS = showFlags && boatPanel.editing.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== boatPanel.editing.id); return { ...S, boat: boatPanel.editing, opponents: o, fleet: o.length }; })() : S;
+  w = new World(courseFile(S.course), WS, seed, S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags } : S.mode === 'sail' ? { freeSail: true } : { showFlags });
   acc = 0; drillShown = false;
   $('trimPanel').classList.toggle('manual', trimMode() >= 1); $('trimPanel').classList.toggle('all', trimMode() === 2);
   $('bTrim').textContent = TRIM_LABEL[trimMode()];
@@ -727,16 +730,39 @@ function boatSummary(): void {
 }
 ($('boatPick') as HTMLSelectElement).onchange = e => {
   const b = S.boats.find(x => x.id === (e.target as HTMLSelectElement).value); if (!b) return;
-  S.boat = b; S.boatId = b.id; saveSettings(S); newGame(); boatSummary();
+  S.boat = b; S.boatId = b.id; fleetChanged(); boatSummary();
 };
-boatPanel = new BoatPanel(S, () => { saveSettings(S); newGame(); boatSummary(); }, () => {
+
+/* The fleet: who you race against. Stock club boats and your own saved boats (not the one you're sailing). */
+function fleetChanged(): void {
+  const ids = new Set(S.boats.map(b => b.id));
+  S.opponents = S.opponents.filter(o => o.startsWith('stock:') || (ids.has(o) && o !== S.boatId));
+  S.fleet = S.opponents.length; saveSettings(S); newGame(); oppRows();
+}
+function oppRows(): void {
+  const chip = (id: string, name: string, no: string, colour: string, hull: string) => {
+    const on = S.opponents.includes(id), full = !on && S.opponents.length >= MAX_OPPONENTS;
+    return `<button type="button" class="opp" data-opp="${id}" aria-pressed="${on}"${full ? ' disabled' : ''}><i style="background:${hull};box-shadow:0 0 0 2px ${colour}"></i><span>${name}</span><small>${no}</small></button>`;
+  };
+  const mine = S.boats.filter(b => b.id !== S.boatId);
+  $('oppList').innerHTML = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
+    + `<div class="opp-h">Your boats</div>` + (mine.length ? mine.map(b => chip(b.id, (b.name || 'Unnamed').replace(/</g, '&lt;'), sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more boats under Your boats…</small>');
+  $('oppCount').textContent = S.opponents.length ? `· ${S.opponents.length} boat${S.opponents.length > 1 ? 's' : ''}` : '· nobody (a solo race)';
+}
+$('oppList').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-opp]'); if (!b || b.disabled) return;
+  const id = b.dataset.opp!;
+  S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);
+  fleetChanged();
+});
+boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(S); newGame(); boatSummary(); oppRows(); }, () => {
   boatPanel.hide(); document.body.classList.remove('showroom'); look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = 24;
   newGame(); $('setup').hidden = false;
 });
 $('bBoat').onclick = () => { $('setup').hidden = true; document.body.classList.add('showroom'); look.yaw = 0.6; look.pitch = 0; boatPanel.show(); newGame(); };
 
 buildSetupChoices();
-newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary();
+newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRows();
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.

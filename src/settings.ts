@@ -8,7 +8,9 @@ export interface Settings {
   tideDate: string; // race day, YYYY-MM-DD, San Francisco local ('' = the coming Saturday)
   tideTime: string; // time of the start signal, HH:MM, San Francisco local
   bias: number; // deg, only for courses with an adjustable line
-  fleet: number; // number of opponents
+  fleet: number; // number of opponents (follows `opponents`)
+  /** Who you race against: stock club boats ('stock:1' .. 'stock:5') and your own saved boats (their ids), sailed by the AI. */
+  opponents: string[];
   seq: number; // start sequence, minutes
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
@@ -29,9 +31,11 @@ export interface Settings {
   crew: { n: 0 | 1 | 2; helm: { h: number; w: number }; people: { h: number; w: number }[] }; // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
 
 const KEY = 'fbsim-settings-v2';
+/** The most boats you can race against. */
+export const MAX_OPPONENTS = 7;
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };
@@ -43,6 +47,11 @@ export function loadSettings(): Settings {
   boats = structuredClone(boats).map(b => fixSpec(b));
   const seen = new Set<string>(); for (const b of boats) { if (seen.has(b.id)) b.id += '-' + seen.size; seen.add(b.id); }
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
+  // your opponents: older saves had only a number of stock boats
+  const ids = new Set(boats.map(b => b.id));
+  const opp = Array.isArray(s.opponents) && s.opponents !== DEFAULT_SETTINGS.opponents ? s.opponents : Array.from({ length: Math.max(0, Math.min(5, s.fleet ?? 3)) }, (_, i) => `stock:${i + 1}`);
+  s.opponents = opp.filter((o, i, a) => a.indexOf(o) === i && (/^stock:[1-5]$/.test(o) || (ids.has(o) && o !== s.boatId))).slice(0, MAX_OPPONENTS);
+  s.fleet = s.opponents.length;
   return s;
 }
 export function saveSettings(s: Settings): void {

@@ -21,6 +21,10 @@ import { lineTransit } from './transits';
 import { destMark, place as getPlace } from './places';
 import { sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
+
+/** Map and label colours for your own boats when they race against you (the stock boats have their own). */
+const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
+const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
@@ -190,7 +194,7 @@ export class World {
     this.updateBreeze();
     this.wind = windAt(this.windModel, this.t);
     this.avgFrom = this.windModel.base;
-    for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i));
+    for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
   }
 
@@ -206,7 +210,11 @@ export class World {
   drainEvents(): SimEvent[] { const e = this.events; this.events = []; return e; }
 
   private makeBoat(i: number): Boat {
-    const isUser = i === 0, F = FLEET[i], r = this.rng;
+    const isUser = i === 0, r = this.rng;
+    // an opponent: a stock club boat, or one of your own saved boats (her looks and her condition), sailed by the AI
+    const pick = isUser ? null : this.settings.opponents?.[i - 1] ?? `stock:${i}`;
+    const oppSpec = pick && !pick.startsWith('stock:') ? this.settings.boats?.find(b => b.id === pick) : undefined;
+    const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
     let p: Vec, h: number;
@@ -233,12 +241,12 @@ export class World {
       do { p = place(70 + r() * 60, (r() - 0.5) * this.lineLen * 0.8); tries++; } while ((onLand(p) || crowded(p)) && tries < 40);
       h = n360(lineH + (r() < 0.5 ? 0 : 180));
     }
-    const spec = isUser ? this.settings.boat : undefined; // your boat as you've set her up
+    const spec = isUser ? this.settings.boat : oppSpec; // your boat as you've set her up (or a rival you've set up)
     return {
-      id: i, isUser, name: F.name, no: spec ? sailNo(spec) : F.no, color: F.tag,
+      id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? OPP_TAGS[(i - 1) % OPP_TAGS.length] : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name } } : {}),
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name } } : { paint: F.paint }),
       x: p.x, y: p.y, h, v: isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,

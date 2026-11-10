@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadSettings, saveSettings } from '../src/settings';
 import { newBoat } from '../src/boat/spec';
+import { World } from '../src/sim/world';
+import { COURSES } from '../src/courses/registry';
+import { FLEET } from '../src/boat/boat';
 
 const store = new Map<string, string>();
 (globalThis as unknown as { localStorage: Storage }).localStorage = {
@@ -42,5 +45,24 @@ describe('your boats: saved, named, chosen', () => {
     copy.perf.cleanedWeeks = 5; expect(s.boat.perf.cleanedWeeks).toBe(0);
     s.boats.push(copy); s.boats = s.boats.filter(x => x.id !== s.boat.id); s.boat = s.boats[0]; s.boatId = s.boat.id; saveSettings(s);
     expect(loadSettings().boats.map(b => b.name)).toEqual(['JOSEPHINE 2']);
+  });
+
+  it('your fleet: race against your own saved boats (as you set them up) and the club boats you pick', () => {
+    const s = loadSettings(), rival = newBoat('Skol'); rival.hull.upper = '#1f2c4f'; rival.perf.cleanedWeeks = 6; rival.perf.mainAge = 'old';
+    s.boats.push(rival); s.opponents = [rival.id, 'stock:2']; s.fleet = 2; saveSettings(s);
+    const t = loadSettings();
+    expect(t.opponents).toEqual([rival.id, 'stock:2']);
+    const w = new World(COURSES[0], { ...t, windKt: 12, current: 'slack', tideDate: '2026-11-14' }, 1);
+    expect(w.boats.length).toBe(3);
+    const r = w.boats[1], blue = w.boats[2];
+    expect(r.name).toBe('Skol'); expect(r.hullColor).toBe('#1f2c4f'); expect(r.ai).not.toBeNull();
+    expect(r.cond?.fouling.slime).toBeGreaterThan(0); // she races with her dirty bottom
+    expect(blue.name).toBe(FLEET[2].name); expect(blue.hullColor).toBe(FLEET[2].hull); expect(blue.spec).toBeUndefined();
+  });
+
+  it('the boat you sail can\'t also be an opponent; deleted boats drop out of the fleet', () => {
+    const s = loadSettings(), b = newBoat('Skol');
+    s.boats.push(b); s.opponents = [b.id, s.boat.id, 'stock:1', 'nonsense']; saveSettings(s);
+    expect(loadSettings().opponents).toEqual([b.id, 'stock:1']);
   });
 });

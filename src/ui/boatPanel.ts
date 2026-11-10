@@ -1,5 +1,5 @@
-import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, newBoat, sailNo, type BoatSpec, type SailAge } from '../boat/spec';
+import { MAX_OPPONENTS, type Settings } from '../settings';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, freeNumber, newBoat, sailNo, type BoatSpec, type SailAge } from '../boat/spec';
 import { BURGEES } from '../render/burgees';
 import { ENSIGNS, SPECIAL_FLAGS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
@@ -20,20 +20,30 @@ export class BoatPanel {
   }
 
   get open(): boolean { return !this.el.hidden; }
-  show(): void { this.render(); this.el.hidden = false; }
+  show(): void { this.editId = this.S.boatId; this.render(); this.el.hidden = false; }
   hide(): void { this.el.hidden = true; }
 
-  private get b(): BoatSpec { return this.S.boat; }
+  /** The boat being set up (shown in the showroom): the one you sail, or one of your others (a rival, perhaps). */
+  get editing(): BoatSpec { return this.S.boats.find(x => x.id === this.editId) ?? this.S.boat; }
+  private editId = '';
+  private get b(): BoatSpec { return this.editing; }
   private set(f: (b: BoatSpec) => void, rerender = true): void {
-    f(this.S.boat); this.use(fixSpec(this.S.boat), rerender);
+    const b = structuredClone(this.b); f(b); this.use(fixSpec(b), rerender);
   }
-  /** Make `b` the boat you're sailing (replacing her entry in your list, or adding her), save, and redraw. */
+  /** Store `b` in your list (replacing her entry, or adding her), make her the one being set up, save, and redraw. */
   private use(b: BoatSpec, rerender = true): void {
     const i = this.S.boats.findIndex(x => x.id === b.id);
     if (i >= 0) this.S.boats[i] = b; else this.S.boats.push(b);
-    this.S.boat = b; this.S.boatId = b.id; this.confirmDelete = false;
+    if (b.id === this.S.boatId) this.S.boat = b;
+    this.editId = b.id; this.confirmDelete = false;
     this.changed(); if (rerender) this.render(); else this.report();
+    this.flashSaved();
   }
+  private flashSaved(): void {
+    const el = this.el.querySelector('#bpSaved'); if (!el) return;
+    el.classList.add('on'); clearTimeout(this.savedT); this.savedT = window.setTimeout(() => el.classList.remove('on'), 1400);
+  }
+  private savedT = 0;
   private confirmDelete = false;
   private uniqueName(base: string): string {
     const names = new Set(this.S.boats.map(b => b.name)); let n = base, k = 2;
@@ -46,14 +56,26 @@ export class BoatPanel {
     const v = t.dataset.v ?? '';
     switch (t.dataset.act) {
       case 'done': this.done(); return;
-      case 'newBoat': this.use(newBoat(this.uniqueName('NEW BOAT'))); return;
-      case 'copyBoat': this.use(newBoat(this.uniqueName(this.b.name || 'BOAT'), this.b)); return;
+      case 'newBoat': case 'copyBoat': {
+        const nb = t.dataset.act === 'newBoat' ? newBoat(this.uniqueName('NEW BOAT')) : newBoat(this.uniqueName(this.b.name || 'BOAT'), this.b);
+        nb.sails.number = freeNumber(this.S.boats, +this.b.sails.number || 100); this.use(nb); return;
+      }
       case 'delBoat': this.confirmDelete = true; this.render(); return;
       case 'delNo': this.confirmDelete = false; this.render(); return;
       case 'delYes': {
         if (this.S.boats.length <= 1) return;
-        this.S.boats = this.S.boats.filter(x => x.id !== this.b.id);
-        this.use(this.S.boats[0]); return;
+        const gone = this.b.id;
+        this.S.boats = this.S.boats.filter(x => x.id !== gone);
+        this.S.opponents = this.S.opponents.filter(o => o !== gone);
+        if (this.S.boatId === gone) { this.S.boat = this.S.boats[0]; this.S.boatId = this.S.boat.id; }
+        this.use(this.S.boats.find(x => x.id === this.S.boatId) ?? this.S.boats[0]); return;
+      }
+      case 'sailHer': this.S.boat = this.b; this.S.boatId = this.b.id; this.S.opponents = this.S.opponents.filter(o => o !== this.b.id); this.use(this.b); return;
+      case 'raceHer': {
+        const id = this.b.id, on = this.S.opponents.includes(id);
+        if (!on && this.S.opponents.length >= MAX_OPPONENTS) return;
+        this.S.opponents = on ? this.S.opponents.filter(o => o !== id) : [...this.S.opponents, id];
+        this.use(this.b); return;
       }
       case 'material': this.set(b => { b.hull.material = v as BoatSpec['hull']['material']; if (v === 'wood' && b.deck === '#8e9f7c') b.deck = 'teak-silver'; }); return;
       case 'upper': this.set(b => { b.hull.upper = v; }); return;
@@ -74,7 +96,7 @@ export class BoatPanel {
     const final = e.type === 'change';
     switch (k) {
       case 'name': if (final) this.set(b => { b.name = t.value.trim().toUpperCase() || this.uniqueName('UNNAMED'); }); return;
-      case 'pick': { const b = this.S.boats.find(x => x.id === t.value); if (b) this.use(b); return; }
+      case 'pick': { const b = this.S.boats.find(x => x.id === t.value); if (b) { this.editId = b.id; this.confirmDelete = false; this.changed(); this.render(); } return; }
       case 'number': if (final) this.set(b => { b.sails.number = t.value; }); return;
       case 'country': this.set(b => { b.sails.country = t.value; }); return;
       case 'burgee': this.set(b => { b.flags.burgee = t.value; }); return;
@@ -129,13 +151,16 @@ export class BoatPanel {
     const opt = (cur: string, list: { id: string; name: string }[], none: string) => `<option value="">${none}</option>` + list.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${x.name}</option>`).join('');
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
     this.el.innerHTML = `
-      <div class="bphead"><h2>Your boats</h2><button type="button" class="cta" data-act="done">Sail her</button></div>
+      <div class="bphead"><h2>Your boats</h2><button type="button" class="cta" data-act="done">Done</button></div>
       <div class="garage">
-        <select data-k="pick" class="pick" aria-label="Your boats">${this.S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${esc(x.name || 'Unnamed')} · ${esc(sailNo(x))}</option>`).join('')}</select>
+        <select data-k="pick" class="pick" aria-label="Your boats">${this.S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${esc(x.name || 'Unnamed')} · ${esc(sailNo(x))}${x.id === this.S.boatId ? ' (you sail her)' : this.S.opponents.includes(x.id) ? ' (racing you)' : ''}</option>`).join('')}</select>
         ${this.confirmDelete
           ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')}? <button type="button" class="ghost danger" data-act="delYes">Delete</button><button type="button" class="ghost" data-act="delNo">Keep her</button></div>`
           : `<div class="gbtns"><button type="button" class="ghost" data-act="newBoat">New boat</button><button type="button" class="ghost" data-act="copyBoat" title="Save a copy of this boat under a new name">Save a copy</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-act="delBoat">Delete</button>' : ''}</div>`}
-        <small>Changes save as you make them. The boat shown here is the one you'll sail.</small>
+        <div class="grole">${b.id === this.S.boatId
+          ? `<span>You sail this boat.</span>`
+          : `<button type="button" class="ghost" data-act="sailHer">Sail this boat</button><button type="button" class="ghost${this.S.opponents.includes(b.id) ? ' on' : ''}" data-act="raceHer" aria-pressed="${this.S.opponents.includes(b.id)}">${this.S.opponents.includes(b.id) ? '✓ Racing against you' : 'Race against her'}</button>`}</div>
+        <small>Every change is saved as you make it.<span class="gsaved" id="bpSaved">Saved ✓</span></small>
       </div>
       <div class="bpbody">
       <section><h3>Hull</h3>
