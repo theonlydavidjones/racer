@@ -517,7 +517,7 @@ function buildSetupChoices(): void {
   from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
   from.onchange = () => { S.sailFrom = from.value; newGame(); };
   const bs = $('burgeeSel') as HTMLSelectElement;
-  bs.innerHTML = '<option value="">None</option>' + BURGEES.map(b => `<option value="${b.id}">${b.club}</option>`).join('');
+  bs.innerHTML = '<option value="">None</option>' + [...BURGEES].sort((a, b) => a.club.localeCompare(b.club)).map(b => `<option value="${b.id}">${b.club}</option>`).join('');
   bs.value = S.burgee ?? '';
   bs.onchange = () => { S.burgee = bs.value; newGame(); };
   to.onchange = () => { S.sailTo = to.value; newGame(); };

@@ -125,7 +125,7 @@ export interface BoatMesh {
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
   /** The club burgee (streams in the apparent wind and flutters), if she flies one. */
-  burgee: { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array } | null;
+  burgee: { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array; fly: number } | null;
   /** The crew, and whether to hide the helm (you're looking through their eyes in the cockpit view). */
   crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
@@ -261,11 +261,11 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   let burgee: BoatMesh['burgee'] = null;
   const bc = b.burgee ? burgeeCanvas(b.burgee) : null;
   if (bc) {
-    const geo = new THREE.PlaneGeometry(0.45, 0.3, 8, 2); geo.translate(0.225, -0.15, 0); // hoisted at its top corner
+    const fly = 0.3 * bc.width / bc.height, geo = new THREE.PlaneGeometry(fly, 0.3, 8, 2); geo.translate(fly / 2, -0.15, 0); // a 12-inch hoist, hoisted at its top corner
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(bc), side: THREE.DoubleSide, alphaTest: 0.5, transparent: false }));
     mesh.position.set(SPREADER.x - 0.06, SPREADER.y - 0.06, SPREADER.z); rig.add(mesh);
     rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(SPREADER.x - 0.06, SPREADER.y - 0.36, SPREADER.z), new THREE.Vector3(SPREADER.x - 0.06, DECK_Y + 0.3, SPREADER.z)]), MAT.wire)); // the halyard's tail down to the deck
-    burgee = { mesh, base: (geo.attributes.position.array as Float32Array).slice() };
+    burgee = { mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly };
   }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, 9.45, -0.6); rig.add(windex);
@@ -316,7 +316,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     // the fly streams downwind of the halyard, fluttering harder in more wind
     const bg = m.burgee, p = bg.mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array, k = Math.min(1, b.aws / 8);
     bg.mesh.rotation.y = m.windex.rotation.y - Math.PI / 2;
-    for (let i = 0; i < a.length; i += 3) { const x = bg.base[i]; a[i + 2] = Math.sin(x * 14 - t * (8 + 6 * k)) * 0.035 * x / 0.45 * (0.4 + k); a[i + 1] = bg.base[i + 1] - (1 - k) * x * 0.5; }
+    for (let i = 0; i < a.length; i += 3) { const x = bg.base[i]; a[i + 2] = Math.sin(x * 14 - t * (8 + 6 * k)) * 0.035 * x / bg.fly * (0.4 + k); a[i + 1] = bg.base[i + 1] - (1 - k) * x * 0.5; }
     p.needsUpdate = true;
   }
   m.card.rotation = b.h * D2R;
