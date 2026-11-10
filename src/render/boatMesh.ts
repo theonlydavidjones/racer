@@ -104,13 +104,13 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   turn.add(new THREE.Mesh(rg.blade, hullMat));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
   grp.add(rud);
-  // an outboard on its transom bracket, tilted up (starboard quarter, clear of the rudder and tiller)
+  // an outboard on its transom bracket, tilted up (port quarter, clear of the rudder, the tiller and the ensign staff)
   if (b.spec?.perf.outboard === 'bracket') {
     const ob = new THREE.Group(), grey = new THREE.MeshPhongMaterial({ color: 0x9aa0a6, specular: 0x666666, shininess: 50 }), blk = MAT.dark;
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.34), blk); head.position.set(0, 0.13, 0.12); ob.add(head);
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.62), grey); leg.position.set(0, 0.0, -0.2); ob.add(leg); // tilted up: the leg lies forward along the bracket
     const brk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.04), grey); brk.position.set(0, -0.05, -0.12); ob.add(brk);
-    ob.position.set(0.42, sheer(1) - 0.12, L / 2 + 0.12); ob.rotation.x = 0.35; grp.add(ob);
+    ob.position.set(-0.42, sheer(1) - 0.12, L / 2 + 0.12); ob.rotation.x = 0.35; grp.add(ob);
   }
   // her name on both quarters
   if (paint.boatName) for (const s of [1, -1]) {
@@ -270,8 +270,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, 7.6, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
-  // her flags (yachting etiquette: render/flagArt.ts). Under way: the ensign on the backstay, a little over halfway up
-  // (no higher than two-thirds); the club burgee, or an officer's flag in its place, on the flag halyard under the
+  // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
   // starboard spreader (the masthead has the windex). Flying a foreign ensign on the Bay, she flies the US flag as a
   // courtesy flag at the starboard spreader and moves her burgee to port.
   const flags: FlyingFlag[] = [];
@@ -288,9 +287,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), spreader(1), 0.25, rig); hoist(club, spreader(-1), b.special ? 0.3 : 0.3, rig); }
   else hoist(club, spreader(1), 0.3, rig);
   if (b.ensign) {
-    // on the backstay (in the hull's frame, like the backstay itself): about 0.58 of the way up from its foot
-    const foot = new THREE.Vector3(0, sheer(1), 3.74), at = foot.clone().lerp(MASTHEAD, 0.58), ens = flagArtCanvas(b.ensign);
-    hoist(ens, at, ens && ens.width / ens.height > 1.7 ? 0.36 : 0.42, grp, false);
+    // on an ensign staff in a socket on the starboard quarter, close to the centreline (the backstay and tiller have the
+    // middle of the transom), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly)
+    const ens = flagArtCanvas(b.ensign), staffH = 1.0, rake = 0.22, base = new THREE.Vector3(0.3, sheer(1) + 0.02, L / 2 - 0.08);
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, staffH, 6), MAT.wood);
+    const top = base.clone().add(new THREE.Vector3(0, Math.cos(rake) * staffH, Math.sin(rake) * staffH));
+    staff.position.copy(base.clone().lerp(top, 0.5)); staff.rotation.x = rake; grp.add(staff);
+    const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); grp.add(truck);
+    if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, grp, false);
   }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, 9.45, -0.6); rig.add(windex);

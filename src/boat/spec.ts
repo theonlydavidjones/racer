@@ -9,6 +9,7 @@ export type SparMaterial = 'aluminium' | 'wood';
 export type SailAge = 'new' | 'mid' | 'old';
 
 export interface BoatSpec {
+  id: string; // stable, for your list of boats
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (wooden boats)
@@ -25,7 +26,7 @@ export interface BoatSpec {
 }
 
 export const DEFAULT_BOAT: BoatSpec = {
-  name: 'JOSEPHINE',
+  id: 'josephine', name: 'JOSEPHINE',
   hull: { material: 'fiberglass', upper: '#f4f1e8', lower: '#2a2d33', stripe: '#24324f' },
   deck: '#8e9f7c',
   sails: { country: 'USA', number: '110', color: 'white' },
@@ -37,7 +38,7 @@ export const DEFAULT_BOAT: BoatSpec = {
 export const HULL_COLORS: [string, string][] = [
   ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'],
   ['Light grey', '#c9ccd0'], ['Pewter', '#8d9399'], ['Charcoal', '#3b3e44'], ['Black', '#1c1d20'],
-  ['Navy', '#1f2c4f'], ['Flag blue', '#24407a'], ['Royal blue', '#2c56a8'], ['Sky blue', '#7fb0d8'], ['Teal', '#1f7a7a'], ['Seafoam', '#a8d5c2'],
+  ['Navy', '#1f2c4f'], ['Midnight', '#24324f'], ['Flag blue', '#24407a'], ['Royal blue', '#2c56a8'], ['Sky blue', '#7fb0d8'], ['Teal', '#1f7a7a'], ['Seafoam', '#a8d5c2'],
   ['Hunter green', '#2a4a33'], ['Racing green', '#1f5a3a'], ['Sage', '#8e9f7c'],
   ['Burgundy', '#6d1f2a'], ['Signal red', '#b3302a'], ['Tomato', '#d6522f'], ['Orange', '#e07a1f'], ['Yellow', '#e8c53a'], ['Pale yellow', '#f0e2a0']
 ];
@@ -62,6 +63,7 @@ export const SAIL_COUNTRIES: [string, string][] = [
 export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
   const d = DEFAULT_BOAT, x = s ?? {};
   const spec: BoatSpec = {
+    id: typeof x.id === 'string' && x.id ? x.id : newId(),
     name: typeof x.name === 'string' ? x.name.slice(0, 18) : d.name,
     hull: { ...d.hull, ...x.hull }, deck: x.deck ?? d.deck,
     sails: { ...d.sails, ...x.sails }, flags: { ...d.flags, ...x.flags }, perf: { ...d.perf, ...x.perf }
@@ -78,3 +80,9 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
 
 /** The sail number as it reads on the main: national letters and the number. */
 export const sailNo = (s: BoatSpec) => `${s.sails.country ? s.sails.country + ' ' : ''}${s.sails.number}`;
+
+const newId = () => 'b' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+/** A new boat for your list: the standard Folkboat, under a new name. */
+export function newBoat(name: string, from: BoatSpec = DEFAULT_BOAT): BoatSpec {
+  return fixSpec({ ...structuredClone(from), id: newId(), name: name.toUpperCase().slice(0, 18) });
+}

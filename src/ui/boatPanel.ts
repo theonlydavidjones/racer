@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, type BoatSpec, type SailAge } from '../boat/spec';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, newBoat, sailNo, type BoatSpec, type SailAge } from '../boat/spec';
 import { BURGEES } from '../render/burgees';
 import { ENSIGNS, SPECIAL_FLAGS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
@@ -25,8 +25,20 @@ export class BoatPanel {
 
   private get b(): BoatSpec { return this.S.boat; }
   private set(f: (b: BoatSpec) => void, rerender = true): void {
-    f(this.S.boat); this.S.boat = fixSpec(this.S.boat);
+    f(this.S.boat); this.use(fixSpec(this.S.boat), rerender);
+  }
+  /** Make `b` the boat you're sailing (replacing her entry in your list, or adding her), save, and redraw. */
+  private use(b: BoatSpec, rerender = true): void {
+    const i = this.S.boats.findIndex(x => x.id === b.id);
+    if (i >= 0) this.S.boats[i] = b; else this.S.boats.push(b);
+    this.S.boat = b; this.S.boatId = b.id; this.confirmDelete = false;
     this.changed(); if (rerender) this.render(); else this.report();
+  }
+  private confirmDelete = false;
+  private uniqueName(base: string): string {
+    const names = new Set(this.S.boats.map(b => b.name)); let n = base, k = 2;
+    while (names.has(n)) n = `${base} ${k++}`;
+    return n;
   }
 
   private click(e: Event): void {
@@ -34,6 +46,15 @@ export class BoatPanel {
     const v = t.dataset.v ?? '';
     switch (t.dataset.act) {
       case 'done': this.done(); return;
+      case 'newBoat': this.use(newBoat(this.uniqueName('NEW BOAT'))); return;
+      case 'copyBoat': this.use(newBoat(this.uniqueName(this.b.name || 'BOAT'), this.b)); return;
+      case 'delBoat': this.confirmDelete = true; this.render(); return;
+      case 'delNo': this.confirmDelete = false; this.render(); return;
+      case 'delYes': {
+        if (this.S.boats.length <= 1) return;
+        this.S.boats = this.S.boats.filter(x => x.id !== this.b.id);
+        this.use(this.S.boats[0]); return;
+      }
       case 'material': this.set(b => { b.hull.material = v as BoatSpec['hull']['material']; if (v === 'wood' && b.deck === '#8e9f7c') b.deck = 'teak-silver'; }); return;
       case 'upper': this.set(b => { b.hull.upper = v; }); return;
       case 'lower': this.set(b => { b.hull.lower = v; }); return;
@@ -52,7 +73,8 @@ export class BoatPanel {
     const t = e.target as HTMLInputElement | HTMLSelectElement, k = t.dataset.k; if (!k) return;
     const final = e.type === 'change';
     switch (k) {
-      case 'name': if (final) this.set(b => { b.name = t.value.toUpperCase(); }); return;
+      case 'name': if (final) this.set(b => { b.name = t.value.trim().toUpperCase() || this.uniqueName('UNNAMED'); }); return;
+      case 'pick': { const b = this.S.boats.find(x => x.id === t.value); if (b) this.use(b); return; }
       case 'number': if (final) this.set(b => { b.sails.number = t.value; }); return;
       case 'country': this.set(b => { b.sails.country = t.value; }); return;
       case 'burgee': this.set(b => { b.flags.burgee = t.value; }); return;
@@ -107,7 +129,14 @@ export class BoatPanel {
     const opt = (cur: string, list: { id: string; name: string }[], none: string) => `<option value="">${none}</option>` + list.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${x.name}</option>`).join('');
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
     this.el.innerHTML = `
-      <div class="bphead"><h2>Your boat</h2><button type="button" class="cta" data-act="done">Done</button></div>
+      <div class="bphead"><h2>Your boats</h2><button type="button" class="cta" data-act="done">Sail her</button></div>
+      <div class="garage">
+        <select data-k="pick" class="pick" aria-label="Your boats">${this.S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${esc(x.name || 'Unnamed')} · ${esc(sailNo(x))}</option>`).join('')}</select>
+        ${this.confirmDelete
+          ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')}? <button type="button" class="ghost danger" data-act="delYes">Delete</button><button type="button" class="ghost" data-act="delNo">Keep her</button></div>`
+          : `<div class="gbtns"><button type="button" class="ghost" data-act="newBoat">New boat</button><button type="button" class="ghost" data-act="copyBoat" title="Save a copy of this boat under a new name">Save a copy</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-act="delBoat">Delete</button>' : ''}</div>`}
+        <small>Changes save as you make them. The boat shown here is the one you'll sail.</small>
+      </div>
       <div class="bpbody">
       <section><h3>Hull</h3>
         <div class="field"><span>Built in</span>${seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood (clinker)']], b.hull.material)}
@@ -153,6 +182,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
 function flagNote(b: BoatSpec): string {
   const notes = ['Flags fly when you\'re just sailing; racing boats strike them for a race.'];
+  if (b.flags.ensign) notes.push('The ensign flies from its staff at the stern (on the starboard quarter, clear of the backstay and tiller).');
   if (b.flags.special) notes.push('An officer\'s flag flies in place of the club burgee, while that officer is aboard.');
   if (b.flags.ensign && b.flags.ensign !== 'us' && b.flags.ensign !== 'us-yacht') notes.push('Under a foreign ensign on the Bay she flies the US flag as a courtesy flag at the starboard spreader, and her burgee moves to port.');
   if (b.flags.ensign === 'us-yacht') notes.push('The yacht ensign is for US waters only.');

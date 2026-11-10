@@ -719,9 +719,16 @@ function frame(now: number): void {
 /* Your boat: the panel, with the boat in the showroom view beside it. */
 let boatPanel: BoatPanel;
 function boatSummary(): void {
-  const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '';
-  $('boatSum').textContent = `${b.name || 'Unnamed'} · ${sailNo(b)} · ${colour.toLowerCase()} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull`;
+  const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '', p = b.perf;
+  const pick = $('boatPick') as HTMLSelectElement;
+  pick.innerHTML = S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${(x.name || 'Unnamed').replace(/</g, '&lt;')} · ${sailNo(x)}</option>`).join('');
+  const cond = [p.cleanedWeeks ? `bottom ${p.cleanedWeeks} wk` : 'clean bottom', p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : 'used sails', p.mast === 'wood' ? 'wooden mast' : ''].filter(Boolean).join(', ');
+  $('boatSum').textContent = `${colour} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull; ${cond}.`;
 }
+($('boatPick') as HTMLSelectElement).onchange = e => {
+  const b = S.boats.find(x => x.id === (e.target as HTMLSelectElement).value); if (!b) return;
+  S.boat = b; S.boatId = b.id; saveSettings(S); newGame(); boatSummary();
+};
 boatPanel = new BoatPanel(S, () => { saveSettings(S); newGame(); boatSummary(); }, () => {
   boatPanel.hide(); document.body.classList.remove('showroom'); look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = 24;
   newGame(); $('setup').hidden = false;

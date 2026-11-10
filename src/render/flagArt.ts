@@ -2,8 +2,9 @@
  * Ensigns and officer flags, drawn on a canvas from their official constructions (Flags of the World; US Executive
  * Order 10834 for the US flag; the national flag laws for the Nordic crosses, the Australian and NZ ensigns).
  *
- * Etiquette (USPS, CCA, RYA): under way, a sloop wears her ensign on the backstay (no higher than two-thirds up) or
- * on a stern staff; the club burgee at the masthead or, when instruments are up there, at the starboard spreader.
+ * Etiquette (USPS, CCA, RYA): a sloop wears her ensign on a staff at the stern (the senior position, under way or at
+ * anchor; with a backstay to the middle of the transom, on the starboard quarter as close to the centreline as
+ * possible), or under way two-thirds up the leech or high on the backstay; the club burgee at the masthead or, when instruments are up there, at the starboard spreader.
  * An officer's flag replaces the burgee in the same place. A foreign-flagged boat flies the host country's ensign as a
  * courtesy flag at the starboard spreader, and moves her burgee to port. The US yacht ensign is for US waters only.
  * Owner-absent, guest and meal flags are for a boat at anchor or on her mooring, never under way, so they aren't

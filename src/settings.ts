@@ -21,13 +21,15 @@ export interface Settings {
   sailFrom: string; // Just sail: where you start (a place id, sim/places.ts)
   sailTo: string; // Just sail: where you're heading ('' = nowhere in particular)
   burgee?: string; // (older saves: your burgee, now in boat.flags)
-  /** Your boat as you've set her up: looks and condition (boat/spec.ts). */
+  /** Your boats (boat/spec.ts), and the one you're sailing. `boat` is that one (the same object as its entry in `boats`). */
+  boats: BoatSpec[];
+  boatId: string;
   boat: BoatSpec;
   /** Who's aboard your boat: you at the helm, and 0–2 crew. Heights in metres, weights in kg. */
   crew: { n: 0 | 1 | 2; helm: { h: number; w: number }; people: { h: number; w: number }[] }; // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
 
 const KEY = 'fbsim-settings-v2';
 
@@ -35,8 +37,12 @@ export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };
   try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) Object.assign(s, saved); } catch { /* private mode etc. */ }
   s.crew = structuredClone(s.crew ?? DEFAULT_SETTINGS.crew); // a copy: editing your crew mustn't change the defaults
-  const saved = s.boat === DEFAULT_BOAT ? { flags: { ...DEFAULT_BOAT.flags, burgee: s.burgee ?? '' } } : s.boat; // older saves kept the burgee on its own
-  s.boat = fixSpec(structuredClone(saved)); delete s.burgee;
+  // your boats: older saves had one boat (and before that, only a burgee)
+  let boats = s.boats !== DEFAULT_SETTINGS.boats && s.boats?.length ? s.boats
+    : [s.boat === DEFAULT_BOAT ? { ...DEFAULT_BOAT, flags: { ...DEFAULT_BOAT.flags, burgee: s.burgee ?? '' } } : s.boat];
+  boats = structuredClone(boats).map(b => fixSpec(b));
+  const seen = new Set<string>(); for (const b of boats) { if (seen.has(b.id)) b.id += '-' + seen.size; seen.add(b.id); }
+  s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
   return s;
 }
 export function saveSettings(s: Settings): void {
