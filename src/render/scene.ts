@@ -12,6 +12,7 @@ import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
+import { Wakes } from './wake';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
 import type { SeaHere } from '../environment/sea';
 
@@ -143,6 +144,9 @@ export class SceneView {
   private waveB = new Float32Array(N_WAVES * 4);
   private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
+  /** Wakes, bow waves and spray. */
+  private wakes!: Wakes;
+  private pitches: number[] = [];
   /** Current map: the current (m/s) and where it converges (tidelines), around the focus. */
   private curData = new Uint8Array(CUR_N * CUR_N * 4);
   private curTex = new THREE.DataTexture(this.curData, CUR_N, CUR_N, THREE.RGBAFormat);
@@ -245,6 +249,7 @@ export class SceneView {
     const water = this.water = new THREE.Mesh(wgeo, waterMat) as unknown as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>;
     water.frustumCulled = false; water.receiveShadow = true; scene.add(water);
 
+    this.wakes = new Wakes(scene);
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
 
@@ -281,6 +286,7 @@ export class SceneView {
   setWorld(w: World): void {
     this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
+    this.wakes.reset(w.boats);
     const month = +w.raceDate.slice(5, 7) || new Date().getMonth() + 1; // the grass: gold in summer and autumn, green after the rains
     if (month !== this.landMonth) { this.landMonth = month; this.land?.setSeason(month); }
     const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)}`;
@@ -518,8 +524,10 @@ export class SceneView {
     }
     w.boats.forEach((b, i) => {
       const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
-      syncBoatMesh(this.boatMeshes[i], b, t, boatOnWaves(this.waves, b, b.h, tw, kW, kS));
+      const mo = boatOnWaves(this.waves, b, b.h, tw, kW, kS); this.pitches[i] = mo.pitch;
+      syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
+    this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     camera.up.set(0, 1, 0);

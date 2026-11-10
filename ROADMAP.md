@@ -40,7 +40,7 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 1. ~~**A real Folkboat hull**~~ (done, from class figures and estimated lines; refine against the official lines plan if we get it): the deep, narrow hull with its sweeping sheer, the long keel with the rudder hung on the transom, the doghouse-style cabin trunk with portlights, the cockpit well and coamings, the tiller. Wooden boats lapstrake (clinker), with the plank lands visible; yours smooth glassfibre with a boot stripe and antifouling that shows when she heels.
 2. **Materials and light:** physically based materials (gloss gelcoat, varnished wood, anodised aluminium, Dacron sails with seams and a little translucency), shadows (sails shading the deck, boats shading the water), and reflections of the sky.
 3. **Crew:** helm and crew figures that hike out, move across on a tack, and sit where you'd sit.
-4. **Bow wave, wake and spray,** sized by boat speed; boats pitch and roll in the waves once sea state is in.
+4. ~~**Bow wave, wake and spray,**~~ (done) sized by boat speed; boats pitch and roll in the waves once sea state is in.
 5. **Rigging detail:** blocks, sheets and control lines (comes with the full sail controls), sail numbers and the class insignia.
 
 ### The bay
