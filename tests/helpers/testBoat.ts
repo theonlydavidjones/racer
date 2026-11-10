@@ -1,3 +1,4 @@
+import { FLAT_SEA } from '../../src/environment/sea';
 import type { Boat } from '../../src/boat/boat';
 import { moveBoat, tackTarget } from '../../src/boat/physics';
 import { V, KT } from '../../src/core/math';
@@ -8,7 +9,7 @@ export function testBoat(o: { heading: number; kt: number; windFrom?: number; wi
   const windFrom = o.windFrom ?? 0, windKt = o.windKt ?? 12;
   return {
     id: 0, isUser: true, name: 'Test', no: '', color: '#fff', hullColor: '#fff', sailColor: '#fff', build: { hull: 'fiberglass', spars: 'aluminium' },
-    x: 0, y: 3000, h: o.heading, v: o.kt * KT, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
+    sea: FLAT_SEA, x: 0, y: 3000, h: o.heading, v: o.kt * KT, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
     steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: o.heading,
     penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: true, ocs: false, leg: 0, finished: false, finishT: null,
     prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,

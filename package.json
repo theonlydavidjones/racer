@@ -13,7 +13,8 @@
     "data:polar": "node scripts/fetch-orc-polar.mjs",
     "data:currents": "node scripts/fetch-currents.mjs",
     "data:wind": "node scripts/fetch-wind-climate.mjs",
-    "data:terrain": "node scripts/fetch-terrain.mjs",
+    "data:terrain": "node scripts/fetch-terrain.mjs && node scripts/make-land-mask.mjs",
+    "data:swell": "node scripts/fetch-swell.mjs",
     "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs"
   },
   "dependencies": {

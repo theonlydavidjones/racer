@@ -1,0 +1,260 @@
+{
+ "source": "NOAA NDBC station 46237 (San Francisco Bar, CDIP 142), historical standard meteorological data 2019–2025",
+ "fetched": "2026-11-10",
+ "observations": 57054,
+ "note": "Per month: small, typical and big days (25th, 50th, 75th percentile of significant wave height, m), with the median dominant period (s) and mean direction the waves come from (deg true) on such days. Measured outside the Gate: total sea (swell plus the ocean wind sea).",
+ "months": [
+  {
+   "month": 1,
+   "n": 4639,
+   "days": [
+    {
+     "hs": 1.5,
+     "tp": 13.3,
+     "from": 273
+    },
+    {
+     "hs": 2,
+     "tp": 13.3,
+     "from": 273
+    },
+    {
+     "hs": 2.64,
+     "tp": 14.3,
+     "from": 270
+    }
+   ]
+  },
+  {
+   "month": 2,
+   "n": 3651,
+   "days": [
+    {
+     "hs": 1.48,
+     "tp": 13.3,
+     "from": 273
+    },
+    {
+     "hs": 1.83,
+     "tp": 13.3,
+     "from": 274
+    },
+    {
+     "hs": 2.32,
+     "tp": 13.3,
+     "from": 272
+    }
+   ]
+  },
+  {
+   "month": 3,
+   "n": 4578,
+   "days": [
+    {
+     "hs": 1.43,
+     "tp": 12.5,
+     "from": 269
+    },
+    {
+     "hs": 1.83,
+     "tp": 12.5,
+     "from": 272
+    },
+    {
+     "hs": 2.35,
+     "tp": 13.3,
+     "from": 273
+    }
+   ]
+  },
+  {
+   "month": 4,
+   "n": 5031,
+   "days": [
+    {
+     "hs": 1.28,
+     "tp": 13.3,
+     "from": 259
+    },
+    {
+     "hs": 1.53,
+     "tp": 11.8,
+     "from": 269
+    },
+    {
+     "hs": 1.92,
+     "tp": 11.8,
+     "from": 277
+    }
+   ]
+  },
+  {
+   "month": 5,
+   "n": 5198,
+   "days": [
+    {
+     "hs": 1.28,
+     "tp": 14.3,
+     "from": 256
+    },
+    {
+     "hs": 1.56,
+     "tp": 11.8,
+     "from": 265
+    },
+    {
+     "hs": 1.87,
+     "tp": 10,
+     "from": 275
+    }
+   ]
+  },
+  {
+   "month": 6,
+   "n": 5031,
+   "days": [
+    {
+     "hs": 1.17,
+     "tp": 14.3,
+     "from": 254
+    },
+    {
+     "hs": 1.36,
+     "tp": 11.1,
+     "from": 262
+    },
+    {
+     "hs": 1.6,
+     "tp": 10,
+     "from": 271
+    }
+   ]
+  },
+  {
+   "month": 7,
+   "n": 5203,
+   "days": [
+    {
+     "hs": 1,
+     "tp": 13.3,
+     "from": 253
+    },
+    {
+     "hs": 1.18,
+     "tp": 14.3,
+     "from": 256
+    },
+    {
+     "hs": 1.37,
+     "tp": 14.3,
+     "from": 257
+    }
+   ]
+  },
+  {
+   "month": 8,
+   "n": 4810,
+   "days": [
+    {
+     "hs": 0.93,
+     "tp": 14.3,
+     "from": 244
+    },
+    {
+     "hs": 1.09,
+     "tp": 14.3,
+     "from": 253
+    },
+    {
+     "hs": 1.28,
+     "tp": 13.3,
+     "from": 257
+    }
+   ]
+  },
+  {
+   "month": 9,
+   "n": 4825,
+   "days": [
+    {
+     "hs": 0.97,
+     "tp": 14.3,
+     "from": 247
+    },
+    {
+     "hs": 1.16,
+     "tp": 14.3,
+     "from": 253
+    },
+    {
+     "hs": 1.42,
+     "tp": 14.3,
+     "from": 260
+    }
+   ]
+  },
+  {
+   "month": 10,
+   "n": 5201,
+   "days": [
+    {
+     "hs": 1.05,
+     "tp": 13.3,
+     "from": 253
+    },
+    {
+     "hs": 1.35,
+     "tp": 12.5,
+     "from": 265
+    },
+    {
+     "hs": 1.7,
+     "tp": 13.3,
+     "from": 273
+    }
+   ]
+  },
+  {
+   "month": 11,
+   "n": 4218,
+   "days": [
+    {
+     "hs": 1.19,
+     "tp": 12.5,
+     "from": 268
+    },
+    {
+     "hs": 1.58,
+     "tp": 13.3,
+     "from": 272
+    },
+    {
+     "hs": 2.03,
+     "tp": 13.3,
+     "from": 272
+    }
+   ]
+  },
+  {
+   "month": 12,
+   "n": 4669,
+   "days": [
+    {
+     "hs": 1.31,
+     "tp": 12.5,
+     "from": 273
+    },
+    {
+     "hs": 1.79,
+     "tp": 13.3,
+     "from": 272
+    },
+    {
+     "hs": 2.44,
+     "tp": 14.3,
+     "from": 270
+    }
+   ]
+  }
+ ]
+}

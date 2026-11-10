@@ -1,4 +1,5 @@
-import { beatAngle, polar, runAngle } from '../boat/polar';
+import { beatFor, targetFor } from '../boat/seaway';
+import { polar, runAngle } from '../boat/polar';
 import type { Boat } from '../boat/boat';
 import { V, unit, type Vec } from '../core/math';
 import type { CourseMark } from '../courses/course';
@@ -28,7 +29,7 @@ export function laylinesFor(w: World, b: Boat): Laylines | null {
   const m = targetMark(w, b);
   if (!m || m.type !== 'round' || m.leg === 'reach') return null;
   const ww = b.ww, c = w.currentAt(m.p);
-  const up = m.leg === 'beat', ang = up ? beatAngle(ww.kt) : runAngle(ww.kt), vs = polar(ww.kt, ang);
+  const up = m.leg === 'beat', ang = up ? beatFor(b) : runAngle(ww.kt), vs = up ? targetFor(b, ang) : polar(ww.kt, ang); // upwind: the best angle in the chop she's in
   const track = (h: number) => { const u = V(h); return unit({ x: u.x * vs + c.x, y: u.y * vs + c.y }); };
   // starboard tack: wind over the starboard side, heading = from − angle
   return { mark: m, kind: up ? 'up' : 'down', tracks: [track(ww.from - ang), track(ww.from + ang)] };

@@ -1,6 +1,7 @@
+import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { bow, type Boat } from '../boat/boat';
 import { timeToCover } from '../boat/dynamics';
-import { beatAngle, polar } from '../boat/polar';
+import { polar } from '../boat/polar';
 import { sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
@@ -168,7 +169,7 @@ export class Hud {
     if (u.finished) { el.hidden = true; return; }
     if (w.freeSail) {
       // just sailing: how you're doing against the boat's target speed at this angle
-      const target = polar(u.ww.kt, u.twa, sailPlan(u)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
+      const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
       el.hidden = false; el.className = '';
       el.textContent = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%` + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
@@ -202,7 +203,7 @@ export class Hud {
   private dial(u: Boat): void {
     const [ctx, w, h] = fitCanvas(this.dialC), cx = w / 2, cy = h / 2, R = w / 2 - 6;
     ctx.clearRect(0, 0, w, h);
-    const a0 = (u.rel - 90) * D2R, ba = beatAngle(u.ww.kt) * D2R;
+    const a0 = (u.rel - 90) * D2R, ba = beatFor(u) * D2R;
     // no-go zone: inside the close-hauled angle
     ctx.fillStyle = 'rgba(255,93,76,.22)';
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0 - ba, a0 + ba); ctx.closePath(); ctx.fill();

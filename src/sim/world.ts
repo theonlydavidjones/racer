@@ -6,6 +6,7 @@ import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, shoreRelief, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
+import { FLAT_SEA, SeaField, swellFor, type SeaHere } from '../environment/sea';
 import { Puffs, breezeAt, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
@@ -76,6 +77,8 @@ export class World {
   /** Puffs and lulls drifting across the course. */
   readonly puffs: Puffs;
   readonly windModel: WindModel;
+  /** The waves: chop from the wind and current, swell through the Gate (or flat water). */
+  readonly sea: SeaField;
 
   t: number; // race time, s; negative before the start signal
   steps = 0;
@@ -121,6 +124,7 @@ export class World {
     // the race day and clock: they drive the real tide and westerly, and always the sun
     this.raceDate = settings.tideDate || nextSaturday();
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
+    this.sea = new SeaField(settings.sea === 'flat' ? null : swellFor(this.raceDate, settings.swellDay ?? 1));
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
       this.updateTide();
@@ -173,7 +177,7 @@ export class World {
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
-      heel: 0, boom: 0, jib: 0,
+      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
         depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
@@ -204,6 +208,12 @@ export class World {
   windHere(p: Vec): Wind {
     const q = this.puffs.at(p);
     return { from: n360(this.wind.from + q.veer), kt: this.wind.kt * windTerrain(p) * q.k };
+  }
+
+  /** The sea at any point, for the wind and current there. */
+  seaHere(p: Vec): SeaHere {
+    const c = this.currentAt(p);
+    return this.sea.at(p, windOnWater(this.windHere(p), c), c, q => this.currentAt(q));
   }
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
@@ -238,6 +248,7 @@ export class World {
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b), b.cur); }
+    if (this.steps % 30 === 1) for (const b of this.boats) b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));
     for (const b of this.boats) if (!b.isUser) aiThink(this, b, dt);
     for (const b of this.boats) moveBoat(b, dt, this.t, this.emit, this.groundToast);
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }

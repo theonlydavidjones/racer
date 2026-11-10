@@ -4,6 +4,7 @@ import type { Emit } from '../sim/events';
 import { bow, type Boat } from './boat';
 import { HANDLING, airDrag, flogAmount, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
 import { NO_GO, beatAngle, polar, type SailPlan } from './polar';
+import { beatFor, seaDrag, waveYaw } from './seaway';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls } from './controls';
 
@@ -81,6 +82,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     }
     rate = clamp(err * 1.6, -maxRate, maxRate);
   }
+  if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
   const dh = rate * dt;
   b.h = n360(b.h + dh);
   if (b.penalty > 0) {
@@ -107,7 +109,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff); // sheet angles, then the sails' shape
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)));
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v));
   b.v = Math.max(0, b.v + a * dt);
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
   const u = V(b.h);
@@ -197,6 +199,6 @@ export function apparent(from: number, windKt: number, h: number, v: number): { 
 export function tackTarget(b: Boat): { dir: number; target: number } {
   const rel = b.rel, twa = b.twa, from = b.ww.from;
   // upwind: tack to the same angle on the other side, but at least close-hauled; downwind: gybe to the mirror angle
-  if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatAngle(b.ww.kt), Math.min(twa, 60))) };
+  if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatFor(b), Math.min(twa, 60))) };
   return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
 }

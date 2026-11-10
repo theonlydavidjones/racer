@@ -1,3 +1,4 @@
+import type { SeaHere } from '../environment/sea';
 import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
@@ -93,6 +94,8 @@ export interface Boat {
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
+  /** The sea where she is (refreshed twice a second). */
+  sea: SeaHere;
   ai: AiState | null;
 }
 
