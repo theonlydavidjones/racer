@@ -301,10 +301,26 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // ... and stowed when it isn't: on the foredeck, a little to starboard of the centreline, from abreast the mast
   // forward, in two deck chocks (the usual place on a small keelboat without lifelines, clear of the jib's tack)
   const stowed = new THREE.Group();
-  { const z0 = -1.22, z1 = -3.35, x = 0.18, yAt = (z: number) => deckY(uAtZ(z), x) + 0.035, len = Math.hypot(z1 - z0, yAt(z1) - yAt(z0));
-    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT); sp.rotation.x = Math.PI / 2 - Math.atan2(yAt(z1) - yAt(z0), z0 - z1);
-    sp.position.set(x, (yAt(z0) + yAt(z1)) / 2, (z0 + z1) / 2); stowed.add(sp);
-    for (const zc of [z0 - 0.25, z1 + 0.25]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.06), MAT.dark); ch.position.set(x, deckY(uAtZ(zc), x) + 0.02, zc); stowed.add(ch); }
+  // (angled from outboard aft to inboard forward, so it lies clear of the forehatch)
+  { const z0 = -1.22, z1 = -3.35, x0 = 0.47, x1 = 0.14, xAt = (z: number) => x0 + (x1 - x0) * (z - z0) / (z1 - z0), yAt = (z: number) => deckY(uAtZ(z), xAt(z)) + 0.035;
+    const a = new THREE.Vector3(x0, yAt(z0), z0), c = new THREE.Vector3(x1, yAt(z1), z1), len = a.distanceTo(c);
+    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT);
+    sp.position.copy(a).lerp(c, 0.5); sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize()); stowed.add(sp);
+    for (const zc of [z0 - 0.25, z1 + 0.25]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.06), MAT.dark); ch.position.set(xAt(zc), deckY(uAtZ(zc), xAt(zc)) + 0.02, zc); ch.rotation.y = Math.atan2(x1 - x0, z1 - z0); stowed.add(ch); }
+  }
+  // the forehatch (class rule 3.31: one hatch forward of the mast, a clear opening no more than 500 mm square, properly
+  // framed, with a hinged cover): on the centreline a little forward of the cabin, its cover varnished teak, hinged at
+  // its forward edge (so a sea over the bow can't throw it open) with a hasp aft; it lies with the deck's sheer
+  { const hz = -1.75, open = 0.5, wall = 0.04, out = open + 2 * wall, rise = 0.055;
+    const yC = deckY(uAtZ(hz), 0), tilt = Math.atan2(deckY(uAtZ(hz - 0.3), 0) - deckY(uAtZ(hz + 0.3), 0), 0.6);
+    const hatch = new THREE.Group(); hatch.position.set(0, yC, hz); hatch.rotation.x = tilt; grp.add(hatch);
+    const frameMat = new THREE.MeshLambertMaterial({ color: b.spec?.deck?.startsWith('#') ? b.spec.deck : 0xb0a58f });
+    for (const [w, d, x, z] of [[out, wall, 0, (open + wall) / 2], [out, wall, 0, -(open + wall) / 2], [wall, open, (open + wall) / 2, 0], [wall, open, -(open + wall) / 2, 0]]) {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(w, rise + 0.03, d), frameMat); f.position.set(x, (rise - 0.03) / 2, z); hatch.add(f); // (its foot set into the deck's camber)
+    }
+    const cover = new THREE.Mesh(new THREE.BoxGeometry(out + 0.02, 0.032, out + 0.02), MAT.wood); cover.position.y = rise + 0.016; hatch.add(cover);
+    for (const x of [-0.17, 0.17]) { const hg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.012, 0.05), STEEL); hg.position.set(x, rise + 0.034, -(out / 2) + 0.02); hatch.add(hg); } // hinges, forward
+    const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.04), STEEL); hasp.position.set(0, rise + 0.034, out / 2 - 0.01); hatch.add(hasp); // the hasp, aft
   }
   grp.add(stowed);
   // sails down: the main flaked along the boom (tied with sail ties) and the jib in its bag on the foredeck
