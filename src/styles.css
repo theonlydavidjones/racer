@@ -411,14 +411,12 @@ details.adjust > *{margin-top:8px}
 .fcard:hover,.fcard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
 .fcard b{font:700 17px/1.15 var(--f-inst);letter-spacing:.04em}
 .fcard span{font:600 13px/1.2 var(--f-inst);color:var(--muted);font-variant-numeric:tabular-nums}
-.fprof{width:100%;height:auto;margin-bottom:6px;border-radius:6px;background:linear-gradient(#24384a,#1a2d3d 72%)}
 .ftable{overflow-x:auto}
 .ftable table,.flog,.ftab{width:100%;border-collapse:collapse;font:500 13px/1.35 var(--f-inst);color:var(--text)}
 .ftable th,.flog th{text-align:left;font:700 10px/1 var(--f-inst);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--rule)}
 .ftable td{padding:9px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
 .ftable tbody tr{cursor:pointer}
 .ftable tbody tr:hover td,.ftable tbody tr:focus-visible td{background:var(--btn-hi)}
-.fdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
 .fnote{color:var(--muted)}
 .ftab td{padding:4px 0;vertical-align:top}
 .ftab td:first-child{color:var(--muted);width:40%}
@@ -434,3 +432,7 @@ details.adjust > *{margin-top:8px}
 .chip.on{border-color:var(--accent);color:var(--accent)}
 /* keyboard settings open from the pause screen (and the start page): always on top of them */
 #keysView{z-index:60}
+.fthumb{width:100%;aspect-ratio:400/300;object-fit:cover;border-radius:6px;margin-bottom:6px;background:linear-gradient(#9fc6e3,#9fc6e3 55%,#2c6488 55%)}
+.fslot{display:inline-flex;align-items:center;justify-content:flex-start;width:30px;height:14px;margin-right:8px;vertical-align:-2px;flex:none}
+.fflag{max-height:13px;max-width:30px;width:auto;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.fcard span{display:flex;align-items:center}

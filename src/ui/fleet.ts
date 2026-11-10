@@ -1,6 +1,8 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, freeNumber, newBoat, sailNo, type BoatSpec } from '../boat/spec';
-import { CLUBS } from '../render/burgees';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, newBoat, sailNo, type BoatSpec } from '../boat/spec';
+import { CLUBS, burgeeCanvas } from '../render/burgees';
+import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
+import { boatThumb } from '../render/thumbs';
 import { HARBOR, marinaName, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 
@@ -91,9 +93,9 @@ export class Fleet {
   private drawList(): void {
     const boats = this.S.boats;
     const body = this.view === 'grid'
-      ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}">${profileSvg(b)}<b>${esc(b.name || 'Unnamed')}</b><span>${esc(sailNo(b))}</span></button>`).join('')}</div>`
-      : `<div class="ftable"><table><thead><tr><th>Name</th><th>Sail no.</th><th>Yacht club</th><th>Skipper</th><th>Home marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
-          `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td><i class="fdot" style="background:${b.hull.upper}"></i>${esc(b.name || 'Unnamed')}</td><td>${esc(sailNo(b))}</td><td>${esc(clubName(b.club) || '—')}</td><td>${skipperName(b)}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${b.slip ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
+      ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}"><img class="fthumb" data-thumb="${b.id}" alt=""><b>${esc(b.name || 'Unnamed')}</b><span>${ensignImg(b)}${esc(sailNo(b))}</span></button>`).join('')}</div>`
+      : `<div class="ftable"><table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Club</th><th>Marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
+          `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${b.slip ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
     this.list.innerHTML = `<div class="panel wide fleetpanel">
       <button type="button" class="linkbtn back" data-f="back">‹ Back</button>
       <div class="fhead"><div><div class="eyebrow">Fleet</div><h1>Your boats</h1></div>
@@ -101,7 +103,18 @@ export class Fleet {
         <button type="button" class="cta" data-f="new">New boat</button></div>
       ${body}
       <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or sail her.</small></div>`;
+    // her pictures: drawn one at a time once the list is up (each is a 3D render of her as she's set up)
+    const imgs = [...this.list.querySelectorAll<HTMLImageElement>('img[data-thumb]')], job = ++this.thumbJob;
+    const next = () => {
+      if (job !== this.thumbJob) return;
+      const im = imgs.shift(); if (!im) return;
+      const b = this.S.boats.find(x => x.id === im.dataset.thumb);
+      if (b) try { im.src = boatThumb(b, this.S); } catch { /* no WebGL: no picture */ }
+      setTimeout(next, 0);
+    };
+    setTimeout(next, 0);
   }
+  private thumbJob = 0;
 
   /* ---------- her page ---------- */
   private drawBoat(): void {
@@ -160,6 +173,17 @@ export class Fleet {
 }
 
 /* ---------- helpers ---------- */
+/** A small picture of a flag (her ensign, her club's burgee), for the lists. */
+const flagUrls = new Map<string, string>();
+function flagImg(key: string, make: () => HTMLCanvasElement | null, title: string): string {
+  let url = flagUrls.get(key);
+  if (url === undefined) { const c = make(); url = c ? c.toDataURL() : ''; flagUrls.set(key, url); }
+  return url ? `<img class="fflag" src="${url}" alt="" title="${esc(title)}">` : '';
+}
+/** (in a slot of its own width, so the text beside it lines up down the column whatever the flag's shape, or none) */
+const slot = (img: string) => `<span class="fslot">${img}</span>`;
+const ensignImg = (b: BoatSpec) => { const id = ensignFor(b.sails.country); return slot(id ? flagImg('e:' + id, () => flagArtCanvas(id), ENSIGNS.find(e => e.id === id)?.name ?? '') : ''); };
+const burgeeImg = (b: BoatSpec) => slot(b.club ? flagImg('b:' + b.club, () => burgeeCanvas(b.club), clubName(b.club)) : '');
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 export const clubName = (id: string) => CLUBS.find(c => c.id === id)?.club ?? '';
 const skipperName = (b: BoatSpec) => b.skipper === 'you' ? 'You' : 'AI skipper (generic)';
@@ -174,25 +198,4 @@ function raceRow(e: LogEntry): string {
 function crewRow(e: LogEntry): string {
   const what = e.kind === 'race' ? `Race: ${esc(e.title)}` : `Cruise: ${esc(e.title)}${e.nm != null ? `, ${e.nm.toFixed(1)} nm` : ''}${e.arrived ? ' ✓' : ''}`;
   return `<tr><td>${dayLabel(e)}</td><td>${what}</td><td>${e.skipper === 'you' ? 'You' : 'AI (generic)'}</td><td>${esc(e.crew)}</td></tr>`;
-}
-
-/** Her profile, side on, in her colours: topsides, boot stripe, bottom paint, sails with her number. */
-export function profileSvg(b: BoatSpec): string {
-  const top = b.hull.upper, bottom = b.hull.lower, stripe = b.hull.stripe, sail = b.sails.color === 'black' ? '#2a2b2f' : '#f6f4ec', ink = b.sails.color === 'black' ? '#f2f0e8' : '#1d2a44';
-  const id = 'h' + b.id.replace(/\W/g, '');
-  const hull = 'M24 92 Q112 100 208 82 L196 104 Q170 116 112 117 Q62 117 40 110 L36 106 Z';
-  return `<svg class="fprof" viewBox="0 0 232 150" role="img" aria-label="${esc(b.name)}">
-    <defs><clipPath id="${id}"><path d="${hull}"/></clipPath></defs>
-    <rect x="0" y="108" width="232" height="42" fill="#1d4a63" opacity=".55"/>
-    <path d="M122 12 L122 84 L52 87 Z" fill="${sail}" stroke="#00000033"/>
-    <path d="M119 26 L203 83 L150 84 Z" fill="${sail}" stroke="#00000033"/>
-    <line x1="121" y1="8" x2="121" y2="92" stroke="#c9ccd2" stroke-width="2"/>
-    <line x1="121" y1="85" x2="50" y2="88" stroke="#c9ccd2" stroke-width="1.6"/>
-    <text x="100" y="52" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="9" fill="${ink}">${esc(b.sails.country)}</text>
-    <text x="100" y="65" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="13" fill="${ink}">${esc(b.sails.number)}</text>
-    <path d="M98 116 L150 116 L141 140 L112 140 Z" fill="${bottom}"/>
-    <path d="M42 110 L56 111 L52 129 L44 127 Z" fill="${bottom}"/>
-    <g clip-path="url(#${id})"><path d="${hull}" fill="${top}"/>${stripe ? `<rect x="0" y="103.5" width="232" height="3" fill="${stripe}"/>` : ''}<rect x="0" y="107" width="232" height="20" fill="${bottom}"/></g>
-    <path d="${hull}" fill="none" stroke="#00000055" stroke-width="1"/>
-  </svg>`;
 }
