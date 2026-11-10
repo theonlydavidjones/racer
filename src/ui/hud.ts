@@ -195,7 +195,9 @@ export class Hud {
     // the sea where you are: chop height (what slows you), and the swell
     { const s = u.sea, ft = (m: number) => (m / 0.3048).toFixed(1) + ' ft';
       $('seaVal').textContent = s.hsW < 0.03 && s.hsS < 0.03 ? 'Flat' : (s.hsW / 0.3048).toFixed(1);
-      $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · swell ${ft(s.hsS)}` : ''); }
+      const ftS = (m: number) => (m / 0.3048).toFixed(m < 0.3 ? 1 : 0) + ' ft'; // short enough for the box
+      $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · ${ftS(s.hsS)} swell` : '');
+      $('seaSub').title = `${s.hsW < 0.05 ? 'Glassy' : `${ft(s.hsW)} of ${s.steep > 0.075 ? 'steep ' : ''}chop`}${s.hsS >= 0.05 ? `, ${ft(s.hsS)} of swell` : ''}`; }
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
     else {
