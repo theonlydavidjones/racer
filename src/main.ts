@@ -115,7 +115,6 @@ $('bCont').onclick = () => {
 /* ---------------- input ---------------- */
 function setControlsIdle(): void {
   const u = w.user; u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0;
-  ['bLuff'].forEach(id => $(id).classList.remove('on'));
 }
 function holdBtn(id: string, on: () => void, off: () => void): void {
   const el = $(id);
@@ -123,7 +122,6 @@ function holdBtn(id: string, on: () => void, off: () => void): void {
   const end = () => { el.classList.remove('on'); off(); };
   (['pointerup', 'pointercancel', 'lostpointercapture'] as const).forEach(ev => el.addEventListener(ev, end));
 }
-holdBtn('bLuff', () => { w.user.luff = true; }, () => { w.user.luff = held.has('luff'); });
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
@@ -321,7 +319,7 @@ $('bKeys2').onclick = () => keysView.open();
 function applyHeld(): void {
   const u = w.user;
   u.steer = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0);
-  u.luff = held.has('luff') || $('bLuff').classList.contains('on');
+  u.luff = held.has('luff');
   // the lines you're working: sheet keys, the selected line's keys, and the panel's buttons
   const cmd: Partial<Record<CtlKey, number>> = { ...btnCmd };
   const add = (k: CtlKey, d: number) => { if (d) cmd[k] = Math.max(-1, Math.min(1, (cmd[k] ?? 0) + d)); };

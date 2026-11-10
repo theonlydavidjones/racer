@@ -87,6 +87,7 @@ body{
 .chip:focus-visible,.big:focus-visible,.seg button:focus-visible,.cta:focus-visible,.ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .big{flex:1;min-width:0;height:64px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);
   font:700 16px/1 var(--f-inst);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;touch-action:none}
+.big.small{flex:0 0 auto;height:40px;padding:0 16px;font-size:13px;align-self:center}
 .big.steer{flex:0 0 72px;font-size:26px}
 .big.on,.big:active{background:var(--btn-hi);border-color:var(--accent)}
 .big.tack{color:var(--accent)}
