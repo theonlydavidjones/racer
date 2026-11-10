@@ -1,3 +1,4 @@
+import { PREP_MEANING } from './sim/signals';
 import { describeSea } from './environment/sea';
 import './styles.css';
 import { CURRENTS } from './environment/current';
@@ -466,6 +467,8 @@ function courseCard(): void {
   $('courseCard').innerHTML = `<div class="legs">${chips.join('<span class="arr">→</span>')}</div><small>${C.notes}</small>`;
   $('biasField').hidden = !C.biasAdjustable;
   $('seqField').hidden = S.mode !== 'race';
+  $('prepField').hidden = S.mode === 'sail';
+  $('prepNote').textContent = PREP_MEANING[S.prepFlag ?? 'P'];
   $('fleetField').hidden = S.mode === 'sail';
   $('penaltyField').hidden = S.mode === 'sail';
   $('modeNote').textContent = S.mode === 'drill'
@@ -550,7 +553,7 @@ function paintSeg(): void {
 document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea') ? v : Number(v);
+  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag') ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
 function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; tideBox(); }
@@ -598,7 +601,8 @@ function showResults(): void {
   $('resTitle').textContent = place === 1 ? 'You won the race' : `You finished ${place}${['th', 'st', 'nd', 'rd'][place] || 'th'}`;
   const sr = w.startReport;
   $('resStart').textContent = sr ? `Your start: crossed ${sr.delay.toFixed(1)} s after the gun at ${sr.kt.toFixed(1)} kt, ${Math.round(sr.frac * 100)}% of the way from ${w.C.pinLabel} to ${w.C.committeeLabel}.` : 'No clean start recorded.';
-  $('resBody').innerHTML = rows.map((b, i) => `<tr><td>${b.finished ? i + 1 : '–'}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}</td></tr>`).join('');
+  const code = (b: Boat) => b.scoring === 'ZFP' ? ' · ZFP: 20% penalty (Rule 30.2)' : b.scoring ? ` · ${b.scoring}: disqualified (Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'})` : '';
+  $('resBody').innerHTML = rows.map((b, i) => `<tr><td>${b.scoring === 'UFD' || b.scoring === 'BFD' ? 'DSQ' : b.finished ? i + 1 : '–'}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td></tr>`).join('');
   $('resFouls').textContent = `Fouls you committed: ${w.fouls}. Fouls against you: ${w.fouledBy}.`;
   $('results').hidden = false;
   w.paused = true;

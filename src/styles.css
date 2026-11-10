@@ -247,3 +247,11 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .ctl-btns button:active,.ctl-btns button.on{border-color:var(--accent);background:var(--btn-hi)}
 #trimPanel:not(.all) .ctl-btns button[data-only="all"]{visibility:hidden}
 #trimPanel:not(.manual) .ctl-btns button[data-only="sheets"]{visibility:hidden}
+
+/* the race committee's flags, under the wind dial */
+#sigPanel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 206px);left:max(16px,env(safe-area-inset-left,0px));width:200px;
+  background:var(--pod);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;pointer-events:none;font-size:11px;color:var(--muted)}
+#sigPanel .sig-lab{font:700 9px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px}
+#sigFlags{display:flex;gap:6px;min-height:22px;align-items:center}
+#sigFlags canvas{width:33px;height:22px;border-radius:2px}
+#sigText{margin-top:5px;line-height:1.35;color:var(--text)}

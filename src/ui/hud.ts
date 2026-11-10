@@ -8,6 +8,8 @@ import { D2R, KT, V, brg, clamp, dist, dot, sub, wrap } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import type { World } from '../sim/world';
 import { $ } from './dom';
+import { flagCanvas } from '../render/flags';
+import { FLAG_NAME } from '../sim/signals';
 import { targetShape, type Shape } from '../boat/controls';
 
 /** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
@@ -49,7 +51,29 @@ export class Hud {
   private dialC = $<HTMLCanvasElement>('dial');
   private mapC = $<HTMLCanvasElement>('map');
 
+  private sigKey = '';
+  /** The race committee's flags flying now, what they mean, and the next signal. */
+  private signals(w: World): void {
+    const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd);
+    const el = $('sigPanel'); el.hidden = !show; if (!show) return;
+    const key = w.flags.join(',');
+    if (key !== this.sigKey) {
+      this.sigKey = key;
+      const box = $('sigFlags'); box.innerHTML = '';
+      for (const f of w.flags) { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(flagCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; box.appendChild(c); }
+      if (!w.flags.length) box.textContent = 'none';
+    }
+    const next = w.sequence.find(s => s.t > w.t), u = w.user;
+    const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    let txt = next ? `${next.name} in ${mmss(next.t - w.t)}` : w.flags.includes('X') ? 'X: individual recall. Boats over early must return.' : '';
+    if (u.roundEnd) txt = 'I flag: go back round an end of the line.';
+    else if (u.scoring) txt = u.scoring === 'ZFP' ? 'Z flag: you have a 20% penalty.' : `You're disqualified (${u.scoring}).`;
+    else if (u.ocs && w.t >= 0) txt = 'X flag: you\'re over. Return and start.';
+    $('sigText').textContent = txt;
+  }
+
   update(w: World, dt: number): void {
+    this.signals(w);
     this.acc += dt; if (this.acc < 0.1) return; this.acc = 0;
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);

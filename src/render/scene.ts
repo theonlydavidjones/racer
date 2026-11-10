@@ -11,6 +11,7 @@ import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import type { Terrain } from './terrain';
+import { SignalMast } from './flags';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
 import type { SeaHere } from '../environment/sea';
 
@@ -113,6 +114,11 @@ export class SceneView {
   private waveB = new Float32Array(N_WAVES * 4);
   private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
+  /** The race committee's signal flags, and the heading of whatever they're mounted on. */
+  private signal: { mast: SignalMast; heading: number } | null = null;
+  /** Marks, to lean and trail a wake in the current. */
+  private markObjs: { p: { x: number; y: number }; float: THREE.Object3D; wake: THREE.Mesh }[] = [];
+  private wakeTex: THREE.CanvasTexture | null = null;
   private seaAcc = 0;
   /** Sea map: wind-sea and swell scale and whitecaps on a coarse grid (refreshed every 2 s), sampled into the wind map. */
   private seaGrid: { x0: number; y0: number; cell: number; v: Float32Array } | null = null;
@@ -224,7 +230,7 @@ export class SceneView {
     this.laylines.forEach((line, i) => {
       line.visible = !!L;
       if (!L) return;
-      const m = L.mark.p, g = L.tracks[i], a = P3(m.x, m.y, 0.15), b = P3(m.x - g.x * 900, m.y - g.y * 900, 0.15);
+      const m = L.mark.p, g = L.tracks[i], a = P3(m.x, m.y, 0.3), b = P3(m.x - g.x * 900, m.y - g.y * 900, 0.3);
       const arr = (line.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
       arr.set([a.x, a.y, a.z, b.x, b.y, b.z]);
       line.geometry.attributes.position.needsUpdate = true;
@@ -262,26 +268,47 @@ export class SceneView {
       const rc = new THREE.Group();
       const rh = new THREE.Mesh(new THREE.BoxGeometry(4, 1.6, 12), new THREE.MeshLambertMaterial({ color: 0xf0f0ea })); rh.position.y = 0.5; rc.add(rh);
       const rcab = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 5), new THREE.MeshLambertMaterial({ color: 0xdedcd2 })); rcab.position.set(0, 2.2, 0.5); rc.add(rcab);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), new THREE.MeshBasicMaterial({ color: 0xff8a1f, side: THREE.DoubleSide })); flag.position.set(0, 8, 0.7); flag.rotation.y = Math.PI / 2; rc.add(flag);
       rc.position.copy(P3(C.committee.x, C.committee.y)); rc.rotation.y = -C.base * D2R; add(rc);
-    }
+      // the signal mast on her cabin top
+      const mast = new SignalMast(5, true, 0.9); mast.group.position.set(0, 3.2, 0.5); rc.add(mast.group);
+      this.signal = { mast, heading: C.base };
+    } else if (C.committeeKind === 'shore') {
+      // flags on a yardarm on the club's flagpole (the pole itself is part of the landscape)
+      const mast = new SignalMast(12, false, 1.3); mast.group.position.copy(P3(C.committee.x, C.committee.y, 2.3)); add(mast.group);
+      this.signal = { mast, heading: 0 };
+    } else this.signal = null;
     if (C.pinKind === 'buoy') {
       const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 1.8, 10), new THREE.MeshLambertMaterial({ color: 0xff7a1a })); pin.position.copy(P3(C.pin.x, C.pin.y, 0.6)); add(pin);
     }
     const drawn = new Set<string>();
+    this.markObjs = [];
+    if (!this.wakeTex) {
+      // a mark's wake: a V of foam trailing downstream, fading out
+      const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d')!;
+      for (let i = 0; i < 140; i++) {
+        const y = Math.random() * 128, spread = 4 + y * 0.42, side = Math.random() < 0.5 ? -1 : 1, x = 32 + side * spread * (0.75 + Math.random() * 0.3);
+        g.fillStyle = `rgba(255,255,255,${(0.75 * (1 - y / 128)).toFixed(2)})`; g.fillRect(x, y, 1.5 + Math.random() * 2, 1.5 + Math.random() * 3);
+      }
+      this.wakeTex = new THREE.CanvasTexture(c);
+    }
     C.marks.forEach(m => {
       if (drawn.has(m.name)) return; drawn.add(m.name);
-      const mesh = m.shape === 'sphere'
+      const float = new THREE.Group();
+      const body = m.shape === 'sphere'
         ? new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffd21a }))
         : new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 2.4, 12), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
-      mesh.position.copy(P3(m.p.x, m.p.y, 0.8)); add(mesh);
+      body.position.y = 0.8; float.add(body);
+      float.position.copy(P3(m.p.x, m.p.y, 0)); add(float);
+      const wake = new THREE.Mesh(new THREE.PlaneGeometry(4, 10), new THREE.MeshBasicMaterial({ map: this.wakeTex, transparent: true, depthWrite: false }));
+      wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(m.p.x, m.p.y, 0.12)); add(wake);
+      this.markObjs.push({ p: m.p, float, wake });
       if (aids && m.type === 'round') {
         const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.25, ZONE + 0.25, 64), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
-        ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(m.p.x, m.p.y, 0.06)); add(ring);
+        ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(m.p.x, m.p.y, 0.3)); add(ring);
       }
     });
     if (aids) {
-      const lg = new THREE.BufferGeometry().setFromPoints([P3(C.pin.x, C.pin.y, 0.08), P3(C.committee.x, C.committee.y, 0.08)]);
+      const lg = new THREE.BufferGeometry().setFromPoints([P3(C.pin.x, C.pin.y, 0.3), P3(C.committee.x, C.committee.y, 0.3)]);
       const line = new THREE.Line(lg, new THREE.LineDashedMaterial({ color: 0xffd84a, dashSize: 2.5, gapSize: 2.5, transparent: true, opacity: 0.8 }));
       line.computeLineDistances(); add(line);
     }
@@ -427,6 +454,19 @@ export class SceneView {
     this.waves.update(this.seaRef, w.windModel.base, dt);
     this.waves.pack(this.waveA, this.waveB);
     this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(this.waves.ref.hsW, this.waves.ref.hsS); this.waveUni.uWhiteRef.value = this.seaRef.white;
+    // the signal flags, and marks leaning and trailing a wake in the current
+    this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);
+    for (const mo of this.markObjs) {
+      const c = w.currentAt(mo.p), kt = Math.hypot(c.x, c.y) / 0.5144, set = Math.atan2(c.x, c.y);
+      const lean = Math.min(16, 6.5 * kt) * D2R; // a moored buoy heels over downstream on its chain
+      mo.float.rotation.set(0, 0, 0); mo.float.rotateOnWorldAxis(new THREE.Vector3(Math.cos(set), 0, Math.sin(set)), -lean);
+      const wv = this.waves.height(mo.p, tw, 1, 1); mo.float.position.y = wv;
+      const len = Math.min(1.6, kt / 1.5);
+      mo.wake.visible = kt > 0.15; mo.wake.scale.set(0.6 + 0.4 * len, len, 1);
+      mo.wake.rotation.z = -set + Math.PI; // trailing downstream
+      mo.wake.position.set(mo.p.x + Math.sin(set) * 5 * len, 0.12, -(mo.p.y + Math.cos(set) * 5 * len));
+      (mo.wake.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, kt / 1.2);
+    }
     w.boats.forEach((b, i) => {
       const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
       syncBoatMesh(this.boatMeshes[i], b, t, boatOnWaves(this.waves, b, b.h, tw, kW, kS));

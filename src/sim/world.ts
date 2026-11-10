@@ -16,6 +16,7 @@ import { aimPoint } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink } from '../ai/ai';
 import type { SimEvent } from './events';
+import { FLAG_NAME, X_FLAG_MAX, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
@@ -115,6 +116,11 @@ export class World {
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
   private hHist: number[][] = [];
 
+  /** The starting signals, the flags flying now, and the X flag (individual recall). */
+  readonly sequence: Signal[];
+  readonly prepFlag: PrepFlag;
+  flags: Flag[] = [];
+  private xUntil = -Infinity;
   /** Every boat at the start signal (null until the gun). */
   gun: { windFrom: number; boats: GunSnap[] } | null = null;
   /** Race time each boat started (crossed the line properly), or null. */
@@ -132,6 +138,9 @@ export class World {
     this.freeSail = !!opts.freeSail;
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60;
     this.t = -this.startAt;
+    this.prepFlag = settings.prepFlag ?? 'P';
+    this.sequence = this.freeSail ? [] : startSequence(settings.seq, this.prepFlag);
+    this.flags = flagsAt(this.sequence, this.t);
     this.seaBreeze = settings.windKt === 0;
     this.windDay = settings.windDay ?? 1;
     this.realTime = settings.current === 'real' || this.seaBreeze;
@@ -307,12 +316,17 @@ export class World {
     for (const b of this.boats) {
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
-      if (gun && d > 0 && Math.abs(a) < this.lineLen / 2 + 25) {
+      if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
         b.ocs = true;
         if (b.isUser) this.emit({ type: 'toast', msg: 'Over early! Return below the line, then start. Keep clear while you do (Rule 21.1).', ms: 4500 });
       }
+      // I flag: back to the pre-start side across an extension of the line (round an end) clears it, before or after the gun
+      if (b.roundEnd && b.prevD != null && b.prevD > 0 && d <= 0 && Math.abs(a) > this.lineLen / 2) {
+        b.roundEnd = false;
+        if (b.isUser && !b.ocs) this.emit({ type: 'toast', msg: 'Back round the end: you can start now (Rule 30.1).' });
+      }
       if (this.t >= 0 && b.prevD != null) {
-        if (b.ocs && d < 0 && this.lineD(stern(b)) < 0) { b.ocs = false; if (b.isUser) this.emit({ type: 'toast', msg: 'Cleared. Now start properly.' }); }
+        if (b.ocs && !b.roundEnd && d < 0 && this.lineD(stern(b)) < 0) { b.ocs = false; if (b.isUser) this.emit({ type: 'toast', msg: 'Cleared. Now start properly.' }); }
         const crossedFwd = b.prevD <= 0 && d > 0 && within, crossedBack = b.prevD > 0 && d <= 0 && within;
         if (!b.started && !b.ocs && crossedFwd) {
           b.started = true; this.startTimes[b.id] = this.t;
@@ -491,17 +505,51 @@ export class World {
     }
   }
 
+  /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
   private signals(prevT: number): void {
-    const marks: number[] = [];
-    for (let m = this.settings.seq; m >= 1; m--) marks.push(-m * 60);
-    marks.push(0);
-    for (const s of marks) if (prevT < s && this.t >= s && !this.horns[s]) {
-      this.horns[s] = true;
-      this.emit({ type: 'horn', dur: s === 0 ? 1.1 : 0.8 });
-      if (s === 0) {
-        if (this.boats.some(b => b.ocs)) this.emit({ type: 'horn', dur: 0.5, delayMs: 900 }); // individual recall
-        if (!this.user.ocs) this.emit({ type: 'toast', msg: 'Gun! Go.', ms: 1500 });
-      } else if (s === -60) this.emit({ type: 'toast', msg: 'One minute', ms: 1500 });
+    for (const sg of this.sequence) if (prevT < sg.t && this.t >= sg.t && !this.horns[sg.t]) {
+      this.horns[sg.t] = true;
+      this.emit({ type: 'horn', dur: sg.sound === 'long' ? 2.2 : 0.8 });
+      if (sg.t === 0) {
+        const over = this.boats.filter(b => b.ocs);
+        if (over.length) {
+          // individual recall: X up, with one sound
+          this.xUntil = X_FLAG_MAX; this.emit({ type: 'horn', dur: 0.5, delayMs: 900 });
+          this.emit({ type: 'toast', ms: 4000, msg: `Individual recall: X flag up, one sound. ${over.map(b => b.isUser ? 'You are' : b.name + ' is').join(', ')} over early.` });
+        }
+        if (!this.user.ocs) this.emit({ type: 'toast', msg: sg.say, ms: 1800 });
+      } else this.emit({ type: 'toast', msg: sg.say, ms: sg.t === -60 ? 2500 : 3500 });
+    }
+    // the X flag comes down once every boat over early has returned (or after four minutes)
+    if (this.xUntil > 0 && (this.t > this.xUntil || !this.boats.some(b => b.ocs))) {
+      this.xUntil = -Infinity;
+      if (this.t > 1) this.emit({ type: 'toast', msg: 'X flag down: all boats over early have returned (or the time is up).', ms: 2500 });
+    }
+    this.flags = flagsAt(this.sequence, this.t);
+    if (this.xUntil > 0) this.flags.push('X');
+    // Rule 30, in the last minute
+    if (this.t >= -60 && this.t < 0 && this.prepFlag !== 'P') this.lastMinute();
+  }
+
+  /** The triangle formed by the ends of the starting line and the first mark (RRS 30.2–30.4). */
+  get triangle(): [Vec, Vec, Vec] { return [this.C.pin, this.C.committee, this.C.marks[0].p]; }
+
+  private lastMinute(): void {
+    const f = this.prepFlag, [a, b2, c] = this.triangle;
+    for (const b of this.boats) {
+      if (f === 'I') {
+        // Rule 30.1: on the course side of the line or its extensions
+        if (!b.roundEnd && this.lineD(bow(b)) > 0) {
+          b.roundEnd = true;
+          if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'I flag: you were on the course side in the last minute. Sail back around an end of the line to the pre-start side, then start (Rule 30.1).' });
+        }
+      } else if (!b.scoring && (inTriangle(bow(b), a, b2, c) || inTriangle(b, a, b2, c))) {
+        b.scoring = f === 'Z' ? 'ZFP' : f === 'U' ? 'UFD' : 'BFD';
+        if (b.isUser) this.emit({ type: 'toast', ms: 6000, msg: f === 'Z'
+          ? 'Z flag: you were in the triangle in the last minute. 20% scoring penalty (Rule 30.2). Keep racing.'
+          : `${FLAG_NAME[f]}: you were in the triangle in the last minute. Disqualified (Rule ${f === 'U' ? '30.3' : '30.4'}), without a hearing.` });
+        else this.emit({ type: 'toast', ms: 3000, msg: `${b.name} was in the triangle in the last minute: ${b.scoring}.` });
+      }
     }
   }
 

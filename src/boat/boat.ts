@@ -94,6 +94,10 @@ export interface Boat {
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
+  /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
+  roundEnd?: boolean;
+  /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
+  scoring?: 'ZFP' | 'UFD' | 'BFD' | null;
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;

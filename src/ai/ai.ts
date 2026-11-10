@@ -1,3 +1,4 @@
+import type { PrepFlag } from '../sim/signals';
 import { bow, type Boat } from '../boat/boat';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatFor, targetFor } from '../boat/seaway';
@@ -5,6 +6,9 @@ import { V, brg, clamp, cross, dist, dot, n360, segCross, sub, unit, wrap, type 
 import { onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
 import type { World } from '../sim/world';
+
+/** Extra seconds of caution at the start under each preparatory flag. */
+const FLAG_CAUTION: Record<PrepFlag, number> = { P: 0, I: 1, Z: 2, U: 3, black: 3.5 };
 
 /** A boat owing a penalty first gets this far (m) from other boats before turning. */
 const PENALTY_CLEAR = 25;
@@ -130,7 +134,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       }
       desired = goH;
       // aim to hit the line 1–3 s after the gun at full speed (the bolder the boat, the closer)
-      if (ai.plan.tReach < tl + 3 - ai.aggr * 0.33) {
+      // (later still under the I, Z, U and black flags: being over in the last minute costs more)
+      if (ai.plan.tReach < tl + 3 - ai.aggr * 0.33 + FLAG_CAUTION[w.prepFlag]) {
         // Early: burn time. Where would we be at the gun if we eased the sails now? Coasting plus drift
         // with the current (current-aware boats allow for all of it; the others underestimate it).
         const drift = (c.x * N.x + c.y * N.y) * tl * (ai.aware ? 1 : 0.6), atGun = d + drift + Math.max(0, ai.plan.coast); // coasting away from the line is no safety margin
@@ -145,7 +150,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (ai.mode === 'hold' || ai.mode === 'approach') ai.mode = 'race';
     let P: Vec;
     const along = (clamp(ai.f, 0.15, 0.85) - 0.5) * w.lineLen;
-    if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
+    if (b.ocs && b.roundEnd) {
+      // I flag: back round the nearer end of the line, then up again
+      const s = w.lineA(b) >= 0 ? 1 : -1, half = w.lineLen / 2, out = Math.abs(w.lineA(b)) > half + 8;
+      P = { x: w.center.x + L.x * s * (half + 20) + N.x * (out ? -20 : 8), y: w.center.y + L.y * s * (half + 20) + N.y * (out ? -20 : 8) };
+    } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
     else if (!b.started) P = { x: w.center.x + N.x * 10 + L.x * along, y: w.center.y + N.y * 10 + L.y * along }; // haven't started yet: cross the line between its ends
     else P = aimPoint(w, b);
     const bP = brg(P.x - b.x, P.y - b.y);
