@@ -130,6 +130,16 @@ Setup → Current → **Real tide** (the default), then pick the race day and th
 - **Presets.** Slack, flood and ebb presets (uniform, with the same shore relief) are still there for practice.
 - Not modelled yet: eddies behind points, and the difference between surface and deeper current.
 
+### Sea state
+
+- **Chop** from the wind over the water and the fetch (open water upwind, measured on the real coastline, averaged across the directions around the wind as the Shore Protection Manual does), by the standard fetch-limited growth laws (JONSWAP). The Central Bay's fetch is short, so the westerly makes a short, steep chop: about 1 ft at the start line in a 20 kt westerly at slack, 1.5 ft on a 2 kt ebb, more out in the channel.
+- **Wind against tide falls out of the physics.** Waves are made by the wind over the *water*: an ebb under a westerly adds to that wind and slows the waves over the ground, so they stay under the wind longer and grow bigger; a flood does the opposite. Where waves run into a stronger opposing current they shorten and steepen (wave action is conserved), and if it's too strong for them they break.
+- **Swell** from the San Francisco Bar buoy (NDBC 46237, 2019–2025): a small, typical or big day for the month (about 2 m at 13 s in winter, 1.1 m in late summer, outside the Gate). It comes in through the Gate, fans out and dies away inside, and the islands and points shadow it. How fast it dies is an estimate: there's no wave buoy inside the Central Bay to check it against.
+- **What it does to the boat:** added resistance in waves (the standard ρ·g·H²·B²/L form), worst head-on and with waves about a boat-length long, which is exactly the Bay's chop. A pinching boat loses a bigger share of her speed to it, so **footing pays in a seaway**: the best upwind angle widens by a couple of degrees in 2 ft of chop and more in light air or bigger seas. The AI, the laylines, the tack targets and the speed target all sail to it. Calibrated so 2 ft of boat-length chop costs about a tenth of a Folkboat's upwind speed: a judgement, not a measurement. The sea also knocks her bow about, most with it on the quarter.
+- **On the water:** the same waves you sail in, drawn as a sum of Gerstner waves (chop and swell, heights from the wave spectrum where you are, bigger or smaller elsewhere from a sea map), with whitecaps on the crests from about 15 kt (more where the chop is steep), and the sky's reflection off each wave face. The boats heave, pitch and roll on them. The cockpit view rides with the hull but keeps the horizon level.
+- **Settings:** real waves or flat water, and the swell day. The HUD shows the chop and swell where you are.
+- Data: `scripts/fetch-swell.mjs` (`npm run data:swell`) for the buoy climatology; `scripts/make-land-mask.mjs` makes the coastline mask from the terrain.
+
 ### Sun, sky, the land and the landmarks
 
 - **The sun where it really is** for the race day and the clock (NOAA's solar position algorithm, for the Cityfront; `src/environment/sun.ts`, tested against noon heights and sunset times). It sets the light's direction, colour (warm and low late in the day) and strength, and the shadows: sails shade the deck and the water.

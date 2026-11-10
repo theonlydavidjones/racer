@@ -1,3 +1,4 @@
+import { describeSea } from './environment/sea';
 import './styles.css';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
@@ -476,6 +477,7 @@ function courseCard(): void {
 function tideBox(): void {
   $('tideBox').hidden = false; $('currentNote').hidden = S.current === 'real';
   $('windDaySeg').hidden = !w.seaBreeze;
+  $('swellDaySeg').hidden = w.sea.flat;
   const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
   d.value = w.raceDate; tm.value = S.tideTime || '12:00';
   drawTideGraph();
@@ -546,7 +548,7 @@ function paintSeg(): void {
 document.querySelectorAll<HTMLElement>('.seg').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode') ? v : Number(v);
+  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea') ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
 function openSetup(): void { courseView.close(); w.running = false; paintSeg(); courseCard(); $('setup').hidden = false; tideBox(); }
@@ -559,10 +561,10 @@ function beginRace(seed?: number): void {
   horn(1.0);
   const m0 = w.C.marks[0];
   toast(S.mode === 'sail'
-    ? `Just sail: open water, no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Try the tiller, the trim and the pole.`
+    ? `Just sail: open water, no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}. Try the tiller, the trim and the pole.`
     : S.mode === 'drill'
     ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
-    : `${S.seq}-minute sequence. Current: ${w.cur.label}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+    : `${S.seq}-minute sequence. Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
 }
 
 /* ---------------- start practice debrief ---------------- */

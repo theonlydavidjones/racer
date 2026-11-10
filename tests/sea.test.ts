@@ -5,7 +5,6 @@ import { beatAngle } from '../src/boat/polar';
 import { LL } from '../src/geo/geo';
 import type { Vec } from '../src/core/math';
 
-const KT = 0.5144;
 const LINE = LL(37.8115, -122.4433), CHANNEL = LL(37.817, -122.455);
 /** Wavelength about 1.2 boat-lengths: the chop that hurts a Folkboat most. */
 const T_BOATLENGTH = Math.sqrt(2 * Math.PI * 1.2 * 5.934 / 9.81);

@@ -67,6 +67,10 @@ export class Hud {
     this.poleHints(w, u);
     this.trimPanel(u);
     $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
+    // the sea where you are: chop height (what slows you), and the swell
+    { const s = u.sea, ft = (m: number) => (m / 0.3048).toFixed(1) + ' ft';
+      $('seaVal').textContent = s.hsW < 0.03 && s.hsS < 0.03 ? 'Flat' : ft(s.hsW);
+      $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · swell ${ft(s.hsS)}` : ''); }
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
     else {

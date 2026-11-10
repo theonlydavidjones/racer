@@ -241,9 +241,11 @@ export function buildBoatMesh(b: Boat): BoatMesh {
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
-export function syncBoatMesh(m: BoatMesh, b: Boat, t: number): void {
-  m.grp.position.copy(P3(b.x, b.y, Math.sin(t * 1.3 + b.id) * 0.06));
-  m.grp.rotation.y = -b.h * D2R; m.grp.rotation.z = b.heel * D2R; m.grp.rotation.x = Math.sin(t * 0.9 + b.id) * 0.012;
+export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: number; pitch: number; roll: number }): void {
+  // riding the waves: heave, pitch and roll from the sea surface under her (or a gentle bob in flat water)
+  const heave = wave ? wave.heave : Math.sin(t * 1.3 + b.id) * 0.03, pitch = wave ? wave.pitch : Math.sin(t * 0.9 + b.id) * 0.006;
+  m.grp.position.copy(P3(b.x, b.y, heave));
+  m.grp.rotation.y = -b.h * D2R; m.grp.rotation.z = b.heel * D2R + (wave ? wave.roll : 0); m.grp.rotation.x = pitch;
   // rudder and tiller: the helm. Turning to port (heading falling) means the tiller is pushed to starboard.
   const dt = m.prevT < 0 ? 0 : t - m.prevT; m.prevT = t;
   const rate = dt > 0 ? (((b.h - m.prevH + 540) % 360) - 180) / dt : 0; m.prevH = b.h; // deg/s

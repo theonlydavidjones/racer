@@ -41,7 +41,7 @@ body{
 
 #hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);
   left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;pointer-events:none;max-width:640px;margin:0 auto}
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;pointer-events:none;max-width:800px;margin:0 auto}
 .pod{background:var(--pod);border:1px solid var(--rule);border-radius:6px;padding:6px 8px 5px;min-width:0;display:flex;flex-direction:column;gap:1px}
 .lab{font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .val{font:700 24px/1.05 var(--f-inst);font-variant-numeric:tabular-nums;letter-spacing:.01em}

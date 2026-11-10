@@ -11,6 +11,8 @@ import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import type { Terrain } from './terrain';
+import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
+import type { SeaHere } from '../environment/sea';
 
 export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
 
@@ -29,6 +31,8 @@ export function fogBankAmount(tMin: number): number {
 
 /** Wind map on the water: PUFF_N × PUFF_N texels over PUFF_SPAN metres around the camera. */
 const PUFF_N = 160, PUFF_SPAN = 3200;
+/** Sea map resolution (samples per side). */
+const SEA_N = 24;
 
 /**
  * Water colour from the wind on it. Stronger wind roughens the surface: denser, higher-contrast ripples and a
@@ -45,12 +49,22 @@ const WATER_FRAGMENT = `
   float rough = clamp(0.85 + 0.55 * gust, 0.25, 1.4);
   diffuseColor.rgb *= mix(vec3(1.0), texelColor.rgb * mix(vec3(1.0), fine.rgb * 1.12, clamp(rough - 0.6, 0.0, 1.0)), rough);
   diffuseColor.rgb *= 1.0 - 0.38 * max(gust, 0.0) + 0.28 * max(-gust, 0.0);
-  float caps = smoothstep(12.0, 21.0, uMeanKt * kw);
-  float speck = smoothstep(0.9 - 0.1 * caps, 0.98, fine.r * texelColor.r);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), speck * caps * 0.75);
+  // the waves: their slope tilts the surface (light and reflections), whitecaps break on the crests
+  float camDF = length(vPuffXZ - cameraPosition.xz);
+  vec3 ws = waveSlope(vWaveP, vKW, vKS, camDF);
+  vec3 waveN = normalize((viewMatrix * vec4(normalize(vec3(-ws.x, 1.0, ws.y)), 0.0)).xyz);
+  float hsLocal = max(0.04, length(vec2(vKW * uHs.x, vKS * uHs.y)));
+  float crest = ws.z / (0.5 * hsLocal) * (1.0 - smoothstep(300.0, 1500.0, camDF));
+  float caps = clamp(vWhite * 35.0, 0.0, 1.0);
+  float speck = smoothstep(0.92 - 0.2 * caps, 0.99, fine.r * texelColor.r + 0.18 * crest);
+  float foam = caps * (smoothstep(0.6, 1.3, crest) * (0.55 + 0.45 * fine.g) + 0.6 * speck);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), clamp(foam, 0.0, 0.85));
   // the sky reflected in the water, strongest at a glancing angle (toward the horizon)
-  float fres = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 4.0);
-  totalEmissiveRadiance += uSkyCol * fres * 0.55 * uDay * (1.0 - 0.35 * max(gust, 0.0));
+  // (Schlick's Fresnel for water: 2% straight down, nearly all at a glancing angle; the wave slopes facing away
+  // from you catch the bright sky, the ones facing you look into the dark water)
+  float fres = 0.02 + 0.98 * pow(1.0 - clamp(abs(dot(waveN, normalize(vViewPosition))), 0.0, 1.0), 5.0);
+  diffuseColor.rgb *= 1.0 - 0.55 * fres * (1.0 - foam);
+  totalEmissiveRadiance += uSkyCol * fres * 0.95 * uDay * (1.0 - 0.3 * max(gust, 0.0)) * (1.0 - foam);
 `;
 
 /** Overhead view state: which way is up, how high the camera is (m), and how far it's panned from the boat (m). */
@@ -93,6 +107,15 @@ export class SceneView {
   private skyUni = { uSkyCol: { value: new THREE.Color('#aecbdb') }, uDay: { value: 1 } };
   private fogBank: THREE.Sprite[] = [];
   private skyAcc = 1;
+  /** The waves: one set, drawn by the water shader and ridden by the boats. */
+  private waves = new WaveSet();
+  private waveA = new Float32Array(N_WAVES * 4);
+  private waveB = new Float32Array(N_WAVES * 4);
+  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
+  private seaRef: SeaHere | null = null;
+  private seaAcc = 0;
+  /** Sea map: wind-sea and swell scale and whitecaps on a coarse grid (refreshed every 2 s), sampled into the wind map. */
+  private seaGrid: { x0: number; y0: number; cell: number; v: Float32Array } | null = null;
   /** The land (real terrain), once it has loaded, and the month to colour it for. */
   private land: Terrain | null = null;
   private landMonth = 0;
@@ -150,16 +173,37 @@ export class SceneView {
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni, this.skyUni);
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni);
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uHs; uniform float uWhiteRef;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vPuffXZ;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPuffXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+        .replace('#include <common>', '#include <common>\n' + decl)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
+          vPuffXZ = wp0.xz;
+          vec2 simP = vec2(wp0.x, -wp0.z);
+          vec2 puvV = (simP - uPuffO) / uPuffS;
+          float edgeV = smoothstep(0.0, 0.1, min(min(puvV.x, 1.0 - puvV.x), min(puvV.y, 1.0 - puvV.y)));
+          vec4 smV = texture2D(uPuff, clamp(puvV, 0.0, 1.0));
+          vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 20.0, edgeV);
+          vWaveP = simP;
+          vec3 dsp = waveDisp(simP, vKW, vKS, length(wp0.xz - cameraPosition.xz));
+          transformed += vec3(dsp.x, dsp.z, -dsp.y);
+          vec2 wuv = vec2((wp0.x + 60000.0) / 120000.0, (60000.0 - wp0.z) / 120000.0);
+          vMapUv = (mapTransform * vec3(wuv, 1.0)).xy;
+          vBumpMapUv = (bumpMapTransform * vec3(wuv, 1.0)).xy;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec3 uSkyCol; uniform float uDay; varying vec2 vPuffXZ;')
-        .replace('#include <map_fragment>', WATER_FRAGMENT);
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl)
+        .replace('#include <map_fragment>', WATER_FRAGMENT)
+        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;');
     };
-    const water = this.water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE, 120, 120), waterMat); // 1 km tiles: one huge quad loses depth precision across its diagonal
-    water.rotation.x = -Math.PI / 2; water.receiveShadow = true; scene.add(water);
+    // the water: a mesh that follows the camera, fine near it and coarse far out, displaced by the waves
+    const wg = waterGrid(), wgeo = new THREE.BufferGeometry();
+    wgeo.setAttribute('position', new THREE.BufferAttribute(wg.pos, 3));
+    wgeo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(wg.pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    wgeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(wg.pos.length / 3 * 2), 2));
+    wgeo.setIndex(new THREE.BufferAttribute(wg.index, 1));
+    const water = this.water = new THREE.Mesh(wgeo, waterMat) as unknown as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>;
+    water.frustumCulled = false; water.receiveShadow = true; scene.add(water);
 
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
@@ -195,7 +239,8 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   setWorld(w: World): void {
-    this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1;
+    this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
     const month = +w.raceDate.slice(5, 7) || new Date().getMonth() + 1; // the grass: gold in summer and autumn, green after the rains
     if (month !== this.landMonth) { this.landMonth = month; this.land?.setSeason(month); }
     const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)}`;
@@ -242,6 +287,16 @@ export class SceneView {
     }
   }
 
+  /** The sea map: how big the chop and swell are around `at`, relative to the sea at the focus, and the whitecaps. */
+  private updateSeaMap(w: World, at: { x: number; y: number }, span: number): void {
+    const ref = this.seaRef!, cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
+    for (let j = 0; j < SEA_N; j++) for (let i = 0; i < SEA_N; i++) {
+      const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
+      v[o] = ref.hsW > 0.01 ? s.hsW / ref.hsW : 1; v[o + 1] = ref.hsS > 0.01 ? s.hsS / ref.hsS : 1; v[o + 2] = s.white;
+    }
+    this.seaGrid = { x0, y0, cell, v };
+  }
+
   /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
   private drawWindOnWater(w: World, at: { x: number; y: number }, span: number): void {
     const PUFF_SPAN = span, cell = span / PUFF_N, x0 = Math.round((at.x - PUFF_SPAN / 2) / cell) * cell, y0 = Math.round((at.y - PUFF_SPAN / 2) / cell) * cell;
@@ -258,7 +313,19 @@ export class SceneView {
     const tg = this.terrain, d = this.puffData;
     for (let j = 0; j < PUFF_N; j++) for (let i = 0; i < PUFF_N; i++) {
       const kk = Math.min(1.8, Math.max(0.4, (1 + sum[j * PUFF_N + i]) * (tg ? tg.at(x0 + (i + 0.5) * cell, y0 + (j + 0.5) * cell) : 1)));
-      d[(j * PUFF_N + i) * 4] = Math.round((kk - 0.4) / 1.4 * 255);
+      const o = (j * PUFF_N + i) * 4;
+      d[o] = Math.round((kk - 0.4) / 1.4 * 255);
+      const sg = this.seaGrid;
+      if (sg) {
+        // the sea map, bilinear from the coarse grid
+        const gx = Math.min(SEA_N - 1.001, Math.max(0, (x0 + (i + 0.5) * cell - sg.x0) / sg.cell)), gy = Math.min(SEA_N - 1.001, Math.max(0, (y0 + (j + 0.5) * cell - sg.y0) / sg.cell));
+        const a = Math.floor(gx), b = Math.floor(gy), u = gx - a, v = gy - b;
+        for (let ch = 0; ch < 3; ch++) {
+          const q = (ii: number, jj: number) => sg.v[(jj * SEA_N + ii) * 3 + ch];
+          const val = (q(a, b) * (1 - u) + q(a + 1, b) * u) * (1 - v) + (q(a, b + 1) * (1 - u) + q(a + 1, b + 1) * u) * v;
+          d[o + 1 + ch] = Math.round(Math.min(1, Math.max(0, ch < 2 ? val / 2 : val * 20)) * 255);
+        }
+      } else { d[o + 1] = d[o + 2] = 128; d[o + 3] = 0; }
     }
     this.puffTex.needsUpdate = true;
     this.puffUni.uPuffO.value.set(x0, y0); this.puffUni.uPuffS.value = span;
@@ -349,7 +416,21 @@ export class SceneView {
     if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user); }
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
-    w.boats.forEach((b, i) => syncBoatMesh(this.boatMeshes[i], b, t));
+    // the waves: heights for the sea where you are, then the sea map around you (every 2 s)
+    const focus = viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user;
+    this.seaAcc += dt;
+    if (!this.seaRef || this.seaAcc > 2) {
+      this.seaAcc = 0; this.seaRef = w.seaHere(focus);
+      this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
+    }
+    const tw = w.t + 600; // wave time: the sim's clock, so the waves pause, speed up and replay with it
+    this.waves.update(this.seaRef, w.windModel.base, dt);
+    this.waves.pack(this.waveA, this.waveB);
+    this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(this.waves.ref.hsW, this.waves.ref.hsS); this.waveUni.uWhiteRef.value = this.seaRef.white;
+    w.boats.forEach((b, i) => {
+      const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
+      syncBoatMesh(this.boatMeshes[i], b, t, boatOnWaves(this.waves, b, b.h, tw, kW, kS));
+    });
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     camera.up.set(0, 1, 0);
@@ -375,6 +456,8 @@ export class SceneView {
       const up = V(overheadUp(over, w)), cx = u.x + over.off.x, cy = u.y + over.off.y;
       camera.position.copy(P3(cx, cy, over.height)); camera.up.set(up.x, 0, -up.y); camera.lookAt(P3(cx, cy, 0));
     }
+    // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
+    this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.renderer.render(this.scene, camera);
   }
 }

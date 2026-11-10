@@ -19,6 +19,7 @@
   <div class="pod"><span class="lab">Boatspeed</span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0 kt</span></div>
   <div class="pod"><span class="lab">Heading</span><span class="val" id="hdg">000</span><span class="sub" id="tackLab">Starboard</span></div>
   <div class="pod"><span class="lab">Wind</span><span class="val" id="twd">270</span><span class="sub" id="shiftLab">12 kt</span></div>
+  <div class="pod"><span class="lab">Sea</span><span class="val" id="seaVal">Flat</span><span class="sub" id="seaSub">no waves</span></div>
 </header>
 <canvas id="dial" aria-label="Wind angle dial"></canvas>
 <canvas id="map" aria-label="Course map, tap to zoom"></canvas>
@@ -79,6 +80,10 @@
     <div class="field"><span>Current</span>
       <div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div>
       <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small></div>
+    <div class="field"><span>Sea</span>
+      <div class="seg" data-k="sea"><button type="button" data-v="real">Real waves</button><button type="button" data-v="flat">Flat water</button></div>
+      <div class="seg" data-k="swellDay" id="swellDaySeg"><button type="button" data-v="0">Small swell</button><button type="button" data-v="1">Typical swell</button><button type="button" data-v="2">Big swell</button></div>
+      <small id="seaNote">Chop from the wind over the water and the open water upwind; an ebb against the westerly makes it bigger and steeper. Ocean swell from the San Francisco Bar buoy's records for the month, dying away inside the Gate. Chop slows you most upwind, so foot a little to keep her going.</small></div>
     <div class="field" id="tideBox" hidden><span>Race day</span>
       <div class="tiderow"><label>Date <input type="date" id="tideDate"></label><label>Start signal <input type="time" id="tideTime" step="300"></label></div>
       <canvas id="tideGraph" aria-label="Current and wind at the start line through the day"></canvas>
