@@ -10,6 +10,7 @@ import { laylinesFor } from '../sim/laylines';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
+import { REFLECTIVE } from './boatMesh';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
@@ -138,6 +139,10 @@ export class SceneView {
   private skyUni = { uSkyCol: { value: new THREE.Color('#aecbdb') }, uDay: { value: 1 } };
   private fogBank: THREE.Sprite[] = [];
   private skyAcc = 1;
+  /** The sky as a cube map, for reflections on gelcoat, varnish and alloy (refreshed every half minute). */
+  private envTarget = new THREE.WebGLCubeRenderTarget(128);
+  private envCam = new THREE.CubeCamera(1, 100000, this.envTarget);
+  private envAcc = 99;
   /** The waves: one set, drawn by the water shader and ridden by the boats. */
   private waves = new WaveSet();
   private waveA = new Float32Array(N_WAVES * 4);
@@ -195,6 +200,7 @@ export class SceneView {
     Object.assign(sm.uniforms, { turbidity: { value: 2.0 }, rayleigh: { value: 2.6 }, mieCoefficient: { value: 0.004 } });
     sm.uniforms.mieDirectionalG.value = 0.8; sm.uniforms.cloudCoverage.value = 0.18; sm.uniforms.cloudDensity.value = 0.35;
     scene.add(sky); scene.background = null;
+    sky.layers.enable(1); this.envCam.children.forEach(c => c.layers.set(1)); // the cube camera sees only the sky
     this.buildFogBank();
 
     // water: a streaky texture that drifts with the current
@@ -496,6 +502,11 @@ export class SceneView {
     this.curUni.uCurMean.value.set(w.cvec.x, w.cvec.y);
     this.skyAcc += dt;
     if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user); }
+    this.envAcc += dt;
+    if (this.envAcc > 30) {
+      this.envAcc = 0; this.envCam.update(this.renderer, this.scene);
+      for (const r of REFLECTIVE) if (r.mat.envMap !== this.envTarget.texture) { r.mat.envMap = this.envTarget.texture; r.mat.needsUpdate = true; }
+    }
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     // the waves: heights for the sea where you are, then the sea map around you (every 2 s)

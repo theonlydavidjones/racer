@@ -23,15 +23,18 @@ const JIB_DEF: SailDef = { tack: V3(0, 0, 0), head: V3(0, 6.1, 2.35), clew: V3(0
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 const JIB_AXIS = new THREE.Vector3(0, 6.1, 2.35).normalize(); // the forestay: the jib swings around it, so its luff stays on the stay
 
+/** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
+export const REFLECTIVE: { mat: THREE.MeshPhongMaterial; amount: number }[] = [];
+const reflect = <T extends THREE.MeshPhongMaterial>(m: T, amount: number): T => { m.combine = THREE.MixOperation; m.reflectivity = amount; REFLECTIVE.push({ mat: m, amount }); return m; };
 const MAT = {
   deck: new THREE.MeshLambertMaterial({ color: 0xb98d5c, side: THREE.DoubleSide }), // laid teak / varnish
   cabin: new THREE.MeshLambertMaterial({ color: 0xece6d8 }),
   spar: new THREE.MeshLambertMaterial({ color: 0xc7a06a }), // varnished spruce
   // fiberglass boats: off-white non-skid gelcoat deck, anodised aluminium spars
   deckGrp: new THREE.MeshLambertMaterial({ color: 0xb9b5ab, side: THREE.DoubleSide }), // matte non-skid reads darker than the glossy cabin top
-  sparAlu: new THREE.MeshPhongMaterial({ color: 0xaeb5bc, specular: 0x9aa0a6, shininess: 70 }),
+  sparAlu: reflect(new THREE.MeshPhongMaterial({ color: 0xaeb5bc, specular: 0x9aa0a6, shininess: 70 }), 0.22),
   wire: new THREE.LineBasicMaterial({ color: 0x333333 }),
-  wood: new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40 }), // varnished trim
+  wood: reflect(new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40 }), 0.06), // varnished trim
   tiller: new THREE.MeshPhongMaterial({ color: 0xb07a44, specular: 0x664422, shininess: 50 }),
   cream: new THREE.MeshLambertMaterial({ color: 0xebe5d6, side: THREE.DoubleSide }),
   mahogany: new THREE.MeshPhongMaterial({ color: 0x6e3f22, specular: 0x442211, shininess: 45, side: THREE.DoubleSide }),
@@ -47,8 +50,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const F = FLEET[b.id] ?? FLEET[1], glass = b.build.hull === 'fiberglass';
   const C = (h: string) => new THREE.Color(h);
   const hullMat = glass
-    ? new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x777777, shininess: 75 }) // glossy gelcoat
-    : new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: b.hullColor === '#9a6a36' ? 60 : 25 }); // painted or varnished planking
+    ? reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x777777, shininess: 75 }), 0.14) // glossy gelcoat, reflecting the sky
+    : reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: b.hullColor === '#9a6a36' ? 60 : 25 }), b.hullColor === '#9a6a36' ? 0.08 : 0.04); // painted or varnished planking
   grp.add(new THREE.Mesh(hullGeometry({ topsides: C(b.hullColor), boot: C(F.paint.boot), bottom: C(F.paint.bottom) }), hullMat));
   // deck: non-skid on glassfibre boats, painted canvas on the wooden ones
   const deckMat = new THREE.MeshLambertMaterial({ color: F.paint.deck, side: THREE.DoubleSide });
@@ -205,14 +208,18 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // aluminium extrusion: constant section; wooden mast: tapered
   const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.055, 0.06, 9.0, 10) : new THREE.CylinderGeometry(0.05, 0.08, 9.0, 6), spar); mast.position.set(0, 4.9, -0.6); rig.add(mast);
   // Your own sails are slightly see-through, as Dacron is in daylight, so the leeward telltales show through.
-  const sailMat = b.isUser
-    ? new THREE.MeshLambertMaterial({ color: b.sailColor, side: THREE.DoubleSide, transparent: true, opacity: 0.86 })
-    : new THREE.MeshLambertMaterial({ color: b.sailColor, side: THREE.DoubleSide });
+  // Dacron sails: crosscut panel seams, the class letter, and the sail number on the main (starboard side higher, RRS
+  // Appendix G), each side its own picture so the numbers read the right way round from both sides
+  const sm = (side: 'front' | 'back', main: boolean) => new THREE.MeshLambertMaterial({
+    map: sailTexture(b.sailColor, main ? b.no : '', side === 'back', main), side: side === 'front' ? THREE.FrontSide : THREE.BackSide,
+    transparent: b.isUser, opacity: b.isUser ? 0.86 : 1
+  });
+  const sailMat = sm('front', true), sailBack = sm('back', true), jibMat = sm('front', false), jibBack = sm('back', false);
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, -0.6); rig.add(boomPivot);
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 3.3, alu ? 10 : 5), spar); boom.rotation.x = Math.PI / 2; boom.position.set(0, 1.05, 1.65); boomPivot.add(boom);
-  const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT); boomPivot.add(main.mesh);
+  const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT, sailBack); boomPivot.add(main.mesh);
   const jibPivot = new THREE.Group(); jibPivot.position.set(0, 0.75, -3.7); rig.add(jibPivot);
-  const jib = new Sail(JIB_DEF, sailMat, null); jibPivot.add(jib.mesh);
+  const jib = new Sail(JIB_DEF, jibMat, null, jibBack); jibPivot.add(jib.mesh);
   // Telltales on your own boat: three pairs on the jib luff, one at each batten on the main leech.
   const jibTells = { windward: [] as Telltale[], leeward: [] as Telltale[] }, leechTells: Telltale[] = [];
   if (b.isUser) {
@@ -383,4 +390,29 @@ function syncLines(m: BoatMesh, b: Boat): void {
     const mid2 = car.clone().lerp(wv, 0.5); mid2.y -= loaded ? 0 : 0.1;
     q.setXYZ(3, mid2.x, mid2.y, mid2.z); q.setXYZ(4, wv.x, wv.y, wv.z); q.needsUpdate = true;
   }
+}
+
+/**
+ * A sail's picture (u: luff → leech, v: foot → head): sailcloth, crosscut seams, and on the main the class letter
+ * near the head and the sail number, starboard side above port. `mirror` draws the other side's view.
+ */
+function sailTexture(color: string, no: string, mirror: boolean, main: boolean): THREE.CanvasTexture {
+  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  g.fillStyle = color; g.fillRect(0, 0, W, H);
+  // crosscut panels: seams across the sail, roughly square to the leech
+  g.strokeStyle = 'rgba(120,115,100,.28)'; g.lineWidth = 2;
+  for (let i = 1; i < (main ? 12 : 8); i++) { const y = H - i * H / (main ? 12 : 8); g.beginPath(); g.moveTo(0, y + 10); g.lineTo(W, y - 6); g.stroke(); }
+  if (main && no) {
+    const put = (txt: string, v: number, size: number, col: string) => {
+      g.save(); g.translate(mirror ? W : 0, 0); g.scale(mirror ? -1 : 1, 1);
+      g.fillStyle = col; g.font = `bold ${size}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(txt, W * 0.42, H * (1 - v)); g.restore();
+    };
+    put('F', 0.84, 58, '#1d3f8f'); // the class letter near the head
+    // starboard side (the front of the cloth) carries the number higher than the port side
+    put(no.replace(/^US\s*/, 'USA '), mirror ? 0.5 : 0.6, 36, '#20242c');
+  }
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+  return t;
 }

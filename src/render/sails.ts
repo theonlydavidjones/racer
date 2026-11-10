@@ -36,7 +36,10 @@ export class Sail {
   private tVals: number[];
   private sVals: number[];
 
-  constructor(readonly def: SailDef, sailMat: THREE.Material, windowMat: THREE.Material | null) {
+  /** The sail seen from its other side (its own material, so numbers read the right way round from both sides). */
+  readonly back: THREE.Mesh | null = null;
+
+  constructor(readonly def: SailDef, sailMat: THREE.Material, windowMat: THREE.Material | null, backMat: THREE.Material | null = null) {
     // grid lines: evenly spaced, plus the window's edges so its corners come out square
     const grid = (n: number, extra: number[]) => [...new Set([...Array(n + 1).keys()].map(i => i / n).concat(extra))].sort((a, b) => a - b);
     const w = def.window;
@@ -45,6 +48,10 @@ export class Sail {
     const R = this.tVals.length - 1, C = this.sVals.length - 1;
     this.pos = new Float32Array((R + 1) * (C + 1) * 3);
     this.geom.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    // texture coordinates: across the sail from luff (0) to leech (1), and up from foot (0) to head (1)
+    const uv = new Float32Array((R + 1) * (C + 1) * 2); let q = 0;
+    for (const t of this.tVals) for (const sv of this.sVals) { uv[q++] = sv; uv[q++] = t; }
+    this.geom.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     // two index groups: sailcloth, then the window cells
     const cloth: number[] = [], win: number[] = [];
     for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) {
@@ -58,6 +65,7 @@ export class Sail {
     if (win.length) this.geom.addGroup(cloth.length, win.length, 1);
     this.mesh = new THREE.Mesh(this.geom, windowMat ? [sailMat, windowMat] : [sailMat]);
     this.mesh.frustumCulled = false;
+    if (backMat) { this.back = new THREE.Mesh(this.geom, windowMat ? [backMat, windowMat] : [backMat]); this.back.frustumCulled = false; this.mesh.add(this.back); }
     if (def.battens?.length) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(def.battens.length * 5 * 2 * 3), 3));
