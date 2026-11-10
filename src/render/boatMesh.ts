@@ -86,7 +86,6 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
   const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
-  const flatMat = teak ? new THREE.MeshLambertMaterial({ color: silver ? 0xa6a197 : 0xa8723f, side: THREE.DoubleSide }) : deckMat; // cockpit sole (teak, no planking drawn)
   const cabinTopMat = teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : deckMat; // a teak-decked boat's cabin top: painted canvas
   grp.add(new THREE.Mesh(deckGeometry(), deckMat));
   // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top
@@ -111,8 +110,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     gr.position.set(s * (CABIN.w - 0.17), cab.topY((CABIN.u0 + CABIN.u1) / 2 + 0.03) + 0.06, zc((CABIN.u0 + CABIN.u1) / 2 + 0.03)); grp.add(gr);
   }
   // cockpit well, seats, and coamings
-  cockpitGeometry().forEach((g, i) => grp.add(new THREE.Mesh(g, i === 0 ? flatMat : MAT.cream))); // non-skid sole, cream sides
-  for (const g of cockpitSeats()) grp.add(new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40, side: THREE.DoubleSide })));
+  // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
+  const cockpitTeak = new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide });
+  for (const g of [...cockpitGeometry(), ...cockpitSeats()]) grp.add(new THREE.Mesh(plankUV(g), cockpitTeak));
   for (const s of [1, -1]) {
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= 12; i++) { const u = COCKPIT.u0 + (COCKPIT.u1 - COCKPIT.u0) * i / 12; pts.push(new THREE.Vector3(s * (cockpitHalf(u) + 0.01), deckY(u, cockpitHalf(u)), zc(u))); }
@@ -551,6 +551,22 @@ function nameColor(hull: string, boot: string): string {
 
 const teakCache = new Map<boolean, THREE.CanvasTexture>();
 /** Laid teak: planks with black caulked seams and grain; weathered silver-grey, or oiled and polished. */
+/**
+ * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
+ * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
+ */
+function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];
+  for (let i = 0; i < p.count; i++) {
+    const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
+    if (ny > 0.7) uv.push(p.getX(i) / 0.28, p.getZ(i) / 2.4);
+    else if (nx >= nz) uv.push(p.getY(i) / 0.28, p.getZ(i) / 2.4);
+    else uv.push(p.getY(i) / 0.28, p.getX(i) / 2.4);
+  }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
 function teakTexture(silver: boolean): THREE.CanvasTexture {
   const hit = teakCache.get(silver); if (hit) return hit;
   const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
