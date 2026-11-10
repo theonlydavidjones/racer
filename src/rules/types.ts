@@ -16,8 +16,12 @@ export interface RulesBoat {
   leg: number; // index of her next mark
   /** Her heading RULE16_WINDOW seconds ago (for Rule 16.1). Omit if unknown. */
   headingAgo?: number;
-  /** She is sailing above her proper course (for Rule 17). Omit if unknown. */
+  /** She is sailing above her proper course (for Rules 17 and 23). Omit if unknown. */
   aboveProper?: boolean;
+  /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
+  backing?: boolean;
+  /** She has finished, so she is no longer racing (Rule 23.1). */
+  finished?: boolean;
 }
 
 export interface RulesMark {
@@ -36,9 +40,14 @@ export interface RulesContext {
   marks: RulesMark[]; // the course's mark sequence
   /** Close-hauled true wind angle, deg (for "fetching" a mark). Default 42. */
   beat?: number;
+  /**
+   * The nearest obstruction to a point (Rule 19): the shore, and after the start the committee boat. Distance (m) and
+   * a unit vector pointing from it toward the water, or null if none is near. `committee`: include the committee boat.
+   */
+  obstacle?: (p: Vec, committee: boolean) => { d: number; n: Vec; continuing: boolean } | null;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.3' | '20' | '21.1' | '21.2';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -72,6 +81,14 @@ export interface PairRecord {
   seenTack: Record<number, number>;
   /** For each boat in the zone of the next mark: has she been on starboard tack since entering it? (Rule 18.3) */
   stbdInZone: Record<number, boolean>;
+  /** Were they overlapped at the last step (to see an overlap begin)? */
+  wasOverlapped: boolean;
+  /**
+   * How the present overlap began: which boat had been clear astern, which had just tacked, and at that moment who was
+   * inside at the mark and whether the outside boat could give mark-room (Rule 18.2(d)), and who was inside at an
+   * obstruction and whether the outside boat could give room there (Rule 19.2(b), and 19.2(c) at a continuing one).
+   */
+  ovStart: { t: number; astern: number | null; tacker: number | null; insideMark: number | null; markUnable: boolean; insideObst: number | null; obstUnable: boolean } | null;
 }
 
 /** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */
@@ -84,7 +101,7 @@ export interface Hail {
 }
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {} });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 
@@ -98,5 +115,9 @@ export interface Incident<B> {
   turned?: number;
   /** Rule 20 hail incidents: whether the fouler was the hailed boat (didn't respond) or the hailing boat (didn't tack after the response). */
   hailRole?: 'hailed' | 'hailer';
+  /** Which part of the rule: '19.2(b)' or '19.2(c)'; '23.1' or '23.2'. */
+  part?: string;
+  /** Rule 43.1(a): she broke the rule only because another boat's breach compelled her to: no penalty. The other boat's id. */
+  exoneratedBy?: number;
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }

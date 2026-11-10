@@ -1,4 +1,4 @@
-import { LOA, V, ZONE, brg, dist, wrap } from '../core/math';
+import { LOA, V, ZONE, brg, dist, dot, segPt, wrap, type Vec } from '../core/math';
 import { clearAstern, hullGap } from './geometry';
 import { rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
@@ -39,6 +39,36 @@ export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: 
   if (h.respondedAt == null) return t >= h.at + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
   const hailerTacked = hailer.lastTackT >= h.at || hailer.tacking;
   return !hailerTacked && t >= h.respondedAt + HAIL_RESPONSE ? { boat: hailer, role: 'hailer' } : null;
+}
+
+/** Room for a Folkboat to pass between a boat and a mark or obstruction: her beam and a little, m. */
+export const ROOM_GAP = 3.5;
+/** Rule 19: a boat this close to an obstruction (m) is at it, and needs room to pass it. */
+export const AT_OBSTRUCTION = 1.5 * LOA;
+
+/** The hull's gap to a point, m (her bow-to-stern line). */
+function gapTo(b: RulesBoat, p: Vec): number {
+  const u = V(b.h), h = LOA / 2;
+  return segPt(p, { x: b.x + u.x * h, y: b.y + u.y * h }, { x: b.x - u.x * h, y: b.y - u.y * h });
+}
+
+/** True wind angle, deg (0..180). */
+const twaOf = (b: RulesBoat, windFrom: number) => Math.abs(wrap(windFrom - b.h));
+/** The tack she'd be on sailing `course`. */
+const tackFor = (course: number, windFrom: number) => (wrap(windFrom - course) >= 0 ? 'S' : 'P');
+
+/**
+ * Rule 18.4: an inside overlapped right-of-way boat that must gybe at the mark to sail her proper course shall, until
+ * she gybes, sail no farther from the mark than needed. Is `b` sailing away from the mark when she should be gybing?
+ */
+export function wideOfGybe(b: RulesBoat, idx: number, ctx: RulesContext): boolean {
+  const mk = ctx.marks[idx], next = ctx.marks[idx + 1];
+  if (!next || mk.type !== 'round') return false;
+  const course = brg(next.p.x - mk.p.x, next.p.y - mk.p.y);
+  const mustGybe = twaOf(b, ctx.windFrom) > 90 && Math.abs(wrap(ctx.windFrom - course)) > 60 && tackFor(course, ctx.windFrom) !== b.tack;
+  if (!mustGybe) return false;
+  const d = dist(b, mk.p), away = d > 0 ? ((b.x - mk.p.x) * b.vx + (b.y - mk.p.y) * b.vy) / d : 0;
+  return d > 1.2 * LOA && away > 0.3;
 }
 
 /** Rule 20.2(c): how long after a "You tack" reply the hailing boat has to get round and clear, s. */
@@ -119,6 +149,22 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     if (rec.mark && A.leg > rec.mark.idx && B.leg > rec.mark.idx) rec.mark = null;
     if (rec.r183 && (A.leg !== rec.r183.idx || B.leg !== rec.r183.idx)) rec.r183 = null;
   }
+  // How an overlap began (Rules 18.2(d), 19.2(b) and 19.2(c)): who came from clear astern or tacked, and could the
+  // outside boat give room at that moment?
+  const overlapped = !clearAstern(A, B) && !clearAstern(B, A);
+  if (overlapped && !rec.wasOverlapped) {
+    const astern = rec.rule === '12' && rec.kc != null ? rec.kc : null;
+    const tacker = ctx.t - A.lastTackT < JUST_TACKED + 1 ? A.id : ctx.t - B.lastTackT < JUST_TACKED + 1 ? B.id : null;
+    let insideMark: number | null = null, markUnable = false, insideObst: number | null = null, obstUnable = false;
+    if (A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
+      const mk = ctx.marks[A.leg], ins = dist(A, mk.p) < dist(B, mk.p) ? A : B, out = ins === A ? B : A;
+      insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
+    }
+    const com = ctx.t > 0 && A.started && B.started, oA = ctx.obstacle?.(A, com), oB = ctx.obstacle?.(B, com);
+    if (oA && oB) { const ins = oA.d < oB.d ? A : B, oo = ins === A ? oB : oA; insideObst = ins.id; obstUnable = oo.d - 1.1 < ROOM_GAP; }
+    rec.ovStart = { t: ctx.t, astern, tacker, insideMark, markUnable, insideObst, obstUnable };
+  } else if (!overlapped) rec.ovStart = null;
+  rec.wasOverlapped = overlapped;
   rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT;
 
   const r = rightOfWay(A, B, ctx, rec);
@@ -159,12 +205,27 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   else if (obs.swerve) kind = 'swerve';
   if (!kind) return { verdict: r, incident: null };
 
+  // boats that have both finished aren't racing: no penalties between them
+  if (A.finished && B.finished) return { verdict: r, incident: null };
   rec.cool = ctx.t + INCIDENT_COOLDOWN;
-  let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null, turned: number | undefined;
-  const row = r.kc === A ? B : A;
-  if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
+  let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null, turned: number | undefined, part: string | undefined;
+  const row = r.kc === A ? B : A, kc = r.kc;
+  const obst = rule19(A, B, r.rule, rec, ctx);
+  if (kc.finished && !row.finished) {
+    // Rule 23.1: a boat not racing (she has finished) shall not interfere with a boat that is racing
+    rule = '23'; part = '23.1';
+  } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
     // Rule 15: she only just got right of way
     fouler = rec.by === A.id ? A : B; rule = '15'; byWhy = rec.byWhy;
+  } else if (obst) {
+    // Rule 19: room to pass an obstruction
+    fouler = obst.fouler; rule = '19'; part = obst.part;
+  } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
+    // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
+    fouler = row; rule = '18.4';
+  } else if (!row.finished && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (kc.ocs && ctx.t > 0)) && ((ctx.t > 0 && row.aboveProper) || turnedToward(row, kc) > 0))) {
+    // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper course
+    fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
   } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {
     // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond.
     // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is passing astern of her.
@@ -173,5 +234,30 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // Rule 17: overlapped from astern within two lengths, then sailed above her proper course
     fouler = row; rule = '17';
   }
-  return { verdict: r, incident: { kind, fouler, rule, byWhy, turned, verdict: r } };
+  return { verdict: r, incident: { kind, fouler, rule, byWhy, turned, part, verdict: r } };
+}
+
+/**
+ * Rule 19 at an incident between overlapped boats at an obstruction (the shore, or the committee boat after the start).
+ * The boat nearer it is inside. 19.2(b): the outside boat gives the inside boat room between her and the obstruction,
+ * unless she couldn't from the moment the overlap began; squeezing the inside boat toward it breaks the rule.
+ * 19.2(c): at a continuing obstruction (the shore), a boat that came from clear astern into a gap that wasn't there
+ * isn't entitled to room, and keeps clear. Only in place of the basic rules (10–13), not Section D, 18 or 20.
+ */
+function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord, ctx: RulesContext): { fouler: B; part: string } | null {
+  if (!ctx.obstacle || !['10', '11', '12', '13'].includes(basic)) return null;
+  const sameTackOrDeep = A.tack === B.tack || (twaOf(A, ctx.windFrom) > 90 && twaOf(B, ctx.windFrom) > 90); // Definitions, Overlap
+  if (!sameTackOrDeep || clearAstern(A, B) || clearAstern(B, A)) return null;
+  const com = ctx.t > 0 && A.started && B.started, oA = ctx.obstacle(A, com), oB = ctx.obstacle(B, com);
+  if (!oA || !oB) return null;
+  const I = oA.d < oB.d ? A : B, O = I === A ? B : A, oI = I === A ? oA : oB;
+  if (oI.d > AT_OBSTRUCTION) return null;
+  const ov = rec.ovStart, unable = !!ov && ov.insideObst === I.id && ov.obstUnable;
+  if (oI.continuing && unable && ov!.astern === I.id) return { fouler: I, part: '19.2(c)' };
+  // squeezing: the outside boat moving in toward the obstruction (and the inside boat), more than the inside boat is
+  // moving out toward her
+  const inward = -dot({ x: O.vx, y: O.vy }, oI.n), outward = dot({ x: I.vx, y: I.vy }, oI.n);
+  const squeeze = inward > 0.15 && inward > outward;
+  if (squeeze && !unable) return { fouler: O, part: '19.2(b)' };
+  return null;
 }

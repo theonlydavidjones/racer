@@ -8,7 +8,7 @@ import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './ren
 import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V } from './core/math';
-import { RULES, explain, type Incident } from './rules';
+import { EXONERATION, RULES, explain, type Incident } from './rules';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import type { Boat } from './boat/boat';
 import { randomSeed } from './core/rng';
@@ -84,20 +84,22 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   const mr = inc.verdict.mr;
   const ex = explain({
     youFouled: youFault, other: other.name, userTack: user.tack, rule: inc.rule, kind: inc.kind, byWhy: inc.byWhy,
-    markName: mr ? w.C.marks[mr.idx].name : inc.rule === '18.3' ? w.nextMark(user)?.name : undefined, markOverlapped: mr?.overlapped, turned: inc.turned, hailRole: inc.hailRole
+    markName: mr ? w.C.marks[mr.idx].name : inc.rule === '18.3' ? w.nextMark(user)?.name : undefined, markOverlapped: mr?.overlapped, turned: inc.turned, hailRole: inc.hailRole,
+    part: inc.part, exoneratedBy: inc.exoneratedBy != null ? w.boats[inc.exoneratedBy].name : undefined
   });
+  const exonerated = inc.exoneratedBy != null;
   $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : inc.kind === 'hail' ? 'Didn\'t answer a hail' : 'Forced to avoid'}` : `${other.name} fouled you`;
   $('rTitle').textContent = RULES[inc.rule][0];
-  $('rRule').textContent = RULES[inc.rule][1];
+  $('rRule').textContent = RULES[inc.rule][1] + (exonerated ? ' ' + EXONERATION : '');
   $('rVerdict').className = 'verdict' + (youFault ? '' : ' ok');
   $('rWhat').textContent = ex.what;
   $('rTip').textContent = ex.tip;
   const turns = w.penaltyDeg === 720 ? 'two turns' : 'one turn';
-  $('rPen').textContent = youFault
+  $('rPen').textContent = exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
     ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a gybe (Rule 44.2).`
     : `${other.name} takes a ${turns} penalty.`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
-  pendingPenalty = inc.fouler;
+  pendingPenalty = exonerated ? null : inc.fouler;
   lastClip = clip;
   $('replay').hidden = false;
   replayView.play(w, clip);

@@ -10,7 +10,7 @@ import { FLAT_SEA, SeaField, swellFor, type SeaHere } from '../environment/sea';
 import { Puffs, breezeAt, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindModel } from '../environment/wind';
 import { onLand, shoreDist } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -32,8 +32,18 @@ export const ONE_TURN = 360;
 /** Half the hull's width for mark contact, m (a Folkboat is 2.2 m wide, narrower toward the ends). */
 const HULL_HALF_BEAM = 0.85;
 
-/** A mark a boat could touch: where it is and how big its float is. */
-export interface Touchable { name: string; p: Vec; r: number }
+/** A mark a boat could touch: where it is and how big its float is. A boat (the committee boat) is a line from `p`
+ * to `q` with half-width `r`. `rule31`: touching it is a Rule 31 touch (otherwise it's just something solid). */
+export interface Touchable { name: string; p: Vec; r: number; q?: Vec; rule31?: boolean }
+/** Gap between a hull (bow to stern) and a mark or the committee boat's hull, m (before subtracting widths). */
+function solidGap(bw: Vec, st: Vec, m: Touchable): number {
+  if (!m.q) return segPt(m.p, bw, st);
+  return Math.min(segPt(m.p, bw, st), segPt(m.q, bw, st), segPt(bw, m.p, m.q), segPt(st, m.p, m.q));
+}
+/** How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. */
+const SAME_INCIDENT = 8;
+/** A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. */
+const COMPELLED_WINDOW = 3;
 
 export interface StartReport { delay: number; frac: number; kt: number }
 
@@ -98,6 +108,10 @@ export class World {
   userFinishT: number | null = null;
   groundToast = { t: -99 };
   events: SimEvent[] = [];
+  /** When each boat last broke a Part 2 rule, and last touched a mark (Rule 44.1(a)); who last fouled each boat (Rule 43.1(a)). */
+  private lastFoul = new Map<number, number>();
+  private lastTouch = new Map<number, number>();
+  private fouledAt = new Map<number, { by: number; t: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
   private hHist: number[][] = [];
 
@@ -186,7 +200,33 @@ export class World {
   }
 
   /* ---------- queries used by AI, HUD and rendering ---------- */
-  rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt) }; }
+  rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt), obstacle: this.obstacle }; }
+  /** The committee boat's hull, as a line along the wind with its half-width (null if the committee end is not a boat). */
+  get committeeHull(): Touchable | null {
+    if (this.C.committeeKind !== 'boat') return null;
+    const u = V(this.C.base), c = this.C.committee;
+    return { name: 'the committee boat', p: { x: c.x + u.x * 6, y: c.y + u.y * 6 }, q: { x: c.x - u.x * 6, y: c.y - u.y * 6 }, r: 2 };
+  }
+  /** Rule 19: the nearest obstruction (the shore; after the start, the committee boat) within 30 m. */
+  private obstacle = (p: Vec, committee: boolean): { d: number; n: Vec; continuing: boolean } | null => {
+    let best: { d: number; n: Vec; continuing: boolean } | null = null;
+    const ds = shoreDist(p);
+    if (ds < 30) {
+      const e = 0.5, gx = shoreDist({ x: p.x + e, y: p.y }) - shoreDist({ x: p.x - e, y: p.y }), gy = shoreDist({ x: p.x, y: p.y + e }) - shoreDist({ x: p.x, y: p.y - e });
+      const l = Math.hypot(gx, gy) || 1;
+      best = { d: ds, n: { x: gx / l, y: gy / l }, continuing: true };
+    }
+    const cb = committee ? this.committeeHull : null;
+    if (cb) {
+      const d = segPt(p, cb.p, cb.q!) - cb.r;
+      if (d < 30 && (!best || d < best.d)) {
+        const ax = cb.q!.x - cb.p.x, ay = cb.q!.y - cb.p.y, k = Math.max(0, Math.min(1, ((p.x - cb.p.x) * ax + (p.y - cb.p.y) * ay) / (ax * ax + ay * ay)));
+        const dx = p.x - (cb.p.x + ax * k), dy = p.y - (cb.p.y + ay * k), l = Math.hypot(dx, dy) || 1;
+        best = { d, n: { x: dx / l, y: dy / l }, continuing: false };
+      }
+    }
+    return best;
+  };
   rights(A: Boat, B: Boat): Verdict<Boat> { return rightOfWay(A, B, this.rulesCtx(), this.pairs[pairKey(A, B)]); }
   pairRecord(A: Boat, B: Boat): PairRecord | undefined { return this.pairs[pairKey(A, B)]; }
   /** Signed distance of a point from the line; positive on the course side. */
@@ -307,39 +347,47 @@ export class World {
     const pin: Touchable | null = C.pinKind === 'buoy' ? { name: C.pinLabel, p: C.pin, r: 0.9 }
       : pinMark ? { name: pinMark.name, p: C.pin, r: pinMark.shape === 'sphere' ? 1.2 : 1.0 } : null;
     const mk = (i: number): Touchable => ({ name: C.marks[i].name, p: C.marks[i].p, r: C.marks[i].shape === 'sphere' ? 1.2 : 1.0 });
-    if (!b.started) { if (pin) out.push(pin); return out; } // a starting mark (the line begins the first leg)
-    if (b.leg === 0 && pin) out.push(pin);
+    const cb = this.committeeHull; // the committee boat is a starting mark too (and a finishing mark)
+    if (!b.started) { if (pin) out.push(pin); if (cb) out.push(cb); return out; } // a starting mark (the line begins the first leg)
+    if (b.leg === 0) { if (pin) out.push(pin); if (cb) out.push(cb); }
     if (b.leg >= 1) out.push(mk(b.leg - 1));
     if (b.leg < n) out.push(mk(b.leg));
-    else if (pin) out.push(pin); // finishing mark
+    else { if (pin) out.push(pin); if (cb) out.push(cb); } // finishing marks
     return out;
   }
 
   private checkMarkTouches(): void {
+    const cb = this.committeeHull;
     for (const b of this.boats) {
       const bw = bow(b), st = stern(b);
       let touching: Touchable | null = null;
-      for (const m of this.touchableMarks(b)) {
-        const gap = segPt(m.p, bw, st) - m.r - HULL_HALF_BEAM;
+      const marks = this.touchableMarks(b), solids = cb && !marks.some(m => m.q) ? [...marks, { ...cb, rule31: false }] : marks;
+      for (const m of solids) {
+        const gap = solidGap(bw, st, m) - m.r - HULL_HALF_BEAM;
         if (gap < 0) {
-          touching = m;
-          // bounce off: push her clear of the float, away from the nearest point of her hull
-          const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((m.p.x - bw.x) * ax + (m.p.y - bw.y) * ay) / (ax * ax + ay * ay)));
-          const dx = bw.x + ax * k - m.p.x, dy = bw.y + ay * k - m.p.y, l = Math.hypot(dx, dy) || 1;
+          if (m.rule31 !== false) touching = m;
+          // bounce off: push her clear, away from the nearest point
+          const np = m.q ? (() => { const ax = m.q!.x - m.p.x, ay = m.q!.y - m.p.y, k = Math.max(0, Math.min(1, ((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay))); return { x: m.p.x + ax * k, y: m.p.y + ay * k }; })() : m.p;
+          const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
+          const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = Math.hypot(dx, dy) || 1;
           b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          b.v *= 0.97;
+          b.v *= m.q ? 0.9 : 0.97;
         }
       }
       // the same touch until she's got clearly away from that mark
-      const prev = b.markTouch ? this.touchableMarks(b).find(m => m.name === b.markTouch) : undefined;
-      const stillNear = !!prev && segPt(prev.p, bw, st) - prev.r - HULL_HALF_BEAM < 1.5;
+      const prev = b.markTouch ? marks.find(m => m.name === b.markTouch) : undefined;
+      const stillNear = !!prev && solidGap(bw, st, prev) - prev.r - HULL_HALF_BEAM < 1.5;
       if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
-        addPenalty(b, ONE_TURN);
+        // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
+        const sameIncident = this.t - (this.lastFoul.get(b.id) ?? -Infinity) < SAME_INCIDENT;
+        if (!sameIncident) { addPenalty(b, ONE_TURN); this.lastTouch.set(b.id, this.t); }
         if (b.isUser) {
-          this.fouls++;
-          this.emit({ type: 'toast', ms: 6000, msg: `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a gybe.` });
-        } else this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+          if (!sameIncident) this.fouls++;
+          this.emit({ type: 'toast', ms: 6000, msg: sameIncident
+            ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
+            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a gybe.` });
+        } else if (!sameIncident) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
       }
       b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }
@@ -408,7 +456,7 @@ export class World {
   }
 
   private checkPairs(): void {
-    const bs = this.boats, ctx = this.rulesCtx();
+    const bs = this.boats, ctx = this.rulesCtx(), found: { A: Boat; B: Boat; incident: Incident<Boat> }[] = [];
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
@@ -420,18 +468,26 @@ export class World {
         const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
         if (hailer.isUser) this.emit({ type: 'toast', ms: 3500, msg: `${hailed.name} is tacking to give you room. Tack now (Rule 20.2(d)).` });
       }
-      if (!incident) continue;
+      if (incident) found.push({ A, B, incident });
+    }
+    // who fouled whom this step, before deciding penalties (Rule 43.1(a) needs the whole picture)
+    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
+    for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
+      // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
+      const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
+      if (incident.kind !== 'hail' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
+      if (incident.exoneratedBy == null) this.lastFoul.set(f.id, this.t);
       if (A.isUser || B.isUser) {
         this.paused = true;
-        if (incident.fouler.isUser) this.fouls++; else this.fouledBy++;
+        if (incident.exoneratedBy == null) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.fouler.penalty <= 0) startPenalty(incident.fouler, this.penaltyDeg); // a boat already doing turns finishes them
+      } else if (incident.exoneratedBy == null && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them
     }
   }
 
@@ -519,7 +575,12 @@ export class World {
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
-  assignPenalty(b: Boat): void { startPenalty(b, this.penaltyDeg); }
+  /** Give a boat the penalty for a Part 2 foul. A mark touch in the same incident needs no penalty of its own (Rule 44.1(a)). */
+  assignPenalty(b: Boat): void {
+    const touched = this.t - (this.lastTouch.get(b.id) ?? -Infinity) < SAME_INCIDENT && b.penalty > 0;
+    startPenalty(b, this.penaltyDeg); // replaces a one-turn penalty from that touch, if she hadn't finished it
+    if (touched) { this.lastTouch.delete(b.id); if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Your mark touch was part of the same incident, so the foul\'s penalty covers it (Rule 44.1(a)).' }); }
+  }
   /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */
   get penaltyDeg(): number { return (this.settings.penaltyTurns === 1 ? 1 : 2) * 360; }
 }

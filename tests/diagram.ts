@@ -19,15 +19,19 @@ export function boat(name: string, o: {
   tacking?: boolean; lastTackT?: number; penalty?: number; ocs?: boolean; started?: boolean; leg?: number;
   /** heading a few seconds ago (Rule 16.1); defaults to the current heading */
   headingAgo?: number;
-  /** sailing above her proper course (Rule 17) */
+  /** sailing above her proper course (Rules 17, 23) */
   aboveProper?: boolean;
+  /** moving astern by backing a sail (Rule 21.3) */
+  backing?: boolean;
+  /** has finished: no longer racing (Rule 23.1) */
+  finished?: boolean;
 }): DiagramBoat {
   const rel = wrap(WIND - o.heading), u = V(o.heading), s = o.speed ?? 2.5;
   return {
     id: nextId++, name, x: o.at[0], y: o.at[1], h: o.heading, vx: u.x * s, vy: u.y * s,
     tack: rel >= 0 ? 'S' : 'P', tacking: o.tacking ?? false, lastTackT: o.lastTackT ?? -999,
     penalty: o.penalty ?? 0, ocs: o.ocs ?? false, started: o.started ?? true, leg: o.leg ?? 0,
-    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false
+    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false, backing: o.backing, finished: o.finished
   };
 }
 
@@ -40,7 +44,7 @@ export function moveTo(b: DiagramBoat, at: [number, number], heading = b.h, head
   return b;
 }
 
-export const ctx = (t: number, marks: RulesMark[] = []): RulesContext => ({ t, windFrom: WIND, marks });
+export const ctx = (t: number, marks: RulesMark[] = [], extra: Partial<RulesContext> = {}): RulesContext => ({ t, windFrom: WIND, marks, ...extra });
 
 /** Who keeps clear, and under which rule. */
 export function verdict(A: DiagramBoat, B: DiagramBoat, t = 10, marks: RulesMark[] = [], rec?: PairRecord) {
@@ -49,16 +53,16 @@ export function verdict(A: DiagramBoat, B: DiagramBoat, t = 10, marks: RulesMark
 }
 
 /** A pair of boats tracked over time, as the simulator does every step. */
-export function pair(A: DiagramBoat, B: DiagramBoat, marks: RulesMark[] = []) {
+export function pair(A: DiagramBoat, B: DiagramBoat, marks: RulesMark[] = [], extra: Partial<RulesContext> = {}) {
   const rec = newPairRecord();
   return {
     rec,
     /** Assess the pair at race time t. Returns the verdict and any incident (contact or forced swerve). */
     at(t: number, obs: { swerve?: boolean } = {}) {
-      const a = assessPair(rec, A, B, ctx(t, marks), { swerve: obs.swerve ?? false });
+      const a = assessPair(rec, A, B, ctx(t, marks, extra), { swerve: obs.swerve ?? false });
       return {
         keepsClear: a.verdict.kc.name, rule: a.verdict.rule,
-        foul: a.incident ? { by: a.incident.fouler.name, rule: a.incident.rule, kind: a.incident.kind, why: a.incident.byWhy } : null
+        foul: a.incident ? { by: a.incident.fouler.name, rule: a.incident.rule, kind: a.incident.kind, why: a.incident.byWhy, ...(a.incident.part ? { part: a.incident.part } : {}) } : null
       };
     }
   };

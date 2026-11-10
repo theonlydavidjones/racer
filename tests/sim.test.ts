@@ -296,3 +296,58 @@ describe('"You tack" (Rule 20.2(c))', () => {
     expect(w.rights(u, red)).toMatchObject({ kc: u, rule: '20' });
   });
 });
+
+describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(a))', () => {
+  it('touching the committee boat before starting is a one-turn penalty, and she bounces off', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack' }), 3);
+    const u = w.user, cb = w.committeeHull!;
+    expect(w.touchableMarks(u).map(m => m.name)).toContain('the committee boat');
+    // sail straight at the middle of its side
+    const side = V(w.C.base + 90), c = w.C.committee, h = brg(-side.x, -side.y);
+    Object.assign(u, { x: c.x + side.x * 9, y: c.y + side.y * 9, h, v: 2, desired: h });
+    let toasts = '';
+    for (let i = 0; i < 60 * 6; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg; }
+    expect(toasts).toContain('committee boat');
+    expect(u.penaltyTotal).toBe(360);
+    // she never ends up inside its hull
+    const a = cb.p, b2 = cb.q!, ax = b2.x - a.x, ay = b2.y - a.y, k = Math.max(0, Math.min(1, ((u.x - a.x) * ax + (u.y - a.y) * ay) / (ax * ax + ay * ay)));
+    expect(Math.hypot(u.x - (a.x + ax * k), u.y - (a.y + ay * k))).toBeGreaterThan(2);
+  });
+
+  it('a mark touch in the same incident as a Part 2 foul costs no extra turn (Rule 44.1(a))', () => {
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
+    w.t = 30; const u = w.user; u.started = true; u.ocs = false; u.leg = 0;
+    (w as unknown as { lastFoul: Map<number, number> }).lastFoul.set(u.id, w.t); // she has just fouled a boat
+    const m = w.C.marks[0], h = w.wind.from + 180, back = V(w.wind.from);
+    Object.assign(u, { x: m.p.x + back.x * 12, y: m.p.y + back.y * 12, h: h % 360, v: 2, desired: h % 360 });
+    let toasts = '';
+    for (let i = 0; i < 60 * 6; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg; }
+    expect(toasts).toContain('44.1(a)');
+    expect(u.penaltyTotal).toBe(0);
+  });
+});
+
+describe('Exoneration (Rule 43.1(a))', () => {
+  //            wind ↓
+  //    Zed ↗ (port) forces Fox (starboard) to swerve...
+  //    Fox ↖  ...into Vic, overlapped to leeward of her: Fox is exonerated, Zed takes the penalty
+  it('a boat compelled to foul by another boat\'s foul is exonerated', () => {
+    const w = new World(SS2, settings({ fleet: 2, current: 'slack' }), 5);
+    w.t = 60;
+    const [vic, fox, zed] = w.boats, from = w.wind.from, stb = (from - 45 + 360) % 360, port = (from + 45) % 360;
+    const up = V(from), right = V(from + 90), at = (a: number, b: number) => ({ x: 200 * right.x + a * right.x + b * up.x, y: 200 * right.y + a * right.y + b * up.y });
+    for (const b of w.boats) Object.assign(b, { started: true, ocs: false, leg: 0, penalty: 0, lastTackT: -999, tacking: false });
+    Object.assign(vic, { ...at(0, 0), h: stb, tack: 'S', v: 2 });
+    Object.assign(fox, { ...at(1.2, 1.5), h: stb, tack: 'S', v: 2 }); // to windward of Vic, overlapped, touching
+    Object.assign(zed, { ...at(14, 10), h: port, tack: 'P', v: 2 }); // port boat Fox had to swerve to avoid
+    for (const b of w.boats) { const u = V(b.h); b.vx = u.x * b.v; b.vy = u.y * b.v; }
+    fox.forced14 = zed.id;
+    const incidents: { fouler: number; rule: string; ex?: number }[] = [];
+    (w as unknown as { checkPairs(): void }).checkPairs();
+    for (const e of w.drainEvents()) if (e.type === 'incident') incidents.push({ fouler: e.incident.fouler.id, rule: e.incident.rule, ex: e.incident.exoneratedBy });
+    const foxOnVic = incidents.find(i => i.fouler === fox.id);
+    expect(foxOnVic).toMatchObject({ rule: '11', ex: zed.id });
+    expect(zed.penaltyTotal).toBeGreaterThan(0); // Zed (port, an AI boat) takes the penalty for the cross
+    expect(fox.penalty).toBe(0); // Fox doesn't
+  });
+});

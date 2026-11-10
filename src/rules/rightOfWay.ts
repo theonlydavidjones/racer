@@ -3,8 +3,9 @@ import { clearAstern } from './geometry';
 import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
 
 /** Who must keep clear, and under which rule (RRS 2025–2028). Rules are checked in order of precedence:
- * 21 (returning to start, taking a penalty: Section A doesn't apply), 20.2(c) (replied "You tack"),
- * 18.3 (tacked in the zone), 18.2(a) mark-room, 13 (tacking), 10, 12, 11. */
+ * 21 (returning to start, taking a penalty, backing a sail: Section A doesn't apply), 20.2(c) (replied "You tack"),
+ * 18.3 (tacked in the zone), 18.2(a) and 18.2(c) mark-room, 13 (tacking), 10, 12, 11.
+ * (Rule 19, room at an obstruction, is settled when there's an incident: see assessPair.) */
 export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, rec?: PairRecord | null): Verdict<B> {
   const B = B_;
   const after = ctx.t > 0;
@@ -12,6 +13,8 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   if (after && B.ocs && !A.ocs) return { kc: B, rule: '21.1' };
   if (A.penalty > 0 && !(B.penalty > 0)) return { kc: A, rule: '21.2' };
   if (B.penalty > 0 && !(A.penalty > 0)) return { kc: B, rule: '21.2' };
+  if (A.backing && !B.backing) return { kc: A, rule: '21.3' };
+  if (B.backing && !A.backing) return { kc: B, rule: '21.3' };
   // Rule 20.2(c): she replied "You tack", so she gives the hailing boat room to tack and avoid her.
   const h = rec?.hail;
   if (h && h.kind === 'room' && h.replyAt != null) return h.by === A.id ? { kc: B, rule: '20' } : { kc: A, rule: '20' };
@@ -25,11 +28,23 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   }
   // Rule 18.2(a): fixed when the first boat reached the zone; ends (18.2(b)) once the entitled boat passes
   // head to wind or leaves the zone. Rule 18 doesn't apply on opposite tacks on a beat (18.1(a)(1)).
+  // Rule 18.2(d): an inside overlap got from clear astern or by tacking to windward, when the outside boat couldn't give
+  // mark-room from the moment it began, earns no mark-room under 18.2(a) or (c).
+  const noRoom18 = (inside: number) => { const o = rec?.ovStart; return !!o && o.insideMark === inside && o.markUnable && (o.astern === inside || o.tacker === inside); };
   if (rec && rec.mark && !rec.mark.ended && A.leg === rec.mark.idx && B.leg === rec.mark.idx) {
     const mk = ctx.marks[rec.mark.idx], m = rec.mark;
     if (A.tack === B.tack || !mk.beat) {
-      if (m.overlapped) return { kc: m.inside === A.id ? B : A, rule: '18.2(a)', mr: m };
-      return { kc: m.ahead === A.id ? B : A, rule: '18.2(a)', mr: m };
+      if (m.overlapped && !noRoom18(m.inside!)) return { kc: m.inside === A.id ? B : A, rule: '18.2(a)', mr: m };
+      if (!m.overlapped) return { kc: m.ahead === A.id ? B : A, rule: '18.2(a)', mr: m };
+    }
+  }
+  // Rule 18.2(c): when 18.2(a) doesn't apply (it ended under 18.2(b)) and the boats are overlapped with at least one in
+  // the zone, the outside boat gives the inside boat mark-room.
+  if (rec && rec.mark?.ended && !rec.r183 && A.leg === rec.mark.idx && B.leg === rec.mark.idx) {
+    const mk = ctx.marks[rec.mark.idx], dA = dist(A, mk.p), dB = dist(B, mk.p);
+    if ((A.tack === B.tack || !mk.beat) && Math.min(dA, dB) < ZONE && !clearAstern(A, B) && !clearAstern(B, A)) {
+      const inside = dA < dB ? A : B;
+      if (!noRoom18(inside.id)) return { kc: inside === A ? B : A, rule: '18.2(c)', mr: { ...rec.mark, overlapped: true, inside: inside.id } };
     }
   }
   if (A.tacking && !B.tacking) return { kc: A, rule: '13' };
