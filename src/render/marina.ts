@@ -1,15 +1,15 @@
 import './three-setup';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BREAKWATER_W, FINGER_W, HARBOR, SLIPS, WALKWAY_W } from '../geo/marina';
+import { BREAKWATER_W, FINGER_W, HARBORS, SLIPS, WALKWAY_W, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
 import type { Vec } from '../core/math';
 import { P3 } from './coords';
-import { boat } from './moored';
 
 /**
- * West Harbor in 3D (geo/marina.ts): floating wooden docks (main walkways and slip fingers, decked in weathered boards
- * laid across them) a little above the water, timber pilings at their corners and ends, the rock breakwaters, the red
- * entrance beacon, and boats in most slips.
+ * The marinas in 3D (geo/marina.ts: West Harbor, Gashouse Cove, South Beach, the Corinthian): floating wooden docks (main
+ * walkways and slip fingers, decked in weathered boards laid across them) a little above the water, timber pilings at
+ * their corners and ends, the rock breakwaters, the entrance beacons (red triangles and green squares, as US daymarks
+ * are), and boats in most slips.
  */
 const DOCK_TOP = 0.45, DOCK_T = 0.35;
 
@@ -74,14 +74,67 @@ function deckTexture(): THREE.CanvasTexture {
 
 function rng(seed: number) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
 
+/**
+ * Boats lying in their slips, all of a harbor's at once (one instanced mesh per part, so a thousand boats cost a handful
+ * of draws): hull, cabin top, mast and the furled main under its cover, the same small cruising boat as render/moored.ts,
+ * at each boat's own length.
+ */
+class SlipBoats {
+  private parts: { mesh: THREE.InstancedMesh; at: (len: number) => { o: THREE.Vector3; s: THREE.Vector3 } }[] = [];
+  private mats: { slip: Slip; len: number }[] = [];
+  readonly index = new Map<string, number>();
+  constructor(group: THREE.Group, boats: { slip: Slip; len: number; colour: number }[]) {
+    const n = boats.length; if (!n) return;
+    // each part built for a 1 m boat, then scaled to hers: the hull and cabin in proportion, the mast and cover only in length
+    const shape = new THREE.Shape(), B = 0.17;
+    shape.moveTo(0, -0.5); shape.quadraticCurveTo(B, -0.2, B * 0.85, 0.5); shape.lineTo(-B * 0.85, 0.5); shape.quadraticCurveTo(-B, -0.2, 0, -0.5);
+    const hull = new THREE.ExtrudeGeometry(shape, { depth: 0.11, bevelEnabled: false }); hull.rotateX(Math.PI / 2);
+    const cover = new THREE.CylinderGeometry(0.14, 0.14, 1, 6); cover.rotateX(Math.PI / 2);
+    const one = new THREE.Vector3(1, 1, 1);
+    const spec: [THREE.BufferGeometry, number, (len: number) => { o: THREE.Vector3; s: THREE.Vector3 }][] = [
+      [hull, 0xffffff, len => ({ o: new THREE.Vector3(0, len * 0.11 - 0.05, 0), s: one.clone().multiplyScalar(len) })],
+      [new THREE.BoxGeometry(B * 1.1, 0.06, 0.32), 0xece8de, len => ({ o: new THREE.Vector3(0, len * 0.14, len * 0.02), s: one.clone().multiplyScalar(len) })],
+      [new THREE.CylinderGeometry(0.05, 0.06, 1, 5), 0xc9ced3, len => ({ o: new THREE.Vector3(0, len * 0.78, -len * 0.12), s: new THREE.Vector3(1, len * 1.35, 1) })],
+      [cover, 0x1f4f7a, len => ({ o: new THREE.Vector3(0, len * 0.11 + 0.9, len * 0.08), s: new THREE.Vector3(1, 1, len * 0.36) })] // the main, furled under its cover
+    ];
+    for (const [g, colour, at] of spec) {
+      const mesh = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: colour }), n);
+      group.add(mesh); this.parts.push({ mesh, at });
+    }
+    boats.forEach((b, i) => { this.mats.push({ slip: b.slip, len: b.len }); this.index.set(b.slip.id, i); this.parts[0].mesh.setColorAt(i, new THREE.Color(b.colour)); this.place(i, true); });
+    for (const p of this.parts) p.mesh.computeBoundingSphere();
+  }
+  private m = new THREE.Matrix4(); private q = new THREE.Quaternion(); private up = new THREE.Vector3(0, 1, 0);
+  /** Show or hide the boat in this slip (hidden: scaled to nothing). */
+  place(i: number, show: boolean): void {
+    const { slip, len } = this.mats[i], c = P3(slip.p.x, slip.p.y, 0);
+    this.q.setFromAxisAngle(this.up, -slip.heading * Math.PI / 180); // the boat's bow is toward −z, as the generic boat's
+    for (const p of this.parts) {
+      const { o, s } = p.at(len);
+      this.m.compose(o.applyQuaternion(this.q).add(c), this.q, show ? s : new THREE.Vector3(0, 0, 0));
+      p.mesh.setMatrixAt(i, this.m); p.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+}
+
 export class Harbor {
   readonly group = new THREE.Group();
-  private inSlip = new Map<string, THREE.Object3D>();
+  private boats: SlipBoats[] = [];
 
   constructor(scene: THREE.Scene) {
+    const deck = new THREE.MeshLambertMaterial({ map: deckTexture(), side: THREE.DoubleSide });
+    const fascia = new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide });
+    const rock = new THREE.MeshLambertMaterial({ color: 0x8a8176 });
+    const pileMat = new THREE.MeshLambertMaterial({ color: 0x5b4a3a }), capMat = new THREE.MeshLambertMaterial({ color: 0x8a8c8e });
+    const pileGeo = new THREE.CylinderGeometry(0.17, 0.19, 4.2, 10), capGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10);
+    for (const H of HARBORS) this.build(H, deck, fascia, rock, pileMat, capMat, pileGeo, capGeo);
+    scene.add(this.group);
+  }
+
+  private build(H: HarborGeo, deck: THREE.Material, fascia: THREE.Material, rock: THREE.Material, pileMat: THREE.Material, capMat: THREE.Material, pileGeo: THREE.BufferGeometry, capGeo: THREE.BufferGeometry): void {
     // the docks: each walkway one continuous strip with mitred corners; each finger a strip from the walkway's edge
     // (trimmed or extended to meet it) to its end; decked in boards laid across, with darker fascias down the sides
-    const walks = HARBOR.walkways, fingers = HARBOR.fingers; // (their ends already meet the walkways' edges: geo/marina.ts)
+    const walks = H.walkways, fingers = H.fingers; // (their ends already meet the walkways' edges: geo/marina.ts)
     const tops: THREE.BufferGeometry[] = [], sides: THREE.BufferGeometry[] = [], piles: Vec[] = [];
     for (const w of walks) { const g = strip(w, WALKWAY_W); tops.push(g.top); sides.push(g.side); piles.push(...alongside(w, WALKWAY_W, 12)); }
     for (const f of fingers) {
@@ -90,27 +143,24 @@ export class Harbor {
       piles.push({ x: e.x - u.x * 0.3 + u.y * (FINGER_W / 2 + 0.2), y: e.y - u.y * 0.3 - u.x * (FINGER_W / 2 + 0.2) }); // a piling at the end, beside it
     }
     // the solid pier areas (a fuel dock, a platform): decked the same, on the same level
-    for (const a of HARBOR.areas) {
+    for (const a of H.areas) {
       const sh = new THREE.Shape(); a.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y)); // (rotated flat below: shape y becomes −z, i.e. north)
       const g = new THREE.ExtrudeGeometry(sh, { depth: DOCK_T, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, DOCK_TOP - DOCK_T, 0);
       const pos = g.attributes.position, uv = g.attributes.uv as THREE.BufferAttribute;
       for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / PLANK_TILE_W, pos.getZ(i) / PLANK_TILE_L);
       tops.push(g.toNonIndexed()); g.dispose();
     }
-    this.group.add(new THREE.Mesh(mergeGeometries(tops), new THREE.MeshLambertMaterial({ map: deckTexture(), side: THREE.DoubleSide })));
-    this.group.add(new THREE.Mesh(mergeGeometries(sides), new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide })));
+    if (tops.length) this.group.add(new THREE.Mesh(mergeGeometries(tops), deck));
+    if (sides.length) this.group.add(new THREE.Mesh(mergeGeometries(sides), fascia));
     [...tops, ...sides].forEach(g => g.dispose());
     // pilings: timber, standing well above the docks (the docks ride up and down them with the tide)
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion();
-    const pile = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.17, 0.19, 4.2, 10), new THREE.MeshLambertMaterial({ color: 0x5b4a3a }), piles.length);
-    piles.forEach((p, i) => { m.compose(P3(p.x, p.y, 0.6), q.identity(), new THREE.Vector3(1, 1, 1)); pile.setMatrixAt(i, m); });
-    this.group.add(pile);
-    const cap = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10), new THREE.MeshLambertMaterial({ color: 0x8a8c8e }), piles.length); // galvanised pile caps
-    piles.forEach((p, i) => { m.compose(P3(p.x, p.y, 2.73), q.identity(), new THREE.Vector3(1, 1, 1)); cap.setMatrixAt(i, m); });
-    this.group.add(cap);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
+    const pile = new THREE.InstancedMesh(pileGeo, pileMat, piles.length), cap = new THREE.InstancedMesh(capGeo, capMat, piles.length); // galvanised pile caps
+    piles.forEach((p, i) => { m.compose(P3(p.x, p.y, 0.6), q, one); pile.setMatrixAt(i, m); m.compose(P3(p.x, p.y, 2.73), q, one); cap.setMatrixAt(i, m); });
+    pile.computeBoundingSphere(); cap.computeBoundingSphere();
+    this.group.add(pile, cap);
     // the breakwaters: rubble mounds of rock
-    const rock = new THREE.MeshLambertMaterial({ color: 0x8a8176 });
-    for (const b of HARBOR.breakwaters) {
+    for (const b of H.breakwaters) {
       if (b.area) {
         const s = new THREE.Shape(); b.pts.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
         const g = new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 1.2, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); g.translate(0, -0.6, 0);
@@ -120,29 +170,28 @@ export class Harbor {
         const bx = new THREE.Mesh(new THREE.BoxGeometry(BREAKWATER_W, 2.6, len), rock); bx.position.copy(P3((a.x + c.x) / 2, (a.y + c.y) / 2, 1.0)); bx.rotation.y = -Math.atan2(c.x - a.x, c.y - a.y) + Math.PI; this.group.add(bx);
       }
     }
-    // the entrance beacon: a red triangle on a post (Q R)
-    if (HARBOR.beacon) {
-      const g = new THREE.Group(), red = new THREE.MeshLambertMaterial({ color: 0xc8302a, side: THREE.DoubleSide });
+    // the entrance beacons: a red triangle (Q R) or a green square on a post, with its light
+    for (const bc of H.beacons) {
+      const g = new THREE.Group(), red = bc.colour === 'red', mat = new THREE.MeshLambertMaterial({ color: red ? 0xc8302a : 0x2e8a4a, side: THREE.DoubleSide });
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 6.4, 8), new THREE.MeshLambertMaterial({ color: 0xd9d6cf })); post.position.y = 3.2; g.add(post);
-      const tri = new THREE.Mesh(new THREE.CircleGeometry(0.75, 3), red); tri.position.y = 5.4; tri.rotation.z = Math.PI / 2; g.add(tri);
-      const tri2 = tri.clone(); tri2.rotation.y = Math.PI / 2; g.add(tri2);
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff4a3a })); lamp.position.y = 6.5; g.add(lamp);
-      g.position.copy(P3(HARBOR.beacon.x, HARBOR.beacon.y, 0)); this.group.add(g);
+      const mark = new THREE.Mesh(red ? new THREE.CircleGeometry(0.75, 3) : new THREE.PlaneGeometry(1.1, 1.1), mat); mark.position.y = 5.4; if (red) mark.rotation.z = Math.PI / 2; g.add(mark);
+      const mark2 = mark.clone(); mark2.rotation.y = Math.PI / 2; g.add(mark2);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: red ? 0xff4a3a : 0x4aff7a })); lamp.position.y = 6.5; g.add(lamp);
+      g.position.copy(P3(bc.p.x, bc.p.y, 0)); this.group.add(g);
     }
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
-    const r = rng(11);
+    const r = rng(11 + HARBORS.indexOf(H)), boats: { slip: Slip; len: number; colour: number }[] = [];
     for (const s of SLIPS) {
-      if (r() > 0.78) continue;
-      const len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), b = boat(len, r);
-      b.position.copy(P3(s.p.x, s.p.y, 0)); b.rotation.y = -s.heading * Math.PI / 180; // the generic boat's bow is toward −z
-      this.group.add(b); this.inSlip.set(s.id, b);
+      if (s.marina !== H.id) continue;
+      const keep = r() <= 0.78, len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = [0xf3f1ea, 0xeae7df, 0x1f3550, 0x8a2a24, 0xdedcd3][Math.floor(r() * 5)];
+      if (keep) boats.push({ slip: s, len, colour });
     }
-    scene.add(this.group);
+    this.boats.push(new SlipBoats(this.group, boats));
   }
 
   /** Leave these slips empty (your boats' slips: she's out sailing, or drawn as herself). */
   clearSlips(ids: (string | undefined)[]): void {
-    const set = new Set(ids.filter(Boolean));
-    for (const [id, o] of this.inSlip) o.visible = !set.has(id);
+    const set = new Set(ids.map(id => slipById(id)?.id).filter(Boolean)); // (older saves name West Harbor's slips without the marina)
+    for (const b of this.boats) for (const [id, i] of b.index) b.place(i, !set.has(id));
   }
 }

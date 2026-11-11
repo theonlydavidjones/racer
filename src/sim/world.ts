@@ -21,7 +21,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { destMark, place as getPlace } from './places';
-import { HARBOR, hitsHarbor, inBasin, pushOffPlan, slipById, type Slip } from '../geo/marina';
+import { harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 
@@ -102,7 +102,7 @@ export function midFairway(slip: Slip): number {
 /** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
 export function slipLeadTime(slip: Slip, line: Vec): number {
   const d = Math.hypot(line.x - slip.p.x, line.y - slip.p.y) * 1.4 + 250; // not a straight line: the fairways, the entrance, tacking
-  return Math.min(60, Math.max(15, Math.ceil((d / 1.8 / 60 + 8) / 5) * 5)) * 60; // at about 3.5 kt, plus pushing off and getting the sails up
+  return Math.min(120, Math.max(15, Math.ceil((d / 1.8 / 60 + 8) / 5) * 5)) * 60; // at about 3.5 kt, plus pushing off and getting the sails up (up to two hours: from South Beach or Tiburon it's 5–7 km)
 }
 
 /** Your crew from the settings (0–2 crew besides you at the helm). */
@@ -194,7 +194,7 @@ export class World {
   courseSignal: { no: number; why: string } | null = null;
   /** Racing: the tactics debrief's log of your race (null when just sailing). */
   log: RaceLog | null = null;
-  /** Your boat's slip in West Harbor (geo/marina.ts), if she has one. */
+  /** Your boat's slip in her home marina (geo/marina.ts), if she has one. */
   homeSlip: Slip | null = null;
   /** Just sail: when you got there (sim time), or null. */
   arrivedT: number | null = null;
@@ -246,8 +246,8 @@ export class World {
     }
     const r = this.rng;
     this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
-    // cruising: from a place on the water or her slip in West Harbor, to another place or back to her slip
-    if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${this.homeSlip.id}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
+    // cruising: from a place on the water or her slip in her marina, to another place or back to her slip
+    if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(this.homeSlip)}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
     { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
       const from = (settings.sailFrom === 'slip' ? this.homeSlip?.p : null) ?? getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
       const c = this.freeSail ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
@@ -855,7 +855,7 @@ export class World {
     if (slip && (u.crew?.spec.crew.length ?? 0) > 0) {
       const f = V(slip.heading), r = { x: f.y, y: -f.x }; // forward, and to starboard
       let best = { d: Infinity, lat: 2, side: 1 };
-      for (const fg of HARBOR.fingers) for (let k = 1; k < fg.length; k++) {
+      for (const fg of harborOf(slip.marina)?.fingers ?? []) for (let k = 1; k < fg.length; k++) {
         const d = segPt(slip.p, fg[k - 1], fg[k]);
         if (d < best.d) { const m = { x: (fg[k - 1].x + fg[k].x) / 2 - slip.p.x, y: (fg[k - 1].y + fg[k].y) / 2 - slip.p.y }; const along = m.x * r.x + m.y * r.y; best = { d, lat: Math.min(2.6, d), side: along >= 0 ? 1 : -1 }; }
       }
@@ -923,7 +923,7 @@ export class World {
     if (d?.key === 'slip') { // home: in her slip, bow in, and stopped (or as good as)
       if (this.arrivedT != null || !this.homeSlip || !this.intoSlip(u, this.homeSlip)) return;
       this.arrivedT = this.t;
-      this.emit({ type: 'toast', msg: `Home: nosed into her slip, ${this.homeSlip.id}, after ${Math.floor(this.t / 60)} min, and made fast. Nicely done.`, ms: 6000 });
+      this.emit({ type: 'toast', msg: `Home: nosed into her slip, ${slipPlace(this.homeSlip)}, after ${Math.floor(this.t / 60)} min, and made fast. Nicely done.`, ms: 6000 });
       return;
     }
     if (!d || this.arrivedT != null || markDist(u, d) > 40) return;

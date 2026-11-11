@@ -94,7 +94,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
     hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
-    ...(typeof x.slip === 'string' && x.slip ? { marina: x.marina || 'west-harbor', slip: x.slip } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
+    // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's
+    ...(typeof x.slip === 'string' && x.slip ? { marina: x.slip.includes(':') ? x.slip.split(':')[0] : 'west-harbor', slip: x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}` } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;

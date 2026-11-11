@@ -9,7 +9,7 @@ import { PLACES } from './sim/places';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { addLog, type LogEntry } from './boat/logbook';
-import { HARBOR, inBasin, slipById } from './geo/marina';
+import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { Labels } from './render/labels';
@@ -625,8 +625,8 @@ function buildSetupChoices(): void {
   const opts = (blank: string | null) => (blank ? `<option value="">${blank}</option>` : '') + (['Spots', 'Marks and buoys'] as const)
     .map(g => `<optgroup label="${g}">${PLACES.filter(p => p.group === g).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup>`).join('');
   const from = $('sailFromSel') as HTMLSelectElement, to = $('sailToSel') as HTMLSelectElement;
-  from.innerHTML = '<option value="slip" id="optSlipFrom">Her slip, West Harbor</option>' + opts(null);
-  to.innerHTML = opts('Nowhere in particular').replace('</option>', '</option><option value="slip" id="optSlipTo">Back to her slip, West Harbor</option>');
+  from.innerHTML = '<option value="slip" id="optSlipFrom">Her slip</option>' + opts(null);
+  to.innerHTML = opts('Nowhere in particular').replace('</option>', '</option><option value="slip" id="optSlipTo">Back to her slip</option>');
   from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
   from.onchange = () => { S.sailFrom = from.value; newGame(); };
   to.onchange = () => { S.sailTo = to.value; newGame(); };
@@ -646,20 +646,20 @@ function courseCard(): void {
   $('prepField').hidden = S.mode === 'sail';
   $('prepNote').textContent = PREP_MEANING[S.prepFlag ?? 'P'];
   $('fleetField').hidden = S.mode === 'sail';
-  { // racing from her slip: sail out to the line from West Harbor
+  { // racing from her slip: sail out to the line from her marina
     const sl = slipById(S.boat.slip), btn = $<HTMLButtonElement>('raceFromSlip');
     $('raceFromField').hidden = S.mode !== 'race';
-    btn.disabled = !sl; btn.textContent = sl ? `Her slip (${sl.id})` : 'Her slip (she has none)';
+    btn.disabled = !sl; btn.textContent = sl ? `Her slip (${slipPlace(sl)})` : 'Her slip (she has none)';
     if (!sl && S.raceFrom === 'slip') S.raceFrom = 'water';
     S.raceFrom ??= 'water';
     $('raceFromNote').textContent = S.raceFrom === 'slip' && w.fromSlip
-      ? `She starts in her slip in ${HARBOR.name}, ${Math.round((w.startAt - S.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
+      ? `She starts in her slip in ${harborOf(sl!.marina)?.short ?? 'her marina'}, ${Math.round((w.startAt - S.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
       : 'You start near the line, a few minutes before the start.';
   }
   { // her slip, if she has one (Marina)
-    const sl = S.boat.slip, f = $<HTMLOptionElement>('optSlipFrom'), t = $<HTMLOptionElement>('optSlipTo');
-    f.textContent = sl ? `Her slip, West Harbor (${sl})` : 'Her slip, West Harbor (give her one in the Fleet)'; f.disabled = !sl;
-    t.textContent = sl ? `Back to her slip, West Harbor (${sl})` : 'Back to her slip (give her one in the Fleet)'; t.disabled = !sl;
+    const slip = slipById(S.boat.slip), sl = slip ? slipPlace(slip) : null, f = $<HTMLOptionElement>('optSlipFrom'), t = $<HTMLOptionElement>('optSlipTo');
+    f.textContent = sl ? `Her slip (${sl})` : 'Her slip (give her one in the Fleet)'; f.disabled = !sl;
+    t.textContent = sl ? `Back to her slip (${sl})` : 'Back to her slip (give her one in the Fleet)'; t.disabled = !sl;
     if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom; ($('sailToSel') as HTMLSelectElement).value = S.sailTo; }
   }
   $('courseField').hidden = S.mode === 'sail'; $('courseCard').hidden = S.mode === 'sail'; $('sailField').hidden = S.mode !== 'sail';
@@ -800,7 +800,7 @@ function beginRaceNow(seed?: number): void {
   const m0 = w.C.marks[0];
   if (w.fromSlip) {
     const m = Math.round((w.startAt - S.seq * 60) / 60);
-    toast(`In her slip in ${HARBOR.name}, ${w.homeSlip!.id}, bow in and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to shove her out astern, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
+    toast(`In her slip in ${harborOf(w.homeSlip!.marina)?.short ?? 'her marina'}, ${w.homeSlip!.label}, bow in and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to shove her out astern, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
     return;
   }
   toast(S.mode === 'sail'
@@ -871,7 +871,7 @@ function logOuting(): void {
   if (!w || w.logged || S.mode === 'drill') return;
   if (S.mode === 'sail' && w.freeSail && w.t >= 60) {
     w.logged = true;
-    const from = S.sailFrom === 'slip' ? `her slip (${S.boat.slip ?? ''})` : PLACES.find(p => p.id === S.sailFrom)?.name ?? 'the Bay';
+    const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : PLACES.find(p => p.id === S.sailFrom)?.name ?? 'the Bay';
     stage([{ ...outing(S.boat, true), kind: 'cruise', title: `From ${from}${w.dest ? ` to ${w.dest.name}` : ''}`, elapsed: Math.round(w.t), nm: w.sailedM / 1852, arrived: w.arrivedT != null }]);
   } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
     // you left the race before finishing: retired

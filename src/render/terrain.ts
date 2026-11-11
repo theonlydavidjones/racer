@@ -4,6 +4,7 @@ import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
 import { onLand } from '../geo/shore';
+import { inBasin } from '../geo/marina';
 
 /**
  * The land around the race area from real elevation data (scripts/fetch-terrain.mjs: USGS-derived open terrain
@@ -62,6 +63,11 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     if (!cityShore(lat, lon)) continue;
     const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
     H[k] = onLand(p) ? Math.max(H[k], 2.5) : -30;
+  }
+  // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i; if (H[k] <= 0) continue;
+    if (inBasin({ x: corner.x + i * dx, y: corner.y + j * dy })) H[k] = -2;
   }
   const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {

@@ -3,7 +3,7 @@ import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ens
 import { CLUBS, burgeeCanvas } from '../render/burgees';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
-import { HARBOR, marinaName, slipById } from '../geo/marina';
+import { harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 
 /**
@@ -95,7 +95,7 @@ export class Fleet {
     const body = this.view === 'grid'
       ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}"><img class="fthumb" data-thumb="${b.id}" alt=""><b>${esc(b.name || 'Unnamed')}</b><span>${ensignImg(b)}${esc(sailNo(b))}</span></button>`).join('')}</div>`
       : `<div class="ftable"><table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Club</th><th>Marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
-          `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${b.slip ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
+          `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${slipById(b.slip)?.label ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
     this.list.innerHTML = `<div class="panel wide fleetpanel">
       <button type="button" class="linkbtn back" data-f="back">‹ Back</button>
       <div class="fhead"><div><div class="eyebrow">Fleet</div><h1>Your boats</h1></div>
@@ -136,7 +136,7 @@ export class Fleet {
         ${row('Yacht club', esc(clubName(b.club) || 'None'))}
         ${row('Skipper', skipperName(b))}
         ${row('Home marina', esc(marinaName(b.marina) || 'None'))}
-        ${row('Slip', slip ? `${slip.id} (dock ${slip.dock}, ${HARBOR.name})` : 'None')}
+        ${row('Slip', slip ? `${slip.label} (dock ${slip.dock}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
       </table></section>
       <section><h3>The boat</h3><table class="ftab">
         ${row('Built', b.hull.material === 'wood' ? 'Wood, clinker' : 'Fiberglass')}
@@ -165,7 +165,7 @@ export class Fleet {
     this.pick.innerHTML = `<div class="panel">
       <button type="button" class="linkbtn back" data-f="pickNo">‹ Back</button>
       <div class="eyebrow">Sail her</div><h2>${esc(b.name || 'Unnamed')} · ${esc(sailNo(b))}</h2>
-      <label class="fslip${slip ? '' : ' off'}"><input type="checkbox" id="shSlip"${slip ? ' checked' : ' disabled'}> Start in her slip${slip ? ` (${HARBOR.name}, ${slip.id})` : ': she has none yet (give her one under Edit)'}</label>
+      <label class="fslip${slip ? '' : ' off'}"><input type="checkbox" id="shSlip"${slip ? ' checked' : ' disabled'}> Start in her slip${slip ? ` (${harborOf(slip.marina)?.short ?? ''}, ${slip.label})` : ': she has none yet (give her one under Edit)'}</label>
       <small>${slip ? 'She lies bow in, made fast. Push off (the crew walks her back out of the slip and swings her bow round), then sail her out of the harbor. Racing, you start in good time to sail out to the line before the warning signal.' : 'She starts on the water: by the line for a race, or where you choose for a cruise.'}</small>
       <div class="modes">
         <button type="button" class="modecard" data-f="go" data-v="race"><b>Race</b><span>Choose the day, the course, who you race against and your crew.</span></button>
@@ -189,7 +189,7 @@ const burgeeImg = (b: BoatSpec) => slot(b.club ? flagImg('b:' + b.club, () => bu
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 export const clubName = (id: string) => CLUBS.find(c => c.id === id)?.club ?? '';
 const skipperName = (b: BoatSpec) => b.skipper === 'you' ? 'You' : 'AI skipper (generic)';
-const shortMarina = (id: string | undefined) => marinaName(id).split(',')[0];
+const shortMarina = (id: string | undefined) => MARINAS.find(m => m.id === id)?.short ?? '';
 const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
 const mmss = (s: number) => `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ':' : ''}${String(Math.floor(s / 60) % 60).padStart(Math.floor(s / 3600) ? 2 : 1, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 const dayLabel = (e: LogEntry) => new Date(e.day + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
