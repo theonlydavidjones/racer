@@ -30,6 +30,30 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
   return desired;
 }
 
+/**
+ * The closest she'd come (m) in the next 12 s to any boat within 40 m (or to `only`) if she steered heading h at her
+ * speed and they held their courses.
+ */
+function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
+  const u = V(h), v = Math.max(b.v, 1.2), hu = V(b.h);
+  const me = { x: b.x, y: b.y, vx: b.vx - hu.x * b.v + u.x * v, vy: b.vy - hu.y * b.v + u.y * v }; // (keeping her drift with the current)
+  let m = Infinity;
+  for (const o of only ? [only] : w.boats) {
+    if (o === b || (!only && dist(o, b) > 40)) continue;
+    m = Math.min(m, cpa(me, o).d);
+  }
+  return m;
+}
+/** Of the sailable headings near `want`, the one that keeps her furthest from other boats (the nearest to `want` among near-equals). */
+function clearestHeading(w: World, b: Boat, want: number): number {
+  let best = want, bestS = -Infinity;
+  for (const k of [0, 20, -20, 40, -40, 60, -60, 90, -90]) {
+    const h = sailable(b, want + k), sc = Math.min(15, clearanceOn(w, b, h)) - Math.abs(k) * 0.02;
+    if (sc > bestS) { bestS = sc; best = h; }
+  }
+  return best;
+}
+
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
   const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1;
@@ -137,6 +161,9 @@ export function bestApproach(w: World, b: Boat): { h: number; along: number } {
     if (vmg <= 0.1) continue;
     const cross = a + (u.x * w.L.x + u.y * w.L.y) / uN * Math.max(0, -d); // where along the line we'd cross
     let t = Math.max(0, -d) / vmg + (tack !== b.tack ? 8 : 0);
+    // coming in on a run or broad reach, take the starboard gybe if it's anywhere near as quick: she has right of
+    // way over port-gybe boats converging on the line (Rule 10), and nobody can come in under her and shut her out
+    if (tack === 'P' && twa > 100) t += 4;
     if (Math.abs(cross) > half) t += 30 + (Math.abs(cross) - half) / 2; // would miss the line: strongly discouraged
     if (t < bestT) { bestT = t; best = { h, along: uN }; }
   }
@@ -168,7 +195,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const H = { x: w.center.x - N.x * ai.depth + L.x * off, y: w.center.y - N.y * ai.depth + L.y * off }, s = ai.wp ? 1 : -1;
       const reach = Math.min(40, w.lineLen * 0.25);
       const wp = { x: H.x + L.x * reach * s, y: H.y + L.y * reach * s };
-      if (dist(b, wp) < 12) ai.wp = ai.wp ? 0 : 1;
+      // turn for the other end of her beat when she gets there, but not across another boat's bows: tacking or
+      // gybing close to another boat she must keep clear (Rule 13), so she carries on a little until there's room
+      const past = ((b.x - H.x) * L.x + (b.y - H.y) * L.y) * s;
+      if (dist(b, wp) < 12 || past > reach - 12) {
+        const crowded = w.boats.some(o => o !== b && dist(o, b) < 28);
+        if (!crowded || past > reach + 45) ai.wp = ai.wp ? 0 : 1;
+      }
       desired = sailable(b, brg(wp.x - b.x, wp.y - b.y));
       // dawdle, but keep enough way on to steer (about 2 kt)
       // (but not when the current has set her down below her spot: then she works back up to it)
@@ -190,7 +223,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         const turn = Math.abs(wrap(goH - b.h)) / Math.max(4, maxTurnRate(Math.max(b.v, 1)) * 0.7);
         ai.plan.tReach = turn + timeToCover(-d, b.v, targetFor(b, twaD), app.along, c.x * N.x + c.y * N.y);
         // how far toward the line we'd coast if we eased the sails now
-        ai.plan.coast = coastDistance(b.v, tl, ww.kt, b.twa) * (V(b.h).x * N.x + V(b.h).y * N.y);
+        ai.plan.coast = coastDistance(b.v, tl, ww.kt, b.twa, targetFor(b, b.twa)) * (V(b.h).x * N.x + V(b.h).y * N.y);
       }
       desired = goH;
       // in another boat's dirty air on the way in: bear away a little, out of her wake to leeward, and build speed
@@ -205,7 +238,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         if (atGun > -3 && drift > 2) ai.plan.back = true;
         else if (atGun < -12 || drift <= 2) ai.plan.back = false;
         if (ai.plan.back) desired = sailable(b, brg(-N.x, -N.y)); // being set onto the line: sail away with way on, come back later
-        else { luff = true; if (d + ai.plan.coast > 0) desired = sailable(b, brg(-N.x, -N.y)); }
+        else if (twaD > 100) {
+          // Coming in on a run, easing the sails barely slows her: they fill against the shrouds. So she does what
+          // sailors do at a start to leeward: heads up onto a reach along the line, eases there until the sails
+          // flog, and bears away for the line when it's time (the plan above counts the turn back down).
+          luff = true;
+          const half = w.lineLen / 2, a = w.lineA(b), sgn = Math.abs(a) > half * 0.7 ? -Math.sign(a) : dot(V(b.h), L) >= 0 ? 1 : -1; // along the line, back toward its middle near the ends
+          desired = d + ai.plan.coast > -6 ? sailable(b, brg(-N.x, -N.y)) : sailable(b, brg(L.x * sgn - N.x * 0.15, L.y * sgn - N.y * 0.15));
+        } else { luff = true; if (d + ai.plan.coast > 0) desired = sailable(b, brg(-N.x, -N.y)); }
       } else ai.plan.back = false;
     }
   } else {
@@ -286,10 +326,19 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
     if (ducking && cp.t < 16 && cp.d < 22) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); continue; }
     if (r.kc === b && cp.t < 12 && cp.d < 14) {
-      const away = sailable(b, brg(-dx, -dy));
-      if (r.rule === '10') desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32);
-      else if (r.rule === '11') { desired = sailable(b, b.tack === 'P' ? b.h - 20 : b.h + 20); luff = true; }
+      const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
+      if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
+      else if (r.rule === '11') { desired = sailable(b, b.tack === 'P' ? b.h - 20 : b.h + 20); luff = !running; }
+      else if (running) { desired = away; luff = false; } // easing barely slows her on a run: steer clear instead
       else { luff = true; desired = away; }
+      // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
+      // heading that opens the most room, nearest what she wanted
+      if (clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
+    } else if (r.kc === o && Math.abs(wrap(desired - b.h)) > 8 && dx * dx + dy * dy < 900 && cp.t < 10) {
+      // Rule 16.1: a right-of-way boat changing course must give the other boat room to keep clear. If the turn
+      // she wants would close on her, she holds her course for now.
+      if (clearanceOn(w, b, desired, o) < 6 && clearanceOn(w, b, b.h, o) > clearanceOn(w, b, desired, o) + 2) desired = b.h;
+      if (cp.t < 2.4 && cp.d < 4.5) { desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; }
     } else if (r.kc === o && cp.t < 2.4 && cp.d < 4.5) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true;

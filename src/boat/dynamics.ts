@@ -136,12 +136,14 @@ export function timeToCover(dist: number, v0: number, vt: number, along = 1, dri
 }
 
 /** Distance (m) the boat coasts in `seconds` if the sails are eased right now (luffing), starting at v0.
- * Uses the true wind as the apparent wind, which is close enough once the boat has slowed. */
-export function coastDistance(v0: number, seconds: number, windKt: number, twa: number): number {
-  const dt = 0.25, aws = windKt * 0.5144;
+ * Uses the true wind as the apparent wind, which is close enough once the boat has slowed. `vt`: her trimmed target
+ * speed on this heading, for the drive eased sails still give (a little on a reach; most of it on a run, where they
+ * fill against the shrouds: luffDriveFactor, as physics.ts applies it). */
+export function coastDistance(v0: number, seconds: number, windKt: number, twa: number, vt = 0): number {
+  const dt = 0.25, aws = windKt * 0.5144, vLuff = vt * luffDriveFactor(twa);
   let v = v0, x = 0;
   for (let t = 0; t < seconds && v > 0.01; t += dt) {
-    const a = surgeAccel(v, 0, airDrag(aws, twa, 1));
+    const a = surgeAccel(v, vLuff, airDrag(aws, twa, flogAmount(twa, 90, 0, true)));
     const v1 = Math.max(0, v + a * dt);
     x += (v + v1) / 2 * Math.min(dt, seconds - t); v = v1;
   }

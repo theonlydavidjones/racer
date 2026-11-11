@@ -1,4 +1,5 @@
 import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
+import { isGeneric } from './boat/generic';
 export interface Settings {
   mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
   course: string; // course id, or 'rc': the race committee chooses (courses/committee.ts)
@@ -16,7 +17,7 @@ export interface Settings {
   tideTime: string; // time of the start signal, HH:MM, San Francisco local
   bias: number; // deg, only for courses with an adjustable line
   fleet: number; // number of opponents (follows `opponents`)
-  /** Who you race against: stock club boats ('stock:1' .. 'stock:5') and your own saved boats (their ids), sailed by the AI. */
+  /** Who you race against: stock club boats ('stock:1' .. 'stock:5'), generic club Folkboats ('gen:1', 'gen:2'..., boat/generic.ts) and your own saved boats (their ids), all sailed by the AI. */
   opponents: string[];
   seq: number; // start sequence, minutes
   aids: 0 | 1; // line, zones and laylines drawn
@@ -59,7 +60,7 @@ export function loadSettings(): Settings {
   // your opponents: older saves had only a number of stock boats
   const ids = new Set(boats.map(b => b.id));
   const opp = Array.isArray(s.opponents) && s.opponents !== DEFAULT_SETTINGS.opponents ? s.opponents : Array.from({ length: Math.max(0, Math.min(5, s.fleet ?? 3)) }, (_, i) => `stock:${i + 1}`);
-  s.opponents = opp.filter((o, i, a) => a.indexOf(o) === i && (/^stock:[1-5]$/.test(o) || (ids.has(o) && o !== s.boatId))).slice(0, MAX_OPPONENTS);
+  s.opponents = opp.filter((o, i, a) => a.indexOf(o) === i && (/^stock:[1-5]$/.test(o) || isGeneric(o) || (ids.has(o) && o !== s.boatId))).slice(0, MAX_OPPONENTS);
   s.fleet = s.opponents.length;
   return s;
 }
