@@ -1,7 +1,7 @@
 import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
-import { onLand, shoreDist, wharfCrossed, wharfNearest } from '../geo/shore';
+import { landAlong, onLand, shoreDist, wharfCrossed, wharfNearest } from '../geo/shore';
 import type { Outlook } from './outlook';
 
 /**
@@ -191,8 +191,9 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
     for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
-  // (the Wharf's piers, breakwaters and docks are 1–10 m wide: sampling would step over them, so they're tested exactly)
-  const visible = (p: Vec, q: Vec) => { if (wharfCrossed(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
+  // the line itself is tested exactly)
+  const visible = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   if (visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.

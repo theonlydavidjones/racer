@@ -7,6 +7,7 @@ import { V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, s
 import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
 import { obstructionAhead } from '../sim/obstruction';
+import { routeAround } from '../sim/routing';
 import type { World } from '../sim/world';
 
 /** Extra seconds of caution at the start under each preparatory flag. */
@@ -73,7 +74,12 @@ function blocked(w: World, b: Boat, h: number, d: number): boolean {
   return false;
 }
 
-/** Land within 45 m ahead on both tacks' close-hauled courses, with land between her and where she's going: boxed in. */
+/** The first turn on the way by water from b to P (sim/routing.ts routeAround), or a clear heading toward it. */
+function escape(b: Vec, P: Vec): Vec | null {
+  const r = routeAround(b, P, 30);
+  return r.length > 2 ? r[1] : detour(b, P);
+}
+/** Land within 45 m ahead on both tacks' close-hauled courses: boxed in. */
 function pocketed(w: World, b: Boat, csS: number, csP: number): boolean {
   return blocked(w, b, csS, 45) && blocked(w, b, csP, 45);
 }
@@ -289,12 +295,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
       if (ai.detour) P = ai.detour;
-    } else if (b.started && (refresh || ai.detour === undefined) && pocketed(w, b, csS, csP)) {
+    } else if (b.started && !ai.detour && refresh && pocketed(w, b, csS, csP)) {
       // beating, but boxed in with land ahead on both tacks (in a harbor's mouth, behind a jetty): tacking off the shore
-      // only takes her back and forth inside, so she steers for clear water round it first, as on a reach
-      ai.detour = detour(b, P);
+      // only takes her back and forth inside, so she takes the way out by water (the navigator's route round the land)
+      ai.detour = escape(b, P);
       if (ai.detour) P = ai.detour;
-    } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 60) P = ai.detour; // (on her way out of it)
+    } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)
     else ai.detour = null;
     const bP = brg(P.x - b.x, P.y - b.y);
     if (Math.abs(wrap(ww.from - bP)) < 44 && !b.ocs) {
