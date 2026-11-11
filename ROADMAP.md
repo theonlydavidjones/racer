@@ -146,6 +146,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   restart (2–4 h). (3) "Send her home" (wording to be settled), in both modes: sets her home slip as the destination for
   the navigator or tiller pilot; before she finishes a race it retires her (scored RET under RRS A5.1 and A11) (1–3 h).
   Layout to the owner first.
+  Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
+  time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
+  lights can be seen on the boat) and the wind, sea and sky.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
