@@ -843,12 +843,12 @@ const teakCache = new Map<boolean, THREE.CanvasTexture>();
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
  * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
  */
-/** The cabin lamp's light up the companionway's well: full at its foot, falling to a quarter at the top (v up). */
+/** The cabin lamp's light up the companionway's well: full on the floor at its foot, faint by the top (v up). */
 let lampTex: THREE.CanvasTexture | null = null;
 function lampFall(): THREE.CanvasTexture {
   if (lampTex) return lampTex;
   const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d')!, gr = g.createLinearGradient(0, 64, 0, 0);
-  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.5, '#8a8a8a'); gr.addColorStop(1, '#404040');
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, '#8c8c8c'); gr.addColorStop(0.6, '#262626'); gr.addColorStop(1, '#080808');
   g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
   return (lampTex = new THREE.CanvasTexture(c));
 }

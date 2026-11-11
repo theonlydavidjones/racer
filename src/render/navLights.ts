@@ -222,5 +222,5 @@ export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): voi
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
   nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * DARK() : 0;
   // and below, seen through the open companionway: the cabin's lamplight on its own woodwork
-  if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.45 * DARK() : 0; }
+  if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.55 * DARK() : 0; }
 }
