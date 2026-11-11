@@ -58,13 +58,37 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
-- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
+- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; Boat Detail; the first try, live in v86 (PR #39), was rejected by the owner: an orange cube aft, an orange disc forward on the cabin top, the doorway misunderstood, lines across the hatch; Boat Detail rolls it back and redoes it after the usage reset): water shows through the cockpit sole, and it's
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
 - **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
+- **Now — cruise ignores the chosen origin** (bug; ~1 h; for Marinas after the reset): owner, "there's a bug in cruise
+  mode where I have an origin selected but it still starts me in the slip." When a cruise origin other than her slip is
+  chosen, she must start there (sim/world.ts, the slip and docked start, near line 301). Goes with the push-off fix.
+- **Now — double-click to lash the tiller always lashes it amidships** (bug; <1 h; Crew Controls after the reset, with
+  its batch): owner, "double-clicking to lash the tiller doesn't work. if I double click while the tiller is selected,
+  the first click registers as a release, and the second as a lash. that means the tiller always gets lashed
+  amidships." Lash at the angle she held before the first click, or hold the release until the double-click window has
+  passed (app.ts tiller handling). Owner, after: "maybe two-finger click? look into how games tend to solve something like
+  this." Plan: lash on right-click or two-finger click (the browser's context menu suppressed over the water), which
+  can't be mistaken for the release click; keep I as the key; keep double-click working by lashing at the angle from
+  the first press; say so in the tiller hint. Owner: "one issue with double-click in browser is that it surfaces the
+  browser menu. need to solve somehow." Over the 3D view only: no context menu, no double-click text selection, no
+  double-tap zoom; menus and text selection still work on the panels. Test in Chrome, Safari and Firefox on a trackpad.
+- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
+  right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
+  (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
+  piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
+  the south tower's fender, the Bay Bridge's piers and towers (their positions are still approximate, from the
+  overpass-api note under the Bay Bridge), and anything else drawn in the water. Solid for collisions, for the AI's and the
+  tiller pilot's look-ahead (landAlong) and the navigator's routes, on the chart, and as obstructions under Rule 19/20
+  (obstruction.ts). A test that sails a boat at each one. And their lee: owner, "there should also be a lee on the lee
+  side of the tower bases, no?" A bluff body leaves a wind shadow downwind (like the ships' and the committee boat's,
+  already in), and in the current a wake of slack water and eddies on its downstream side, shifting with flood and ebb;
+  size both from sourced bluff-body wake lengths, not by eye.
 - **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
@@ -104,22 +128,62 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
   offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
   outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
-- **Next — heavy weather: reefing, and what a skipper does in 30+ kt** (accuracy + feature; 8–12 h; owner: "not for
-  now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner: "that
-  boat would have sunk by now… This may very well be true-to-life physics (I don't know)… How would an IRL skipper
-  handle this situation? can't Folkboats handle heavy weather like this?" What's known: a Folkboat is stiff and
-  seaworthy, with ballast about 50% of displacement (Folkboat Year Book 2023, folkboats.com; mauripro 0.52) and a capsize
-  screening figure of 1.78 (keelindex.com; under 2.0 counts as fit offshore). A real skipper would have reefed long
-  before 32 kt, dropped the main and sailed under jib alone, or hove to or run off. The sim has no reefing at all
-  (grep: no "reef" in the code), and the drive calibration stands in for it (see heaving to, above). To build:
-  (1) reefing the main (how a Folkboat reefs, slab or roller, and how many reefs, still to source; general practice is
-  a first reef near 20 kt), dropping the main, jib alone, with the auto crew doing it by skill and the strategist and
-  coach advising it;
-  (2) check the heel she settles at with sheets eased in 30+ kt against the righting curve past a few degrees, which
-  still needs the hull's offsets (see crew weight, above): eased right out she shouldn't lie at 60°;
-  (3) water in the cockpit: a self-draining cockpit is optional (NFIA class rules 2025–2028, 3.21) and most traditional
-  boats aren't, so a knockdown can fill one: model water shipped, its weight, and the pump. The Folkboat's AVS (limit
-  of positive stability) and a sourced reefing wind speed are still unfound.
+- **Next — heavy weather: how she copes in 30+ kt, and reefing for cruising only** (accuracy + feature; 8–12 h; owner:
+  "not for now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner:
+  "that boat would have sunk by now… How would an IRL skipper handle this situation? can't Folkboats handle heavy weather
+  like this?" and, after: "I don't know of any Folkboats skipper on the Bay who reefs, or even has reefing capabilities…
+  I've heard that Folkboats don't *need* to reef because of their heavy keel… If we introduce a reefing mode, make sure
+  it's true to life, and keep it hidden in racing mode."
+  What's sourced: ballast about 50% of displacement, cast-iron keel (Folkboat Year Book 2023; NFIA class rules
+  2025–2028, rule 4.10); capsize screening 1.78 (keelindex.com). The NFIA rules (March 2026 update) say nothing about
+  reefing either way; the UK Folkboat Association's rules (10.0) allow reef points "at the discretion of the owner" and
+  ban flattening-reef zips. A self-draining cockpit is optional (NFIA 3.21) and pumping only while racing (12.40).
+  Not found: the SF Bay fleet's practice in 25–30+ kt, first-hand accounts of a Folkboat in 30+ kt, how classic boats
+  reefed, the AVS. So "they don't need to reef" is the owner's report of Bay practice, not yet sourced either way; to
+  try next: sfbayfolkboats.org and the YRA sailing instructions, the Year Books, North Sails' Folkboat guide.
+  To build:
+  (1) first, the physics: with the main eased or luffing, traveller down and backstay on, what does she really do in
+  30+ kt under full sail? The heel past a few degrees still needs the righting curve from the hull's offsets (see crew
+  weight, above); if Bay racers sail on unreefed, she must be able to too, not lie at 60° at 0 kt;
+  (2) the auto crew's heavy-air handling as Bay sailors do it (dump the main, sail on the jib, feather);
+  (3) water in the cockpit: water shipped, its weight, the pump;
+  (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
+  many reefs, at what wind).
+- **Next — cruising and racing: pick places on the map, change the conditions, and "Send her home"** (feature; 6–10 h
+  in all): owner, "when cruising, I'd like to be able to pick my start and end locations on the map rather than in
+  dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
+  cruise, and in both modes I would like a 'Send her home' feature (copy TBD) that auto-sets her home slip as the
+  destination. In race mode, send her home would essentially be withdrawing from the race, if actioned before race is
+  complete." (1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns (2–3 h).
+  (2) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
+  restart (2–4 h). (3) "Send her home" (wording to be settled), in both modes: sets her home slip as the destination for
+  the navigator or tiller pilot; before she finishes a race it retires her (scored RET under RRS A5.1 and A11) (1–3 h).
+  (4) After "cast off", change where she starts without ending the cruise (owner, "once I tap 'cast off' in cruise
+  mode, I'd like to be able to edit the starting location without having to end the cruise altogether"): pick a new
+  start on the chart and she's moved there, the cruise and its log carrying on (1–2 h).
+  Layout to the owner first.
+  Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
+  time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
+  lights can be seen on the boat) and the wind, sea and sky.
+- **Later — aluminium spars look like white plastic** (polish; 1–2 h): owner, "the aluminum on the masts and booms
+  looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
+  fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
+  a long highlight down the mast. For every aluminium rig (the wooden spars stay wood). Check in daylight and at night.
+- **Later — the boat cards' pictures** (polish; 2–3 h): owner, "make the background of these models more true to life
+  and less ugly af, or just show the model suspended in empty space and slowly rotating? find something beautiful to do
+  here." Today (render/thumbs.ts) each boat card (name, flag, sail number) shows her on a flat blue sky over a flat blue
+  sea. Options to show the owner as pictures before building: her on the real Bay water and sky at golden hour; or alone
+  in soft studio light on a dark gradient, turning slowly (live on hover, still otherwise); either with her heel and sails
+  set as she'd sail, and her own colours. A design change, so the owner picks.
+- **Next — chase view: see the sails clear of the dials** (polish; 1–2 h): owner, "right now in chase view the hull
+  appears to be centered in frame, but I need to be able to see the sails easily. currently too much stuff (dials,
+  notifs) sit on top of the sail." Frame her so the whole sail plan sits in the open middle of the screen, clear of
+  the dials and messages: the hull low in frame (render/scene.ts chase camera), and the HUD kept out of the sails' area.
+  May fold into a broader HUD review. Batch with: the Navigator button (owner, "move the navigator button to be next
+  to the autopilot button. probably to the left of it."): in a cruise it moves from beside the map (#mapBar) to the
+  bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min). And the Hail icon (owner, "the hail button icon is the same as the
+  sound icon. let's fix that too."): a distinct icon, a hand cupped to the mouth or a sailor calling, never a speaker or
+  megaphone (that reads as Sound).
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
@@ -155,7 +219,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
   for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
   the **windex** dial's subtext should add the **point of sail**.
-- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
+- ~~**Next — the buttons at bottom-left**~~ (done, v87; polish; 3–5 h; Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 

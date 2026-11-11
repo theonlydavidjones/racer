@@ -1,7 +1,7 @@
 import { $ } from './dom';
 import { ACTIONS, keyLabel, type Action, type KeyMap } from './keys';
 
-/** Keyboard settings: see every binding, change any of them (press the new key), reset to defaults. */
+/** Keyboard settings: see every binding; click a key to change it (then press the new key); reset to defaults. */
 export class KeysView {
   private listening: Action | null = null;
   constructor(private map: KeyMap, private onChange: () => void) {
@@ -36,7 +36,6 @@ export class KeysView {
     const groups = [...new Set(ACTIONS.map(a => a.group))];
     $('keysList').innerHTML = groups.map(g => `<div class="kgroup"><div class="eyebrow">${g}</div>` + ACTIONS.filter(a => a.group === g).map(a =>
       `<div class="krow${this.listening === a.id ? ' listening' : ''}"><span class="klab">${a.label}</span>` +
-      `<span class="kkeys">${this.map.keys[a.id].map(k => `<kbd>${keyLabel(k)}</kbd>`).join('') || '<span class="knone">none</span>'}</span>` +
-      `<button class="ghost sm" type="button" data-a="${a.id}">${this.listening === a.id ? 'Press a key…' : 'Change'}</button></div>`).join('') + '</div>').join('');
+      `<button class="kkeys" type="button" data-a="${a.id}" title="Click, then press the new key">${this.listening === a.id ? '<span class="knone">Press a key…</span>' : this.map.keys[a.id].map(k => `<kbd>${keyLabel(k)}</kbd>`).join('') || '<span class="knone">none</span>'}</button></div>`).join('') + '</div>').join('');
   }
 }

@@ -119,12 +119,28 @@ function addRing(P: Path2D, a: Pts, close: boolean): void {
   pts(a).forEach(([x, y], i) => i ? P.lineTo(x, y) : P.moveTo(x, y));
   if (close) P.closePath();
 }
+/** The bounding box of some lines, in the sim's metres (null if none). */
+function boxOfLines(list: Pts[]): { x0: number; x1: number; y0: number; y1: number } | null {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const l of list) for (const [x, y] of pts(l)) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return x0 <= x1 ? { x0, x1, y0, y1 } : null;
+}
+/** The part of the world a map shows, in metres: its screen corners taken back through its transform. */
+function viewBox(o: [number, number], ex: [number, number], ey: [number, number], w: number, h: number): { x0: number; x1: number; y0: number; y1: number } {
+  const a = ex[0] - o[0], b = ex[1] - o[1], c = ey[0] - o[0], d = ey[1] - o[1], det = a * d - b * c || 1e-12;
+  const back = (sx: number, sy: number) => { const u = sx - o[0], v = sy - o[1]; return { x: (d * u - c * v) / det, y: (a * v - b * u) / det }; };
+  const cs = [back(0, 0), back(w, 0), back(0, h), back(w, h)];
+  return { x0: Math.min(...cs.map(q => q.x)), x1: Math.max(...cs.map(q => q.x)), y0: Math.min(...cs.map(q => q.y)), y1: Math.max(...cs.map(q => q.y)) };
+}
+/** The chart's line kinds on screen at the last draw of each map (the legend lists these). */
+export const SEEN: Record<Detail, Set<string>> = { inset: new Set(), chart: new Set() };
+
 function polyPath(list: Pts[][]): Path2D { const P = new Path2D(); for (const poly of list) for (const r of poly) addRing(P, r, true); return P; }
 function linePath(list: Pts[]): Path2D { const P = new Path2D(); for (const l of list) addRing(P, l, false); return P; }
 
 interface Built {
   bands: { k: ReturnType<typeof band>; p: Path2D }[]; contours: Path2D; land: Path2D; built: Path2D; structures: Path2D; shore: Path2D; piers: Path2D;
-  areas: { a: Area; o: Path2D | null; f: Path2D | null; at: { x: number; y: number } | null }[];
+  areas: { a: Area; o: Path2D | null; f: Path2D | null; at: { x: number; y: number } | null; box: { x0: number; x1: number; y0: number; y1: number } | null }[];
   hazards: { h: Hazard; p: { x: number; y: number } | null; f: Path2D | null; o: Path2D | null }[];
   soundings: { x: number; y: number; d: number }[]; aids: { a: Aid; x: number; y: number; text: string }[]; islets: { x: number; y: number }[];
   names: (Name & { x: number; y: number })[];
@@ -141,7 +157,7 @@ function built(): Built {
     bands: (['deep', 'mid', 'shoal', 'vshoal', 'dry'] as const).filter(k => byBand.has(k)).map(k => ({ k, p: polyPath(byBand.get(k)!) })),
     contours: linePath(ENC.contours.flatMap(c => c.l)),
     land: polyPath(ENC.land), built: polyPath(ENC.built), structures: polyPath(ENC.structures), shore: linePath(ENC.shore), piers: linePath(ENC.piers),
-    areas: ENC.areas.map(a => ({ a, o: a.o?.length ? linePath(a.o) : null, f: a.f?.length ? polyPath(a.f) : null, at: a.at ? at(a.at) : null })),
+    areas: ENC.areas.map(a => ({ a, o: a.o?.length ? linePath(a.o) : null, f: a.f?.length ? polyPath(a.f) : null, at: a.at ? at(a.at) : null, box: boxOfLines(a.o ?? []) })),
     hazards: ENC.hazards.map(h => ({ h, p: h.p ? at(h.p) : null, f: h.f?.length ? polyPath(h.f) : null, o: h.o?.length ? linePath(h.o) : null })),
     soundings: snd,
     aids: ENC.aids.map(a => ({ a, ...at(a.p), text: aidText(a) })),
@@ -184,12 +200,13 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
   ctx.strokeStyle = I.coast; ctx.lineWidth = px(1); ctx.stroke(G.structures); ctx.stroke(G.piers);
   ctx.lineWidth = px(1.2); ctx.stroke(G.shore);
   // the regulated areas: magenta dashed limits, as on the chart
+  const seen = SEEN[detail]; seen.clear();
+  const view = viewBox(o, ex, ey, w, h);
   for (const A of G.areas) {
     if (!A.o) continue;
-    const s = areaStroke(A.a.k, I); if (!s) continue;
-    // drawn to scale, but never thinner than a hairline or heavier than the chart's own pen (it mustn't bury the boats)
-    const lw = Math.min(detail === 'inset' ? 1.6 : 2.4, Math.max(0.8, s.w * k)), dk = Math.min(0.5, Math.max(0.12, k));
-    ctx.strokeStyle = s.c; ctx.lineWidth = px(lw); ctx.setLineDash(s.dash.map(d => px(d * dk))); ctx.stroke(A.o);
+    const s = areaPen(A.a.k, I, k, detail); if (!s) continue;
+    ctx.strokeStyle = s.c; ctx.lineWidth = px(s.w); ctx.setLineDash(s.dash.map(px)); ctx.stroke(A.o);
+    if (A.box && A.box.x1 > view.x0 && A.box.x0 < view.x1 && A.box.y1 > view.y0 && A.box.y0 < view.y1) seen.add(A.a.k); // (for the legend)
   }
   ctx.setLineDash([]);
   for (const H of G.hazards) {
@@ -205,6 +222,7 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
   // TSS lanes: an open arrow along each lane, the way traffic goes
   for (const A of G.areas) if (A.a.k === 'lane' && A.at && A.a.orient != null) {
     const s = tf(A.at.x, A.at.y); if (!on(s[0], s[1], 60)) continue;
+    seen.add('lane');
     const L = Math.min(60, Math.max(18, (A.a.size ?? 1000) * scale * 0.5)), d = A.a.orient * Math.PI / 180;
     const e = tf(A.at.x + Math.sin(d) * 10, A.at.y + Math.cos(d) * 10), ang = Math.atan2(e[1] - s[1], e[0] - s[0]);
     laneArrow(ctx, s[0], s[1], ang, L, I.magenta);
@@ -312,6 +330,25 @@ export function drawEncLand(ctx: CanvasRenderingContext2D, tf: Tf, pal: ChartPal
   ctx.strokeStyle = I.coast; ctx.lineWidth = 1 / k; ctx.stroke(G.structures); ctx.stroke(G.piers); ctx.lineWidth = 1.2 / k; ctx.stroke(G.shore);
   ctx.restore();
 }
+
+/**
+ * An area kind's line as the map draws it at `pxPerM` (and as the legend draws its sample): to scale, but never thinner
+ * than a hairline or heavier than the chart's own pen (it mustn't bury the boats). Width and dashes in pixels.
+ */
+export function areaPen(kind: string, I: Ink, pxPerM: number, detail: Detail): { c: string; w: number; dash: number[] } | null {
+  const s = areaStroke(kind, I); if (!s) return null;
+  const dk = Math.min(0.5, Math.max(0.12, pxPerM));
+  return { c: s.c, w: Math.min(detail === 'inset' ? 1.6 : 2.4, Math.max(0.8, s.w * pxPerM)), dash: s.dash.map(d => d * dk) };
+}
+
+/** What each of the chart's line kinds is, as US Chart No. 1 names it. */
+export const AREA_NAME: Record<string, string> = {
+  tssbound: 'Traffic lane limit (traffic separation scheme)', sepline: 'Separation line between the lanes', lane: 'Traffic lane: the way ships go',
+  precaution: 'Precautionary area (ships converge: keep a lookout)', anchorage: 'Anchorage area', berth: 'Anchor berth', restricted: 'Restricted area (security zone, regulated area)',
+  caution: 'Caution area (see the chart\'s notes: VTS, TSS)', cable: 'Cable area', cableline: 'Submarine cable', pipeline: 'Pipeline or pipeline area',
+  dumping: 'Dumping ground', military: 'Military area', fairway: 'Fairway', dredged: 'Dredged channel (depth in feet)', deepwater: 'Deep-water route',
+  track: 'Recommended track', navline: 'Leading line', ferry: 'Ferry route'
+};
 
 /** Each area kind's line on the chart (widths and dashes in metres on the water: they scale with the chart). */
 function areaStroke(k: string, I: Ink): { c: string; w: number; dash: number[] } | null {
