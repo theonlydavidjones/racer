@@ -1,11 +1,11 @@
 import type { Boat, LineKey } from './boat';
-import { heelFactor, heelWithCrew, helmNeeded, netDrive, rudderDrag, sailForces } from './balance';
+import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
 import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
 import { crewMass, crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
 import { hullResistance } from './dynamics';
 import { beatAngle, polar } from './polar';
-import { byHand, crewMainAngle, leeDrift, sailPlan, sailWind } from './physics';
+import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { KT, clamp } from '../core/math';
 
@@ -111,7 +111,7 @@ function speedFactor(b: Boat, c: Controls): number {
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
   // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
   // as physics.ts trimSails counts it; the deliberate ease is in the sails' power, below)
-  const ease = crewMainAngle(b) - optimalSheet('main', b.awaSlow), intended = clamp(optimalSheet('main', awa) + ease, SAILS.main.min, SAILS.main.max);
+  const ease = crewMainAngle(b) - optimalSheet('main', b.awaSlow);
   let f = Math.sqrt(Math.max(0, trimDrive(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max)), tj) * eff));
   // heel and helm, with the crew where they are now
   const sf = sailForces(sw.aws, sw.awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
@@ -123,10 +123,9 @@ function speedFactor(b: Boat, c: Controls): number {
     const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.ceh);
     // the drive the sails make less the keel's drag for their side force (balance.ts netDrive): flatter sails push less,
     // but heel her less and ask less of the keel; against the drive as she is, as physics.ts powerFactor weighs it
-    // (at the intended sheeting, as powerFactor takes it: a sheet set wrong is counted once, above)
-    const sfI = sailForces(sw.aws, sw.awa, { trim: sailTrim('main', sw.awa, intended), shape: ms, out: intended }, tj && js ? { trim: sailTrim('jib', sw.awa, optimalSheet('jib', sw.awa)), shape: js } : null, false);
-    const now = b.forces ? b.forces.drive : 0;
-    if (now > 1) f *= Math.sqrt(Math.max(0, netDrive(sfI, heel, v)) / now);
+    // (exactly as the boat weighs it: physics.ts sailPush, against the push with her lines as they are)
+    const pushNow = sailPush(tws, b.twa, plan, b.shape.main, b.shape.jib, b.heelMag ?? 0, b.depower ?? 0);
+    if (pushNow > 1) f *= Math.sqrt(Math.max(0, sailPush(tws, b.twa, plan, ms, js, heel, b.depower ?? 0)) / pushNow);
     f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
   }
   return f;

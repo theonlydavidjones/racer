@@ -101,6 +101,17 @@ describe('Roll tacking (RRS 42.3(b))', () => {
     expect(tack(0.9).rolled).toBe(true);
     expect(tack(0.2).rolled).toBe(false);
   });
+  it('in light air too: sitting to leeward before the tack, they move up onto the old high side so she rolls through it', () => {
+    const range = (skill: number) => {
+      const W = 4, twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 2.5, windKt: W }); b.crew = newCrew(crewOf(skill), 'S');
+      sail(b, 40); startTack(b); let lo = 0, hi = 0, v0 = kt(b), vMax = 0;
+      sail(b, 20, () => { lo = Math.min(lo, b.heel ?? 0); hi = Math.max(hi, b.heel ?? 0); vMax = Math.max(vMax, kt(b)); });
+      return { roll: hi - lo, v0, vMax };
+    };
+    const good = range(0.9), novice = range(0.2);
+    expect(good.roll).toBeGreaterThan(novice.roll + 4);
+    expect(good.vMax).toBeLessThanOrEqual(good.v0 + 0.01); // never faster than before the tack (RRS 42.3(b))
+  });
   it('the flatten after the tack lasts as long onto either tack (it ends once she is upright)', () => {
     const flatten = (tack: 'S' | 'P') => {
       const W = 10, twa = beatAngle(W), hd = tack === 'S' ? 360 - twa : twa, b = testBoat({ heading: hd, kt: 4.5, windKt: W });

@@ -309,8 +309,9 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (free.length - 1 - j) * Z.gap;
       tgt[i] = { arm, z: za + (zf - za) * foreF, pose: arm < -0.05 ? 'lee' : arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit' };
     });
-    // the roll tack: holding the old high side (now the low side) as she comes through the wind, then everyone out hard
-    if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: c.people[i].x * w, z: c.people[i].z, pose: 'sit' };
+    // the roll tack: as she comes through the wind they're out on the old high side (now the low side: in light air,
+    // sitting to leeward before the tack, they move up onto it), so she rolls onto the new tack; then everyone out hard
+    if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
     if (c.roll?.phase === 'flatten') for (const i of free) tgt[i] = { arm: maxOf(i), z: tgt[i].z, pose: 'hike' };
     if (c.roll?.phase === 'hold' && !helmBusy) tgt[0] = { arm: c.people[0].x * w, z: Z.helm, pose: 'helm' };
     c.tgt = tgt;

@@ -30,8 +30,11 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
       skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
       change with trim and heel) from a Folkboat lines plan, and the righting curve's shape past a few degrees (the
       moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll gybe; the help a roll
-      tack gives in steering her through the wind, heeled, with less rudder (only the rig's swing is modelled, so a roll
-      tack is worth little either way); the helm's own steering suffering while
+      tack: she now rolls through it (in light air too), the rig's sweep adds push while she rolls (quasi-steady, from the
+      sail forces) and a turn costs speed by the rudder it needs net of her helm, but in a 2-tonne keelboat that adds
+      up to nothing measurable; the only measured gains are a Laser's (Kogure et al. 2013, GPS: 5.3% faster through the
+      tack in 2–4 m/s, 2.8% in 4–6 m/s) and Cornell's towing-tank work on the unsteady thrust (APS DFD 2015–19, behind
+      a browser check), and nothing sizes the heeled hull's own turning or the unsteady flow for a keelboat; the helm's own steering suffering while
       single-handed at the cabin top; crew moving in waves (aft in a chop to free the bow).
    d. ~~Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved~~ (done). Later: measured
       timings for Folkboat crew work (the times are estimates); the order of jobs at a mark rounding (pole, vang, cars)

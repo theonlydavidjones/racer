@@ -214,9 +214,29 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const beat = beatAngle(ww.kt);
   // holding a lot of helm to keep her straight is a brake (the steady helm the sails demand; turning has its own cost)
   const helmDrag = Math.abs(rate) < 4 ? rudderDrag(clamp(b.helmNeed ?? 0, -12, 12), b.v) : 0;
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0), disp);
+  // the rig sweeping through the air as she rolls (a roll tack's flatten, a crew throwing their weight out): the extra
+  // wind across the sails is extra push while it lasts, from the same sail forces (quasi-steady; the unsteady flow
+  // measured on dinghies (Schutt & Williamson, Cornell) only adds to it), scaled to the hull as the force model scales
+  // the sails' push (driveCalibration). Kogure et al. (Japan J. Coaching Studies 27(1), 2013) measured a Laser
+  // Radial's roll tacks 5.3% faster than flat ones through the tack in 2–4 m/s, 2.8% in 4–6 m/s.
+  let sweep = 0;
+  const sway = rigSway(b);
+  if (Math.abs(sway) > 0.02 && !b.luff) {
+    const ap0 = sailWind(ww.from, ww.kt, b.h, b.v, 0, b.heel ?? 0);
+    const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+    sweep = (sf.main.drive + sf.jib.drive - sf0.main.drive - sf0.jib.drive) * driveCalibration(ww.kt, twa);
+  }
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
   b.v = Math.max(0, b.v + a * dt);
-  b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * Math.abs(rate) * D2R * dt)); // turning bleeds speed
+  // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
+  // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
+  // which is how a roll tack starts her turning with less rudder), so the same turn costs less or more by her balance
+  let bleed = 1;
+  if (Math.abs(rate) > 0.5) {
+    const toWind = rate * Math.sign(wrap(ww.from - b.h) || 1), turn = FULL_RUDDER * toWind / Math.max(1, maxTurnRate(b.v));
+    bleed = clamp(Math.abs(turn - clamp(b.helmNeed ?? 0, -12, 12)) / Math.max(2, Math.abs(turn)), 0.3, 2);
+  }
+  b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * bleed * Math.abs(rate) * D2R * dt));
   // not hove to: any sideways slip dies away as the keel bites again (a second or two)
   if (b.sway) { b.sway *= Math.exp(-dt / 1.5); if (Math.abs(b.sway) < 0.005) b.sway = 0; }
   travel(b, dt, t, emit, groundToast);
@@ -430,14 +450,8 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
   // shape's own cost is shapeEfficiency's), at the crew's intended sheeting (a sheet set wrong, by you or the crew, is
   // counted once, in the step's trimDrive) and her own heel; her heel's cost to the hull is in the target already
   // (heelFactor), and her rudder's drag acts on her as a force in the step
-  // (in the wind triangle the reference sails in, at the polar speed and her heel: this weighs her sails' shape and her
-  // heel against the polar crew's, not how fast she's going)
-  const heel = b.heelMag ?? 0, w = sailWind(0, twsR, -twaR, Math.max(0.3, polar(twsR, twaR, plan)), 0, heel);
-  const boom = stepBoom(w.awa, b.depower ?? 0), full = crewShapes(twsR, w.awa, 0, stepBoom(w.awa, 0), optimalSheet('jib', w.awa));
-  const cap = (s: Shape, f: Shape): Shape => ({ ...s, depth: Math.min(s.depth, f.depth) });
-  const now = intendedForces(cap(b.shape.main, full.main), jibOn ? cap(jibOn.shape, full.jib) : null, w.aws, w.awa, boom);
   // (the polar has the polar crew's heel in it already: her speed is the polar's times heelFactor(hers) / heelFactor(theirs))
-  const dNow = netDrive(now, heel, Math.max(0.3, polar(twsR, twaR, plan))), dRef = ref.p * heelFactor(ref.h) ** 2;
+  const dNow = sailPush(tws, twa, plan, b.shape.main, jibOn ? jibOn.shape : null, b.heelMag ?? 0, b.depower ?? 0), dRef = ref.p * heelFactor(ref.h) ** 2;
   b.powerK = dRef > 1 ? clamp(Math.sqrt(Math.max(0, dNow) / dRef), 0.5, 1.05) : 1;
   return b.powerK;
 }
@@ -445,6 +459,18 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
 function herFastestStep(b: Boat, twa: number, tws: number, plan: SailPlan, disp: number): StepPick {
   const cs = b.crew, spec = cs?.spec ?? DEFAULT_CREW, twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
   return fastestStep(twsR, twaR, plan, disp, crewMass(spec), hikingMoment(spec, cs?.people.map(p => p.fatigue)), crewBestHeel(twaR, twsR, crewSkill(cs)), sittingMoment(spec));
+}
+/**
+ * What her sails push (N, drive less the keel's drag: netDrive) with these shapes at heel `heel` and depowering step
+ * `depower`, judged as the speed search judges the polar crew's: in the wind triangle at the polar speed (rounded as the
+ * search is) and her heel, the sheets where the crew intends them, no fuller than full power counting for more. So it
+ * weighs her sails' shape and her heel, not how fast she's going. (powerFactor; the coach, for a line you might move.)
+ */
+export function sailPush(tws: number, twa: number, plan: SailPlan, main: Shape, jib: Shape | null, heel: number, depower: number): number {
+  const twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2), vP = Math.max(0.3, polar(twsR, twaR, plan));
+  const w = sailWind(0, twsR, -twaR, vP, 0, heel), full = crewShapes(twsR, w.awa, 0, stepBoom(w.awa, 0), optimalSheet('jib', w.awa));
+  const cap = (s: Shape, f: Shape): Shape => ({ ...s, depth: Math.min(s.depth, f.depth) });
+  return netDrive(intendedForces(cap(main, full.main), jib ? cap(jib, full.jib) : null, w.aws, w.awa, stepBoom(w.awa, depower)), heel, vP);
 }
 /** The boom where the crew wants it at depowering step d: eased down the traveller on the last steps (crewEaseBoom). */
 const stepBoom = (awa: number, d: number) => clamp(optimalSheet('main', awa) + (awa < 70 ? 7 * clamp((d - 0.6) / 0.4, 0, 1) : 0), SAILS.main.min, SAILS.main.max);
