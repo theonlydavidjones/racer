@@ -48,21 +48,25 @@ export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
 }
 
 /** Overlay colours for a light chart (ui/encChart.ts INK.day); left out, the colours for a dark map. */
-export interface OverlayInk { mark?: string; markPass?: string; line?: string; current?: string; lull?: (a: number) => string; lullHatch?: boolean; puff?: (a: number) => string; windTick?: string }
+/** `halo`: a band drawn under each overlay line and round each symbol, so it stands clear of the chart's own print. */
+export interface OverlayInk { mark?: string; markPass?: string; markHi?: string; line?: string; current?: string; lull?: (a: number) => string; lullHatch?: boolean; puff?: (a: number) => string; windTick?: string; halo?: string; edge?: string; starboard?: string; port?: string }
 
 export function drawCourse(ctx: CanvasRenderingContext2D, C: Course, aids: boolean, tf: Tf, scale: number, highlight: number, ink: OverlayInk = {}): void {
   const p1 = tf(C.pin.x, C.pin.y), p2 = tf(C.committee.x, C.committee.y);
-  ctx.setLineDash([5, 5]); ctx.strokeStyle = ink.line ?? 'rgba(255,216,74,.75)'; ctx.lineWidth = 1.5;
+  if (ink.halo) { ctx.strokeStyle = ink.halo; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); } // the start line, clear of the chart
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = ink.line ?? 'rgba(255,216,74,.75)'; ctx.lineWidth = ink.halo ? 2 : 1.5;
   ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); ctx.setLineDash([]);
   const seen = new Set<string>();
   C.marks.forEach((m, i) => {
     const s = tf(m.p.x, m.p.y), key = m.name;
     const hi = highlight === i;
-    if (m.type === 'round' && aids) { ctx.strokeStyle = hi ? 'rgba(255,216,74,.6)' : 'rgba(255,216,74,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s[0], s[1], Math.max(2, ZONE * scale), 0, 6.29); ctx.stroke(); }
+    if (m.type === 'round' && aids) { ctx.strokeStyle = ink.mark ? hexA(ink.mark, hi ? 0.8 : 0.45) : hi ? 'rgba(255,216,74,.6)' : 'rgba(255,216,74,.25)'; ctx.lineWidth = ink.mark ? 1.3 : 1; ctx.beginPath(); ctx.arc(s[0], s[1], Math.max(2, ZONE * scale), 0, 6.29); ctx.stroke(); }
     if (seen.has(key) && !hi) return; seen.add(key);
-    ctx.fillStyle = hi ? '#ffb627' : (m.type === 'pass' ? ink.markPass ?? '#c9b25a' : ink.mark ?? '#ffc21a');
-    ctx.beginPath(); ctx.arc(s[0], s[1], hi ? 4 : 3, 0, 6.29); ctx.fill();
-    if (ink.mark) { ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1; ctx.stroke(); }
+    const r = ink.halo ? (hi ? 5.5 : 4.5) : hi ? 4 : 3;
+    if (ink.halo) { ctx.fillStyle = ink.halo; ctx.beginPath(); ctx.arc(s[0], s[1], r + 2.2, 0, 6.29); ctx.fill(); }
+    ctx.fillStyle = hi ? ink.markHi ?? '#ffb627' : (m.type === 'pass' ? ink.markPass ?? '#c9b25a' : ink.mark ?? '#ffc21a');
+    ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, 6.29); ctx.fill();
+    if (ink.edge) { ctx.strokeStyle = ink.edge; ctx.lineWidth = 1.2; ctx.stroke(); }
   });
 }
 
@@ -92,13 +96,15 @@ export function fitCanvas(c: HTMLCanvasElement): [CanvasRenderingContext2D, numb
 }
 
 /** Starboard-tack (green) and port-tack (red) laylines from the mark, `len` metres long. */
-export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines | null, len: number, width = 1): void {
+export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines | null, len: number, width = 1, ink: OverlayInk = {}): void {
   if (!L) return;
   const m = L.mark.p, mk = tf(m.x, m.y);
-  ctx.save(); ctx.setLineDash([4, 4]); ctx.lineWidth = width;
+  ctx.save();
+  if (ink.halo) { ctx.strokeStyle = ink.halo; ctx.lineWidth = width + 3; L.tracks.forEach(g => { const e = tf(m.x - g.x * len, m.y - g.y * len); ctx.beginPath(); ctx.moveTo(mk[0], mk[1]); ctx.lineTo(e[0], e[1]); ctx.stroke(); }); }
+  ctx.setLineDash([4, 4]); ctx.lineWidth = ink.halo ? width + 0.6 : width;
   L.tracks.forEach((g, i) => {
     const e = tf(m.x - g.x * len, m.y - g.y * len);
-    ctx.strokeStyle = i === 0 ? 'rgba(63,209,151,.75)' : 'rgba(255,106,92,.75)';
+    ctx.strokeStyle = i === 0 ? ink.starboard ?? 'rgba(63,209,151,.75)' : ink.port ?? 'rgba(255,106,92,.75)';
     ctx.beginPath(); ctx.moveTo(mk[0], mk[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
   });
   ctx.restore();
@@ -121,6 +127,10 @@ export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p:
     const a = tf(x, y), b = tf(x + c.x / (kt * 0.5144) * 10, y + c.y / (kt * 0.5144) * 10); // direction only
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, len = Math.min(spacing * 0.8, kt * pxPerKt);
     const ux = dx / l, uy = dy / l, tx = a[0] + ux * len / 2, ty = a[1] + uy * len / 2;
+    if (ink.halo) { // a pale band under it, so it reads over the chart's print
+      ctx.save(); ctx.strokeStyle = ink.halo; ctx.lineWidth = 3.4; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(a[0] - ux * len / 2, a[1] - uy * len / 2); ctx.lineTo(tx, ty); ctx.lineTo(tx - ux * 4 - uy * 2.5, ty - uy * 4 + ux * 2.5); ctx.moveTo(tx, ty); ctx.lineTo(tx - ux * 4 + uy * 2.5, ty - uy * 4 - ux * 2.5); ctx.stroke(); ctx.restore();
+    }
     ctx.beginPath(); ctx.moveTo(a[0] - ux * len / 2, a[1] - uy * len / 2); ctx.lineTo(tx, ty); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - ux * 4 - uy * 2.5, ty - uy * 4 + ux * 2.5); ctx.lineTo(tx - ux * 4 + uy * 2.5, ty - uy * 4 - ux * 2.5); ctx.closePath(); ctx.fill();
   }

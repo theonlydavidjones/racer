@@ -20,6 +20,7 @@ import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, type Incident } from './rules';
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
+import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
@@ -37,6 +38,7 @@ import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { onSaveTrouble, saveStatus } from './store/cloud';
+import { layerMenu, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
@@ -239,7 +241,7 @@ function releaseTiller(): void {
   if (!tillerHeld) return;
   tillerHeld = false; document.body.classList.remove('tiller-held'); $('tiller').classList.remove('held');
 }
-const overControl = (t: EventTarget | null) => t instanceof Element && !!t.closest('button, a, input, select, #tiller, #msgLog, #map, #trimPanel, .overlay');
+const overControl = (t: EventTarget | null) => t instanceof Element && !!t.closest('button, a, input, select, #tiller, #msgLog, #map, #trimPanel, .overlay, .layerpop');
 addEventListener('mousemove', e => { lastCursorX = e.clientX; if (tillerHeld && !panning && !overControl(e.target) && w.running && !w.paused) tillerFromCursor(e.clientX); });
 addEventListener('blur', releaseTiller);
 /** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
@@ -559,6 +561,13 @@ $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 let chartDest: unknown = null;
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
   pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
+// the map's layers: the same choices on the inset map and the full chart, saved with your settings
+{
+  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = { ...S.mapLayers, [k]: on }; w.settings.mapLayers = S.mapLayers; saveSettings(S); };
+  const redraw = () => { if (chart.isOpen) chart.draw(); };
+  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw);
+  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw);
+}
 $('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
@@ -1150,7 +1159,7 @@ function boatSummary(): void {
 /* The fleet: who you race against. Stock club boats and your own saved boats (not the one you're sailing). */
 function fleetChanged(): void {
   const ids = new Set(S.boats.map(b => b.id));
-  S.opponents = S.opponents.filter(o => o.startsWith('stock:') || (ids.has(o) && o !== S.boatId));
+  S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (ids.has(o) && o !== S.boatId));
   S.fleet = S.opponents.length; saveSettings(S); newGame(); oppRows();
 }
 function oppRows(): void {
@@ -1160,10 +1169,14 @@ function oppRows(): void {
   };
   const mine = S.boats.filter(b => b.id !== S.boatId);
   $('oppList').innerHTML = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
+    // generic club Folkboats (boat/generic.ts), to fill out the fleet: tap one to drop her, + to add another
+    + `<div class="opp-h">More club Folkboats</div>` + S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), sailNo(g), genericTag(id), g.hull.upper); }).join('')
+    + (S.opponents.length < MAX_OPPONENTS ? `<button type="button" class="opp" data-fill="1"><span>+ Add one</span></button>` : '')
     + `<div class="opp-h">Your boats</div>` + (mine.length ? mine.map(b => chip(b.id, (b.name || 'Unnamed').replace(/</g, '&lt;'), sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more boats under Your boats…</small>');
   $('oppCount').textContent = S.opponents.length ? `· ${S.opponents.length} boat${S.opponents.length > 1 ? 's' : ''}` : '· nobody (a solo race)';
 }
 $('oppList').addEventListener('click', e => {
+  if ((e.target as HTMLElement).closest('[data-fill]')) { S.opponents = fillFleet(S.opponents, S.opponents.length + 1, MAX_OPPONENTS); fleetChanged(); return; }
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-opp]'); if (!b || b.disabled) return;
   const id = b.dataset.opp!;
   S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);

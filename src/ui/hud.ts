@@ -39,7 +39,11 @@ function shapeWords(u: Boat): string {
 import { toast } from './feedback';
 import { drawCourse, drawCurrentArrows, drawWindField, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
-import { INK, chartCredit, drawEncChart, drawEncLand } from './encChart';
+import { INK, chartCredit, drawEncChart, drawEncLand, type Ink } from './encChart';
+import { layerOn, type LayerKey } from './layers';
+import { drawFog, drawSea, nm } from './mapLayers';
+import { visibilityFor } from '../environment/weather';
+import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
 
 export function fmtClock(t: number): string {
@@ -403,17 +407,22 @@ export class Hud {
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
     this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
-    const day = (wd.settings.chartPal ?? 'day') === 'day';
-    ctx.fillStyle = day ? '#3d4a54' : '#94abb7'; ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('WIND ↓', 6, 12);
+    const day = (wd.settings.chartPal ?? 'day') === 'day', I = INK[day ? 'day' : 'dusk'];
+    // the map's own words, each on a halo so it reads over the chart
+    const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
+    ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
+    say('WIND ↓', 34, 12, 'left'); // (right of the layers button on the map's corner)
+    const fog = this.fogNote(wd, true);
+    if (fog) say(fog, 6, h - 6, 'left');
     const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
-    if (ckt > 0.05) {
+    if (ckt > 0.05 && layerOn(wd.settings, 'current')) {
       // the current where you are
       const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w - 18, oy = 16;
       const cc = day ? '#0060aa' : '#6fd0ff';
+      ctx.strokeStyle = I.halo; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
       ctx.strokeStyle = cc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
       ctx.fillStyle = cc; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
-      ctx.textAlign = 'right'; ctx.fillText('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6);
+      say('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6 - (fog ? 12 : 0), 'right');
     }
   }
 
@@ -422,14 +431,15 @@ export class Hud {
    * spot you've picked. Same picture as the inset map: land, wind, puffs, current, the course or your destination, boats, ships.
    */
   drawChart(c: HTMLCanvasElement, wd: World, cx: number, cy: number, scale: number, pick: Vec | null): void {
-    const [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[wd.settings.chartPal ?? 'day'];
+    const pal = wd.settings.chartPal ?? 'day', [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[pal];
     // the places' names go over the chart: its own print keeps clear of them
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
     const avoid = PLACES.filter(pl => scale > 0.12 || !pl.buoy).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
+    const me = tf(u.x, u.y); avoid.push([me[0] - 26, me[1] - 26, 52, 52]); // (and clear of your boat)
     this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-    const placed: [number, number, number, number][] = [];
+    const placed: [number, number, number, number][] = [[me[0] - 26, me[1] - 26, 52, 52]]; // (your boat's spot is kept clear of names)
     for (const pl of PLACES) {
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
       // (the sim's own places: the racing marks in amber, under the chart's print)
@@ -437,7 +447,7 @@ export class Hud {
       const bw = ctx.measureText(pl.name).width; // (zoomed out, the names would pile up: each only where it fits)
       if (placed.some(b => q[0] + 6 < b[0] + b[2] && q[0] + 6 + bw > b[0] && q[1] - 17 < b[1] + b[3] && q[1] - 3 > b[1])) continue;
       placed.push([q[0] + 6, q[1] - 17, bw, 14]);
-      if (scale > 0.12 || !pl.buoy) { ctx.fillStyle = pl.buoy ? I.mark : I.text; ctx.fillText(pl.name, q[0] + 6, q[1] - 6); }
+      if (scale > 0.12 || !pl.buoy) { ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(pl.name, q[0] + 6, q[1] - 6); ctx.fillStyle = pl.buoy ? (pal === 'day' ? '#c24a00' : I.mark) : I.text; ctx.fillText(pl.name, q[0] + 6, q[1] - 6); }
     }
     if (pick) { // the spot you've picked: a ring, and the line from you to it
       const a = tf(u.x, u.y), b = tf(pick.x, pick.y);
@@ -445,6 +455,13 @@ export class Hud {
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
       ctx.strokeStyle = I.pick; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b[0], b[1], 9, 0, 6.29); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(b[0] - 14, b[1]); ctx.lineTo(b[0] + 14, b[1]); ctx.moveTo(b[0], b[1] - 14); ctx.lineTo(b[0], b[1] + 14); ctx.stroke();
+    }
+    // the fog layer: what visibility it shows, and whose (or why there's none)
+    const fogLine = this.fogNote(wd, false);
+    if (fogLine) {
+      ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+      const fw = ctx.measureText(fogLine).width; ctx.fillStyle = I.halo; ctx.fillRect(10, 8, fw + 12, 18);
+      ctx.fillStyle = I.text; ctx.fillText(fogLine, 16, 21);
     }
     // north, the wind, and a scale bar
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
@@ -462,64 +479,102 @@ export class Hud {
     ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
   }
 
+  /** The sea state, remembered for ten seconds of the race at each spot (it's worked out from the wind, current and fetch). */
+  private seaCache = new Map<string, SeaHere>(); private seaT = -1;
+  private seaAt(wd: World, p: Vec): SeaHere | null {
+    if (wd.sea.flat) return null;
+    const tb = Math.floor(wd.t / 10); if (tb !== this.seaT) { this.seaCache.clear(); this.seaT = tb; }
+    if (onLand(p)) return null;
+    const k = `${Math.round(p.x)},${Math.round(p.y)}`; let v = this.seaCache.get(k);
+    if (!v) { v = wd.seaHere(p); if (this.seaCache.size > 5000) this.seaCache.clear(); this.seaCache.set(k, v); }
+    return v;
+  }
+
+  /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
+  fogNote(wd: World, short: boolean): string | null {
+    if (!layerOn(wd.settings, 'fog')) return null;
+    const v = visibilityFor(wd.raceDate, wd.clockUtc);
+    if ('none' in v) return short ? (v.noFog ? 'NO FOG FORECAST · NWS' : 'FOG: NO DATA') : `Fog: ${v.none}`;
+    if (v.source === 'observed') { const m = v.points[0].m; return short ? `VIS ${nm(m, v.cap).toUpperCase()} AT PIER 17` : `Visibility ${nm(m, v.cap)} at Pier 17: ${v.says}.`; }
+    if (v.source === 'outlook') { const w = v.words!(wd.user); return short ? (w ? `${w.toUpperCase()} · NWS` : w === '' ? 'NO FOG HERE · NWS' : 'FOG: OFF THE GRID') : `${w ? w[0].toUpperCase() + w.slice(1) : w === '' ? 'No fog' : 'Nothing'} here: ${v.says}.`; }
+    const m = v.at(wd.user);
+    if (!Number.isFinite(m)) return short ? 'FOG: OFF THE NWS GRID' : `Fog: you're beyond the NWS forecast grid (${v.says}).`;
+    return short ? `VIS ${nm(m, v.cap).toUpperCase()} · NWS` : `Visibility ${nm(m, v.cap)} here: ${v.says}.`;
+  }
+
+
   private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
-    const pal = wd.settings.chartPal ?? 'day', I = INK[pal];
+    const S = wd.settings, pal = S.chartPal ?? 'day', I = INK[pal], on = (k: LayerKey) => layerOn(S, k), half = Math.max(w, h) / scale * 0.75;
     drawEncChart(ctx, tf, scale, w, h, pal, detail, avoid); // NOAA's chart underneath everything the sim draws
-    if (wd.settings.aids) { // the wind across the course: where it blows harder and lighter, and which way
-      const half = Math.max(w, h) / scale * 0.75, spacing = Math.max(250, half / 7);
-      drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, spacing, onLand, I);
+    if (on('sea')) drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
+    if (on('wind')) { // the wind across the course: where it blows harder and lighter, and which way; and the puffs and lulls
+      drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, Math.max(250, half / 7), onLand, I);
+      drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I);
     }
-    drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I);
+    const fog = on('fog') ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
-    { // the current across the water around you, from the sim's own current field
-      const half = Math.max(w, h) / scale * 0.75, mid = ctr;
-      drawCurrentArrows(ctx, tf, p => wd.currentAt(p), mid.x, mid.y, half, Math.max(60, half / 4), 9, onLand, I);
-    }
-    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, pal === 'day');
-    else drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
-    if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), wd.freeSail ? 2500 : 450);
+    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
+    // the current across the water around you, from the sim's own current field
+    if (on('current')) drawCurrentArrows(ctx, tf, p => wd.currentAt(p), ctr.x, ctr.y, half, Math.max(60, half / 4), 9, onLand, I);
+    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I);
+    else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
+    if (on('laylines')) drawLaylines(ctx, tf, laylinesFor(wd, u), wd.freeSail ? 2500 : 450, 1.2, I);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
-    for (const v of wd.vessels) {
+    if (on('ships')) for (const v of wd.vessels) {
       const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);
-      ctx.strokeStyle = I.ship; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(3, ty.beam * scale);
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); ctx.lineCap = 'butt';
-      if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = 'rgba(230,230,225,.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); }
-      if (labels) { ctx.fillStyle = I.shipText; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
+      const bw = Math.max(3.5, ty.beam * scale);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = I.shipHalo; ctx.lineWidth = bw + 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke();
+      ctx.strokeStyle = I.ship; ctx.lineWidth = bw; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); ctx.lineCap = 'butt';
+      if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = I.ship; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+      if (labels) { ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = I.shipHalo; const lx = (a[0] + b2[0]) / 2 + 6, ly = (a[1] + b2[1]) / 2 - 6; ctx.strokeText(ty.name, lx, ly); ctx.fillStyle = I.shipText; ctx.fillText(ty.name, lx, ly); }
     }
-    if (wd.settings.aids && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
-    for (const b of wd.boats) {
-      const p = tf(b.x, b.y), s = b.isUser ? 5 : 4;
-      ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R);
-      ctx.fillStyle = b.color; ctx.beginPath(); ctx.moveTo(0, -s * 1.6); ctx.lineTo(s * 0.8, s); ctx.lineTo(-s * 0.8, s); ctx.closePath(); ctx.fill();
-      if (b.isUser) { ctx.strokeStyle = I.boatEdge; ctx.lineWidth = 1; ctx.stroke(); } else if (pal === 'day') { ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 0.8; ctx.stroke(); }
+    if (on('shadows') && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
+    // the boats: each in her colour with a halo and a dark edge, so she reads on any part of the chart; you bigger, in cyan
+    // (bigger on the full chart, and bigger still zoomed out, where everything else shrinks round her)
+    const big = detail === 'chart' ? (scale < 0.1 ? 1.6 : 1.25) : 1;
+    for (const b of [...wd.boats].sort((x, y) => (x.isUser ? 1 : 0) - (y.isUser ? 1 : 0))) {
+      const p = tf(b.x, b.y), s = (b.isUser ? 6.5 : 4.5) * big;
+      ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R); ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -s * 1.6); ctx.lineTo(s * 0.8, s); ctx.lineTo(-s * 0.8, s); ctx.closePath();
+      ctx.strokeStyle = I.halo; ctx.lineWidth = b.isUser ? 5 : 3.5; ctx.stroke();
+      ctx.fillStyle = b.isUser ? I.you : b.color; ctx.fill();
+      ctx.strokeStyle = I.edge; ctx.lineWidth = b.isUser ? 1.6 : 1.1; ctx.stroke();
       ctx.restore();
+      if (b.isUser) { ctx.strokeStyle = I.you; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p[0], p[1], s * 2.3, 0, 6.29); ctx.stroke(); } // a ring round you
     }
     ctx.restore();
   }
+
 }
 
 /**
  * Just sailing, on the map: the buoys around you, and where you're heading. If that's off the map, an arrow at the
  * edge points to it.
  */
-function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, light = false): void {
+function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink): void {
+  // the racing marks and buoys the sim knows (the chart draws the real ones under them): small orange rings
   for (const pl of PLACES) if (pl.buoy) {
     const s = tf(pl.p.x, pl.p.y);
-    ctx.fillStyle = light ? 'rgba(224,154,0,.8)' : 'rgba(255,210,26,.55)'; ctx.beginPath(); ctx.arc(s[0], s[1], 2.2, 0, 6.29); ctx.fill();
+    ctx.strokeStyle = I.halo; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(s[0], s[1], 3, 0, 6.29); ctx.stroke();
+    ctx.strokeStyle = I.mark; ctx.lineWidth = 1.6; ctx.stroke();
   }
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
-  ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = light ? 'rgba(190,120,0,.9)' : 'rgba(255,210,26,.7)'; ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
-  if (inside) {
-    ctx.fillStyle = '#ffd21a'; ctx.beginPath(); ctx.moveTo(b[0], b[1] - 6); ctx.lineTo(b[0] + 5, b[1]); ctx.lineTo(b[0], b[1] + 6); ctx.lineTo(b[0] - 5, b[1]); ctx.closePath(); ctx.fill();
-    if (light) { ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke(); }
-  } else {
+  ctx.save();
+  ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.setLineDash([5, 4]); ctx.strokeStyle = I.line; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+  const shape = (pts: [number, number][]) => {
+    ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = I.mark; ctx.fill(); ctx.strokeStyle = I.edge; ctx.lineWidth = 1.2; ctx.stroke();
+  };
+  if (inside) shape([[b[0], b[1] - 8], [b[0] + 6.5, b[1]], [b[0], b[1] + 8], [b[0] - 6.5, b[1]]]); // where you're heading: an orange diamond
+  else {
     // pinned to the edge of the map, pointing the way
     const dx = b[0] - a[0], dy = b[1] - a[1], k = Math.min((w / 2 - 12) / Math.abs(dx || 1e-6), (h / 2 - 12) / Math.abs(dy || 1e-6));
     const ex = a[0] + dx * k, ey = a[1] + dy * k, ang = Math.atan2(dy, dx);
-    ctx.fillStyle = '#ffd21a'; ctx.beginPath(); ctx.moveTo(ex + Math.cos(ang) * 7, ey + Math.sin(ang) * 7);
-    ctx.lineTo(ex + Math.cos(ang + 2.5) * 7, ey + Math.sin(ang + 2.5) * 7); ctx.lineTo(ex + Math.cos(ang - 2.5) * 7, ey + Math.sin(ang - 2.5) * 7); ctx.closePath(); ctx.fill();
+    shape([[ex + Math.cos(ang) * 8, ey + Math.sin(ang) * 8], [ex + Math.cos(ang + 2.5) * 8, ey + Math.sin(ang + 2.5) * 8], [ex + Math.cos(ang - 2.5) * 8, ey + Math.sin(ang - 2.5) * 8]]);
   }
 }

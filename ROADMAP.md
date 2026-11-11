@@ -84,12 +84,13 @@ left); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
-players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip numbers and nicer moored boats (4–6 h); real
+players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
 phone layout (on hold, 8–12 h).
 
-Open check: the tiller pilot's specs from primary sources (the ST2000+ may be 4.5 s lock to lock, not 4.0 s; AutoTrim
-and the RRS 52 wording unconfirmed). Needs docs.raymarine.com and www.sailing.org allowed.
+Checked: RRS 52 and the ERS rudder definition (primary sources), and the ST2000+'s 4,500 kg rating (Raymarine). Still
+unconfirmed: the ST2000+'s hard-over time (now 4.5 s, from secondary sources), its AutoTack default (100°) and AutoTrim;
+the handbook (Raymarine document 81130) wasn't reachable.
 
 ## The owner's list (November 2026, to prioritise)
 
@@ -117,6 +118,19 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
+- **The Bay Bridge and the city at night** (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+  suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
+  the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
+  night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
+  and time, so the lights come on at real dusk. Sources: Caltrans and OSM for the bridge's geometry; the Bay Lights' own
+  published specifications for its LEDs and patterns.
+- **Lights on the boats at night** (owner, November 2026: "make them beautiful"; 4–6 h): the real navigation lights for a
+  sailing vessel under 20 m (Inland/International Rules 25): red and green sidelights over 112.5° each, the white
+  sternlight over 135°, or the masthead tricolour as an option under sail; the steaming light when motoring and the
+  all-round white anchor light at anchor or on a mooring. Their sectors exact, so you can read another boat's heading
+  and right of way from her lights, as the rules intend (and the IRPCAS teaching uses it). Beautiful as well as right:
+  soft glow and bloom, their reflections trembling on the water, warm cabin light through the ports, the compass lit,
+  a red cockpit light, and the moored and anchored boats' lights round the harbors.
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
@@ -127,6 +141,14 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Real nautical charts on the map:** NOAA's official charts (the US nautical charts are NOAA's; USGS makes land maps):
   chart 18649 (Entrance to San Francisco Bay) and its neighbours, as raster tiles or drawn from the ENC vector data
   (depths, channels, buoys, lights, restricted areas), on the inset map and the full-screen chart.
+- **Map layers and contrast** (requested): ~~layers on the inset map and the chart (wind, current, sea state, fog from
+  real visibility only, ships, laylines, wind shadows), saved per player; the sim's overlays in colours the chart
+  doesn't use, on halos~~ (done). Next: **fog in the 3D scene and on the water** from the same real visibility (today
+  the 3D fog bank is an estimate by month and hour), and **its effect on sailing**: you can't see marks, boats or ships
+  beyond the visibility, so no transits, laylines by eye or sighting the next mark; ships sound their fog signals (and
+  the bridge's and the lighthouses' horns, with their real characteristics from the chart); the AI navigates by
+  compass and chart in it. Observed visibility comes from one sensor (Pier 17, 7 km inside the Gate): the Gate's own
+  fog can differ.
 - **The Bay to Berkeley, Alameda and Richmond:** the shores, harbors and marks east and north, with the wind and current
   fields extended over them (NOAA current stations and the NWS grid already reach there).
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to

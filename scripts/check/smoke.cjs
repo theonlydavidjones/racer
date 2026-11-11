@@ -11,6 +11,8 @@ const root = path.resolve(__dirname, '../..'), out = process.argv[2] || root;
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  // the headless software renderer draws a frame in a second or two with the full scene, so clicks get room to settle
+  page.setDefaultTimeout(120000);
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await page.route('https://cdn.jsdelivr.net/npm/three@*/build/**', r => {
     const f = path.basename(new URL(r.request().url()).pathname);
