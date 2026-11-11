@@ -130,7 +130,7 @@ const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] }
 function withCrew(b: Boat, k: LineKey, v: number): Controls {
   const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
   if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
-  if (k === 'mainsheet' && !byHand(b, 'traveller') && !b.hove && !byHand(b, 'jibsheetW')) c.traveller = travellerFor(want, v, depowerLimits(b.depower ?? 0, b.awaSlow).min.traveller ?? -1);
+  if (k === 'mainsheet' && !byHand(b, 'traveller') && !b.hove && !byHand(b, 'jibsheetW')) c.traveller = travellerFor(want, v, depowerLimits(b.depower ?? 0, b.awaSlow, b.ww.kt).min.traveller ?? -1);
   return c;
 }
 /** The best setting for one line with the crew answering it, and the speed it's worth. */

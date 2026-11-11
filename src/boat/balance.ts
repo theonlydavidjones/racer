@@ -249,7 +249,12 @@ export function rudderDrag(weather: number, v: number): number {
   return 0.5 * RHO_W * v * v * RUDDER.area * (cl * cl / (Math.PI * RUDDER.aspect) + 0.02 * excess * D2R);
 }
 
-/** Speed lost to heeling past the boat's best angle (about 20° for a Folkboat): leeway, wetted shape, sail area tipped away. */
+/**
+ * Speed lost to the hull heeling past about 20°: the heeled hull's own resistance as the lee rail nears the water. ORC's
+ * VPP works it from the hull's offsets (VPP Documentation 2025, §6.4), which aren't published for the Folkboat (ORC
+ * and the NFIA hold them), so this curve is an estimate. (Fitting it so that the speed search depowers where North
+ * Sails' guide does needs an impossible cost, 19% at 16°: see ROADMAP, the depowering question.)
+ */
 export const heelFactor = (heelDeg: number) => 1 - 0.55 * Math.max(0, (Math.abs(heelDeg) - 20) / 30) ** 2;
 
 /**

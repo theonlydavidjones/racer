@@ -6,7 +6,10 @@ import { kt, sail, testBoat } from './helpers/testBoat';
 describe('what each control does to the sails', () => {
   it('outhaul and backstay flatten the main; the backstay flattens the jib too', () => {
     const c = defaultControls(), base = mainShape(c, 12).depth;
-    expect(mainShape({ ...c, outhaul: 1 }, 12).depth).toBeLessThan(base - 0.01);
+    // the outhaul flattens the foot: from 3 cm off the black band (light air) to on it (12 kt and up, North Sails), about
+    // 1.5% of the main's camber; the backstay, bending the mast, does more
+    const foot = mainShape({ ...c, outhaul: 0 }, 12).depth - mainShape({ ...c, outhaul: 1 }, 12).depth;
+    expect(foot).toBeGreaterThan(0.01); expect(foot).toBeLessThan(0.02);
     expect(mainShape({ ...c, backstay: 1 }, 12).depth).toBeLessThan(base - 0.01);
     expect(jibShape({ ...c, backstay: 1 }, 12, 'S').depth).toBeLessThan(jibShape(c, 12, 'S').depth - 0.01);
   });
@@ -54,12 +57,14 @@ describe('the crew', () => {
       expect(b.shape.eff).toBeGreaterThan(0.985);
     });
   }
-  it('flattens and depowers in a breeze, eases everything in light air', () => {
-    const light = testBoat({ heading: 318, kt: 3, windKt: 5 }), heavy = testBoat({ heading: 318, kt: 5, windKt: 20 });
+  it('flattens and depowers in a breeze, eases everything in light air (as North Sails\' Folkboat guide sets them)', () => {
+    const light = testBoat({ heading: 318, kt: 3, windKt: 4 }), heavy = testBoat({ heading: 318, kt: 5, windKt: 20 });
     sail(light, 40); sail(heavy, 40);
-    expect(heavy.ctl.backstay).toBeGreaterThan(light.ctl.backstay + 0.5);
-    expect(heavy.ctl.outhaul).toBeGreaterThan(light.ctl.outhaul + 0.2);
-    expect(heavy.ctl.cunningham).toBeGreaterThan(light.ctl.cunningham + 0.5);
+    // 20 kt: outhaul on the band, the Cunningham "pulled hard" past 15 kt, the vang on past 18, the backstay well on
+    expect(heavy.ctl.outhaul).toBeGreaterThan(0.95); expect(heavy.ctl.cunningham).toBeGreaterThan(0.85);
+    expect(heavy.ctl.vang).toBeGreaterThan(0.25); expect(heavy.ctl.backstay).toBeGreaterThan(light.ctl.backstay + 0.3);
+    // light air: no Cunningham, the outhaul 3 cm off the band, the traveller cars 15–20 cm to windward
+    expect(light.ctl.cunningham).toBeLessThan(0.05); expect(light.ctl.outhaul).toBeLessThan(0.1); expect(light.ctl.traveller).toBeLessThan(-0.2);
   });
 });
 
