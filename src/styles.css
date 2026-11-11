@@ -232,7 +232,16 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pilot .tp-btn{padding:7px 8px}
 body.pilot-on #keysHint{display:none}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
-@media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 136px)} }
+@media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)} }
+/* one line along the bottom: the helm's buttons, then the pilot's control head while it steers (clear of the view buttons) */
+#controls{flex-direction:row;align-items:flex-end;padding-right:calc(max(16px,env(safe-area-inset-right,0px)) + 96px)}
+#controls .row2{flex:1 1 auto;min-width:0}
+#controls .row1{flex:0 0 auto;flex-wrap:nowrap}
+#controls .pilot{flex-wrap:nowrap;width:max-content}
+#controls .pilot .tp-btn{min-width:0;height:38px}
+#controls .pl-read{min-width:150px}
+/* (the pilot's row only while the pilot steers: otherwise the helm's buttons sit on the bottom edge, level with the view's) */
+.row2:not(:has(.pilot:not([hidden]))){display:none}
 /* start practice debrief */
 ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;line-height:1.45}
 /* course view */
@@ -421,7 +430,7 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
-body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #keysHint,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,
 body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
 
 .garage{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-bottom:1px solid var(--rule)}
@@ -597,3 +606,37 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .layerpop input{accent-color:#ff6a1a}
 .lp-wrap{position:relative}
 #chartLayersPop{position:absolute;top:calc(100% + 6px);left:0}
+
+/* ---------- the button clusters (owner, Nov 2026): small icons with a word under each, each kind where it belongs ---------- */
+.ibar{display:flex;gap:6px;pointer-events:auto}
+.ibar.col{flex-direction:column}
+.ib{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:52px;height:46px;padding:4px 6px;
+  background:var(--pod);border:1px solid var(--rule);border-radius:8px;color:var(--text);cursor:pointer}
+.ib[hidden]{display:none}
+.ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ib .w{font:600 9.5px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.ib:hover{border-color:var(--accent)}
+.ib:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ib.on{border-color:var(--accent);color:var(--accent)}
+.ib .mute{display:none} .ib.muted .mute{display:inline} .ib.muted .wave{display:none}
+#appBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:max(16px,env(safe-area-inset-right,0px))}
+#appBar .ib{min-width:46px;height:40px;opacity:.6}
+#appBar .ib:hover,#appBar .ib:focus-visible{opacity:1}
+#mapBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 82px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}
+#viewBar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}
+/* the keys line: over the view buttons, while the pointer is on a button cluster (K lists every key) */
+#keysHint{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 66px);
+  pointer-events:none;opacity:0;transition:opacity .2s}
+body:has(.ibar:hover) #keysHint{opacity:1}
+/* the trim panel's own line: who has the lines, in plain words */
+.tp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 12px/1.2 var(--f-inst);color:var(--muted)}
+.tp-head.mine{color:var(--text)}
+/* the sheets' Auto pills, as the crew's: lit while the crew trims, dark once the line is yours */
+/* the lashed tiller, on the tiller guide: a quiet marker where it's lashed, and what to do */
+body.lashed #tillerGuide{display:block}
+body.lashed:not(.tiller-held) #tillerGuide .tg-l,body.lashed:not(.tiller-held) #tillerGuide .tg-r,body.lashed:not(.tiller-held) #tillerGuide .tg-hard{display:none}
+body.lashed:not(.tiller-held) #tillerGuide .tg-line{opacity:.35}
+body.lashed .tg-cur{background:#c9a36a}
+.tg-lash{display:none;position:absolute;top:calc(74% + 6px);left:50%;transform:translateX(-50%);padding:5px 10px;border-radius:6px;
+  background:rgba(9,22,33,.78);border:1px dashed #c9a36a;color:#f0dcb8;font:600 11px/1.2 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+body.lashed .tg-lash{display:block}
