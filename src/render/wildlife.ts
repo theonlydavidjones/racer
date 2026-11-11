@@ -344,6 +344,7 @@ export class Wildlife {
       b.g.rotation.z = b.bank; // + rolls the right wing up: a left turn
     }
     const [L, R] = b.wings;
+    if (wing === 'sit') { b.bank = 0; b.g.rotation.x = 0; b.g.rotation.z = 0; } // sitting level on the water
     if (wing === 'sit' || wing === 'dive') {
       // folded: the arm back along the body, the hand tucked over it (in a plunge, swept right back)
       for (const [w, sx] of [[L, -1], [R, 1]] as const) { w.arm.rotation.set(0, -sx * 1.4, -sx * 0.12); w.hand.rotation.set(0, -sx * 0.15, 0); }

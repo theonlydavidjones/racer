@@ -59,7 +59,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       if (lat > 37.796 && lat < 37.807 && lon > -122.425 && lon < -122.398) return { p: 0.6, h: [10, 18], tall: [0.06, 30, 55], w: [14, 24] }; // Russian Hill, North Beach, the Wharf
       if (lat > 37.785 && lat < 37.799 && lon > -122.449 && lon < -122.405) return { p: 0.62, h: [11, 19], tall: [0.05, 28, 45], w: [15, 25] }; // Pacific Heights, Nob Hill
       if (lat < 37.812 && lon > -122.515) return { p: 0.3, h: [8, 13], w: [14, 22] }; // the avenues and the rest of the city
-      if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return { p: 0.2, h: [6, 12], w: [14, 34] }; // Treasure Island
+      if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return { p: 0.35, h: [6, 14], w: [14, 34] }; // Treasure Island
       if (lat > 37.845 && lon > -122.51) return { p: 0.12, h: [6, 10], w: [10, 16] }; // Sausalito, Tiburon, Belvedere
       return null;
     };

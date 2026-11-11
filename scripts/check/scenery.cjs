@@ -49,6 +49,7 @@ const VIEWS = {
   }
   // the wildlife, close: each kind of bird, a seal and a porpoise, the camera a few metres off (sim time keeps running)
   if (!only.length || only.includes('animals')) {
+    await p.evaluate(() => { window.sim().paused = true; }); // hold them still for the camera
     for (const [name, pick] of [['gull', "b.kind === 'gull' && !b.sit"], ['gull_sitting', "b.kind === 'gull' && b.sit"], ['pelican', "b.kind === 'pelican'"], ['cormorant', "b.kind === 'cormorant'"], ['seal', 'seal'], ['porpoise', 'porpoise']]) {
       for (let tries = 0; tries < 12; tries++) {
         const at = await p.evaluate(pick => {
@@ -58,8 +59,8 @@ const VIEWS = {
           else { const b = W.birds.find(b => b.g.visible && eval(pick)); o = b && b.g; }
           if (!o) return null; const v = o.position; return [v.x, -v.z, v.y];
         }, pick);
-        if (!at) { await p.waitForTimeout(1500); continue; }
-        const d = name.startsWith('pelican') ? 9 : 5;
+        if (!at) { await p.evaluate(() => { window.sim().paused = false; }); await p.waitForTimeout(3000); await p.evaluate(() => { window.sim().paused = true; }); continue; }
+        const d = name.startsWith('pelican') ? 7 : name === 'seal' || name === 'porpoise' ? 3 : 4;
         await p.evaluate(([x, y, z, d]) => { window.__cam = { pos: [x + d * 0.8, y - d * 0.6, z + d * 0.25], at: [x, y, z] }; }, [...at, d]);
         await p.waitForTimeout(400); await p.screenshot({ path: `${out}/animal_${name}.png` }); console.log('animal', name); break;
       }
@@ -67,6 +68,7 @@ const VIEWS = {
   }
   // wildlife near the boat: the chase view, looking round
   if (!only.length || only.includes('chase')) {
+    await p.evaluate(() => { window.sim().paused = false; });
     await p.evaluate(() => { window.__cam = undefined; }); await p.evaluate(() => document.getElementById('bView').click()); await p.waitForTimeout(500);
     for (const yaw of [0, 1.6, 3.1]) { await p.evaluate(y => window.__look(y, 0.1, 30), yaw); await p.waitForTimeout(2500); await p.screenshot({ path: `${out}/chase_${yaw}.png` }); }
   }

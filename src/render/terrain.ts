@@ -54,7 +54,7 @@ export function onAngel(lat: number, lon: number): boolean {
 export function region(lat: number, lon: number, h: number): Region {
   if (onAngel(lat, lon)) return 'island'; // Angel Island: a state park, woods and grass, no town
   if (lat > 37.804 && lat < 37.8155 && lon > -122.3745 && lon < -122.357) return 'woods'; // Yerba Buena Island: wooded, a few Navy houses
-  if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return 'suburb'; // Treasure Island: flat, low buildings
+  if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return 'city'; // Treasure Island: flat, built over (the old Navy base and the new blocks)
   if (lat > 37.8235 && lat < 37.8295 && lon > -122.4265 && lon < -122.418) return 'rock'; // Alcatraz
   if (lat > 37.787 && lat < 37.811 && lon > -122.486 && lon < -122.447) return 'woods'; // the Presidio
   if (lat > 37.8013 && lat < 37.8034 && lon > -122.4074 && lon < -122.4043) return 'woods'; // Pioneer Park, round Coit Tower

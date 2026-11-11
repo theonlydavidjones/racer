@@ -67,7 +67,7 @@ const WATER_FRAGMENT = `
   float ph0 = fract(uTime / 6.0), ph1 = fract(uTime / 6.0 + 0.5);
   vec4 texelColor = mix(texture2D( map, vMapUv - fuv * ph0 ), texture2D( map, vMapUv - fuv * ph1 + vec2(0.37, 0.21) ), abs(2.0 * ph0 - 1.0));
   vec2 puv = (vec2(vPuffXZ.x, -vPuffXZ.y) - uPuffO) / uPuffS;
-  float edge = smoothstep(0.0, 0.1, min(min(puv.x, 1.0 - puv.x), min(puv.y, 1.0 - puv.y)));
+  float edge = 1.0 - smoothstep(0.3, 0.5, length(puv - 0.5)); // faded out in a circle over the map's outer part, so its edge never shows
   float kw = mix(1.0, 0.4 + 1.4 * texture2D(uPuff, clamp(puv, 0.0, 1.0)).r, edge);
   // the gusts inside a puff: the map is 20 m cells, but the wind in a puff comes in smaller bursts (turbulence a few
   // tens of metres across), which roughen the water in ragged patches and cat's paws. Carried along with the
@@ -263,7 +263,7 @@ export class SceneView {
           vPuffXZ = wp0.xz;
           vec2 simP = vec2(wp0.x, -wp0.z);
           vec2 puvV = (simP - uPuffO) / uPuffS;
-          float edgeV = smoothstep(0.0, 0.1, min(min(puvV.x, 1.0 - puvV.x), min(puvV.y, 1.0 - puvV.y)));
+          float edgeV = 1.0 - smoothstep(0.3, 0.5, length(puvV - 0.5));
           vec4 smV = texture2D(uPuff, clamp(puvV, 0.0, 1.0));
           vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 20.0, edgeV);
           vWaveP = simP;
@@ -275,7 +275,10 @@ export class SceneView {
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE)
         .replace('#include <map_fragment>', WATER_FRAGMENT)
-        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;');
+        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;')
+        // the ripple texture's bumps (about 12 cm a texel) fade where a pixel covers more water than they can show, so
+        // the far water doesn't alias into rows parallel to the horizon
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(mix(normal, waveN, smoothstep(0.12, 0.6, foot)));');
     };
     // the water: a mesh that follows the camera, fine near it and coarse far out, displaced by the waves
     const wg = waterGrid(), wgeo = new THREE.BufferGeometry();
