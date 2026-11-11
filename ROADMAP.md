@@ -15,11 +15,20 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself (6–10 h).
    d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).
-3. **Race strategist** in the course view, and a **navigator** for cruising (8–12 h).
+3. ~~Race strategist in the course view, and a navigator for cruising~~ (done; published with the combined build of
+   the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
+   slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
+   chart data; the crew-trim model's traveller (boat/controls.ts puts it to leeward in medium air: found in review).
+   Also from review: check the brief's leg times against the sim's own fleet sailing the same legs (an observed day's
+   long beat was planned at 38 min, the AI took 47–71); list a max flood or ebb already under way at the window's edges;
+   the tide predictions stop about 6 h after the gun (tide.ts stationsFor), so later passages see it frozen; and the
+   gusts: Fort Point's records show peak gusts of 2–5 × the 6-minute mean on light, puffy days, while the sim's puffs
+   stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
+   deep physics pass.
 
 Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
-in depth (12–20 h); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda
+in depth (~~done~~, published); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
@@ -52,7 +61,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
   pared back. First an audit of every start-state screen for redundancy and friction.
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
-- **The Bay, in depth:** bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
+- ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
@@ -77,7 +86,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). Later: show each item on the replay (the header you held, where you overstood), and compare against the boat that won.
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail.
 - **GGYC and StFYC, and the start line.** Dial in the clubs' buildings and the GGYC flagpole (the inner end of the start line) on the spot. The course file has the flagpole at 37.80925 N; the city's building data puts the GGYC clubhouse at 37.8077 N.
-- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (Fort Mason's piers in the sim sit 50–130 m east of the real ones), and Rule 20 hails at the islands (today only at the Cityfront).
+- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (~~Fort Mason's piers~~ done: OSM's coast from Crissy Field to Aquatic Park; still hand-traced east of there), and Rule 20 hails at the islands (today only at the Cityfront).
 - **Your boat** (done: looks, flags, condition). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 

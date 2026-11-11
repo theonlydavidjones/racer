@@ -1,0 +1,76 @@
+#!/usr/bin/env node
+/**
+ * The Bay's scenery from fixed viewpoints on the water and from overhead: the bridges' shore ends, Angel Island,
+ * Telegraph Hill and the skyline, puffs on the water, the waves, and the wildlife near the boat. Needs the dev server
+ * (npm run dev) on :5173. Uses the dev-only free camera (window.__cam, render/scene.ts).
+ *
+ *   node scripts/check/scenery.cjs <out-dir> [name ...]   → out-dir/<name>.png, and the frame time of each view
+ */
+const { chromium } = require('playwright');
+const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
+const LL = (lat, lon, z) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT, z];
+// name: [camera lat, lon, height], [target lat, lon, height]
+const VIEWS = {
+  gg_south: [LL(37.8150, -122.4630, 4), LL(37.8090, -122.4775, 40)], // the bridge's south end and Fort Point, from the water off Crissy Field
+  gg_fort: [LL(37.8135, -122.4735, 5), LL(37.8098, -122.4785, 35)], // Fort Point, the arch and the south pylons, close
+  gg_whole: [LL(37.8130, -122.4440, 4), LL(37.8197, -122.4786, 90)], // the whole Golden Gate from the start line
+  baybridge: [LL(37.8070, -122.3950, 4), LL(37.7960, -122.3780, 50)], // the Bay Bridge's west span, Rincon Hill to Yerba Buena Island
+  angel: [LL(37.8450, -122.4400, 4), LL(37.8620, -122.4320, 80)], // Angel Island from Raccoon Strait's south side
+  ayala: [LL(37.8610, -122.4480, 4), LL(37.8685, -122.4355, 30)], // Ayala Cove from the west
+  skyline: [LL(37.8120, -122.4200, 4), LL(37.7960, -122.4000, 90)], // Telegraph Hill, Coit Tower and the towers from off Aquatic Park
+  coit: [LL(37.8095, -122.4045, 3), LL(37.8024, -122.40584, 110)], // Coit Tower close, from off Pier 33
+  water: [LL(37.8118, -122.4510, 9), LL(37.8240, -122.4510, 0)], // the water near the start line: puffs and waves
+  water_low: [LL(37.8118, -122.4510, 2.2), LL(37.8200, -122.4500, 0)], // the water from a boat's deck
+  over_gate: [LL(37.8150, -122.4700, 3200), LL(37.8150, -122.47001, 0)], // overhead: the Golden Gate
+  over_bay: [LL(37.8250, -122.4200, 9000), LL(37.8250, -122.42001, 0)], // overhead: the Central Bay
+  over_angel: [LL(37.8620, -122.4320, 3500), LL(37.8620, -122.43201, 0)], // overhead: Angel Island
+  over_city: [LL(37.7980, -122.4000, 3000), LL(37.7980, -122.40001, 0)], // overhead: the Cityfront and Rincon Hill
+  over_water: [LL(37.8150, -122.4450, 900), LL(37.8150, -122.44501, 0)], // overhead: puffs near the line
+};
+(async () => {
+  const out = process.argv[2] || '.', only = process.argv.slice(3);
+  const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const p = await b.newPage({ viewport: { width: 1280, height: 760 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+  await p.evaluate(() => document.querySelector('[data-home="race"]').click()); await p.waitForTimeout(1200);
+  await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
+  // the scenery only: hide the instruments and panels
+  await p.addStyleTag({ content: 'body *:not(#gl) { visibility: hidden !important; } #gl { visibility: visible !important; }' });
+  // a typical gusty afternoon (gust factor 1.55), so the puffs on the water can be judged
+  await p.evaluate(() => window.sim().puffs.setGust(1.55));
+  for (const [name, [pos, at]] of Object.entries(VIEWS)) {
+    if (only.length && !only.includes(name)) continue;
+    await p.evaluate(([pos, at]) => { window.__cam = { pos, at }; }, [pos, at]);
+    await p.waitForTimeout(6000);
+    const ms = await p.evaluate(() => new Promise(res => { let n = 0; const t0 = performance.now(); const f = () => (++n < 5 ? requestAnimationFrame(f) : res((performance.now() - t0) / 5)); requestAnimationFrame(f); }));
+    await p.screenshot({ path: `${out}/${name}.png` });
+    console.log(name, `${ms.toFixed(0)} ms/frame`);
+  }
+  // the wildlife, close: each kind of bird, a seal and a porpoise, the camera a few metres off (sim time keeps running)
+  if (!only.length || only.includes('animals')) {
+    await p.evaluate(() => { window.sim().paused = true; }); // hold them still for the camera
+    for (const [name, pick] of [['gull', "b.kind === 'gull' && !b.sit"], ['gull_sitting', "b.kind === 'gull' && b.sit"], ['pelican', "b.kind === 'pelican'"], ['cormorant', "b.kind === 'cormorant'"], ['seal', 'seal'], ['porpoise', 'porpoise']]) {
+      for (let tries = 0; tries < 12; tries++) {
+        const at = await p.evaluate(pick => {
+          const W = window.__wild; let o;
+          if (pick === 'seal') { W.seals.forEach(s => { s.t = 0; }); o = W.seals[0].g; }
+          else if (pick === 'porpoise') { const a = W.porpoises.find(a => a.g.visible); o = a && a.g; }
+          else { const b = W.birds.find(b => b.g.visible && eval(pick)); o = b && b.g; }
+          if (!o) return null; const v = o.position; return [v.x, -v.z, v.y];
+        }, pick);
+        if (!at) { await p.evaluate(() => { window.sim().paused = false; }); await p.waitForTimeout(3000); await p.evaluate(() => { window.sim().paused = true; }); continue; }
+        const d = name.startsWith('pelican') ? 7 : name === 'seal' || name === 'porpoise' ? 3 : 4;
+        await p.evaluate(([x, y, z, d]) => { window.__cam = { pos: [x + d * 0.8, y - d * 0.6, z + d * 0.25], at: [x, y, z] }; }, [...at, d]);
+        await p.waitForTimeout(400); await p.screenshot({ path: `${out}/animal_${name}.png` }); console.log('animal', name); break;
+      }
+    }
+  }
+  // wildlife near the boat: the chase view, looking round
+  if (!only.length || only.includes('chase')) {
+    await p.evaluate(() => { window.sim().paused = false; });
+    await p.evaluate(() => { window.__cam = undefined; }); await p.evaluate(() => document.getElementById('bView').click()); await p.waitForTimeout(500);
+    for (const yaw of [0, 1.6, 3.1]) { await p.evaluate(y => window.__look(y, 0.1, 30), yaw); await p.waitForTimeout(2500); await p.screenshot({ path: `${out}/chase_${yaw}.png` }); }
+  }
+  console.log('ERRORS:', errs.join('\n') || 'none'); await b.close();
+})();

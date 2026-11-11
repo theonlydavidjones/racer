@@ -6,8 +6,12 @@ import { hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); the stretch past the
 // Marina is replaced below by the real one.
+// Fort Point itself (the brick fort, 37.81056 N 122.47722 W, Wikipedia "Fort Point National Historic Site") stands on
+// the point under the Golden Gate Bridge's south end: the shore runs out round it, so the fort and the bridge's
+// arch over it are on land.
 const SHORE_LL: [number, number][] = [
-  [37.8108, -122.4785], [37.8065, -122.4720], [37.8045, -122.4620], [37.8040, -122.4520], [37.8055, -122.4490],
+  [37.8100, -122.4790], [37.8108, -122.4782], [37.8112, -122.4773], [37.8110, -122.4764], [37.8100, -122.4757],
+  [37.8092, -122.4747], [37.8065, -122.4720], [37.8045, -122.4620], [37.8040, -122.4520], [37.8055, -122.4490],
   [37.8078, -122.4475], [37.8082, -122.4462], [37.8079, -122.4450], [37.8088, -122.4441], [37.8093, -122.4434],
   [37.8087, -122.4427], [37.8071, -122.4421], [37.8067, -122.4380], [37.8071, -122.4340], [37.8080, -122.4326],
   [37.8100, -122.4322], [37.8100, -122.4315], [37.8083, -122.4312], [37.8100, -122.4306], [37.8100, -122.4299],
@@ -17,11 +21,10 @@ const SHORE_LL: [number, number][] = [
 
 // From Crissy Field past the Marina to Fort Mason, the real shoreline (OpenStreetMap, scripts/make-marina-coast.mjs):
 // the Marina Green seawall, the West Harbor's basin and its jetty out to the entrance beacon, in place of the hand-drawn one
-// and round Gashouse Cove (the Marina's East Harbor) to the end of Fort Mason's Pier 1 (only that far east: the hand-drawn
-// shore has the other Fort Mason piers)
-const COAST = (() => { const c = (marinaCoast as unknown as { coast: [number, number][] }).coast; return c.slice(0, c.findIndex(p => p[1] > -122.4325 && p[0] > 37.8085) + 1); })(); // (west to east: the last point is the north-east corner of Pier 1's end)
-// (east of it, the hand-drawn shore from its next pier on: its own Pier 1, which ran on to 37.8100, is left out)
-const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > -122.4314)];
+// and round Gashouse Cove (the Marina's East Harbor) and Fort Mason's three piers, to their east (the hand-drawn shore had
+// the piers 50–200 m too far east and too long)
+const COAST = (marinaCoast as unknown as { coast: [number, number][] }).coast;
+const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > COAST[COAST.length - 1][1])];
 export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
 // (closed round the far side of the city, out to the edges of the area the Cityfront shore governs (onLand's CF box), so

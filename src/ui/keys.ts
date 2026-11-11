@@ -30,7 +30,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'jibHalyard', label: 'Hoist or strike the jib', group: 'Sails' },
   { id: 'mainHalyard', label: 'Hoist or strike the main', group: 'Sails' },
   { id: 'hail', label: 'Hail ("Room to tack!", "Starboard!", or reply "You tack")', group: 'Racing' },
-  { id: 'course', label: 'Course view', group: 'Racing' },
+  { id: 'course', label: 'Course and strategist (racing) · navigator (cruising)', group: 'Racing' },
   { id: 'viewCockpit', label: 'Cockpit view', group: 'Views' },
   { id: 'viewChase', label: 'Chase view', group: 'Views' },
   { id: 'viewOverhead', label: 'Overhead view', group: 'Views' },

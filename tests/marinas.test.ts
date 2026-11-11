@@ -60,8 +60,11 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     }
     expect(leaks.length).toBeGreaterThan(0);
     for (const q of leaks) expect(Math.hypot(q.x - H.exits[0].x, q.y - H.exits[0].y)).toBeLessThan(60);
-    // Pier 1 ends where OpenStreetMap has it, with open water north of its end
+      // Pier 1 ends where OpenStreetMap has it, with open water north of its end
     expect(onLand(LL(37.8084, -122.4325))).toBe(true); expect(onLand(LL(37.8092, -122.4324))).toBe(false);
+    // and Piers 2 and 3 too (OpenStreetMap's coast), with water between them and north of their ends
+    for (const [la, lo] of [[37.8088, -122.4315], [37.8090, -122.4304]]) expect(onLand(LL(la, lo))).toBe(true);
+    for (const [la, lo] of [[37.8095, -122.4316], [37.8095, -122.4304], [37.8088, -122.43185]]) expect(onLand(LL(la, lo))).toBe(false);
   });
   it('the way out from every slip to the open Bay (a fine path search from offshore)', () => {
     for (const id of NEW) {
