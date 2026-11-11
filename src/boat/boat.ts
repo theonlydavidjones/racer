@@ -198,6 +198,8 @@ export interface Boat {
   spec?: BoatSpec;
   /** Wind shadows on her (environment/shadows.ts): the lee of the land (cached) and everything together (1 = clear air). */
   leeK?: number; shadowK?: number;
+  /** About a minute's running mean of the wind she's in (deg): her compass's average, for lifts and headers. */
+  avgFrom?: number;
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
   cond?: Condition;
 }
