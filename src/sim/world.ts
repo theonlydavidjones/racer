@@ -400,11 +400,14 @@ export class World {
     return withPierWakes(p, this.streamAt(p), this.pierFlows(), this.t);
   }
   private streamAt(p: Vec): Vec { return this.tide ? this.tide.atShore(p) : currentAt(p, this.cvec); }
-  /** The stream meeting each pier, refreshed every half minute (the tide turns over hours). */
+  /**
+   * The stream meeting each pier, refreshed every half minute (the tide turns over hours): the open water's (the
+   * stations' current there, or the preset), not eased by the shore relief, which would read the pier itself as shore.
+   */
   private flowsT = NaN; private flows: Vec[] = [];
   private pierFlows(): Vec[] {
     if (!(Math.abs(this.t - this.flowsT) < 30) || (!this.tide && this.flowsC !== this.cvec)) {
-      this.flowsT = this.t; this.flowsC = this.cvec; this.flows = WAKE_PIERS.map(w => this.streamAt(w.c));
+      this.flowsT = this.t; this.flowsC = this.cvec; this.flows = WAKE_PIERS.map(w => this.tide ? this.tide.at(w.c) : this.cvec);
     }
     return this.flows;
   }
@@ -523,7 +526,7 @@ export class World {
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
     f.setTime(now);
-    this.cvec = this.currentAt(this.C.center);
+    this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
 

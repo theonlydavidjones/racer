@@ -19,9 +19,12 @@ import { WindSum, bluffDeficit } from './shadows';
  *    we take 0.09). The wake carries the pier's drag, ½ρU²·C_D·D per metre of depth, so its momentum thickness is
  *    θ = C_D·D/2, and Us·y½ = θ·Uc/∫f = 0.235·C_D·D·Uc (∫exp(−ln2·ξ²)dξ = √(π/ln2) = 2.129). Integrating S:
  *    y½ = √(2·S·0.235·C_D·D·x) ≈ 0.21·√(C_D·D·x), Us/Uc ≈ 1.1·√(C_D·D/x).
- *  - C_D = 2.1, a square cylinder's (Lyn et al. 1995, JFM 304, Re ≈ 22,000; as ERCOFTAC's UFR 2-02 quotes it). Long
- *    rectangles differ with their side ratio (up to about 2.8 near 2.5 : 1 along the flow, Norberg 1993, less beyond);
- *    not modelled: about ±15% on the wake's width and depth, which go as √C_D.
+ *  - C_D = 2.1, a square cylinder's (Lyn et al. 1995, JFM 304, Re ≈ 22,000; as ERCOFTAC's UFR 2-02 quotes it).
+ *    Rectangles differ with their side ratio: most drag (about 2.8–3) with the long side across the stream at about
+ *    0.6 : 1 along it, less as they lengthen along the flow (Bearman & Trueman 1972; Norberg 1993), and rounded ends,
+ *    as the Golden Gate's south fender has, take much less at these Reynolds numbers (~10⁷). Not modelled until those
+ *    curves are read from the sources: the Golden Gate's towers stand about 1.8 : 1 along the tide, so their wakes are
+ *    probably 10–15% too wide and deep, the fender's more (width and depth go as √C_D).
  *  - Close behind it, where that law would take more than all the stream, the water is slack (the deficit is capped at
  *    the whole stream): a slack patch about three widths long (W/(8·S·0.235·C_D)). The real recirculating bubble is shorter, about 1–1½ widths,
  *    with a little back-flow in it; the law only holds well once the deficit is under a tenth (some 200 widths on).
@@ -33,9 +36,12 @@ import { WindSum, bluffDeficit } from './shadows';
  *  - Eddies: a Kármán vortex street, since the Bay is deep for its piers. Shallow-water wakes stay unsteady while
  *    S = c_f·D/h is under about 0.2 (Chen & Jirka 1995, Fluid Dyn. Res. 16), and here it is 0.002–0.02. They shed at
  *    a Strouhal number of 0.133 (Lyn et al. 1995, via ERCOFTAC), each side in turn, so the water pulses faster and
- *    slower across the wake, opposite on the two sides, every D/(0.133·U): about 5 minutes behind a Golden Gate tower
- *    in a 1 m/s stream. The pulse is the turbulence measured in plane wakes, peak ⟨u²⟩^½ ≈ 0.32–0.41·Us (Pope, as
- *    above), taken as a sine (×√2) carried downstream at the wake's own speed.
+ *    slower across the wake, opposite on the two sides and passing through nothing on the centreline (the profile
+ *    η·exp(−ln2·η²), η = y/y½), every D/(0.133·U): about 2½ minutes behind a Golden Gate tower in a 1 m/s stream. Its
+ *    size is the turbulence measured in plane wakes, peak ⟨u²⟩^½ ≈ 0.32–0.41·Us (Pope, as above), all of it put into
+ *    the one sine (×√2): an upper bound, since that is broadband. The street forms over the first three widths (the
+ *    slack patch) and its eddies travel down at about 0.85 of the stream (Kármán vortices move at about 0.8–0.9 U∞,
+ *    Cantwell & Coles 1983; quoted from memory, not checked).
  *  - Taken straight down the stream from the pier: beyond about 2 km the real stream through the Bay curves (NOAA's
  *    current stations a kilometre or two apart disagree in direction), so the wake stops there.
  *  - Not modelled: the faster water beside a pier, where the stream squeezes round it, and the slack just upstream.
@@ -87,10 +93,13 @@ export function addPierWakes(sum: WindSum, from: number, p: Vec): void {
 /* ---------- the water ---------- */
 
 export const WAKE = {
-  S: 0.09, CD: 2.1, cf: 0.0025, St: 0.133, turb: 0.36, reach: 2000,
+  S: 0.09, CD: 2.1, cf: 0.0025, St: 0.133, turb: 0.36, reach: 2000, conv: 0.85,
   /** Us·y½ / (C_D·D·Uc), from the Gaussian's integral */
   K: 1 / (2 * Math.sqrt(Math.PI / Math.LN2))
 };
+
+/** the peak of η·exp(−ln2·η²), at η = 1/√(2·ln2) */
+const ODD_PEAK = Math.exp(-0.5) / Math.sqrt(2 * Math.LN2);
 
 /**
  * The current at p with the piers' wakes in it: `here` the current at p without them, `flows[i]` the stream meeting
@@ -116,9 +125,9 @@ export function withPierWakes(p: Vec, here: Vec, flows: Vec[], t: number): Vec {
     let def = Us * prof;
     // the eddies: shed every D/(St·U), alternately each side, carried down at the wake's own speed
     const Sc = WAKE.cf * W / P.depth, street = clamp((0.5 - Sc) / 0.3, 0, 1); // (Chen & Jirka: steady bubbles by S ≈ 0.5)
-    if (street > 0 && Us < 1) {
-      const fq = WAKE.St * U / W, Uc = U * (1 - Us);
-      def += Math.SQRT2 * WAKE.turb * Us * prof * Math.sign(y) * Math.sin(2 * Math.PI * fq * (t - x / Math.max(0.05, Uc))) * street;
+    if (street > 0) {
+      const fq = WAKE.St * U / W, eta = y / half, odd = eta * prof / ODD_PEAK, form = clamp(x / (3 * W), 0, 1);
+      def += Math.SQRT2 * WAKE.turb * Us * odd * Math.sin(2 * Math.PI * fq * (t - x / (WAKE.conv * U))) * street * form;
     }
     def = clamp(def, 0, 1);
     // take that share of the stream meeting the pier out of the water here (not more than is here to take)

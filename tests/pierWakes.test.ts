@@ -4,7 +4,8 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { World } from '../src/sim/world';
 import { WAKE, WAKE_PIERS, addPierWakes, withPierWakes } from '../src/environment/pierWakes';
 import { WindSum, bluffDeficit } from '../src/environment/shadows';
-import { onLand } from '../src/geo/shore';
+import { onLand, shoreDist } from '../src/geo/shore';
+import { shoreRelief } from '../src/environment/current';
 import type { Vec } from '../src/core/math';
 
 const tower = WAKE_PIERS.findIndex(w => w.P.name === 'Golden Gate Bridge, north tower');
@@ -63,19 +64,46 @@ describe('the piers\' current wakes', () => {
     expect(P / 60).toBeGreaterThan(2); // minutes, behind a Golden Gate tower in a 1 m/s stream
   });
 
-  it('turns with the real tide in the sim: the current behind the north tower is slower than beside it', () => {
+  it('turns with the real tide in the sim: the current behind the north tower is slower than beside it, flood and ebb', () => {
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'real', sea: 'flat' };
-    const w = new World(COURSES[0], S, 7, { freeSail: true });
-    for (let k = 0; k < 6; k++) {
-      (w as unknown as { t: number }).t += 3600; // (through the tides; the stream meeting the tower is refreshed)
-      (w as unknown as { tide?: { setTime(d: Date): void } }).tide?.setTime(new Date(Date.parse('2026-07-11T17:00:00Z') + k * 3600e3));
-      const f = (w as unknown as { pierFlows(): Vec[] }).pierFlows()[tower], U = speed(f);
+    const w = new World(COURSES[0], S, 7, { freeSail: true }), ws = w as unknown as { t: number; tide: { setTime(min: number): void; at(p: Vec): Vec }; pierFlows(): Vec[]; streamAt(p: Vec): Vec };
+    let tested = 0; const sets = new Set<string>();
+    for (let k = 0; k < 13; k++) {
+      ws.t += 3600; ws.tide.setTime(Date.parse('2026-07-11T12:00:00Z') / 60000 + k * 60); // (minutes; the stream meeting the tower is refreshed)
+      const f = ws.pierFlows()[tower], U = speed(f);
+      // the stream meeting the pier is the open water's, not eased as if the pier were shore
+      expect(U).toBeCloseTo(speed(ws.tide.at(T.c)), 6);
       if (U < 0.2) continue;
       const e = { x: f.x / U, y: f.y / U }, b = Math.max(...T.P.pts.map(p => (p.x - T.c.x) * e.x + (p.y - T.c.y) * e.y));
-      const behind = { x: T.c.x + e.x * (b + 60), y: T.c.y + e.y * (b + 60) };
+      const behind = { x: T.c.x + e.x * (b + 30), y: T.c.y + e.y * (b + 30) };
       if (onLand(behind)) continue;
-      expect(speed(w.currentAt(behind)), `hour ${k}`).toBeLessThan(0.5 * speed((w as unknown as { streamAt(p: Vec): Vec }).streamAt(behind)));
+      expect(speed(w.currentAt(behind)), `hour ${k}`).toBeLessThan(0.2 * speed(ws.streamAt(behind)));
+      tested++; sets.add(e.x < 0 ? 'ebb' : 'flood');
     }
+    expect(tested).toBeGreaterThanOrEqual(4); expect([...sets].sort()).toEqual(['ebb', 'flood']);
+  });
+
+  it('leaves the water beside and ahead of a pier at full stream (a pier standing alone isn\'t a harbour wall)', () => {
+    for (const { P, c } of WAKE_PIERS) {
+      const r = Math.max(...P.pts.map(p => Math.hypot(p.x - c.x, p.y - c.y)));
+      for (const a of [0, 90, 180, 270]) {
+        const q = { x: c.x + Math.sin(a * Math.PI / 180) * (r + 30), y: c.y + Math.cos(a * Math.PI / 180) * (r + 30) };
+        if (onLand(q) || shoreDist(q) < 400) continue;
+        expect(shoreRelief(q), `${P.name} ${a}°`).toBe(1);
+      }
+    }
+  });
+
+  it('passes smoothly across the wake\'s centreline (the eddies are nothing on it)', () => {
+    const v = { x: -1, y: 0 }, x0 = T.c.x - back(-1);
+    for (const t of [0, 40, 80, 120]) {
+      const a = speed(at({ x: x0 - 300, y: T.c.y + 0.02 }, v, t)), b = speed(at({ x: x0 - 300, y: T.c.y - 0.02 }, v, t));
+      expect(Math.abs(a - b), `t ${t}`).toBeLessThan(0.01);
+    }
+    // and no flicker right behind it: along the slack patch the speed changes smoothly
+    let worst = 0, last = speed(at({ x: x0 - 5, y: T.c.y + 5 }, { x: -1.5, y: 0 }, 100));
+    for (let x = 6; x < 80; x++) { const s2 = speed(at({ x: x0 - x, y: T.c.y + 5 }, { x: -1.5, y: 0 }, 100)); worst = Math.max(worst, Math.abs(s2 - last)); last = s2; }
+    expect(worst).toBeLessThan(0.05);
   });
 });
 

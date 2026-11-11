@@ -116,6 +116,7 @@ describe('the bridges\' towers and piers: solid', () => {
   it('leaves the places, the marks and the ships\' routes clear of them', () => {
     for (const pl of PLACES) expect(pierAt(pl.p), pl.id).toBeNull();
     for (const [k, r] of Object.entries(ROUTES)) for (let i = 1; i < r.length; i++) for (const P of PIERS) {
+      const b = P.box; if (Math.max(r[i - 1].x, r[i].x) < b.x0 || Math.min(r[i - 1].x, r[i].x) > b.x1 || Math.max(r[i - 1].y, r[i].y) < b.y0 || Math.min(r[i - 1].y, r[i].y) > b.y1) continue;
       // (the ships' tracks pass between the piers, as the real ones do)
       for (let t = 0; t <= 1; t += 0.002) expect(inPoly({ x: r[i - 1].x + (r[i].x - r[i - 1].x) * t, y: r[i - 1].y + (r[i].y - r[i - 1].y) * t }, P.pts), `${k} through ${P.name}`).toBe(false);
     }
