@@ -175,6 +175,96 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 
+**Deep physics pass: the audit** (Deep Physics session, November 2026; six independent reviews of the sails, hull and
+appendages, waves, wind and puffs, crew and balance, and the AI, with sources). Where the sim disagrees with published
+data, ranked by how much it changes what a sailor feels or a race result. Each fix gets a test against its source.
+1. ~~**Feathering cost 10–16× ORC's pinching curve**~~ (done): the sails flogged by the angle below the polar's beat
+   angle, on top of the polar's own pinch, so 1–2° low cost 1.6–3.5% of VMG at 20 kt (ORC: 0.1–0.3%), teaching "never
+   feather". Now they flog as far as they luff (trim.ts), and below the beat by the square of the angle below it (flat
+   at the beat, so ORC's optimum stays: 1–2° low costs 0.2–0.6%; ten degrees high still a big loss; she stops in the
+   no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done. And
+   the crew's deliberate ease of the main on the last depowering steps (up to 7°, half luffing) flogs at no cost, in the
+   speed search and on the water alike: price it in the search, then judge the main where it is.
+2. **No tactical wind shifts on most days.** Off observed days the only shifts are two fixed sine waves (120 s ±6°,
+   41 s ±2.5°, unsourced) and a 63 s ±8% pulse: about 1° rms change over 30–60 min, against Fort Point's 13–14° on
+   10–15 kt westerlies (6-minute record, 492 days, racing hours) and 26–29° on 6–10 kt days. Beats are drag races; a
+   fixed period can be timed. Fix: a seeded, broadband shift process fitted to FTPC1's structure function by kind of day
+   and strength.
+3. **Shifts hit every boat at once.** Carried down the course with the wind (Taylor's frozen turbulence), the boat 300 m
+   to windward gets a header about a minute before the one to leeward, and one side of the course gets a lift first.
+   And on observed days the station's own 6-minute turbulence (about 5–6° of it) becomes a course-wide shift: smooth
+   the record and hand the residue to the local turbulence (4).
+4. **Almost no gusts, and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
+   not reach the records' 2–5× peaks: those are almost all below 6 kt mean (a third of 6-minute windows at 4–6 kt reach
+   2×; none above 12 kt) and the station's off-land turbulence (TI ≈ 0.22). Open water: TI ≈ 0.09–0.12, a 5-s gust over
+   the 2-min mean of 1.15–1.27 at 10–15 kt (WMO TD-1555, Harper et al. 2010). The sim's puffs give TI ≈ 0.03 and gust
+   factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
+   vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
+   everywhere (off the Cityfront it should be about twice the slot's).
+4a. **The AI's tacks aren't held** (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
+   uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
+   boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
+   last boat 63% behind the winner where the real SF fleet's median is 12% (sf-folkboat-results.json). Holding the
+   decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
+   38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
+   only) and some never start.
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
+   she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
+   620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
+   and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
+   US Sailing's 1–2 for keelboats).
+5. **The waves move her only on average** (waves 1): a mean added drag and a synthetic yaw; no surge, roll, pitch or
+   heave, so no hobby-horsing in the Bay's 2–3 s chop (her pitch period), no rolling on a reach, no surfing, and the
+   telltales don't answer the pitching. The drawn hull rolls on the waves the physics doesn't have, so heel, sails and
+   flags don't answer the same motion. Needs the wave field shared by the physics and render/waves.ts (render's owners).
+6. **The swell's yaw is wrong in kind** (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
+   Froude–Krylov yaw goes as k²), and peaks abeam not on the quarter: up to 16° heading swings and 3% speed lost in a
+   2 m 13 s swell outside the Gate, where it should be next to nothing.
+7. **No leeway** (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
+   angles), but slow she should slip: 0.3–0.7 kt to leeward at 1.5 kt close-hauled in 12 kt, so a boat parked on the
+   line sags onto the one below her and each tack costs 0.2–0.4 boat lengths more. A design change: ask the owner.
+8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
+   0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
+   32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
+9. **Sail shape and speed** (sails 2, 6): RIG.fullDepth (unsourced) puts ORC's full power at a light-air shape, so the
+   force model never uses full lift upwind and is 17–28% short on a reach; set at the crew's medium-air shape, the speed
+   search starts depowering at 14 kt, where North Sails' guide does (most of the depowering question below). And speed
+   goes as the square root of drive where the resistance goes as v^3–5.6 near hull speed, so trim mistakes cost
+   1.5–2.8× too much.
+10. **In irons** (hull 3): at rest she turns 4°/s the way the tiller points and sails off; a real boat gathers sternway
+   and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
+   42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own
+   hove-to model).
+11. **The chop** (waves 3–6): it follows the wind at the boat, so a puff or a neighbour's lee changes her sea (it is set
+   by the wind over kilometres of fetch); it's fully grown at once (CEM: 3.4 h to fetch-limited on the Berkeley Circle
+   in 18 kt, so 2.5× too big an hour into the breeze); ORC's polar already has a seaway drag in it (eq. 3.2, D_raw), so
+   the chop is partly counted twice and "flat water" isn't flat (est. 1–3% upwind); and its added drag falls off too
+   little toward the beam, so footing hardly pays.
+12. **Heel** (sails 3, crew 3, hull 6, 9): 21–25° upwind from 18 kt is the high end of practice (no Folkboat figure is
+   published; Elvstrøm's H-boat guide 6–10°, general keelboat guidance 15–20°, 20–25° at most) and is set by heelFactor's
+   unsourced knee at 20°. Fixes: the Delft series' heeled resistance; the deck edge from the class freeboard (0.568 m:
+   about 27.5°, not 30°); the effective draft from the Delft series by heel and speed (the speed search's induced drag
+   is about 1.5× Delft's, the hove-to model's about right).
+13. **Pointing and the top of the range** (sails 4, 5, 7): a flatter sail can't point higher (luffing starts at a fixed
+   angle of attack whatever the camber), so the guide's "sheet tight … pointing ability is improved" has no effect;
+   above about 26 kt nothing is left to depower (ORC next reduces the jib, then reefs: VPP 2022 §5.1.3), and ORC's
+   flattest is 0.62 × the 8-kt flat in the 2022 documentation against the sim's 0.42 (the 2025 text unconfirmed).
+14. Smaller: in chop the best beat narrows by 0.2–0.4° where the comment says footing pays (the added drag rises
+   with speed and the acceleration boost is used as a steady drive: AI 6); the leeward-mark round-up loses a third of
+   her speed in 18 kt (unsourced); the results file's 2025-11-01 distance looks wrong (7.8 kt over 6.1 nm in 7 kt);
+   the rudder (class rules' offsets give about 0.56 m² below the waterline against RUDDER.area 0.42; its drag's
+   aspect 1.4 against the lift slope's 2.5; a keel-hung blade works partly as a flap); HOVE.latArea 5.01 m² and dragAft
+   0.54 m from the drawn profile without the rudder (not 3.39 m² and a tuned 0.3); the crew (DEFAULT_CREW 230 kg against
+   the certificates' declared 240–308, mean 276; the light-air heel target steps at 7 kt; legs over the side on a reach,
+   which CR 13.20 allows); the sails' weight aloft (negligible, −1.8% GM); crewSolve's start dependence; the twist
+   function against VPP 2022 eq. 5.49; the chop's peak period (SPM against CEM, 25% apart); added masses.
+15. ~~The keel's induced drag fell with heel~~ (done): ORC's FH is the force normal to the centre plane (VPP 2022 §3),
+   not its part across the water, so heel was nearly free to the speed search (about 2° less heel at 18–20 kt now).
+   ~~The ×0.6 on heel past 120° TWA~~ (done: no source; the heel follows the balance of moments everywhere).
+Checked and sound: the hiking geometry against CR 13.20 (only mid-thigh to feet must stay inboard), the roll period
+(3.5 s, Klaka) and its damping, the wind gradient (ORC eq. 7.1) and heeled triangle, the sea's growth laws, wave–current
+physics, whitecaps, Kelvin wakes, fatigue, the tiller pilot, the condition model, determinism.
+
 **Depowering: the physics against the sailmaker** (owner, November 2026: "crew follows the guide for now, but let's keep
 this on the roadmap as something to investigate"; 4–8 h). With ORC's sail and keel physics, a speed search like ORC's
 VPP (physics.ts powerFactor) has a Folkboat carry full power to about 17–18 kt; North Sails' Nordic Folkboat guide has
@@ -236,8 +326,8 @@ step is spread thin: the AI's look-ahead, the crew, the tide field's blending of
 
 Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (begun, November 2026: stability from ORC certificates, the sails' forces from ORC's model, the
 wind's gradient and the heeled wind triangle, the keel's induced drag, depowering by a VPP-style speed search; still to
-do: the depowering question above, waves and puffs in every response, the gusts' peaks against the records; 6–10 h
-left); skipper and crew model (15–25 h); cheating, protests
+do: the audit's ranked list above (the depowering question, waves and puffs in every response, the gusts' peaks
+against the records among them); in progress: Deep Physics); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (moved up to now, above); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other

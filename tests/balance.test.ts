@@ -4,6 +4,10 @@ import { beatAngle } from '../src/boat/polar';
 import type { Controls } from '../src/boat/controls';
 import type { Boat } from '../src/boat/boat';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
+import { netDrive } from '../src/boat/balance';
+import { takeLine } from '../src/boat/physics';
+import { polar } from '../src/boat/polar';
+import { KT } from '../src/core/math';
 
 /** Beat at `windKt` with the crew's settings, then (optionally) change the controls yourself and settle again. */
 /** Sail her close-hauled; `full`: the crew held at full power (no depowering of their own), so one line's own effect shows. */
@@ -55,6 +59,31 @@ describe('Heel from the forces on the sails', () => {
   });
 });
 
+describe('The keel and the heel, by the same balance everywhere', () => {
+  it("the keel's induced drag is for the force square to her centre plane (ORC VPP Documentation 2022, §3, eq. 6.33), so heeling her doesn't lighten it", () => {
+    // the same sail forces at 15°, 22° and 30° of heel: the keel answers the same push along its own heeled span
+    // (ORC's MHSD), so the drag, and what's left to push her along, are the same (past 15°, where ORC's
+    // nearly-upright multiplier, Fig. 6.8, has gone)
+    const f = { main: { heel: 700, drive: 260 }, jib: { heel: 300, drive: 140 } };
+    const at = (h: number) => netDrive(f, h, 2.5);
+    expect(at(22)).toBeCloseTo(at(15), 6);
+    expect(at(30)).toBeCloseTo(at(15), 6);
+    expect(at(15)).toBeLessThan(400); // (and it is a drag: less than the sails' 400 N of drive)
+  });
+  it('off the wind she heels as far as the balance of moments says, with no step at a broad reach', () => {
+    // the crew held in the middle, so only the sails' force heels her: it eases smoothly as she bears away
+    const heelAt = (twa: number) => {
+      const b = testBoat({ heading: 360 - twa, kt: polar(28, twa, 'jib') / KT, windKt: 28 });
+      b.crew = newCrew(DEFAULT_CREW, 'S'); b.crew.place = { across: 'mid', fore: null };
+      sail(b, 40, () => { b.h = 360 - twa; });
+      return { heel: b.heelMag!, eq: b.heelEqLast! };
+    };
+    const a = heelAt(118), c = heelAt(122);
+    expect(Math.abs(a.heel - c.heel)).toBeLessThan(2);
+    expect(Math.abs(c.heel - c.eq)).toBeLessThan(1);
+  });
+});
+
 describe('Helm balance (weather helm)', () => {
   it('a little weather helm in a moderate breeze, more as she heels', () => {
     const h12 = beat(12).helmNeed!, h20 = beat(20, undefined, true).helmNeed!; // (20 kt held at full power: heeled)
@@ -67,7 +96,8 @@ describe('Helm balance (weather helm)', () => {
     // where they want it, so it doesn't ease the boom)
     expect(beat(16, c => { c.traveller = 1; c.mainsheet = Math.min(1, c.mainsheet + 0.12); }).helmNeed!).toBeLessThan(base - 2);
     expect(beat(16, c => { c.backstay = 1; }).helmNeed!).toBeLessThan(base);
-    expect(beat(16, c => { c.mainsheet += 0.2; }).helmNeed!).toBeLessThan(0);
+    // (eased until it's luffing hard: the main's flogging slows her too, physics.ts sailFlog)
+    expect(beat(16, c => { c.mainsheet += 0.25; }).helmNeed!).toBeLessThan(0);
   });
   it('let go of the tiller with weather helm and she rounds up into the wind', () => {
     const b = beat(16), twa0 = b.twa;
@@ -108,5 +138,38 @@ describe('The crew', () => {
     sail(solo, 30, () => { solo.h = 360 - beatAngle(20); });
     expect(solo.heelMag! > two.heelMag! + 3 || (solo.depower ?? 0) > (two.depower ?? 0) + 0.1).toBe(true);
     expect(solo.v).toBeLessThan(two.v);
+  });
+});
+
+describe('Sailing a little below the beat angle', () => {
+  it("costs what the polar's pinching curve says (ORC's VMG peak), not more: the sails flog only as far as they luff", () => {
+    for (const W of [8, 14, 20]) {
+      const beat = beatAngle(W), vmg = (off: number) => {
+        const twa = beat - off, b = testBoat({ heading: 360 - twa, kt: polar(W, beat, 'jib') / KT, windKt: W });
+        let s = 0, n = 0; sail(b, 60, t => { b.h = 360 - twa; if (t > 40) { s += b.v; n++; } });
+        return s / n * Math.cos(twa * Math.PI / 180);
+      };
+      const v0 = vmg(0);
+      expect(vmg(1) / v0).toBeGreaterThan(0.995);
+      expect(vmg(2) / v0).toBeGreaterThan(0.99);
+    }
+  });
+  it('but pinching ten degrees too high is a big loss, and inside the no-go zone she stops', () => {
+    const W = 14, beat = beatAngle(W), vb = polar(W, beat, 'jib');
+    const at = (twa: number, secs: number) => { const b = testBoat({ heading: 360 - twa, kt: vb / KT, windKt: W }); sail(b, secs, () => { b.h = 360 - twa; }); return b.v; };
+    expect(at(30, 150) * Math.cos(30 * Math.PI / 180) / (vb * Math.cos(beat * Math.PI / 180))).toBeLessThan(0.75);
+    expect(at(22, 40)).toBeLessThan(0.1); // (from full speed, in 40 s)
+  });
+});
+
+describe('Who holds the sheet', () => {
+  it('taking the mainsheet where the crew had it, in a breeze, changes nothing', () => {
+    const W = 26, twa = beatAngle(W), run = (mine: boolean) => {
+      const b = testBoat({ heading: 360 - twa, kt: 5, windKt: W }); sail(b, 40, () => { b.h = 360 - twa; });
+      if (mine) takeLine(b, 'mainsheet');
+      sail(b, 30, () => { b.h = 360 - twa; });
+      return b.v;
+    };
+    expect(run(true)).toBeCloseTo(run(false), 2);
   });
 });
