@@ -205,6 +205,11 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .tp-auto.sm{height:34px;min-width:48px;padding:0 8px}
 #tpCrewRow{min-height:36px}
 .tp-seg .tp-btn.on{background:var(--accent);color:#13202b;border-color:var(--accent)}
+/* on auto: a faint outline follows where the crew have put themselves */
+.tp-seg .tp-btn.at{border:1px dashed var(--accent);color:var(--accent)}
+/* the crew's Auto pill: lit while they're on auto, dark once you've placed them (tap to give it back) */
+.tp-auto.off{background:none;color:var(--muted);border-color:var(--rule)}
+.tp-auto.off:hover{color:var(--text);border-color:var(--accent);filter:none}
 .tp-crew{color:var(--text)}
 /* who has the line: shown only when it's yours, one tap gives it back to the crew */
 .tp-auto{font:700 12px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#13202b;background:var(--accent);border:1px solid var(--accent);

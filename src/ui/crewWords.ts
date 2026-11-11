@@ -15,5 +15,36 @@ export function crewWords(u: Boat): string {
   const trim = Math.abs(c.trim) < 0.015 ? '' : c.trim > 0 ? ` · weight forward: bow down ${Math.round(c.trim * 100)} cm` : ` · weight aft: stern down ${Math.round(-c.trim * 100)} cm`;
   const jobs = c.people.map((p, i) => p.job && p.job.line !== 'jibsheet' && p.job.line !== 'mainsheet' && JOB[p.job.line] ? `${names[i] ?? 'Crew'} ${JOB[p.job.line]}${p.job.reach > 0 ? ' (on the way)' : ''}` : '').filter(Boolean);
   const tired = Math.max(...c.people.map(p => p.fatigue)) > 0.4 ? ' · tiring' : '';
-  return `${where}${trim}${tired}${jobs.length ? ' · ' + jobs.join(', ') : ''}${c.place ? ' (where you put them)' : ''}`;
+  return `${where}${trim}${tired}${jobs.length ? ' · ' + jobs.join(', ') : ''}${c.place ? ' (where you put them: off auto)' : ''}`;
+}
+
+/** Where the crew have put themselves, in the crew buttons' terms (boat/crewPhys.ts modes). */
+export function autoAcross(u: Boat): 'lee' | 'mid' | 'up' | 'hike' {
+  const m = u.crew?.mode; return m === 'leeward' ? 'lee' : m === 'hike' ? 'hike' : m === 'centre' || m === 'downwind' || m === 'foredeck' ? 'mid' : 'up';
+}
+
+/**
+ * The trim panel's crew row: who's in charge of where they sit. On auto, the Auto pill is lit and a faint outline
+ * follows where the crew have put themselves; once you've placed them, your choice is lit, the row says "you", and
+ * the Auto pill goes dark (one tap gives it back to them), as a sail line does when you take it.
+ */
+export function showCrewRow(u: Boat): void {
+  const c = u.crew, pl = c?.place, mine = !!pl;
+  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : null, autoA = c ? autoAcross(u) : null;
+  document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => {
+    bt.classList.toggle('on', pl?.across === bt.dataset.ca);
+    bt.classList.toggle('at', !pl?.across && autoA === bt.dataset.ca);
+    bt.setAttribute('aria-pressed', String(pl?.across === bt.dataset.ca));
+  });
+  document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => {
+    bt.classList.toggle('on', pl?.fore === bt.dataset.cf);
+    bt.classList.toggle('at', !pl?.fore && autoFore === bt.dataset.cf);
+    bt.setAttribute('aria-pressed', String(pl?.fore === bt.dataset.cf));
+  });
+  const auto = document.getElementById('bCrewAuto'), lab = document.getElementById('tpCrewLab');
+  if (auto) {
+    auto.classList.toggle('off', mine); auto.setAttribute('aria-pressed', String(!mine));
+    auto.title = mine ? 'You\'ve placed the crew and they stay there. Tap to put them back on auto.' : 'On auto: the crew place their own weight (the outline shows where). Tap a place to put them there yourself.';
+  }
+  if (lab) lab.textContent = mine ? 'Crew · you' : 'Crew';
 }

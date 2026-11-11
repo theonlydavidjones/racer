@@ -196,3 +196,37 @@ describe('The jib cars: rarely moved', () => {
     void KT;
   });
 });
+
+describe('Placing the crew yourself: off auto until you give it back (owner, 11 Nov 2026)', () => {
+  const PIANO = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham'];
+  it('told to hike, they stay hiked through puffs, lulls, a tack and minutes on end; Auto gives it back', () => {
+    const W = 12, b = testBoat({ heading: 360 - beatAngle(W), kt: 4.5, windKt: W });
+    b.crew = newCrew(crewOf(0.6), 'S'); sail(b, 20);
+    b.crew.place = { across: 'hike', fore: null };
+    const c = b.crew, bad: string[] = [];
+    // every second, outside the tack itself: still yours, everyone free out on the rail, nobody off at the cabin top
+    const check = (when: string) => {
+      if (c.place?.across !== 'hike') bad.push(`${when}: place lost`);
+      c.people.forEach((p, i) => {
+        if (p.job && PIANO.includes(p.job.line)) bad.push(`${when}: #${i} left the rail for the ${p.job.line}`);
+        if (i > 0 && !p.job && c.tgt![i].pose !== 'hike') bad.push(`${when}: #${i} ${c.tgt![i].pose}`);
+      });
+    };
+    const leg = (secs: number, kt: number, label: string) => { b.ww.kt = kt; sail(b, secs, t => { if (t > 5 && Math.abs(t % 1) < 1 / 120) check(`${label} ${t.toFixed(0)}s`); }); };
+    leg(30, W, 'steady'); leg(30, 18, 'puff'); leg(30, 6, 'lull');
+    b.ww.kt = W; startTack(b); sail(b, 15); expect(b.tack).toBe('P');
+    leg(120, W, 'after the tack');
+    expect(bad).toEqual([]);
+    // the weight is on the new windward side (port), as far out as they reach
+    expect(c.side).toBe('P'); expect(c.mode).toBe('hike');
+    // Auto: in a drifter a good crew goes back to their own call (to leeward or the middle, not hiking)
+    b.ww.kt = 3; c.place = undefined; sail(b, 20);
+    expect(c.place).toBeUndefined(); expect(c.mode).not.toBe('hike');
+  });
+  it('to leeward in a breeze, they stay there (auto would have them up to windward) until you tap Auto', () => {
+    const W = 14, b = testBoat({ heading: 360 - beatAngle(W), kt: 5, windKt: W });
+    b.crew = newCrew(crewOf(0.6), 'S'); b.crew.place = { across: 'lee', fore: null };
+    sail(b, 60); expect(b.crew.mode).toBe('leeward'); expect(b.crew.place?.across).toBe('lee');
+    b.crew.place = undefined; sail(b, 20); expect(['hike', 'windward']).toContain(b.crew.mode);
+  });
+});

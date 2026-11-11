@@ -102,6 +102,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
   c.people.forEach(a => {
     const j = a.job; if (!j) return;
+    if (c.place && PIANO.has(j.line)) { a.job = null; return; } // (placed by you: they leave the tweak and go where you put them)
     if (j.line in want) { const to = sheetOf(j.line) ? want[j.line as Ctl]! : j.to ?? want[j.line as Ctl]!; if (Math.abs(to - b.ctl[j.line as Ctl]) < DONE) a.job = null; }
     else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
   });
@@ -118,6 +119,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const sheet = k === 'jibsheet' || k === 'mainsheet';
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
+    // you've told them where to sit: they stay there, and their own tweaks to the cabin-top lines wait (the sheets,
+    // traveller and backstay are worked from where they sit; a line you take is yours to work, not theirs)
+    if (c.place && PIANO.has(k)) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
       const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
@@ -173,8 +177,8 @@ function carJob(b: Boat, dt: number): void {
   const skill = skillOf(p);
   b.carOff = (b.carOff ?? 0) + dt;
   // your call: as soon as they're free. Their own: a change that has lasted, worth a pin (a novice: two), and not while
-  // she needs their weight on the rail
-  const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20);
+  // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)
+  const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && !c.place);
   if (!worth || a.job) return;
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
 }
