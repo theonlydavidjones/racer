@@ -103,9 +103,10 @@ function keelHalf(u: number): number {
  * nearly upright-sided at the deck, curving in to meet the sternpost near the waterline (the owner's photos).
  */
 function sectionShape(u: number): { al: number; be: number } {
-  // at the transom itself the hollow eases out, so the transom's foot is a broad round under the rudder head, not a point
-  const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.84) / 0.12);
-  return { al: 1.6 + 2.4 * mid + 1.8 * aft, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.7 * tr };
+  // toward the transom the hollow gives way to a full, round run (Josephine hauled out: the owner's photo), so the
+  // transom's foot is a broad, nearly flat U at about the waterline, not a point
+  const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.78) / 0.18);
+  return { al: 1.6 + 2.4 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
 }
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
@@ -183,7 +184,7 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
     for (let j = 0; j <= P; j++) { const p = j / P; outline.push(hullPoint(uMax(p), p)); }
     for (let j = P - 1; j >= 0; j--) { const p = j / P, pt = hullPoint(uMax(p), p); outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
     const ring = outline.filter((q, i) => i === 0 || q.distanceTo(outline[i - 1]) > 1e-4);
-    const base = pos.length / 3;
+    const base = pos.length / 3; transomFrom = base; transomTo = base + ring.length;
     for (const q of ring) { pos.push(q.x, q.y, q.z); const c = colorAt(q.y); col.push(c.r, c.g, c.b); }
     const out = new THREE.Vector3(0, -(TRANSOM_TOP.z - HEEL.z) / (TRANSOM_TOP.y - HEEL.y), 1); // the plane's aft-facing normal
     const tris = THREE.ShapeUtils.triangulateShape(ring.map(q => new THREE.Vector2(q.x, q.y)), []);
@@ -197,8 +198,14 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx); g.computeVertexNormals();
+  // The raked transom looks down at the water, so the scene's sky and sun leave it in shade; on the real boat light
+  // bounced off the water and the hard keeps it nearly as bright as the topsides (the owner's haul-out photo). The
+  // scene has no bounced light, so the transom is lit as if it faced straight aft.
+  const nrm = g.attributes.normal as THREE.BufferAttribute;
+  for (let i = transomFrom; i < transomTo; i++) nrm.setXYZ(i, 0, 0.1 / Math.hypot(1, 0.1), 1 / Math.hypot(1, 0.1));
   return g;
 }
+let transomFrom = 0, transomTo = 0;
 
 /* ---------- deck, cabin, cockpit ---------- */
 
