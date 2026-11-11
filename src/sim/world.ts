@@ -114,9 +114,19 @@ export function slipLeadTime(slip: Slip, line: Vec): number {
  * Your own saved boats raced against you have a club-level crew.
  */
 const AI_CREW_SKILL: Record<string, number> = { Red: 0.75, Blue: 0.6, Green: 0.5, Black: 0.85, Varnish: 0.45 };
-function aiCrew(name: string): CrewSpec {
+function aiCrew(name: string, who = name): CrewSpec {
   const skill = AI_CREW_SKILL[name] ?? DEFAULT_SKILL;
-  return { helm: { ...DEFAULT_CREW.helm, skill }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill })) };
+  // real people, not three of the same: heights across about the adult range (1.60–1.92 m: US adults average about
+  // 1.75 m for men and 1.62 m for women, CDC NHANES) and builds from slight to solid (about BMI 21–28; estimates), from
+  // the boat's name so a crew is the same race to race. Their weights are scaled so each boat carries the standard
+  // crew's total (230 kg): the same weight aboard; a taller crew reaches slightly further out (about ±1% of the
+  // righting moment, inside the speed target's rounding)
+  let h = 2166136261; for (const ch of who) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
+  const ppl = [DEFAULT_CREW.helm, ...DEFAULT_CREW.crew].map(() => { const ht = 1.6 + 0.32 * (rnd() + rnd()) / 2; return { h: Math.round(ht * 100) / 100, w: (21 + 7 * rnd()) * ht * ht }; });
+  const total = [DEFAULT_CREW.helm, ...DEFAULT_CREW.crew].reduce((a, p) => a + p.w, 0), k = total / ppl.reduce((a, p) => a + p.w, 0);
+  const [helm, ...crew] = ppl.map(p => ({ h: p.h, w: Math.round(p.w * k * 10) / 10, skill }));
+  return { helm, crew };
 }
 
 /** Your crew from the settings (0–2 crew besides you at the helm). */
@@ -337,7 +347,7 @@ export class World {
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
-      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name), 'S'),
+      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
