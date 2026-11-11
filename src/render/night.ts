@@ -11,8 +11,9 @@ export const NIGHT = {
   uNight: { value: 0 },
   /** The light installations are on: from sunset (the sun's centre 0.83° down) to sunrise. */
   uOn: { value: 0 },
-  /** Late at night (from 23:00 to 01:00 local, 0 → 1): offices and homes put their lights out. */
-  uLate: { value: 0 },
+  /** The share of offices' lights on now, and of homes' (OFFICE_LIGHTS, HOME_LIGHTS below, by the local hour). */
+  uOffice: { value: 0.05 },
+  uHome: { value: 0.3 },
   /** Seconds, for the light shows' movement. */
   uTime: { value: 0 },
   /** The sea's slope standard deviation (Cox & Munk), for how long and wide the reflections stretch. */
@@ -33,7 +34,34 @@ const dimBase = new WeakMap<THREE.LineBasicMaterial, THREE.Color>();
 /** Clocks that show the time (the Ferry Building's dials), redrawn when the minute changes: (hour, minute) local. */
 export const clocks: ((h: number, m: number) => void)[] = [];
 
-const TZ_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+const TZ_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+
+/**
+ * How many lights are on, by the hour: the US Department of Energy's commercial reference buildings, as the
+ * EnergyPlus models carry them (NREL/EnergyPlus testfiles, RefBldgMediumOfficeNew2004 and
+ * RefBldgMidriseApartmentNew2004; the office one is ASHRAE 90.1-2004's schedule). Each value holds until the hour
+ * given. They are fractions of a building's installed lighting in use, which stands in here for the share of its
+ * windows lit. Offices: half lit at 19:00 on a weekday, a tenth by 22:30, a twentieth (cleaners, security, stairwells)
+ * through the night and all Saturday evening and Sunday. Apartments: most lit around 20:00–21:00, falling to a
+ * sixth by midnight.
+ */
+const OFFICE_LIGHTS: Record<'wk' | 'sat' | 'sun', [number, number][]> = {
+  wk: [[5, 0.05], [7, 0.1], [8, 0.3], [17, 0.9], [18, 0.7], [20, 0.5], [22, 0.3], [23, 0.1], [24, 0.05]],
+  sat: [[6, 0.05], [8, 0.1], [14, 0.5], [17, 0.15], [24, 0.05]],
+  sun: [[24, 0.05]],
+};
+const HOME_LIGHTS: [number, number][] = [[4, 0.067], [5, 0.187], [6, 0.394], [7, 0.44], [8, 0.393], [9, 0.172], [15, 0.119], [16, 0.206], [17, 0.439],
+  [18, 0.616], [19, 0.829], [20, 0.986], [21, 1.0], [22, 0.692], [23, 0.384], [24, 0.16]];
+/**
+ * At the apartments' peak not every window shows a light: rooms not in use, blinds and curtains drawn. The share
+ * of a home's windows lit at that peak is a judgement (no survey found), set so the residential hills read sparse.
+ */
+const HOME_PEAK_WINDOWS = 0.3;
+/** A schedule's value at hour h (0–24), eased over the half hour either side of each step so lights don't all switch at once. */
+function sched(tab: [number, number][], h: number): number {
+  const at = (x: number) => { x = (x + 24) % 24; for (const [u, v] of tab) if (x < u) return v; return tab[tab.length - 1][1]; };
+  const f = h - Math.floor(h); return at(h) * (1 - Math.max(0, f - 0.5)) + at(h + 1) * Math.max(0, f - 0.5);
+}
 let lastMin = NaN, localH = 12;
 /**
  * The city's lights for the moment: `el` the sun's elevation (°), `tMin` minutes since the epoch (UTC), `windMs`
@@ -46,7 +74,10 @@ export function updateNight(el: number, tMin: number, windMs: number, tSec: numb
   const m = Math.floor(tMin), key = m * 1000 + Math.round(el * 10);
   if (key === lastMin) return;
   lastMin = key;
-  const [hh, mm] = TZ_FMT.format(new Date(m * 60000)).split(':').map(Number); localH = hh + mm / 60;
+  const parts = TZ_FMT.formatToParts(new Date(m * 60000)), part = (t: string) => parts.find(p => p.type === t)?.value ?? '';
+  const hh = +part('hour'), mm = +part('minute'), wd = part('weekday'); localH = hh + mm / 60;
+  NIGHT.uOffice.value = sched(OFFICE_LIGHTS[wd === 'Sat' ? 'sat' : wd === 'Sun' ? 'sun' : 'wk'], localH);
+  NIGHT.uHome.value = HOME_PEAK_WINDOWS * sched(HOME_LIGHTS, localH);
   for (const c of clocks) c(hh, mm);
   const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   NIGHT.uNight.value = 1 - ss(-6, 6, el);
@@ -54,7 +85,6 @@ export function updateNight(el: number, tMin: number, windMs: number, tSec: numb
   NIGHT.uOn.value = on;
   // lights going out late: 0 at 23:00 → 1 at 01:00, and back on through the small hours before dawn
   const h = localH < 12 ? localH + 24 : localH;
-  NIGHT.uLate.value = ss(23, 25, h) * (1 - ss(29, 31, h));
   // Day for Night: the city video from sunset to 00:30, then the stars until sunrise
   NIGHT.uStars.value = h >= 24.5 && h < 36 ? 1 : 0;
   for (const o of nightOnly) o.visible = on === 1;
@@ -69,55 +99,73 @@ float nHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453
 `;
 
 /**
- * Lit windows: patches a Lambert or Phong material so its walls show a grid of windows after dark, each on or off
- * by its own chance, the fraction lit varying from building to building (an instanced mesh gives each instance its
- * own) and falling late at night. The window grid comes from the wall's position in the world (floors every
- * `floor` metres, bays every `bay` metres along the wall), so it needs no texture or uv. Where a window is smaller
- * than a pixel the wall shows the average of its windows instead, so the far city glows evenly and doesn't shimmer.
- * `warm` is the share of warm (homes, 2700–3000 K) against cool (offices, 4000 K) light.
+ * Lit windows: patches a Lambert or Phong material so its walls show lit windows after dark, as many as the hour's
+ * schedule says (NIGHT.uOffice, uHome), each building its own share round that. Offices light by floor (whole floors
+ * or runs of floors, and a stray light or two on the dark ones), in runs of windows along a floor; homes in ones and
+ * twos (a flat's rooms), floor by floor at random. Each run has its own brightness and colour: offices 3500–4100 K
+ * (fluorescent and LED), homes 2700–3000 K with the odd cooler LED. The windows come from the wall's position in the
+ * world (floors every `floor` m, bays every `bay` m along the wall), so the material needs no texture or uv. Far
+ * off, where a window is smaller than a pixel, a floor's lit runs show as short streaks; where the floors are too,
+ * the wall shows the building's average, a faint glow. `kind`: 'office', 'home', or 'auto' for an instanced city,
+ * where a building over 24 m tall counts as offices.
  */
-export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: number; lit?: [number, number]; warm?: number; seed?: number; glow?: number; from?: number } = {}): void {
-  const { floor = 3.6, bay = 3.2, lit = [0.15, 0.55], warm = 0.5, seed = 0, glow = 1, from = 4 } = o;
+export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: number; kind?: 'office' | 'home' | 'auto'; seed?: number; glow?: number; from?: number } = {}): void {
+  const { floor = 3.6, bay = 3.2, kind = 'auto', seed = 0, glow = 1, from = 4 } = o;
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     prev.call(mat, sh, r);
-    Object.assign(sh.uniforms, { uNight: NIGHT.uNight, uLate: NIGHT.uLate });
+    Object.assign(sh.uniforms, { uNight: NIGHT.uNight, uOffice: NIGHT.uOffice, uHome: NIGHT.uHome });
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed; varying float vWinH;')
       .replace('#include <project_vertex>', `#include <project_vertex>
         #ifdef USE_INSTANCING
           vec4 winW = modelMatrix * instanceMatrix * vec4(transformed, 1.0);
           vWinN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal);
-          vWinSeed = float(gl_InstanceID) * 0.6180339 + ${(seed + 0.5).toFixed(3)};
+          vWinSeed = mod(float(gl_InstanceID) * 7.31, 977.0) + ${(seed + 0.5).toFixed(3)};
+          vWinH = length(instanceMatrix[1].xyz);
         #else
           vec4 winW = modelMatrix * vec4(transformed, 1.0);
           vWinN = normalize(mat3(modelMatrix) * objectNormal);
-          vWinSeed = ${(seed + 0.5).toFixed(3)};
+          vWinSeed = ${(seed + 0.5).toFixed(3)}; vWinH = 0.0;
         #endif
         vWinP = winW.xyz;`);
+    const office = kind === 'office' ? '1.0' : kind === 'home' ? '0.0' : 'step(24.0, vWinH)';
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uLate; varying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed;${HASH}`)
+        uniform float uNight; uniform float uOffice; uniform float uHome; varying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed; varying float vWinH;
+        // a hash without sine (Hoskins), steady at the world's large coordinates
+        float wH(vec2 p) { p = fract(p * vec2(0.1031, 0.1030)); p += dot(p, p.yx + 33.33); return fract((p.x + p.y) * p.x); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         if (uNight > 0.01 && abs(vWinN.y) < 0.5 && vWinP.y > ${from.toFixed(1)}) {
           vec2 tg = normalize(vec2(-vWinN.z, vWinN.x));
           vec2 cell = vec2(dot(vWinP.xz, tg) / ${bay.toFixed(2)}, vWinP.y / ${floor.toFixed(2)});
           vec2 id = floor(cell), f = fract(cell);
-          float bld = nHash(vWinSeed * 17.0);
-          float share = mix(${lit[0].toFixed(3)}, ${lit[1].toFixed(3)}, bld) * (1.0 - 0.6 * uLate);
-          float on = step(nHash2(id + vWinSeed * 31.0), share);
-          // the glass in the middle of each cell, the wall and floor slab round it
-          float pane = step(0.18, f.x) * step(f.x, 0.86) * step(0.22, f.y) * step(f.y, 0.88);
-          float w = on * pane * (0.55 + 0.45 * nHash2(id.yx + 3.7));
-          // smaller than a pixel: the wall's average instead
-          float sub = smoothstep(0.35, 0.9, max(length(fwidth(cell.x)), length(fwidth(cell.y))));
-          w = mix(w, share * 0.36, sub); // (the glass is 54% of a cell, at 0.78 of full brightness on average)
-          float wm = step(nHash2(id * 1.3 + 7.1), ${warm.toFixed(2)});
-          vec3 wc = mix(vec3(0.80, 0.86, 1.0), vec3(1.0, 0.74, 0.42), wm);
+          float s = vWinSeed, off = ${office};
+          // this building's share of windows lit: the schedule's, varied between a third and twice that
+          float share = clamp(mix(uHome, uOffice, off) * (0.35 + 1.65 * wH(vec2(s, 7.0))), 0.0, 1.0);
+          // offices: lit floors (in runs of 1–3), and runs of 3–8 windows lit on them; homes: every floor, flats of 1–2 windows
+          float runF = 1.0 + floor(wH(vec2(s, 3.0)) * 3.0 * off), fid = floor(id.y / runF);
+          float pFloor = off > 0.5 ? min(1.0, share / 0.5) : 1.0;
+          float pRun = min(1.0, share / (pFloor * 0.85));
+          float runW = off > 0.5 ? 3.0 + floor(wH(vec2(s, 5.0)) * 6.0) : 1.0 + floor(wH(vec2(s, 6.0)) * 2.0);
+          float rid = floor((id.x + floor(wH(vec2(fid, s)) * 8.0)) / runW);
+          float floorOn = step(wH(vec2(fid * 1.37, s + 1.0)), pFloor), runOn = step(wH(vec2(rid + s * 0.73, id.y * 1.91)), pRun);
+          float on = floorOn * runOn * step(wH(id + vec2(s * 1.13, 0.5)), 0.85) + off * (1.0 - floorOn) * step(0.993, wH(id * 1.7 + s));
+          float rh = wH(vec2(rid * 1.3 + 0.2, id.y + s)), br = 0.3 + 0.7 * rh;
+          // colour: offices 3500–4100 K, homes 2700–3000 K and one in eight a cool LED
+          vec3 cOff = mix(vec3(1.0, 0.84, 0.66), vec3(0.86, 0.9, 1.0), wH(vec2(rid, id.y * 0.37 + s)));
+          vec3 cHome = wH(vec2(rid * 0.7, id.y + s * 2.0)) < 0.125 ? vec3(0.8, 0.85, 1.0) : mix(vec3(1.0, 0.62, 0.32), vec3(1.0, 0.76, 0.5), rh);
+          vec3 wc = mix(cHome, cOff, off);
+          float paneX = step(0.2, f.x) * step(f.x, 0.84), paneY = step(0.24, f.y) * step(f.y, 0.86);
+          // near: each window; windows smaller than a pixel: the run's average along the floor; floors too: the wall's average
+          float subX = smoothstep(0.4, 1.0, fwidth(cell.x)), subY = smoothstep(0.4, 1.0, fwidth(cell.y));
+          float w0 = on * paneX * br, w1 = floorOn * runOn * 0.85 * 0.64 * br;
+          float w = mix(w0, w1, subX) * mix(paneY, 0.62, subY);
+          w = mix(w, share * 0.64 * 0.62 * 0.65, smoothstep(0.6, 1.4, fwidth(cell.y)));
           totalEmissiveRadiance += wc * w * uNight * ${glow.toFixed(2)};
         }`);
   };
-  mat.customProgramCacheKey = () => `win${floor}|${bay}|${lit}|${warm}|${seed}|${glow}|${from}`;
+  mat.customProgramCacheKey = () => `win2|${floor}|${bay}|${kind}|${seed}|${glow}|${from}`;
 }
 
 /**
