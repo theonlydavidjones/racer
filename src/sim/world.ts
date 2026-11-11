@@ -9,7 +9,7 @@ import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } fro
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
 import { Puffs, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
-import { onLand, shoreDist } from '../geo/shore';
+import { SHORE, alongside, onLand, shoreDist, shoreNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
@@ -24,6 +24,7 @@ import { destMark, place as getPlace } from './places';
 import { harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
+import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
@@ -279,7 +280,8 @@ export class World {
     const isUser = i === 0, r = this.rng;
     // an opponent: a stock club boat, or one of your own saved boats (her looks and her condition), sailed by the AI
     const pick = isUser ? null : this.settings.opponents?.[i - 1] ?? `stock:${i}`;
-    const oppSpec = pick && !pick.startsWith('stock:') ? this.settings.boats?.find(b => b.id === pick) : undefined;
+    // (a generic club Folkboat, boat/generic.ts: her sail number clear of your boats')
+    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
@@ -313,7 +315,7 @@ export class World {
     }
     const spec = isUser ? this.settings.boat : oppSpec; // your boat as you've set her up (or a rival you've set up)
     return {
-      id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? OPP_TAGS[(i - 1) % OPP_TAGS.length] : F.tag,
+      id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, hatch: spec.hatch } } : { paint: F.paint }),
@@ -341,15 +343,20 @@ export class World {
     const u = V(this.C.base), c = this.C.committee;
     return { name: 'the committee boat', p: { x: c.x + u.x * 6, y: c.y + u.y * 6 }, q: { x: c.x - u.x * 6, y: c.y - u.y * 6 }, r: 2 };
   }
-  /** Rule 19: the nearest obstruction (the shore; after the start, the committee boat) within 30 m. */
+  /** Rule 19: the nearest obstruction (the shore, the Wharf's piers and breakwaters; after the start, the committee boat) within 30 m. */
   private obstacle = (p: Vec, committee: boolean): { d: number; n: Vec; continuing: boolean } | null => {
     let best: { d: number; n: Vec; continuing: boolean } | null = null;
-    const ds = shoreDist(p);
+    const sn = shoreNearest(p), ds = sn.d;
     if (ds < 30) {
       const e = 0.5, gx = shoreDist({ x: p.x + e, y: p.y }) - shoreDist({ x: p.x - e, y: p.y }), gy = shoreDist({ x: p.x, y: p.y + e }) - shoreDist({ x: p.x, y: p.y - e });
-      const l = Math.hypot(gx, gy) || 1;
-      best = { d: ds, n: { x: gx / l, y: gy / l }, continuing: true };
+      const l = Math.hypot(gx, gy) || 1, n = { x: gx / l, y: gy / l };
+      // continuing if she'd pass alongside it for three hull lengths (a long shore, a pier's side; not a pier head)
+      const q = { x: p.x - n.x * ds, y: p.y - n.y * ds };
+      best = { d: ds, n, continuing: alongside(SHORE, false, sn.k, q, n) >= 3 * LOA };
     }
+    // the Wharf's piers, breakwaters and docks: along a side, a continuing obstruction; at a pier head, not
+    const wf = wharfNearest(p, 30);
+    if (wf && (!best || wf.d < best.d)) best = { d: wf.d, n: wf.n, continuing: wf.along >= 3 * LOA };
     const cb = committee ? this.committeeHull : null;
     if (cb) {
       const d = segPt(p, cb.p, cb.q!) - cb.r;

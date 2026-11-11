@@ -54,12 +54,13 @@ Then, unranked: ~~start screens~~ (done: Race → create a race or run a past ra
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
-players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip numbers and nicer moored boats (4–6 h); real
+players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
 phone layout (on hold, 8–12 h).
 
-Open check: the tiller pilot's specs from primary sources (the ST2000+ may be 4.5 s lock to lock, not 4.0 s; AutoTrim
-and the RRS 52 wording unconfirmed). Needs docs.raymarine.com and www.sailing.org allowed.
+Checked: RRS 52 and the ERS rudder definition (primary sources), and the ST2000+'s 4,500 kg rating (Raymarine). Still
+unconfirmed: the ST2000+'s hard-over time (now 4.5 s, from secondary sources), its AutoTack default (100°) and AutoTrim;
+the handbook (Raymarine document 81130) wasn't reachable.
 
 ## The owner's list (November 2026, to prioritise)
 
@@ -87,6 +88,19 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
+- **The Bay Bridge and the city at night** (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+  suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
+  the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
+  night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
+  and time, so the lights come on at real dusk. Sources: Caltrans and OSM for the bridge's geometry; the Bay Lights' own
+  published specifications for its LEDs and patterns.
+- **Lights on the boats at night** (owner, November 2026: "make them beautiful"; 4–6 h): the real navigation lights for a
+  sailing vessel under 20 m (Inland/International Rules 25): red and green sidelights over 112.5° each, the white
+  sternlight over 135°, or the masthead tricolour as an option under sail; the steaming light when motoring and the
+  all-round white anchor light at anchor or on a mooring. Their sectors exact, so you can read another boat's heading
+  and right of way from her lights, as the rules intend (and the IRPCAS teaching uses it). Beautiful as well as right:
+  soft glow and bloom, their reflections trembling on the water, warm cabin light through the ports, the compass lit,
+  a red cockpit light, and the moored and anchored boats' lights round the harbors.
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
@@ -118,7 +132,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). Later: show each item on the replay (the header you held, where you overstood), and compare against the boat that won.
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail.
 - **GGYC and StFYC, and the start line.** Dial in the clubs' buildings and the GGYC flagpole (the inner end of the start line) on the spot. The course file has the flagpole at 37.80925 N; the city's building data puts the GGYC clubhouse at 37.8077 N.
-- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (~~Fort Mason's piers~~ done: OSM's coast from Crissy Field to Aquatic Park; still hand-traced east of there), and Rule 20 hails at the islands (today only at the Cityfront).
+- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (~~Fort Mason's piers~~ done: OSM's coast from Crissy Field to Aquatic Park; ~~Pier 39 and the Wharf~~ done: OSM's coast on to Pier 27, with the open piers, breakwaters and Pier 39's docks; still hand-traced from Fort Point to Crissy Field). Still to do at the Wharf: the AI's and the tiller pilot's look-ahead for land samples every 15–45 m (ai/ai.ts, boat/autopilot.ts), so it can step over a 1–10 m pier, breakwater or dock: test those lines exactly against geo/shore.ts WHARF (wharfCrossed), as the passage planner does; the sea lions' floats at Pier 39 aren't solid, and Rule 20 hails at the islands (today only at the Cityfront).
 - **Your boat** (done: looks, flags, condition). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 

@@ -16,6 +16,7 @@
     "data:terrain": "node scripts/fetch-terrain.mjs && node scripts/make-land-mask.mjs",
     "data:swell": "node scripts/fetch-swell.mjs",
     "data:charts": "NODE_USE_ENV_PROXY=1 node scripts/fetch-charts.mjs",
+    "data:wharf": "NODE_USE_ENV_PROXY=1 node scripts/make-wharf.mjs",
     "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs",
     "test:fast": "vitest run --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts'"
   },

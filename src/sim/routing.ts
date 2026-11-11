@@ -1,7 +1,7 @@
 import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
-import { onLand, shoreDist } from '../geo/shore';
+import { onLand, shoreDist, wharfCrossed, wharfNearest } from '../geo/shore';
 import type { Outlook } from './outlook';
 
 /**
@@ -180,7 +180,7 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
 
 /**
  * A way round the land from a to b for a cruise, as you'd draw it on the chart: the straight line if it keeps `clear`
- * metres off the land, or else the shortest way through the water on a 50 m grid (A*), pulled straight between the
+ * metres off the land, or else the shortest way through the water on a 50 m grid (10 m by the Wharf; A*), pulled straight between the
  * turns. Near either end (a slip, a cove) it may come closer, as it has to.
  */
 export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
@@ -191,40 +191,24 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
     for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
-  const visible = (p: Vec, q: Vec) => { const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  // (the Wharf's piers, breakwaters and docks are 1–10 m wide: sampling would step over them, so they're tested exactly)
+  const visible = (p: Vec, q: Vec) => { if (wharfCrossed(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   if (visible(a, b)) return [a, b];
-  const cell = 50, pad = 2500;
-  const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
-  const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
-  const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
-  const idx = (q: Vec) => Math.round((q.y - y0) / cell) * nx + Math.round((q.x - x0) / cell);
-  const block = new Int8Array(nx * ny).fill(-1); // -1 not yet worked out
-  const isBlocked = (k: number) => { if (block[k] < 0) block[k] = blocked(at(k % nx, Math.floor(k / nx))) ? 1 : 0; return block[k] === 1; };
-  const start = idx(a), goal = idx(b), gs = new Float64Array(nx * ny).fill(Infinity), from = new Int32Array(nx * ny).fill(-1);
-  const h = (k: number) => dist(at(k % nx, Math.floor(k / nx)), b);
-  // a binary heap of [f, k]
-  const heap: [number, number][] = [];
-  const push = (e: [number, number]) => { heap.push(e); let c = heap.length - 1; while (c > 0) { const pa = (c - 1) >> 1; if (heap[pa][0] <= heap[c][0]) break; [heap[pa], heap[c]] = [heap[c], heap[pa]]; c = pa; } };
-  const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
-  gs[start] = 0; push([h(start), start]);
-  let found = false;
-  while (heap.length) {
-    const [, k] = pop();
-    if (k === goal) { found = true; break; }
-    const i = k % nx, j = Math.floor(k / nx);
-    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-      if (!di && !dj) continue;
-      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
-      const kk = jj * nx + ii; if (kk !== goal && isBlocked(kk)) continue;
-      if (di && dj && (isBlocked(j * nx + ii) || isBlocked(jj * nx + i))) continue; // no cutting a corner of the land
-      const g = gs[k] + cell * Math.hypot(di, dj);
-      if (g < gs[kk]) { gs[kk] = g; from[kk] = k; push([g + h(kk), kk]); }
-    }
-  }
-  if (!found) return [a, b];
-  const cells: Vec[] = [];
-  for (let k = goal; k >= 0 && k !== start; k = from[k]) cells.push(at(k % nx, Math.floor(k / nx)));
-  const pts = [a, ...cells.reverse().slice(0, -1), b];
+  // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
+  // nearest water clear of them), then the rest of the way on the usual 50 m grid.
+  const ea = wharfNearest(a, 150) ? escapeWharf(a) : [a];
+  const eb = wharfNearest(b, 150) ? escapeWharf(b).reverse() : [b];
+  const A = ea[ea.length - 1], B = eb[0];
+  const near2 = (q: Vec) => dist(q, A) < 400 || dist(q, B) < 400 || nearEnd(q);
+  const blocked2 = (q: Vec) => {
+    if (onLand(q)) return true;
+    if (near2(q)) return false;
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
+    return false;
+  };
+  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => !wharfCrossed(p, q));
+  if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
+  const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
   const out = [a];
   let i = 0;
@@ -234,4 +218,54 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
     out.push(pts[j]); i = j;
   }
   return out;
+}
+
+/**
+ * The shortest way through the water from a to b on a grid of `cell` metres reaching `pad` metres beyond them (A*,
+ * eight neighbours, no cutting a corner of the land), with a and b themselves as its ends; null if there's none.
+ * With `isGoal`, it stops at the first cell that passes (b then only steers the search).
+ */
+function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
+  isGoal?: (q: Vec) => boolean, lean = 1): Vec[] | null {
+  const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
+  const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
+  const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
+  const idx = (q: Vec) => Math.round((q.y - y0) / cell) * nx + Math.round((q.x - x0) / cell);
+  const block = new Int8Array(nx * ny).fill(-1); // -1 not yet worked out
+  const isBlocked = (k: number) => { if (block[k] < 0) block[k] = blocked(at(k % nx, Math.floor(k / nx))) ? 1 : 0; return block[k] === 1; };
+  const start = idx(a), goal = isGoal ? -1 : idx(b), gs = new Float64Array(nx * ny).fill(Infinity), from = new Int32Array(nx * ny).fill(-1);
+  const h = (k: number) => lean * dist(at(k % nx, Math.floor(k / nx)), b);
+  // a binary heap of [f, k]
+  const heap: [number, number][] = [];
+  const push = (e: [number, number]) => { heap.push(e); let c = heap.length - 1; while (c > 0) { const pa = (c - 1) >> 1; if (heap[pa][0] <= heap[c][0]) break; [heap[pa], heap[c]] = [heap[c], heap[pa]]; c = pa; } };
+  const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+  gs[start] = 0; push([h(start), start]);
+  let end = -1;
+  while (heap.length) {
+    const [f, k] = pop();
+    if (f > gs[k] + h(k) + 1e-6) continue; // (a stale entry)
+    const i = k % nx, j = Math.floor(k / nx);
+    if (k === goal || (isGoal && k !== start && isGoal(at(i, j)))) { end = k; break; }
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+      if (!di && !dj) continue;
+      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+      const kk = jj * nx + ii; if (kk !== goal && isBlocked(kk)) continue;
+      if (di && dj && (isBlocked(j * nx + ii) || isBlocked(jj * nx + i))) continue; // no cutting a corner of the land
+      const g = gs[k] + cell * Math.hypot(di, dj);
+      if (g >= gs[kk]) continue;
+      if (!edgeOk(k === start ? a : at(i, j), kk === goal ? b : at(ii, jj))) continue; // nor through a pier or a dock
+      gs[kk] = g; from[kk] = k; push([g + h(kk), kk]);
+    }
+  }
+  if (end < 0) return null;
+  const cells: Vec[] = [];
+  for (let k = end; k >= 0 && k !== start; k = from[k]) cells.push(at(k % nx, Math.floor(k / nx)));
+  const path = [a, ...cells.reverse()];
+  if (!isGoal) path[path.length - 1] = b;
+  return path;
+}
+
+/** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid. */
+function escapeWharf(p: Vec): Vec[] {
+  return gridPath(p, p, 10, 700, onLand, (u, v) => !wharfCrossed(u, v), q => wharfNearest(q, 150) === null, 0) ?? [p];
 }

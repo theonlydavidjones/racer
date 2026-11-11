@@ -19,6 +19,7 @@ import { Wakes } from './wake';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
 import { Harbor } from './marina';
+import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { landAt } from '../environment/sea';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
@@ -292,6 +293,7 @@ export class SceneView {
     this.wakes = new Wakes(scene);
     this.moorings = new Moorings(scene, p => landAt(p) === false);
     this.harbor = new Harbor(scene); // West Harbor: docks, breakwaters, boats in their slips
+    addWharf(scene); // Fisherman's Wharf and Pier 39: the open piers, breakwaters and the marina's docks
     this.wildlife = new Wildlife(scene, p => landAt(p) === false);
     if (import.meta.env.DEV) Object.assign(window, { __wild: this.wildlife }); // for the scenery check (scripts/check/scenery.cjs)
     this.vesselView = new VesselView(scene);
