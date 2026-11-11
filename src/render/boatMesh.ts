@@ -583,8 +583,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   syncPole(m, plan === 'wing');
   syncLines(m, b);
   for (const r of m.ribbons) syncRibbon(r, b, t);
-  // (the sea's slope from the wind she feels: her apparent wind, which overstates the true wind going upwind)
-  syncNavLights(m.nav, b.aws / 0.5144);
+  syncNavLights(m.nav);
 }
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);

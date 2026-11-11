@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { NIGHT } from './night';
 
 /**
  * A Folkboat's own lights at night: her navigation lights, by the Navigation Rules (COLREGS 1972 and the US Inland
@@ -28,8 +29,8 @@ import * as THREE from 'three';
  * light toward the viewer, long when the light and the eye are low, wider with the wind.
  */
 
-/** How dark it is and whether the lights are on: set by the scene from the sun (scene.ts updateSky). */
-export const BOAT_LIGHTS = { on: 0, dark: 0 };
+/** How dark it is, whether lights are on (sunset to sunrise) and the sea's slope: shared with the city's lights (night.ts). */
+const DARK = () => NIGHT.uNight.value, ON = () => NIGHT.uOn.value;
 
 const NM = 1852;
 type Arc = { from: number; to: number; aftFrom: boolean; aftTo: boolean };
@@ -113,7 +114,7 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
     glow.onBeforeRender = (r, _s, cam) => {
       tmpW.copy(pos).applyMatrix4(grp.matrixWorld); cam.getWorldPosition(tmpE);
       tmpL.copy(tmpE).applyMatrix4(inv.copy(grp.matrixWorld).invert()).sub(pos);
-      const seen = arcIntensity(arc, bearing(tmpL.x, tmpL.z)) * BOAT_LIGHTS.dark, d = tmpW.distanceTo(tmpE), e = seen * overThreshold(range, d);
+      const seen = arcIntensity(arc, bearing(tmpL.x, tmpL.z)) * DARK(), d = tmpW.distanceTo(tmpE), e = seen * overThreshold(range, d);
       L.seen = e;
       // the point grows with how far over the threshold it is (a log response, as the eye's), from a pinprick at its range
       r.getSize(size); const p11 = cam instanceof THREE.PerspectiveCamera ? cam.projectionMatrix.elements[5] : 1;
@@ -170,14 +171,14 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
   return nl;
 }
 
-/** Each frame: on or off by the clock (and off under engine for the tricolour), the reflections' spread from the wind. */
-export function syncNavLights(nl: NavLights, windKt: number, motoring = false): void {
-  const on = BOAT_LIGHTS.on > 0 && !(motoring && nl.kind === 'tricolour');
-  // the sea's slopes (Cox & Munk 1954): all directions σ² = 0.003 + 0.00512·U; across the wind σ_c² = 0.003 + 0.00192·U
-  // (the streak is taken as if seen across the wind)
-  const U = windKt * 0.5144; nl.sigma = Math.sqrt(0.003 + 0.00512 * U); nl.sigmaC = Math.sqrt(0.003 + 0.00192 * U);
+/** Each frame: on or off by the clock (and off under engine for the tricolour), the reflections' spread from the sea. */
+export function syncNavLights(nl: NavLights, motoring = false): void {
+  const on = ON() > 0 && !(motoring && nl.kind === 'tricolour');
+  // the sea's slopes (Cox & Munk 1954): all directions σ² = 0.003 + 0.00512·U (night.ts, from the true wind); across the
+  // wind σ_c² = 0.003 + 0.00192·U (the streak is taken as if seen across the wind)
+  nl.sigma = NIGHT.uSlope.value; const U = Math.max(0, (nl.sigma ** 2 - 0.003) / 0.00512); nl.sigmaC = Math.sqrt(0.003 + 0.00192 * U);
   for (const L of nl.lamps) { L.glow.visible = on; L.streak.visible = on; }
   for (const m of nl.lenses) m.emissiveIntensity = on ? 1.6 : 0;
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
-  nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * BOAT_LIGHTS.dark : 0;
+  nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * DARK() : 0;
 }
