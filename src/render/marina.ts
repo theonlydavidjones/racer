@@ -183,11 +183,22 @@ export class Harbor {
       } else if (b.area) {
         const s = new THREE.Shape(); b.pts.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
         const g = new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.3, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); g.translate(0, -0.6, 0); // (a small bevel: the rock you see is the rock you hit)
-        this.group.add(new THREE.Mesh(g, H.pavedCrest ? [paved, rock] : rock)); // (a paved path along the top: the caps; rock down the sides)
+        this.group.add(new THREE.Mesh(g, rock));
       } else for (let i = 1; i < b.pts.length; i++) {
         const a = b.pts[i - 1], c = b.pts[i], len = Math.hypot(c.x - a.x, c.y - a.y);
         const bx = new THREE.Mesh(new THREE.BoxGeometry(BREAKWATER_W, 2.6, len), rock); bx.position.copy(P3((a.x + c.x) / 2, (a.y + c.y) / 2, 1.0)); bx.rotation.y = -Math.atan2(c.x - a.x, c.y - a.y) + Math.PI; this.group.add(bx);
       }
+    }
+    // paved paths along the breakwaters' tops, 3 m wide, just above the rock (its top: 2.6 m)
+    for (const path of H.paths) {
+      const pos: number[] = [];
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1], c = path[i], l = Math.hypot(c.x - a.x, c.y - a.y); if (l < 0.1) continue;
+        const n = { x: (c.y - a.y) / l * 1.5, y: -(c.x - a.x) / l * 1.5 };
+        for (const p of [[a, -1], [a, 1], [c, 1], [a, -1], [c, 1], [c, -1]] as [Vec, number][]) { const q = P3(p[0].x + n.x * p[1], p[0].y + n.y * p[1], 2.65); pos.push(q.x, q.y, q.z); }
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+      this.group.add(new THREE.Mesh(g, paved));
     }
     // the entrance beacons: a red triangle (Q R) or a green square on a post, with its light
     for (const bc of H.beacons) {

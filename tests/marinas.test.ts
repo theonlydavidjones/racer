@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { segPt } from '../src/core/math';
 import { HARBORS, SLIPS, harborAt, harborOf, hitsHarbor, hullClear, inBasin, pushOffPlan, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { SeaField, fetchAt } from '../src/environment/sea';
@@ -97,12 +98,19 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       }
       fr = nx;
     }
-    const westEdge = Math.min(...H.basin.map(p => p.x)) + 45; // the outline's open west side (it runs a little east as it goes north)
+    // the only way off it: across its open west side (its longest edge, the outline's line across the water), nowhere else
+    const edges = H.basin.map((p, i) => [p, H.basin[(i + 1) % H.basin.length]] as const), [wa, wb] = edges.reduce((m, e) => Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) > Math.hypot(m[1].x - m[0].x, m[1].y - m[0].y) ? e : m);
+    expect(Math.hypot(wb.x - wa.x, wb.y - wa.y)).toBeGreaterThan(150);
     expect(leaks.length).toBeGreaterThan(0);
-    for (const q of leaks) expect(q.x).toBeLessThan(westEdge);
+    for (const q of leaks) expect(segPt(q, wa, wb)).toBeLessThan(2);
     const sea = new SeaField({ hs: 1.5, tp: 12, from: 270 } as never), sw = { from: 215, kt: 18 } as Wind, still = () => ({ x: 0, y: 0 });
     const inside = sea.at(LL(37.8322, -122.4745), sw, still(), still), outside = sea.at(LL(37.8305, -122.4745), sw, still(), still);
     expect(inside.hsW).toBeLessThan(0.3 * outside.hsW);
+    expect(inside.hsS).toBeLessThan(0.3 * outside.hsS);
+    // and no shadow of the 50 m terrain grid lying across it: the swell (from the south-south-west, so the breakwater shades
+    // both) about the same in line with the entrance as tucked behind the breakwater (it was 8 times less)
+    const open = sea.at({ x: -2804, y: 2479 }, sw, still(), still), tucked = sea.at({ x: -2742, y: 2412 }, sw, still(), still); // (in line with the entrance; behind the breakwater)
+    expect(open.hsS).toBeGreaterThan(0.5 * tucked.hsS);
   });
   it('the sea by a harbor is open water\'s, and the same whichever point asks first (the same seed, the same race)', () => {
     // just north of West Harbor's breakwater, by the GGYC line: its 150 m cell's node lies in the basin

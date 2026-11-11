@@ -21,7 +21,7 @@ import horseshoeBay from './data/horseshoe-bay.json';
 type LLs = [number, number][];
 interface HarborData {
   name?: string; basin: LLs; breakwaters: { area: boolean; pts: LLs; seawall?: { top: number; rail: LLs } }[]; walkways: LLs[]; fingers: LLs[]; areas: LLs[];
-  beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[]; piles?: 'white'; pavedCrest?: boolean;
+  beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[]; piles?: 'white'; paths?: LLs[];
   slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number }[];
 }
 const SOURCES: { id: string; name: string; short: string; data: HarborData }[] = [
@@ -68,8 +68,8 @@ export interface Harbor {
   shore: Vec[][];
   /** Entrance beacons (lateral marks), and the ways out of the harbor (the middle of each entrance). */
   beacons: { p: Vec; colour: 'red' | 'green' }[]; exits: Vec[];
-  /** The dock pilings' colour (white: plastic-sleeved, as at Horseshoe Bay; else timber), and whether the breakwaters' tops are paved paths. */
-  piles: 'white' | 'timber'; pavedCrest: boolean;
+  /** The dock pilings' colour (white: plastic-sleeved, as at Horseshoe Bay; else timber), and paved paths along the breakwaters' tops. */
+  piles: 'white' | 'timber'; paths: Vec[][];
   /** The basin's bounding box, and a box round everything solid that belongs to the harbor. */
   box: Box; reach: Box;
 }
@@ -85,7 +85,7 @@ export const HARBORS: Harbor[] = SOURCES.map(({ id, name, short, data: D }) => {
   // (an end that stops short of a walkway, or runs on over it, is made to meet its edge: as drawn, and as solid)
   const walkways = walks.map(w => meetEdge(w, walks.filter(o => o !== w), WALKWAY_W)), areas = D.areas.map(v);
   return {
-    id, name, short, basin, breakwaters, shore: (D.shore ?? []).map(v), walkways, fingers: fingers.map(f => meetEdge(f, walks, WALKWAY_W)), areas, beacons, exits, piles: D.piles ?? 'timber', pavedCrest: !!D.pavedCrest,
+    id, name, short, basin, breakwaters, shore: (D.shore ?? []).map(v), walkways, fingers: fingers.map(f => meetEdge(f, walks, WALKWAY_W)), areas, beacons, exits, piles: D.piles ?? 'timber', paths: (D.paths ?? []).map(v),
     box: boxOf(basin), reach: boxOf([...basin, ...breakwaters.flatMap(b => b.pts), ...walkways.flat(), ...areas.flat()], BREAKWATER_W)
   };
 });
