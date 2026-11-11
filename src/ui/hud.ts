@@ -423,10 +423,14 @@ export class Hud {
     this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+    const placed: [number, number, number, number][] = [];
     for (const pl of PLACES) {
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
       // (the sim's own places: the racing marks in amber, under the chart's print)
       if (!pl.buoy) { ctx.fillStyle = I.text; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }
+      const bw = ctx.measureText(pl.name).width; // (zoomed out, the names would pile up: each only where it fits)
+      if (placed.some(b => q[0] + 6 < b[0] + b[2] && q[0] + 6 + bw > b[0] && q[1] - 17 < b[1] + b[3] && q[1] - 3 > b[1])) continue;
+      placed.push([q[0] + 6, q[1] - 17, bw, 14]);
       if (scale > 0.12 || !pl.buoy) { ctx.fillStyle = pl.buoy ? I.mark : I.text; ctx.fillText(pl.name, q[0] + 6, q[1] - 6); }
     }
     if (pick) { // the spot you've picked: a ring, and the line from you to it
@@ -447,8 +451,9 @@ export class Hud {
     const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
     ctx.strokeStyle = I.text; ctx.fillStyle = I.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
     ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
-    ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = I.text; ctx.globalAlpha = 0.75;
-    ctx.fillText(chartCredit(), w - 10, h - 8); ctx.globalAlpha = 1;
+    ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
+    const cw = ctx.measureText(chartCredit()).width; ctx.fillStyle = I.deep; ctx.globalAlpha = 0.85; ctx.fillRect(w - cw - 16, h - 19, cw + 12, 15);
+    ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
   }
 
   private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {

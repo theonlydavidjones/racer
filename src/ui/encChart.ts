@@ -31,14 +31,14 @@ export interface Ink {
   dry: string; vshoal: string; shoal: string; mid: string; deep: string;
   none: string; land: string; built: string; structure: string; coast: string; contour: string; magenta: string; ink: string; sounding: string; soundingDeep: string; waterText: string;
   // the sim's own overlays
-  current: string; lull: (a: number) => string; lullHatch?: boolean; windTick: string; ship: string; shipText: string; text: string; boatEdge: string; pick: string; mark: string; markPass: string; line: string;
+  current: string; lull: (a: number) => string; lullHatch?: boolean; puff?: (a: number) => string; windTick: string; ship: string; shipText: string; text: string; boatEdge: string; pick: string; mark: string; markPass: string; line: string;
 }
 export const INK: Record<ChartPalette, Ink> = {
   // US Chart No. 1 on paper: buff land, white deep water, blue shoal tints, green where it dries, magenta for regulated areas
   day: {
     dry: '#c6d7a4', vshoal: '#8fc3ea', shoal: '#b9dbf2', mid: '#e1eff9', deep: '#ffffff', none: '#d9dcdf',
     land: '#f3e2a9', built: '#e6cf8f', structure: '#d4c08a', coast: '#2e3236', contour: '#7f9bb0', magenta: '#b8188f', ink: '#1d2328', sounding: '#1d2328', soundingDeep: '#6a7781', waterText: '#1f4f7a',
-    current: 'rgba(0,96,170,.8)', lull: a => `rgba(196,140,50,${a})`, lullHatch: true, windTick: 'rgba(20,40,60,.35)', ship: 'rgba(55,55,60,.9)', shipText: 'rgba(40,40,45,.9)', text: '#1d2328',
+    current: 'rgba(0,96,170,.8)', lull: a => `rgba(196,140,50,${a})`, lullHatch: true, puff: a => `rgba(20,60,110,${a})`, windTick: 'rgba(20,40,60,.35)', ship: 'rgba(30,30,34,.95)', shipText: 'rgba(30,30,34,.95)', text: '#1d2328',
     boatEdge: '#000000', pick: '#000000', mark: '#e09a00', markPass: '#9c8a3a', line: 'rgba(200,130,0,.9)'
   },
   // the ECDIS night-time look: dark water, deeper is darker
@@ -179,7 +179,9 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
   for (const A of G.areas) {
     if (!A.o) continue;
     const s = areaStroke(A.a.k, I); if (!s) continue;
-    ctx.strokeStyle = s.c; ctx.lineWidth = px(s.w); ctx.setLineDash(s.dash.map(px)); ctx.stroke(A.o);
+    // drawn to scale, but never thinner than a hairline or heavier than the chart's own pen (it mustn't bury the boats)
+    const lw = Math.min(detail === 'inset' ? 1.6 : 2.4, Math.max(0.8, s.w * k)), dk = Math.min(0.5, Math.max(0.12, k));
+    ctx.strokeStyle = s.c; ctx.lineWidth = px(lw); ctx.setLineDash(s.dash.map(d => px(d * dk))); ctx.stroke(A.o);
   }
   ctx.setLineDash([]);
   for (const H of G.hazards) {

@@ -48,7 +48,7 @@ export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
 }
 
 /** Overlay colours for a light chart (ui/encChart.ts INK.day); left out, the colours for a dark map. */
-export interface OverlayInk { mark?: string; markPass?: string; line?: string; current?: string; lull?: (a: number) => string; lullHatch?: boolean; windTick?: string }
+export interface OverlayInk { mark?: string; markPass?: string; line?: string; current?: string; lull?: (a: number) => string; lullHatch?: boolean; puff?: (a: number) => string; windTick?: string }
 
 export function drawCourse(ctx: CanvasRenderingContext2D, C: Course, aids: boolean, tf: Tf, scale: number, highlight: number, ink: OverlayInk = {}): void {
   const p1 = tf(C.pin.x, C.pin.y), p2 = tf(C.committee.x, C.committee.y);
@@ -143,10 +143,13 @@ export function drawWindField(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x
       const a = tf(x, y), b = tf(x + spacing, y + spacing), c = tf(x + spacing, y), e = tf(x, y + spacing);
       ctx.fillStyle = d > 0 ? `rgba(10,30,60,${Math.min(0.32, d * 0.9)})` : (ink.lull ?? (a => `rgba(200,230,245,${a})`))(Math.min(0.25, -d * 0.8));
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(e[0], e[1]); ctx.closePath();
-      if (d < 0 && ink.lullHatch) { // on a white chart nothing is paler than the water: lighter wind is hatched instead, so it can't read as land
-        ctx.save(); ctx.clip(); ctx.strokeStyle = ink.lull?.(Math.min(0.7, -d * 2.4)) ?? ctx.fillStyle; ctx.lineWidth = 1; ctx.beginPath();
-        const xs = [a[0], b[0], c[0], e[0]], ys = [a[1], b[1], c[1], e[1]], x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-        for (let t = x0 - (y1 - y0); t < x1; t += 7) { ctx.moveTo(t, y1); ctx.lineTo(t + (y1 - y0), y0); }
+      if (ink.lullHatch) {
+        // on a paper chart a flat tint means depth, and nothing is paler than white water: the wind is hatched instead,
+        // blue-grey one way where it blows harder, amber the other way where it's lighter
+        ctx.save(); ctx.clip(); ctx.lineWidth = 1; ctx.beginPath();
+        ctx.strokeStyle = d > 0 ? ink.puff?.(Math.min(0.55, d * 1.6)) ?? ctx.fillStyle : ink.lull?.(Math.min(0.7, -d * 2.4)) ?? ctx.fillStyle;
+        const xs = [a[0], b[0], c[0], e[0]], ys = [a[1], b[1], c[1], e[1]], x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), sg = d > 0 ? -1 : 1;
+        for (let t = x0 - (y1 - y0); t < x1 + (y1 - y0); t += 7) { ctx.moveTo(t, sg > 0 ? y1 : y0); ctx.lineTo(t + (y1 - y0), sg > 0 ? y0 : y1); }
         ctx.stroke(); ctx.restore();
       } else ctx.fill();
     }
