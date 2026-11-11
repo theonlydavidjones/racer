@@ -295,7 +295,7 @@ export class SceneView {
     this.harbor = new Harbor(scene); // West Harbor: docks, breakwaters, boats in their slips
     addWharf(scene); // Fisherman's Wharf and Pier 39: the open piers, breakwaters and the marina's docks
     this.wildlife = new Wildlife(scene, p => landAt(p) === false);
-    if (import.meta.env.DEV) Object.assign(window, { __wild: this.wildlife }); // for the scenery check (scripts/check/scenery.cjs)
+    if (import.meta.env.DEV) Object.assign(window, { __wild: this.wildlife, __renderer: renderer }); // for the scenery check (scripts/check/scenery.cjs)
     this.vesselView = new VesselView(scene);
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
