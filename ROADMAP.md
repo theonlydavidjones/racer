@@ -72,7 +72,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   its batch): owner, "double-clicking to lash the tiller doesn't work. if I double click while the tiller is selected,
   the first click registers as a release, and the second as a lash. that means the tiller always gets lashed
   amidships." Lash at the angle she held before the first click, or hold the release until the double-click window has
-  passed (app.ts tiller handling).
+  passed (app.ts tiller handling). Owner, after: "maybe two-finger click? look into how games tend to solve something like
+  this." Plan: lash on right-click or two-finger click (the browser's context menu suppressed over the water), which
+  can't be mistaken for the release click; keep I as the key; keep double-click working by lashing at the angle from
+  the first press; say so in the tiller hint.
 - **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
   right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
   (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
