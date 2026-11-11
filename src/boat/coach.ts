@@ -2,7 +2,10 @@ import type { Boat } from './boat';
 import { IDEAL_HELM, heelFactor, rudderDrag } from './balance';
 import { CAR_FORE_PINS, CAR_IN_PINS, loadedCar, shapeEfficiency, targetShape, type Shape } from './controls';
 import { hullResistance } from './dynamics';
-import { sailPlan } from './physics';
+import { byHand, leeDrift, sailPlan } from './physics';
+
+/** Whether you're working the shape lines (any of them): otherwise the coach explains the crew's settings. */
+const shapeMine = (b: Boat) => (['backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'traveller', 'car'] as const).some(k => byHand(b, k));
 import { SAILS } from './trim';
 
 /**
@@ -53,16 +56,17 @@ function shapeAdvice(sail: 'main' | 'jib', s: Shape, t: Shape, mineToFix: boolea
  * lost costs about half that fraction of speed.
  */
 export function actions(b: Boat): CoachAction[] {
-  const out: CoachAction[] = [], you = b.manualTrim, all = b.trimAll && you, tws = b.ww.kt, awa = b.awa, upwind = b.twa < 70;
+  const out: CoachAction[] = [], all = shapeMine(b), tws = b.ww.kt, awa = b.awa, upwind = b.twa < 70;
   const who = (mine: boolean): 'you' | 'crew' => (mine ? 'you' : 'crew');
   if (b.luff) return [{ text: 'Sails eased right out (luffing): trim in to go', gain: 0.5, who: 'you' }];
+  if ((b.jibBacked ?? 0) > 0.3) return [{ text: 'Jib aback: ease the windward jib sheet (or tap its Auto) to sail again', gain: 0.5, who: 'you' }];
   // steering: both sails luffing upwind means pinching
   const tm = b.trim.main, tj = b.trim.jib;
   if (upwind && tm.flow === 'luffing' && (!tj || tj.flow === 'luffing')) out.push({ text: `Bear away ~${Math.round(Math.max(3, -tm.err - 1))}°: both sails luffing`, gain: 0.5 * (1 - (SAILS.main.share * tm.eff + SAILS.jib.share * (tj?.eff ?? 1))), who: 'you' });
   else for (const [name, t] of [['Main', tm], ['Jib', tj]] as const) {
     if (!t || Math.abs(awa) > 115 || t.flow === 'good') continue;
     const share = name === 'Main' ? SAILS.main.share : SAILS.jib.share, gain = 0.5 * share * (1 - t.eff);
-    out.push({ text: t.flow === 'luffing' ? `${name}: trim in ~${Math.round(-t.err - 1)}°` : `${name}: ease ~${Math.round(t.err - 2)}°`, gain, who: who(you) });
+    out.push({ text: t.flow === 'luffing' ? `${name}: trim in ~${Math.round(-t.err - 1)}°` : `${name}: ease ~${Math.round(t.err - 2)}°`, gain, who: who(byHand(b, name === 'Main' ? 'mainsheet' : 'jibsheet')) });
   }
   // shape, one dimension at a time: what fixing it is worth
   const shapeItems = (sail: 'main' | 'jib', sh: Shape | null, share: number) => {
@@ -86,16 +90,17 @@ export function actions(b: Boat): CoachAction[] {
 }
 
 export function coach(b: Boat): CoachReport {
-  const items: CoachItem[] = [], you = b.manualTrim, all = b.trimAll && you, tws = b.ww.kt, awa = b.awa, upwind = b.twa < 70;
+  const items: CoachItem[] = [], you = byHand(b, 'mainsheet') || byHand(b, 'jibsheet'), all = shapeMine(b), tws = b.ww.kt, awa = b.awa, upwind = b.twa < 70;
   const R = regime(tws, awa), plan = sailPlan(b);
   const who = (mine: boolean) => (mine ? 'You' : 'The crew');
   items.push({ head: `Conditions: ${R.name}`, text: `${Math.round(tws)} kt over the water, apparent wind ${Math.round(Math.abs(awa))}° ${awa >= 0 ? 'to starboard' : 'to port'}, ${Math.round(b.aws / 0.5144)} kt across the deck. ${R.why}`, ok: true });
 
+  if ((b.jibBacked ?? 0) > 0.3) items.push({ head: 'Jib aback (hove to)', text: `The windward sheet holds the jib's clew ${deg(-b.sheets.jib)} to windward, so the wind presses on its wrong side: it pushes the bow away from the wind and shoves her to leeward. Ease the main until it just draws and lash the tiller to leeward (Lash), and the main and rudder turn her back up as fast as the jib pushes her off: she lies hove to about 50–60° off the wind, creeping forward at around a knot (more as the breeze builds) and slipping to leeward at about as much. Right now: ${deg(b.twa)} off the wind, ${(b.v / 0.5144).toFixed(1)} kt ahead, ${(leeDrift(b) / 0.5144).toFixed(1)} kt to leeward. To sail again, let the windward sheet go and trim the leeward one.`, ok: true });
   // sheets: angle of attack
   for (const [name, t, sheet] of [['main', b.trim.main, b.sheets.main], ['jib', b.trim.jib, b.sheets.jib]] as const) {
     if (!t) { items.push({ head: 'Jib', text: plan === 'wing' ? 'Poled out to windward, wing-on-wing: no telltales to read; keep it full and steady.' : 'The jib is down while the crew works the pole.', ok: true }); continue; }
     const aoa = Math.abs(awa) - sheet, best = SAILS[name].aoa, cap = name === 'main' ? 'Main' : 'Jib';
-    const mine = you;
+    const mine = byHand(b, name === 'main' ? 'mainsheet' : 'jibsheet');
     let text = `${cap} sheeted at ${deg(sheet)} off the centreline: angle of attack ${deg(aoa)} (best about ${deg(best)}). `;
     if (b.luff) text += 'Eased right out to slow down: no drive.';
     else if (Math.abs(awa) > 115) text += `Downwind: ${mine ? 'ease until the leech just stays steady and the boom is near the shroud.' : 'the crew has it eased right out, presenting as much sail as they can to the wind.'}`;

@@ -10,8 +10,15 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 1. ~~Saves kept with your account; save or discard after each sail~~ (done, v53).
 2. **Hands-on boat handling**, in order:
-   a. Easier sail controls: adjusting one line takes only that line off auto; one tap puts it back; bigger targets (4–6 h).
-   b. Heaving to: each jib sheet on its own, the tiller lashed at an angle, hove-to physics checked against real boats (4–6 h).
+   a. ~~Easier sail controls: adjusting one line takes only that line off auto; one tap puts it back; bigger targets~~ (done).
+   b. ~~Heaving to: each jib sheet on its own, the tiller lashed at an angle, hove-to physics checked against real boats~~
+      (done; the real-boat figures are anecdotal, so a GPS track of a Folkboat hove to would tighten the test bands).
+      Later, from review: the hull's lift and broadside drag both act at one centre of lateral resistance (no Munk
+      moment), and the hove-to model's lateral area, added masses and side windage are estimates (physics.ts HOVE).
+      The force model's drive calibration (physics.ts driveCalibration) comes from full, unreefed sails at their best
+      shape, so in a gale (k ≈ 0.2 at 35 kt) it stands in for the reefing and depowering it leaves out; from rest a
+      backed-jib boat there gathers way quickly (5 kt in about 10 s). Holding the traveller down doesn't depower her: the
+      crew sheets in to keep the boom angle it wants, so with the traveller yours the mainsheet should follow your intent.
    c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself (6–10 h).
    d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).

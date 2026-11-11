@@ -7,6 +7,9 @@ import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
 import type { Controls, CrewSettings, Shape } from './controls';
 
+/** A line you can work: every control, plus the lazy jib car's pins. */
+export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
+
 export type Tack = 'S' | 'P';
 
 export interface AiState {
@@ -94,8 +97,26 @@ export interface Boat {
   aws: number; // apparent wind speed, m/s
   // sail trim: sheet angles (deg from centreline), who trims, and how each sail is drawing
   sheets: { main: number; jib: number };
-  manualTrim: boolean; // you trim the sheets (otherwise the crew does)
-  trimAll: boolean; // you also work every other control (otherwise the crew does)
+  manualTrim: boolean; // you trim the sheets (otherwise the crew does): the starting state, until you touch a line (`hand`)
+  trimAll: boolean; // you also work every other control (otherwise the crew does): likewise
+  /**
+   * Who has each line, once you've touched it (true: you; false: back with the crew). Adjusting a line takes only that
+   * line off the crew; one tap gives it back. Lines not listed follow `manualTrim` (sheets) and `trimAll` (the rest).
+   * The windward jib sheet is only ever yours once you've worked it.
+   */
+  hand?: Partial<Record<LineKey, boolean>>;
+  /** The tiller lashed at this position (−1..1, as `tiller`): it stays there, hands off, until you take it again. */
+  lashed?: number | null;
+  /** Sideways speed through the water, m/s, + to starboard: slipping to leeward when hove to (physics.ts heaveTo). In the boat's own frame, so it doesn't flip when the wind crosses the bow. */
+  sway?: number;
+  /** Turn rate, deg/s, + turning to starboard (clockwise): kept every step, so a turn carries on across a change of model. */
+  yawRate?: number;
+  /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
+  wHauled?: boolean;
+  /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
+  hove?: boolean;
+  /** How far the jib is backed (aback): 0 drawing normally … 1 clew held well to windward. */
+  jibBacked?: number;
   /** Every line on the boat (see controls.ts), and what you're doing on each: +1 raises the value (eases a sheet; tightens the vang, outhaul, backstay…), −1 lowers it. */
   ctl: Controls;
   ctlCmd: Partial<Record<Exclude<keyof Controls, 'car'>, number>>;
@@ -105,6 +126,8 @@ export interface Boat {
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
   crewPlan?: CrewSettings | null; crewPlanT?: number;
+  /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
+  crewFixed?: string;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
   depower?: number;
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease

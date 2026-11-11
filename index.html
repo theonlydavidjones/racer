@@ -42,9 +42,12 @@
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
   <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
-    <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button></div>
+    <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button>
+    <button class="tp-auto" id="bMainAuto" type="button" hidden title="You have the mainsheet: tap to give it back to the crew">Auto</button></div>
   <div class="tp-row" id="tpJibRow"><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span>
-    <button class="tp-btn" id="bJibIn" type="button" aria-label="Trim the jib in">Trim</button><button class="tp-btn" id="bJibOut" type="button" aria-label="Ease the jib">Ease</button></div>
+    <button class="tp-btn" id="bJibIn" type="button" aria-label="Trim the jib in">Trim</button><button class="tp-btn" id="bJibOut" type="button" aria-label="Ease the jib">Ease</button>
+    <button class="tp-btn tp-back" id="bJibBack" type="button">Back</button>
+    <button class="tp-auto" id="bJibAuto" type="button" hidden title="You have the jib sheet: tap to give it back to the crew">Auto</button></div>
   <div class="tp-row" id="tpPoleRow"><span class="tp-lab">Pole</span><span class="tp-state" id="tpPole"></span>
     <button class="tp-btn tp-pole" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button></div>
   <div class="tp-hint" id="tpHint"></div>
@@ -77,6 +80,7 @@
       <div class="tiller-track"></div><div class="tiller-mid"></div><div class="tiller-handle" id="tillerHandle"></div>
       <span class="tiller-lab" id="tillerLab">Tiller · centred</span>
     </div>
+    <span class="lashgrp"><button class="chip" id="bLashP" type="button" hidden title="Move the lashing: tiller further to port" aria-label="Lashed tiller: further to port">◀</button><button class="chip lash" id="bLash" type="button" aria-pressed="false" title="Lash the tiller where it is (I): hands off, as when heaving to">Lash tiller</button><button class="chip" id="bLashS" type="button" hidden title="Move the lashing: tiller further to starboard" aria-label="Lashed tiller: further to starboard">▶</button></span>
     <div class="pilot" id="pilot" hidden role="group" aria-label="Tiller pilot">
       <span class="pl-lab">Pilot</span>
       <button class="tp-btn" type="button" data-pm="auto" title="Hold a compass course">Auto</button>

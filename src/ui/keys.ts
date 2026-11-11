@@ -1,6 +1,6 @@
 /** Keyboard bindings: every action, its keys, and saving your changes in this browser. */
 export type Action =
-  | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'luff'
+  | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
   | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
@@ -15,6 +15,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'steerPort', label: 'Turn to port (push the tiller to starboard)', group: 'Helm' },
   { id: 'steerStbd', label: 'Turn to starboard (push the tiller to port)', group: 'Helm' },
   { id: 'centreTiller', label: 'Centre the tiller', group: 'Helm' },
+  { id: 'lashTiller', label: 'Lash the tiller where it is (heaving to) / unlash', group: 'Helm' },
   { id: 'luff', label: 'Luff (ease both sails, hold)', group: 'Sails' },
   { id: 'mainIn', label: 'Trim the main in', group: 'Sails' },
   { id: 'mainOut', label: 'Ease the main', group: 'Sails' },
@@ -50,7 +51,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 ];
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
-  takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'],
+  takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
   luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], pushOff: ['g'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'],

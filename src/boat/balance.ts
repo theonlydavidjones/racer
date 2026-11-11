@@ -33,13 +33,13 @@ const DISP = orc.boat.displacementSailing, GM = 0.92;
 /** Three crew hiking: their weight (kg) and how far to windward of the centreline they can sit (m). */
 const CREW = { kg: 240, reach: 1.05 };
 /** Centre of effort height above the centre of lateral resistance (m), at moderate twist. */
-const CE_HEIGHT = 4.3;
+export const CE_HEIGHT = 4.3;
 /** Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force. */
-const LEVER = { main: -0.62, jib: 1.55 };
+export const LEVER = { main: -0.62, jib: 1.55 };
 /** Chord of each sail at its centre of effort (m). */
 const CHORD = { main: 2.4, jib: 2.0 };
 /** Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m). */
-const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
+export const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
 /** Full helm (deg of rudder) for the sim's fastest turn. */
 export const FULL_RUDDER = 30;
 /** Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. */
@@ -110,6 +110,17 @@ export function equilibriumHeel(heelForce: number, twist: number): number {
  * centreline (deg); `v` boat speed (m/s).
  */
 export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, v: number, twist: number): number {
+  const m = sailYaw(f, heelDeg, boomOut, twist);
+  // (below ~3.5 kt the hull's grip falls away as fast as the rudder's, so the balance doesn't run away at low speed)
+  const qw = 0.5 * RHO_W * Math.max(1.8, v) ** 2;
+  return clamp(m / (qw * RUDDER.area * RUDDER.slope * RUDDER.arm) / D2R, -25, 25);
+}
+
+/**
+ * The sails' turning moment about the keel (N·m, + toward the wind): side forces ahead of and behind the centre of
+ * lateral resistance, and the drive pushed out to leeward by heel and by an eased boom.
+ */
+export function sailYaw(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, twist: number): number {
   const h = Math.abs(heelDeg) * D2R, ce = CE_HEIGHT - 0.03 * (twist - 8);
   // side forces about the keel: the main aft (+ toward the wind), the jib forward (− away)
   // (a stretched old sail's draft sits further aft, and its force with it, by a share of the chord at the centre of effort)
@@ -117,9 +128,7 @@ export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: numb
   // drive pushed out to leeward by heel, and by the boom eased out: both turn her toward the wind
   m += (f.main.drive + f.jib.drive) * ce * 0.55 * Math.sin(h);
   m += Math.max(0, f.main.drive) * 1.6 * Math.sin(Math.abs(boomOut) * D2R) * 0.5;
-  // (below ~3.5 kt the hull's grip falls away as fast as the rudder's, so the balance doesn't run away at low speed)
-  const qw = 0.5 * RHO_W * Math.max(1.8, v) ** 2;
-  return clamp(m / (qw * RUDDER.area * RUDDER.slope * RUDDER.arm) / D2R, -25, 25);
+  return m;
 }
 
 /** Drag (N) from the rudder held at `weather` deg of weather helm (negative: lee helm), at speed v. A little weather helm is free. */
