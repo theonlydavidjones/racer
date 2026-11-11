@@ -431,6 +431,7 @@ function boxSegDist(bx0: number, by0: number, bx1: number, by1: number, a: Vec, 
   return Math.min(toBox(a.x, a.y), toBox(b.x, b.y), corner(bx0, by0), corner(bx1, by0), corner(bx0, by1), corner(bx1, by1));
 }
 function nearCell(ci: number, cj: number): Int32Array | null {
+  if (Math.abs(ci) >= 32768 || Math.abs(cj) >= 32768) return null; // (over 800 km off: beyond the keys, the ring search)
   const key = (ci + 32768) * 65536 + (cj + 32768);
   let list = nearCells.get(key) ?? 0;
   if (typeof list !== 'number') return list;
