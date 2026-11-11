@@ -95,6 +95,15 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
   in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
   the shove from her real mass and low-speed drag, not a set distance.
+- **Next — outside the Gate, the sea dial disagrees with the water and the chart** (bug; 2–3 h; owner: "not for now"):
+  sailing on auto just west of the Golden Gate Bridge (37°48.48'N 122°30.23'W), the dial showed "FLOOD 0.4" and
+  "9 FT SWELL"; owner, "water definitely does not show 9 foot swell, and the chart shows that it's an ebb?"
+  (1) Flood or ebb: the dial calls it by the nearest NOAA station's flood direction (ui/hud.ts: the current dotted with
+  that station's flood bearing), while the chart's current layer draws the current field itself; find which is wrong
+  out there (a station inside the Gate with a different flood bearing, an eddy, or the layer's arrows), and make the
+  dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
+  offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
+  outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
