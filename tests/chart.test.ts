@@ -80,6 +80,6 @@ describe('the chart against the sim', () => {
     const worst = [...where].sort((a, b) => (b[1].s + b[1].e) - (a[1].s + a[1].e)).slice(0, 8)
       .map(([k, c]) => `${k}: ${Math.round(c.s * step * step / 1e3)}k m² sim-only land, ${Math.round(c.e * step * step / 1e3)}k m² chart-only land`);
     console.log(`coastline: ${(100 * (simOnly + encOnly) / n).toFixed(2)}% of ${n} samples disagree (sim-only land ${simOnly}, chart-only land ${encOnly})\n  ` + worst.join('\n  '));
-    expect((simOnly + encOnly) / n).toBeLessThan(0.03);
+    expect((simOnly + encOnly) / n).toBeLessThan(0.015);
   });
 });

@@ -1,5 +1,5 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { shoreDist } from '../geo/shore';
+import { shoreDist, wharfDist, wharfShelter } from '../geo/shore';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -19,8 +19,15 @@ export function currentVector(c: CurrentPreset): Vec {
   return { x: v.x * c.kt * KT, y: v.y * c.kt * KT };
 }
 
-/** Current relief near the shore: 25% of the open-water current at the beach, full strength 350 m out. */
-export const shoreRelief = (p: Vec): number => clamp(0.25 + 0.75 * shoreDist(p) / 350, 0.25, 1);
+/**
+ * Current relief near the shore: 25% of the open-water current at the beach, full strength 350 m out. In water the
+ * Wharf's piers and breakwaters enclose (Aquatic Park, inside Municipal Pier and the Wharf's breakwater; the Pier 39
+ * marina) they count as shore too; off a pier head, where the stream runs past, they don't.
+ */
+export const shoreRelief = (p: Vec): number => {
+  const k = clamp(0.25 + 0.75 * shoreDist(p) / 350, 0.25, 1), w = wharfShelter(p);
+  return w > 0 ? Math.min(k, 1 - w * (1 - clamp(0.25 + 0.75 * wharfDist(p, 350) / 350, 0.25, 1))) : k;
+};
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec): Vec {
