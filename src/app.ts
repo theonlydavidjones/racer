@@ -461,7 +461,14 @@ function stepCrew(part: 'across' | 'fore', d: number): void {
 }
 const showCrewPlace = () => showCrewRow(w.user);
 document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => bt.onclick = () => setPlace('across', bt.dataset.ca as PlaceAcross));
-document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.onclick = () => setPlace('fore', bt.dataset.cf as PlaceFore));
+// (fore and aft there's no middle button, two "Mid"s in one row read as one: tap the lit one again to leave fore and aft
+// to the crew; an across choice stays yours)
+document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.onclick = () => {
+  const c = w.user.crew, pl = c?.place;
+  if (!c || !pl || pl.fore !== bt.dataset.cf) { setPlace('fore', bt.dataset.cf as PlaceFore); return; }
+  pl.fore = null; if (pl.across == null) c.place = undefined;
+  showCrewPlace(); toast(c.place ? 'Fore and aft back to the crew; where they sit across stays yours.' : 'Crew back on auto: they place their own weight again.', 2500);
+});
 $('bCrewAuto').onclick = () => {
   const c = w.user.crew; if (!c) return;
   if (!c.place) { toast('The crew are on auto, placing their own weight (the outline shows where). Tap a place to put them there yourself.', 3500); return; }
