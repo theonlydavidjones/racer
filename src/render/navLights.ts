@@ -185,10 +185,11 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
     for (const [c, arc] of [[GREEN, ARC.stbd], [RED, ARC.port], [WHITE, ARC.stern]] as const) lamp(at.masthead.clone().add(new THREE.Vector3(0, 0.01, 0)), c, arc, 2);
   }
   // at anchor or on a mooring: one all-round white light where it can best be seen (Rule 30(b), a vessel under 50 m;
-  // Inland Rule 30 reads alike), seen 2 nm (Rule 22(c), under 12 m): a small all-round lantern at the masthead, above
-  // the tricolour where she has one
+  // Inland Rule 30 reads alike), seen 2 nm (Rule 22(c), under 12 m): a small all-round lantern at the masthead. (In a
+  // special anchorage such as Richardson Bay, Inland Rule 30(g) excuses a boat under 20 m from it; showing it is allowed.)
   role = 'anchor';
-  { const a = new THREE.Group(), ap = at.masthead.clone().add(new THREE.Vector3(0, kind === 'tricolour' ? 0.09 : 0, 0)); a.position.copy(ap); fittings.anchor.add(a);
+  // (on a short bracket aft of the masthead, clear of the windex's post and arrow and of the tricolour)
+  { const a = new THREE.Group(), ap = at.masthead.clone().add(new THREE.Vector3(0, -0.03, 0.1)); a.position.copy(ap); fittings.anchor.add(a);
     a.add(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.03, 10), housing));
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.04, 10), lens(WHITE)); ring.position.y = 0.035; a.add(ring);
     lamp(ap.clone().add(new THREE.Vector3(0, 0.035, 0)), WHITE, null, 2); }
@@ -196,13 +197,20 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
 }
 
 /**
- * Each frame: which set is lit, by what she's doing (`mode`) and the clock (sunset to sunrise, Rule 20(b)), and the
+ * Restricted visibility (the conditions set to fog, or heavy rain): the lights are shown by day too (Rule 20(c)).
+ * The summer fog bank at the Gate, which comes and goes by place, isn't counted.
+ */
+let restricted = false;
+export function setRestrictedVisibility(on: boolean): void { restricted = on; }
+
+/**
+ * Each frame: which set is lit, by what she's doing (`mode`), the clock (sunset to sunrise, Rule 20(b)) and the visibility (Rule 20(c)), and the
  * reflections' spread from the sea. In her slip or made fast to a dock she shows none (the Rules light vessels under
  * way or at anchor, not ones made fast to the shore), under way the sidelights and sternlight or the tricolour
  * (Rule 25), at anchor the all-round white (Rule 30). The lanterns not lit aren't drawn.
  */
 export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): void {
-  const dark = ON() > 0, lit = (r: Role) => dark && mode === r;
+  const dark = ON() > 0 || restricted, lit = (r: Role) => dark && mode === r;
   // (and only while they're lit, by the owner's wish: a real boat's lanterns stay on her by day; to draw them so, show
   // the set for `mode` whatever the clock)
   nl.fittings.underway.visible = lit('underway'); nl.fittings.anchor.visible = lit('anchor');

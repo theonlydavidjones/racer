@@ -39,6 +39,12 @@ describe('the lights in use (Rules 25 and 30)', async () => {
   const { NIGHT } = await import('../src/render/night');
   const build = (kind: 'deck' | 'tricolour') => buildNavLights(new THREE.Group(), { stem: new THREE.Vector3(0, 1, -3.8), stern: new THREE.Vector3(0, 0.6, 3.8), masthead: new THREE.Vector3(0, 10, -1) }, kind, new THREE.MeshPhongMaterial());
   const shown = (nl: ReturnType<typeof build>) => nl.lamps.filter(l => l.glow.visible).map(l => `${l.role}:${l.arc ? 'arc' : 'round'}`).sort();
+  it('shows them by day in restricted visibility (Rule 20(c))', async () => {
+    const { setRestrictedVisibility } = await import('../src/render/navLights');
+    const nl = build('deck'); NIGHT.uOn.value = 0;
+    setRestrictedVisibility(true); syncNavLights(nl, 'underway'); expect(shown(nl).length).toBe(3);
+    setRestrictedVisibility(false); syncNavLights(nl, 'underway'); expect(shown(nl).length).toBe(0);
+  });
   for (const kind of ['deck', 'tricolour'] as const) it(`${kind}: none in the slip or switched off, the arcs under way, one all-round white at anchor; lanterns only while lit`, () => {
     const nl = build(kind);
     NIGHT.uOn.value = 1;
