@@ -288,6 +288,17 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
 3. ~~**Landmarks you steer and sight by:**~~ (done, with transits for the start line and laylines) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. ~~**Marks and the committee boat:**~~ (done; no general recall yet) real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
+4a. **The Ferry Building, drawn properly** (owner, November 2026: "a more complete drawing of the ferry building, with
+   Port of San Francisco sign… Not urgent"; later; accuracy/polish; 4–6 h). Today (render/landscape.ts) it's a
+   30 × 200 × 15 m cream box with a 60 m tower, a pyramid roof and four lit 6.7 m clock dials; no sign, arcade or slips.
+   True to life (Wikipedia, Ferry Building (San Francisco)): A. Page Brown, Beaux-Arts, opened 1898; the clock tower is
+   245 ft (75 m), so ours is 15 m short; the building is about 660 ft (200 m) long with an arched arcade along the
+   whole base; four 22 ft (6.7 m) dials, the inner dial lit at night; ferry slips B–G behind it on the Bay side (B to
+   the north, C–D the Golden Gate Ferry terminal at the centre, E–G south); the plaza in front. The **PORT OF SAN
+   FRANCISCO** sign has been on the Bay side since 1951, replacing "Welcome to San Francisco" (OpenSFHistory photo
+   wnp25.2344). Still to find: its letter style and colour, exact position, and whether it's lit at night (the Port's
+   sign guidelines, sfport.com, have a Ferry Building section: that host needs allowing), the building's width and
+   roof height, and its OSM footprint.
 5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
 6. ~~**Moored boats**~~ (done: the anchorages; marinas need the real shoreline) **and marina life** in the harbour behind the line; traffic (see below).
 
