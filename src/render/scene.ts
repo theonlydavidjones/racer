@@ -211,7 +211,7 @@ export class SceneView {
   private landMonth = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off
+    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, stencil: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off; the boats mark the stencil (navLights.ts)
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;

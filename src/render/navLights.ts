@@ -29,6 +29,13 @@ import { NIGHT } from './night';
  * light toward the viewer, long when the light and the eye are low, wider with the wind.
  */
 
+/** The stencil value a boat's surfaces leave where they're drawn, so the lights' reflections on the water stay off her. */
+const BOAT_STENCIL = 1;
+export function markBoat(m: THREE.Material): void {
+  m.stencilWrite = true; m.stencilRef = BOAT_STENCIL; m.stencilFunc = THREE.AlwaysStencilFunc;
+  m.stencilFail = THREE.KeepStencilOp; m.stencilZFail = THREE.KeepStencilOp; m.stencilZPass = THREE.ReplaceStencilOp;
+}
+
 /** How dark it is, whether lights are on (sunset to sunrise) and the sea's slope: shared with the city's lights (night.ts). */
 const DARK = () => NIGHT.uNight.value, ON = () => NIGHT.uOn.value;
 
@@ -57,7 +64,7 @@ export function arcIntensity(arc: Arc | null, b: number): number {
 export const overThreshold = (range: number, d: number) => { const D = Math.max(0.005, d / NM); return (range / D) ** 2 * Math.pow(0.8, D - range); };
 
 interface Lamp { pos: THREE.Vector3; color: THREE.Color; arc: Arc | null; range: number; glow: THREE.Sprite; streak: THREE.Mesh; seen: number }
-export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: THREE.MeshPhongMaterial[]; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial }
+export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: THREE.MeshPhongMaterial[]; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial; below?: THREE.MeshLambertMaterial }
 
 /** Colours of the lights as the eye sees them (inside Annex I §7's chromaticity areas: a deep red, a blue-green, a warm white). */
 const RED = new THREE.Color(1.0, 0.13, 0.08), GREEN = new THREE.Color(0.1, 1.0, 0.55), WHITE = new THREE.Color(1.0, 0.93, 0.8);
@@ -105,9 +112,10 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
   const lamp = (pos: THREE.Vector3, color: THREE.Color, arc: Arc | null, range: number) => {
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, sizeAttenuation: false, fog: false }));
     glow.visible = false; glow.renderOrder = 5; glow.frustumCulled = false;
-    const streak = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: streakTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, side: THREE.DoubleSide }));
-    // (drawn over the sea, whose waves would hide a quad at its mean level; it lies between the light and the eye, so
-    // nothing of hers stands in front of it)
+    const streak = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: streakTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, side: THREE.DoubleSide,
+      stencilWrite: true, stencilRef: BOAT_STENCIL, stencilFunc: THREE.NotEqualStencilFunc, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.KeepStencilOp }));
+    // (drawn over the sea, whose waves would hide a quad at its mean level, but not over a boat: the water under her
+    // hull, her cockpit and her deck is out of sight, so where a boat has marked the stencil the streak isn't drawn)
     streak.visible = false; streak.matrixAutoUpdate = false; streak.matrixWorldAutoUpdate = false; streak.renderOrder = 10; streak.frustumCulled = false;
     const L: Lamp = { pos, color, arc, range, glow, streak, seen: 0 };
     // what the eye sees of the light, worked out for each camera as it draws: the arc, the range, how dark it is
@@ -181,4 +189,6 @@ export function syncNavLights(nl: NavLights, motoring = false): void {
   for (const m of nl.lenses) m.emissiveIntensity = on ? 1.6 : 0;
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
   nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * DARK() : 0;
+  // and below, seen through the open companionway: the cabin's lamplight on its own woodwork
+  if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.45 * DARK() : 0; }
 }

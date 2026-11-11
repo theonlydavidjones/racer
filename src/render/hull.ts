@@ -246,6 +246,14 @@ export const SIDE_DECK = 0.30;
 export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
 export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
 export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: 0.24 };
+/**
+ * The companionway in the after end of the cabin, drawn open (as she's sailed): the sliding hatch 550 mm wide and
+ * 460 mm long, from the after bulkhead forward (the construction plan's deck plan, "sliding hatch"), slid forward over
+ * the cabin top; the doors (carried while racing, CR 3.18) stowed below. The sill's height isn't on the plan: about
+ * 250 mm over the cockpit sole is estimated, enough to keep a sea in the cockpit out of the cabin. Headroom inside is
+ * 1230 mm from the cabin floor (CR 3.14, at least, at St. 8).
+ */
+export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.25, headroom: 1.23 };
 /** The coaming's thickness (m): the cockpit opening is its inside face. */
 export const COAMING_T = 0.025;
 /** Cockpit half-width: inside the coaming, which follows the side line, narrowing aft with the hull. */
@@ -309,16 +317,29 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   }
   for (let i = 0; i < ring.length - 1; i++) { const a = i * 2; sIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3)); sg.setIndex(sIdx); sg.computeVertexNormals();
-  const top: number[] = [], tIdx: number[] = [], NX = 8;
-  for (let i = 0; i <= N; i++) {
-    const u = outline[i].u, w = outline[i].x - CABIN_LEAN;
-    for (let j = 0; j <= NX; j++) { const x = -w + 2 * w * j / NX; top.push(x, cabinTopAt(u, x), zAt(u)); }
+  // the top, open over the companionway aft of where the sliding hatch's opening begins (its edges are grid lines)
+  const top: number[] = [], tIdx: number[] = [], NX = 8, hw = COMPANIONWAY.hw, uSlot = CABIN.u1 - COMPANIONWAY.len / L;
+  const rows = [...outline.map(o => o.u), uSlot].sort((a, b) => a - b), NC = NX + 2;
+  for (const u of rows) {
+    const w = cabinHalf(u) - CABIN_LEAN, h = Math.min(hw, w * 0.99);
+    const xs = [...Array.from({ length: NX + 1 }, (_, j) => -w + 2 * w * j / NX), -h, h].sort((a, b) => a - b);
+    for (const x of xs) top.push(x, cabinTopAt(u, x), zAt(u));
   }
-  for (let i = 0; i < N; i++) for (let j = 0; j < NX; j++) { const a = i * (NX + 1) + j, b = a + 1, c = a + NX + 1, d = c + 1; tIdx.push(a, b, c, b, d, c); }
+  for (let i = 0; i < rows.length - 1; i++) for (let j = 0; j < NC; j++) {
+    const a = i * (NC + 1) + j, b = a + 1, c = a + NC + 1, d = c + 1;
+    const xm = (top[3 * a] + top[3 * b]) / 2, um = (rows[i] + rows[i + 1]) / 2;
+    if (um > uSlot && Math.abs(xm) < hw) continue; // the open companionway
+    tIdx.push(a, b, c, b, d, c);
+  }
   const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); tg.setIndex(tIdx); tg.computeVertexNormals();
   // the after end: from the deck up the sides and over the arch of the top, facing aft into the cockpit
   const u1 = CABIN.u1, w1 = cabinHalf(u1), z1 = zAt(u1) + 0.002, rim: THREE.Vector2[] = [new THREE.Vector2(w1, COCKPIT.sole)];
-  for (let j = 0; j <= 16; j++) { const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 16); rim.push(new THREE.Vector2(x, cabinTopAt(u1, x))); }
+  // over the arch, with the companionway's opening cut down from the top to its sill
+  for (let j = 0; j <= 16; j++) {
+    const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 16), xn = (w1 - CABIN_LEAN) * (1 - 2 * (j + 1) / 16);
+    if (Math.abs(x) >= hw) rim.push(new THREE.Vector2(x, cabinTopAt(u1, x)));
+    if (x > hw && xn <= hw) rim.push(new THREE.Vector2(hw, cabinTopAt(u1, hw)), new THREE.Vector2(hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, cabinTopAt(u1, -hw)));
+  }
   rim.push(new THREE.Vector2(-w1, COCKPIT.sole));
   const ap: number[] = []; for (const q of rim) ap.push(q.x, q.y, z1);
   const ag = new THREE.BufferGeometry(); ag.setAttribute('position', new THREE.Float32BufferAttribute(ap, 3));
@@ -451,6 +472,54 @@ export function cockpitLid(): THREE.BufferGeometry {
   for (let i = 0; i <= N; i++) { const u = u0 + (u1 - u0) * i / N, w = cockpitHalf(u) + 0.02, y = deckY(u, w) + 0.01; pos.push(-w, y, zAt(u), w, y, zAt(u)); }
   for (let i = 0; i < N; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3, a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); return g;
+}
+
+/**
+ * Below, seen through the open companionway: the cabin's floor, its sides and its forward end (no after wall or
+ * deckhead: the bulkhead and the cabin top are those), inside the hull's shell, so the water and the shell's inside
+ * aren't what's seen through the opening.
+ */
+export function cabinInterior(): THREE.BufferGeometry[] {
+  // 1.4 m of it, forward from the bulkhead: as far as the eye reaches through the opening, where the cabin is still full width
+  const z1 = zAt(CABIN.u1) - 0.01, z0 = z1 - 1.4, uF = uAtZ(z0), yf = cabinTopY(CABIN.u1) + CABIN.crown - COMPANIONWAY.headroom;
+  // (inside the cabin sides, and inside the hull's shell down at the floor)
+  const hb = Math.min(cabinHalf(uF) - 0.06, cabinHalf(CABIN.u1) - 0.06, hullHalfAt(uF, yf) - 0.03, hullHalfAt(CABIN.u1, yf) - 0.03), V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  const roof = (z: number, x: number) => cabinTopAt(uAtZ(z), x) - 0.01; // just under the cabin top
+  const fwd: THREE.Vector3[] = [V(-hb, yf, z0), V(hb, yf, z0)];
+  for (let j = 0; j <= 8; j++) { const x = hb * (1 - 2 * j / 8); fwd.push(V(x, roof(z0, x), z0)); }
+  const fg = new THREE.BufferGeometry().setFromPoints(fwd); fg.setIndex(THREE.ShapeUtils.triangulateShape(fwd.map(q => new THREE.Vector2(q.x, q.y)), []).flat()); fg.computeVertexNormals();
+  return [
+    quad(V(-hb, yf, z1), V(hb, yf, z1), V(hb, yf, z0), V(-hb, yf, z0)), // the floor
+    fg, // forward
+    quad(V(hb, yf, z1), V(hb, roof(z1, hb), z1), V(hb, roof(z0, hb), z0), V(hb, yf, z0)), // the sides
+    quad(V(-hb, yf, z0), V(-hb, roof(z0, -hb), z0), V(-hb, roof(z1, -hb), z1), V(-hb, yf, z1)),
+  ];
+}
+/** Depth-only covers over the companionway's openings (as cockpitLid): the sea isn't drawn inside her through them. */
+export function companionwayLid(): THREE.BufferGeometry {
+  const { hw, len, sill } = COMPANIONWAY, u1 = CABIN.u1, z1 = zAt(u1) + 0.003, uS = u1 - len / L, V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  // (flat at the crown's height: over the arch's edges they stand at most a couple of cm proud, and draw nothing)
+  const yc = cabinTopAt(u1, 0) + 0.005, zS = zAt(uS);
+  const pts = [V(-hw, sill, z1), V(hw, sill, z1), V(hw, yc, z1), V(-hw, sill, z1), V(hw, yc, z1), V(-hw, yc, z1), // the doorway
+    V(-hw, yc, z1), V(hw, yc, z1), V(hw, yc, zS), V(-hw, yc, z1), V(hw, yc, zS), V(-hw, yc, zS)]; // the hatch's opening
+  return new THREE.BufferGeometry().setFromPoints(pts);
+}
+/** The sliding hatch, slid forward its own length onto its runners: a board arched like the cabin top, with its edges. */
+export function slidingHatch(): THREE.BufferGeometry {
+  const hw = COMPANIONWAY.hw + 0.03, lift = 0.05, uA = CABIN.u1 - COMPANIONWAY.len / L + 0.02 / L, uF = uA - (COMPANIONWAY.len + 0.04) / L;
+  const NXh = 8, pos: number[] = [], idx: number[] = [];
+  const P = (u: number, x: number, dy: number) => pos.push(x, cabinTopAt(u, x) + dy, zAt(u));
+  // the top (rows at the two ends), then a skirt down to the cabin top all round
+  for (const u of [uF, uA]) for (let j = 0; j <= NXh; j++) P(u, -hw + 2 * hw * j / NXh, lift);
+  for (let j = 0; j < NXh; j++) idx.push(j, j + 1, NXh + 1 + j, j + 1, NXh + 2 + j, NXh + 1 + j);
+  const ring: [number, number][] = [];
+  for (let j = 0; j <= NXh; j++) ring.push([uA, -hw + 2 * hw * j / NXh]);
+  for (let j = NXh; j >= 0; j--) ring.push([uF, -hw + 2 * hw * j / NXh]);
+  ring.push(ring[0]);
+  const b0 = pos.length / 3;
+  for (const [u, x] of ring) { P(u, x, lift); P(u, x, 0.005); }
+  for (let i = 0; i < ring.length - 1; i++) { const a = b0 + 2 * i; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
 /** Station u for a z position (m, aft positive). */
