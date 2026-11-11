@@ -139,7 +139,9 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    angle, on top of the polar's own pinch, so 1–2° low cost 1.6–3.5% of VMG at 20 kt (ORC: 0.1–0.3%), teaching "never
    feather". Now they flog as far as they luff (trim.ts), and below the beat by the square of the angle below it (flat
    at the beat, so ORC's optimum stays: 1–2° low costs 0.2–0.6%; ten degrees high still a big loss; she stops in the
-   no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done.
+   no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done. And
+   the crew's deliberate ease of the main on the last depowering steps (up to 7°, half luffing) flogs at no cost, in the
+   speed search and on the water alike: price it in the search, then judge the main where it is.
 2. **No tactical wind shifts on most days.** Off observed days the only shifts are two fixed sine waves (120 s ±6°,
    41 s ±2.5°, unsourced) and a 63 s ±8% pulse: about 1° rms change over 30–60 min, against Fort Point's 13–14° on
    10–15 kt westerlies (6-minute record, 492 days, racing hours) and 26–29° on 6–10 kt days. Beats are drag races; a

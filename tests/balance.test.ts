@@ -5,6 +5,7 @@ import type { Controls } from '../src/boat/controls';
 import type { Boat } from '../src/boat/boat';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 import { netDrive } from '../src/boat/balance';
+import { takeLine } from '../src/boat/physics';
 import { polar } from '../src/boat/polar';
 import { KT } from '../src/core/math';
 
@@ -158,5 +159,17 @@ describe('Sailing a little below the beat angle', () => {
     const at = (twa: number, secs: number) => { const b = testBoat({ heading: 360 - twa, kt: vb / KT, windKt: W }); sail(b, secs, () => { b.h = 360 - twa; }); return b.v; };
     expect(at(30, 150) * Math.cos(30 * Math.PI / 180) / (vb * Math.cos(beat * Math.PI / 180))).toBeLessThan(0.75);
     expect(at(22, 40)).toBeLessThan(0.1); // (from full speed, in 40 s)
+  });
+});
+
+describe('Who holds the sheet', () => {
+  it('taking the mainsheet where the crew had it, in a breeze, changes nothing', () => {
+    const W = 26, twa = beatAngle(W), run = (mine: boolean) => {
+      const b = testBoat({ heading: 360 - twa, kt: 5, windKt: W }); sail(b, 40, () => { b.h = 360 - twa; });
+      if (mine) takeLine(b, 'mainsheet');
+      sail(b, 30, () => { b.h = 360 - twa; });
+      return b.v;
+    };
+    expect(run(true)).toBeCloseTo(run(false), 2);
   });
 });

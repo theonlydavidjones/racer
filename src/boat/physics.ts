@@ -582,8 +582,9 @@ function sailFlog(b: Boat, plan: SailPlan, awa: number): number {
   const luff = (t: { flow: string; amount: number } | null | undefined) => t && t.flow === 'luffing' ? t.amount : 0;
   // (the main against the boom the crew intends: the last depowering steps ease it down the traveller on purpose, and the
   // speed search prices that ease through the sails' own forces, as trimSails counts the sheet, so it isn't flogging
-  // here; a mainsheet you hold is judged where it is)
-  const main = byHand(b, 'mainsheet') ? b.trim.main : sailTrim('main', awa, clamp(b.sheets.main - crewEaseBoom(b), SAILS.main.min, SAILS.main.max));
+  // here; the same for a mainsheet you hold, so taking the sheet where the crew had it changes nothing. Pricing the
+  // flogging in the search too, and judging the main where it is, is for later: ROADMAP, the audit)
+  const main = sailTrim('main', awa, clamp(b.sheets.main - crewEaseBoom(b), SAILS.main.min, SAILS.main.max));
   return SAILS.main.share * luff(main) * (b.rig?.main ?? 1) + (plan === 'jib' ? SAILS.jib.share * luff(b.trim.jib) * (b.rig?.jib ?? 1) : 0);
 }
 
