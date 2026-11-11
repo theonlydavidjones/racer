@@ -33,6 +33,9 @@ function pearson(xs, ys) {
   xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; syy += (ys[i] - my) ** 2; });
   return { r: sxy / Math.sqrt(sxx * syy), slope: sxy / sxx, intercept: my - (sxy / sxx) * mx };
 }
+/** One skipper however the scorer typed the name ("Tricia D Antin", "Tricia Dantin"). */
+const skipperKey = s => s.toLowerCase().replace(/[^a-z]/g, '');
+
 /** Kendall's tau-a between two finishing orders, over the boats that finished both (null under 3 such boats). */
 function kendall(a, b) {
   const pa = new Map(a.map(x => [x.key, x.place])), common = b.filter(x => pa.has(x.key));
@@ -92,7 +95,7 @@ export function analyse(data, real) {
       const w = timed[0].elapsedS;
       r.spread = {
         finishers: timed.length,
-        winnerElapsed: timed[0].elapsedS, winnerSpeedKt: r.distanceNm ? r2(r.distanceNm / (w / 3600)) : null,
+        winnerElapsed: timed[0].elapsedS, winnerSpeedKt: r.distanceNm ? r2(r.distanceNm / (w / 3600)) : null, // over the nominal distance, current included
         gapPct: timed.map(b => r1((b.elapsedS / w - 1) * 100)),
         gapSecPerNm: r.distanceNm ? timed.map(b => Math.round((b.elapsedS - w) / r.distanceNm)) : null,
       };
@@ -136,7 +139,7 @@ export function analyse(data, real) {
       const n = r.fin.length;
       for (const b of r.fin) {
         const k = keyOf(b);
-        if (!m.has(k)) m.set(k, { label: labelOf(b), rel: [], wins: 0, gaps: [] });
+        if (!m.has(k)) m.set(k, { key: k, label: labelOf(b), rel: [], wins: 0, gaps: [] });
         const x = m.get(k);
         x.rel.push((b.place - 1) / (n - 1));
         if (b.place === 1) x.wins++;
@@ -144,17 +147,17 @@ export function analyse(data, real) {
       }
     }
     return [...m.values()].filter(x => x.rel.length >= 4)
-      .map(x => ({ name: x.label, races: x.rel.length, wins: x.wins, meanRelPlace: r2(mean(x.rel)), sdRelPlace: r2(sd(x.rel)), timedRaces: x.gaps.length, meanGapPct: x.gaps.length ? r1(mean(x.gaps)) : null }))
+      .map(x => ({ key: x.key, name: x.label, races: x.rel.length, wins: x.wins, meanRelPlace: r2(mean(x.rel)), sdRelPlace: r2(sd(x.rel)), timedRaces: x.gaps.length, meanGapPct: x.gaps.length ? r1(mean(x.gaps)) : null }))
       .sort((a, b) => a.meanRelPlace - b.meanRelPlace);
   };
   const boats = per(b => b.key, b => `${b.boat} (${b.key})`);
-  const skippers = per(b => b.skipper.toLowerCase(), b => b.skipper);
+  const skippers = per(b => skipperKey(b.skipper), b => b.skipper);
   // How much of the race-to-race scatter in place is the boat/skipper, and how much is the day: the share of the
   // variance in relative place explained by who it is (one-way ANOVA R², boats with 4+ races).
   const share = list => {
     const all = [], groups = new Map();
     for (const r of placed) for (const b of r.fin) {
-      const k = list === 'boat' ? b.key : b.skipper.toLowerCase();
+      const k = list === 'boat' ? b.key : skipperKey(b.skipper);
       const v = (b.place - 1) / (r.fin.length - 1);
       all.push([k, v]);
       groups.set(k, [...(groups.get(k) ?? []), v]);
@@ -178,9 +181,29 @@ export function analyse(data, real) {
   const fit = windPts.length >= 3 ? pearson(windPts.map(p => p.windKt), windPts.map(p => p.lastPct)) : null;
   const spdPts = windPts.filter(p => p.winnerSpeedKt != null);
   const fitSpeed = spdPts.length >= 3 ? pearson(spdPts.map(p => p.windKt), spdPts.map(p => p.winnerSpeedKt)) : null;
+  // How far each race's order strays from the fleet's usual order (boats ranked by mean relative place over all
+  // races), by the observed wind: light, shifty days should scramble the order more.
+  const usual = new Map(boats.map((b, i) => [b.key, i]));
+  const bands = [{ label: 'under 8 kt', lo: 0, hi: 8 }, { label: '8–14 kt', lo: 8, hi: 14 }, { label: '14 kt and over', lo: 14, hi: 99 }];
+  const orderByWind = bands.map(band => {
+    const taus = [];
+    for (const r of placed) {
+      const w = r.realDay?.fortPoint?.meanKt;
+      if (w == null || w < band.lo || w >= band.hi) continue;
+      const fin = r.fin.filter(b => usual.has(b.key));
+      if (fin.length < 4) continue;
+      const k = kendall(fin.map(b => ({ key: b.key, place: usual.get(b.key) })), fin);
+      if (k) taus.push(k.tau);
+    }
+    return { wind: band.label, races: taus.length, meanTauWithUsualOrder: r2(mean(taus)), sdTau: r2(sd(taus)) };
+  });
+
   const wind = {
-    note: 'Fort Point (NOAA 9414290) mean wind from the start to the winner\'s finish, against the last finisher\'s gap. ' +
-      'Fort Point reads the Gate; the Cityfront race area is usually a little lighter.',
+    orderByWind,
+    note: 'Fort Point (NOAA 9414290) mean wind over the race (start to the winner\'s finish where timed, else the first hour). ' +
+      'Fort Point reads the Gate; the race areas are usually a little lighter. orderByWind: Kendall\'s tau between each race\'s ' +
+      'order and the fleet\'s usual order (all races with observed wind). races: the timed races, last finisher\'s gap ' +
+      'against wind; winner speed is over the nominal course distance and includes the current, so it is not boat speed.',
     races: windPts,
     lastPctVsWind: fit ? { slopePctPerKt: r2(fit.slope), interceptPct: r1(fit.intercept), r: r2(fit.r) } : null,
     winnerSpeedVsWind: fitSpeed ? { slopeKtPerKt: r2(fitSpeed.slope), interceptKt: r2(fitSpeed.intercept), r: r2(fitSpeed.r) } : null,
@@ -197,6 +220,10 @@ export function analyse(data, real) {
     topToMedianPct: r1(timedBoats[timedBoats.length >> 1].meanGapPct - timedBoats[0].meanGapPct),
     topToBackPct: r1(timedBoats.at(-1).meanGapPct - timedBoats[0].meanGapPct),
   } : null;
+
+  const topByPlace = boats[0] ? { name: boats[0].name, races: boats[0].races, wins: boats[0].wins, meanRelPlace: boats[0].meanRelPlace,
+    note: 'The fleet\'s top boat by place over all races (Regatta Network included); it sailed none of the timed races.' } : null;
+  if (gaps) gaps.topByPlace = topByPlace;
 
   // --- What's covered and what isn't.
   const coverage = {

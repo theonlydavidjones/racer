@@ -34,7 +34,8 @@ const JIBESET_EVENTS = [
   { club: 'GGYC', rg: 'T008047221', name: 'GGYC Manuel Fagundes Seaweed Soup Regatta 2025–26', host: 'Golden Gate Yacht Club' },
   { club: 'GGYC', rg: 'T00227699', name: 'GGYC Manuel Fagundes Seaweed Soup Regatta 2026–27', host: 'Golden Gate Yacht Club' },
 ];
-/** Jibeset regattas known to have had a Folkboat fleet but gated (a person check), so not fetched. */
+/** Earlier Seaweed Soup seasons on Jibeset: behind its person check, so not fetched, and whether they had a Folkboat
+ *  fleet isn't confirmed (press reports mention one in some midwinters). */
 const JIBESET_GATED = [
   { club: 'GGYC', rg: 'T00645992', name: 'GGYC Seaweed Soup 2024–25' },
   { club: 'GGYC', rg: 'T008769423', name: 'GGYC Seaweed Soup 2023' },
@@ -123,9 +124,14 @@ async function fetchJibesetEvent(ev) {
   if (/person check/i.test(fh)) return { ...ev, gated: true };
   const raceDocs = [...new Set([...fh.matchAll(/DOC=r(\d+)&/g)].map(m => +m[1]))].sort((a, b) => a - b);
   const races = [];
-  for (const n of raceDocs) {
+  // A season under way may have no series page yet: then try race 1, 2, … until one isn't there.
+  const tryInTurn = !raceDocs.length;
+  for (let i = 0; tryInTurn ? i < 20 : i < raceDocs.length; i++) {
+    const n = tryInTurn ? i + 1 : raceDocs[i];
     const url = `${JIBESET}/show.php?RR=${ev.club}_${ev.rg}&DOC=r${n}&TYP=html`;
-    const r = parseJibesetRace(await get(url), url);
+    const html = await get(url);
+    if (tryInTurn && !html.trim()) break;
+    const r = parseJibesetRace(html, url);
     if (r) races.push({ raceNo: n, ...r });
   }
   console.log(`Jibeset ${ev.name}: ${races.length} Folkboat races`);
@@ -237,6 +243,10 @@ const out = {
       'are hand-entered, so they are kept but not used for speed. A start of 00:00:00 there means not entered (null here).',
     'place is the finishing place among finishers (null for a scoring code). points are as published.',
     'key is the digits of the sail number, to follow one boat across events (sail numbers are typed differently by each scorer).',
+    'Course numbers are each season\'s own: the 2025–26 Seaweed Soup sheet isn\'t the 2026–27 one in src/courses/data ' +
+      '(2025–26 course 3 is given as 6.1 nm; 2026–27 course 3 is 3.7 nm), so don\'t map them onto those course files.',
+    'Distances are the scorer\'s nominal course lengths, not sailed distances.',
+    'Regatta Network gives every 2023 SYC Classic race the date 2023-06-11 although the event ran June–October; treat those dates as unsure.',
     'Skippers are as published, tidied to one spelling; a boat can have several skippers over the years.',
   ],
   gated,
