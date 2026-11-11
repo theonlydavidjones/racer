@@ -407,25 +407,34 @@ export const shoreDist = (p: Vec): number => shoreNearest(p).d;
  * Exact: the distance to the shore changes by at most the distance moved, so nowhere in the cell is the shore further
  * than U = (its distance from the cell's centre) + (the cell's half-diagonal), and a segment further than U from the
  * whole cell can't be the nearest (nor tie with it) for any point in it. So scanning the cell's list gives the same
- * answer as scanning every segment, for a handful of them (the ring search below finds the centre's distance).
+ * answer as scanning every segment, for a handful of them (the ring search below finds the centre's distance). A cell
+ * gets its list once it's been asked about a few times (a boat crossing it asks hundreds of times): points asked about
+ * here and there (the landscape's, building the city at load) are quicker by the ring search alone.
  */
-const NC = 25, NR = NC * Math.SQRT1_2, nearCells = new Map<number, Int32Array>();
+const NC = 25, NR = NC * Math.SQRT1_2, LIST_AFTER = 8, nearCells = new Map<number, Int32Array | number>();
 const shoreSeen = new Int32Array(SHORE.length); let shoreStamp = 0;
 function boxSegDist(bx0: number, by0: number, bx1: number, by1: number, a: Vec, b: Vec): number {
   // (0 if the segment enters the box: clipped to it, Liang–Barsky)
   const dx = b.x - a.x, dy = b.y - a.y; let t0 = 0, t1 = 1, inside = true;
-  for (const [pp, qq] of [[-dx, a.x - bx0], [dx, bx1 - a.x], [-dy, a.y - by0], [dy, by1 - a.y]]) {
-    if (pp === 0) { if (qq < 0) { inside = false; break; } continue; }
-    const r = qq / pp; if (pp < 0) { if (r > t1) { inside = false; break; } if (r > t0) t0 = r; } else { if (r < t0) { inside = false; break; } if (r < t1) t1 = r; }
-  }
+  const clip = (pp: number, qq: number) => {
+    if (pp === 0) { if (qq < 0) inside = false; return; }
+    const r = qq / pp; if (pp < 0) { if (r > t1) inside = false; else if (r > t0) t0 = r; } else { if (r < t0) inside = false; else if (r < t1) t1 = r; }
+  };
+  clip(-dx, a.x - bx0); if (inside) clip(dx, bx1 - a.x); if (inside) clip(-dy, a.y - by0); if (inside) clip(dy, by1 - a.y);
   if (inside && t0 <= t1) return 0;
-  const toBox = (q: Vec) => Math.hypot(Math.max(bx0 - q.x, 0, q.x - bx1), Math.max(by0 - q.y, 0, q.y - by1));
-  return Math.min(toBox(a), toBox(b), segPt({ x: bx0, y: by0 }, a, b), segPt({ x: bx1, y: by0 }, a, b), segPt({ x: bx0, y: by1 }, a, b), segPt({ x: bx1, y: by1 }, a, b));
+  const toBox = (x: number, y: number) => Math.hypot(Math.max(bx0 - x, 0, x - bx1), Math.max(by0 - y, 0, y - by1));
+  // the corners to the segment
+  const L2 = dx * dx + dy * dy || 1, corner = (x: number, y: number) => {
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / L2));
+    return Math.hypot(x - a.x - dx * t, y - a.y - dy * t);
+  };
+  return Math.min(toBox(a.x, a.y), toBox(b.x, b.y), corner(bx0, by0), corner(bx1, by0), corner(bx0, by1), corner(bx1, by1));
 }
-function nearCell(ci: number, cj: number): Int32Array {
+function nearCell(ci: number, cj: number): Int32Array | null {
   const key = (ci + 32768) * 65536 + (cj + 32768);
-  let list = nearCells.get(key);
-  if (list) return list;
+  let list = nearCells.get(key) ?? 0;
+  if (typeof list !== 'number') return list;
+  if (list < LIST_AFTER) { nearCells.set(key, list + 1); return null; } // (not yet: the ring search)
   const bx0 = ci * NC, by0 = cj * NC, bx1 = bx0 + NC, by1 = by0 + NC;
   const U = ringNearest({ x: bx0 + NC / 2, y: by0 + NC / 2 }).d + NR + 1e-6;
   // every segment filed in the search grid's cells within U of the cell
@@ -444,6 +453,7 @@ function nearCell(ci: number, cj: number): Int32Array {
 export function shoreNearest(p: Vec): { d: number; k: number } {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return { d: NaN, k: -1 };
   const list = nearCell(Math.floor(p.x / NC), Math.floor(p.y / NC));
+  if (!list) return ringNearest(p);
   let m = Infinity, mk = -1;
   for (let i = 0; i < list.length; i++) { const k = list[i], d = segPt(p, SHORE[k - 1], SHORE[k]); if (d < m) { m = d; mk = k; } }
   return { d: m, k: mk };
