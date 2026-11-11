@@ -6,6 +6,8 @@ import { HARBOR } from '../geo/marina';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
 import { segPt } from '../core/math';
+import { buildBayBridge, BAY_APPROACH } from './bayBridge';
+import { clocks, crownDisplayMaterial, floodlit, glints, litWindows, nightOnly, type Glint } from './night';
 
 /** A small seeded random generator, so the city is the same every time. */
 function rng(seed: number) { return () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -43,7 +45,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     scene.add(new THREE.Mesh(g, lam(0x93a079)));
   }
 
-  buildBayBridge(grp, (x, y) => terrain.heightAt(x, y)); // first: the city's buildings keep clear of its approach
+  const glows: Glint[] = buildBayBridge(grp, (x, y) => terrain.heightAt(x, y)); // first: the city's buildings keep clear of its approach
 
   /* ---------- the city ---------- */
   // one instanced box per building, on a 36 m grid, by neighbourhood: the Marina's low pastel houses, Pacific
@@ -91,7 +93,9 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       const c = (h > 40 ? glass : pale)[Math.floor(rand() * (h > 40 ? glass.length : pale.length))].clone().offsetHSL(0, 0, (rand() - 0.5) * 0.06);
       mats.push({ m: m0.clone(), c });
     }
-    const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), mats.length);
+    const cityMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    litWindows(cityMat, { lit: [0.12, 0.5], warm: 0.6, glow: 1.7 }); // homes and offices: each building its own share lit (no source for it: a guess)
+    const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cityMat, mats.length);
     mats.forEach((b, i) => { city.setMatrixAt(i, b.m); city.setColorAt(i, b.c); });
     grp.add(city);
   }
@@ -105,7 +109,11 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // the forecourt to the west. (The shaft's diameter, about 11 m, and the number of flutes, sixteen, are read off
   // photographs.)
   {
-    const CON = lam(0xd8cfbb), SHADE = lam(0x5b5650), g = new THREE.Group();
+    const CON = lam(0xd8cfbb), SHADE = lam(0x5b5650), g = new THREE.Group(), g0 = ground(37.80240, -122.40584);
+    // floodlit at night from lamps round its foot: brightest low on the shaft, fading toward the crown (a warm white,
+    // from photographs; it is lit in other colours for occasions, which this leaves out)
+    floodlit(CON, 0xffdcaa, g0 + 6, g0 + 62, 0.55, 1.1, 'coit');
+    glows.push({ ...LL(37.80240, -122.40584), h: g0 + 35, color: 0xffd6a0, i: 0.55, w: 6 });
     g.add(new THREE.Mesh(loft([0, 47, 49], (y, t) => { const R = 5.75 - 0.45 * y / 49, fl = 1 - 0.045 * Math.max(0, Math.cos(t * 16)) ** 3; return [R * fl * Math.cos(t), R * fl * Math.sin(t)]; }, 96), CON));
     // the observation level: the core behind, twelve piers between the arches
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 7.2, 24), SHADE).translateY(52.6));
@@ -121,8 +129,12 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   }
   // the Transamerica Pyramid: 260 m, a slim four-sided pyramid with its spire, and the two "wings" for the lifts
   {
-    const pyr = new THREE.Mesh(new THREE.ConeGeometry(37, 212, 4, 1), lam(0xeae7df)); pyr.rotation.y = Math.PI / 4; pyr.position.y = 106;
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(4.5, 60, 4, 1), lam(0xe0ddd4)); spire.rotation.y = Math.PI / 4; spire.position.y = 230;
+    const PYR = lam(0xeae7df), SPIRE = lam(0xe0ddd4);
+    litWindows(PYR, { floor: 3.9, bay: 2.8, lit: [0.25, 0.4], warm: 0.2, seed: 3 });
+    floodlit(SPIRE, 0xfff1d8, 0, 1, 1, 1.2, 'spire'); // the aluminium spire, lit from within (Wikipedia, "Transamerica Pyramid")
+    const pyr = new THREE.Mesh(new THREE.ConeGeometry(37, 212, 4, 1), PYR); pyr.rotation.y = Math.PI / 4; pyr.position.y = 106;
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(4.5, 60, 4, 1), SPIRE); spire.rotation.y = Math.PI / 4; spire.position.y = 230;
+    glows.push({ ...LL(37.79519, -122.40279), h: 235, color: 0xfff1d8, i: 0.35, w: 4 });
     const wings = [-1, 1].map(s => { const w = new THREE.Mesh(new THREE.ConeGeometry(9, 160, 4, 1), lam(0xe4e1d9)); w.rotation.y = Math.PI / 4; w.position.set(s * 26, 80, 0); w.scale.set(0.55, 1, 0.55); return w; });
     place(group(pyr, spire, ...wings), 37.79519, -122.40279);
   }
@@ -135,12 +147,19 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const FIN = new THREE.MeshPhongMaterial({ color: 0xe1e3e1, specular: 0x777777, shininess: 40 });
     const prof = (y: number) => y < 250 ? 26 - 4 * y / 250 : 22 - 7 * ((y - 250) / 46) ** 2; // half-width (m)
     const t = new THREE.Mesh(loft([0, 60, 120, 180, 230, 250, 265, 280, 290, 296], (y, a) => rsq(a, prof(y), prof(y) * 0.32), 64), FIN);
+    litWindows(FIN, { floor: 4.2, bay: 3, lit: [0.3, 0.45], warm: 0.15, seed: 5, from: 10 });
     const crown = new THREE.Mesh(loft([296, 326], (y, a) => rsq(a, 15 - 3 * (y - 296) / 30, 5), 48, true), new THREE.MeshLambertMaterial({ color: 0xeceeee, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
-    const g = group(t, crown); g.rotation.y = Math.PI / 4; place(group(g), 37.7899, -122.3969);
+    // the crown's LED display, just inside the lattice (night.ts)
+    const show = new THREE.Mesh(loft([298, 324], (y, a) => rsq(a, 14.2 - 3 * (y - 296) / 30, 4.6), 48, true), crownDisplayMaterial(298, 324));
+    show.renderOrder = 4; show.visible = false; nightOnly.push(show);
+    glows.push({ ...LL(37.7899, -122.3969), h: 311, color: 0xf2f4ff, i: 0.6, w: 10 });
+    const g = group(t, crown, show); g.rotation.y = Math.PI / 4; place(group(g), 37.7899, -122.3969);
   }
   const tower = (lat: number, lon: number, h: number, hw: number, hd: number, color: number, opts: { taper?: number; round?: number; spire?: number; rot?: number } = {}) => {
     const { taper = 1, round = 0.15, spire = 0, rot = 45 } = opts;
-    const m = new THREE.Mesh(loft([0, h], (y, a) => { const k = 1 - (1 - taper) * y / h; return rsq(a, hw * k, Math.min(hw, hd) * k * round, hd / hw); }, 32), new THREE.MeshPhongMaterial({ color, specular: 0x444444, shininess: 25 }));
+    const mat = new THREE.MeshPhongMaterial({ color, specular: 0x444444, shininess: 25 });
+    litWindows(mat, { floor: 3.9, bay: 3, lit: [0.2, 0.5], warm: 0.25, seed: Math.round(lat * 1e4) % 97, from: 8 }); // offices: cool white, a share left on at night
+    const m = new THREE.Mesh(loft([0, h], (y, a) => { const k = 1 - (1 - taper) * y / h; return rsq(a, hw * k, Math.min(hw, hd) * k * round, hd / hw); }, 32), mat);
     const g = group(m); if (spire) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.4, spire, 6), lam(0xd8d8d8)).translateY(h + spire / 2));
     g.rotation.y = rot * Math.PI / 180; place(group(g), lat, lon);
   };
@@ -152,7 +171,23 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   tower(37.7919, -122.4038, 237, 22, 30, 0x5e4a44, { round: 0.05, rot: 0 }); // 555 California: dark red granite (237 m, Wikipedia's figure not fetched)
   tower(37.7925, -122.4005, 212, 18, 24, 0xc4b2a2, { round: 0.1, rot: 0 }); // 345 California Center: 212 m, pink granite
   // the Ferry Building: the long shed on the Embarcadero, and its 75 m clock tower
-  place(group(block(30, 200, 15, CREAM), block(16, 16, 60, CREAM, 0).translateZ(0), new THREE.Mesh(new THREE.ConeGeometry(9, 15, 4), lam(0x8f8a7c)).translateY(67.5)), 37.79554, -122.39369, 132, 2);
+  // Its four clock dials, 6.7 m (22 ft) across (Wikipedia, "San Francisco Ferry Building"), high on the tower, showing
+  // the time; at night the tower is floodlit and the dials glow from behind (both from photographs).
+  {
+    const TWR = lam(0xe9e1cf); floodlit(TWR, 0xffe0b0, 2, 62, 0.75, 0.8, 'ferry');
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d')!, tex = new THREE.CanvasTexture(cv);
+    clocks.push((hh, mm) => {
+      cx.fillStyle = '#f4efe2'; cx.fillRect(0, 0, 128, 128); cx.strokeStyle = '#2a2722'; cx.lineCap = 'round';
+      cx.lineWidth = 5; cx.beginPath(); cx.arc(64, 64, 60, 0, 7); cx.stroke();
+      for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(64 + 50 * Math.sin(a), 64 - 50 * Math.cos(a)); cx.lineTo(64 + 57 * Math.sin(a), 64 - 57 * Math.cos(a)); cx.stroke(); }
+      const hand = (a: number, l: number, w: number) => { cx.lineWidth = w; cx.beginPath(); cx.moveTo(64, 64); cx.lineTo(64 + l * Math.sin(a), 64 - l * Math.cos(a)); cx.stroke(); };
+      hand(((hh % 12) + mm / 60) * Math.PI / 6, 30, 7); hand(mm * Math.PI / 30, 46, 5); tex.needsUpdate = true;
+    });
+    const DIAL = new THREE.MeshLambertMaterial({ map: tex }); floodlit(DIAL, 0xfff4dc, 0, 1, 1, 0.9, 'dial');
+    const dials = [0, 1, 2, 3].map(k => { const d = new THREE.Mesh(new THREE.CircleGeometry(3.35, 24), DIAL); d.rotation.y = k * Math.PI / 2; d.position.set(8.06 * Math.sin(k * Math.PI / 2), 52, 8.06 * Math.cos(k * Math.PI / 2)); return d; });
+    place(group(block(30, 200, 15, CREAM), block(16, 16, 60, TWR, 0), new THREE.Mesh(new THREE.ConeGeometry(9, 15, 4), lam(0x8f8a7c)).translateY(67.5), ...dials), 37.79554, -122.39369, 132, 2);
+    glows.push({ ...LL(37.79554, -122.39369), h: 45, color: 0xffe0b0, i: 0.45, w: 6 });
+  }
   // Sutro Tower: three red-and-white legs on Mt Sutro, 298 m, crossarms at two levels, three masts on top
   {
     const g = new THREE.Group(), RW = [lam(0xc8372d), lam(0xf2f0ea)];
@@ -284,6 +319,18 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   place(group(block(7, 9, 5, WHITE), new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 10, 8), WHITE).translateY(5), new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 2, 8), RED).translateY(11)), 37.815614, -122.529578);
   place(block(8, 10, 6, WHITE), 37.825447, -122.478321, 0, 3);
   place(group(new THREE.Mesh(new THREE.CylinderGeometry(9, 10, 9, 16), lam(0x55585a)).translateY(4.5), new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 10, 12), WHITE).translateY(14)), 37.79300, -122.51010, 0, 0);
+  // the waterfront's lights (the Embarcadero's lamps and the piers, the Marina, the Wharf) reflected in the water:
+  // a light every 80 m or so along the city's shore, from the Marina Green to China Basin
+  {
+    const r = rng(23), x0 = LL(37.8, -122.452).x;
+    let acc = 0;
+    for (let i = 1; i < LAND.length - 3; i++) { // (the last three close the polygon inland)
+      const p = LAND[i], q = LAND[i - 1]; acc += Math.hypot(p.x - q.x, p.y - q.y);
+      if (acc < 80 || p.x < x0 || p.y > LL(37.812, 0).y) continue; acc = 0;
+      glows.push({ x: p.x, y: p.y, h: 6 + r() * 6, color: r() < 0.6 ? 0xffc98a : 0xf0f2ff, i: 0.35 + r() * 0.3, w: 2 });
+    }
+    grp.add(glints(glows));
+  }
   grp.traverse(o => { o.castShadow = false; o.receiveShadow = false; o.matrixAutoUpdate = true; });
   return terrain;
 }
@@ -307,61 +354,6 @@ function rsq(a: number, hw: number, r: number, aspect = 1): [number, number] {
   return [hx * Math.sign(c) * Math.abs(c) ** (2 / n), hz * Math.sign(s) * Math.abs(s) ** (2 / n)];
 }
 
-/**
- * The Bay Bridge's west span, from Rincon Hill to Yerba Buena Island: two suspension bridges end to end, joined at
- * a central anchorage. Each has a 704 m main span between 160 m towers and 354 m side spans (Wikipedia, "San
- * Francisco–Oakland Bay Bridge": west span 3,141 m, main spans 2,310 ft); the double deck rides on a truss about 9 m
- * deep, the upper roadway about 60 m up. The cables come down into the Rincon Hill anchorage on the shore; from
- * there the roadway goes on west over SoMa on a viaduct, coming down toward the Fifth Street ramps, and at the other
- * end it runs onto Yerba Buena Island's west side to the tunnel. Silver-grey steel.
- */
-function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: number) => number): void {
-  const STEEL = new THREE.MeshLambertMaterial({ color: 0x9ea4a8 }), CONC = new THREE.MeshLambertMaterial({ color: 0xb8b2a6 });
-  const a = LL(37.7866, -122.3896), b = LL(37.8091, -122.3664); // the Rincon Hill anchorage → the tunnel on Yerba Buena Island
-  const len = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, g = new THREE.Group();
-  // local −z runs from SF to the island: a group turned by θ sends local (0, 0, −1) to (−sin θ, 0, −cos θ), which
-  // must be the sim direction (ux, uy) in three.js axes (ux, 0, −uy)
-  g.position.copy(P3(a.x, a.y, 0)); g.rotation.y = Math.atan2(-ux, uy); parent.add(g);
-  const ground = (d: number) => Math.max(0, groundAt(a.x + ux * d, a.y + uy * d));
-  const deckY = 60, towerH = 160, SIDE = 354, MAIN = 704;
-  const anch = [0, 2 * SIDE + MAIN, 4 * SIDE + 2 * MAIN], towers = [SIDE, SIDE + MAIN, 3 * SIDE + MAIN, 3 * SIDE + 2 * MAIN];
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(20, 9, len), STEEL); deck.position.set(0, deckY, -len / 2); g.add(deck);
-  for (const z of anch) { const g0 = ground(z), h = deckY + 25 - g0; const m = new THREE.Mesh(new THREE.BoxGeometry(40, h, 50), CONC); m.position.set(0, g0 + h / 2, -z); g.add(m); }
-  for (const z of towers) {
-    for (const sx of [-1, 1]) { const t = new THREE.Mesh(new THREE.BoxGeometry(5, towerH, 7), STEEL); t.position.set(sx * 10, towerH / 2, -z); g.add(t); }
-    for (const y of [deckY + 30, towerH - 8]) { const st = new THREE.Mesh(new THREE.BoxGeometry(20, 5, 5), STEEL); st.position.set(0, y, -z); g.add(st); }
-    for (const sgn of [-1, 1]) { const br = new THREE.Mesh(new THREE.BoxGeometry(1.6, 62, 1.6), STEEL); br.position.set(0, (deckY - 6) / 2, -z); br.rotation.z = sgn * Math.atan2(20, deckY - 6); g.add(br); } // X-bracing below the deck
-  }
-  // piers under the deck where it crosses the land at Yerba Buena Island, between the last anchorage and the tunnel
-  for (let z = anch[2] + 40; z < len - 10; z += 45) { const g0 = ground(z); if (deckY - 5 - g0 > 2) { const p = new THREE.Mesh(new THREE.BoxGeometry(16, deckY - 5 - g0, 4), CONC); p.position.set(0, (deckY - 5 + g0) / 2, -z); g.add(p); } }
-  // the main cables: down to the anchorages, and sagging to the roadway in mid-span
-  for (const sx of [-1, 1]) for (const k of [0, 1]) {
-    const z0 = anch[k], t1 = towers[2 * k], t2 = towers[2 * k + 1], z1 = anch[k + 1], mid = (t1 + t2) / 2, pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 60; i++) {
-      const z = z0 + (z1 - z0) * i / 60;
-      const y = z < t1 ? deckY + 20 + (towerH - deckY - 20) * (z - z0) / SIDE : z > t2 ? deckY + 20 + (towerH - deckY - 20) * (z1 - z) / SIDE : deckY + 6 + (towerH - deckY - 6) * ((z - mid) / (MAIN / 2)) ** 2;
-      pts.push(new THREE.Vector3(sx * 10, y, -z));
-    }
-    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x8d9398 })));
-  }
-  // the SF approach: on west from the anchorage over SoMa (bearing about 240°), coming down at about 4% to the ground
-  // near Fifth Street, on concrete bents every 40 m
-  {
-    const v = new THREE.Group(), c = LL(37.7866, -122.3896), brg = 240 * Math.PI / 180, ex = Math.sin(brg), ey = Math.cos(brg);
-    v.position.copy(P3(c.x, c.y, 0)); v.rotation.y = Math.atan2(-ex, ey); parent.add(v);
-    const yAt = (d: number) => deckY - 0.04 * d;
-    let d = 0;
-    for (; d < 1600; d += 40) {
-      const g0 = Math.max(0, groundAt(c.x + ex * d, c.y + ey * d)), top = yAt(d) - 4.5; if (top - g0 < 3) break;
-      const p = new THREE.Mesh(new THREE.BoxGeometry(18, top - g0, 3), CONC); p.position.set(0, (top + g0) / 2, -d); v.add(p);
-    }
-    const L = d, ramp = new THREE.Mesh(new THREE.BoxGeometry(20, 9, Math.hypot(L, yAt(0) - yAt(L))), STEEL);
-    ramp.position.set(0, (yAt(0) + yAt(L)) / 2, -L / 2); ramp.rotation.x = -Math.atan2(yAt(0) - yAt(L), L); v.add(ramp);
-    BAY_APPROACH.push([c, { x: c.x + ex * L, y: c.y + ey * L }]);
-  }
-}
-/** The Bay Bridge's SF approach, as a segment (sim coords): the city's buildings keep clear of it. */
-const BAY_APPROACH: [{ x: number; y: number }, { x: number; y: number }][] = [];
 
 /* ---------- the Golden Gate Bridge ---------- */
 

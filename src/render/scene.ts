@@ -12,6 +12,7 @@ import { laylinesFor } from '../sim/laylines';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
+import { updateNight } from './night';
 import { REFLECTIVE } from './boatMesh';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
@@ -167,6 +168,8 @@ export class SceneView {
   private skyUni = { uSkyCol: { value: new THREE.Color('#aecbdb') }, uDay: { value: 1 } };
   private fogBank: THREE.Sprite[] = [];
   private skyAcc = 1;
+  /** The sun's elevation (°), for the city's night lights. */
+  private sunEl = 45;
   /** The sky as a cube map, for reflections on gelcoat, varnish and alloy (refreshed every half minute). */
   private envTarget = new THREE.WebGLCubeRenderTarget(128);
   private envCam = new THREE.CubeCamera(1, 100000, this.envTarget);
@@ -297,7 +300,7 @@ export class SceneView {
     this.harbor = new Harbor(scene); // West Harbor: docks, breakwaters, boats in their slips
     addWharf(scene); // Fisherman's Wharf and Pier 39: the open piers, breakwaters and the marina's docks
     this.wildlife = new Wildlife(scene, p => landAt(p) === false);
-    if (import.meta.env.DEV) Object.assign(window, { __wild: this.wildlife }); // for the scenery check (scripts/check/scenery.cjs)
+    if (import.meta.env.DEV) Object.assign(window, { __wild: this.wildlife, __renderer: renderer }); // for the scenery check (scripts/check/scenery.cjs)
     this.vesselView = new VesselView(scene);
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
@@ -525,6 +528,7 @@ export class SceneView {
   /** Sun, sky light, haze and fog bank for the moment `tMin` (minutes since epoch, UTC). */
   private updateSky(tMin: number, focus: { x: number; y: number }, rain: 0 | 1 | 2 = 0, fog: 'real' | 0 | 1 | 2 = 'real'): void {
     const sp = sunPosition(tMin * 60000), el = sp.el, D = Math.PI / 180;
+    this.sunEl = el;
     const dir = new THREE.Vector3(Math.sin(sp.az * D) * Math.cos(el * D), Math.sin(el * D), -Math.cos(sp.az * D) * Math.cos(el * D)); // x east, y up, −z north
     const sm = this.sky.material as THREE.ShaderMaterial;
     sm.uniforms.sunPosition.value.copy(dir);
@@ -614,6 +618,7 @@ export class SceneView {
     this.curUni.uCurMean.value.set(w.cvec.x, w.cvec.y);
     this.skyAcc += dt;
     if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user, w.settings.rain ?? 0, w.settings.fog ?? 'real'); }
+    updateNight(this.sunEl, w.clockUtc, w.wind.kt * 0.5144, t); // the Bay Bridge's and the city's lights after dark (night.ts)
     this.envAcc += dt;
     if (this.envAcc > 30) {
       this.envAcc = 0; this.envCam.update(this.renderer, this.scene);
