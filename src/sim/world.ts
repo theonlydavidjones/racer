@@ -494,7 +494,7 @@ export class World {
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
     this.wind = windAt(this.windModel, this.t);
-    this.puffs.step(dt, this.wind);
+    this.puffs.step(dt, this.wind, p => this.fieldAt(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second

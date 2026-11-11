@@ -132,7 +132,7 @@ export function windTerrain(p: Vec, from = 255): number {
 /* ---------- puffs and lulls ---------- */
 
 /** A patch of stronger (puff) or lighter (lull) wind, carried downwind with the breeze. */
-export interface Puff { x: number; y: number; r: number; amp: number; age: number; life: number }
+export interface Puff { x: number; y: number; r: number; amp: number; age: number; life: number; /** the way it travels (unit vector, downwind): the wind where it is */ dx?: number; dy?: number; /** and how fast (m/s) */ v?: number }
 
 /** Puffs are streaks, longer downwind than across: half-length r × PUFF_LONG, half-width r × PUFF_WIDE. */
 const PUFF_LONG = 1.5, PUFF_WIDE = 0.75;
@@ -163,17 +163,30 @@ export class Puffs {
     return c ? Object.assign(c, n) : n;
   }
 
-  /** Carry the puffs downwind with the mean wind, age them, and replace the ones that have died out. */
-  step(dt: number, mean: Wind): void {
-    const go = this.dir = V(mean.from + 180), v = mean.kt * KT * 0.8; // puffs travel at a bit less than the wind speed
+  private localT = 0;
+  /**
+   * Carry the puffs downwind, age them, and replace the ones that have died out. Each travels with the wind where it
+   * is: `local` gives the wind's turn from the mean (deg) and its speed factor at a point (the day's pattern across the
+   * Bay, sim/world.ts fieldAt), looked up for each puff once a second. Without it, they all go with the mean wind.
+   */
+  step(dt: number, mean: Wind, local?: (p: Vec) => { turn: number; k: number }): void {
+    this.dir = V(mean.from + 180);
+    this.localT -= dt;
+    const look = local && this.localT <= 0; if (look) this.localT = 1;
     for (const c of this.cells) {
-      c.x += go.x * v * dt; c.y += go.y * v * dt; c.age += dt;
-      if (c.age > c.life || Math.abs(c.x - this.center.x) > this.half + 300 || Math.abs(c.y - this.center.y) > this.half + 300) this.spawn(c);
+      if (look || c.dx == null) {
+        const f = local ? local(c) : { turn: 0, k: 1 }, d = V(mean.from + f.turn + 180);
+        c.dx = d.x; c.dy = d.y; c.v = mean.kt * KT * f.k * 0.8; // puffs travel at a bit less than the wind speed
+      }
+      const v = c.v ?? mean.kt * KT * 0.8;
+      c.x += c.dx! * v * dt; c.y += c.dy! * v * dt; c.age += dt;
+      if (c.age > c.life || Math.abs(c.x - this.center.x) > this.half + 300 || Math.abs(c.y - this.center.y) > this.half + 300) { this.spawn(c); c.dx = c.dy = c.v = undefined; }
     }
   }
 
-  /** Strength of one puff at a point, 0..1: a smooth streak along the wind (`dir`), fading in and out over its life. */
-  static weight(c: Puff, x: number, y: number, dir: Vec): number {
+  /** Strength of one puff at a point, 0..1: a smooth streak along the wind where it is (or `dir`), fading in and out over its life. */
+  static weight(c: Puff, x: number, y: number, mean: Vec): number {
+    const dir = c.dx != null ? { x: c.dx, y: c.dy! } : mean;
     const dx = x - c.x, dy = y - c.y, a = (dx * dir.x + dy * dir.y) / (c.r * PUFF_LONG), b = (dx * dir.y - dy * dir.x) / (c.r * PUFF_WIDE);
     const d2 = a * a + b * b;
     if (d2 >= 1) return 0;

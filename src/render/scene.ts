@@ -485,7 +485,8 @@ export class SceneView {
     this.puffTex.needsUpdate = true;
     this.puffUni.uPuffO.value.set(x0, y0); this.puffUni.uPuffS.value = span;
     this.puffUni.uMeanKt.value = w.wind.kt;
-    this.puffUni.uPuffV.value.set(w.puffs.dir.x, w.puffs.dir.y).multiplyScalar(w.wind.kt * 0.5144 * 0.8); // as the puffs travel (environment/wind.ts)
+    const fh = w.fieldAt(at), go = V(w.wind.from + fh.turn + 180); // the wind here: the puffs in view travel with it
+    this.puffUni.uPuffV.value.set(go.x, go.y).multiplyScalar(w.wind.kt * fh.k * 0.5144 * 0.8); // as the puffs travel (environment/wind.ts)
   }
 
   /**
