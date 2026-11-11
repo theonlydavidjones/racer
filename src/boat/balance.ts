@@ -79,25 +79,98 @@ export const IDEAL_HELM = 2.5;
 
 export interface SailForce { heel: number; drive: number; ceAft?: number }
 
-/** Force coefficient (lift-ish) for a sail from its trim and shape. */
-function coef(t: SailTrim, s: Shape): number {
-  const cmax = (0.85 + 5.5 * s.depth) * (s.clMul ?? 1); // fuller sail, more force: 0.10 → 1.4, 0.14 → 1.62 (a porous old sail a little less)
-  const twist = clamp(1 - 0.013 * (s.twist - 8), 0.7, 1.08);
-  // angle of attack: rises to the best trim, holds on a little past it (stalling sails still push sideways)
-  const aoa = t.flow === 'luffing' ? 1 - t.amount * 0.92 : t.flow === 'stalled' ? 1 - 0.18 * t.amount : 1;
-  return cmax * twist * aoa;
-}
+/*
+ * The sails' forces: ORC's aerodynamic model (ORC VPP Documentation 2025, chapter 5), with the Folkboat's measured rig.
+ * Each sail has a maximum lift coefficient and a parasitic drag coefficient that depend on the apparent wind angle,
+ * fitted by ORC to wind-tunnel and full-scale data (Tables 5.1 and 5.4). A Folkboat has a backstay and no runners: the
+ * main takes the medium set, halfway between ORC's low and high sets (fractionality IG/(P+BAS) = 0.67 gives fcoef = 1:
+ * eqs. 5.5–5.6), the jib the low set (eq. 5.9); woven polyester sails carry ORC's low-technology cloth adjustment
+ * (Table 5.3; for the jib a third of the roller-furling change, Table 5.6). How much of that lift a sail makes depends
+ * on how deep the crew has set it ("flat", eq. 5.48: lift in proportion to the camber, down to ORC's flattest 0.42) and
+ * on its trim (trim.ts: luffing or stalled). Drag is the parasitic drag (the jib's falls with flat, eq. 5.47, and the
+ * fcdmult curve), plus the quadratic parasitic drag and the induced drag of the rig's effective height (eqs. 5.41–5.46).
+ * The centre of effort is each sail's weighted by its force (eq. 5.39), lowered as the sails are flattened and twisted
+ * off (the twist function, eq. 5.40); the heeling arm runs from it down to ORC's hydrodynamic centre of pressure, 0.43
+ * × draft below the waterline (eq. 4.29).
+ */
+const tab = (xs: readonly number[], ys: readonly number[], x: number) => {
+  if (x <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) if (x <= xs[i]) { const f = (x - xs[i - 1]) / (xs[i] - xs[i - 1]); return ys[i - 1] + (ys[i] - ys[i - 1]) * f; }
+  return ys[ys.length - 1];
+};
+/** ORC Table 5.1, mainsail: apparent wind angle (deg), and the low and high drag and lift sets; Table 5.3 the cloth adjustment. */
+const MAIN_C = {
+  b: [0, 7, 9, 12, 28, 60, 90, 120, 150, 180],
+  cdLo: [0.04310, 0.02586, 0.02328, 0.02328, 0.03259, 0.11302, 0.38250, 0.96888, 1.31578, 1.34483],
+  clLo: [0.00000, 0.86207, 1.05172, 1.16379, 1.34698, 1.35345, 1.26724, 0.93103, 0.38793, -0.11207],
+  cdHi: [0.03448, 0.01724, 0.01466, 0.01466, 0.02586, 0.11302, 0.38250, 0.96888, 1.31578, 1.34483],
+  clHi: [0.00000, 0.94828, 1.13793, 1.25000, 1.42681, 1.38319, 1.26724, 0.93103, 0.38793, -0.11207],
+  dcd: [0.0028, 0.0028, 0.0028, 0.0028, 0.0028, 0, 0, 0, 0, 0],
+  dcl: [0, 0.0284, 0.0284, 0.0284, 0.0284, 0.0085, 0, 0, 0, 0],
+  kpp: 0.01379
+};
+/** ORC Table 5.4, jib (low set); Table 5.6 the roller-furling lift change, a third of which is the cloth adjustment. */
+const JIB_C = {
+  b: [7, 15, 20, 27, 50, 60, 100, 150, 180],
+  cd: [0.05, 0.032, 0.031, 0.037, 0.25, 0.35, 0.73, 0.95, 0.90],
+  cl: [0, 1.0, 1.375, 1.45, 1.45, 1.25, 0.40, 0, -0.10],
+  dcl: [0, 0.10, 0.10, 0.05, 0, 0, 0, 0, 0],
+  kpp: 0.016
+};
+/** ORC's drag multiplier along the depowering curve (Figure 5.16 table): flat → fcdmult. */
+const FCD = { f: [0.1, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0], m: [1.06, 1.06, 1.06, 1.055, 1.048, 1.035, 1.02, 1.008, 1.002, 1.0, 1.004, 1.06] };
+/**
+ * The rig (ORC 2026 certificates EST F51 FRIDA and EST F39 Castor): P 8.75, E 3.38, BAS 1.00, IG 6.50, J 2.00, jib
+ * luff 5.95 and LP 2.36 (m). Derived: fractionality IG/(P+BAS) 0.667; overlap LP/J 1.18; roach (eq. 5.3) 0.193; the
+ * main's centre of effort (eq. 5.7: the girth trapezoids' centroid, 3.23 m, + 0.024·P) 3.44 m above the boom, so 4.44
+ * above the sheer; the jib's about 2.2 m above the sheer (its centroid, with the tack just above the deck); the sheer
+ * 0.65 m above the waterline at the mast (Danish class correction-weight sheet: the waterline 620–665 mm below the deck
+ * line); the highest point of the sails P + BAS above the sheer.
+ */
+export const RIG = {
+  P: 8.75, E: 3.38, BAS: 1.0, IG: 6.5, J: 2.0, frac: 6.5 / 9.75, overlap: 2.36 / 2.0, roach: 0.193,
+  zMain: 4.44, zJib: 2.2, hbi: 0.65, rm4: 0.43 * orc.boat.draft,
+  /** The depth (camber/chord) of each sail with every flattening control off: "flat" is a sail's depth against this. */
+  fullDepth: { main: 0.145, jib: 0.141 }
+};
+/** Effective span coefficient (eq. 5.42) and its fall-off as the sails are eased (eq. 5.43, Figure 5.15: 1.451 at 20° to 0.80 at 80°, taken as linear between). */
+const EFF_SPAN = 1.1 + 0.08 * (RIG.roach - 0.2) + 0.5 * (0.68 + 0.31 * RIG.frac + 0.075 * RIG.overlap - 1.1);
+const kheff = (awa: number) => 1.451 + (0.80 - 1.451) * clamp((awa - 20) / 60, 0, 1);
 
-/** Heeling force (N, across the boat) and drive (N) from both sails, for apparent wind `aws` (m/s) at `awa` (deg). */
-export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean): { main: SailForce; jib: SailForce; twist: number } {
-  const q = 0.5 * RHO_AIR * aws * aws, a = Math.abs(awa) * D2R;
-  const one = (area: number, t: SailTrim, s: Shape): SailForce => {
+/** Heeling force (N, across the mast), drive (N) from both sails, and the height of their centre of effort above the hull's centre of pressure (m, `ceh`), for the apparent wind at the sails `aws` (m/s) at `awa` (deg). */
+export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean): { main: SailForce; jib: SailForce; twist: number; ceh: number; flat: number } {
+  const q = 0.5 * RHO_AIR * aws * aws, b = clamp(Math.abs(awa), 0, 180), a = b * D2R;
+  const Am = AREA.main, Aj = jib ? AREA.jib : 0, Aref = Am + Aj;
+  // each sail's maximum lift and parasitic drag at this wind angle (the jib blanketed by the main on a run, §5.6.2)
+  const fj = (AREA.jib - Math.min(AREA.jib, RIG.IG * RIG.J / 2)) / AREA.jib, bkJ = b <= 135 ? 1 : 1 - fj * (b - 135) / 45;
+  const clM = (tab(MAIN_C.b, MAIN_C.clLo, b) + tab(MAIN_C.b, MAIN_C.clHi, b)) / 2 - tab(MAIN_C.b, MAIN_C.dcl, b);
+  const cdM = (tab(MAIN_C.b, MAIN_C.cdLo, b) + tab(MAIN_C.b, MAIN_C.cdHi, b)) / 2 + tab(MAIN_C.b, MAIN_C.dcd, b);
+  const clJ = (tab(JIB_C.b, JIB_C.cl, b) - tab(JIB_C.b, JIB_C.dcl, b) / 3) * bkJ, cdJ = tab(JIB_C.b, JIB_C.cd, b) * bkJ;
+  // the rig's efficiency: quadratic parasitic drag (eq. 5.41) and induced drag from its effective height (eqs. 5.45–5.46)
+  const clMax = (clM * Am + clJ * Aj) / Aref;
+  const kpp = clMax > 0.05 ? (MAIN_C.kpp * clM * clM * Am + JIB_C.kpp * clJ * clJ * Aj) / (Aref * clMax * clMax) : MAIN_C.kpp;
+  const heff = EFF_SPAN * kheff(b) * (RIG.P + RIG.BAS + RIG.hbi);
+  const ce = kpp + Aref / (Math.PI * heff * heff);
+  // how much lift each sail makes: its depth against its fullest (flat), its trim, a worn sail's lost lift
+  const trimK = (t: SailTrim) => (t.flow === 'luffing' ? 1 - t.amount * 0.92 : t.flow === 'stalled' ? 1 - 0.18 * t.amount : 1);
+  const flatOf = (s: Shape, full: number) => clamp(s.depth / full, 0.42, 1);
+  const fM = flatOf(main.shape, RIG.fullDepth.main), fJ = jib ? flatOf(jib.shape, RIG.fullDepth.jib) : 1;
+  const one = (area: number, clmax: number, cd0: number, flat: number, jibSail: boolean, t: SailTrim, s: Shape): SailForce => {
     if (luffing) return { heel: q * area * 0.06 * Math.cos(a), drive: 0 };
-    const cl = coef(t, s), cd = (s.cd0 ?? 0.07) + 0.11 * cl * cl; // profile drag (more from an old sail's hooked leech) + induced
+    const cl = clmax * flat * trimK(t) * (s.clMul ?? 1), m = tab(FCD.f, FCD.m, flat);
+    const cd = (jibSail ? cd0 * flat * m : cd0) + ((s.cd0 ?? 0.07) - 0.07) + ce * cl * cl * m; // (a worn sail's hooked leech adds its own profile drag)
     const L = q * area * cl, D = q * area * cd;
     return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
   };
-  return { main: one(AREA.main, main.trim, main.shape), jib: jib ? one(AREA.jib, jib.trim, jib.shape) : { heel: 0, drive: 0 }, twist: main.shape.twist };
+  const mainF = one(Am, clM, cdM, fM, false, main.trim, main.shape);
+  const jibF = jib ? one(Aj, clJ, cdJ, fJ, true, jib.trim, jib.shape) : { heel: 0, drive: 0 };
+  // centre of effort (eq. 5.39), lowered as she's depowered (eq. 5.40), above the hull's centre of pressure
+  const wM = Math.hypot(clM, cdM) * Am, wJ = Math.hypot(clJ, cdJ) * Aj;
+  const flat = (fM * Am + fJ * Aj) / Aref;
+  const zce = (RIG.zMain * wM + RIG.zJib * wJ) / Math.max(1e-6, wM + wJ);
+  const low = (0.5 * (1 - flat) + 0.902 * (1 - flat) * (1 - RIG.frac)) * (1 - (RIG.overlap - 0.9) / 0.6);
+  const ceh = RIG.hbi + zce * (1 - low) + RIG.rm4;
+  return { main: mainF, jib: jibF, twist: main.shape.twist, ceh, flat };
 }
 
 /** Righting moment (N·m) at a heel angle (deg), with the crew hiking as hard as needed (`hike` 0..1). */
@@ -112,26 +185,26 @@ export function hullRighting(heelDeg: number, disp = DISP, crewKg = 240): number
   // past a few degrees isn't on the certificates, which print only the moment at 1°)
   return disp * G * gmSailing(disp, crewKg) * Math.sin(t) * (1 - 0.3 * Math.sin(t) ** 2);
 }
-/** The heeling moment (N·m) at heel `heelDeg` from a side force, with the centre of effort lowered by twist. */
-export const heelingMoment = (heelForce: number, twist: number, heelDeg: number) => heelForce * (CE_HEIGHT - 0.03 * (twist - 8)) * Math.cos(heelDeg * D2R);
+/** The heeling moment (N·m) at heel `heelDeg` from a side force acting `ceh` m above the hull's centre of pressure (sailForces). */
+export const heelingMoment = (heelForce: number, ceh: number, heelDeg: number) => heelForce * ceh * Math.cos(heelDeg * D2R);
 
 /**
  * Heel (deg, + to leeward, − to windward) with the crew where they are: the sails' heeling moment plus the crew's
  * weight to leeward (or minus it to windward) against the hull's righting moment. `crewMoment(h)`: + to windward, N·m.
  * With little wind in the sails and the crew up to windward she heels to windward.
  */
-export function heelWithCrew(heelForce: number, twist: number, disp: number, crewMoment: (h: number) => number, crewKg = 240): number {
+export function heelWithCrew(heelForce: number, ceh: number, disp: number, crewMoment: (h: number) => number, crewKg = 240): number {
   let lo = -40, hi = 75;
   for (let i = 0; i < 30; i++) {
     const h = (lo + hi) / 2;
-    if (heelingMoment(heelForce, twist, h) - crewMoment(h) > hullRighting(h, disp, crewKg)) lo = h; else hi = h;
+    if (heelingMoment(heelForce, ceh, h) - crewMoment(h) > hullRighting(h, disp, crewKg)) lo = h; else hi = h;
   }
   return (lo + hi) / 2;
 }
 
 /** Heel (deg, ≥ 0) where the heeling moment balances the righting moment. The crew hike once she's heeling. */
-export function equilibriumHeel(heelForce: number, twist: number): number {
-  const ce = CE_HEIGHT - 0.03 * (twist - 8); // more twist, lower centre of effort
+export function equilibriumHeel(heelForce: number, ceh: number = CE_HEIGHT): number {
+  const ce = ceh;
   let lo = -40, hi = 75;
   for (let i = 0; i < 30; i++) {
     const h = (lo + hi) / 2, hike = clamp((h - 4) / 8, 0, 1);
@@ -145,9 +218,9 @@ export function equilibriumHeel(heelForce: number, twist: number): number {
  * toward the wind; you hold the tiller to windward), negative lee helm. `boomOut` is the boom's angle off the
  * centreline (deg); `v` boat speed (m/s).
  */
-export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, v: number, twist: number, clrFwd = 0): number {
+export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, v: number, ceh: number, clrFwd = 0): number {
   // (clrFwd: the centre of lateral resistance moved forward by trimming her bow-down, hullTrim.ts: the side force then acts further aft of it)
-  const m = sailYaw(f, heelDeg, boomOut, twist) + (f.main.heel + f.jib.heel) * clrFwd;
+  const m = sailYaw(f, heelDeg, boomOut, ceh) + (f.main.heel + f.jib.heel) * clrFwd;
   // (below ~3.5 kt the hull's grip falls away as fast as the rudder's, so the balance doesn't run away at low speed)
   const qw = 0.5 * RHO_W * Math.max(1.8, v) ** 2;
   return clamp(m / (qw * RUDDER.area * RUDDER.slope * RUDDER.arm) / D2R, -25, 25);
@@ -157,9 +230,9 @@ export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: numb
  * The sails' turning moment about the keel (N·m, + toward the wind): side forces ahead of and behind the centre of
  * lateral resistance, and the drive pushed out to leeward by heel and by an eased boom.
  */
-export function sailYaw(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, twist: number): number {
+export function sailYaw(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, ceh: number): number {
   // (heel signed, + to leeward: heeled to windward, the drive pushes from to windward of the keel and turns her away)
-  const h = heelDeg * D2R, ce = CE_HEIGHT - 0.03 * (twist - 8);
+  const h = heelDeg * D2R, ce = ceh;
   // side forces about the keel: the main aft (+ toward the wind), the jib forward (− away)
   // (a stretched old sail's draft sits further aft, and its force with it, by a share of the chord at the centre of effort)
   let m = -(f.main.heel * (LEVER.main - CHORD.main * 0.5 * (f.main.ceAft ?? 0)) + f.jib.heel * (LEVER.jib - CHORD.jib * 0.5 * (f.jib.ceAft ?? 0)));

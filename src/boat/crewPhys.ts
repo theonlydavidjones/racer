@@ -33,12 +33,13 @@ import { bestTrim, trimFromMoment } from './hullTrim';
  * the hip ~0.15 m inboard of the edge, it's 0.15 m + 0.056 × height inboard. Full hiking is about λ = 70°; a novice
  * leans out less. (The ORC VPP assumes 89 kg per crew; the class allows 2 or 3 aboard, 4 if three weigh ≤ 200 kg: CR 13.10.)
  *
- * Hiking tires the thighs (quasi-isometric quadriceps work): sailors hold a full dinghy hike on a hiking bench about
- * 200 s (less highly ranked) to 300 s (highly ranked) before failure (Vogiatzis et al., hiking endurance; secondary
- * summaries). A Folkboat sit-out, the upper thigh resting on the deck edge and the feet braced on the seat, loads the
- * thighs much less, so here the endurance is taken as twice that (an estimate). A person's fatigue builds as the square
- * of how hard they hike against it and recovers over a couple of minutes off the rail (an estimate), and a tired crew
- * leans out less.
+ * Hiking tires the thighs (quasi-isometric quadriceps work at about 30% of maximum EMG: Vogiatzis, "The physiological
+ * demands of 'hiking' on dinghy sailors", PhD thesis, Glasgow 1995, study I). On a hiking bench held to exhaustion,
+ * sailors lasted 5.0–5.5 min untrained and 7.2–8.5 min after seven weeks' training (study II, p. 135), so a novice
+ * here lasts about 5 min of full hiking and an expert about 8.5; fatigue builds as the square of how hard they hike
+ * (a part hike tires far less: endurance falls steeply with effort), and recovers off the rail with a time constant of
+ * a minute (quadriceps oxygenation and heart rate back within about 3 min: Vogiatzis p. 98), and a tired crew leans
+ * out less. (A dinghy bench is harder than a Folkboat sit-out, so this is on the tiring side.)
  */
 
 /** height (m), weight (kg), skill (0 novice … 1 expert; club-racing crew ≈ 0.6). */
@@ -167,7 +168,7 @@ export const hikeArm = (p: Person, lean = 1, edge = EDGE) => edge + (0.063 + 0.1
 export const leeArm = (p: Person, edge = EDGE) => -sitArm(p, edge);
 /** The helm, aft at the tiller where the deck is narrower (its half-breadth there from the plan): sitting up, leaning out
  * as far as they will with a hand on the tiller extension, and to leeward. */
-const helmArms = (p: Person, fatigue = 0) => {
+export const helmArms = (p: Person, fatigue = 0) => {
   const e = deckHalf(Z.helm);
   return { sit: sitArm(p, e), max: hikeArm(p, leanCap(p, fatigue), e), lee: leeArm(p, e) };
 };
@@ -178,8 +179,8 @@ const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * skillOf(p)) * (1 
 export const reactTime = (p: Person) => 1.6 - 1.2 * skillOf(p);
 /** Pace of a person's work and movement against a club crew (1 at skill 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
 export const pace = (p: Person) => 0.55 + 0.75 * skillOf(p);
-/** Hiking endurance (s at a full hike): ~200 s for less and ~300 s for highly ranked sailors (hiking-bench studies); recovery off the rail (estimate). */
-const ENDURE = (p: Person) => 2 * (200 + 100 * skillOf(p)), RECOVER = 120;
+/** Hiking endurance (s at a full hike) and recovery time constant (s): Vogiatzis 1995 (above). */
+const ENDURE = (p: Person) => 300 + 210 * skillOf(p), RECOVER = 60;
 
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
@@ -257,7 +258,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const sit = (s.helm.w * HELM.sit + s.crew.reduce((a, p) => a + p.w * sitArm(p), 0)) / total;
     const needArm = k.need / (total * 9.81);
     let want = downwind ? clamp(needArm, minArm, maxArm)
-      : breeze <= 0 ? clamp(Math.min(needArm, -0.3), minArm, 0) * smoothSkill(skill) + 0.1 * (1 - smoothSkill(skill)) // light air: a good crew to leeward, a novice in the middle
+      : breeze <= 0 ? clamp(needArm, minArm, maxArm) * smoothSkill(skill) + 0.1 * (1 - smoothSkill(skill)) // light air: a good crew as far to leeward as gives her the light-air heel; a novice in the middle
       : clamp(Math.max(needArm, sit * breeze), minArm, maxArm);
     const pl = c.place;
     if (pl?.across) want = pl.across === 'lee' ? minArm : pl.across === 'mid' ? 0.1 : pl.across === 'up' ? sit : maxArm;
@@ -401,3 +402,13 @@ export function bestFore(twa: number, tws: number, pole: boolean): number {
   if (twa > 120) return tws > 17 ? 0.35 : pole ? 0.95 : 0.85;
   return tws < 7 ? 0.8 : tws < 13 ? 0.6 : 0.45;
 }
+
+/**
+ * The righting moment (N·m, upright) of a crew all hiking as far as they reach (their skill, and how tired: `fatigue`
+ * per person, helm first). The polar's crew: the ORC certificates the polar comes from declare 240–300 kg of crew; the
+ * sim's standard three (DEFAULT_CREW, 230 kg) at a club crew's reach, fresh.
+ */
+export function hikingMoment(s: CrewSpec, fatigue: number[] = []): number {
+  return 9.81 * (s.helm.w * helmArms(s.helm, fatigue[0] ?? 0).max + s.crew.reduce((a, p, i) => a + p.w * hikeArm(p, leanCap(p, fatigue[i + 1] ?? 0)), 0));
+}
+export const standardCrewMoment = () => hikingMoment(DEFAULT_CREW);

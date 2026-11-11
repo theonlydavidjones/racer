@@ -113,9 +113,9 @@ function speedFactor(b: Boat, c: Controls): number {
   const cs = b.crew;
   if (cs) {
     const disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
-    const heel = heelWithCrew(F, sf.twist, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0)) * (b.twa > 120 ? 0.6 : 1);
+    const heel = heelWithCrew(F, sf.ceh, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0)) * (b.twa > 120 ? 0.6 : 1);
     f *= heelFactor(heel);
-    const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.twist);
+    const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.ceh);
     f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
   }
   return f;

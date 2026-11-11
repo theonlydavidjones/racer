@@ -39,7 +39,7 @@ describe('Hiking a Folkboat, by the class rules', () => {
 
 describe('Where the weight goes, and what she does', () => {
   it('light air: a good crew sits to leeward and heels her; a novice sits in the middle', () => {
-    const good = steady(5, beatAngle(5)), novice = steady(5, beatAngle(5), { skill: 0.1 });
+    const good = steady(4, beatAngle(4)), novice = steady(4, beatAngle(4), { skill: 0.1 });
     expect(good.b.crew!.mode).toBe('leeward'); expect(good.b.heelMag!).toBeGreaterThan(4);
     expect(novice.b.crew!.arm).toBeGreaterThan(good.b.crew!.arm + 0.15);
   });

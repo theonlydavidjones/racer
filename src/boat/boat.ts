@@ -159,6 +159,10 @@ export interface Boat {
   heelRate?: number;
   /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
   seaShare?: number; seaShareT?: number;
+  /** Speed factor from the power she carries against the polar crew's (physics.ts powerFactor), and seconds until it's worked out again. */
+  powerK?: number; powerT?: number;
+  /** The depowering step (0..1) that's fastest for her crew now (physics.ts powerFactor): what the crew works toward. */
+  depowerBest?: number;
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */

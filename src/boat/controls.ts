@@ -258,6 +258,25 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   return x;
 }
 
+/**
+ * The sails as a crew sets them at depowering step `depower` (crewSolve, within the step's floors on each line: a step
+ * flattens her more than its target shape alone), for the main and jib at these sheet angles, standard rig and new
+ * sails. For physics.ts powerFactor's search over the steps. (Cached by half a knot, a degree and an eighth of a step.)
+ */
+const crewShapeCache = new Map<number, { main: Shape; jib: Shape }>();
+export function crewShapes(tws: number, awa: number, depower: number, mainAngle: number, jibAng: number): { main: Shape; jib: Shape } {
+  const t = Math.round(clamp(tws, 0, 45) * 2), a = Math.round(clamp(Math.abs(awa), 0, 180)), d = Math.round(clamp(depower, 0, 1) * 8);
+  const ma = Math.round(clamp(mainAngle, 0, 90)), ja = Math.round(clamp(jibAng, 0, 90)), key = (((t * 181 + a) * 9 + d) * 91 + ma) * 91 + ja;
+  const hit = crewShapeCache.get(key); if (hit) return hit;
+  const v = crewSolve(t / 2, a, 'S', ma, ja, undefined, STD_RIG, SAIL_WEAR.new, t / 2, d / 8);
+  const c: Controls = { mainsheet: mainsheetFor(ma, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
+    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+  c.jibsheet = jibsheetFor(ja, c, 'S');
+  const out = { main: mainShape(c, t / 2, STD_RIG, t / 2), jib: jibShape(c, t / 2, 'S', SAIL_WEAR.new, t / 2) };
+  crewShapeCache.set(key, out);
+  return out;
+}
+
 /** The drive (as a share of the best) the sails' shapes give with these settings, for the sheet angles wanted. */
 function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: number, jibAng: number, tm: Shape, tj: Shape, rig: SailRig, jibWear: SailWear, aws: number, mainsheet?: number): number {
   const c: Controls = { mainsheet: mainsheet ?? mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
