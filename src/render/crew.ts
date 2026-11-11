@@ -25,7 +25,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; vel?: THREE.Vector3; upr?: number; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh }
 type Limb = Body['arm'][number];
@@ -113,12 +113,35 @@ function onSeat(s: number, x: number, z: number, k: number): PoseT {
   const kneeAt = hip.clone().addScaledVector(f, 0.4 * k).add(V(0, 0.1, 0));
   return { hip, yaw, pitch: -0.1, roll: 0, feet: [foot(0), foot(1)], hands: [kneeAt.clone().addScaledVector(r, -0.1), kneeAt.clone().addScaledVector(r, 0.1)], look: JIB_LUFF.clone() };
 }
-/** On the cockpit sole, facing forward, knees up and arms round them (in the middle of the boat in light air). */
+/**
+ * Low in the cockpit, nobody sits on the sole: they kneel on one knee (the owner: "nobody sits in the bottom of the
+ * cockpit. they would kneel, usually on one knee"), the other foot planted ahead, out from under the boom and with
+ * leverage on the lines. `front` which leg is forward (0 left, 1 right).
+ */
+function kneelOne(x: number, z: number, yaw: number, front: number, hands: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
+  const g = ground(x, z), f = fwd(yaw), r = right(yaw);
+  // (the kneeling thigh near upright, its knee on the sole under the hips and the shin flat behind; the front foot
+  // a stride ahead, its thigh about level)
+  const hip = V(x, g + 0.47 * k, z);
+  const feet = [0, 1].map(j => j === front
+    ? onGround(hip.clone().addScaledVector(f, 0.36 * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k))
+    : hip.clone().addScaledVector(f, -0.4 * k).addScaledVector(r, (j ? 1 : -1) * 0.1 * k).setY(g + 0.07)) as [THREE.Vector3, THREE.Vector3];
+  return { hip, yaw, pitch: -0.2, roll: 0, feet, hands, look: lookAt.clone() };
+}
+/** Up in a crouch, a slight bend at the waist and the knees, under the boom (the middle crew tacking the main). */
+function crouch(x: number, z: number, yaw: number, hands: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
+  // (the head well under the boom, about 1.66 m above the waterline over the cockpit)
+  const g = groundNear(x, z, 0.15), f = fwd(yaw), r = right(yaw), hip = V(x, g + 0.55 * k, z);
+  const feet = [0, 1].map(j => onGround(hip.clone().addScaledVector(f, (j ? 0.08 : -0.05) * k).addScaledVector(r, (j ? 1 : -1) * 0.15 * k))) as [THREE.Vector3, THREE.Vector3];
+  return { hip, yaw, pitch: -0.6, roll: 0, feet, hands, look: lookAt.clone() };
+}
+/** In the middle, low: on one knee on the sole, facing forward, a hand on the forward knee and one on the seat's edge. */
 function onSole(x: number, z0: number, k: number): PoseT {
-  const z = Math.max(z0, COCK0 + 0.55), hip = V(x, COCKPIT.sole + 0.09 * k, z), yaw = 0;
-  const foot = (j: number) => V(x + (j ? 1 : -1) * 0.13 * k, COCKPIT.sole + 0.06, z - 0.42 * k);
-  const knees = V(x, COCKPIT.sole + 0.42 * k, z - 0.28 * k);
-  return { hip, yaw, pitch: -0.25, roll: 0, feet: [foot(0), foot(1)], hands: [knees.clone().add(V(-0.08, 0, -0.04)), knees.clone().add(V(0.08, 0, -0.04))], look: JIB_LUFF.clone() };
+  const z = Math.min(THWART.z - THWART.half - 0.45, Math.max(z0, COCK0 + 0.55)), s = x >= 0 ? 1 : -1, front = s > 0 ? 0 : 1;
+  const p = kneelOne(x, z, 0, front, [V(0, 0, 0), V(0, 0, 0)], k);
+  const knee = p.feet[front].clone().add(V(0, 0.4 * k, 0.05));
+  p.hands = front === 0 ? [knee, V(0.35, SEAT.y + 0.05, z - 0.1)] : [V(-0.35, SEAT.y + 0.05, z - 0.1), knee];
+  return p;
 }
 /** Kneeling on the surface at (x, z), facing `yaw`, shins flat behind, hands at `reach`. */
 function kneel(x: number, z: number, yaw: number, reach: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
@@ -143,7 +166,8 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
   // in the cockpit (or across the after deck): crouched under the boom, stepping over the seats and the thwart (with
   // room ahead for the knees)
   if (z < COCK1) { z = Math.max(z, COCK0 + 0.5); if (z < THWART.z) z = Math.min(z, THWART.z - THWART.half - 0.24); }
-  const hip = V(x, g + 0.42 * k, z);
+  // (low: crouched over the sole or a seat, not stood up because the coaming is near)
+  const hip = V(x, groundNear(x, z, 0.08) + 0.42 * k, z);
   const foot = (j: number) => onGround(V(x, 0, z).addScaledVector(f, (j ? 0.06 : -0.06) * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k));
   // hands down to the seat or the coaming for balance
   const hand = (j: number) => { const h = hip.clone().addScaledVector(f, 0.28 * k).addScaledVector(r, (j ? 1 : -1) * 0.25 * k); return h.setY(Math.max(ground(h.x, h.z), hip.y - 0.3) + 0.05); };
@@ -151,15 +175,29 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
 }
 
 /** Where a crew member is and what they're doing (crewPhys.ts), as a pose on something real. */
-function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, windward: number, isMoving: boolean, motion: number, idx: number): PoseT {
+function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, windward: number, isMoving: boolean, motion: number, idx: number, tackRole: 'jib' | 'main' | null = null): PoseT {
   const k = fig.scale, s = Math.abs(x) > 0.05 ? Math.sign(x) : windward, ax = Math.abs(x);
+  if (tackRole) {
+    // through a tack, down in the cockpit and across under the boom (the owner): the forward crew on one knee working
+    // the jib sheets at the leeward winch, the middle crew up in a crouch tacking the main from the thwart
+    // (the jib hand forward by the winches, the main hand aft by the thwart, clear of each other)
+    const zz = tackRole === 'jib' ? COCK0 + 0.45 : THWART.z - THWART.half - 0.18, lim = chz(zz) - SEAT.d - 0.08, px = Math.max(-lim, Math.min(lim, x));
+    if (tackRole === 'jib') {
+      const wz = COCK0 + 0.03 * L, ws = -windward, w = V(ws * (chz(wz) + 0.06), deckY(uAtZ(wz), chz(wz)) + coamH(wz) + 0.12, wz);
+      const yaw = ws * 0.5, hold = V(px + ws * 0.15, ground(px, zz) + 0.75 * k, zz - 0.3);
+      return kneelOne(px, zz, yaw, ws > 0 ? 1 : 0, ws > 0 ? [hold, w] : [w, hold], k, w);
+    }
+    const sheet = V(px * 0.4, 0.9, THWART.z - 0.08);
+    return crouch(px, zz, 0, [sheet.clone().add(V(-0.07, 0.05, 0)), sheet.clone().add(V(0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, -1)));
+  }
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
   const sideways = Math.abs(motion) > 0.6 && Math.abs(motion) < 2.5, alongside = z > COCK0 && z < COCK1 && ax > chz(z) - 0.2;
   // (moving fore and aft along the side deck within the cockpit's length: they slide along it sitting, not walk the coaming)
   if (isMoving && !sideways && alongside && z > COCK0 + 0.3 && job !== 'car' && job !== 'mast') return onDeck(s, Math.min(THWART.z - THWART.half - 0.2, Math.max(COCK0 + 0.5, z)), 0, k);
   if (isMoving && !(alongside && sideways)) {
     // (across the cockpit they shuffle sideways facing forward, under the boom; fore and aft, the way they're going)
-    return moving(fig, x, Math.max(z, CAB0 + 0.45), sideways && inCockpit(ax, z) ? 0 : motion, k);
+    // (on the way to the cabin-top lines, which they work from the cockpit's forward end: through the cockpit)
+    return moving(fig, x, job === 'piano' ? Math.max(z, COCK0 + 0.5) : Math.max(z, CAB0 + 0.45), sideways && inCockpit(ax, z) ? 0 : motion, k);
   }
   if (job === 'mast') {
     // kneeling on the cabin top just aft of the mast (the pole, a halyard), hands up on it
@@ -227,6 +265,7 @@ function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.V
   // (facing forward as they shuffle across behind the tiller, so the knees stay over the cockpit's after end)
   void dir; const p = moving(h, x, z, 0, h.scale), chest = p.hip.clone().add(V(0, 0.35 * h.scale, 0));
   const d = chest.sub(tip), ext = tip.clone().addScaledVector(d.normalize(), Math.max(0.2, Math.min(0.95, d.length() - 0.25)));
+  ext.y = Math.min(ext.y, p.hip.y + 0.2 * h.scale); // (low, at the hip, as they pass the stick behind them)
   p.hands[x >= 0 ? 0 : 1] = ext;
   return p;
 }
@@ -406,7 +445,7 @@ function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: nu
  * the mast). `windward` +1 when the wind is over the starboard side; `c` the crew state (null: a default);
  * `hideHelm` when you're looking through the helm's eyes; `dt` for easing; `tip` the tiller's end (tillerTip).
  */
-export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0): void {
+export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0, tacking = false): void {
   // (sitting, people hold their bodies near upright as she heels; hiking or kneeling at a job, braced, less)
   const heel = heelDeg * Math.PI / 180, against = (pose: string) => -heel * (pose === 'sit' || pose === 'lee' || pose === 'helm' ? 0.55 : pose === 'cross' ? 0.3 : 0.2);
   const ppl = c?.people;
@@ -424,6 +463,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   // (two of them in the middle sit side by side on the sole)
   const mids = cr.crew.map((_, i) => { const a = ppl?.[i + 1]; return !!a && Math.abs(a.x) < 0.3 && (a.pose === 'sit' || a.pose === 'lee') && inC(zs[i]); });
   const nMid = mids.filter(Boolean).length; let m = 0;
+  // a tack under way: from the helm putting her about (the roll's lead) through the wind until they're across. The forward
+  // crew works the jib on one knee, the others tack the main in a crouch (alone with the helm, the one crew does the jib)
+  const tackOn = !!c && (tacking || !!c.roll);
+  const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
   cr.crew.forEach((f, i) => {
     const a = ppl?.[i + 1];
     let x = a ? a.x : windward * 0.8;
@@ -433,7 +476,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const dir = track(f, x, a?.z ?? z, dt);
     // (on the move from 0.22 m/s, settled again under 0.1: no flicker between walking and sitting)
     const go = f.going = travelling(f, a, x);
-    const want = crewPose(f, x, z, lean, pose, windward, go, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i);
+    // (in the tack while it's under way, and until they're across; a job elsewhere, the mast or the car, comes first)
+    const busy = pose === 'mast' || pose === 'car' || pose === 'piano';
+    f.tack = !busy && (tackOn || (!!f.tack && go));
+    const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
+    const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role);
     apply(f, ease(f, want, dt), upright(f, against(pose), dt), dt);
     f.root.visible = true;
   });
