@@ -75,12 +75,16 @@ export const CE_HEIGHT = 4.78;
 /** The centre of effort's height above the waterline (m), near the roll axis: the lever for the rig's sweep as she rolls. */
 export const CE_ABOVE_WL = 4.29;
 /**
- * Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force: an estimate. (The drawn
- * rig, built to the class rules and FRIDA's ORC certificate, has the sails' centres of area 1.88 m apart, not these
- * 2.17: render/boatMesh.ts, tests/rig.test.ts. Moving to 1.88 with the centre of effort kept where it is costs the
- * backed jib the moment that holds her hove to in 8 kt, so the two wait for a sourced centre of lateral resistance.)
+ * Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force, at the sail's centre of
+ * area. The two are 1.88 m apart: the main's centre 1.26 m aft of the mast's after side, the jib's 0.62 m forward of
+ * the mast's front, with the mast 2.80 m from the bow and the forestay 0.80 m (NFIA Class Rules 7.21, 6.1.7) and the
+ * sails as FRIDA's ORC certificate measures them (the drawn rig: render/boatMesh.ts, tests/rig.test.ts). A sail's
+ * centre of pressure at its best trim, mostly from camber, is near its centre of area (thin-aerofoil theory: camber's
+ * lift at mid chord). Where the centre of lateral resistance lies between them isn't published: it's kept where the
+ * earlier estimate (−0.62, +1.55) had it, the area-weighted centre of effort about on it (the weather helm comes from
+ * the sails' twist and draft, ceAft).
  */
-export const LEVER = { main: -0.62, jib: 1.55 };
+export const LEVER = { main: -0.538, jib: 1.342 };
 /** Chord of each sail at its centre of effort (m). */
 const CHORD = { main: 2.4, jib: 2.0 };
 /** Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m). */
