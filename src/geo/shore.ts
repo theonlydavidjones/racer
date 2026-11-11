@@ -6,8 +6,12 @@ import { hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); the stretch past the
 // Marina is replaced below by the real one.
+// Fort Point itself (the brick fort, 37.81056 N 122.47722 W, Wikipedia "Fort Point National Historic Site") stands on
+// the point under the Golden Gate Bridge's south end: the shore runs out round it, so the fort and the bridge's
+// arch over it are on land.
 const SHORE_LL: [number, number][] = [
-  [37.8108, -122.4785], [37.8065, -122.4720], [37.8045, -122.4620], [37.8040, -122.4520], [37.8055, -122.4490],
+  [37.8100, -122.4790], [37.8108, -122.4782], [37.8112, -122.4773], [37.8110, -122.4764], [37.8100, -122.4757],
+  [37.8092, -122.4747], [37.8065, -122.4720], [37.8045, -122.4620], [37.8040, -122.4520], [37.8055, -122.4490],
   [37.8078, -122.4475], [37.8082, -122.4462], [37.8079, -122.4450], [37.8088, -122.4441], [37.8093, -122.4434],
   [37.8087, -122.4427], [37.8071, -122.4421], [37.8067, -122.4380], [37.8071, -122.4340], [37.8080, -122.4326],
   [37.8100, -122.4322], [37.8100, -122.4315], [37.8083, -122.4312], [37.8100, -122.4306], [37.8100, -122.4299],
