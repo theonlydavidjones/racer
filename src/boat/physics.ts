@@ -8,8 +8,8 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, crewBestHeel, crewMoment, crewSkill, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
+import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
+import { DEFAULT_CREW, crewBestHeel, crewMass, crewMoment, crewSkill, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, trimSpeedFactor } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -175,7 +175,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   trimSails(b, ap.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
-  const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  const hR = Math.abs(b.heelMag ?? 0) * D2R, aR = ap.awa * D2R;
+  const awsE = ap.aws * Math.sqrt(Math.cos(aR) ** 2 + (Math.sin(aR) * Math.cos(hR)) ** 2), awaE = Math.atan2(Math.sin(aR) * Math.cos(hR), Math.cos(aR)) / D2R;
+  const sf = sailForces(awsE, awaE, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
   const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1; // how much of each sail is up: its force goes with its hoisted area
   if (hm < 1 || hj < 1) { sf.main.heel *= hm; sf.main.drive *= hm; sf.jib.heel *= hj; sf.jib.drive *= hj; }
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
@@ -376,9 +378,8 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
 }
 
 /** The rig's sideways speed through the air at the sails' centre of effort (m/s, + to starboard) from her rolling: the
- * roll rate times the centre of effort's height above the roll axis (near the waterline: CE_HEIGHT is measured from the
- * keel's centre of lateral resistance, about 0.6 m below it, an estimate). */
-const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * (CE_HEIGHT - 0.6) * Math.cos((b.heel ?? 0) * D2R);
+ * roll rate times the centre of effort's height above the roll axis, taken at the waterline (balance.ts CE_ABOVE_WL). */
+const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
 /** The waves' added resistance at speed v as a share of the calm-water resistance (for the trim: hullTrim.ts). */
 const seaShare = (b: Boat, v: number) => { const r = hullResistance(Math.max(0.5, v)); return r > 0 ? seaDrag(b.sea, b.h, Math.max(0.5, v)) / r : 0; };
 /** (Worked out twice a second, as the sea is refreshed.) */
@@ -392,17 +393,17 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, twist: number, disp: num
   void rel;
   const n = cs.spec.crew.length, skill = n ? cs.spec.crew.reduce((a, p) => a + skillOf(p), 0) / n : skillOf(cs.spec.helm);
   const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
-  const need = heelingMoment(F, twist, bh) - hullRighting(bh, disp) - rmExtra(bh);
+  const need = heelingMoment(F, twist, bh) - hullRighting(bh, disp, crewMass(cs.spec)) - rmExtra(bh);
   // (the windward side by her tack, which holds through a moment by the lee until the boom crosses)
   placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
-  return heelWithCrew(F, twist, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h));
+  return heelWithCrew(F, twist, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec));
 }
 /** Roll her toward the heel `heelLee` (deg, + to leeward) as a damped oscillator (balance.ts rollStep). */
 function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number): void {
   void rel;
   const side = b.tack === 'S' ? 1 : -1; // b.heel is + to port: to leeward with the wind over the starboard side (by her tack, as the boom)
-  const r = rollStep(b.heel ?? 0, b.heelRate ?? 0, heelLee * side, disp, dt);
+  const r = rollStep(b.heel ?? 0, b.heelRate ?? 0, heelLee * side, disp, dt, b.v, b.crew ? crewMass(b.crew.spec) : 240);
   b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
 
