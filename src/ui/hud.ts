@@ -417,7 +417,10 @@ export class Hud {
    */
   drawChart(c: HTMLCanvasElement, wd: World, cx: number, cy: number, scale: number, pick: Vec | null): void {
     const [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[wd.settings.chartPal ?? 'day'];
-    this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart');
+    // the places' names go over the chart: its own print keeps clear of them
+    ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
+    const avoid = PLACES.filter(pl => scale > 0.12 || !pl.buoy).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
+    this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
     for (const pl of PLACES) {
@@ -448,10 +451,10 @@ export class Hud {
     ctx.fillText(chartCredit(), w - 10, h - 8); ctx.globalAlpha = 1;
   }
 
-  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart'): void {
+  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     const pal = wd.settings.chartPal ?? 'day', I = INK[pal];
-    drawEncChart(ctx, tf, scale, w, h, pal, detail); // NOAA's chart underneath everything the sim draws
+    drawEncChart(ctx, tf, scale, w, h, pal, detail, avoid); // NOAA's chart underneath everything the sim draws
     if (wd.settings.aids) { // the wind across the course: where it blows harder and lighter, and which way
       const half = Math.max(w, h) / scale * 0.75, spacing = Math.max(250, half / 7);
       drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, spacing, onLand, I);

@@ -144,7 +144,7 @@ export function drawWindField(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x
       ctx.fillStyle = d > 0 ? `rgba(10,30,60,${Math.min(0.32, d * 0.9)})` : (ink.lull ?? (a => `rgba(200,230,245,${a})`))(Math.min(0.25, -d * 0.8));
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(e[0], e[1]); ctx.closePath();
       if (d < 0 && ink.lullHatch) { // on a white chart nothing is paler than the water: lighter wind is hatched instead, so it can't read as land
-        ctx.save(); ctx.clip(); ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.save(); ctx.clip(); ctx.strokeStyle = ink.lull?.(Math.min(0.7, -d * 2.4)) ?? ctx.fillStyle; ctx.lineWidth = 1; ctx.beginPath();
         const xs = [a[0], b[0], c[0], e[0]], ys = [a[1], b[1], c[1], e[1]], x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
         for (let t = x0 - (y1 - y0); t < x1; t += 7) { ctx.moveTo(t, y1); ctx.lineTo(t + (y1 - y0), y0); }
         ctx.stroke(); ctx.restore();

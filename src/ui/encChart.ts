@@ -38,7 +38,7 @@ export const INK: Record<ChartPalette, Ink> = {
   day: {
     dry: '#c6d7a4', vshoal: '#8fc3ea', shoal: '#b9dbf2', mid: '#e1eff9', deep: '#ffffff', none: '#d9dcdf',
     land: '#f3e2a9', built: '#e6cf8f', structure: '#d4c08a', coast: '#2e3236', contour: '#7f9bb0', magenta: '#b8188f', ink: '#1d2328', sounding: '#1d2328', soundingDeep: '#6a7781', waterText: '#1f4f7a',
-    current: 'rgba(0,96,170,.8)', lull: a => `rgba(214,150,40,${Math.min(1, a * 3)})`, lullHatch: true, windTick: 'rgba(20,40,60,.35)', ship: 'rgba(55,55,60,.9)', shipText: 'rgba(40,40,45,.9)', text: '#1d2328',
+    current: 'rgba(0,96,170,.8)', lull: a => `rgba(196,140,50,${a})`, lullHatch: true, windTick: 'rgba(20,40,60,.35)', ship: 'rgba(55,55,60,.9)', shipText: 'rgba(40,40,45,.9)', text: '#1d2328',
     boatEdge: '#000000', pick: '#000000', mark: '#e09a00', markPass: '#9c8a3a', line: 'rgba(200,130,0,.9)'
   },
   // the ECDIS night-time look: dark water, deeper is darker
@@ -152,7 +152,7 @@ export type Detail = 'inset' | 'chart';
  * The chart under everything the sim draws. `tf` is the map's own world → screen transform (rotated with the wind on
  * the inset map; north up on the full chart); `scale` is px per metre.
  */
-export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: number, w: number, h: number, pal: ChartPalette, detail: Detail): void {
+export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: number, w: number, h: number, pal: ChartPalette, detail: Detail, avoid: [number, number, number, number][] = []): void {
   const G = built(), I = INK[pal];
   const o = tf(0, 0), ex = tf(1, 0), ey = tf(0, 1), k = Math.hypot(ex[0] - o[0], ex[1] - o[1]) || 1e-9; // px per metre
   const px = (v: number) => v / k;
@@ -206,10 +206,12 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
   }
   // the print: names first, then the aids' labels, each kept clear of what's already placed; soundings fill the gaps
   const P = new Placer(ctx);
+  for (const b of avoid) P.block(...b); // the sim's own labels, drawn later over the chart
   ctx.textAlign = 'left';
   if (detail === 'chart') {
     for (const n of G.names) {
       const s = tf(n.x, n.y), sz = n.size * scale; if (!on(s[0], s[1], 80)) continue;
+      if (n.k === 'sea' && /Anchorage/.test(n.t)) continue; // (named with the anchorage's own symbol)
       if (n.k === 'bridge') { if (scale < 0.08) continue; }
       else if (sz < 70 || sz > Math.max(w, h) * 2.5) continue;
       const font = n.k === 'sea' ? 'italic 600 12px Georgia, serif' : n.k === 'land' ? '600 11px "Saira Semi Condensed", sans-serif' : '600 10px "Saira Semi Condensed", sans-serif';
