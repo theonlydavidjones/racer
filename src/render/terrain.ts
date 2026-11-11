@@ -41,7 +41,12 @@ async function loadHeights(): Promise<Float32Array> {
 /** Simple deterministic noise for colour variation. */
 const hash = (i: number, j: number) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
 
-export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock' | 'island';
+export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock' | 'island' | 'port';
+
+/** The Port of Oakland's terminals and the old Naval Air Station at Alameda Point: flat paved fill, no houses. */
+export const onPort = (lat: number, lon: number): boolean =>
+  (lat > 37.793 && lat < 37.8195 && lon > -122.335 && lon < -122.296) || // the Outer and Middle Harbor terminals and the old Army base
+  (lat > 37.7695 && lat < 37.7955 && lon > -122.3295 && lon < -122.3); // Alameda Point: the runways, hangars and piers
 
 /** Angel Island's cells in the elevation grid (found by flooding the land out from Mount Livermore), once loaded. */
 let ANGEL: Uint8Array | null = null;
@@ -57,11 +62,20 @@ export function region(lat: number, lon: number, h: number): Region {
   if (lat > 37.804 && lat < 37.8155 && lon > -122.3745 && lon < -122.357) return 'woods'; // Yerba Buena Island: wooded, a few Navy houses
   if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return 'city'; // Treasure Island: flat, built over (the old Navy base and the new blocks)
   if (lat > 37.8235 && lat < 37.8295 && lon > -122.4265 && lon < -122.418) return 'rock'; // Alcatraz
+  if (lon > -122.345) {
+    // the East Bay, from Alameda and Oakland to Berkeley, Richmond and San Pablo: the flatlands built over to the foot of the hills;
+    // the Berkeley and Oakland hills above about 120 m grassland (gold in summer), darker with oak, bay and eucalyptus on
+    // the north-facing slopes and in the canyons (Tilden, Claremont Canyon, Redwood Regional Park: the grass's scrub shading)
+    if (onPort(lat, lon) && h < 20) return 'port';
+    if (h > 120) return 'grass';
+    return h > 70 ? 'suburb' : 'city';
+  }
+  if (lat > 37.885 && lon > -122.445) return h > 45 ? 'grass' : 'city'; // Richmond: Point Richmond, the refinery, the harbor; the Potrero Hills and Point San Pablo's ridge grass
   if (lat > 37.787 && lat < 37.811 && lon > -122.486 && lon < -122.447) return 'woods'; // the Presidio
   if (lat > 37.8013 && lat < 37.8034 && lon > -122.4074 && lon < -122.4043) return 'woods'; // Pioneer Park, round Coit Tower
   if (lat > 37.764 && lat < 37.7745 && lon > -122.511 && lon < -122.454) return 'woods'; // Golden Gate Park
   if (lat < 37.812 && lon > -122.515) return lon > -122.4545 && lat < 37.7755 && h > 150 ? 'grass' : 'city'; // San Francisco (Twin Peaks grassy on top)
-  if (lat > 37.845 && h < 90 && lon > -122.51) return 'suburb'; // Sausalito, Tiburon, Belvedere, Mill Valley
+  if (lat > 37.845 && h < 90 && lon > (lat > 37.88 ? -122.58 : -122.51)) return 'suburb'; // Sausalito, Tiburon, Belvedere, Mill Valley; Corte Madera, Larkspur, San Rafael
   return 'grass';
 }
 
@@ -117,7 +131,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   const C = (h: string) => new THREE.Color(h);
   const PAL = {
     city: [C('#a9a796'), C('#bdb9a8'), C('#8f8f82'), C('#c6c0ae')], woods: [C('#45603f'), C('#3b5236'), C('#56704a')],
-    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')]
+    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')], paved: [C('#8c8b86'), C('#9d9a92'), C('#7b7c7a')]
   };
   const wood = new Uint8Array(nx * ny);
   const setSeason = (mo: number) => {
@@ -141,6 +155,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       else if (r === 'woods') { tmp.copy(PAL.woods[Math.floor(n * 3) % 3]); wood[k] = 1; }
       else if (r === 'rock') tmp.copy(PAL.stone).lerp(PAL.scrub, n < 0.5 ? 0.7 : 0.1); // Alcatraz: grey rock and concrete, patches of scrub and garden
       else if (r === 'suburb') tmp.copy(PAL.suburb[0]).lerp(PAL.suburb[1], n);
+      else if (r === 'port') tmp.copy(PAL.paved[Math.floor(n * 3) % 3]); // asphalt and concrete yards, container stacks seen from afar
       else {
         // grassland, with scrub on north-facing slopes and in the gullies, chaparral up high on Tamalpais
         tmp.copy(grass);
@@ -148,7 +163,8 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
         if (h > 380) tmp.lerp(PAL.chaparral, 0.6);
         tmp.offsetHSL(0, 0, (n - 0.5) * 0.06);
       }
-      if (h < 5 && r !== 'city') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      const shore = H[k - 1] <= 0 || H[k + 1] <= 0 || H[k - nx] <= 0 || H[k + nx] <= 0 || H[k - 2] <= 0 || H[k + 2] <= 0 || H[k - 2 * nx] <= 0 || H[k + 2 * nx] <= 0; // within 100 m of the water
+      if (h < 5 && shore && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
       else if (slope > 0.55) tmp.lerp(PAL.rock, 0.6); // cliffs
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
     }

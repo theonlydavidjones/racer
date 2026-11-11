@@ -29,6 +29,14 @@ const VIEWS = {
   wharf: [LL(37.8128, -122.4075, 25), LL(37.8098, -122.4120, 0)], // Pier 39 and its marina, Pier 41, from above the water off Pier 35
   aquatic: [LL(37.8118, -122.4285, 20), LL(37.8095, -122.4225, 0)], // Municipal Pier round Aquatic Park, Hyde Street Pier, from above the water to the west
   over_wharf: [LL(37.8095, -122.4160, 1400), LL(37.8095, -122.41601, 0)], // overhead: Aquatic Park to Pier 35
+  // the East Bay and the north reach (extended November 2026)
+  over_east: [LL(37.8300, -122.3000, 14000), LL(37.8300, -122.30001, 0)], // overhead: Oakland, Alameda, Emeryville and Berkeley
+  over_north: [LL(37.9300, -122.4000, 12000), LL(37.9300, -122.40001, 0)], // overhead: Richmond, Red Rock, Point San Pablo and the Brothers
+  berkeley: [LL(37.8650, -122.3600, 5), LL(37.8700, -122.2900, 120)], // the Berkeley shore and hills from the Berkeley Circle
+  oakland: [LL(37.8100, -122.3550, 5), LL(37.8000, -122.3100, 60)], // the Port of Oakland from off Yerba Buena Island
+  alameda: [LL(37.7800, -122.3600, 5), LL(37.7750, -122.3000, 40)], // Alameda Point and the Estuary's mouth from the south of the Bay Bridge
+  richmond: [LL(37.8950, -122.4250, 5), LL(37.9250, -122.3900, 60)], // Point Richmond and the Long Wharf from Southampton Shoal
+  sanpablo: [LL(37.9200, -122.4350, 5), LL(37.9620, -122.4330, 30)], // Red Rock, the Richmond–San Rafael Bridge and the Brothers from the south
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);
