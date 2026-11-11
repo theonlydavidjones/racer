@@ -26,6 +26,9 @@ const VIEWS = {
   over_angel: [LL(37.8620, -122.4320, 3500), LL(37.8620, -122.43201, 0)], // overhead: Angel Island
   over_city: [LL(37.7980, -122.4000, 3000), LL(37.7980, -122.40001, 0)], // overhead: the Cityfront and Rincon Hill
   over_water: [LL(37.8150, -122.4450, 900), LL(37.8150, -122.44501, 0)], // overhead: puffs near the line
+  wharf: [LL(37.8128, -122.4075, 25), LL(37.8098, -122.4120, 0)], // Pier 39 and its marina, Pier 41, from above the water off Pier 35
+  aquatic: [LL(37.8118, -122.4285, 20), LL(37.8095, -122.4225, 0)], // Municipal Pier round Aquatic Park, Hyde Street Pier, from above the water to the west
+  over_wharf: [LL(37.8095, -122.4160, 1400), LL(37.8095, -122.41601, 0)], // overhead: Aquatic Park to Pier 35
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);
