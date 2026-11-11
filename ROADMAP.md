@@ -68,6 +68,11 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Now — cruise ignores the chosen origin** (bug; ~1 h; for Marinas after the reset): owner, "there's a bug in cruise
   mode where I have an origin selected but it still starts me in the slip." When a cruise origin other than her slip is
   chosen, she must start there (sim/world.ts, the slip and docked start, near line 301). Goes with the push-off fix.
+- **Now — double-click to lash the tiller always lashes it amidships** (bug; <1 h; Crew Controls after the reset, with
+  its batch): owner, "double-clicking to lash the tiller doesn't work. if I double click while the tiller is selected,
+  the first click registers as a release, and the second as a lash. that means the tiller always gets lashed
+  amidships." Lash at the angle she held before the first click, or hold the release until the double-click window has
+  passed (app.ts tiller handling).
 - **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
   right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
   (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
