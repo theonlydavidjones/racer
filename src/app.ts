@@ -659,6 +659,9 @@ function setView(i: number): void {
 const anyOverlay = () => !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
+  // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
+  const tgt = e.target as HTMLElement | null;
+  if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) && e.key !== 'Escape') return;
   if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
   if (!$('keepAsk').hidden) return; // save or discard first
   const a = keymap.actionFor(e.key);
