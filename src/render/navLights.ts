@@ -111,8 +111,7 @@ const X = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vec
 export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; stern: THREE.Vector3; masthead: THREE.Vector3 }, kind: 'deck' | 'tricolour', ports: THREE.MeshPhongMaterial): NavLights {
   const group = new THREE.Group(); group.name = 'navLights'; grp.add(group);
   const housing = new THREE.MeshPhongMaterial({ color: 0x15171a, specular: 0x666666, shininess: 60 });
-  // the lanterns themselves, a group for each set: only the set in use is shown (the owner: "remove the hull lights
-  // when they're not in use")
+  // the lanterns themselves, a group for each set, always on her: only the light goes on and off
   const fittings = { underway: new THREE.Group(), anchor: new THREE.Group() }; group.add(fittings.underway, fittings.anchor);
   const nl: NavLights = { group, lamps: [], lenses: [], fittings, kind, sigma: 0.15, sigmaC: 0.1, ports };
   let role: Role = 'underway';
@@ -207,13 +206,12 @@ export function setRestrictedVisibility(on: boolean): void { restricted = on; }
  * Each frame: which set is lit, by what she's doing (`mode`), the clock (sunset to sunrise, Rule 20(b)) and the visibility (Rule 20(c)), and the
  * reflections' spread from the sea. In her slip or made fast to a dock she shows none (the Rules light vessels under
  * way or at anchor, not ones made fast to the shore), under way the sidelights and sternlight or the tricolour
- * (Rule 25), at anchor the all-round white (Rule 30). The lanterns not lit aren't drawn.
+ * (Rule 25), at anchor the all-round white (Rule 30). The lanterns stay on her, dark when not lit.
  */
 export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): void {
   const dark = ON() > 0 || restricted, lit = (r: Role) => dark && mode === r;
-  // (and only while they're lit, by the owner's wish: a real boat's lanterns stay on her by day; to draw them so, show
-  // the set for `mode` whatever the clock)
-  nl.fittings.underway.visible = lit('underway'); nl.fittings.anchor.visible = lit('anchor');
+  // (the lanterns themselves stay on her, lit or not, as on any boat: the owner's call)
+  nl.fittings.underway.visible = nl.fittings.anchor.visible = true;
   // the sea's slopes (Cox & Munk 1954): all directions σ² = 0.003 + 0.00512·U (night.ts, from the true wind); across the
   // wind σ_c² = 0.003 + 0.00192·U (the streak is taken as if seen across the wind)
   nl.sigma = NIGHT.uSlope.value; const U = Math.max(0, (nl.sigma ** 2 - 0.003) / 0.00512); nl.sigmaC = Math.sqrt(0.003 + 0.00192 * U);
@@ -224,5 +222,5 @@ export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): voi
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
   nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * DARK() : 0;
   // and below, seen through the open companionway: the cabin's lamplight on its own woodwork
-  if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.45 * DARK() : 0; }
+  if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.55 * DARK() : 0; }
 }

@@ -53,6 +53,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
+once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
+companionway redo) and Crew Figures; next as each finishes, Crew Controls and Marinas, then Bay East.
+
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
@@ -244,14 +248,18 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
    vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
    everywhere (off the Cityfront it should be about twice the slot's).
-4a. **The AI's tacks aren't held** (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
+4a. ~~**The AI's tacks aren't held**~~ (done: a tack or gybe she decides on is held until she's round; the rhumb-line test by
+   her close-hauled course; clear of the whole committee boat) (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
    uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
    boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
    last boat 63% behind the winner where the real SF fleet's median is 12% (sf-folkboat-results.json). Holding the
    decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
    38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
    only) and some never start.
-4b. **The AI sails at the mark** (AI 3, 4, 8, 9): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and gybing on the
+   laylines downwind, headers from her own wind held 10 s; to do: the planner's 8 s a tack; and the AI fouls at the
+   windward mark: 3–7 two-turn penalties among five boats in a 620 m race, the base code as much: mark-room and
+   right-of-way handling there): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
    she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
    620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
    and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
@@ -568,6 +576,25 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Downhaul: drawn as a gooseneck downhaul, cleat position approximate.
 
 ## Later
+
+- **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
+  getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the
+  technical port, plus the business setup):
+  - Wrap the same TypeScript and three.js code as a Mac and Windows app: Tauri for a small download, or Electron for
+    consistent graphics.
+  - Sell it on Steam, itch.io, or direct through Paddle or Lemon Squeezy.
+  - Move saves from the artifact's database and localStorage to local files, with Steam cloud sync.
+  - Cache NOAA, NWS and chart data for offline use, and check the ENC chart data's terms for bundling.
+  - Add a graphics-quality setting, an installer, and code-signing (Apple and Microsoft certificates, about $100 a year
+    each).
+  - Store page, trailer, privacy policy, price and refunds.
+  - Keep real skippers' names out of the shipped product without permission.
+
+  **Watch note:** move off the browser when any of these becomes true (the Coordinator flags it when one comes close):
+  - the artifact's 16 MB size limit is in sight (3.5 MB today);
+  - performance needs native threads or a GPU budget the browser can't give;
+  - saves outgrow the artifact database;
+  - we need things a page can't have: file access, game controllers, a full-screen app.
 
 - Real past races with real wind and current (goal 4).
 - More courses, and race-committee options (course changes, shortened courses).

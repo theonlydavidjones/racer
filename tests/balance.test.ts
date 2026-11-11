@@ -30,7 +30,9 @@ describe('Heel from the forces on the sails', () => {
     expect(h14).toBeLessThan(h20);
     expect(h20).toBeGreaterThan(18); expect(h20).toBeLessThan(30);
     // held at full power she'd be well over (the righting moment from the ORC certificates)
-    expect(beat(20, undefined, true).heelMag!).toBeGreaterThan(h20 + 3.5); // (the crew depower only as far as is fastest)
+    // (the crew depower only as far as is fastest; with the helm on the after deck, where it's narrower, about 0.3° less
+    // between the two than with the helm at the tiller's end)
+    expect(beat(20, undefined, true).heelMag!).toBeGreaterThan(h20 + 3.0); // (steady, 3.8°: this is 12 s in)
   });
   it('heels at once in a gust', () => {
     const b = beat(12), before = b.heelMag!;
