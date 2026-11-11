@@ -27,7 +27,7 @@ export const VESSEL: Record<VesselKind, VesselType> = {
 
 const route = (pts: [number, number][]) => pts.map(([la, lo]) => LL(la, lo));
 // Approximate tracks (lat, lon). Ships keep to the deep water north of the race area, inside Alcatraz.
-const ROUTES: Record<string, Vec[]> = {
+export const ROUTES: Record<string, Vec[]> = {
   channel: route([[37.8060, -122.5350], [37.8160, -122.4790], [37.8240, -122.4500], [37.8330, -122.4200], [37.8240, -122.3900], [37.8060, -122.3500]]),
   sausalito: route([[37.7960, -122.3910], [37.8060, -122.4050], [37.8190, -122.4330], [37.8400, -122.4640], [37.8560, -122.4770]]),
   alcatraz: route([[37.8080, -122.4040], [37.8180, -122.4130], [37.8262, -122.4212]]),
@@ -35,8 +35,8 @@ const ROUTES: Record<string, Vec[]> = {
   coastguard: route([[37.8325, -122.4740], [37.8200, -122.4600], [37.8150, -122.4400], [37.8260, -122.4350], [37.8325, -122.4740]])
 };
 
-interface Service { kind: VesselKind; route: string; loop: boolean; phase: number; dwell: number }
-const SERVICES: Service[] = [
+export interface Service { kind: VesselKind; route: string; loop: boolean; phase: number; dwell: number }
+export const SERVICES: Service[] = [
   { kind: 'container', route: 'channel', loop: false, phase: 0.15, dwell: 1500 },
   { kind: 'tanker', route: 'channel', loop: false, phase: 0.62, dwell: 2100 },
   { kind: 'ferry', route: 'sausalito', loop: false, phase: 0.3, dwell: 600 },

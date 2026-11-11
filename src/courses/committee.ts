@@ -73,7 +73,8 @@ const MANOEUVRE_S = 8, ROUNDING_S = 10;
  * 41): the leaders take about 15% longer than the polar arithmetic (puffs and lulls, tacks, each other's wind), and
  * rounding Alcatraz costs about six minutes more (the wide berth, and the patchy air in its lee).
  */
-const FLEET_FACTOR = 1.15, ISLAND_ROUNDING_S = 360;
+const FLEET_FACTOR = 1.15;
+export const ISLAND_ROUNDING_S = 360;
 
 /** Time (s) to sail from a to b, and how: tacking or gybing on the best angles, or straight there (crabbing across the current). */
 export function legTime(a: Vec, b: Vec, w: { kt: number; from: number }, c: Vec): { s: number; kind: LegKind } | null {
