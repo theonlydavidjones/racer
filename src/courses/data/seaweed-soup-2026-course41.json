@@ -27,9 +27,9 @@
     "committee": {
       "label": "GGYC flagpole",
       "kind": "shore",
-      "lat": 37.80925,
-      "lon": -122.44325,
-      "verify": "Flagpole on the GGYC deck to X. The addendum doesn't define the line; X is ~300 yd north of GGYC and exists to keep boats off the line mid-race, so it is the outer end."
+      "lat": 37.80799,
+      "lon": -122.4426,
+      "verify": "GGYC's race deck to X. The addendum doesn't define the line; GGYC's past sailing instructions (2011 Seaweed Soup, 2010 Farallon Race, as summarised: the PDFs weren't reachable) run it from an orange marker on the race deck to X, so X is the outer end. The deck end is on the Bay side of the clubhouse (OpenStreetMap: the clubhouse, way 239024736 at 1 Yacht Road, 37.8077 N 122.4426 W, as the city's building data has it), on the jetty's north seawall (OSM coastline, 37.8080 N there). The marker's own position isn't published: this is the seawall in front of the clubhouse, within about 10 m. (It was at 37.80925 N, 130 m out in the water.)"
     },
     "pin": {
       "label": "X",

@@ -60,8 +60,8 @@ describe('the chart against the sim', () => {
 
   /*
    * Where the sim's land (what you run aground on) and NOAA's land disagree, sampled every 20 m over the race area.
-   * This reports, it doesn't fix: the owner decides which to move. The known one is the Cityfront's hand-drawn shore
-   * (ROADMAP, Real shoreline: Fort Mason's piers sit east of the real ones).
+   * This reports, it doesn't fix: the owner decides which to move. (0.8% since the coast from Fort Point to Crissy
+   * Field came from OpenStreetMap; the rest is mostly the terrain's 50 m cells round Marin and Angel Island.)
    */
   it('agrees with the sim\'s coastline over the race area (reports where it doesn\'t)', () => {
     const land = ENC.land.map(p => p.map(ring)), strc = ENC.structures.map(p => p.map(ring));

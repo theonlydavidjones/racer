@@ -186,8 +186,11 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   }
   // the yacht clubs, and the GGYC flagpole (the inner end of the start line)
   place(group(block(47, 91, 10, lam(0xf1ede2)), block(40, 80, 3, lam(0xb5654a), 10)), 37.80728, -122.44664, 81, 2.3); // St. Francis YC: white walls, red tile roof
-  place(block(12, 16, 6, lam(0xf4f1ea)), 37.8090, -122.4433, 0, 2.3); // Golden Gate YC
-  place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80925, -122.44325, 0, 2.3);
+  // Golden Gate YC: OpenStreetMap's footprint (way 239024736, 1 Yacht Road: about 22 × 25 m, 8 m high, its long side
+  // along the jetty at 259°), on the south edge of the West Harbor jetty; the flagpole on its race deck at the jetty's
+  // north seawall, facing the Bay (the start line's inner end: see the Seaweed Soup course files)
+  place(block(22, 25, 8, lam(0xf4f1ea)), 37.80773, -122.44259, 79, 2.3);
+  place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80799, -122.44260, 0, 2.3);
   // Fort Mason's piers, with the long pier sheds
   // (on the real piers, OpenStreetMap's coast: Piers 1, 2 and 3, ending at 37.8085, 37.8091 and 37.8092; each shed's
   // north end a few metres short of its pier's, turned to the pier: they run 7–14° west of north)

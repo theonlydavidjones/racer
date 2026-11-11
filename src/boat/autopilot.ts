@@ -2,7 +2,7 @@ import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
-import { onLand } from '../geo/shore';
+import { landAlong } from '../geo/shore';
 import { detour } from '../ai/ai';
 
 /**
@@ -102,8 +102,9 @@ function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
   return Math.abs(k) > 0.9 ? null : n360(brgT - Math.asin(k) / D2R);
 }
 
-/** Land within `d` m ahead on heading h? */
-const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); for (let s = 20; s <= d; s += 20) if (onLand({ x: b.x + u.x * s, y: b.y + u.y * s })) return true; return false; };
+/** Land within `d` m ahead on heading h? The whole way, exactly (geo/shore.ts landAlong): a pier or a dock a metre
+ * or two wide is in the way, however far ahead it is. */
+const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); return landAlong(b, { x: b.x + u.x * d, y: b.y + u.y * d }) <= d; };
 
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
 function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
