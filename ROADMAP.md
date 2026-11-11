@@ -1,6 +1,6 @@
 # Build plan
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips). Later: the East Harbor and the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the harbor's real dock letters and slip numbers; boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
 
 What's planned, roughly in order. Done work is described in the README.
 
@@ -20,7 +20,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (12–20 h); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda
-and Richmond (10–16 h); Gashouse Cove, South Beach and Corinthian marinas (9–15 h); Sam's (3–5 h); accounts for other
+and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
 phone layout (on hold, 8–12 h).
@@ -55,7 +55,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **The Bay, in depth:** bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
-- **More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.
+- ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
 - **Save or discard** after each race or cruise: asked when it ends, before it goes in the logbook.
 - **Heaving to, and the other seamanship manoeuvres** (a real-world stress test the sim fails today): each jib sheet on

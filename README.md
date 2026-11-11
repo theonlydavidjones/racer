@@ -152,11 +152,16 @@ When a race or a cruise ends (you leave it, start another, or go to setup), you'
 
 `src/boat/autopilot.ts`: an electric ram on the tiller, modelled on the common Raymarine ST2000+ (hard over to hard over in 4 s, no load), so it can't correct faster than that, and in a seaway it works all the time. It steers a turn rate proportional to the heading error; its AutoTrim learns the standing helm (weather helm) she needs and carries it. In Wind mode it reads the masthead unit damped over 2.5 s, as a pilot's response setting does. Nav is the pilot plus a navigator calling the tacks. It keeps no lookout: other boats, ships and the shore ahead on a reach are still yours. Tested: holding course on a beam reach in a real seaway (within 3°, tiller within 17% of its travel), no standing error close-hauled in 20 kt, and beating to Crissy Field from the Cityfront in 11 minutes with two tacks.
 
-### West Harbor
+### The marinas
 
-San Francisco Marina's West Harbor, by the St. Francis and Golden Gate yacht clubs, from OpenStreetMap (`scripts/make-west-harbor.mjs` → `src/geo/data/west-harbor.json`, `src/geo/marina.ts`): the basin, the stone breakwaters, the entrance at the east end by its red beacon (Q R), 22 main walkways and 165 slip fingers. The basin is water you can sail in; the docks and breakwaters are solid (you bump the dock). Slips aren't mapped, so they're worked out from the fingers: 278 that a Folkboat fits in (her length and beam clear of every dock). The dock letters and slip numbers are this sim's, not the harbor's. Floating concrete docks, steel pilings and generic boats in about three-quarters of the slips.
+Four harbors, each from OpenStreetMap: its basin (water you can sail in), its breakwaters, its docks (main walkways and slip fingers) and solid piers, and its entrance beacons. Docks and breakwaters are solid (you bump the dock). Slips aren't mapped, so they're worked out from the fingers: those a Folkboat fits in (her length and beam clear of every dock). Floating wooden docks, timber pilings and generic boats in about three-quarters of the slips.
 
-In the **Marina**, give any of your boats a slip. In **Cruise**, start from her slip (turned bow out, ready to sail off) and/or sail back to it: you're home when she's in it and stopped.
+- **West Harbor**, San Francisco Marina, by the St. Francis and Golden Gate yacht clubs (`scripts/make-west-harbor.mjs`): the entrance at the east end by its red beacon (Q R); 284 slips. Dock letters and slip numbers are this sim's: the harbor's own aren't published anywhere we could reach.
+- **Gashouse Cove**, the Marina's East Harbor, by Fort Mason (`scripts/make-marinas.mjs`, like the two below): the way in from the north, between the hooked pier along the north side and Fort Mason's Pier 1; 313 slips on docks A–G. Dock letters (north to south) and slip numbers are this sim's.
+- **South Beach Harbor**, by Oracle Park: the breakwater along the east side with a way in at each end between lateral beacons (red triangles, green squares); 676 slips. Docks A–G (north to south) are the harbor's own names; slip numbers are this sim's, along each dock from the shore.
+- **The Corinthian Yacht Club**, Tiburon: the basin behind the club's L-shaped breakwater, open to the north-east between its end and the ferry floats; 58 slips. A dock is the southernmost line, along the breakwater, with the guest dock at its end (the club's visitor notes); B and C, the fingers (not mapped) and the slip numbers are inferred.
+
+In the **Fleet**, give any of your boats a home marina and a slip in it. In **Cruise**, start from her slip (bow in, made fast: push off to leave) and/or sail back to it: you're home when she's nosed in and stopped. In **Race**, start from her slip with time to sail out to the line (from South Beach or Tiburon, 5–7 km away, up to two hours before the warning signal: speed up the clock).
 
 ### The real day: observed, forecast, or from the records
 
