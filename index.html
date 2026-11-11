@@ -44,21 +44,30 @@
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
-  <div class="tp-head"><span id="tpWho">Crew is trimming</span><button class="tp-more" id="bTrim" type="button" hidden>Give all back</button></div>
+  <div class="tp-head"><span class="tp-lab">Sail trim</span><span id="tpWho">Crew trims every line</span></div>
   <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
-    <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button>
-    <button class="tp-auto" id="bMainAuto" type="button">Auto</button></div>
+    <button class="tp-btn two" id="bMainIn" type="button" aria-label="Trim the main in">Trim<small>boom in</small></button><button class="tp-btn two" id="bMainOut" type="button" aria-label="Ease the main">Ease<small>boom out</small></button>
+    <span class="who" id="whoMain" data-line="mainsheet" role="group" aria-label="Who works the mainsheet"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
   <div class="tp-row" id="tpJibRow"><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span>
-    <button class="tp-btn" id="bJibIn" type="button" aria-label="Trim the jib in">Trim</button><button class="tp-btn" id="bJibOut" type="button" aria-label="Ease the jib">Ease</button>
-    <button class="tp-btn tp-back" id="bJibBack" type="button">Back</button>
-    <button class="tp-auto" id="bJibAuto" type="button">Auto</button></div>
+    <button class="tp-btn two" id="bJibIn" type="button" aria-label="Trim the jib in">Trim<small>sheet in</small></button><button class="tp-btn two" id="bJibOut" type="button" aria-label="Ease the jib">Ease<small>sheet out</small></button>
+    <button class="tp-btn two tp-back" id="bJibBack" type="button"><span class="w">Back</span><small>jib to windward</small></button>
+    <span class="who" id="whoJib" data-line="jibsheet" role="group" aria-label="Who works the jib sheet"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
   <div class="tp-row" id="tpPoleRow"><span class="tp-lab">Pole</span><span class="tp-state" id="tpPole"></span>
     <button class="tp-btn tp-pole" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button></div>
-  <div class="tp-row" id="tpCrewRow"><span class="tp-lab" id="tpCrewLab">Crew</span>
-    <span class="tp-seg" role="group" aria-label="Crew weight across the boat (your choice holds until you change it or tap Auto)"><button class="tp-btn sm" type="button" data-ca="lee" title="Crew to leeward (7)">Lee</button><button class="tp-btn sm" type="button" data-ca="mid" title="Crew in the middle">Mid</button><button class="tp-btn sm" type="button" data-ca="up" title="Crew sitting up to windward">Up</button><button class="tp-btn sm" type="button" data-ca="hike" title="Crew hiking out (8)">Hike</button></span>
-    <span class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Crew weight fore and aft (tap the lit one again to leave fore and aft to the crew)"><button class="tp-btn sm" type="button" data-cf="aft" title="Weight aft, by the helm (0)">Aft</button><button class="tp-btn sm" type="button" data-cf="fwd" title="Weight forward in the cockpit (9)">Fwd</button></span>
-    <button class="tp-auto sm" id="bCrewAuto" type="button" aria-pressed="true" title="On auto: the crew place their own weight">Auto</button></div>
-  <div class="tp-hint tp-crew" id="tpCrew"></div>
+  <!-- the crew's weight: one line while they place themselves (tap it to open); open while you've placed them -->
+  <div class="tp-crewbox" id="tpCrewBox">
+    <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
+      <span class="who" id="whoCrew" data-line="crew" role="group" aria-label="Who works the crew weight"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
+    <div class="tp-crewopen" id="tpCrewOpen" hidden>
+      <div class="tp-wind" id="tpWind">Wind over the port side: port is windward, starboard leeward</div>
+      <div class="tp-seg tp-across" id="tpCrewRow" role="group" aria-label="Where the crew sit across the boat">
+        <button class="tp-btn two" type="button" data-ca="lee"><span class="w">Sit to leeward</span><small data-side="lee">stbd &middot; heels her</small></button><button class="tp-btn two" type="button" data-ca="mid"><span class="w">Middle</span><small>on the centreline</small></button><button class="tp-btn two" type="button" data-ca="up"><span class="w">Sit up</span><small data-side="up">port side deck</small></button><button class="tp-btn two" type="button" data-ca="hike"><span class="w">Hike out</span><small data-side="hike">port rail &middot; holds her up</small></button>
+      </div>
+      <div class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Where the crew sit fore and aft (tap the lit one again to leave it to the crew)">
+        <button class="tp-btn two" type="button" data-cf="fwd"><span class="w">Forward</span><small>bow down &middot; light, flat</small></button><button class="tp-btn two" type="button" data-cf="aft"><span class="w">Aft</span><small>stern down &middot; fast, or chop</small></button>
+      </div>
+    </div>
+  </div>
   <div class="tp-hint" id="tpHint"></div>
   <div class="tp-shape" id="tpShape"></div>
   <div class="tp-balance" id="tpBalance"></div>
@@ -117,13 +126,12 @@
   <div class="panel wide home">
     <div class="eyebrow">San Francisco Bay</div>
     <h1>Folkboat Racing Sim</h1>
-    <p class="lede">Nordic Folkboats on the real Bay, in the real wind, tide and sea for the day you choose.</p>
     <div class="modes three">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
       <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats and their records</span></button>
     </div>
-    <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button><button type="button" class="linkbtn" data-home="club">Yacht Club: coming</button><span class="savenote" id="saveNote"></span></div>
+    <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button></div>
   </div>
 </div>
 <div class="overlay" id="club" hidden>
@@ -310,10 +318,12 @@
       <div><div class="eyebrow">Settings</div><h2>Settings</h2></div>
       <button class="ghost" id="bKeysClose" type="button">Done</button>
     </div>
-    <div class="field"><span>On screen</span>
-      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div>
-      <div class="seg" data-k="windDial"><button type="button" data-v="0">No wind-angle dial</button><button type="button" data-v="1">Show the wind-angle dial</button></div>
-      <small>Training aids. Real boats have neither: they have the windex and the telltales.</small></div>
+    <div class="field"><span>Training aids</span>
+      <div class="togs">
+        <label class="tog">Show laylines and zones<input type="checkbox" data-t="aids"><span class="tog-sw"></span></label>
+        <label class="tog">Show wind-angle dial<input type="checkbox" data-t="windDial"><span class="tog-sw"></span></label>
+      </div>
+      <small>Real boats have neither: they have the windex and the telltales.</small></div>
     <details class="more"><summary><u>How to sail her ▸</u></summary>
     <div class="help">
       <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
@@ -323,7 +333,7 @@
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
     <div class="field"><span>Keyboard</span>
-    <small>Click Change, then press the key you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
+    <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
     <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
