@@ -127,7 +127,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
   (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
   (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
-  current tack, and what auto is doing now. Layout to the owner first.
+  current tack, and what auto is doing now. Every line's setting, too: owner, "can't tell which way is 'on' for the
+  backstay. is 0% on? or 100%?" (100% is on: controls.ts, 0 off … 1 bar tight). Label each end in sailors' words
+  (eased … on, or for the traveller windward … leeward) and what that end does to the sail. Layout to the owner first.
 - **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
