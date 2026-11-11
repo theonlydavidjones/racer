@@ -1,10 +1,11 @@
 import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
-import { crewWords } from './crewWords';
+import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { PLACES } from '../sim/places';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
+import { currentWords } from '../sim/outlook';
 import { byHand, sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
@@ -53,6 +54,19 @@ export function fmtClock(t: number): string {
 export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
 
 /** Instrument pods, wind dial, course map, situation banner and line-aid readout. Redraws at 10 Hz. */
+/**
+ * The point of sail, by the true wind angle: close-hauled is as close as she sails well (her beat angle in this wind
+ * and sea, boat/seaway.ts), a beam reach the wind square across her (80–100°), a run within 20° of dead downwind; head
+ * to wind inside 30°, where no sail draws.
+ */
+export function pointOfSail(u: Boat): { short: string; long: string } {
+  const a = Math.abs(u.twa), beat = beatFor(u);
+  const [short, long] = a < 30 ? ['head to wind', 'head to wind'] : a < beat + 7 ? ['close-hauled', 'close-hauled']
+    : a < 80 ? ['close reach', 'on a close reach'] : a <= 100 ? ['beam reach', 'on a beam reach']
+    : a < 160 ? ['broad reach', 'on a broad reach'] : ['run', 'running'];
+  return { short, long };
+}
+
 export class Hud {
   private acc = 0;
   mapZoom = false;
@@ -192,7 +206,9 @@ export class Hud {
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
     this.windex(u);
     const poleTxt = u.pole === 'set' ? (u.poleTack === u.tack ? ' · wing' : '') : u.pole === 'setting' ? ' · poling' : u.pole === 'stowing' ? ' · stowing' : '';
-    $('tackLab').textContent = (u.tack === 'S' ? 'Stbd' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt || ` · ${Math.round(Math.abs(u.awa))}°`);
+    { const pos = pointOfSail(u);
+      $('tackLab').textContent = (u.tack === 'S' ? 'Stbd' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt || ` · ${pos.short}`);
+      $('tackLab').title = `${u.tack === 'S' ? 'Starboard' : 'Port'} tack, ${pos.long}: ${Math.round(Math.abs(u.twa))}° off the true wind, ${Math.round(Math.abs(u.awa))}° apparent`; }
     // the pole only on deep points of sail: a poled-out jib fills from about 145° true (polar.ts jibEfficiency), so the
     // row appears at 140° (time to set it as you bear away) and goes below 135°; while it's out it stays, to take it in
     const deep = Math.abs(u.twa), wantPole = u.pole !== 'down' || deep >= (this.poleRowShown === true ? 135 : 140);
@@ -203,22 +219,31 @@ export class Hud {
     $('tpPole').textContent = u.pole === 'set' ? (u.poleTack === u.tack ? 'Wing' : 'Set') : u.pole === 'down' ? 'Stowed' : '…';
     this.poleHints(w, u);
     this.trimPanel(u);
-    $('twd').textContent = String(Math.round(ww.from) % 360).padStart(3, '0');
+    // the wind on the water here (the windex has the angle); its direction goes under it
+    $('tws').textContent = ww.kt.toFixed(0);
+    const twd = String(Math.round(ww.from) % 360).padStart(3, '0') + '°';
+    // the tide where you are: the current's speed, flood or ebb by the nearest NOAA station's flood direction (or, with
+    // a practice current, the Gate's: the flood sets in, about 095°: environment/current.ts)
+    { const c = u.cur, kt = Math.hypot(c.x, c.y) / KT;
+      const st = w.tide?.stations.length ? w.tide.stations.reduce((a, s) => (dist(s.p, u) < dist(a.p, u) ? s : a)) : null;
+      const flood = st ? st.flood : 95, slack = kt < 0.15;
+      $('tideVal').textContent = slack ? 'Slack' : kt.toFixed(1);
+      $('tideLab').textContent = slack ? 'Tide' : dot(c, V(flood)) >= 0 ? 'Flood' : 'Ebb';
+      $('tideVal').title = slack ? 'Slack water here' : `The tide here: ${currentWords(c, flood)}`; }
     // the sea where you are: chop height (what slows you), and the swell
     { const s = u.sea, ft = (m: number) => (m / 0.3048).toFixed(1) + ' ft';
-      $('seaVal').textContent = s.hsW < 0.03 && s.hsS < 0.03 ? 'Flat' : (s.hsW / 0.3048).toFixed(1);
       const ftS = (m: number) => (m / 0.3048).toFixed(m < 0.3 ? 1 : 0) + ' ft'; // short enough for the box
       $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · ${ftS(s.hsS)} swell` : '');
       $('seaSub').title = `${s.hsW < 0.05 ? 'Glassy' : `${ft(s.hsW)} of ${s.steep > 0.075 ? 'steep ' : ''}chop`}${s.hsS >= 0.05 ? `, ${ft(s.hsS)} of swell` : ''}`; }
     const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
-    if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = (lifted ? 'Lift ' : 'Header ') + Math.abs(dev).toFixed(0) + '°'; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); }
+    if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = `${twd} · ${lifted ? 'lift' : 'head'} ${Math.abs(dev).toFixed(0)}°`; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); sl.title = `True wind from ${twd}, ${lifted ? 'a lift' : 'a header'} of ${Math.abs(dev).toFixed(0)}° on this tack`; }
     else {
       // in a puff or a lull?
       const k = w.puffs.at(u).k, lee = u.leeK ?? 1, dirty = (u.shadowK ?? 1) / lee; // the land's lee, and other boats' and ships' wakes
       // short enough for the box; the full words on hover
       const blanket = dirty < 0.95 ? ` · dirty −${Math.round((1 - dirty) * 100)}%` : lee < 0.92 ? ` · lee −${Math.round((1 - lee) * 100)}%` : '';
       const why = dirty < 0.95 ? `in another boat's or a ship's dirty air (${Math.round((1 - dirty) * 100)}% less wind)` : lee < 0.92 ? `in the lee of the land (${Math.round((1 - lee) * 100)}% less wind)` : k > 1.08 ? 'in a puff' : k < 0.92 ? 'in a lull' : '';
-      sl.textContent = ww.kt.toFixed(0) + ' kt' + (blanket || (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : ' on water'));
+      sl.textContent = twd + (blanket || (k > 1.08 ? ' · puff' : k < 0.92 ? ' · lull' : ' true'));
       sl.title = `${ww.kt.toFixed(1)} kt of wind on the water here${why ? ', ' + why : ''}`;
       sl.className = 'sub' + (blanket ? ' head' : k > 1.08 ? ' lift' : '');
     }
@@ -232,7 +257,7 @@ export class Hud {
     const [mw, mc] = u.luff ? ['Eased', 'off'] : word(u.trim.main, '');
     const backed = (u.jibBacked ?? 0) > 0.3;
     const [jw, jc] = backed ? ['Aback', 'backed'] : u.luff ? ['Eased', 'off'] : word(u.trim.jib, plan === 'wing' ? 'Poled out' : 'Down');
-    $('tpCrew').textContent = crewWords(u);
+    $('tpCrew').textContent = crewWords(u); showCrewRow(u);
     const tm = $('tpMain'), tj = $('tpJib');
     tm.textContent = mw; tm.className = 'tp-state ' + mc;
     tj.textContent = jw; tj.className = 'tp-state ' + jc;

@@ -1,6 +1,6 @@
 # Build plan
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
 - **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
   neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
@@ -55,17 +55,17 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
-- **Now — crew buttons fight auto** (bug; 1–2 h): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
+- ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
-- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h): water shows through the cockpit sole, and it's
+- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
-- **Now — bow spray** (bug; 1–2 h): at night the spray against the bow is "white squares… they look fake and read as
+- **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
-- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h): "a transparent seem between the keel and the
+- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
   the keel's rabbet). Check from both sides.
@@ -86,18 +86,49 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
   sides on both tacks.
+- **Now — push off doesn't get her out of the slip** (bug; 2–3 h; in progress: Marinas, with a test over every slip): "push off action is still not getting me far
+  enough into the fairway of any marina to be able to get out of the slip. also, push off should move me forward if
+  I'm at a dock that doesn't require me to be nosed in." Today (geo/marina.ts planPushOff) every berth is treated as
+  bow-in: the crew walks her back until her bow is level with the finger's end, swings her and shoves, and she stops
+  short of a fairway she can sail or steer out along. True to life: the crew walks her right out of the slip and into
+  the fairway, pointed down it toward the exit, before stepping aboard with a shove, so she keeps steerage way; at
+  an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
+  in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
+  the shove from her real mass and low-speed drag, not a set distance.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
-  (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. Also check whether the "big white V" at the
+  (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
+  and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
-- **Next — the bow wave** (polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
+- **Now — the crew, drawn and animated as well as the boat** (accuracy + bug; 10–16 h; in progress: Crew Figures, screenshots to the owner partway; moved up from the unranked
+  "crew figures and animation"): owner, "crew movement animations are clumsy, ugly, and distracting… we have so much
+  beauty and accuracy in this game and the physics of crew movement are super cool, but the animations are complete
+  garbage… we need crew drawings and animations to be commensurate with what we have for the boat." Found: (1) the crew
+  move through the hull (their paths must go over the deck, coamings and thwart, never through them); (2) in auto they
+  move "with a frequency that isn't true to life": a real crew moves on a puff, a lull, a tack or a job, and otherwise
+  sits still, so the auto crew needs a dead band and a minimum time between moves (source it: racing coaches'
+  guidance, or video of Folkboat crews); (3) in "mid" they're "sitting on an invisible chair": they need a real seat
+  (the cockpit seat, the thwart, the floor, the bridge deck). Real bodies (proportions, clothing, lifejackets as in
+  reference/photos), poses for each job (helm on the aft deck or aft rail per the thwart item, hiking with feet under
+  the straps, sitting to leeward, at the winch, at the piano, crossing on a tack), and moves that follow the physics.
+  Check from both sides on both tacks.
+- **Now — crystal clarity on the crew and trim controls** (polish/clarity; 4–6 h; Crew Controls, after the bottom-bar layout; merged with the trim controls review
+  below): owner, "I also can't understand the buttons, even after using them for a while. how do I get them to hike on
+  the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
+  (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
+  (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
+  current tack, and what auto is doing now. Layout to the owner first.
+- **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
+  controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
+  line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
+- **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
-- **Next — instruments** (feature; 1–2 h): the TWD dial's big number should be **wind speed** ("I already have the windex
+- ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
   for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
   the **windex** dial's subtext should add the **point of sail**.
-- **Next — the buttons at bottom-left** (polish; 3–5 h): "starting to overload". They mix trim, navigation, pausing and
+- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 
@@ -124,7 +155,7 @@ Also found on the way: the outhaul's range was five points of camber, past what 
 the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
 car, an estimate between the end points).
 
-~~**Performance review**~~ (owner, November 2026: no lag or crashes as the sim grows; done). **The budget**: a steady
+~~**Performance review**~~ (owner, November 2026: no lag or crashes as the sim grows; done, v78). **The budget**: a steady
 60 fps on a typical laptop in a full race (eight boats, ships, wildlife, the chart): a frame's JS (the sim's steps, the
 scene's update, labels, HUD and maps) within about 8 ms of the 16.7, and the sim's steps within 3 ms of that at 4×
 speed; at most 2,000 draw calls and 2 million triangles in any view, day or night; the page up in under a few seconds;
@@ -165,7 +196,7 @@ wind's gradient and the heeled wind triangle, the keel's induced drag, depowerin
 do: the depowering question above, waves and puffs in every response, the gusts' peaks against the records; 6–10 h
 left); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
-in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
+in depth (~~done~~, published); crew figures and animation (moved up to now, above); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); ~~accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands~~ (done);
@@ -201,7 +232,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
-- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable; the overlit skyline fixed in v79: lit windows follow the DOE reference buildings' lighting schedules, offices 50% at 19:00, 10% by 22:30, 5% on weekend nights, clustered by floor. more far glow on the towers on weekend nights in v80 (owner's call); the homes' peak lit share stays at 0.3) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
   suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
   the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
   night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
@@ -246,7 +277,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
-- **Your boat** (done: looks, flags, condition). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
+- **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)
@@ -287,6 +318,17 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
 3. ~~**Landmarks you steer and sight by:**~~ (done, with transits for the start line and laylines) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. ~~**Marks and the committee boat:**~~ (done; no general recall yet) real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
+4a. **The Ferry Building, drawn properly** (owner, November 2026: "a more complete drawing of the ferry building, with
+   Port of San Francisco sign… Not urgent"; later; accuracy/polish; 4–6 h). Today (render/landscape.ts) it's a
+   30 × 200 × 15 m cream box with a 60 m tower, a pyramid roof and four lit 6.7 m clock dials; no sign, arcade or slips.
+   True to life (Wikipedia, Ferry Building (San Francisco)): A. Page Brown, Beaux-Arts, opened 1898; the clock tower is
+   245 ft (75 m), so ours is 15 m short; the building is about 660 ft (200 m) long with an arched arcade along the
+   whole base; four 22 ft (6.7 m) dials, the inner dial lit at night; ferry slips B–G behind it on the Bay side (B to
+   the north, C–D the Golden Gate Ferry terminal at the centre, E–G south); the plaza in front. The **PORT OF SAN
+   FRANCISCO** sign has been on the Bay side since 1951, replacing "Welcome to San Francisco" (OpenSFHistory photo
+   wnp25.2344). Still to find: its letter style and colour, exact position, and whether it's lit at night (the Port's
+   sign guidelines, sfport.com, have a Ferry Building section: that host needs allowing), the building's width and
+   roof height, and its OSM footprint.
 5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
 6. ~~**Moored boats**~~ (done: the anchorages; marinas need the real shoreline) **and marina life** in the harbour behind the line; traffic (see below).
 

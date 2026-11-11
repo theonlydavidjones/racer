@@ -126,13 +126,14 @@ export class Harbor {
     const fascia = new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide });
     const rock = new THREE.MeshLambertMaterial({ color: 0x8a8176 });
     const concrete = new THREE.MeshLambertMaterial({ color: 0xcfcbc2 }), white = new THREE.MeshLambertMaterial({ color: 0xf2f2ee }); // weathered white-grey concrete; white pipe rails
+    const whitePile = new THREE.MeshLambertMaterial({ color: 0xeeeeea }), paved = new THREE.MeshLambertMaterial({ color: 0x9c968c }); // white-sleeved piles; a weathered paved path
     const pileMat = new THREE.MeshLambertMaterial({ color: 0x5b4a3a }), capMat = new THREE.MeshLambertMaterial({ color: 0x8a8c8e });
     const pileGeo = new THREE.CylinderGeometry(0.17, 0.19, 4.2, 10), capGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10);
-    for (const H of HARBORS) this.build(H, deck, fascia, rock, concrete, white, pileMat, capMat, pileGeo, capGeo);
+    for (const H of HARBORS) this.build(H, deck, fascia, rock, concrete, white, whitePile, paved, pileMat, capMat, pileGeo, capGeo);
     scene.add(this.group);
   }
 
-  private build(H: HarborGeo, deck: THREE.Material, fascia: THREE.Material, rock: THREE.Material, concrete: THREE.Material, white: THREE.Material, pileMat: THREE.Material, capMat: THREE.Material, pileGeo: THREE.BufferGeometry, capGeo: THREE.BufferGeometry): void {
+  private build(H: HarborGeo, deck: THREE.Material, fascia: THREE.Material, rock: THREE.Material, concrete: THREE.Material, white: THREE.Material, whitePile: THREE.Material, paved: THREE.Material, pileMat: THREE.Material, capMat: THREE.Material, pileGeo: THREE.BufferGeometry, capGeo: THREE.BufferGeometry): void {
     // the docks: each walkway one continuous strip with mitred corners; each finger a strip from the walkway's edge
     // (trimmed or extended to meet it) to its end; decked in boards laid across, with darker fascias down the sides
     const walks = H.walkways, fingers = H.fingers; // (their ends already meet the walkways' edges: geo/marina.ts)
@@ -156,7 +157,7 @@ export class Harbor {
     [...tops, ...sides].forEach(g => g.dispose());
     // pilings: timber, standing well above the docks (the docks ride up and down them with the tide)
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
-    const pile = new THREE.InstancedMesh(pileGeo, pileMat, piles.length), cap = new THREE.InstancedMesh(capGeo, capMat, piles.length); // galvanised pile caps
+    const pile = new THREE.InstancedMesh(pileGeo, H.piles === 'white' ? whitePile : pileMat, piles.length), cap = new THREE.InstancedMesh(capGeo, capMat, piles.length); // galvanised pile caps
     piles.forEach((p, i) => { m.compose(P3(p.x, p.y, 0.6), q, one); pile.setMatrixAt(i, m); m.compose(P3(p.x, p.y, 2.73), q, one); cap.setMatrixAt(i, m); });
     pile.computeBoundingSphere(); cap.computeBoundingSphere();
     this.group.add(pile, cap);
@@ -187,6 +188,17 @@ export class Harbor {
         const a = b.pts[i - 1], c = b.pts[i], len = Math.hypot(c.x - a.x, c.y - a.y);
         const bx = new THREE.Mesh(new THREE.BoxGeometry(BREAKWATER_W, 2.6, len), rock); bx.position.copy(P3((a.x + c.x) / 2, (a.y + c.y) / 2, 1.0)); bx.rotation.y = -Math.atan2(c.x - a.x, c.y - a.y) + Math.PI; this.group.add(bx);
       }
+    }
+    // paved paths along the breakwaters' tops, 3 m wide, just above the rock (its top: 2.6 m)
+    for (const path of H.paths) {
+      const pos: number[] = [];
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1], c = path[i], l = Math.hypot(c.x - a.x, c.y - a.y); if (l < 0.1) continue;
+        const n = { x: (c.y - a.y) / l * 1.5, y: -(c.x - a.x) / l * 1.5 };
+        for (const p of [[a, -1], [a, 1], [c, 1], [a, -1], [c, 1], [c, -1]] as [Vec, number][]) { const q = P3(p[0].x + n.x * p[1], p[0].y + n.y * p[1], 2.65); pos.push(q.x, q.y, q.z); }
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+      this.group.add(new THREE.Mesh(g, paved));
     }
     // the entrance beacons: a red triangle (Q R) or a green square on a post, with its light
     for (const bc of H.beacons) {
