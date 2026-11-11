@@ -22,10 +22,12 @@ describe('the AI sails the boat as a sailor does', () => {
       if (w.t < 0) continue;
       for (const b of ai) {
         if (!b.started || b.finished || b.penalty > 0) { pending.delete(b.id); stuck.delete(b.id); continue; }
-        const g = b.ai!.goTack;
-        if (g && b.twa < 90 && !pending.has(b.id)) pending.set(b.id, { to: g.to, at: w.t });
+        // (a tack held while nobody's near: keeping clear of another boat rightly comes first, Rules 10–16)
+        const g = b.ai!.goTack, near = w.boats.some(o => o !== b && Math.hypot(o.x - b.x, o.y - b.y) < 30);
+        if (g && g.mode === 'beat' && !pending.has(b.id)) pending.set(b.id, { to: g.to, at: w.t });
         const p = pending.get(b.id);
-        if (p && b.tack === p.to) pending.delete(b.id);
+        if (p && near) pending.delete(b.id);
+        else if (p && b.tack === p.to) pending.delete(b.id);
         else if (p && w.t - p.at > 15) { late.push(`${b.name} t${p.at.toFixed(0)}`); pending.delete(b.id); }
         // head to wind (within 10°) for more than 6 s
         const h2w = b.twa < 10 ? (stuck.get(b.id) ?? 0) + DT : 0; stuck.set(b.id, h2w);
