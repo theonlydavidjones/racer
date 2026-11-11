@@ -23,6 +23,7 @@ export function autoAcross(u: Boat): 'lee' | 'mid' | 'up' | 'hike' {
   const m = u.crew?.mode; return m === 'leeward' ? 'lee' : m === 'hike' ? 'hike' : m === 'centre' || m === 'downwind' || m === 'foredeck' ? 'mid' : 'up';
 }
 
+let lastRow = '';
 /**
  * The trim panel's crew row: who's in charge of where they sit. On auto, the Auto pill is lit and a faint outline
  * follows where the crew have put themselves; once you've placed them, your choice is lit, the row says "you", and
@@ -30,7 +31,9 @@ export function autoAcross(u: Boat): 'lee' | 'mid' | 'up' | 'hike' {
  */
 export function showCrewRow(u: Boat): void {
   const c = u.crew, pl = c?.place, mine = !!pl;
-  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : null, autoA = c ? autoAcross(u) : null;
+  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : 'mid', autoA = c ? autoAcross(u) : null;
+  // (this runs every frame: touch the page only when something has changed)
+  const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}`; if (key === lastRow) return; lastRow = key;
   document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => {
     bt.classList.toggle('on', pl?.across === bt.dataset.ca);
     bt.classList.toggle('at', !pl?.across && autoA === bt.dataset.ca);

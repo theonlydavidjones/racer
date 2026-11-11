@@ -447,11 +447,11 @@ sheetBtn('bMainIn', 'mainsheet', -1); sheetBtn('bMainOut', 'mainsheet', 1); shee
 const ACROSS: PlaceAcross[] = ['lee', 'mid', 'up', 'hike'], FORE: PlaceFore[] = ['aft', 'mid', 'fwd'];
 function setPlace(part: 'across' | 'fore', v: PlaceAcross | PlaceFore): void {
   const c = w.user.crew; if (!c || !w.running) return;
+  if (!c.spec.crew.length && part === 'fore') { toast('Single-handed, you can\'t leave the tiller to move forward: only your own weight across the boat moves.', 3500); return; }
   const was = !!c.place, pl = c.place ?? { across: null, fore: null };
   if (part === 'across') pl.across = v as PlaceAcross; else pl.fore = v as PlaceFore;
   c.place = pl;
-  if (!c.spec.crew.length && part === 'fore') toast('Single-handed, you can\'t leave the tiller to move forward: only your own weight across the boat moves.', 3500);
-  else if (!was) toast('Crew off auto: they stay where you put them until you move them or tap Auto.', 3000);
+  if (!was) toast('Crew off auto: they stay where you put them until you move them or tap Auto.', 3000);
   showCrewRow(w.user);
 }
 function stepCrew(part: 'across' | 'fore', d: number): void {
