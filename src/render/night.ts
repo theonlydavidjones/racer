@@ -234,7 +234,7 @@ export function glints(list: Glint[]): THREE.Mesh {
         float k = 1.0;
         if (aCol.w >= 0.0) k = bayLights(aCol.w, 0.55, 20.0, floor(aCol.w / 15.0), uTime) * 1.4;
         // fainter as the light's image spreads over a longer streak
-        vCol = aCol.rgb * k * uOn * clamp(60.0 / (dFar - dNear + 30.0), 0.12, 1.0);
+        vCol = aCol.rgb * k * uOn * clamp(60.0 / (dFar - dNear + 30.0), 0.2, 1.0);
         vec4 mv = viewMatrix * vec4(q.x, 0.35, q.y, 1.0); vDepth = -mv.z; gl_Position = projectionMatrix * mv;
         #include <logdepthbuf_vertex>
       }`,
@@ -288,7 +288,7 @@ export function crownDisplayMaterial(y0: number, y1: number): THREE.ShaderMateri
         float sc = floor(uTime / 20.0), dir = nHash(sc) < 0.5 ? -1.0 : 1.0;
         float vid = smoothstep(0.55, 0.8, vn(vec2(c.x * 0.09 + dir * uTime * (0.6 + nHash(sc + 1.0)), c.y * 0.14 + sc * 7.0)) * (0.7 + 0.3 * vn(c * 0.3 + uTime)));
         float stars = step(0.992, nHash2(c)) * (0.5 + 0.5 * sin(uTime * (1.0 + 3.0 * nHash2(c.yx)) + c.x));
-        float b = mix(vid, stars, uStars) * uOn * (0.5 + 0.5 * uNight) * (1.0 - smoothstep(fogNear, fogFar, vDepth));
+        float b = mix(0.12 + 0.88 * vid, stars, uStars) * uOn * (0.5 + 0.5 * uNight) * (1.0 - smoothstep(fogNear, fogFar, vDepth));
         vec3 col = mix(vec3(1.0, 0.62, 0.42), vec3(0.95, 0.96, 1.0), smoothstep(0.3, 0.9, uNight)); // the sunset's colours at first
         gl_FragColor = vec4(col * b * 0.9, 1.0);
       }`,

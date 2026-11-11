@@ -327,7 +327,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     for (let i = 1; i < LAND.length - 3; i++) { // (the last three close the polygon inland)
       const p = LAND[i], q = LAND[i - 1]; acc += Math.hypot(p.x - q.x, p.y - q.y);
       if (acc < 80 || p.x < x0 || p.y > LL(37.812, 0).y) continue; acc = 0;
-      glows.push({ x: p.x, y: p.y, h: 6 + r() * 6, color: r() < 0.6 ? 0xffc98a : 0xf0f2ff, i: 0.22 + r() * 0.2, w: 2 });
+      glows.push({ x: p.x, y: p.y, h: 6 + r() * 6, color: r() < 0.6 ? 0xffc98a : 0xf0f2ff, i: 0.35 + r() * 0.3, w: 2 });
     }
     grp.add(glints(glows));
   }

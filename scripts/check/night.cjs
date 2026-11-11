@@ -12,7 +12,8 @@ const LL = (lat, lon, z) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT, z];
 const VIEWS = {
   bridge_water: [LL(37.8030, -122.3800, 4), LL(37.7960, -122.3780, 60)], // under the West Span's north side, looking south along it
   bridge_whole: [LL(37.8140, -122.3990, 5), LL(37.7980, -122.3740, 70)], // the whole West Span, Rincon Hill to the island, from off Pier 35
-  east_span: [LL(37.8160, -122.3500, 5), LL(37.8150, -122.3300, 60)], // the East Span's tower from north of Yerba Buena
+  east_span: [LL(37.8070, -122.3520, 4), LL(37.8125, -122.3590, 80)], // the East Span's tower and the island, from the water to the south-east
+  coit: [LL(37.8095, -122.4045, 3), LL(37.8024, -122.40584, 110)], // Coit Tower, from off Pier 33
   cityfront: [LL(37.8090, -122.4300, 3), LL(37.7960, -122.3950, 90)], // the skyline and the bridge from the Cityfront, off Aquatic Park
   ferry: [LL(37.8000, -122.3870, 3), LL(37.7930, -122.3960, 60)], // the Ferry Building and the towers from the water off Pier 14
   start: [LL(37.8118, -122.4510, 2.5), LL(37.7980, -122.3900, 60)], // from a boat on the start line, looking east
