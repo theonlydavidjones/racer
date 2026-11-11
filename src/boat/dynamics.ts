@@ -104,13 +104,14 @@ export const driveFrom = (rvt: number, v: number, vt: number): number => rvt * (
 
 /**
  * Air drag (N) against forward motion when the sails aren't drawing: rig windage plus flogging sails.
- * `flog` is 0..1, how much the sails are flogging (1 when luffing or head to wind).
+ * `flog` is 0..1, how much the sails are flogging (1 when luffing or head to wind). `hoisted` 0..1: how much of her sail
+ * is up to flog (the area's share; struck and stowed, there's only the bare rig).
  * aws is apparent wind speed (m/s), awa apparent wind angle (deg); only wind from forward of the beam slows the boat.
  */
-export function airDrag(aws: number, awa: number, flog: number): number {
+export function airDrag(aws: number, awa: number, flog: number, hoisted = 1): number {
   if (awa >= 90 || flog <= 0) return 0;
   const q = 0.5 * RHO_AIR * aws * aws;
-  return flog * q * (HANDLING.windageCdA + HANDLING.flogCdA) * Math.cos(awa * D2R);
+  return flog * q * (HANDLING.windageCdA + HANDLING.flogCdA * hoisted) * Math.cos(awa * D2R);
 }
 
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */
