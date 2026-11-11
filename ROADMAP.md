@@ -1,6 +1,13 @@
 # Build plan
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
+  through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
+  neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
+  sourced coefficients (Wiegel's diffraction diagrams, Shore Protection Manual) in place of the unsourced ×0.15;
+  (2) the 15 fetch rays alias on the 10 m grid near an entrance (chop 0.17 → 0.04 → 0.13 m over 12 m at 315°): spread
+  or smooth them; (3) at South Beach and the Corinthian, just inside the entrance has a little more chop than just outside
+  (fetch 194 m against 108 m), from the open-water ray's 50 m minimum fetch (2–4 h).
 
 What's planned, roughly in order. Done work is described in the README.
 
@@ -33,16 +40,27 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
-Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
+**Performance review** (owner, November 2026; 6–10 h): no lag or crashes as the sim grows. Set a budget first (a
+steady 60 fps on a typical laptop in a full race: fleet, ships, wildlife, charts; page load under a few seconds; memory
+that doesn't climb over a long session; the page well under the 16 MB limit, 3.1 MB today), then measure against it:
+frame time by part (physics step, AI, onLand/shoreDist calls, the sea model, the 3D scene's draw calls and triangles,
+the map and chart redraws, the sails' canvas textures), memory over an hour's sail (leaks from scenes, textures and
+listeners not freed between races), and the worst cases (big fleet, heavy weather, the chart zoomed out). Fix the
+hot spots; add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
+quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
+sessions changing the scene or the physics while it measures.
+
+Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
-in depth (~~done~~, published); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda
+in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
 phone layout (on hold, 8–12 h).
 
-Open check: the tiller pilot's specs from primary sources (the ST2000+ may be 4.5 s lock to lock, not 4.0 s; AutoTrim
-and the RRS 52 wording unconfirmed). Needs docs.raymarine.com and www.sailing.org allowed.
+Checked: RRS 52 and the ERS rudder definition (primary sources), and the ST2000+'s 4,500 kg rating (Raymarine). Still
+unconfirmed: the ST2000+'s hard-over time (now 4.5 s, from secondary sources), its AutoTack default (100°) and AutoTrim;
+the handbook (Raymarine document 81130) wasn't reachable.
 
 ## The owner's list (November 2026, to prioritise)
 
@@ -64,7 +82,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   of crew and their skill.
 - **A deep pass on sail and boat physics:** every crew move, wave, puff and line adjustment makes a response, from real
   science and maths.
-- **Cleaner start screens.** Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
+- ~~**Cleaner start screens.**~~ (done) Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
   start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
   pared back. First an audit of every start-state screen for redundancy and friction.
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
@@ -93,7 +111,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). Later: show each item on the replay (the header you held, where you overstood), and compare against the boat that won.
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail.
 - **GGYC and StFYC, and the start line.** Dial in the clubs' buildings and the GGYC flagpole (the inner end of the start line) on the spot. The course file has the flagpole at 37.80925 N; the city's building data puts the GGYC clubhouse at 37.8077 N.
-- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (~~Fort Mason's piers~~ done: OSM's coast from Crissy Field to Aquatic Park; still hand-traced east of there), and Rule 20 hails at the islands (today only at the Cityfront).
+- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (~~Fort Mason's piers~~ done: OSM's coast from Crissy Field to Aquatic Park; ~~Pier 39 and the Wharf~~ done: OSM's coast on to Pier 27, with the open piers, breakwaters and Pier 39's docks; still hand-traced from Fort Point to Crissy Field). Still to do at the Wharf: the AI's and the tiller pilot's look-ahead for land samples every 15–45 m (ai/ai.ts, boat/autopilot.ts), so it can step over a 1–10 m pier, breakwater or dock: test those lines exactly against geo/shore.ts WHARF (wharfCrossed), as the passage planner does; the sea lions' floats at Pier 39 aren't solid, and Rule 20 hails at the islands (today only at the Cityfront).
 - **Your boat** (done: looks, flags, condition). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 

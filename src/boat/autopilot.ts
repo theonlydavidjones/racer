@@ -7,10 +7,19 @@ import { detour } from '../ai/ai';
 
 /**
  * A tiller pilot, as Folkboat sailors fit one: an electric ram on the tiller, steering to a compass course (Auto), to
- * the apparent wind angle from the masthead unit (Wind), or toward a waypoint (Nav). The ram drives the tiller
- * hard-over to hard-over in about 4 s (Raymarine's ST2000+, a common tiller pilot on a boat this size: "hard-over to
- * hard-over time 4.0 s, no load"), so it can't catch a broach any faster than you could, and in a seaway it works the
- * whole time. Like the real thing, its AutoTrim learns the standing helm the boat needs (weather helm) and holds it.
+ * the apparent wind angle from the masthead unit (Wind), or toward a waypoint (Nav). Modelled on Raymarine's ST2000+,
+ * a common tiller pilot on a boat this size (Raymarine: "suitable for boats up to 4,500 kg (10,000 lb) maximum
+ * displacement", with AutoTack; raymarine.com, ST1000/ST2000 product page; a Folkboat is about 1.9 t). The ram drives
+ * the tiller hard over to hard over in about 4.5 s (secondary sources quoting the handbook, document 81130, which we
+ * couldn't reach: unconfirmed), so it can't catch a broach any faster than you could, and in a seaway it works the
+ * whole time. It also learns the standing helm the boat needs (weather helm) and holds it (what Raymarine calls
+ * AutoTrim is unconfirmed; the behaviour here is the standard integral term of any course-keeping pilot).
+ *
+ * Not when racing: RRS 52 (2025–2028), "A boat's standing rigging, running rigging, spars and movable hull appendages
+ * shall be adjusted and operated only by the power provided by the crew", and the Equipment Rules of Sailing E.1.2(j)
+ * define the rudder as "a movable hull appendage primarily used to affect steerage". So a powered autopilot breaks
+ * rule 52 unless the notice of race changes it, as World Sailing's Offshore Special Regulations Appendix M suggests
+ * for offshore races ("autopilots may be used to adjust and operate moveable hull appendages").
  *
  * Nav goes a step beyond the pilot alone: it's the pilot plus a navigator calling the tacks. When the waypoint is
  * upwind it sails close-hauled and tacks on the layline (allowing for the current), tacks off the shore as it nears
@@ -44,15 +53,16 @@ export interface Pilot {
   alarm: string | null;
 }
 
-/** Tiller travel per second: hard over to hard over (2 units) in 4 s. */
-const RAM_RATE = 0.5;
+/** Tiller travel per second: hard over to hard over (2 units) in about 4.5 s (see above: unconfirmed). */
+const RAM_RATE = 2 / 4.5;
 /** How briskly it asks to turn: deg/s of turn per degree off course. A tuning choice, not a measured figure: it settles a
  * heading error with a time constant of about 2 s, about as quickly as a good helmsman, and well inside what the ram can
  * deliver; much higher and it chases every wave (a real pilot's "response" setting trades the same thing). */
 const GAIN = 0.45;
 /** Damping on the masthead reading, s (a pilot's "response" setting: low, to save the battery and not chase every wave). */
 const AWA_TAU = 2.5;
-/** The angle Auto turns through when you press Tack (Raymarine's AutoTack in compass mode: 100°). */
+/** The angle Auto turns through when you press Tack. Raymarine's AutoTack default is commonly given as 100° (unconfirmed
+ * against the ST2000+ handbook). */
 export const AUTO_TACK = 100;
 
 export function newPilot(): Pilot {
