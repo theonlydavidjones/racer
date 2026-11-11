@@ -158,6 +158,11 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   sea. Options to show the owner as pictures before building: her on the real Bay water and sky at golden hour; or alone
   in soft studio light on a dark gradient, turning slowly (live on hover, still otherwise); either with her heel and sails
   set as she'd sail, and her own colours. A design change, so the owner picks.
+- **Next — chase view: see the sails clear of the dials** (polish; 1–2 h): owner, "right now in chase view the hull
+  appears to be centered in frame, but I need to be able to see the sails easily. currently too much stuff (dials,
+  notifs) sit on top of the sail." Frame her so the whole sail plan sits in the open middle of the screen, clear of
+  the dials and messages: the hull low in frame (render/scene.ts chase camera), and the HUD kept out of the sails' area.
+  May fold into a broader HUD review.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
