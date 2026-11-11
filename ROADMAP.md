@@ -75,7 +75,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   passed (app.ts tiller handling). Owner, after: "maybe two-finger click? look into how games tend to solve something like
   this." Plan: lash on right-click or two-finger click (the browser's context menu suppressed over the water), which
   can't be mistaken for the release click; keep I as the key; keep double-click working by lashing at the angle from
-  the first press; say so in the tiller hint.
+  the first press; say so in the tiller hint. Owner: "one issue with double-click in browser is that it surfaces the
+  browser menu. need to solve somehow." Over the 3D view only: no context menu, no double-click text selection, no
+  double-tap zoom; menus and text selection still work on the panels. Test in Chrome, Safari and Firefox on a trackpad.
 - **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
   right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
   (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
