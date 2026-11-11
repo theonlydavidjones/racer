@@ -26,7 +26,7 @@ export function wordsStrength(w: string): number {
  * Fog. The forecast's visibility: a grey veil cell by cell, only over its own grid. Beyond its ~day: a veil where the
  * forecast names fog, by its words. A past day's one sensor: the veil round that spot only, with its reading.
  */
-export function drawFog(ctx: CanvasRenderingContext2D, tf: Tf, v: Visibility, ctr: Vec, half: number, I: Ink, labels: boolean): void {
+export function drawFog(ctx: CanvasRenderingContext2D, tf: Tf, v: Visibility, ctr: Vec, half: number, I: Ink, labels: boolean, part: 'veil' | 'marks' = 'veil'): void {
   ctx.save();
   const cells = (alpha: (q: Vec) => number) => {
     const sp = Math.max(150, half / 9), x0 = Math.floor((ctr.x - half) / sp) * sp, y0 = Math.floor((ctr.y - half) / sp) * sp;
@@ -37,6 +37,7 @@ export function drawFog(ctx: CanvasRenderingContext2D, tf: Tf, v: Visibility, ct
     }
   };
   ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillStyle = I.fogText;
+  if (part === 'marks' && v.source !== 'observed') { ctx.restore(); return; }
   if (v.source === 'outlook') {
     cells(q => { const w = v.words!(q); return w ? 0.09 * wordsStrength(w) : 0; });
     if (labels) { ctx.textAlign = 'center'; for (const c of v.points) { const s = tf(c.p.x, c.p.y); ctx.fillText(c.words!, s[0], s[1]); } }
@@ -46,26 +47,35 @@ export function drawFog(ctx: CanvasRenderingContext2D, tf: Tf, v: Visibility, ct
   } else {
     // one sensor: its reading round its own spot (a kilometre or so), not over the whole Bay
     const c = v.points[0], s = tf(c.p.x, c.p.y), e = tf(c.p.x + 1200, c.p.y), r = Math.hypot(e[0] - s[0], e[1] - s[1]), a = murk(c.m);
-    if (a > 0.02) { const gr = ctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], r); gr.addColorStop(0, I.fog(a)); gr.addColorStop(1, I.fog(0)); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, 6.29); ctx.fill(); }
+    if (part === 'veil') { if (a > 0.02) { const gr = ctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], r); gr.addColorStop(0, I.fog(a)); gr.addColorStop(1, I.fog(0)); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, 6.29); ctx.fill(); } ctx.restore(); return; }
+    // (the sensor stands on the pier: its mark goes on after the land)
     ctx.strokeStyle = I.fogText; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(s[0], s[1], 5, 0, 6.29); ctx.stroke();
-    ctx.textAlign = 'left'; ctx.fillStyle = I.fogText; ctx.fillText(labels ? `Pier 17: visibility ${nm(c.m, v.cap)}` : nm(c.m, v.cap), s[0] + 8, s[1] + 4);
+    const t = labels ? `Pier 17: visibility ${nm(c.m, v.cap)}` : nm(c.m, v.cap);
+    ctx.textAlign = 'right'; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, s[0] - 8, s[1] - 8); // (above and left of the sensor, clear of the bridge's name)
+    ctx.fillStyle = I.fogText; ctx.fillText(t, s[0] - 8, s[1] - 8);
   }
   ctx.restore();
 }
 
-/** Sea state: the significant height of the chop and swell together, tinted cell by cell, with the height in metres. */
+/**
+ * Sea state: the significant height of the chop and swell together, as stipple (more dots where the waves are higher),
+ * so it can't be taken for the chart's depth tints; the height in metres on the chart.
+ */
 export function drawSea(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: Vec) => SeaHere | null, ctr: Vec, half: number, I: Ink, labels: boolean): void {
   ctx.save();
   const sp = Math.max(200, half / 6), x0 = Math.floor((ctr.x - half) / sp) * sp, y0 = Math.floor((ctr.y - half) / sp) * sp;
-  ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
   for (let x = x0; x <= ctr.x + half; x += sp) for (let y = y0; y <= ctr.y + half; y += sp) {
     const c = { x: x + sp / 2, y: y + sp / 2 }, s = at(c); if (!s) continue;
-    const hs = Math.hypot(s.hsW, s.hsS); // (the two together: heights add as energy)
-    const p = [tf(x, y), tf(x + sp, y), tf(x + sp, y + sp), tf(x, y + sp)];
-    ctx.fillStyle = I.sea(clamp(hs / 2, 0, 1) * 0.35 + (hs > 0.05 ? 0.04 : 0));
-    ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); ctx.fill();
-    const cs = tf(c.x, c.y), px = Math.hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]);
-    if (labels && px > 34 && hs > 0.05) { ctx.fillStyle = I.seaText; ctx.fillText(`${hs.toFixed(1)} m${s.white > 0.01 ? ' ˜' : ''}`, cs[0], cs[1]); }
+    const hs = Math.hypot(s.hsW, s.hsS); // (the two together: their energies add)
+    // dots at fixed spots in the cell (the same each frame), as many as the waves are high: 0 to 40 for 0 to 2.5 m
+    const n = Math.round(clamp(hs / 2.5, 0, 1) * 40);
+    let r = (Math.abs(Math.round(x) * 73856093 ^ Math.round(y) * 19349663) % 2147483647) || 1;
+    const rnd = () => (r = r * 16807 % 2147483647) / 2147483647;
+    ctx.fillStyle = I.seaText;
+    for (let k = 0; k < n; k++) { const q = tf(x + rnd() * sp, y + rnd() * sp); ctx.fillRect(q[0] - 0.7, q[1] - 0.7, 1.4, 1.4); }
+    const cs = tf(c.x, c.y), p0 = tf(x, y), p1 = tf(x + sp, y), px = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+    if (labels && px > 60 && hs > 0.05) { const t = `${hs.toFixed(1)} m sea`; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, cs[0], cs[1] + 0.3 * px); ctx.fillStyle = I.seaText; ctx.fillText(t, cs[0], cs[1] + 0.3 * px); }
   }
   ctx.restore();
 }

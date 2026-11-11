@@ -433,10 +433,11 @@ export class Hud {
     // the places' names go over the chart: its own print keeps clear of them
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
     const avoid = PLACES.filter(pl => scale > 0.12 || !pl.buoy).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
+    const me = tf(u.x, u.y); avoid.push([me[0] - 26, me[1] - 26, 52, 52]); // (and clear of your boat)
     this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-    const placed: [number, number, number, number][] = [];
+    const placed: [number, number, number, number][] = [[me[0] - 26, me[1] - 26, 52, 52]]; // (your boat's spot is kept clear of names)
     for (const pl of PLACES) {
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
       // (the sim's own places: the racing marks in amber, under the chart's print)
@@ -509,8 +510,10 @@ export class Hud {
       drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, Math.max(250, half / 7), onLand, I);
       drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I);
     }
-    if (on('fog')) { const v = visibilityFor(wd.raceDate, wd.clockUtc); if (!('none' in v)) drawFog(ctx, tf, v, ctr, half, I, detail === 'chart'); }
+    const fog = on('fog') ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
+    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     // the current across the water around you, from the sim's own current field
     if (on('current')) drawCurrentArrows(ctx, tf, p => wd.currentAt(p), ctr.x, ctr.y, half, Math.max(60, half / 4), 9, onLand, I);
     if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I);
@@ -528,7 +531,8 @@ export class Hud {
     }
     if (on('shadows') && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
     // the boats: each in her colour with a halo and a dark edge, so she reads on any part of the chart; you bigger, in cyan
-    const big = detail === 'chart' ? 1.25 : 1;
+    // (bigger on the full chart, and bigger still zoomed out, where everything else shrinks round her)
+    const big = detail === 'chart' ? (scale < 0.1 ? 1.6 : 1.25) : 1;
     for (const b of [...wd.boats].sort((x, y) => (x.isUser ? 1 : 0) - (y.isUser ? 1 : 0))) {
       const p = tf(b.x, b.y), s = (b.isUser ? 6.5 : 4.5) * big;
       ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R); ctx.lineJoin = 'round';
