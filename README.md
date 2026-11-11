@@ -51,7 +51,8 @@ src/
                 geometry.ts (overlap, hull gap, CPA), explain.ts (rule text, explanations, banner text)
   ai/           ai.ts (pre-start holding and approach, beating, laylines, marks, shore, rules-based avoidance)
   courses/      data/*.json (one file per course), course.schema.json, course.ts (loader), registry.ts
-  sim/          world.ts (World: fixed 60 Hz step, lines, marks, signals, incidents), events.ts
+  sim/          world.ts (World: fixed 60 Hz step, lines, marks, signals, incidents), events.ts,
+                outlook.ts, routing.ts, strategist.ts, navigator.ts (the pre-race briefing and the passage plan)
   replay/       recorder.ts (10 Hz snapshots), replayView.ts (overhead wind-up incident replay)
   render/       three.js scene, boat meshes, landscape, floating labels
   ui/           HUD (pods, dial, map, situation banner, line aid), toasts, horn, 2D drawing helpers
@@ -85,6 +86,20 @@ tests/
 - **Easing sails to slow down** works upwind and reaching (the sails flog). From a broad reach to a run, eased sails still fill against the shrouds, so it barely slows you: head up first.
 - **Turning.** Turn rate = speed / turning radius (9 m), up to 22°/s, down to 4°/s when nearly stopped. Turning bleeds speed.
 - **Uses of the polar.** AI close-hauled courses, the dial's no-go zone and the laylines use the polar's beat angle (it changes with wind speed) instead of a fixed 42°. The line aid's "time to line" and the AI's start approach assume you sheet in now and accelerate from your current speed, and the AI allows for coasting when it eases sails.
+
+### The strategist and the navigator
+
+**Racing: the strategist** (the course view's Strategist tab, from the setup screen's *Course and strategist* or **M**). A briefing before the start, there to teach you to make the calls yourself, so every point explains why and says where it comes from: NOAA/NWS data, worked out with the sim's physics, general racing practice, or the rules.
+
+- **The day:** a timeline from the warning signal to the estimated finish (the wind, the current at the line, the sea), how the breeze builds or swings (a persistent shift, and which side it favours), where it blows harder or lighter across the course, NOAA's nearest current station's slacks and peaks, the relief along the shore, and wind against tide. How far to trust it: hindsight on an observed day, a forecast, or a typical day from the records.
+- **The start:** the favoured end (how many metres and boat lengths, and how to check it on the water), what the current does at the line (carrying you over, or back), how it differs end to end, and which end leads to the favoured side of the first beat.
+- **Each leg** sailed on paper three ways (`src/sim/routing.ts`): left first, right first and up the middle, at the polar speeds in the chop, through the day's wind and tide as they change along the way, tacking on the current-bent laylines or off the land. The fastest plan, by how much and why (the current and the wind on each side, the shift during the leg), then tested against the forecast being off (veered or backed 8°, half an hour early or late, a quarter stronger or lighter): a clear call, likely, or open, with a plan B. The plans are drawn on the map. Reaches: how far to steer up-current of the mark.
+- **The competition:** each boat's condition and her skipper's habits at the start; your own boat's.
+- **Trim and tuning by phase** (start, middle, finish): the settings the boat's own sail model finds fastest for that wind and chop, the upwind target, where the crew sit, and what to change, in what order, as it builds or eases.
+
+**Cruising: the navigator** (**M**, the *Navigator* chip, or *Passage plan* on the setup screen). A passage plan to your destination: the way round the land (`routeAround`, A* on the water), the time leaving now and leaving later (the tide first), the current gates on the way with when each turns (NOAA stations), the strongest and lightest wind (the slot), the ship and ferry routes you cross with what AIS would show and the Inland Navigation Rules for crossing them, and the hazards (rocks by their buoys, sunset and lights, fog signals, cold water).
+
+Both work from `src/sim/outlook.ts`: the day's wind (without the puffs and oscillations nobody can forecast), current and sea at any place and time, from the same data the boats sail in. The tactical rules of thumb are general practice, labelled as such: the session's research couldn't read the local sources (Latitude 38, the sailmakers' Folkboat tuning guides, the Coast Pilot) through the network policy, so local specifics are computed from NOAA data rather than quoted.
 
 ### Start practice
 
