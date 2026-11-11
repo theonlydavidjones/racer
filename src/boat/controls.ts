@@ -61,6 +61,8 @@ export function boomAngle(c: Controls): number {
 export function mainsheetFor(angle: number, traveller: number): number {
   return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - 9.5 * traveller) / 80, 1 / 1.5)));
 }
+/** Where the traveller puts the boom at `angle` with the mainsheet at `sheet` (inverse of boomAngle), within [floor, 1]. */
+export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.min(1, Math.max(floor, (angle - 80 * Math.pow(sheet, 1.5)) / 9.5));
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). */
 export function jibAngle(c: Controls, tack: Tack): number {
   const lead = 8 + 1.25 * c.car[tack === 'S' ? 'P' : 'S'].ins; // the loaded car is the leeward one
@@ -223,7 +225,7 @@ export function depowerLimits(depower: number, awa: number): { min: Partial<Reco
   };
 }
 
-export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> = {}): CrewSettings {
+export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}): CrewSettings {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa);
   // lines you hold are fixed where you have them: the crew sets the rest around them
   const lo = (k: keyof CrewSettings) => fixed[k] ?? lim.min[k] ?? (k === 'traveller' ? -1 : 0), hi = (k: keyof CrewSettings) => fixed[k] ?? 1;
@@ -232,10 +234,16 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, carFore: 3, carIn, ...from };
   const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const;
   for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
+  // with your mainsheet held, the traveller is how the crew puts the boom where they want it (up to windward in light
+  // air with your sheet eased; never below their depowering floor), aimed at their angle, not yours: it doesn't run away
+  if (fixed.mainsheet != null && fixed.traveller == null) fixed = { ...fixed, traveller: travellerFor(mainAngle, fixed.mainsheet, lo('traveller')) };
+  if (fixed.traveller != null) x.traveller = fixed.traveller;
   const carMin = fixed.carFore ?? Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft), carMax = fixed.carFore ?? CAR_FORE_PINS - 1;
   x.carFore = clamp(x.carFore, carMin, carMax); if (fixed.carIn != null) x.carIn = fixed.carIn;
   const score = (v: CrewSettings) => {
-    const c: Controls = { mainsheet: mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
+    // (your mainsheet, when you hold it, stays where it is: the crew sets the traveller for the conditions around it, and
+    // doesn't chase your boom with it)
+    const c: Controls = { mainsheet: fixed.mainsheet ?? mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
       backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
     c.jibsheet = jibsheetFor(jibAng, c, tack);
     // a hair of preference for easy settings, so the crew doesn't haul on lines that make no difference
