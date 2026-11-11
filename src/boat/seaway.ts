@@ -77,16 +77,36 @@ export function beatInChop(kt: number, hs: number, tp: number): number {
 }
 
 /**
- * Yaw the sea puts into her heading (deg/s) at time t: a wave-by-wave push, worst with the sea on the
- * quarter and next to nothing head-on or dead astern. Deterministic (the same race replays the same).
+ * Yaw the sea puts into her heading (deg/s) at time t: a wave-by-wave push. The yaw moment a wave puts on a slender hull
+ * is the sway force along her length (the wave's pressure difference across her, Froude–Krylov: ρ·g·ζ·k·sin β per
+ * metre of side, fading with depth as e^(−kT)) times its lever about her middle. A wave meets her bow and stern in
+ * different phases, so integrated over her length, ∫ x·sin(ωt − k·x·cos β) dx, the moment goes as
+ * 2(sin q − q·cos q)/a², a = k·cos β, q = a·L/2 (strip theory: Faltinsen, Sea Loads on Ships and Offshore Structures,
+ * 1990, ch. 3; Newman, Marine Hydrodynamics, §6.17). That is nothing head-on, beam-on or dead astern, most with the sea
+ * on the bow or the quarter, and next to nothing in a long swell (as k² once the wave is much longer than she is): a
+ * 13 s ocean swell, 260 m long, lifts her whole and barely turns her; a boat-length chop on the quarter slews her about.
+ * Its size is kept where the sim had it for a boat-length chop on the quarter (about 3.2°/s per metre of wave height, peaks to 4.9:
+ * a judgement, not a measurement: she has no yaw inertia while sailing, so the moment is felt as a rate). Deterministic
+ * (the same race replays the same).
  */
+const YAW_DEPTH = 0.6; // (m: the mean depth of her side area, hull and keel, for e^(−kT): about half her 1.2 m draft)
+function yawMoment(H: number, k: number, encRad: number): number {
+  const a = k * Math.cos(encRad), q = a * LWL / 2;
+  // (the length integral, 2(sin q − q cos q)/a², tends to a·L³/12 for a short boat in a long wave)
+  const lever = Math.abs(q) < 1e-3 ? a * LWL ** 3 / 12 : 2 * (Math.sin(q) - q * Math.cos(q)) / (a * a);
+  return H * k * Math.abs(Math.sin(encRad)) * Math.exp(-k * YAW_DEPTH) * Math.abs(lever);
+}
+/** The moment for a boat-length wave on the quarter (135°), 1 m high: the scale's reference. */
+const YAW_REF = yawMoment(1, 2 * Math.PI / LWL, 135 * D2R);
+/** Yaw rate (deg/s) per metre of wave height for that reference wave, as the sim had it (7 × the old 0.463; its peak
+ * half as much again with the second harmonic). */
+const YAW_RATE = 3.24;
 export function waveYaw(s: SeaHere, h: number, v: number, t: number, seed: number): number {
   const one = (H: number, T: number, from: number, ph: number) => {
     if (H < 0.03) return 0;
     const enc = Math.abs(wrap(from - h)) * D2R, k = 2 * Math.PI / (G * T * T / (2 * Math.PI));
     const we = Math.abs(2 * Math.PI / T + k * v * Math.cos(enc)) + 0.3; // encounter frequency
-    const side = Math.sin(enc) ** 2 * (0.5 + 0.5 * (1 - Math.cos(enc)) / 2); // on the quarter most
-    return 7 * H * side * (Math.sin(we * t + ph) + 0.5 * Math.sin(1.7 * we * t + 2 * ph));
+    return YAW_RATE * yawMoment(H, k, enc) / YAW_REF * (Math.sin(we * t + ph) + 0.5 * Math.sin(1.7 * we * t + 2 * ph));
   };
   return one(s.hsW, s.tpW, s.fromW, seed * 1.7) + one(s.hsS, s.tpS, s.fromS, seed * 2.9 + 1) + (s.wake ? 1.6 * one(s.wake.h, s.wake.t, s.wake.from, seed * 4.1 + 2) : 0);
 }

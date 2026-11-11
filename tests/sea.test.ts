@@ -113,4 +113,12 @@ describe('the boat in waves', () => {
     expect(peak(135)).toBeGreaterThan(peak(10) * 3);
     expect(waveYaw(s, 135, 2.5, 12.3, 2)).toBe(waveYaw(s, 135, 2.5, 12.3, 2));
   });
+  it("the yaw is a slender hull's Froude–Krylov moment: nothing beam-on, as much on the bow as the quarter, next to nothing in a long swell", () => {
+    const peakOf = (sea: typeof FLAT_SEA, h: number) => { let m = 0; for (let t = 0; t < 40; t += 0.02) m = Math.max(m, Math.abs(waveYaw(sea, h, 2.5, t, 1))); return m; };
+    const chop = { ...FLAT_SEA, hsW: 0.6, tpW: 2.5, fromW: 0 }, swell = { ...FLAT_SEA, hsS: 0.6, tpS: 12, fromS: 0 };
+    expect(peakOf(chop, 90)).toBeLessThan(0.2 * peakOf(chop, 135));
+    expect(peakOf(chop, 45) / peakOf(chop, 135)).toBeGreaterThan(0.7); expect(peakOf(chop, 45) / peakOf(chop, 135)).toBeLessThan(1.3);
+    // (per metre of height, a 12 s swell turns her less than 2% as much as a 2.5 s chop)
+    expect(peakOf(swell, 135)).toBeLessThan(0.02 * peakOf(chop, 135));
+  });
 });
