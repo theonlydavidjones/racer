@@ -63,7 +63,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       if (lat > 37.845 && lon > -122.51) return { p: 0.12, h: [6, 10], w: [10, 16] }; // Sausalito, Tiburon, Belvedere
       return null;
     };
-    const keepClear = [[37.80250, -122.40583, 140], [37.80292, -122.44840, 170], [37.79519, -122.40279, 60], [37.7899, -122.3969, 55], [37.79554, -122.39369, 110],
+    const keepClear = [[37.80240, -122.40584, 140], [37.80292, -122.44840, 170], [37.79519, -122.40279, 60], [37.7899, -122.3969, 55], [37.79554, -122.39369, 110],
       [37.7897, -122.39535, 35], [37.7904, -122.3961, 35], [37.7903, -122.3943, 35], [37.785778, -122.392139, 35], [37.79285, -122.39793, 35], [37.7919, -122.4038, 45], [37.7925, -122.4005, 40]] as const; // landmarks' own ground
     const mats: { m: THREE.Matrix4; c: THREE.Color }[] = [];
     const pale = ['#e9e4d8', '#f1ede4', '#ddd6c6', '#e7dcc8', '#d5d2c9', '#ece0cf', '#cfd3d4'].map(h => new THREE.Color(h));
@@ -117,7 +117,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     // the rotunda: a low drum with a flat roof terrace, and the forecourt in front
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(13, 13.5, 7, 32), CON).translateY(3.5));
     g.add(block(30, 22, 0.6, lam(0x9b968c)).translateX(-24)); // the forecourt (parking)
-    place(g, 37.80250, -122.40583);
+    place(g, 37.80240, -122.40584); // from the DataSF building footprints
   }
   // the Transamerica Pyramid: 260 m, a slim four-sided pyramid with its spire, and the two "wings" for the lifts
   {
@@ -190,18 +190,16 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80925, -122.44325, 0, 2.3);
   // Fort Mason's piers, with the long pier sheds
   for (const lon of [-122.43185, -122.43025, -122.42875]) place(group(block(26, 150, 3, lam(0x9d968a)), block(22, 140, 13, lam(0xd9cfb8), 3)), 37.8091, lon, 0, 0);
-  // Fort Point: the brick fort (1853–61) under the bridge's arch, on the rock blasted down to 15 ft (4.6 m) above the
-  // sea: three tiers of casemates round a courtyard, with the lighthouse on its roof. Wikipedia gives its position
-  // (37.81056 N 122.47722 W, to about 50 m) about 60 m east of the bridge's axis, but it stands directly under the
-  // arch, so it's put there, at the same distance along the bridge.
+  // Fort Point: the brick fort (1853–61) at the foot of the bridge, on the rock blasted down to 15 ft (4.6 m) above
+  // the sea (Wikipedia, "Fort Point National Historic Site"): three tiers of casemates round a courtyard, with the
+  // lighthouse on its roof. Position and footprint from the DataSF building footprints; the bridge's arch crosses its
+  // west end.
   {
     const BRICK = lam(0x9a5a44), g = new THREE.Group(), H = 14;
-    for (const [w, d, x, z] of [[97, 10, 0, -23], [97, 10, 0, 23], [10, 36, -43.5, 0], [10, 36, 43.5, 0]] as const) g.add(block(w, d, H, BRICK).translateX(x).translateZ(z));
-    g.add(block(77, 36, 0.5, lam(0x8d8170))); // the courtyard
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 8, 8), WHITE).translateY(H + 4).translateX(30)); // Fort Point light, on the barbette
-    const fp = LL(37.81972, -122.47861), b = 176.5 * Math.PI / 180, al = 1032; // 1,032 m south of the bridge's centre
-    const o = { x: fp.x + Math.sin(b) * al, y: fp.y + Math.cos(b) * al };
-    g.position.copy(P3(o.x, o.y, 4.6)); g.rotation.y = -86.5 * Math.PI / 180; grp.add(g);
+    for (const [w, d, x, z] of [[56, 10, 0, -43.5], [56, 10, 0, 43.5], [10, 77, -23, 0], [10, 77, 23, 0]] as const) g.add(block(w, d, H, BRICK).translateX(x).translateZ(z));
+    g.add(block(36, 77, 0.5, lam(0x8d8170))); // the courtyard
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 8, 8), WHITE).translateY(H + 4).translateZ(-38)); // Fort Point light, on the barbette
+    place(g, 37.81055, -122.47710, 56, 4.6);
   }
   // Alcatraz: the cellhouse along the island's crest, the lighthouse at its south end, the water tower to the north
   {
