@@ -34,6 +34,7 @@ import { $ } from './ui/dom';
 import { horn, logMessage, messageLog, setLogClock, sound, toast } from './ui/feedback';
 import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
+import { NavView } from './ui/navView';
 import { onSaveTrouble, saveStatus } from './store/cloud';
 import { Chart } from './ui/chart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
@@ -48,6 +49,7 @@ const labels = new Labels($('labels'));
 const hud = new Hud();
 const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));
 const courseView = new CourseView();
+const navView = new NavView();
 const drillView = new ReplayView($<HTMLCanvasElement>('dcanvas'));
 /** Start practice begins this many seconds before the gun, and the debrief comes this long after it. */
 const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
@@ -98,6 +100,7 @@ function newGame(seed = randomSeed()): void {
     S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) });
   acc = 0; drillShown = false;
   showTrimOwner(); showLash();
+  $('bCourse').textContent = w.freeSail ? 'Navigator' : 'Course';
   view.setWorld(w);
   labels.build(w);
 }
@@ -480,9 +483,11 @@ function sailButtons(): void {
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
-$('bCourse').onclick = () => courseView.toggle(w);
-$('bPreview').onclick = () => courseView.open(w);
+// Cruising, the same button (and key) opens the navigator's passage plan instead.
+$('bCourse').onclick = () => (w.freeSail ? navView.toggle(w) : courseView.toggle(w));
+$('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
+$('bNavClose').onclick = () => navView.close();
 $('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1; $('bFast').textContent = 'Speed ' + w.speed + '×'; };
 $('bSound').onclick = () => { sound.on = !sound.on; $('bSound').textContent = sound.on ? 'Sound on' : 'Sound off'; };
 $('bPause').onclick = () => {
@@ -553,6 +558,7 @@ addEventListener('keydown', e => {
   const a = keymap.actionFor(e.key);
   if (e.key === 'Escape') {
     if (courseView.isOpen) { courseView.close(); return; }
+    if (navView.isOpen) { navView.close(); return; }
     if (chart.isOpen) { chart.close(); return; }
     if (!$('logView').hidden) { $('logView').hidden = true; return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
@@ -562,7 +568,7 @@ addEventListener('keydown', e => {
   }
   if (a === 'keys') { keysView.open(); return; }
   if (a === 'log') { if ($('logView').hidden) openLog(); else $('logView').hidden = true; return; }
-  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { courseView.toggle(w); return; }
+  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.freeSail) navView.toggle(w); else courseView.toggle(w); return; }
   if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
   if (anyOverlay() || !a) return;
   if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
@@ -726,6 +732,7 @@ function courseCard(): void {
     ? 'Cruise: open water, no other boats, no start and no clock: practise steering, trimming and the pole.'
     : 'The whole race, from the warning signal to the finish.';
   $('bGo').textContent = S.mode === 'drill' ? 'Practise a start' : S.mode === 'sail' ? 'Cast off' : 'Start the sequence';
+  $('bPreview').textContent = S.mode === 'sail' ? 'Passage plan' : S.mode === 'race' ? 'Course and strategist' : 'View the course';
   const cruise = S.mode === 'sail';
   $('setupTitle').textContent = $('setupEyebrow').textContent = cruise ? 'Cruise' : 'Race';
   $('setupLede').textContent = cruise ? 'Sail anywhere on the Bay in the day\'s real wind, tide and sea: choose where to start and, if you like, where you\'re going.'
@@ -844,7 +851,7 @@ function crewRows(): void {
   });
 }
 function openSetup(): void { settleLog(openSetupNow); }
-function openSetupNow(): void { courseView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
+function openSetupNow(): void { courseView.close(); navView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
   saveSettings(S);
@@ -860,10 +867,10 @@ function beginRaceNow(seed?: number): void {
     return;
   }
   toast(S.mode === 'sail'
-    ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}. Try the tiller, the trim and the pole.`
+    ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}.${w.dest ? ' The navigator (M) has a passage plan.' : ' Try the tiller, the trim and the pole.'}`
     : S.mode === 'drill'
     ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
-    : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+    : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
   if (w.courseSignal && S.mode !== 'sail') logMessage(`Course ${w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signalled by the warning signal). ${w.courseSignal.why}`);
 }
 
@@ -887,7 +894,7 @@ $('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
 $('bDNew').onclick = () => { closeDrill(); beginRace(); };
 $('bDKeep').onclick = () => { closeDrill(); w.paused = false; };
 $('bDSetup').onclick = () => { closeDrill(); openSetup(); };
-$('bGo').onclick = () => { courseView.close(); $('setup').hidden = true; beginRace(); };
+$('bGo').onclick = () => { courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
 
 /** The tactics debrief: what cost you time, most first, and your place at each mark. */
 function debriefHtml(title: string): string {
@@ -1080,7 +1087,7 @@ const fleet: Fleet = new Fleet(S, {
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
   $('saveNote').textContent = saveStatus();
-  courseView.close(); w.running = false; w.paused = false;
+  courseView.close(); navView.close(); w.running = false; w.paused = false;
   for (const id of ['setup', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);

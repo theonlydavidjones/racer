@@ -5,6 +5,9 @@ import type { World } from '../sim/world';
 import { $ } from './dom';
 import { drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
+import { raceBrief, type RaceBrief } from '../sim/strategist';
+import type { Plan } from '../sim/routing';
+import { briefHtml } from './briefView';
 
 type P = [number, number];
 const sideName = (s: 's' | 'p') => (s === 's' ? 'starboard' : 'port');
@@ -47,8 +50,12 @@ export class CourseView {
   private pinch: { d: number; scale: number } | null = null;
   private size: P = [600, 400];
   private canvas = $<HTMLCanvasElement>('cvcanvas');
+  /** Which tab: the course, or the strategist's briefing (with its plans drawn on the map). */
+  private tab: 'course' | 'brief' = 'course';
+  private brief: { w: World; b: RaceBrief } | null = null;
 
   constructor() {
+    for (const t of $('cvTabs').querySelectorAll<HTMLButtonElement>('[data-tab]')) t.onclick = () => this.setTab(t.dataset.tab as 'course' | 'brief');
     const cv = this.canvas;
     cv.addEventListener('pointerdown', e => { cv.setPointerCapture?.(e.pointerId); this.pointers.set(e.pointerId, [e.offsetX, e.offsetY]); this.pinch = null; });
     cv.addEventListener('pointermove', e => {
@@ -86,6 +93,8 @@ export class CourseView {
     $('cvTitle').textContent = w.C.title;
     $('cvEyebrow').textContent = w.t < 0 && !w.running ? 'Course preview' : 'Course';
     $('cvNotes').textContent = w.C.notes;
+    $('cvTabs').hidden = w.freeSail; // cruising has the navigator instead
+    this.setTab(w.freeSail ? 'course' : this.tab);
     const u = w.user;
     this.setFocus(u.started ? Math.min(u.leg, w.C.marks.length) : 0);
     clearInterval(this.timer);
@@ -93,6 +102,27 @@ export class CourseView {
   }
   close(): void { $('courseView').hidden = true; clearInterval(this.timer); this.world = null; }
   toggle(w: World): void { if (this.isOpen) this.close(); else this.open(w); }
+
+  /** Switch tabs. The briefing is worked out the first time it's asked for (it takes a moment), for this race. */
+  setTab(tab: 'course' | 'brief'): void {
+    this.tab = tab;
+    for (const t of $('cvTabs').querySelectorAll<HTMLButtonElement>('[data-tab]')) { const on = t.dataset.tab === tab; t.classList.toggle('on', on); t.setAttribute('aria-selected', String(on)); }
+    $('cvCourse').hidden = tab !== 'course'; $('cvBrief').hidden = tab !== 'brief'; $('cvPlanKey').hidden = tab !== 'brief';
+    const w = this.world;
+    if (tab !== 'brief' || !w) { this.draw(); return; }
+    if (this.brief?.w === w) { this.showBrief(); return; }
+    $('cvBrief').innerHTML = '<p class="lede">The strategist is working out the day…</p>';
+    setTimeout(() => { // let the panel paint first
+      if (this.world !== w || this.tab !== 'brief') return;
+      this.brief = { w, b: raceBrief(w) };
+      this.showBrief();
+    }, 30);
+  }
+  private showBrief(): void {
+    const b = this.brief!.b;
+    $('cvBrief').innerHTML = `<p class="lede"><b>${b.sub}</b> The plans are drawn on the map: step through the legs above to see each one.</p>` + briefHtml(b);
+    this.draw();
+  }
 
   private legCount(): number { return (this.world?.C.marks.length ?? 0) + 1; }
   private step(d: number): void {
@@ -238,7 +268,26 @@ export class CourseView {
     });
 
     // laylines to the user's next mark
-    if (w.settings.aids) drawLaylines(ctx, tf, laylinesFor(w, u), 3000, 1.5);
+    if (w.settings.aids && this.tab === 'course') drawLaylines(ctx, tf, laylinesFor(w, u), 3000, 1.5);
+    // the strategist's plans: each way of sailing the leg, the best one bold
+    if (this.tab === 'brief' && this.brief?.w === w) {
+      const PC: Record<Plan, string> = { left: '#6fd0ff', right: '#ff9f43', middle: '#c9cdd4' };
+      this.brief.b.legs.forEach(L => {
+        if (!shown(L.i) || L.kind === 'reach') return;
+        for (const k of ['left', 'right', 'middle'] as Plan[]) {
+          const r = L.plans[k]; if (!r.ok || k === L.best) continue;
+          ctx.strokeStyle = PC[k]; ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+          ctx.beginPath(); r.path.forEach((q, j) => { const s = S(q.p); if (j) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); }); ctx.stroke();
+        }
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      });
+      this.brief.b.legs.forEach(L => {
+        if (!shown(L.i)) return;
+        const r = L.plans[L.best];
+        ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); r.path.forEach((q, j) => { const s = S(q.p); if (j) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); }); ctx.stroke();
+      });
+    }
 
     // boats
     for (const b of w.boats) {
@@ -260,7 +309,11 @@ export class CourseView {
       const tip: P = [ox + Math.sin(cb) * 14, oy - Math.cos(cb) * 14];
       ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 14, oy + Math.cos(cb) * 14); ctx.lineTo(tip[0], tip[1]); ctx.stroke();
       arrowHead(ctx, tip, [Math.sin(cb), -Math.cos(cb)], 7);
-      ctx.textAlign = 'right'; ctx.fillText(w.cur.label.toUpperCase(), cw - 12, oy + 32); ctx.textAlign = 'left';
+      { // on a dark pill, so it stays readable over marks and lines
+        const t = w.cur.label.toUpperCase(), tw = ctx.measureText(t).width;
+        ctx.save(); ctx.fillStyle = 'rgba(9,22,33,.85)'; ctx.beginPath(); ctx.roundRect(cw - 12 - tw - 6, oy + 32 - 13, tw + 12, 18, 4); ctx.fill(); ctx.restore();
+        ctx.fillStyle = '#6fd0ff'; ctx.textAlign = 'right'; ctx.fillText(t, cw - 12, oy + 32); ctx.textAlign = 'left';
+      }
     }
     const nb = -W * D2R, nx = cw - 34, ny = 22;
     ctx.strokeStyle = ctx.fillStyle = '#94abb7'; ctx.lineWidth = 1.5;

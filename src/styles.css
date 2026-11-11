@@ -238,6 +238,33 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .cvlegs li.focus{background:var(--btn-hi);color:var(--text)}
 .cvlegs li.now{color:var(--accent);font-weight:700}
 .cvlegs li.done{color:var(--muted)}
+/* course view tabs, and the strategist's and navigator's briefings */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:600 14px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;padding:10px 14px;cursor:pointer}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.sw.ll.best{border-color:var(--accent);border-style:solid;border-top-width:3px}
+.sw.ll.pl{border-color:#6fd0ff} .sw.ll.pr{border-color:#ff9f43} .sw.ll.pm{border-color:#c9cdd4}
+.sw.ll.ship{border-color:rgba(255,93,76,.8)} .sw.ll.ferry{border-color:rgba(201,205,212,.6)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%}
+.dot.gate{background:#6fd0ff} .dot.lane{background:#ff5d4c} .dot.wind{background:#e9f2f5}
+#navcanvas{width:100%;height:min(48vh,440px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.brief{display:flex;flex-direction:column;gap:18px}
+.brief .bf-key{font-size:12px;color:var(--muted);line-height:1.8}
+.bf-sec h3{font:700 17px/1.2 var(--f-inst);letter-spacing:.03em;margin:0 0 6px;color:var(--text)}
+.bf-sec .lede{font-size:14px;margin-bottom:8px}
+.bf-items{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
+.bf-items li{padding:8px 10px;background:rgba(150,196,218,.05);border-left:3px solid var(--rule);border-radius:0 6px 6px 0}
+.bf-items li b{color:var(--text)}
+.bf-src{display:inline-block;font:600 10px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;padding:3px 6px;border-radius:4px;margin-right:8px;vertical-align:1px;white-space:nowrap}
+.bf-src.data{background:rgba(111,208,255,.16);color:#6fd0ff}
+.bf-src.model{background:rgba(255,182,39,.16);color:var(--accent)}
+.bf-src.practice{background:rgba(63,209,151,.14);color:var(--row)}
+.bf-src.rule{background:rgba(255,93,76,.15);color:var(--giveway)}
+.bf-tw{overflow-x:auto;margin-bottom:8px}
+.bf-table{border-collapse:collapse;font-size:13px;width:100%}
+.bf-table th{text-align:left;font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--rule)}
+.bf-table td{padding:6px 8px;border-bottom:1px solid rgba(150,196,218,.08);vertical-align:top}
 @media (min-width:760px){
   .val{font-size:28px}
   #dial{width:120px;height:120px;top:calc(env(safe-area-inset-top,0px) + 82px)}

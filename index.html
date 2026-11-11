@@ -212,6 +212,10 @@
       <div><div class="eyebrow" id="cvEyebrow">Course</div><h2 id="cvTitle">Course</h2></div>
       <button class="ghost" id="bCvClose" type="button">Close · M</button>
     </div>
+    <div class="tabs" id="cvTabs" role="tablist">
+      <button class="tab on" type="button" role="tab" data-tab="course" aria-selected="true">Course</button>
+      <button class="tab" type="button" role="tab" data-tab="brief" aria-selected="false">Strategist</button>
+    </div>
     <div class="cvbar">
       <button class="ghost sm" id="bCvPrev" type="button" aria-label="Previous leg">◀</button>
       <div class="cvleg" id="cvLeg" aria-live="polite"></div>
@@ -223,6 +227,14 @@
       <div class="cvzoom"><button class="ghost sm" id="bCvIn" type="button" aria-label="Zoom in">+</button><button class="ghost sm" id="bCvOut" type="button" aria-label="Zoom out">−</button></div>
       <div class="cvhint">Drag to move · scroll or pinch to zoom · tap a leg below</div>
     </div>
+    <div class="cvkey" id="cvPlanKey" hidden>
+      <span><i class="sw ll best"></i>The strategist's plan</span>
+      <span><i class="sw ll pl"></i>Going left first</span>
+      <span><i class="sw ll pr"></i>Going right first</span>
+      <span><i class="sw ll pm"></i>Up the middle</span>
+    </div>
+    <div id="cvBrief" class="brief" hidden></div>
+    <div id="cvCourse">
     <div class="cvkey">
       <span><i class="sw s"></i>Leave to starboard (round clockwise)</span>
       <span><i class="sw p"></i>Leave to port (round counter-clockwise)</span>
@@ -231,6 +243,26 @@
     </div>
     <ol class="cvlegs" id="cvLegs"></ol>
     <p class="lede" id="cvNotes"></p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="navView" hidden>
+  <div class="panel wide">
+    <div class="cvhead">
+      <div><div class="eyebrow">Navigator</div><h2 id="navTitle">Passage plan</h2><p class="lede" id="navSub"></p></div>
+      <button class="ghost" id="bNavClose" type="button">Close · M</button>
+    </div>
+    <div class="cvwrap"><canvas id="navcanvas" aria-label="Chart of the passage: your track, current gates, the ship and ferry routes"></canvas></div>
+    <div class="cvkey">
+      <span><i class="sw ll best"></i>Your track leaving now</span>
+      <span><i class="dot gate"></i>Current gate</span>
+      <span><i class="dot lane"></i>Crossing a ship or ferry route</span>
+      <span><i class="dot wind"></i>Strongest wind on the way</span>
+      <span><i class="sw ll ship"></i>Ship route</span>
+      <span><i class="sw ll ferry"></i>Ferry and tour routes</span>
+    </div>
+    <div id="navBrief" class="brief"></div>
   </div>
 </div>
 

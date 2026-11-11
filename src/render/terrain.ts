@@ -22,6 +22,8 @@ export interface Terrain {
   lights: THREE.Points;
   /** Recolour for the season (month 1–12). */
   setSeason(month: number): void;
+  /** Is the land at a point (course coordinates) wooded? (For planting trees.) */
+  wooded(x: number, y: number): boolean;
 }
 
 const M = meta as { south: number; north: number; west: number; east: number; nx: number; ny: number; scale: number };
@@ -38,13 +40,25 @@ async function loadHeights(): Promise<Float32Array> {
 /** Simple deterministic noise for colour variation. */
 const hash = (i: number, j: number) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
 
-export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock';
+export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock' | 'island';
+
+/** Angel Island's cells in the elevation grid (found by flooding the land out from Mount Livermore), once loaded. */
+let ANGEL: Uint8Array | null = null;
+/** Is this point on Angel Island? */
+export function onAngel(lat: number, lon: number): boolean {
+  if (!ANGEL) return false;
+  const i = Math.round((lon - M.west) / (M.east - M.west) * (M.nx - 1)), j = Math.round((M.north - lat) / (M.north - M.south) * (M.ny - 1));
+  return i >= 0 && j >= 0 && i < M.nx && j < M.ny && ANGEL[j * M.nx + i] === 1;
+}
+
 export function region(lat: number, lon: number, h: number): Region {
+  if (onAngel(lat, lon)) return 'island'; // Angel Island: a state park, woods and grass, no town
+  if (lat > 37.804 && lat < 37.8155 && lon > -122.3745 && lon < -122.357) return 'woods'; // Yerba Buena Island: wooded, a few Navy houses
+  if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return 'city'; // Treasure Island: flat, built over (the old Navy base and the new blocks)
   if (lat > 37.8235 && lat < 37.8295 && lon > -122.4265 && lon < -122.418) return 'rock'; // Alcatraz
   if (lat > 37.787 && lat < 37.811 && lon > -122.486 && lon < -122.447) return 'woods'; // the Presidio
   if (lat > 37.8013 && lat < 37.8034 && lon > -122.4074 && lon < -122.4043) return 'woods'; // Pioneer Park, round Coit Tower
   if (lat > 37.764 && lat < 37.7745 && lon > -122.511 && lon < -122.454) return 'woods'; // Golden Gate Park
-  if (lat > 37.853 && lat < 37.875 && lon > -122.447 && lon < -122.415) return lat > 37.866 && h > 120 ? 'grass' : 'woods'; // Angel Island
   if (lat < 37.812 && lon > -122.515) return lon > -122.4545 && lat < 37.7755 && h > 150 ? 'grass' : 'city'; // San Francisco (Twin Peaks grassy on top)
   if (lat > 37.845 && h < 90 && lon > -122.51) return 'suburb'; // Sausalito, Tiburon, Belvedere, Mill Valley
   return 'grass';
@@ -52,6 +66,18 @@ export function region(lat: number, lon: number, h: number): Region {
 
 export async function buildTerrain(scene: THREE.Scene, month: number): Promise<Terrain> {
   const H = await loadHeights(), { nx, ny } = M;
+  // Angel Island: flood the land out from Mount Livermore's summit (37.8608 N 122.4324 W)
+  {
+    const A = new Uint8Array(nx * ny), i0 = Math.round((-122.4324 - M.west) / (M.east - M.west) * (nx - 1)), j0 = Math.round((M.north - 37.8608) / (M.north - M.south) * (ny - 1));
+    const stack = [j0 * nx + i0];
+    while (stack.length) {
+      const k = stack.pop()!; if (A[k] || H[k] <= 0) continue; A[k] = 1;
+      const i = k % nx, j = (k - i) / nx;
+      if (i > 0) stack.push(k - 1); if (i < nx - 1) stack.push(k + 1); if (j > 0) stack.push(k - nx); if (j < ny - 1) stack.push(k + nx);
+    }
+    let n = 0; for (const v of A) n += v;
+    ANGEL = n > 100 && n < 3000 ? A : null; // about 1,200 cells (3 km²); anything else means the flood leaked: leave it unlabelled
+  }
   const corner = LL(M.north, M.west), far = LL(M.south, M.east);
   const dx = (far.x - corner.x) / (nx - 1), dy = (far.y - corner.y) / (ny - 1); // dy < 0: rows run south
   // fit the San Francisco shore to the sim's coastline
@@ -87,6 +113,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     city: [C('#a9a796'), C('#bdb9a8'), C('#8f8f82'), C('#c6c0ae')], woods: [C('#45603f'), C('#3b5236'), C('#56704a')],
     gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')]
   };
+  const wood = new Uint8Array(nx * ny);
   const setSeason = (mo: number) => {
     // how golden the grass is: gold from late spring to the first rains (May–Nov), green Dec–Apr
     const gold = [0.15, 0.1, 0.1, 0.3, 0.6, 0.85, 1, 1, 1, 0.95, 0.7, 0.35][(mo - 1 + 12) % 12];
@@ -96,8 +123,16 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1);
       const n = hash(i, j), slope = 1 - nrm.getY(k), northFacing = nrm.getZ(k) < -0.15; // −z is north
       const r = region(lat, lon, h);
-      if (r === 'city') tmp.copy(PAL.city[Math.floor(n * 4) % 4]);
-      else if (r === 'woods') tmp.copy(PAL.woods[Math.floor(n * 3) % 3]);
+      if (r === 'island') {
+        // Angel Island (Wikipedia, "Angel Island (California)"): evergreen woodland (coast live oak, bay, madrone,
+        // toyon) on the slopes sheltered from the westerlies, facing north and east, and in the gullies; grassland
+        // and coastal scrub on the south- and west-facing slopes and the ridge tops; Mount Livermore's summit bare
+        const shelter = -nrm.getZ(k) + nrm.getX(k) * 0.8; // north- and east-facing
+        wood[k] = h > 6 && h < 215 && (shelter > 0.05 - 0.25 * n || (slope > 0.3 && n > 0.4)) ? 1 : 0;
+        if (wood[k]) tmp.copy(PAL.woods[Math.floor(n * 3) % 3]);
+        else { tmp.copy(grass).lerp(PAL.scrub, 0.35 + 0.4 * n); tmp.offsetHSL(0, 0, (n - 0.5) * 0.05); }
+      } else if (r === 'city') tmp.copy(PAL.city[Math.floor(n * 4) % 4]);
+      else if (r === 'woods') { tmp.copy(PAL.woods[Math.floor(n * 3) % 3]); wood[k] = 1; }
       else if (r === 'rock') tmp.copy(PAL.stone).lerp(PAL.scrub, n < 0.5 ? 0.7 : 0.1); // Alcatraz: grey rock and concrete, patches of scrub and garden
       else if (r === 'suburb') tmp.copy(PAL.suburb[0]).lerp(PAL.suburb[1], n);
       else {
@@ -132,5 +167,9 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     const u = fi - i, v = fj - j, at = (a: number, b: number) => Math.max(0, H[b * nx + a]);
     return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
   };
-  return { heightAt, mesh, lights, setSeason };
+  const wooded = (x: number, y: number) => {
+    const i = Math.round((x - corner.x) / dx), j = Math.round((y - corner.y) / dy);
+    return i >= 0 && j >= 0 && i < nx && j < ny && wood[j * nx + i] === 1;
+  };
+  return { heightAt, mesh, lights, setSeason, wooded };
 }
