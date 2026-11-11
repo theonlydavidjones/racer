@@ -309,7 +309,7 @@ Current: **Real tide** (the default), for the date and start time you pick in th
 
 ### Instruments
 
-- **The instrument row** is styled on real displays: the race clock, boatspeed (and speed over the ground), the **windex** as you'd see it looking up at the masthead (the vane into the apparent wind, the close-hauled tabs, the boat bow-up), true wind direction (with lifts, headers, puffs and lulls), and the sea.
+- **The instrument row** is styled on real displays: the race clock, boatspeed (and speed over the ground), the **windex** as you'd see it looking up at the masthead (the vane into the apparent wind, the close-hauled tabs, the boat bow-up), true wind speed on the water (its direction under it, with lifts, headers, puffs and lulls), and the tide where you are (flood or ebb, in knots, with the chop and swell under it). The windex box names the point of sail (close-hauled, close reach, beam reach, broad reach, run).
 - The **wind-angle dial** (true and apparent wind around a boat outline) is a training aid real boats don't have, so it's hidden by default; turn it on in Setup under Training aids.
 
 - **Tactical compass** under the instrument pods: a tape of headings around yours, with the bearing to the next mark (yellow), the wind direction (blue), the heading you'd sail on the other tack (or gybe) after you turn, and your average close-hauled heading on this tack ("avg"). Sailing higher than your average on starboard (lower on port) means you're lifted; the tape says "lifted 6°" or "headed 4°". That's how racers spot shifts on the compass: tack on the headers.
