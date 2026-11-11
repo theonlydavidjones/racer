@@ -312,7 +312,8 @@ function line(points: THREE.Vector3[], mat: THREE.Material = LINE_MAT): THREE.Li
 function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // traveller: a wooden thwart across the cockpit in front of the helmsman, the track on top, and its car
   const tu = uAtZ(TRAV_Z), tw = cockpitHalf(tu), ty = deckY(tu, tw) + 0.03;
-  const thwart = new THREE.Mesh(new THREE.BoxGeometry(tw * 2 + 0.12, 0.05, 0.22), MAT.wood); thwart.position.set(0, ty - 0.03, TRAV_Z); grp.add(thwart);
+  // (a deep beam with a vertical face, its top about the coaming's height, as on Josephine: the owner's photos)
+  const thwart = new THREE.Mesh(new THREE.BoxGeometry(tw * 2 + 0.12, 0.17, 0.09), MAT.wood); thwart.position.set(0, ty - 0.09, TRAV_Z); grp.add(thwart);
   const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.08, 0.02, 0.035), STEEL); track.position.set(0, ty + 0.005, TRAV_Z); grp.add(track);
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
