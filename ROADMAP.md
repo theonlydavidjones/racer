@@ -55,7 +55,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
-- **Now — crew buttons fight auto** (bug; 1–2 h; in progress: Crew Controls): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
+- ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
 - **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
@@ -92,13 +92,16 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
   and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
+- **Next — a broader review of the trim controls** (polish/clarity; 4–6 h): owner, "we need a broader review of trim
+  controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
+  line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
 - **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
-- **Next — instruments** (feature; 1–2 h; in progress: Crew Controls): the TWD dial's big number should be **wind speed** ("I already have the windex
+- ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
   for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
   the **windex** dial's subtext should add the **point of sail**.
-- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls, layout to the owner first): "starting to overload". They mix trim, navigation, pausing and
+- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 
