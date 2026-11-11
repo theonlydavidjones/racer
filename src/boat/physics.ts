@@ -279,6 +279,16 @@ export const HOVE = {
   get aspect() { return 2 * orc.boat.draft ** 2 / this.latArea; },
   /** Broadside drag coefficient of the hull and keel (Hoerner: flat-sided bodies across the flow, about 1). */
   crossCd: 1.0,
+  /**
+   * How far aft of the centre of lateral resistance the broadside drag acts, m. With way on, the long keel's lift acts
+   * near its quarter chord (the CLR, the origin of balance.ts LEVER); sliding sideways, the cross-flow drag acts nearer
+   * the centre of the side-on area, which on a cutaway forefoot and a deep heel lies aft. TUNED, not measured: the drawn
+   * profile's centroid (render/hull.ts) is 0.81 m aft of the CLR, but there she wanders 30° hove to in 8 kt and
+   * forereaches near 2 kn in 25 kt; 0.3 m keeps her inside the hove-to observations (tests/heaveto.test.ts), which are
+   * anecdotal. (With none, the backed jib can't hold her bow off in 8 kt with the sails' levers 1.88 m apart.)
+   * A towing-tank or GPS record of a long-keeler drifting would set it.
+   */
+  dragAft: 0.3,
   /** Sway and yaw: added mass of water as a fraction of the boat's (a deep keel side-on drags a lot with it: ~0.9; in yaw ~0.4, estimates). */
   swayAdded: 0.9, yawAdded: 0.4,
   /** Radius of gyration in yaw, as a fraction of LOA (0.25, the usual figure for a yacht). */
@@ -363,10 +373,12 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const windX = -q * HANDLING.windageCdA * Math.cos(awaR), windY = q * HOVE.windSide * Math.sin(awaR) * Math.abs(Math.sin(awaR));
   // hull and keel: strips along the waterline, each with lift (with way on) and broadside drag
   const L = orc.boat.imsL, A = HOVE.latArea, AR = HOVE.aspect, aL = Math.PI * AR / 2, N = 8;
+  // (the broadside drag's share of the area by strip: more aft, so its centre is HOVE.dragAft behind the CLR)
+  const x2 = (L * L / 12) * (1 - 1 / (N * N)), kD = -HOVE.dragAft / x2;
   let hullY = 0, hullM = 0;
   for (let i = 0; i < N; i++) {
-    const x = -L / 2 + (i + 0.5) * L / N, vy = d0 - r0 * x; // sideways water speed at the strip (+: she's moving to leeward there)
-    const f = -0.5 * RHO * (A / N) * (aL * Math.max(0, u0) * vy + HOVE.crossCd * vy * Math.abs(vy));
+    const x = -L / 2 + (i + 0.5) * L / N, vy = d0 - r0 * x; // (x + forward) sideways water speed at the strip (+: she's moving to leeward there)
+    const f = -0.5 * RHO * (A / N) * (aL * Math.max(0, u0) * vy + HOVE.crossCd * (1 + kD * x) * vy * Math.abs(vy));
     hullY += f; hullM -= f * x; // a push to windward ahead of the centre turns her toward the wind
   }
   const lift = -0.5 * RHO * A * aL * Math.max(0, u0) * d0; // the keel's lift alone, for its induced drag

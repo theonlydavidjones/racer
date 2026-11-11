@@ -22,6 +22,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
       (done; the real-boat figures are anecdotal, so a GPS track of a Folkboat hove to would tighten the test bands).
       Later, from review: the hull's lift and broadside drag both act at one centre of lateral resistance (no Munk
       moment), and the hove-to model's lateral area, added masses and side windage are estimates (physics.ts HOVE).
+      The broadside drag's centre hove to is tuned (HOVE.dragAft 0.3 m aft of the CLR, against the drawn profile's
+      0.81 m, which makes her wander 30° in 8 kt), and HOVE.latArea (3.39 m²) disagrees with the drawn profile (5.36 m²):
+      a towing-tank or GPS record of a long-keeler drifting, or the class lines (Plan 1), would settle both.
       The force model's drive calibration (physics.ts driveCalibration) comes from full, unreefed sails at their best
       shape, so in a gale (k ≈ 0.2 at 35 kt) it stands in for the reefing and depowering it leaves out; from rest a
       backed-jib boat there gathers way quickly (5 kt in about 10 s). Holding the traveller down doesn't depower her: the

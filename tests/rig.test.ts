@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RIG } from '../src/render/boatMesh';
 import { sailArea, sailEdges } from '../src/render/sails';
-import { L, halfBeam, sheer, uAtZ } from '../src/render/hull';
+import { CABIN, COCKPIT, L, halfBeam, sheer, uAtZ } from '../src/render/hull';
 import { carLead } from '../src/boat/controls';
 
 /** The drawn boat against the class rules (NFIA CR 2025–2028) and FRIDA's ORC certificate (EST F51, 2026). */
@@ -45,5 +45,12 @@ describe('the drawn rig and hull', () => {
     expect(2 * halfBeam(uAtZ(L / 2 - 5.0))).toBeCloseTo(1.910, 2); // station 11 (CR 2.161)
     let lo = 9; for (let u = 0; u <= 1; u += 0.002) lo = Math.min(lo, sheer(u));
     expect(lo).toBeCloseTo(0.568, 3); // lowest freeboard (class Appendix)
+  });
+  it('lays out the cabin and cockpit by the class rules (CR 3.11, 3.12, 3.22)', () => {
+    const z = (u: number) => -L / 2 + u * L, st = (n: number) => L / 2 - 0.5 * (n - 1);
+    expect(z(CABIN.u1) - z(CABIN.u0)).toBeGreaterThanOrEqual(1.85 - 1e-9); // the cabin top's length
+    expect(st(6) - z(CABIN.u1)).toBeGreaterThanOrEqual(0); expect(st(6) - z(CABIN.u1)).toBeLessThanOrEqual(0.30);
+    expect(z(CABIN.u0)).toBeGreaterThan(RIG.MAST_FRONT_Z + 0.133); // aft of the mast
+    expect(z(COCKPIT.u1)).toBeCloseTo(st(3), 3);
   });
 });
