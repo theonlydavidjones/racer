@@ -94,7 +94,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       mats.push({ m: m0.clone(), c });
     }
     const cityMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    litWindows(cityMat, { lit: [0.12, 0.5], warm: 0.6, glow: 1.7 }); // homes and offices: each building its own share lit (no source for it: a guess)
+    litWindows(cityMat, { kind: 'auto', glow: 1.1 }); // homes and offices, by height (night.ts: the DOE lighting schedules)
     const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cityMat, mats.length);
     mats.forEach((b, i) => { city.setMatrixAt(i, b.m); city.setColorAt(i, b.c); });
     grp.add(city);
@@ -130,7 +130,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // the Transamerica Pyramid: 260 m, a slim four-sided pyramid with its spire, and the two "wings" for the lifts
   {
     const PYR = lam(0xeae7df), SPIRE = lam(0xe0ddd4);
-    litWindows(PYR, { floor: 3.9, bay: 2.8, lit: [0.25, 0.4], warm: 0.2, seed: 3 });
+    litWindows(PYR, { floor: 3.9, bay: 2.8, kind: 'office', seed: 3 });
     floodlit(SPIRE, 0xfff1d8, 0, 1, 1, 1.2, 'spire'); // the aluminium spire, lit from within (Wikipedia, "Transamerica Pyramid")
     const pyr = new THREE.Mesh(new THREE.ConeGeometry(37, 212, 4, 1), PYR); pyr.rotation.y = Math.PI / 4; pyr.position.y = 106;
     const spire = new THREE.Mesh(new THREE.ConeGeometry(4.5, 60, 4, 1), SPIRE); spire.rotation.y = Math.PI / 4; spire.position.y = 230;
@@ -147,7 +147,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const FIN = new THREE.MeshPhongMaterial({ color: 0xe1e3e1, specular: 0x777777, shininess: 40 });
     const prof = (y: number) => y < 250 ? 26 - 4 * y / 250 : 22 - 7 * ((y - 250) / 46) ** 2; // half-width (m)
     const t = new THREE.Mesh(loft([0, 60, 120, 180, 230, 250, 265, 280, 290, 296], (y, a) => rsq(a, prof(y), prof(y) * 0.32), 64), FIN);
-    litWindows(FIN, { floor: 4.2, bay: 3, lit: [0.3, 0.45], warm: 0.15, seed: 5, from: 10 });
+    litWindows(FIN, { floor: 4.2, bay: 3, kind: 'office', seed: 5, from: 10 });
     const crown = new THREE.Mesh(loft([296, 326], (y, a) => rsq(a, 15 - 3 * (y - 296) / 30, 5), 48, true), new THREE.MeshLambertMaterial({ color: 0xeceeee, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
     // the crown's LED display, just inside the lattice (night.ts)
     const show = new THREE.Mesh(loft([298, 324], (y, a) => rsq(a, 14.2 - 3 * (y - 296) / 30, 4.6), 48, true), crownDisplayMaterial(298, 324));
@@ -155,18 +155,18 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     glows.push({ ...LL(37.7899, -122.3969), h: 311, color: 0xf2f4ff, i: 0.6, w: 10 });
     const g = group(t, crown, show); g.rotation.y = Math.PI / 4; place(group(g), 37.7899, -122.3969);
   }
-  const tower = (lat: number, lon: number, h: number, hw: number, hd: number, color: number, opts: { taper?: number; round?: number; spire?: number; rot?: number } = {}) => {
-    const { taper = 1, round = 0.15, spire = 0, rot = 45 } = opts;
+  const tower = (lat: number, lon: number, h: number, hw: number, hd: number, color: number, opts: { taper?: number; round?: number; spire?: number; rot?: number; home?: boolean } = {}) => {
+    const { taper = 1, round = 0.15, spire = 0, rot = 45, home = false } = opts;
     const mat = new THREE.MeshPhongMaterial({ color, specular: 0x444444, shininess: 25 });
-    litWindows(mat, { floor: 3.9, bay: 3, lit: [0.2, 0.5], warm: 0.25, seed: Math.round(lat * 1e4) % 97, from: 8 }); // offices: cool white, a share left on at night
+    litWindows(mat, { floor: 3.9, bay: 3, kind: home ? 'home' : 'office', seed: Math.round(lat * 1e4) % 97, from: 8 }); // offices, or flats (`home`)
     const m = new THREE.Mesh(loft([0, h], (y, a) => { const k = 1 - (1 - taper) * y / h; return rsq(a, hw * k, Math.min(hw, hd) * k * round, hd / hw); }, 32), mat);
     const g = group(m); if (spire) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.4, spire, 6), lam(0xd8d8d8)).translateY(h + spire / 2));
     g.rotation.y = rot * Math.PI / 180; place(group(g), lat, lon);
   };
   tower(37.7897, -122.39535, 213, 17, 17, 0xb9c3c8, { taper: 0.62, spire: 32 }); // 181 Fremont: 213 m roof, 245 m spire; tapering, diagonal bracing
-  tower(37.7904, -122.3961, 197, 14, 22, 0x8c9ba5, { taper: 0.85, round: 0.5 }); // Millennium Tower: 197 m, blue-grey glass
+  tower(37.7904, -122.3961, 197, 14, 22, 0x8c9ba5, { taper: 0.85, round: 0.5, home: true }); // Millennium Tower (condominiums): 197 m, blue-grey glass
   tower(37.7903, -122.3943, 184, 16, 22, 0xa7b2b6, { round: 0.3 }); // Park Tower at Transbay: 184 m
-  tower(37.785778, -122.392139, 195, 15, 22, 0x93a2ab, { round: 0.6 }); // One Rincon Hill (south tower): 195 m
+  tower(37.785778, -122.392139, 195, 15, 22, 0x93a2ab, { round: 0.6, home: true }); // One Rincon Hill (condominiums) (south tower): 195 m
   tower(37.79285, -122.39793, 183, 18, 18, 0x6f7f88, { round: 1 }); // 101 California: 183 m, a faceted glass cylinder
   tower(37.7919, -122.4038, 237, 22, 30, 0x5e4a44, { round: 0.05, rot: 0 }); // 555 California: dark red granite (237 m, Wikipedia's figure not fetched)
   tower(37.7925, -122.4005, 212, 18, 24, 0xc4b2a2, { round: 0.1, rot: 0 }); // 345 California Center: 212 m, pink granite
