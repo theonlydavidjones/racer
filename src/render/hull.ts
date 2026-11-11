@@ -77,9 +77,9 @@ export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - 
 const BOW = 0.144; // where the stem's curve meets the forefoot (fraction of L)
 function canoe(u: number): number {
   if (u < BOW) return 0.96 - 1.06 * Math.pow(u / BOW, 1.34);
-  if (u < 0.45) return -0.1 - 0.38 * ease((u - BOW) / (0.45 - BOW));
-  if (u < 0.62) return -0.48;
-  return -0.48 + 0.65 * ease((u - 0.62) / 0.38);
+  if (u < 0.45) return -0.1 - 0.52 * ease((u - BOW) / (0.45 - BOW));
+  if (u < 0.62) return -0.62; // where the hollow garboards meet the keel amidships (the plan's main section at St. 8)
+  return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
 }
 /** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band), where the sternpost rises. */
 const U_HEEL = (HEEL.z + L / 2) / L;
@@ -94,11 +94,18 @@ function keelHalf(u: number): number {
   return 0.03 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - BOW) / 0.73)), 0.7);
 }
 /**
- * Section fullness: V-shaped forward, slack round bilge amidships, and V-shaped again aft, so the sides run nearly
- * straight into the sternpost and the flat transom is shield-shaped, wide at the deck and coming to a point at the
- * sternpost near the waterline (as the boats are: the owner's photos of Josephine and her neighbours).
+ * The sections' shape: the wineglass section of the class's construction plan (main section at St. 8): topsides
+ * nearly upright, a firm turn of the bilge just below the waterline, then hollow garboards running down into the keel.
+ * Half-breadth = keel + (deck − keel) · F(q), q the height from the keel's side (0) to the sheer (1), with
+ * F(q) = (1 − (1 − q)^α)^β: α sets how long the topsides stay upright, β > 1 the hollow into the keel. Fitted to the
+ * St. 8 section (within about 3 cm at the waterline, the turn of the bilge and the garboards); finer and more V-shaped
+ * forward, and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
+ * nearly upright-sided at the deck, curving in to meet the sternpost near the waterline (the owner's photos).
  */
-const sectionN = (u: number) => 1.35 + 1.0 * ease(u / 0.5) - 1.2 * ease((u - 0.62) / 0.38);
+function sectionShape(u: number): { al: number; be: number } {
+  const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38);
+  return { al: 1.6 + 2.4 * mid - 1.2 * aft, be: 1.0 + 0.6 * mid + 0.3 * aft };
+}
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
 
@@ -106,9 +113,10 @@ const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
 function sectionPoint(u: number, p: number): { x: number; y: number } {
   const b = halfBeam(u), s = sheer(u), kc = canoe(u), wk = keelHalf(u), kb = Math.min(keel(u), kc);
   if (p <= 0.8) {
-    const a = (p / 0.8) * Math.PI / 2, n = sectionN(u);
-    const xs = b * Math.pow(Math.cos(a), 2 / n), ys = s - (s - kc) * Math.pow(Math.sin(a), 2 / (n * 0.8));
-    return { x: p >= 0.8 ? wk : Math.pow(xs ** 4 + wk ** 4, 0.25), y: ys }; // blends smoothly into the keel's side
+    // heights spread down the section (the strakes a little closer near the keel), the breadth from the wineglass curve
+    const a = (p / 0.8) * Math.PI / 2, g = Math.pow(Math.sin(a), 1.15), ys = s - (s - kc) * g;
+    const { al, be } = sectionShape(u), w = Math.min(wk, b), F = Math.pow(1 - Math.pow(g, al), be);
+    return { x: w + (b - w) * F, y: ys };
   }
   const f = (p - 0.8) / 0.2;
   return f < 0.85 ? { x: wk * (1 - 0.15 * f / 0.85), y: kc + (kb - kc) * f / 0.85 } : { x: wk * 0.85 * (1 - (f - 0.85) / 0.15), y: kb };
