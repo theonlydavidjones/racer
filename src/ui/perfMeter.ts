@@ -13,7 +13,7 @@ export class PerfMeter {
   toggle(): void {
     if (this.el) { this.el.remove(); this.el = null; return; }
     const el = this.el = document.createElement('div');
-    el.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99;background:rgba(0,0,0,.72);color:#cfe;font:11px/1.35 ui-monospace,monospace;padding:6px 8px;border-radius:4px;pointer-events:none;white-space:pre';
+    el.style.cssText = 'position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:99;background:rgba(0,0,0,.72);color:#cfe;font:11px/1.35 ui-monospace,monospace;padding:6px 8px;border-radius:4px;pointer-events:none;white-space:pre';
     document.body.appendChild(el); this.n = 0; this.last = 0;
   }
   /** Once a frame: `now` the frame's timestamp, and the JS times (ms) of the whole frame, the sim's steps and the scene. */
