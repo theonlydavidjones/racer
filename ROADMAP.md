@@ -104,6 +104,22 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
   offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
   outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
+- **Next — heavy weather: reefing, and what a skipper does in 30+ kt** (accuracy + feature; 8–12 h; owner: "not for
+  now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner: "that
+  boat would have sunk by now… This may very well be true-to-life physics (I don't know)… How would an IRL skipper
+  handle this situation? can't Folkboats handle heavy weather like this?" What's known: a Folkboat is stiff and
+  seaworthy, with ballast about 50% of displacement (Folkboat Year Book 2023, folkboats.com; mauripro 0.52) and a capsize
+  screening figure of 1.78 (keelindex.com; under 2.0 counts as fit offshore). A real skipper would have reefed long
+  before 32 kt, dropped the main and sailed under jib alone, or hove to or run off. The sim has no reefing at all
+  (grep: no "reef" in the code), and the drive calibration stands in for it (see heaving to, above). To build:
+  (1) reefing the main (how a Folkboat reefs, slab or roller, and how many reefs, still to source; general practice is
+  a first reef near 20 kt), dropping the main, jib alone, with the auto crew doing it by skill and the strategist and
+  coach advising it;
+  (2) check the heel she settles at with sheets eased in 30+ kt against the righting curve past a few degrees, which
+  still needs the hull's offsets (see crew weight, above): eased right out she shouldn't lie at 60°;
+  (3) water in the cockpit: a self-draining cockpit is optional (NFIA class rules 2025–2028, 3.21) and most traditional
+  boats aren't, so a knockdown can fill one: model water shipped, its weight, and the pump. The Folkboat's AVS (limit
+  of positive stability) and a sourced reefing wind speed are still unfound.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
