@@ -445,6 +445,11 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 
+/** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step: up to about 7°). */
+export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? 7 * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
+/** The boom angle the crew is aiming for. */
+export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaSlow) + crewEaseBoom(b);
+
 /** Taking in a slack sheet by hand, full range per second (an arm's length of line a second, no load on it). */
 const SLACK_RATE = 0.6;
 
@@ -522,7 +527,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const over = !up ? -1 : (heel > 18 || helmLoad > 6) && maxed ? 1 : (heel < 13 && helmLoad < 3.5) || (!maxed && heel < 18 && helmLoad < 6) ? -1 : 0;
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
-  const easeBoom = up ? 7 * clamp((b.depower - 0.6) / 0.4, 0, 1) : 0;
+  const easeBoom = crewEaseBoom(b);
   const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
@@ -532,17 +537,17 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; }
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
-    const fixed: Partial<CrewSettings> = {};
+    const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
     if (b.isUser) {
       for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) if (byHand(b, k)) fixed[k] = c[k];
-      // the traveller and the mainsheet set the boom together: with the mainsheet in your hand, the crew leaves the
-      // traveller where it is (moving it would swing the boom under your sheet)
-      if (byHand(b, 'mainsheet')) fixed.traveller = c.traveller;
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
-    const mAng = b.isUser && byHand(b, 'mainsheet') ? boomAngle(c) : wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
+    if (b.isUser && byHand(b, 'mainsheet')) fixed.mainsheet = c.mainsheet;
+    // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
+    if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
+    const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, cond?.main, cond?.jib, b.aws / KT, b.depower);
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, cond?.main, cond?.jib, b.aws / KT, b.depower, fixed.mainsheet);
   }
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;

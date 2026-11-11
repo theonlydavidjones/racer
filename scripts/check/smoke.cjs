@@ -20,7 +20,7 @@ const root = path.resolve(__dirname, '../..'), out = process.argv[2] || root;
   await page.click('[data-home="fleet"]'); await page.waitForTimeout(800); await page.click('.fcard'); await page.waitForTimeout(1500);
   console.log('boat page', await page.isVisible('#fleetBoat'));
   await page.click('[data-f="toList"]'); await page.waitForTimeout(300); await page.click('[data-f="back"]'); await page.waitForTimeout(800);
-  await page.click('[data-home="race"]'); await page.waitForTimeout(1000);
+  await page.click('[data-home="race"]'); await page.waitForTimeout(500); await page.click('[data-home="create"]'); await page.waitForTimeout(1000);
   await page.click('#bGo'); await page.waitForTimeout(2500);
   await page.screenshot({ path: path.join(out, 'smoke.png') });
   console.log(await page.evaluate(() => ['clock', 'spd', 'linebox'].map(i => document.getElementById(i).textContent).join(' | ')));

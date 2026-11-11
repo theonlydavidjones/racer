@@ -19,7 +19,7 @@ import corinthian from './data/corinthian.json';
 
 type LLs = [number, number][];
 interface HarborData {
-  name?: string; basin: LLs; breakwaters: { area: boolean; pts: LLs }[]; walkways: LLs[]; fingers: LLs[]; areas: LLs[];
+  name?: string; basin: LLs; breakwaters: { area: boolean; pts: LLs; seawall?: { top: number; rail: LLs } }[]; walkways: LLs[]; fingers: LLs[]; areas: LLs[];
   beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[];
   slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number }[];
 }
@@ -58,7 +58,8 @@ export interface Slip {
 }
 export interface Harbor {
   id: string; name: string; short: string;
-  basin: Vec[]; breakwaters: { area: boolean; pts: Vec[] }[];
+  /** Breakwaters: rubble mounds, or a vertical concrete seawall (its top above the water, m, and the railing along its outer edge). */
+  basin: Vec[]; breakwaters: { area: boolean; pts: Vec[]; seawall?: { top: number; rail: Vec[] } }[];
   /** Main walkways (2.4 m wide) and slip fingers (1.0 m), as centre lines; and solid pier areas. */
   walkways: Vec[][]; fingers: Vec[][]; areas: Vec[][];
   /** Stretches of the basin's edge that are the shore itself, solid (where the terrain grid is too coarse to stop a boat). */
@@ -74,7 +75,7 @@ const inBox = (p: Vec, b: Box) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y 
 
 export const HARBORS: Harbor[] = SOURCES.map(({ id, name, short, data: D }) => {
   const walks = D.walkways.map(v), fingers = D.fingers.map(v);
-  const basin = v(D.basin), breakwaters = D.breakwaters.map(b => ({ area: b.area, pts: v(b.pts) }));
+  const basin = v(D.basin), breakwaters = D.breakwaters.map(b => ({ area: b.area, pts: v(b.pts), ...(b.seawall ? { seawall: { top: b.seawall.top, rail: v(b.seawall.rail) } } : {}) }));
   const beacons = D.beacons ? D.beacons.map(b => ({ p: LL(b.at[0], b.at[1]), colour: b.colour })) : D.beacon ? [{ p: LL(D.beacon[0], D.beacon[1]), colour: 'red' as const }] : [];
   const exits = D.exits ? v(D.exits) : beacons.map(b => b.p);
   // (an end that stops short of a walkway, or runs on over it, is made to meet its edge: as drawn, and as solid)
@@ -112,6 +113,17 @@ export function hitsHarbor(p: Vec): boolean {
     for (const l of H.shore) if (nearLine(p, l, SHORE_W / 2)) return true;
     for (const w of H.walkways) if (nearLine(p, w, WALKWAY_W / 2)) return true;
     for (const f of H.fingers) if (nearLine(p, f, FINGER_W / 2)) return true;
+  }
+  return false;
+}
+
+/** A wall that stops the waves here: a breakwater, a solid pier or the shore (not the floating docks, which ride on them). */
+export function hitsWall(p: Vec): boolean {
+  for (const H of HARBORS) {
+    if (!inBox(p, H.reach)) continue;
+    for (const b of H.breakwaters) if (b.area ? inPoly(p, b.pts) : nearLine(p, b.pts, BREAKWATER_W / 2)) return true;
+    for (const a of H.areas) if (inPoly(p, a)) return true;
+    for (const l of H.shore) if (nearLine(p, l, SHORE_W / 2)) return true;
   }
   return false;
 }

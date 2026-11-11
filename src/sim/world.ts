@@ -9,7 +9,7 @@ import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } fro
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
 import { Puffs, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
-import { onLand, shoreDist } from '../geo/shore';
+import { SHORE, alongside, onLand, shoreDist, shoreNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
@@ -352,15 +352,20 @@ export class World {
     const u = V(this.C.base), c = this.C.committee;
     return { name: 'the committee boat', p: { x: c.x + u.x * 6, y: c.y + u.y * 6 }, q: { x: c.x - u.x * 6, y: c.y - u.y * 6 }, r: 2 };
   }
-  /** Rule 19: the nearest obstruction (the shore; after the start, the committee boat) within 30 m. */
+  /** Rule 19: the nearest obstruction (the shore, the Wharf's piers and breakwaters; after the start, the committee boat) within 30 m. */
   private obstacle = (p: Vec, committee: boolean): { d: number; n: Vec; continuing: boolean } | null => {
     let best: { d: number; n: Vec; continuing: boolean } | null = null;
-    const ds = shoreDist(p);
+    const sn = shoreNearest(p), ds = sn.d;
     if (ds < 30) {
       const e = 0.5, gx = shoreDist({ x: p.x + e, y: p.y }) - shoreDist({ x: p.x - e, y: p.y }), gy = shoreDist({ x: p.x, y: p.y + e }) - shoreDist({ x: p.x, y: p.y - e });
-      const l = Math.hypot(gx, gy) || 1;
-      best = { d: ds, n: { x: gx / l, y: gy / l }, continuing: true };
+      const l = Math.hypot(gx, gy) || 1, n = { x: gx / l, y: gy / l };
+      // continuing if she'd pass alongside it for three hull lengths (a long shore, a pier's side; not a pier head)
+      const q = { x: p.x - n.x * ds, y: p.y - n.y * ds };
+      best = { d: ds, n, continuing: alongside(SHORE, false, sn.k, q, n) >= 3 * LOA };
     }
+    // the Wharf's piers, breakwaters and docks: along a side, a continuing obstruction; at a pier head, not
+    const wf = wharfNearest(p, 30);
+    if (wf && (!best || wf.d < best.d)) best = { d: wf.d, n: wf.n, continuing: wf.along >= 3 * LOA };
     const cb = committee ? this.committeeHull : null;
     if (cb) {
       const d = segPt(p, cb.p, cb.q!) - cb.r;

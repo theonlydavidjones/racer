@@ -4,7 +4,7 @@ import { LL } from '../geo/geo';
 /**
  * Ship traffic through the race area, on approximate real routes: a container ship and a tanker in the deep-water
  * route from the Golden Gate across the Central Bay toward Oakland; the Sausalito ferry from the Ferry Building; the
- * Alcatraz ferry from Pier 33; bay-cruise boats from Pier 39 out under the bridge and back; a Coast Guard boat out
+ * Alcatraz ferry from Pier 33; bay-cruise boats from Pier 41 out under the bridge and back; a Coast Guard boat out
  * of Horseshoe Bay. Where each one is comes straight from the race clock (deterministic), so replays match.
  *
  * Their wakes: the Kelvin pattern, two arms at 19.47° either side of the track (the same angle for any vessel at any
@@ -29,9 +29,12 @@ const route = (pts: [number, number][]) => pts.map(([la, lo]) => LL(la, lo));
 // Approximate tracks (lat, lon). Ships keep to the deep water north of the race area, inside Alcatraz.
 export const ROUTES: Record<string, Vec[]> = {
   channel: route([[37.8060, -122.5350], [37.8160, -122.4790], [37.8240, -122.4500], [37.8330, -122.4200], [37.8240, -122.3900], [37.8060, -122.3500]]),
-  sausalito: route([[37.7960, -122.3910], [37.8060, -122.4050], [37.8190, -122.4330], [37.8400, -122.4640], [37.8560, -122.4770]]),
-  alcatraz: route([[37.8080, -122.4040], [37.8180, -122.4130], [37.8262, -122.4212]]),
-  tour: route([[37.8105, -122.4105], [37.8125, -122.4300], [37.8145, -122.4560], [37.8195, -122.4760], [37.8280, -122.4790], [37.8300, -122.4500], [37.8300, -122.4250], [37.8200, -122.4120], [37.8105, -122.4105]]),
+  // (out clear of the pier heads: Piers 35 to 27 reach out to 37.810; geo/shore.ts)
+  sausalito: route([[37.7960, -122.3910], [37.8050, -122.3930], [37.8110, -122.4040], [37.8190, -122.4330], [37.8400, -122.4640], [37.8560, -122.4770]]),
+  alcatraz: route([[37.8085, -122.4030], // (off the head of Pier 33, the Alcatraz landing)
+     [37.8180, -122.4130], [37.8262, -122.4212]]),
+  // (from the berth on the west side of Pier 41, where OpenStreetMap's ferry routes end, out round Pier 45 and the Wharf's breakwater)
+  tour: route([[37.8102, -122.4135], [37.8128, -122.4140], [37.8128, -122.4300], [37.8145, -122.4560], [37.8195, -122.4760], [37.8280, -122.4790], [37.8300, -122.4500], [37.8300, -122.4250], [37.8200, -122.4120], [37.8102, -122.4135]]),
   coastguard: route([[37.8325, -122.4740], [37.8200, -122.4600], [37.8150, -122.4400], [37.8260, -122.4350], [37.8325, -122.4740]])
 };
 

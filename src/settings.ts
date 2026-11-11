@@ -27,6 +27,7 @@ export interface Settings {
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
   traffic: 0 | 1; // ship traffic through the race area
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
+  chartPal?: 'day' | 'dusk'; // the map's NOAA chart: the paper chart's colours, or dark (ECDIS dusk)
   sailFrom: string; // Just sail: where you start (a place id, sim/places.ts)
   sailTo: string; // Just sail: where you're heading ('' = nowhere in particular)
   raceFrom?: 'water' | 'slip'; // Race: start on the water by the line, or in her slip in time to sail out to it
