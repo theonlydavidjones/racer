@@ -164,7 +164,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the dials and messages: the hull low in frame (render/scene.ts chase camera), and the HUD kept out of the sails' area.
   May fold into a broader HUD review. Batch with: the Navigator button (owner, "move the navigator button to be next
   to the autopilot button. probably to the left of it."): in a cruise it moves from beside the map (#mapBar) to the
-  bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min).
+  bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min). And the Hail icon (owner, "the hail button icon is the same as the
+  sound icon. let's fix that too."): a distinct icon, a hand cupped to the mouth or a sailor calling, never a speaker or
+  megaphone (that reads as Sound).
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
