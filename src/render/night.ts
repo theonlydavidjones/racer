@@ -23,6 +23,45 @@ export const NIGHT = {
 
 /** Objects that show only when the installations are on (hidden by day, so they cost no draw calls). */
 export const nightOnly: THREE.Object3D[] = [];
+/** Objects that show only by day (the Bay Bridge's steel suspenders, which the Bay Lights replace after dark). */
+export const dayOnly: THREE.Object3D[] = [];
+/** Lamps that come on around sunset, as the Golden Gate's do (the Bay Bridge's roadway and aviation lights). */
+export const duskLights: THREE.Object3D[] = [];
+/** Unlit lines (cables drawn as lines) that would glow at night: their colour fades with the daylight. */
+export const nightDim: THREE.LineBasicMaterial[] = [];
+const dimBase = new WeakMap<THREE.LineBasicMaterial, THREE.Color>();
+/** Clocks that show the time (the Ferry Building's dials), redrawn when the minute changes: (hour, minute) local. */
+export const clocks: ((h: number, m: number) => void)[] = [];
+
+const TZ_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+let lastMin = NaN, localH = 12;
+/**
+ * The city's lights for the moment: `el` the sun's elevation (°), `tMin` minutes since the epoch (UTC), `windMs`
+ * the wind (m/s) for the sea's slope, `tSec` a running clock for the light shows. Called by the scene.
+ */
+export function updateNight(el: number, tMin: number, windMs: number, tSec: number): void {
+  NIGHT.uTime.value = tSec % 3600;
+  NIGHT.uSlope.value = Math.sqrt(0.003 + 0.00512 * Math.max(0, windMs)); // Cox & Munk (1954)
+  // recomputed when the minute or the sun's height changes (the sun is updated a moment after the clock)
+  const m = Math.floor(tMin), key = m * 1000 + Math.round(el * 10);
+  if (key === lastMin) return;
+  lastMin = key;
+  const [hh, mm] = TZ_FMT.format(new Date(m * 60000)).split(':').map(Number); localH = hh + mm / 60;
+  for (const c of clocks) c(hh, mm);
+  const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  NIGHT.uNight.value = 1 - ss(-6, 6, el);
+  const on = el < -0.83 ? 1 : 0; // from sunset (the sun's upper limb on the horizon, with refraction) to sunrise
+  NIGHT.uOn.value = on;
+  // lights going out late: 0 at 23:00 → 1 at 01:00, and back on through the small hours before dawn
+  const h = localH < 12 ? localH + 24 : localH;
+  NIGHT.uLate.value = ss(23, 25, h) * (1 - ss(29, 31, h));
+  // Day for Night: the city video from sunset to 00:30, then the stars until sunrise
+  NIGHT.uStars.value = h >= 24.5 && h < 36 ? 1 : 0;
+  for (const o of nightOnly) o.visible = on === 1;
+  for (const o of dayOnly) o.visible = on === 0;
+  for (const o of duskLights) o.visible = el < 3;
+  for (const mt of nightDim) { const c0 = dimBase.get(mt) ?? dimBase.set(mt, mt.color.clone()).get(mt)!; mt.color.copy(c0).multiplyScalar(1 - 0.85 * NIGHT.uNight.value); }
+}
 
 const HASH = `
 float nHash(float n) { return fract(sin(n) * 43758.5453123); }
@@ -72,7 +111,7 @@ export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: numbe
           float w = on * pane * (0.55 + 0.45 * nHash2(id.yx + 3.7));
           // smaller than a pixel: the wall's average instead
           float sub = smoothstep(0.35, 0.9, max(length(fwidth(cell.x)), length(fwidth(cell.y))));
-          w = mix(w, share * 0.46 * 0.78, sub);
+          w = mix(w, share * 0.36, sub); // (the glass is 54% of a cell, at 0.78 of full brightness on average)
           float wm = step(nHash2(id * 1.3 + 7.1), ${warm.toFixed(2)});
           vec3 wc = mix(vec3(0.80, 0.86, 1.0), vec3(1.0, 0.74, 0.42), wm);
           totalEmissiveRadiance += wc * w * uNight * ${glow.toFixed(2)};
@@ -144,7 +183,7 @@ export function bayLightsMaterial(): THREE.ShaderMaterial {
       ${BAY_LIGHTS_GLSL}
       void main() {
         #include <logdepthbuf_fragment>
-        float b = bayLights(vS, vH, vHm, vC, uTime) * uOn * (0.45 + 0.55 * uNight);
+        float b = min(1.0, 1.6 * bayLights(vS, vH, vHm, vC, uTime)) * uOn * (0.45 + 0.55 * uNight); // 1-px lines: brighter so the far span still reads
         b *= 1.0 - smoothstep(fogNear, fogFar, vDepth);
         gl_FragColor = vec4(vec3(0.93, 0.95, 1.0) * b, 1.0);
       }`,
@@ -188,7 +227,8 @@ export function glints(list: Glint[]): THREE.Mesh {
         float dFar = al - sg > 0.0004 ? hc / tan(al - sg) : D, dNear = hc / tan(min(al + 1.5 * sg, 1.4));
         dFar = min(dFar, D); dNear = min(dNear, dFar - 1.0);
         float along = mix(dFar, dNear, position.y);
-        float wdt = aSrc.w + along * 2.0 * sg * max(sin(al), 0.012);
+        // its width: the light's own, seen in the mirror at that distance (w·along/D), plus the glitter's spread across
+        float wdt = aSrc.w * along / D + along * sg * max(sin(al), 0.012);
         vec2 q = C - u * along + p * position.x * wdt;
         vUV = vec2(position.x, position.y); vSeed = aSrc.x * 0.013 + aSrc.y * 0.007;
         float k = 1.0;
@@ -213,4 +253,44 @@ export function glints(list: Glint[]): THREE.Mesh {
   });
   const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = 3; nightOnly.push(m); m.visible = false;
   return m;
+}
+
+/**
+ * The Salesforce Tower's crown, "Day for Night" (Jim Campbell, 2018; Wikipedia, "Salesforce Tower"): about 11,000
+ * white LEDs facing inward on the top six floors, seen through the crown's open lattice, showing low-resolution video
+ * of people and scenes filmed round the city from sunset to about 00:30 (the SF Chronicle, 2020), then star fields
+ * until sunrise. Drawn here as a grid of 200 × 55 cells round and up the crown (`y0`..`y1` in its own frame): drifting
+ * soft figures of light for the video, sparse twinkling cells for the stars, warm at first in the sunset's colours.
+ */
+export function crownDisplayMaterial(y0: number, y1: number): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { ...THREE.UniformsLib.fog, uTime: NIGHT.uTime, uOn: NIGHT.uOn, uNight: NIGHT.uNight, uStars: NIGHT.uStars },
+    fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: `#include <common>
+      #include <logdepthbuf_pars_vertex>
+      varying vec3 vP; varying float vDepth;
+      void main() { vP = position; vec4 mv = modelViewMatrix * vec4(position, 1.0); vDepth = -mv.z; gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: `#include <common>
+      #include <logdepthbuf_pars_fragment>
+      uniform float uTime; uniform float uOn; uniform float uNight; uniform float uStars; ${FOG_PARS}
+      varying vec3 vP; varying float vDepth;
+      ${HASH}
+      float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(nHash2(i), nHash2(i + vec2(1, 0)), f.x), mix(nHash2(i + vec2(0, 1)), nHash2(i + vec2(1, 1)), f.x), f.y); }
+      void main() {
+        #include <logdepthbuf_fragment>
+        float u = (atan(vP.z, vP.x) / 6.2831853 + 0.5) * 200.0, v = (vP.y - ${y0.toFixed(1)}) / ${(y1 - y0).toFixed(1)} * 55.0;
+        if (v < 0.0 || v > 55.0) discard;
+        vec2 c = floor(vec2(u, v));
+        // the video: soft shapes drifting round the crown (people walking, water, traffic), changing scene every 20 s
+        float sc = floor(uTime / 20.0), dir = nHash(sc) < 0.5 ? -1.0 : 1.0;
+        float vid = smoothstep(0.55, 0.8, vn(vec2(c.x * 0.09 + dir * uTime * (0.6 + nHash(sc + 1.0)), c.y * 0.14 + sc * 7.0)) * (0.7 + 0.3 * vn(c * 0.3 + uTime)));
+        float stars = step(0.992, nHash2(c)) * (0.5 + 0.5 * sin(uTime * (1.0 + 3.0 * nHash2(c.yx)) + c.x));
+        float b = mix(vid, stars, uStars) * uOn * (0.5 + 0.5 * uNight) * (1.0 - smoothstep(fogNear, fogFar, vDepth));
+        vec3 col = mix(vec3(1.0, 0.62, 0.42), vec3(0.95, 0.96, 1.0), smoothstep(0.3, 0.9, uNight)); // the sunset's colours at first
+        gl_FragColor = vec4(col * b * 0.9, 1.0);
+      }`,
+  });
 }

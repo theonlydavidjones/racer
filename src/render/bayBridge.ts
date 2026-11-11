@@ -3,10 +3,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { LL } from '../geo/geo';
 import { P3 } from './coords';
-import { bayLightsMaterial, nightOnly, type Glint } from './night';
+import { bayLightsMaterial, dayOnly, duskLights, nightDim, nightOnly, type Glint } from './night';
 
-/** Lights that come on at dusk (the scene switches them with the Golden Gate's): aviation lights and roadway lamps. */
-export const bayBridgeLights: THREE.Object3D[] = [];
 /** The Bay Bridge's SF approach, as segments (sim coords): the city's buildings keep clear of it. */
 export const BAY_APPROACH: [{ x: number; y: number }, { x: number; y: number }][] = [];
 
@@ -16,14 +14,12 @@ class Path {
   private cum: number[] = [0];
   constructor(readonly pts: V2[]) { for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)); }
   get len() { return this.cum[this.cum.length - 1]; }
-  /** The point and direction at distance s; the corners are rounded over `r` metres so the line bends smoothly. */
+  /** The point and direction at distance s; the direction turns smoothly over `r` metres round a corner. */
   at(s: number, r = 160): { x: number; y: number; ux: number; uy: number } {
     const seg = (s: number) => { let i = 0; while (i < this.cum.length - 2 && s > this.cum[i + 1]) i++; const a = this.pts[i], b = this.pts[i + 1], L = this.cum[i + 1] - this.cum[i], t = (s - this.cum[i]) / L; return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, ux: (b.x - a.x) / L, uy: (b.y - a.y) / L }; };
     const p = seg(s);
     // round the corners: average the direction over ±r/2 and follow that
-    if (this.pts.length > 2) { const p0 = seg(s - r / 2), p1 = seg(s + r / 2), ux = p0.ux + p1.ux, uy = p0.uy + p1.uy, n = Math.hypot(ux, uy);
-      const q = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }, k = Math.min(1, Math.abs(p0.ux * p1.uy - p0.uy * p1.ux) * 40);
-      return { x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k, ux: ux / n, uy: uy / n }; }
+    if (this.pts.length > 2) { const p0 = seg(s - r / 2), p1 = seg(s + r / 2), ux = p0.ux + p1.ux, uy = p0.uy + p1.uy, n = Math.hypot(ux, uy); return { x: p.x, y: p.y, ux: ux / n, uy: uy / n }; }
     return p;
   }
 }
@@ -90,17 +86,10 @@ function frustum(bw: number, bd: number, bx: number, tw: number, td: number, tx:
   const bot = c.map(([i, k]) => [bx + i * bw / 2, 0, k * bd / 2]), top = c.map(([i, k]) => [tx + i * tw / 2, h, k * td / 2]);
   const pos: number[] = [];
   const quad = (a: number[], b: number[], cc: number[], d: number[]) => pos.push(...a, ...b, ...cc, ...a, ...cc, ...d);
-  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(bot[i], bot[j], top[j], top[i]); }
-  quad(top[0], top[1], top[2], top[3]);
+  // outward-facing: the sides wound counter-clockwise seen from outside, then the top
+  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(bot[j], bot[i], top[i], top[j]); }
+  quad(top[3], top[2], top[1], top[0]);
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  // outward faces: the winding above runs counter-clockwise seen from outside for the sides when z grows inward; fix by computing and flipping where needed
-  g.computeVertexNormals();
-  const p = g.attributes.position.array as Float32Array, n = g.attributes.normal.array as Float32Array;
-  for (let t = 0; t < p.length; t += 9) { // each triangle: its normal should point away from the leg's axis
-    const cx = (p[t] + p[t + 3] + p[t + 6]) / 3, cy = (p[t + 1] + p[t + 4] + p[t + 7]) / 3, cz = (p[t + 2] + p[t + 5] + p[t + 8]) / 3;
-    const ax = bx + (tx - bx) * cy / h, out = (cx - ax) * n[t] + (cy - h / 2) * n[t + 1] * 0.01 + cz * n[t + 2];
-    if (out < 0 && !(cy > h - 1e-3 && n[t + 1] > 0)) { for (const o of [0, 1, 2]) { const tmp = p[t + 3 + o]; p[t + 3 + o] = p[t + 6 + o]; p[t + 6 + o] = tmp; } }
-  }
   g.computeVertexNormals(); return g;
 }
 
@@ -198,14 +187,13 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     if (cable % 3 === 0) { const p = west.at(s); glints.push({ x: p.x + sx * CW * p.uy, y: p.y - sx * CW * p.ux, h: (top + bot) / 2, color: 0xeef2ff, i: 0.5, w: 2.5, s }); }
   }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sus, 3));
-  const susLines = new THREE.LineSegments(sg, new THREE.LineBasicMaterial({ color: 0x8d9499 })); parent.add(susLines);
+  const susMat = new THREE.LineBasicMaterial({ color: 0x8d9499 }); nightDim.push(susMat); const susLines = new THREE.LineSegments(sg, susMat); parent.add(susLines);
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(led, 3));
   lg.setAttribute('aS', new THREE.Float32BufferAttribute(aS, 1)); lg.setAttribute('aH', new THREE.Float32BufferAttribute(aH, 1));
   lg.setAttribute('aHm', new THREE.Float32BufferAttribute(aHm, 1)); lg.setAttribute('aC', new THREE.Float32BufferAttribute(aC, 1));
   const bayLights = new THREE.LineSegments(lg, bayLightsMaterial()); bayLights.renderOrder = 4; bayLights.frustumCulled = false; bayLights.visible = false;
   parent.add(bayLights); nightOnly.push(bayLights);
   // the steel suspenders vanish into the dark once the lights are on (and the lights take their place)
-  bayLights.onBeforeRender = () => { susLines.visible = false; }; susLines.onBeforeRender = () => {};
   dayOnly.push(susLines);
   // roadway lamps along the upper deck, and red aviation lights on the towers and the central anchorage
   const lamps: number[] = [], red: number[] = [];
@@ -240,7 +228,7 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     // the deck's height: from the tunnel (about 75 m) down to the SAS, level over it, then the Skyway's long fall
     const yD = (s: number) => s < W2 ? 75 + (SAS - 75) * Math.min(1, s / W2) : s < E2 ? SAS : SAS + (OAK - SAS) * Math.pow(Math.min(1, (s - E2) / (eLen - E2)), 1.25);
     for (const sx of [-1, 1]) {
-      E.sweep(sx < 0 ? CONC : CONC, 0, W2, sx * HALF, DW, s => yD(s) - GIRDER, s => yD(s) - 0.4, 20, 'blr');
+      E.sweep(CONC, 0, W2, sx * HALF, DW, s => yD(s) - GIRDER, s => yD(s) - 0.4, 20, 'blr');
       E.sweep(WHITE, W2, E2, sx * HALF, DW, s => yD(s) - GIRDER, s => yD(s) - 0.4, 20, 'blr');
       E.sweep(CONC, E2, eLen, sx * HALF, DW, s => yD(s) - GIRDER, s => yD(s) - 0.4, 30, 'blr');
       E.sweep(ROAD, 0, eLen, sx * HALF, DW, s => yD(s) - 0.4, yD, 30, 't');
@@ -254,9 +242,10 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     // the tower: four legs, tapering, tied by shear-link beams, between the two decks
     E.box(CONC, 30, 10, 30, T1, 0, 3);
     for (const [ix, iz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const g = frustum(5.5, 5.5, ix * 4.2, 3.6, 3.6, ix * 2.6, TOP - 8); g.translate(0, 0, iz * 4.2 * (1 - 0)); E.put(WHITE, g, T1, 0, 8);
+      const g = frustum(5.5, 5.5, ix * 4.2, 3.6, 3.6, ix * 2.6, TOP - 8); g.translate(0, 0, iz * 4.2); E.put(WHITE, g, T1, 0, 8);
     }
-    for (let y = 30; y < TOP - 4; y += 14) { const k = (y - 8) / (TOP - 8), x = 4.2 - 1.6 * k; for (const iz of [-1, 1]) E.box(WHITE, 2 * x, 1.6, 0.8, T1, 0, y, 0); void iz; }
+    // the shear links: short beams between the legs, across and along, every 14 m up
+    for (let y = 30; y < TOP - 4; y += 14) { const x = 4.2 - 1.6 * (y - 8) / (TOP - 8); for (const k of [-1, 1]) { E.box(WHITE, 2 * x, 1.6, 0.8, T1 + k * 4.2, 0, y); E.box(WHITE, 0.8, 1.6, 8.4, T1, k * x, y); } }
     E.box(WHITE, 12, 3, 12, T1, 0, TOP - 1);
     // the cable: from the outer edges of the decks at the ends up over the tower top (an A in section), looped round
     // the west end; suspenders every 10 m from it to the decks' outer edges
@@ -271,7 +260,7 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     }
     { const pts: [number, number, number][] = []; for (let i = 0; i <= 12; i++) { const t = i / 12 * Math.PI; pts.push([W2 - 6 * Math.sin(t), -OUT * Math.cos(t), SAS + 1.5]); } E.tube(WHITE, pts, 0.39, 24); } // round the west end
     const eg2 = new THREE.BufferGeometry(); eg2.setAttribute('position', new THREE.Float32BufferAttribute(esus, 3));
-    parent.add(new THREE.LineSegments(eg2, new THREE.LineBasicMaterial({ color: 0xc9cccb })));
+    const eMat = new THREE.LineBasicMaterial({ color: 0xc9cccb }); nightDim.push(eMat); parent.add(new THREE.LineSegments(eg2, eMat));
     // the Skyway's lamps (white LEDs) along both decks' outer edges, and the tower's aviation lights
     for (let s = 30; s < eLen; s += 55) for (const sx of [-1, 1]) { const p = E.W(s, sx * (OUT - 1), yD(s) + 8); lamps.push(p.x, p.y, p.z); if (sx > 0 && Math.round(s / 55) % 3 === 0) { const q = east.at(s); glints.push({ x: q.x, y: q.y, h: yD(s) + 8, color: 0xf2f4ff, i: 0.3, w: 3 }); } }
     for (const sx of [-1, 1]) { const p = E.W(T1, sx * 3, TOP + 1.5); red.push(p.x, p.y, p.z); }
@@ -280,11 +269,9 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
 
   const pts = (arr: number[], color: number, size: number) => {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
-    const p = new THREE.Points(g, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, fog: false })); p.visible = false; parent.add(p); bayBridgeLights.push(p);
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, fog: false })); p.visible = false; parent.add(p); duskLights.push(p);
   };
-  pts(lamps, 0xffe2b8, 2); pts(red, 0xff2a1a, 3.2);
+  pts(lamps, 0xffe2b8, 1.6); pts(red, 0xff2a1a, 3.2);
   parent.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = false; o.receiveShadow = false; } });
   return glints;
 }
-/** Shown only by day: the scene hides them while the night lights are on. */
-export const dayOnly: THREE.Object3D[] = [];
