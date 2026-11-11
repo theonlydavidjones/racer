@@ -79,11 +79,6 @@ function escape(b: Vec, P: Vec): Vec | null {
   const r = routeAround(b, P, 30);
   return r.length > 2 ? r[1] : detour(b, P);
 }
-/** Land within 45 m ahead on both tacks' close-hauled courses: boxed in. */
-function pocketed(w: World, b: Boat, csS: number, csP: number): boolean {
-  return blocked(w, b, csS, 45) && blocked(w, b, csP, 45);
-}
-
 /** Where the AI steers for its next mark: a little wide of rounding marks, well clear of pass marks. */
 export function aimPoint(w: World, b: Boat): Vec {
   const m = w.nextMark(b);
@@ -295,9 +290,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
       if (ai.detour) P = ai.detour;
-    } else if (b.started && !ai.detour && refresh && pocketed(w, b, csS, csP)) {
-      // beating, but boxed in with land ahead on both tacks (in a harbor's mouth, behind a jetty): tacking off the shore
-      // only takes her back and forth inside, so she takes the way out by water (the navigator's route round the land)
+    } else if (b.started && !ai.detour && refresh && landAlong(b, P) < 500) {
+      // beating toward a point with land close ahead on the straight line to it (a jetty, a point, the harbor's mouth
+      // she's in): tacking off the shore would only take her back and forth into the corner it makes, so she lays the
+      // end of it first, as a sailor does: the first turn of the way round by water (the navigator's route)
       ai.detour = escape(b, P);
       if (ai.detour) P = ai.detour;
     } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)

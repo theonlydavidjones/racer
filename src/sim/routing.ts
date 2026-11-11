@@ -1,7 +1,7 @@
 import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
-import { landAlong, onLand, shoreDist, wharfCrossed, wharfNearest } from '../geo/shore';
+import { landAlong, onLand, shoreDist, wharfNearest } from '../geo/shore';
 import type { Outlook } from './outlook';
 
 /**
@@ -207,7 +207,8 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
     for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
-  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => !wharfCrossed(p, q));
+  // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier)
+  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
@@ -268,5 +269,5 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
 
 /** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid. */
 function escapeWharf(p: Vec): Vec[] {
-  return gridPath(p, p, 10, 700, onLand, (u, v) => !wharfCrossed(u, v), q => wharfNearest(q, 150) === null, 0) ?? [p];
+  return gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0) ?? [p];
 }
