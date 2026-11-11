@@ -20,7 +20,7 @@ import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, type Incident } from './rules';
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
-import { fillFleet, genericSpec, isGeneric } from './boat/generic';
+import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
@@ -1124,7 +1124,7 @@ function oppRows(): void {
   const mine = S.boats.filter(b => b.id !== S.boatId);
   $('oppList').innerHTML = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
     // generic club Folkboats (boat/generic.ts), to fill out the fleet: tap one to drop her, + to add another
-    + `<div class="opp-h">More club Folkboats</div>` + S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), sailNo(g), '#9fb4ff', g.hull.upper); }).join('')
+    + `<div class="opp-h">More club Folkboats</div>` + S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), sailNo(g), genericTag(id), g.hull.upper); }).join('')
     + (S.opponents.length < MAX_OPPONENTS ? `<button type="button" class="opp" data-fill="1"><span>+ Add one</span></button>` : '')
     + `<div class="opp-h">Your boats</div>` + (mine.length ? mine.map(b => chip(b.id, (b.name || 'Unnamed').replace(/</g, '&lt;'), sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more boats under Your boats…</small>');
   $('oppCount').textContent = S.opponents.length ? `· ${S.opponents.length} boat${S.opponents.length > 1 ? 's' : ''}` : '· nobody (a solo race)';

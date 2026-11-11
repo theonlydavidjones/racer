@@ -322,11 +322,31 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   }
   // collision avoidance under the rules
+  // (around the start, in the pre-start and the first minute after the gun, when the fleet is bunched up, she also
+  // looks at each heading's room to other boats: out on the course the simple moves below are enough, and cheaper)
+  const startArea = w.t < 60;
+  const near: { o: Boat; dx: number; dy: number; r: ReturnType<World['rights']>; cp: { t: number; d: number } }[] = [];
   for (const o of w.boats) {
     if (o === b) continue;
     const dx = o.x - b.x, dy = o.y - b.y;
     if (dx * dx + dy * dy > 3600) continue;
-    const r = w.rights(b, o), cp = cpa(b, o);
+    near.push({ o, dx, dy, r: w.rights(b, o), cp: cpa(b, o) });
+  }
+  // First, her right of way. Rule 16.1: a right-of-way boat changing course must give the other boat room to keep
+  // clear, so if the turn she wants would close on a boat close by she turns only as far as still leaves it that room.
+  // (Room: 8 m between centres, a little more than a Folkboat's length (7.6 m); with less than that already, she
+  // mustn't close it further.)
+  if (startArea) for (const { o, dx, dy, r, cp } of near) {
+    if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
+    const ROOM = 8, need = Math.min(ROOM, clearanceOn(w, b, b.h, o));
+    if (clearanceOn(w, b, desired, o) >= need) continue;
+    const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
+    let ok = b.h;
+    for (let i = 1; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
+    desired = ok;
+  }
+  // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
+  for (const { o, dx, dy, r, cp } of near) {
     // keep clear early: slow, heavy boats need time to respond
     // hailed "Starboard!" by this boat: duck early and generously
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
@@ -335,24 +355,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
       if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') { desired = sailable(b, b.tack === 'P' ? b.h - 20 : b.h + 20); luff = !running; }
-      else if (running) { desired = clearestHeading(w, b, b.h); luff = false; } // easing barely slows her on a run: steer round instead
+      else if (running) { desired = startArea ? clearestHeading(w, b, b.h) : away; luff = false; } // easing barely slows her on a run: steer round instead
       else { luff = true; desired = away; }
       // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
       // heading that opens the most room, nearest what she wanted
-      if (clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
-    } else if (r.kc === o && Math.abs(wrap(desired - b.h)) > 8 && dx * dx + dy * dy < 900 && cp.t < 10) {
-      // Rule 16.1: a right-of-way boat changing course must give the other boat room to keep clear. If the turn
-      // she wants would close on her, she turns only as far as still leaves the other boat that room.
-      // (Room to keep clear: about 8 m between centres, a Folkboat's length plus room to manoeuvre in a seamanlike
-      // way; less than that, she mustn't close it further.)
-      const ROOM = 8, cNow = clearanceOn(w, b, b.h, o), need = Math.min(ROOM, cNow);
-      if (clearanceOn(w, b, desired, o) < need) {
-        const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
-        let ok = b.h;
-        for (let i = 1; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
-        desired = ok;
-      }
-      if (cp.t < 2.4 && cp.d < 4.5) { desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; }
+      if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && cp.t < 2.4 && cp.d < 4.5) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true;

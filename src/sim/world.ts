@@ -24,7 +24,7 @@ import { destMark, place as getPlace } from './places';
 import { harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
-import { genericSpec } from '../boat/generic';
+import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
@@ -315,7 +315,7 @@ export class World {
     }
     const spec = isUser ? this.settings.boat : oppSpec; // your boat as you've set her up (or a rival you've set up)
     return {
-      id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? OPP_TAGS[(i - 1) % OPP_TAGS.length] : F.tag,
+      id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, hatch: spec.hatch } } : { paint: F.paint }),

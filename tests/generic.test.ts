@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
-import { fillFleet, genericBoat, genericSpec, isGeneric } from '../src/boat/generic';
+import { fillFleet, genericBoat, genericSpec, genericTag, isGeneric } from '../src/boat/generic';
 import { DEFAULT_BOAT } from '../src/boat/spec';
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, type Settings } from '../src/settings';
 import { World } from '../src/sim/world';
@@ -45,5 +45,6 @@ describe('generic club Folkboats', () => {
     expect(gens).toHaveLength(3);
     for (const g of gens) { expect(g.ai).not.toBeNull(); expect(g.cond).toBeDefined(); expect(g.name).toBe(genericSpec(g.spec!.id)!.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase())); }
     expect(new Set(w.boats.map(b => b.no)).size).toBe(6); // no two boats carry the same number
+    for (const g of gens) expect(g.color).toBe(genericTag(g.spec!.id)); // the colour her chip shows in setup
   });
 });

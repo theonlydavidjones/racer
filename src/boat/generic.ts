@@ -22,6 +22,10 @@ const BOTTOMS = ['#2a2d33', '#1f2a44', '#7a2420', '#2b4f8f', '#9a5a2e'];
 const DECKS = ['#cdbb94', '#e8e3d6', '#c9ccd0', 'teak-silver', '#8e9f7c'];
 /** Bay clubs with Folkboat sailors (render/burgees.ts ids). */
 const CLUBS = ['stfyc', 'sfyc', 'ggyc', 'cyc', 'sbyc', 'tyc', 'ssyc'];
+/** Map and label colours for generic boats, one each (clear of the club boats' and of your own boats' colours). */
+const TAGS = ['#7fe0c4', '#ffc58a', '#b7a6ff', '#ff9fd0', '#8fdcff', '#dff07a', '#ffb3a6', '#c2e8a0', '#f0c0ff'];
+/** Generic boat `gen:k`'s map and label colour (the same in setup and on the water). */
+export const genericTag = (id: string): string => TAGS[(Math.max(1, +id.slice(GENERIC_PREFIX.length) || 1) - 1) % TAGS.length];
 /** Sail numbers the five stock club boats carry (boat/boat.ts FLEET), so a generic boat never shares one. */
 const STOCK_NUMBERS = new Set(['87', '104', '92', '120', '63', '110']);
 
