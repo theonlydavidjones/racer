@@ -236,7 +236,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
   }
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
+  // the sails flog (windage of their own) as far as they're luffing: from their trim to the wind they have (trim.ts), so
+  // sailing a degree or two below the beat angle with the sheets in hard costs what the polar's pinching curve says and
+  // no more, and head to wind they flog right out (the polar's pinch, polar.ts, is the speed with them drawing)
+  const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : sailFlog(b, plan, ap.awa);
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
   b.v = Math.max(0, b.v + a * dt);
   // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
@@ -569,6 +573,16 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
   }
   stepCache.set(key, top);
   return top;
+}
+
+/** How much the sails are flogging (0..1), from their trim: each sail's luffing, by its share of the area (a jib that's
+ * poled out or down isn't flogging; a sail half hoisted flogs as much of it as is up). */
+function sailFlog(b: Boat, plan: SailPlan, awa: number): number {
+  const luff = (t: { flow: string; amount: number } | null | undefined) => t && t.flow === 'luffing' ? t.amount : 0;
+  // (the main against the boom the crew intends: the last depowering steps ease it down the traveller on purpose, and the
+  // speed search prices that ease through the sails' own forces, as trimSails counts the sheet, so it isn't flogging here)
+  const main = sailTrim('main', awa, clamp(b.sheets.main - crewEaseBoom(b), SAILS.main.min, SAILS.main.max));
+  return SAILS.main.share * luff(main) * (b.rig?.main ?? 1) + (plan === 'jib' ? SAILS.jib.share * luff(b.trim.jib) * (b.rig?.jib ?? 1) : 0);
 }
 
 /** Roll her toward the heel `heelLee` (deg, + to leeward) as a damped oscillator (balance.ts rollStep). */

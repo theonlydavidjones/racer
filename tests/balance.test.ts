@@ -95,7 +95,8 @@ describe('Helm balance (weather helm)', () => {
     // where they want it, so it doesn't ease the boom)
     expect(beat(16, c => { c.traveller = 1; c.mainsheet = Math.min(1, c.mainsheet + 0.12); }).helmNeed!).toBeLessThan(base - 2);
     expect(beat(16, c => { c.backstay = 1; }).helmNeed!).toBeLessThan(base);
-    expect(beat(16, c => { c.mainsheet += 0.2; }).helmNeed!).toBeLessThan(0);
+    // (eased until it's luffing hard: the main's flogging slows her too, physics.ts sailFlog)
+    expect(beat(16, c => { c.mainsheet += 0.25; }).helmNeed!).toBeLessThan(0);
   });
   it('let go of the tiller with weather helm and she rounds up into the wind', () => {
     const b = beat(16), twa0 = b.twa;
@@ -136,5 +137,20 @@ describe('The crew', () => {
     sail(solo, 30, () => { solo.h = 360 - beatAngle(20); });
     expect(solo.heelMag! > two.heelMag! + 3 || (solo.depower ?? 0) > (two.depower ?? 0) + 0.1).toBe(true);
     expect(solo.v).toBeLessThan(two.v);
+  });
+});
+
+describe('Sailing a little below the beat angle', () => {
+  it("costs what the polar's pinching curve says (ORC's VMG peak), not more: the sails flog only as far as they luff", () => {
+    for (const W of [8, 14, 20]) {
+      const beat = beatAngle(W), vmg = (off: number) => {
+        const twa = beat - off, b = testBoat({ heading: 360 - twa, kt: polar(W, beat, 'jib') / KT, windKt: W });
+        let s = 0, n = 0; sail(b, 60, t => { b.h = 360 - twa; if (t > 40) { s += b.v; n++; } });
+        return s / n * Math.cos(twa * Math.PI / 180);
+      };
+      const v0 = vmg(0);
+      expect(vmg(1) / v0).toBeGreaterThan(0.995);
+      expect(vmg(2) / v0).toBeGreaterThan(0.99);
+    }
   });
 });
