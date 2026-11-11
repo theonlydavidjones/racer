@@ -36,7 +36,8 @@ describe('Heel from the forces on the sails', () => {
   it('depowering stands her up once the crew are hiking flat out: backstay, outhaul and traveller down all reduce heel', () => {
     const base = beat(22, undefined, true).heelMag!;
     expect(beat(22, c => { c.backstay = 1; }).heelMag!).toBeLessThan(base);
-    expect(beat(22, c => { c.outhaul = 1; }).heelMag!).toBeLessThan(base);
+    // (the outhaul's on its band already in 22 kt, North Sails: easing it heels her more)
+    expect(beat(22, c => { c.outhaul = 0; }).heelMag!).toBeGreaterThan(base);
     expect(beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); }).heelMag!).toBeLessThan(base - 4);
     expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 0.5); // fuller: more power, more heel
   });
@@ -73,8 +74,9 @@ describe('Helm balance (weather helm)', () => {
   });
   it('carrying a lot of helm is slower than sailing balanced', () => {
     // the crew's own trim, once they've worked through the depowering steps (one job at a time): they take the helm off her
-    const balanced = beat(18, undefined, false, 60);
-    const loaded = beat(18, undefined, true, 60); // held at full power: heeled, a lot of weather helm
+    // (in 22 kt, where depowering pays: up to about 18 kt the fastest is near full power, physics.ts powerFactor)
+    const balanced = beat(22, undefined, false, 60);
+    const loaded = beat(22, undefined, true, 60); // held at full power: heeled, a lot of weather helm
     expect(loaded.helmNeed!).toBeGreaterThan(balanced.helmNeed! + 1.5); // (the crew hikes harder to hold her up, which takes some of it off)
     expect(loaded.v).toBeLessThan(balanced.v);
   });

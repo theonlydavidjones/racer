@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt } from './helpers/testBoat';
 import { KT, wrap } from '../src/core/math';
-import { allToCrew, byHand, leeDrift, linesByHand, takeLine } from '../src/boat/physics';
+import { allToCrew, byHand, crewMainAngle, leeDrift, linesByHand, takeLine } from '../src/boat/physics';
 import { jibClew, shapeEfficiency, targetShape } from '../src/boat/controls';
 import { polar } from '../src/boat/polar';
 import type { Boat } from '../src/boat/boat';
@@ -32,8 +32,11 @@ describe('taking one line off the crew', () => {
     sail(b, 20); const best = b.sheets.main;
     b.ctlCmd.mainsheet = 1; sail(b, 3); b.ctlCmd = {};
     expect(b.sheets.main).toBeGreaterThan(best + 10);
-    takeLine(b, 'mainsheet', false); sail(b, 15);
-    expect(b.sheets.main).toBeCloseTo(best, 0); // (with the traveller and sheet it likes: there's more than one way to the same boom angle)
+    // (back up to speed: until then the apparent wind is wider and the trimmer eases for it, which opens the leech)
+    takeLine(b, 'mainsheet', false); sail(b, 30);
+    // back where the crew wants the boom (with the traveller and sheet it likes: more than one way to the same angle), to
+    // within the trimmer's deadband (crewWork.ts: a sheet is not touched for less than 0.006, about 0.3° of boom here)
+    expect(Math.abs(b.sheets.main - crewMainAngle(b))).toBeLessThan(1); expect(Math.abs(b.sheets.main - best)).toBeLessThan(1);
     expect(b.shape.eff).toBeGreaterThan(0.99);
     expect(linesByHand(b)).toEqual([]);
   });

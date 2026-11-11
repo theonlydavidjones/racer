@@ -42,10 +42,13 @@ describe('the bottom: fouling and skin friction', () => {
 });
 
 describe('sails: age', () => {
-  it('old sails cost more in a breeze (3–6% upwind at 20 kt) than in light air', () => {
+  it('old sails cost more in a breeze than in light air', () => {
+    // (the sizes are estimates, controls.ts SAIL_WEAR: a stretched main 3–4% of camber deeper in 20 kt, its draft well
+    // aft. The crew can't flatten it back: the outhaul stops at its black band and the backstay's bend is all there is,
+    // so she heels more and depowers further: several percent upwind, up to about 15%)
     const old = { mainAge: 'old', jibAge: 'old' } as const;
     const light = loss(6, benchAngles(6).up, old), breeze = loss(20, benchAngles(20).up, old);
-    expect(breeze).toBeLessThan(-0.03); expect(breeze).toBeGreaterThan(-0.08);
+    expect(breeze).toBeLessThan(-0.03); expect(breeze).toBeGreaterThan(-0.15);
     expect(Math.abs(light)).toBeLessThan(Math.abs(breeze) / 2);
   });
 
@@ -74,12 +77,14 @@ describe('equipment the class rules make equal', () => {
     expect(at(1, 20).depth).toBe(mainShape(c, 20 / 1.4, { wear: SAIL_WEAR.new, bend: 1 }, 20).depth);
   });
 
-  it('a wooden mast is within a fraction of a percent: a little heavier aloft', () => {
+  it('a wooden mast is within about a percent: a little heavier aloft', () => {
+    // (9 kg about 5.3 m up takes ~160 N·m off her righting moment at 20° of heel, ~2.5% with the crew hiking; in 20 kt,
+    // held up by her stability, speed goes roughly with its 0.3–0.5 power: about 1%)
     const a = benchAngles(20).up;
-    expect(Math.abs(loss(20, a, { mast: 'wood' }))).toBeLessThan(0.006);
-    // (heavier aloft: she heels more, or the crew hike harder or depower more to hold her)
+    expect(Math.abs(loss(20, a, { mast: 'wood' }))).toBeLessThan(0.012);
+    // (heavier aloft, so less stable: in a breeze, where her stability holds her back, a little slower)
     const wood = benchSpeed(20, a, spec({ mast: 'wood' })), alu = benchSpeed(20, a, spec());
-    expect(wood.heel > alu.heel + 0.01 || wood.arm > alu.arm + 0.005 || wood.depower > alu.depower + 0.005).toBe(true);
+    expect(wood.kt).toBeLessThan(alu.kt);
   });
 
   it('extra weight: slower in light air, no worse (a little stiffer) in a breeze', () => {

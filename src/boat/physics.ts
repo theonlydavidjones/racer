@@ -394,7 +394,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
   const need = heelingMoment(F, ceh, bh) - hullRighting(bh, disp, crewMass(cs.spec)) - rmExtra(bh);
   // (the windward side by her tack, which holds through a moment by the lee until the boom crosses)
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt) }, dt);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heel }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec));
 }
@@ -449,7 +449,17 @@ function powerFactor(b: Boat, aws: number, awa: number, jibOn: { trim: NonNullab
   };
   const fastest = (dsp: number, crewKg: number, crewM: number) => {
     let top = sailAt(0, dsp, crewKg, crewM);
-    if (twa < 120) for (let i = 1; i <= 8; i++) { const t = sailAt(i / 8, dsp, crewKg, crewM); if (t.speed > top.speed) top = t; }
+    if (twa >= 120) return top;
+    for (let i = 1; i <= 8; i++) { const t = sailAt(i / 8, dsp, crewKg, crewM); if (t.speed > top.speed) top = t; }
+    // then the half-steps either side, and a parabola through the best three for where between them it peaks (so two
+    // boats a little different don't land a whole step apart)
+    const h = 1 / 16, lo = top.d > 0 ? sailAt(top.d - h, dsp, crewKg, crewM) : null, hi = top.d < 1 ? sailAt(top.d + h, dsp, crewKg, crewM) : null;
+    for (const t of [lo, hi]) if (t && t.speed > top.speed) top = t;
+    const a = top.d > 0 ? sailAt(Math.max(0, top.d - h), dsp, crewKg, crewM) : null, c = top.d < 1 ? sailAt(Math.min(1, top.d + h), dsp, crewKg, crewM) : null;
+    if (a && c) {
+      const den = a.speed - 2 * top.speed + c.speed;
+      if (den < 0) { const off = clamp(0.5 * (a.speed - c.speed) / den, -0.5, 0.5) * h; if (Math.abs(off) > 1e-4) return { ...top, d: clamp(top.d + off, 0, 1) }; }
+    }
     return top;
   };
   const ref = fastest(STANDARD_DISP, crewMass(DEFAULT_CREW), standardCrewMoment());

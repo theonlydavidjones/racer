@@ -218,6 +218,8 @@ export interface CrewCall {
   extraMoment?: number;
   /** The waves' added resistance as a share of the calm-water resistance (hullTrim.ts: bow-down ploughs into a chop). */
   sea?: number;
+  /** Her heel now (deg, + to leeward), for the roll tack's flatten: out hard until she's upright. */
+  heel?: number;
 }
 
 /**
@@ -242,7 +244,8 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > 3.5)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
-    else if (c.roll.phase === 'flatten' && c.roll.t > 1.6) c.roll = null;
+    // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
+    else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }
   const downwind = k.twa > 120;
   // where everyone wants to be: thought about 20 times a second (far quicker than anyone reacts), and at once at a tack
