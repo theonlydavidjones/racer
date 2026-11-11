@@ -50,6 +50,8 @@ export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
 export class Hud {
   private acc = 0;
   mapZoom = false;
+  /** Whether the trim panel's Pole row is showing (deep downwind, or the pole is out). */
+  private poleRowShown = true;
   /** Label of the key bound to Hail (set by main, which owns the key map). */
   hailKey: () => string = () => 'H';
   private dialC = $<HTMLCanvasElement>('dial');
@@ -185,6 +187,10 @@ export class Hud {
     this.windex(u);
     const poleTxt = u.pole === 'set' ? (u.poleTack === u.tack ? ' · wing' : '') : u.pole === 'setting' ? ' · poling' : u.pole === 'stowing' ? ' · stowing' : '';
     $('tackLab').textContent = (u.tack === 'S' ? 'Stbd' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt || ` · ${Math.round(Math.abs(u.awa))}°`);
+    // the pole only on deep points of sail: a poled-out jib fills from about 145° true (polar.ts jibEfficiency), so the
+    // row appears at 140° (time to set it as you bear away) and goes below 135°; while it's out it stays, to take it in
+    const deep = Math.abs(u.twa), wantPole = u.pole !== 'down' || deep >= (this.poleRowShown ? 135 : 140);
+    if (wantPole !== this.poleRowShown) { this.poleRowShown = wantPole; $('tpPoleRow').hidden = !wantPole; }
     const bp = $('bPole');
     bp.textContent = u.pole === 'down' ? 'Pole out' : u.pole === 'set' ? 'Pole in' : u.pole === 'setting' ? 'Poling…' : 'Stowing…';
     bp.classList.toggle('on', u.pole === 'set' || u.pole === 'setting');
