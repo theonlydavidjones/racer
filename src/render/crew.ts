@@ -470,7 +470,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   cr.crew.forEach((f, i) => {
     const a = ppl?.[i + 1];
     let x = a ? a.x : windward * 0.8;
-    if (nMid > 1 && mids[i]) x = (m++ ? 0.21 : -0.21);
+    if (nMid > 1 && mids[i]) x = (m++ ? 0.21 : -0.21) * windward; // (mirrored on the other tack)
     const lean = a?.lean ?? 0, pose = a?.pose ?? 'sit';
     const z = mids[i] && nMid > 1 ? Math.max(zs[i], COCK0 + 0.6) : zs[i];
     const dir = track(f, x, a?.z ?? z, dt);
