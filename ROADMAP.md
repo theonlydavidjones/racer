@@ -58,7 +58,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
-- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
+- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; Boat Detail; the first try, live in v86 (PR #39), was rejected by the owner: an orange cube aft, an orange disc forward on the cabin top, the doorway misunderstood, lines across the hatch; Boat Detail rolls it back and redoes it after the usage reset): water shows through the cockpit sole, and it's
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
@@ -136,6 +136,16 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   (3) water in the cockpit: water shipped, its weight, the pump;
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
+- **Next — cruising and racing: pick places on the map, change the conditions, and "Send her home"** (feature; 6–10 h
+  in all): owner, "when cruising, I'd like to be able to pick my start and end locations on the map rather than in
+  dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
+  cruise, and in both modes I would like a 'Send her home' feature (copy TBD) that auto-sets her home slip as the
+  destination. In race mode, send her home would essentially be withdrawing from the race, if actioned before race is
+  complete." (1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns (2–3 h).
+  (2) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
+  restart (2–4 h). (3) "Send her home" (wording to be settled), in both modes: sets her home slip as the destination for
+  the navigator or tiller pilot; before she finishes a race it retires her (scored RET under RRS A5.1 and A11) (1–3 h).
+  Layout to the owner first.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
@@ -171,7 +181,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
   for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
   the **windex** dial's subtext should add the **point of sail**.
-- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
+- ~~**Next — the buttons at bottom-left**~~ (done, v87; polish; 3–5 h; Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 
