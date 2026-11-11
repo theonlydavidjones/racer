@@ -73,7 +73,8 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   right"): the thwart is drawn as "a horizontal plank", and "the skipper is crammed behind the thwart with the thwart in
   their lap. That's not true to life. While underway, skippers often (but not always) sit on the stern… or along the rear
   rail." From the owner's three photos (Josephine at the dock, Josephine under way looking aft, CircleSea side-on; the
-  photos are in the Roadmap session, so attach them again to the session that builds this):
+  photos are in reference/photos: josephine-cockpit-at-dock.jpg, josephine-helm-on-aft-deck-underway.jpg,
+  circlesea-helm-on-aft-rail-side.jpg):
   (1) the thwart is a deep wooden beam spanning the cockpit at about coaming height, with a vertical face, not a flat
   plank; the black traveller track and car with the mainsheet blocks run along its top, and the green cam cleats for the
   traveller (and the backstay ends) sit at each end where it meets the coamings;
