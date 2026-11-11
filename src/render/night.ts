@@ -13,6 +13,8 @@ export const NIGHT = {
   uOn: { value: 0 },
   /** The share of offices' lights on now, and of homes' (OFFICE_LIGHTS, HOME_LIGHTS below, by the local hour). */
   uOffice: { value: 0.05 },
+  /** Weekend nights: the far glow of the office towers, as a share of windows (the owner's call: "a bit more far glow on weekends"). */
+  uFarOffice: { value: 0 },
   uHome: { value: 0.3 },
   /** Seconds, for the light shows' movement. */
   uTime: { value: 0 },
@@ -77,6 +79,9 @@ export function updateNight(el: number, tMin: number, windMs: number, tSec: numb
   const parts = TZ_FMT.formatToParts(new Date(m * 60000)), part = (t: string) => parts.find(p => p.type === t)?.value ?? '';
   const hh = +part('hour'), mm = +part('minute'), wd = part('weekday'); localH = hh + mm / 60;
   NIGHT.uOffice.value = sched(OFFICE_LIGHTS[wd === 'Sat' ? 'sat' : wd === 'Sun' ? 'sun' : 'wk'], localH);
+  // the schedule's 5% leaves the towers barely there from the water on a weekend night: seen from afar they keep a
+  // little more glow (lobbies, stairwells, crowns and the city's light on them), a look the owner chose over the bare 5%
+  NIGHT.uFarOffice.value = wd === 'Sat' || wd === 'Sun' ? 0.14 : 0;
   NIGHT.uHome.value = HOME_PEAK_WINDOWS * sched(HOME_LIGHTS, localH);
   for (const c of clocks) c(hh, mm);
   const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -114,7 +119,7 @@ export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: numbe
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     prev.call(mat, sh, r);
-    Object.assign(sh.uniforms, { uNight: NIGHT.uNight, uOffice: NIGHT.uOffice, uHome: NIGHT.uHome });
+    Object.assign(sh.uniforms, { uNight: NIGHT.uNight, uOffice: NIGHT.uOffice, uHome: NIGHT.uHome, uFarOffice: NIGHT.uFarOffice });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed; varying float vWinH;')
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -132,7 +137,7 @@ export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: numbe
     const office = kind === 'office' ? '1.0' : kind === 'home' ? '0.0' : 'step(24.0, vWinH)';
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uNight; uniform float uOffice; uniform float uHome; varying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed; varying float vWinH;
+        uniform float uNight; uniform float uOffice; uniform float uHome; uniform float uFarOffice; varying vec3 vWinP; varying vec3 vWinN; varying float vWinSeed; varying float vWinH;
         // a hash without sine (Hoskins), steady at the world's large coordinates
         float wH(vec2 p) { p = fract(p * vec2(0.1031, 0.1030)); p += dot(p, p.yx + 33.33); return fract((p.x + p.y) * p.x); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -161,7 +166,8 @@ export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: numbe
           float subX = smoothstep(0.4, 1.0, fwidth(cell.x)), subY = smoothstep(0.4, 1.0, fwidth(cell.y));
           float w0 = on * paneX * br, w1 = floorOn * runOn * 0.85 * 0.64 * br;
           float w = mix(w0, w1, subX) * mix(paneY, 0.62, subY);
-          w = mix(w, share * 0.64 * 0.62 * 0.65, smoothstep(0.6, 1.4, fwidth(cell.y)));
+          float farShare = max(share, off * uFarOffice * (0.6 + 0.8 * wH(vec2(s, 9.0))));
+          w = mix(w, farShare * 0.64 * 0.62 * 0.65, smoothstep(0.6, 1.4, fwidth(cell.y)));
           totalEmissiveRadiance += wc * w * uNight * ${glow.toFixed(2)};
         }`);
   };
