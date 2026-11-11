@@ -957,8 +957,12 @@ function paintSeg(): void {
     const k = seg.dataset.k as keyof Settings;
     const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
-  });
+  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = S[c.dataset.t as 'aids' | 'windDial'] === 1; });
 }
+// the on-screen training aids: a switch each (on = shown)
+document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => c.addEventListener('change', () => {
+  const k = c.dataset.t as 'aids' | 'windDial'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
+}));
 document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;

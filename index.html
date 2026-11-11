@@ -319,8 +319,8 @@
       <button class="ghost" id="bKeysClose" type="button">Done</button>
     </div>
     <div class="field"><span>On screen</span>
-      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div>
-      <div class="seg" data-k="windDial"><button type="button" data-v="0">No wind-angle dial</button><button type="button" data-v="1">Show the wind-angle dial</button></div>
+      <label class="tog"><input type="checkbox" data-t="aids"><span class="tog-sw"></span>Show laylines and zones</label>
+      <label class="tog"><input type="checkbox" data-t="windDial"><span class="tog-sw"></span>Show wind-angle dial</label>
       <small>Training aids. Real boats have neither: they have the windex and the telltales.</small></div>
     <details class="more"><summary><u>How to sail her ▸</u></summary>
     <div class="help">
@@ -331,7 +331,7 @@
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
     <div class="field"><span>Keyboard</span>
-    <small>Click Change, then press the key you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
+    <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
     <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
