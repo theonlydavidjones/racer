@@ -40,7 +40,7 @@ import { drawCourse, drawCurrentArrows, drawWindField, drawPuffs, drawLaylines, 
 import { onLand } from '../geo/shore';
 import { INK, chartCredit, drawEncChart, drawEncLand, type Ink } from './encChart';
 import { layerOn, type LayerKey } from './layers';
-import { COVER, drawFog, drawSea, nm } from './mapLayers';
+import { drawFog, drawSea, nm } from './mapLayers';
 import { visibilityFor } from '../environment/weather';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
@@ -491,11 +491,14 @@ export class Hud {
   fogNote(wd: World, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
     const v = visibilityFor(wd.raceDate, wd.clockUtc);
-    if ('none' in v) return short ? 'FOG: NO DATA' : `Fog: no real visibility for this day and hour. ${v.none}`;
-    if (v.source === 'outlook') { const c = v.cover!(wd.user); return short ? `FOG ${c ? COVER[c].replace(' fog', '').toUpperCase() : 'NONE'} · NWS` : `${c ? COVER[c][0].toUpperCase() + COVER[c].slice(1) : 'No fog'} here: ${v.says}.`; }
+    if ('none' in v) return short ? (v.noFog ? 'NO FOG FORECAST · NWS' : 'FOG: NO DATA') : `Fog: ${v.none}`;
+    if (v.source === 'observed') { const m = v.points[0].m; return short ? `VIS ${nm(m, v.cap).toUpperCase()} AT PIER 17` : `Visibility ${nm(m, v.cap)} at Pier 17: ${v.says}.`; }
+    if (v.source === 'outlook') { const w = v.words!(wd.user); return short ? (w ? `${w.toUpperCase()} · NWS` : w === '' ? 'NO FOG HERE · NWS' : 'FOG: OFF THE GRID') : `${w ? w[0].toUpperCase() + w.slice(1) : w === '' ? 'No fog' : 'Nothing'} here: ${v.says}.`; }
     const m = v.at(wd.user);
-    return short ? `VIS ${nm(m).toUpperCase()} · ${v.source === 'forecast' ? 'NWS' : 'PIER 17'}` : `Visibility ${nm(m)} here: ${v.says}.`;
+    if (!Number.isFinite(m)) return short ? 'FOG: OFF THE NWS GRID' : `Fog: you're beyond the NWS forecast grid (${v.says}).`;
+    return short ? `VIS ${nm(m, v.cap).toUpperCase()} · NWS` : `Visibility ${nm(m, v.cap)} here: ${v.says}.`;
   }
+
 
   private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();

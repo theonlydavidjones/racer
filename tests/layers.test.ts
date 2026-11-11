@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { layerOn, LAYERS } from '../src/ui/layers';
-import { visibilityFor } from '../src/environment/weather';
+import { idw, visibilityFor } from '../src/environment/weather';
 import { sfLocalToUtcMin } from '../src/environment/tide';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { INK } from '../src/ui/encChart';
+import { nm } from '../src/ui/mapLayers';
 
 describe('the map\'s layers', () => {
   it('has wind, current, sea state, fog, ships, laylines and wind shadows, each its own switch', () => {
@@ -31,9 +32,11 @@ describe('fog: real visibility only', () => {
     const v = visibilityFor('2022-03-02', sfLocalToUtcMin('2022-03-02', '11:00'));
     expect('none' in v).toBe(false);
     if ('none' in v) return;
-    expect(v.source).toBe('observed'); expect(v.at({ x: 0, y: 0 })).toBeLessThanOrEqual(200); // 0.1 km
+    expect(v.source).toBe('observed'); expect(v.points[0].m).toBe(140); // NOAA's reading at 19:00 UTC: 0.14 km
+    expect(v.at({ x: 0, y: 0 })).toBeNaN(); // one sensor: it says nothing about the water 4 km away
     const later = visibilityFor('2022-03-02', sfLocalToUtcMin('2022-03-02', '15:00'));
-    expect('none' in later ? 0 : later.at({ x: 0, y: 0 })).toBe(10000); // cleared: the sensor's 10 km cap
+    expect('none' in later ? 0 : later.points[0].m).toBe(10000); // cleared: the sensor's 10 km cap
+    expect('none' in later ? '' : later.cap).toBe(10000);
   });
   it('says so, rather than making fog up, when there\'s no real visibility', () => {
     const before = visibilityFor('2019-07-15', sfLocalToUtcMin('2019-07-15', '14:00'));
@@ -42,5 +45,14 @@ describe('fog: real visibility only', () => {
     expect('none' in far && far.none).toMatch(/No visibility forecast/);
     const night = visibilityFor('2022-03-02', sfLocalToUtcMin('2022-03-02', '22:00'));
     expect('none' in night).toBe(true);
+  });
+  it('writes visibility as a sailor does, with each source\'s own cap', () => {
+    expect(nm(140)).toBe('140 m'); expect(nm(10000, 10000)).toBe('5.4+ nm'); expect(nm(16093, 16093)).toBe('8.7+ nm'); expect(nm(14500, 16093)).toBe('8 nm');
+  });
+  it('shows forecast fog only over the NWS grid, not beyond it', () => {
+    // two 2.5 km cells: between them, a value between theirs; 5 km beyond the outer one, nothing
+    const f = idw([{ p: { x: 0, y: 0 }, m: 1000 }, { p: { x: 2500, y: 0 }, m: 9000 }]);
+    expect(f({ x: 1250, y: 0 })).toBeCloseTo(5000, 0); expect(f({ x: 0, y: 1000 })).toBeLessThan(5000);
+    expect(f({ x: 7500, y: 0 })).toBeNaN(); expect(f({ x: 0, y: -4000 })).toBeNaN();
   });
 });
