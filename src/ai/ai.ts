@@ -199,8 +199,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // gybing close to another boat she must keep clear (Rule 13), so she carries on a little until there's room
       const past = ((b.x - H.x) * L.x + (b.y - H.y) * L.y) * s;
       if (dist(b, wp) < 12 || past > reach - 12) {
-        const crowded = w.boats.some(o => o !== b && dist(o, b) < 28);
-        if (!crowded || past > reach + 45) ai.wp = ai.wp ? 0 : 1;
+        const next = { x: H.x - L.x * reach * s, y: H.y - L.y * reach * s }, hNext = sailable(b, brg(next.x - b.x, next.y - b.y));
+        const crowded = Math.abs(wrap(hNext - b.h)) > 30 && clearanceOn(w, b, hNext) < 10; // the turn would put her on a collision course
+        if ((dist(b, wp) < 12 && !crowded) || past > reach + 30) ai.wp = ai.wp ? 0 : 1;
       }
       desired = sailable(b, brg(wp.x - b.x, wp.y - b.y));
       // dawdle, but keep enough way on to steer (about 2 kt)
@@ -219,9 +220,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const app = bestApproach(w, b), goH = app.h;
       const d = w.lineD(bow(b)), twaD = Math.abs(wrap(ww.from - goH));
       if (refresh) {
-        // Time to the line if we go now: turn onto the approach, then accelerate there, with the current.
-        const turn = Math.abs(wrap(goH - b.h)) / Math.max(4, maxTurnRate(Math.max(b.v, 1)) * 0.7);
-        ai.plan.tReach = turn + timeToCover(-d, b.v, targetFor(b, twaD), app.along, c.x * N.x + c.y * N.y);
+        // Time to the line if we go now: turn onto the approach, then accelerate there, with the current. She keeps
+        // moving through the turn, on headings between this one and the approach, so count that ground too.
+        const turn = Math.abs(wrap(goH - b.h)) / Math.max(4, maxTurnRate(Math.max(b.v, 1)) * 0.7), cN = c.x * N.x + c.y * N.y;
+        const inTurn = turn * (b.v * (V(b.h).x * N.x + V(b.h).y * N.y + app.along) / 2 + cN);
+        ai.plan.tReach = turn + timeToCover(-d - inTurn, b.v, targetFor(b, twaD), app.along, cN);
         // how far toward the line we'd coast if we eased the sails now
         ai.plan.coast = coastDistance(b.v, tl, ww.kt, b.twa, targetFor(b, b.twa)) * (V(b.h).x * N.x + V(b.h).y * N.y);
       }
@@ -336,8 +339,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && Math.abs(wrap(desired - b.h)) > 8 && dx * dx + dy * dy < 900 && cp.t < 10) {
       // Rule 16.1: a right-of-way boat changing course must give the other boat room to keep clear. If the turn
-      // she wants would close on her, she holds her course for now.
-      if (clearanceOn(w, b, desired, o) < 6 && clearanceOn(w, b, b.h, o) > clearanceOn(w, b, desired, o) + 2) desired = b.h;
+      // she wants would close on her, she turns only as far as still leaves the other boat that room.
+      const cNow = clearanceOn(w, b, b.h, o);
+      if (clearanceOn(w, b, desired, o) < 5 && cNow >= 5) {
+        const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
+        let ok = b.h;
+        for (let i = 1; i <= n; i++) { const h = n360(b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < 5) break; ok = h; }
+        desired = ok;
+      }
       if (cp.t < 2.4 && cp.d < 4.5) { desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; }
     } else if (r.kc === o && cp.t < 2.4 && cp.d < 4.5) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
