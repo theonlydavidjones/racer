@@ -121,7 +121,11 @@ const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** The figure's forward and right in the boat frame for a yaw (it faces −z at yaw 0). */
 const fwd = (yaw: number) => V(-Math.sin(yaw), 0, -Math.cos(yaw)), right = (yaw: number) => V(Math.cos(yaw), 0, -Math.sin(yaw));
 /** An ankle standing on whatever is there (the boot's sole on it). */
-const onGround = (p: THREE.Vector3) => p.setY(ground(p.x, p.z) + 0.06);
+const onGround = (p: THREE.Vector3) => {
+  // (never on the coaming's narrow top: a foot near it goes inside it, on the seat)
+  if (p.z > COCK0 && p.z < COCK1) { const c = chz(p.z), ax = Math.abs(p.x); if (ax > c - 0.08 && ax < c + 0.12) p.x = Math.sign(p.x) * (c - 0.08); }
+  return p.setY(ground(p.x, p.z) + 0.06);
+};
 /** What the crew watch: the jib's luff (its telltales). */
 const JIB_LUFF = V(0, 1.5, -1.6);
 
@@ -129,11 +133,11 @@ const JIB_LUFF = V(0, 1.5, -1.6);
  * leaning back out (`lean` 0 sitting … 1 hiking flat out: about 70°, crewPhys.ts hikeArm). `s` the side (+1 starboard). */
 function onDeck(s: number, z: number, lean: number, k: number): PoseT {
   const u = uAtZ(z), c = chz(z), e = halfBeam(u);
-  const knee = V(s * (c - 0.07), deckY(u, c) + coamH(z) + 0.07, z - 0.04);
+  const knee = V(s * (c - 0.1), deckY(u, c) + coamH(z) + 0.07, z - 0.04);
   const hipY = deckY(u, e - 0.1) + 0.09 * k, dy = hipY - knee.y, l1 = BONE.thigh * k;
   const hipX = Math.min(e + 0.06 * lean, Math.abs(knee.x) + Math.sqrt(Math.max(0.01, l1 * l1 - dy * dy)));
   const yaw = s * (Math.PI / 2 - 0.2 + 0.15 * lean), r = right(yaw);
-  const foot = (j: number) => onGround(V(s * (c - 0.19), 0, z - 0.06).addScaledVector(r, (j ? 1 : -1) * 0.09 * k));
+  const foot = (j: number) => onGround(V(s * (c - 0.22), 0, z - 0.06).addScaledVector(r, (j ? 1 : -1) * 0.09 * k));
   const hip = V(s * hipX, hipY, z), f = fwd(yaw);
   // hands: sitting, on the knees; hiking, one on the coaming beside them and one across the chest (on the sheet)
   const hands: [THREE.Vector3, THREE.Vector3] = lean > 0.15
