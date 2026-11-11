@@ -63,8 +63,8 @@ export const HULL_EMPTY = orc.boat.displacementSailing - 240;
 export const STANDARD_DISP = orc.boat.displacementSailing;
 
 export type CrewMode = 'leeward' | 'centre' | 'windward' | 'hike' | 'downwind' | 'foredeck';
-/** What a person's body is doing, for the figures: at the tiller, sitting, hiking, to leeward, crossing, at a winch, at the cabin-top lines, at the jib car, at the mast. */
-export type Pose = 'helm' | 'sit' | 'hike' | 'lee' | 'cross' | 'winch' | 'piano' | 'car' | 'mast';
+/** What a person's body is doing, for the figures: at the tiller, sitting, hiking, to leeward, crossing, at a winch, at the cabin-top lines, at the jib car, at the mast, sitting astride the bow forward of the forestay, sitting on the foredeck. */
+export type Pose = 'helm' | 'sit' | 'hike' | 'lee' | 'cross' | 'winch' | 'piano' | 'car' | 'mast' | 'bow' | 'fore';
 /** A person aboard. Positions in the boat's frame: x across (+ starboard), z fore-and-aft (+ aft, the bow at −3.84 m). */
 export interface Aboard {
   /** The centre of their weight across the boat, m (+ starboard). */
@@ -126,8 +126,9 @@ export interface CrewState {
   trim: number; trimMoment: number;
   /** The fore-and-aft place they've chosen (0 aft … 1 forward), and seconds until they think about it again. */
   fore01?: number; foreT?: number;
-  /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place). */
-  mastPays?: boolean;
+  /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
+   * whether, with the pole out, both crew right forward on the foredeck pays more. */
+  mastPays?: boolean; foredeck?: boolean;
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
   tgt?: Target[]; decideT?: number;
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
@@ -167,7 +168,14 @@ export function deckHalf(z: number): number {
  * Sails' Nordic Folkboat tuning guide: the cabin-top lead 2.65 m from the forestay pin, the track centred 58 cm off the
  * centreline: on the cabin top about 0.6 m aft of the mast).
  */
-export const Z = { helm: 2.95, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.6 };
+export const Z = { helm: 2.95, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.6, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
+/**
+ * Deep downwind with the pole out in light air, the crew go right forward to put her bow down (the owner, who races
+ * them: "normally people sit all the way up on the foredeck. usually one crew will sit in front of the forestay with both
+ * legs dangling over, one on each side. the second crew sits down between the mast and the forestay"): `Z.bow` just
+ * forward of where the forestay meets the deck (0.8 m aft of the stem), `Z.foredeck` between the mast and the forestay.
+ * Whether it pays is the hull's trim (hullTrim.ts bestTrim), as for the bow hand at the mast.
+ */
 /** Half-beam at the sheer where the crew sit (between the cockpit's forward end and its middle), from the plan. */
 export const EDGE = deckHalf(1.3);
 /** Where the person moving a jib car kneels: on the side deck beside the cabin, reaching in to the track (58 cm out). */
@@ -324,6 +332,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // the bow hand goes forward to the mast downwind when the bow-down trim pays (light air: hullTrim.ts), if they know to
     if (c.foreT === 1) c.mastPays = downwind && bestTrim(Math.max(0.5, k.v), k.sea ?? 0) > 0.03;
     const atMast = n > 0 && downwind && !pl?.fore && skill > 0.5 && !!c.mastPays;
+    // with the pole out and two crew, right up on the foredeck if that trims her nearer her best than the bow hand at the
+    // mast and the other in the cockpit (thought about with the fore-and-aft place, once a second)
+    if (c.foreT === 1) c.foredeck = atMast && k.pole && n >= 2 && foredeckPays(c, k, foreF);
+    const forward = atMast && !!c.foredeck;
     // targets for each person: jobs first, then the helm, then the free crew share what's left of the wanted moment
     const tgt: Target[] = new Array(ppl.length);
     let fixedM = 0, freeW = 0;
@@ -332,6 +344,8 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       const st = a.job?.station;
       if (st) { tgt[i] = { ...st }; fixedM += W[i] * st.arm; }
       else if (i === 0) { /* the helm: below */ }
+      else if (i === n && forward) { tgt[i] = { arm: 0, z: Z.bow, pose: 'bow' }; }
+      else if (i === n - 1 && forward) { tgt[i] = { arm: 0.15, z: Z.foredeck, pose: 'fore' }; fixedM += W[i] * 0.15; }
       else if (i === n && atMast) { tgt[i] = { arm: 0.25, z: Z.mast, pose: 'mast' }; fixedM += W[i] * 0.25; }
       else { free.push(i); freeW += W[i]; }
     });
@@ -421,7 +435,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
-    if (!t || a.job?.station || t.pose === 'mast') { held[i] = null; return; }
+    if (!t || a.job?.station || t.pose === 'mast' || t.pose === 'bow' || t.pose === 'fore') { held[i] = null; return; }
     if (reset || !h) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; return; }
     h.since += step;
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
@@ -451,6 +465,20 @@ const reachLean = (p: Person, fatigue: number, edge = EDGE) => {
 /** (in place: this runs for everyone aboard every step) */
 const setGoal = (a: Aboard, x: number, z: number) => { if (a.goal) { a.goal.x = x; a.goal.z = z; } else a.goal = { x, z }; };
 const smoothSkill = (s: number) => { const t = clamp((s - 0.2) / 0.4, 0, 1); return t * t * (3 - 2 * t); };
+
+/** Whether both crew right forward (one astride the bow, one on the foredeck) trims her nearer her best (hullTrim.ts) than
+ * the bow hand at the mast with the rest in the cockpit at `foreF`. */
+function foredeckPays(c: CrewState, k: CrewCall, foreF: number): boolean {
+  const cr = c.spec.crew, n = cr.length, best = bestTrim(Math.max(0.5, k.v), k.sea ?? 0), m0 = k.extraMoment ?? 0;
+  const cockpitZ = (j: number, count: number) => { const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (count - 1 - j) * Z.gap; return za + (zf - za) * foreF; };
+  let mastM = 0, foreM = 0;
+  cr.forEach((p, j) => {
+    const ref = zRef(j + 1, n);
+    mastM += p.w * (ref - (j === n - 1 ? Z.mast : cockpitZ(j, n - 1)));
+    foreM += p.w * (ref - (j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2)));
+  });
+  return Math.abs(trimFromMoment(m0 + foreM) - best) < Math.abs(trimFromMoment(m0 + mastM) - best);
+}
 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a skilled crew. */
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
@@ -485,7 +513,7 @@ function summarise(c: CrewState, w: number, downwind = false, pole = false, extr
     const q = P[i], wt = ppl[i].w;
     arm += wt * q.x * w; m += wt * (zRef(i, n) - q.z);
     if (i > 0) {
-      hike = Math.max(hike, q.lean); fore += clamp((Z.helm - q.z) / (Z.helm - Z.mast), 0, 1); if (q.pose === 'mast') mast = true;
+      hike = Math.max(hike, q.lean); fore += clamp((Z.helm - q.z) / (Z.helm - Z.mast), 0, 1); if (q.pose === 'mast' || q.pose === 'bow' || q.pose === 'fore') mast = true;
       // (out as far as they can go now: their own reach, which tires; someone away at a job doesn't count either way)
       const onRail = q.pose === 'sit' || q.pose === 'hike' || q.pose === 'lee' || q.pose === 'cross';
       if (onRail && (q.pose !== 'hike' || q.lean < reachLean(ppl[i], q.fatigue) - 0.03)) out = false;
