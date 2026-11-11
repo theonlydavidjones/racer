@@ -55,7 +55,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
-- **Now — crew buttons fight auto** (bug; 1–2 h; in progress: Crew Controls): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
+- ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
 - **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
@@ -86,19 +86,49 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
   sides on both tacks.
+- **Now — push off doesn't get her out of the slip** (bug; 2–3 h; in progress: Marinas, with a test over every slip): "push off action is still not getting me far
+  enough into the fairway of any marina to be able to get out of the slip. also, push off should move me forward if
+  I'm at a dock that doesn't require me to be nosed in." Today (geo/marina.ts planPushOff) every berth is treated as
+  bow-in: the crew walks her back until her bow is level with the finger's end, swings her and shoves, and she stops
+  short of a fairway she can sail or steer out along. True to life: the crew walks her right out of the slip and into
+  the fairway, pointed down it toward the exit, before stepping aboard with a shove, so she keeps steerage way; at
+  an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
+  in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
+  the shove from her real mass and low-speed drag, not a set distance.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
   (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
   and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
+- **Now — the crew, drawn and animated as well as the boat** (accuracy + bug; 10–16 h; in progress: Crew Figures, screenshots to the owner partway; moved up from the unranked
+  "crew figures and animation"): owner, "crew movement animations are clumsy, ugly, and distracting… we have so much
+  beauty and accuracy in this game and the physics of crew movement are super cool, but the animations are complete
+  garbage… we need crew drawings and animations to be commensurate with what we have for the boat." Found: (1) the crew
+  move through the hull (their paths must go over the deck, coamings and thwart, never through them); (2) in auto they
+  move "with a frequency that isn't true to life": a real crew moves on a puff, a lull, a tack or a job, and otherwise
+  sits still, so the auto crew needs a dead band and a minimum time between moves (source it: racing coaches'
+  guidance, or video of Folkboat crews); (3) in "mid" they're "sitting on an invisible chair": they need a real seat
+  (the cockpit seat, the thwart, the floor, the bridge deck). Real bodies (proportions, clothing, lifejackets as in
+  reference/photos), poses for each job (helm on the aft deck or aft rail per the thwart item, hiking with feet under
+  the straps, sitting to leeward, at the winch, at the piano, crossing on a tack), and moves that follow the physics.
+  Check from both sides on both tacks.
+- **Now — crystal clarity on the crew and trim controls** (polish/clarity; 4–6 h; Crew Controls, after the bottom-bar layout; merged with the trim controls review
+  below): owner, "I also can't understand the buttons, even after using them for a while. how do I get them to hike on
+  the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
+  (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
+  (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
+  current tack, and what auto is doing now. Layout to the owner first.
+- **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
+  controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
+  line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
 - **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
-- **Next — instruments** (feature; 1–2 h; in progress: Crew Controls): the TWD dial's big number should be **wind speed** ("I already have the windex
+- ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
   for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
   the **windex** dial's subtext should add the **point of sail**.
-- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls, layout to the owner first): "starting to overload". They mix trim, navigation, pausing and
+- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls; owner's decisions on the layout: as proposed, but Lash tiller goes into the tiller control itself (e.g. a double-click), not a button of its own; Hail stays a button; an icon with a short word under each; "Trim · crew" moves into the trim panel's header in plain words; the Main and Jib rows get the crew row's Auto pill): "starting to overload". They mix trim, navigation, pausing and
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 
@@ -166,7 +196,7 @@ wind's gradient and the heeled wind triangle, the keel's induced drag, depowerin
 do: the depowering question above, waves and puffs in every response, the gusts' peaks against the records; 6–10 h
 left); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
-in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
+in depth (~~done~~, published); crew figures and animation (moved up to now, above); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); ~~accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands~~ (done);
