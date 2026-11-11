@@ -203,6 +203,22 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // toerail along the sheer
     grp.add(new THREE.Mesh(rail(sheerLine(s, 0.03), 0.035, 0.03), MAT.wood));
   }
+  // the raised lip across the after end of the cockpit, moulded in with the side coamings and turning into them round
+  // its corners (at least 80 mm high at station 3, CR 3.22), so water on the after deck stays out of the cockpit
+  {
+    const u1 = COCKPIT.u1, z1 = zc(u1) + COAMING_T / 2, w = cockpitHalf(u1) + COAMING_T / 2, r = 0.12, lip: THREE.Vector3[] = [];
+    for (let i = 0; i <= 8; i++) { const a = Math.PI / 2 * i / 8; lip.push(new THREE.Vector3(-(w - r + r * Math.cos(a)), 0, z1 - r + r * Math.sin(a))); }
+    for (let i = 8; i >= 0; i--) { const a = Math.PI / 2 * i / 8; lip.push(new THREE.Vector3(w - r + r * Math.cos(a), 0, z1 - r + r * Math.sin(a))); }
+    for (const q of lip) q.y = deckY(uAtZ(q.z), Math.abs(q.x));
+    const lipRail = wall(lip, i => COAMING_H(lip[i].z), COAMING_T);
+    grp.add(new THREE.Mesh(lipRail, sideMat));
+    // a mooring cleat on the after deck, a little to starboard of the centreline (as on Josephine)
+    const cz = (z1 + L / 2) / 2, cx = 0.12, cy = deckY(uAtZ(cz), cx);
+    const cleat = new THREE.Group();
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 10), STEEL); horn.rotation.x = Math.PI / 2; horn.position.y = 0.035; cleat.add(horn);
+    for (const dz of [-0.035, 0.035]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, 0.022), STEEL); leg.position.set(0, 0.017, dz); cleat.add(leg); }
+    cleat.position.set(cx, cy, cz); grp.add(cleat);
+  }
   // rudder and tiller, hinged on the raked sternpost/transom line
   const rud = new THREE.Group(); rud.position.set(0, HEEL.y, HEEL.z); rud.rotation.x = RUDDER_RAKE;
   const turn = new THREE.Group(); rud.add(turn);
@@ -850,4 +866,16 @@ function windowTexture(): THREE.CanvasTexture {
   const g = c.createLinearGradient(0, 10, 0, 54); g.addColorStop(0, '#3c4c5a'); g.addColorStop(0.45, '#1c252d'); g.addColorStop(1, '#141a20');
   c.fillStyle = g; rr(10, 10, 492, 44, 20); c.fill(); // the glass
   winCache = new THREE.CanvasTexture(cv); winCache.anisotropy = 4; return winCache;
+}
+
+/** A wall standing up from a path of points, h high and t thick across the path (in plan), with its top closed. */
+function wall(pts: THREE.Vector3[], hh: (i: number) => number, t: number): THREE.BufferGeometry {
+  const pos: number[] = [], idx: number[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1;
+    const nx = -dz / l * t / 2, nz = dx / l * t / 2, p = pts[i], h = hh(i);
+    pos.push(p.x - nx, p.y, p.z - nz, p.x - nx, p.y + h, p.z - nz, p.x + nx, p.y + h, p.z + nz, p.x + nx, p.y, p.z + nz);
+  }
+  for (let i = 0; i < pts.length - 1; i++) { const a = i * 4, b = a + 4; for (let k = 0; k < 3; k++) idx.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
