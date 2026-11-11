@@ -79,7 +79,9 @@ that doesn't climb over a long session; the page well under the 16 MB limit, 3.1
 frame time by part (physics step, AI, onLand/shoreDist calls, the sea model, the 3D scene's draw calls and triangles,
 the map and chart redraws, the sails' canvas textures), memory over an hour's sail (leaks from scenes, textures and
 listeners not freed between races), and the worst cases (big fleet, heavy weather, the chart zoomed out). Fix the
-hot spots; add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
+hot spots (measured in November 2026: `shoreDist`, which the wind's terrain model and the current's shore relief ask
+for every boat every step, is over half of a race step on a course out toward the Gate; a distance field on a grid
+would take most of it); add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
 quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
 sessions changing the scene or the physics while it measures.
 
