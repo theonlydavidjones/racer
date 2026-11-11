@@ -64,9 +64,10 @@ function basinRay(p: Vec, from: number): { d: number; out: Vec | null } {
 }
 
 /** Open water straight upwind of `p` for wind from `from` (deg), m: to the first land, or MAX_FETCH. */
-export function fetchRay(p: Vec, from: number): number {
+export function fetchRay(p: Vec, from: number, inHarbor = inBasin(p)): number {
   // in a marina: the breakwaters and the shore stop the chop within metres; through the entrance it comes in from the Bay
-  if (inBasin(p)) { const r = basinRay(p, from); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
+  // (`inHarbor` false: open water's fetch, measured coarsely as it always was, even from a point that's in a basin)
+  if (inHarbor) { const r = basinRay(p, from); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
   const u = V(from);
   for (let d = 50; d < MAX_FETCH; d += 100) {
     const l = landAt({ x: p.x + u.x * d, y: p.y + u.y * d });
@@ -81,9 +82,9 @@ export function fetchRay(p: Vec, from: number): number {
  * standard Saville method, as in the Shore Protection Manual). A narrow gap upwind counts for less than
  * open water all round.
  */
-export function fetchAt(p: Vec, from: number): number {
+export function fetchAt(p: Vec, from: number, inHarbor = inBasin(p)): number {
   let num = 0, den = 0;
-  for (let a = -42; a <= 42; a += 6) { const c = Math.cos(a * D2R); num += fetchRay(p, from + a) * c * c; den += c; }
+  for (let a = -42; a <= 42; a += 6) { const c = Math.cos(a * D2R); num += fetchRay(p, from + a, inHarbor) * c * c; den += c; }
   return num / den;
 }
 
@@ -180,13 +181,17 @@ export class SeaField {
 
   /** Fetch, cached on a 150 m grid by wind direction (to 2°). */
   fetch(p: Vec, from: number): number {
-    const g = inBasin(p) ? 10 : 150; // (in a marina, on a 10 m grid: its walls shelter it within metres)
-    const key = `${Math.round(from / 2)}:${g}:${Math.round(p.x / g)}:${Math.round(p.y / g)}`;
+    // by where `p` is: open water on a 150 m grid, a marina on a 10 m one (its walls shelter it within metres); always worked
+    // out at the grid node, so it's the same whichever point asks first (the same seed, the same race). A cell whose node
+    // is on the other side of a basin's edge (a few, by the marinas) isn't cached: worked out at `p` itself, each time.
+    const harbor = inBasin(p), g = harbor ? 10 : 150, w = Math.round(from / 2) * 2;
+    const c = { x: Math.round(p.x / g) * g, y: Math.round(p.y / g) * g };
+    if (inBasin(c) !== harbor) return fetchAt(p, w, harbor);
+    const key = `${w}:${g}:${Math.round(p.x / g)}:${Math.round(p.y / g)}`;
     let f = this.cache.get(key);
     if (f === undefined) {
       if (this.cache.size > 60000) this.cache.clear();
-      const c = { x: Math.round(p.x / g) * g, y: Math.round(p.y / g) * g };
-      f = fetchAt(inBasin(c) ? c : p, Math.round(from / 2) * 2);
+      f = fetchAt(c, w, harbor);
       this.cache.set(key, f);
     }
     return f;

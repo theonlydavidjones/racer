@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HARBORS, SLIPS, harborAt, harborOf, hitsHarbor, hullClear, inBasin, pushOffPlan, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
-import { SeaField } from '../src/environment/sea';
+import { SeaField, fetchAt } from '../src/environment/sea';
 import type { Wind } from '../src/environment/wind';
 import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
@@ -81,6 +81,17 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     const sea = new SeaField({ hs: 1.5, tp: 12, from: 270 } as never), nw = { from: 315, kt: 18 } as Wind, still = () => ({ x: 0, y: 0 });
     const inside = sea.at(LL(37.8075, -122.4345), nw, still(), still), outside = sea.at(LL(37.8095, -122.4340), nw, still(), still);
     expect(inside.hsW).toBeLessThan(0.25 * outside.hsW); expect(inside.hsS).toBeLessThan(0.25 * outside.hsS);
+  });
+  it('the sea by a harbor is open water\'s, and the same whichever point asks first (the same seed, the same race)', () => {
+    // just north of West Harbor's breakwater, by the GGYC line: its 150 m cell's node lies in the basin
+    const p = { x: 224, y: -230 }; expect(inBasin(p)).toBe(false); expect(inBasin({ x: 150, y: -300 })).toBe(true);
+    expect(new SeaField({ hs: 1, tp: 12, from: 270 } as never).fetch(p, 315)).toBeGreaterThan(2000);
+    for (const [a, b] of [[{ x: 224, y: -230 }, { x: 260, y: -250 }], [{ x: 3000, y: 1000 }, { x: 3060, y: 1040 }], [LL(37.8075, -122.4345), LL(37.80752, -122.43448)]]) {
+      const s1 = new SeaField({ hs: 1, tp: 12, from: 270 } as never), s2 = new SeaField({ hs: 1, tp: 12, from: 270 } as never);
+      const one = [s1.fetch(a, 300), s1.fetch(b, 300)], two = [s2.fetch(b, 300), s2.fetch(a, 300)];
+      expect(one).toEqual([two[1], two[0]]);
+    }
+    expect(new SeaField({ hs: 1, tp: 12, from: 270 } as never).fetch(p, 315)).toBe(fetchAt(p, 316, false)); // (worked out where she is, not at the node in the basin)
   });
   it('the way out from every slip to the open Bay (a fine path search from offshore)', () => {
     for (const id of NEW) {
