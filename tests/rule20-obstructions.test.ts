@@ -187,7 +187,7 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
 describe('Rule 20.2(e): while a hail for room to tack is under way, rule 18.2 does not apply between the two boats', () => {
   //   ↑ wind     (mark M to port, Blue inside and overlapped, both in the zone)
   it('mark-room gives way to the hail until the hailing boat has tacked', () => {
-    const M = { p: { x: 0, y: 0 }, type: 'round' as const, side: 'p' as const, beat: true };
+    const M = { name: 'M', p: { x: 0, y: 0 }, type: 'round' as const, side: 'p' as const, beat: true };
     const ctx = { t: 50, windFrom: WIND, marks: [M], beat: 42 };
     const red = boat('Red', { at: [-12, -10], heading: 315 }), blue = boat('Blue', { at: [-6, -16], heading: 315 });
     const rec = newPairRecord();

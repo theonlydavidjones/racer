@@ -3,7 +3,7 @@ import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
 import wharf from './data/wharf.json';
-import { BREAKWATER_W, FINGER_W, HARBORS, SHORE_W, WALKWAY_W, hitsHarbor, inBasin } from './marina';
+import { HARBORS, harborIndex, hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); from the Gate to Pier 27
 // it's replaced below by the real one, so only its stretch east of Pier 27 is still used.
@@ -295,6 +295,7 @@ function gridWalk(x0: number, y0: number, x1: number, y1: number, nx: number, ny
 type Box = { x0: number; x1: number; y0: number; y1: number };
 const overlaps = (A: Box, B: Box) => !(A.x1 < B.x0 || A.x0 > B.x1 || A.y1 < B.y0 || A.y0 > B.y1);
 const HARBOR_BASINS = HARBORS.map(H => ({ H, basinBox: boxOf(H.basin, 0) }));
+let harborStamp = 0;
 /**
  * How far along the straight line from a to b (m) she'd first be on land a boat runs aground on (onLand), or Infinity
  * if the whole line is water. Exact: nothing, however narrow, slips between samples.
@@ -320,11 +321,13 @@ export function landAlong(a: Vec, b: Vec): number {
   }
   for (const { H, basinBox } of HARBOR_BASINS) {
     if (!overlaps(bb, H.reach)) continue;
-    for (const w of H.breakwaters) if (w.area) poly(w.pts, solid); else dock(w.pts, BREAKWATER_W / 2);
-    for (const A of H.areas) poly(A, solid);
-    for (const l of H.shore) dock(l, SHORE_W / 2);
-    for (const l of H.walkways) dock(l, WALKWAY_W / 2);
-    for (const l of H.fingers) dock(l, FINGER_W / 2);
+    // the docks and breakwaters filed in the cells the line passes through (each looked at once)
+    const ix = harborIndex(H), stamp = ++harborStamp;
+    gridWalk((a.x - ix.x0) / ix.C, (a.y - ix.y0) / ix.C, (b.x - ix.x0) / ix.C, (b.y - ix.y0) / ix.C, ix.nx, ix.ny, (i, j, t) => {
+      if (t > best) return true;
+      for (const S of ix.cells[j * ix.nx + i]) { if (S.seen === stamp) continue; S.seen = stamp; if (S.poly) poly(S.pts, solid); else dock(S.pts, S.half); }
+      return false;
+    });
     if (overlaps(bb, basinBox)) poly(H.basin, maybe); // out of the basin, onto whatever's there
   }
   // the Cityfront shore: its edges in the cells the line passes through
