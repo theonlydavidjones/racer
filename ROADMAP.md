@@ -65,6 +65,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Now — bow spray** (bug; 1–2 h): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
+- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h): "a transparent seem between the keel and the
+  hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
+  the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
+  the keel's rabbet). Check from both sides.
 - **Next — the bow wave** (polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
