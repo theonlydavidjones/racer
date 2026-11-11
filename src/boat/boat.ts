@@ -32,6 +32,12 @@ export interface AiState {
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
+  /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
+  goTack?: { to: 'S' | 'P'; at: number } | null;
+  /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
+  avgFrom?: number;
+  /** How long she's been headed (s), by her compass. */
+  headedT?: number;
 }
 
 export interface Boat {
