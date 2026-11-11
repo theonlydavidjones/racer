@@ -206,11 +206,15 @@ export const heelingMoment = (heelForce: number, ceh: number, heelDeg?: number) 
  * weight to leeward (or minus it to windward) against the hull's righting moment. `crewMoment(h)`: + to windward, N·m.
  * With little wind in the sails and the crew up to windward she heels to windward.
  */
-export function heelWithCrew(heelForce: number, ceh: number, disp: number, crewMoment: (h: number) => number, crewKg = 240): number {
-  let lo = -40, hi = 75;
-  for (let i = 0; i < 30; i++) {
+export function heelWithCrew(heelForce: number, ceh: number, disp: number, crewMoment: (h: number) => number, crewKg = 240, guess?: number): number {
+  const over = (h: number) => heelingMoment(heelForce, ceh, h) - crewMoment(h) > hullRighting(h, disp, crewKg);
+  let lo = -40, hi = 75, n = 30;
+  // (from the last answer when there is one: it moves little from step to step, so a narrow bracket around it, if it
+  // holds the answer, needs half the halvings)
+  if (guess != null && over(guess - 4) && !over(guess + 4)) { lo = guess - 4; hi = guess + 4; n = 16; }
+  for (let i = 0; i < n; i++) {
     const h = (lo + hi) / 2;
-    if (heelingMoment(heelForce, ceh, h) - crewMoment(h) > hullRighting(h, disp, crewKg)) lo = h; else hi = h;
+    if (over(h)) lo = h; else hi = h;
   }
   return (lo + hi) / 2;
 }

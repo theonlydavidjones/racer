@@ -64,8 +64,11 @@ ORC's full-power lift is never reached above about 10 kt (this partly hides the 
 the sailing displacement is about 300–330 kg against the sim's 240 (GM 0.50 rather than 0.52); the sails' own weight
 aloft is left out (ORC eq. 4.9); the hove-to force model's keel is a slender wing (Te² = 2T²) while the speed search
 uses ORC's effective draft; the crew's line planner (controls.ts crewSolve) is a local search, so two boats can settle
-on different but equally good settings. Speed: a full race runs about 20% slower than main (the depowering search,
-cached, and the crew's line planning): for the performance review.
+on different but equally good settings. Speed (November 2026, the same race five times, median µs per world step,
+fleet of 5): the training course 461 against main's 420 (+10%), Seaweed Soup 444 against 422 (+5%), down from +40% and
++18% (the hull's resistance tabled, the heel solve warm-started, the depowering search cached and simpler, no per-step
+allocations in the puffs and the crew). What's left is spread thin: the crew's per-step placement and jobs, the heel
+solve, and the search's first look at a new wind (it fills in over a race). For the performance review.
 Also found on the way: the outhaul's range was five points of camber, past what its black band allows (now about 1.5,
 the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
 car, an estimate between the end points).

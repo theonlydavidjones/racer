@@ -163,6 +163,8 @@ export interface Boat {
   powerK?: number; powerT?: number;
   /** The depowering step (0..1) that's fastest for her crew now (physics.ts powerFactor): what the crew works toward. */
   depowerBest?: number;
+  /** The heel the moments balanced at last step (deg), to start the next solve from (balance.ts heelWithCrew). */
+  heelEqLast?: number;
   /** The tiller pilot is steering her this step (sim/world.ts). */
   pilotSteers?: boolean;
   /** The drive share from the sheet angles against where they should be (physics.ts trimSails). */

@@ -50,7 +50,13 @@ export const DEFAULT_SKILL = 0.6;
 export const DEFAULT_CREW: CrewSpec = { helm: { h: 1.78, w: 80 }, crew: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] };
 export const skillOf = (p: Person) => clamp(p.skill ?? DEFAULT_SKILL, 0, 1);
 /** The crew's skill: the average of the crew (alone: the helm's). */
-export const crewSkill = (c?: { spec: CrewSpec }) => !c ? DEFAULT_SKILL : c.spec.crew.length ? c.spec.crew.reduce((a, p) => a + skillOf(p), 0) / c.spec.crew.length : skillOf(c.spec.helm);
+const skillCache = new WeakMap<CrewSpec, number>();
+export const crewSkill = (c?: { spec: CrewSpec }) => {
+  if (!c) return DEFAULT_SKILL;
+  let k = skillCache.get(c.spec);
+  if (k == null) { k = c.spec.crew.length ? c.spec.crew.reduce((a, p) => a + skillOf(p), 0) / c.spec.crew.length : skillOf(c.spec.helm); skillCache.set(c.spec, k); }
+  return k;
+};
 
 /** The hull and rig without people (the ORC sailing displacement includes about three crew, ~240 kg). */
 export const HULL_EMPTY = orc.boat.displacementSailing - 240;
@@ -321,15 +327,15 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   // move each person toward their target: decide (after a reaction time, for a big change), then go at a human pace
   c.people.forEach((a, i) => {
     const p = ppl[i], t = tgt[i], tx = t.arm * w, tz = t.z;
-    const g = a.goal ?? { x: a.x, z: a.z };
-    const big = Math.abs(tx - g.x) > 0.25 || Math.abs(tz - g.z) > 0.4;
+    const gx = a.goal ? a.goal.x : a.x, gz = a.goal ? a.goal.z : a.z;
+    const big = Math.abs(tx - gx) > 0.25 || Math.abs(tz - gz) > 0.4;
     const rolling = c.roll?.phase === 'flatten' || (a.job && a.job.reach > 0);
     if (big && !rolling) {
       if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = reactTime(p);
       a.react -= dt;
-      if (a.react <= 0) { a.goal = { x: tx, z: tz }; a.react = 0; }
+      if (a.react <= 0) { setGoal(a, tx, tz); a.react = 0; }
       else if (!a.goal) a.goal = { x: a.x, z: a.z };
-    } else { a.goal = { x: tx, z: tz }; a.react = 0; }
+    } else { setGoal(a, tx, tz); a.react = 0; }
     const goal = a.goal!;
     // across: crossing the cockpit (ducking under the boom) about 1 m/s for a club crew; leaning out or in, about 0.7 m/s
     const crossing = Math.sign(goal.x) !== Math.sign(a.x) && Math.abs(goal.x - a.x) > 0.5;
@@ -350,6 +356,8 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   summarise(c, w, downwind, k.pole, k.extraMoment ?? 0);
 }
 
+/** (in place: this runs for everyone aboard every step) */
+const setGoal = (a: Aboard, x: number, z: number) => { if (a.goal) { a.goal.x = x; a.goal.z = z; } else a.goal = { x, z }; };
 const smoothSkill = (s: number) => { const t = clamp((s - 0.2) / 0.4, 0, 1); return t * t * (3 - 2 * t); };
 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a skilled crew. */

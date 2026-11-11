@@ -75,12 +75,15 @@ const bestCache = new Map<number, Best>();
 function best(v: number, sea = 0): Best {
   const ks = Math.round(clamp(sea, 0, 1) * 40), key = Math.round(clamp(v, 0.3, 8) * 50) * 100 + ks, hit = bestCache.get(key); if (hit) return hit;
   const u = Math.floor(key / 100) / 50, sq = ks / 40;
+  // (trimDrag's sum, with the hull's resistance at this speed worked out once)
+  const r1 = resistanceParts(u), r2 = resistanceParts(u * 1.02), tot = r1.friction + r1.residuary;
+  const fn0 = u / Math.sqrt(9.81 * HULL.length), wave0 = TRIM.waveK * smooth((fn0 - 0.25) / 0.15);
+  const drag = (t: number) => (r1.friction * TRIM.wsBest * ((t - TRIM.wsAt) ** 2 - TRIM.wsAt ** 2) / TRIM.wsAt ** 2 + r1.residuary * wave0 * t) / tot + sq * TRIM.seaK * t;
   let t0 = 0, lo = Infinity;
-  for (let t = -0.15; t <= 0.1501; t += 0.005) { const d = trimDrag(u, t, sq); if (d < lo) { lo = d; t0 = t; } }
+  for (let t = -0.15; t <= 0.1501; t += 0.005) { const d = drag(t); if (d < lo) { lo = d; t0 = t; } }
   // the least resistance a standard crew can reach from the cockpit: the polar's reference
-  let reachD = Infinity; for (let t = TRIM.reach[0]; t <= TRIM.reach[1] + 1e-9; t += 0.0025) reachD = Math.min(reachD, trimDrag(u, t, sq));
+  let reachD = Infinity; for (let t = TRIM.reach[0]; t <= TRIM.reach[1] + 1e-9; t += 0.0025) reachD = Math.min(reachD, drag(t));
   // the local exponent of resistance with speed (R ∝ vⁿ)
-  const r1 = resistanceParts(u), r2 = resistanceParts(u * 1.02);
   const n = Math.log((r2.friction + r2.residuary) / (r1.friction + r1.residuary)) / Math.log(1.02);
   // (the friction share and the wave term's slope, so a step's trimDrag is a few multiplications: trimSpeedFactor)
   const fF = r1.friction / (r1.friction + r1.residuary), fn = u / Math.sqrt(9.81 * HULL.length);

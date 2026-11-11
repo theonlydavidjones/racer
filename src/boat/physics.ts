@@ -421,7 +421,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (the windward side by her tack, which holds through a moment by the lee until the boom crosses)
   placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
-  return heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec));
+  return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
 /**
  * How hard to drive her, and what it's worth against the polar. In ORC's VPP the crew holds her up by hiking and by
@@ -440,13 +440,14 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  * and heeling past her best costs the hull (heelFactor).
  * Done twice a second: for the polar's standard crew (the reference: a boat sailed as the polar sails it), and for her
  * own crew as they are (how many, how heavy, how tired), whose fastest step the crew then works toward (trimSails).
+ * (Once a second.)
  * The speed factor is the square root of her push, with her sails as they are, against the polar crew's.
  */
 function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; shape: Shape } | null, twa: number, ww: { from: number; kt: number }, disp: number, dt: number, plan: SailPlan): number {
   const tws = ww.kt;
   b.powerT = (b.powerT ?? 0) - dt;
   if (b.powerK != null && b.powerT > 0) return b.powerK;
-  b.powerT = 0.5;
+  b.powerT = 1; // (once a second: her sails' power changes slowly)
   // (the search, and her sails against it, in the wind rounded to a knot and 2°: cached, and like for like)
   const twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
   const ref = fastestStep(twsR, twaR, plan, STANDARD_DISP, crewMass(DEFAULT_CREW), standardCrewMoment(), crewBestHeel(twaR, twsR), sittingMoment(DEFAULT_CREW));
@@ -509,11 +510,12 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
     // (the heel where the moments balance with the crew hiking, with the sails' force at that heel: heeling takes wind out
     // of them, so a straight iteration rings; bisect on the heel instead. The sheets trimmed for the wind at each heel.)
     const at = (x: number) => { const w = wind(x); return intendedForces(sh.main, jibOn ? sh.jib : null, w.aws, w.awa, stepBoom(w.awa, d)); };
+    // (one bisection on the balance of moments at heel m, the sails' force there included)
     const balance = (m0: number) => {
       let lo = 0, hi = 60;
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 10; i++) { // (to 0.06°)
         const m = (lo + hi) / 2, r = at(m);
-        if (heelWithCrew(r.main.heel + r.jib.heel, r.ceh, dsp, x => m0 * Math.cos(x * D2R), crewKg) > m) lo = m; else hi = m;
+        if (heelingMoment(r.main.heel + r.jib.heel, r.ceh, m) - m0 * Math.cos(m * D2R) > hullRighting(m, dsp, crewKg)) lo = m; else hi = m;
       }
       return (lo + hi) / 2;
     };
@@ -529,9 +531,10 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
   };
   let top = sailAt(0);
   if (twa < 120) {
-    for (let i = 1; i <= 8; i++) { const t = sailAt(i / 8); if (t.speed > top.speed) top = t; }
-    // then the half-steps either side, and a parabola through the best three for where between them it peaks (so two
-    // boats a little different don't land a whole step apart)
+    for (let i = 1; i <= 4; i++) { const t = sailAt(i / 4); if (t.speed > top.speed) top = t; }
+    // then the eighths either side, the sixteenths either side of the best of those, and a parabola through the best
+    // three for where between them it peaks (so two boats a little different don't land a whole step apart)
+    for (const t of [top.d > 0 ? sailAt(top.d - 1 / 8) : null, top.d < 1 ? sailAt(top.d + 1 / 8) : null]) if (t && t.speed > top.speed) top = t;
     const h = 1 / 16;
     for (const t of [top.d > 0 ? sailAt(top.d - h) : null, top.d < 1 ? sailAt(top.d + h) : null]) if (t && t.speed > top.speed) top = t;
     const a = top.d > 0 ? sailAt(Math.max(0, top.d - h)) : null, c = top.d < 1 ? sailAt(Math.min(1, top.d + h)) : null;
@@ -717,7 +720,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   if (!byHand(b, 'jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
   // the lazy (windward) jib car: the crew's plan for it (they move it only when it's worth it), or yours
-  b.carPlan = byHand(b, 'car') ? null : { fore: t.carFore, ins: t.carIn };
+  if (byHand(b, 'car')) b.carPlan = null; else if (!b.carPlan || b.carPlan.fore !== t.carFore || b.carPlan.ins !== t.carIn) b.carPlan = { fore: t.carFore, ins: t.carIn };
   // (the first time: she was set up before she sailed, so the crew's lines start where they want them)
   if (!b.crewReady) {
     b.crewReady = true;

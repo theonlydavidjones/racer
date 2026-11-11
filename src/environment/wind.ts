@@ -186,8 +186,8 @@ export class Puffs {
 
   /** Strength of one puff at a point, 0..1: a smooth streak along the wind where it is (or `dir`), fading in and out over its life. */
   static weight(c: Puff, x: number, y: number, mean: Vec): number {
-    const dir = c.dx != null ? { x: c.dx, y: c.dy! } : mean;
-    const dx = x - c.x, dy = y - c.y, a = (dx * dir.x + dy * dir.y) / (c.r * PUFF_LONG), b = (dx * dir.y - dy * dir.x) / (c.r * PUFF_WIDE);
+    const ux = c.dx ?? mean.x, uy = c.dy ?? mean.y; // (no object per call: this runs for every puff, for every boat, every step)
+    const dx = x - c.x, dy = y - c.y, a = (dx * ux + dy * uy) / (c.r * PUFF_LONG), b = (dx * uy - dy * ux) / (c.r * PUFF_WIDE);
     const d2 = a * a + b * b;
     if (d2 >= 1) return 0;
     return (1 - d2) ** 2 * Math.sin(Math.PI * c.age / c.life);

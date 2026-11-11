@@ -73,10 +73,16 @@ export function luffDriveFactor(twa: number): number {
   return HANDLING.luffFactor + (0.75 - HANDLING.luffFactor) * t * t * (3 - 2 * t);
 }
 
-/** Calm-water hull resistance at speed v (m/s), newtons. */
+/** Calm-water hull resistance at speed v (m/s), newtons. (Tabled every 1 mm/s up to 10 m/s and interpolated: the AI's
+ * predictions ask for it thousands of times a step.) */
+const RES_STEP = 0.001, RES_N = 10001, resTable = new Float64Array(RES_N).fill(NaN);
+const resAt = (i: number) => { let r = resTable[i]; if (Number.isNaN(r)) { const p = resistanceParts(i * RES_STEP); r = resTable[i] = p.friction + p.residuary; } return r; };
 export function hullResistance(v: number): number {
-  const r = resistanceParts(v);
-  return r.friction + r.residuary;
+  if (v <= 0) return 0;
+  const x = v / RES_STEP, i = Math.floor(x);
+  if (i >= RES_N - 1) { const r = resistanceParts(v); return r.friction + r.residuary; }
+  const f = x - i;
+  return resAt(i) * (1 - f) + resAt(i + 1) * f;
 }
 /** The two parts of the calm-water resistance (N): skin friction (goes with the wetted surface) and wave-making. */
 export function resistanceParts(v: number): { friction: number; residuary: number } {
