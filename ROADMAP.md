@@ -40,6 +40,16 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Performance review** (owner, November 2026; 6–10 h): no lag or crashes as the sim grows. Set a budget first (a
+steady 60 fps on a typical laptop in a full race: fleet, ships, wildlife, charts; page load under a few seconds; memory
+that doesn't climb over a long session; the page well under the 16 MB limit, 3.1 MB today), then measure against it:
+frame time by part (physics step, AI, onLand/shoreDist calls, the sea model, the 3D scene's draw calls and triangles,
+the map and chart redraws, the sails' canvas textures), memory over an hour's sail (leaks from scenes, textures and
+listeners not freed between races), and the worst cases (big fleet, heavy weather, the chart zoomed out). Fix the
+hot spots; add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
+quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
+sessions changing the scene or the physics while it measures.
+
 Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda

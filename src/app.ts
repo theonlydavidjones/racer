@@ -1,4 +1,4 @@
-import { coach } from './boat/coach';
+import { CoachMemory } from './boat/coach';
 import { PREP_MEANING } from './sim/signals';
 import { describeSea } from './environment/sea';
 import './styles.css';
@@ -311,25 +311,51 @@ function openLines(open = $('ctlList').hidden): void {
   $('ctlList').hidden = !open; $('trimPanel').classList.toggle('lines', !!open); $('tpMore').textContent = open ? 'Lines ▾' : 'Lines ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
 }
 $('tpMore').onclick = () => openLines();
-/* The trim coach: opens beside the trim panel and updates live, so you can work a line and watch what it does. */
-let coachT = 0, coachWhy = false;
+/* The trim coach, as a teacher (boat/coach.ts): the one thing that matters now, why, and what to look at on the boat;
+ * when you fix it, it says so. Its headline sits in the trim panel and, when there's something new to say, shows on
+ * the water for a few seconds; the panel beside the trim panel has the why and the tell, and the smaller things. */
+const coachMem = new CoachMemory();
+let coachT = 0, coachMore = false, coachTipUntil = 0, lastLeg = -1, legT = -1e9, coachShown: ReturnType<CoachMemory['step']> | null = null;
+const ce = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 function renderCoach(): void {
-  const r = coach(w.user), esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const acts = r.actions, crew = linesByHand(w.user).length === 0;
-  $('coachSum').textContent = acts.length ? `${acts.length} thing${acts.length > 1 ? 's' : ''} worth fixing` : 'Nothing to fix';
-  // underway: short action items, biggest gain first; the full explanation only when paused (you can't read paragraphs and steer)
-  let html = acts.length
-    ? `<ol class="coach-acts">${acts.map(a => `<li><span class="gain">+${(a.gain * 100).toFixed(a.gain < 0.01 ? 1 : 0)}%</span>${a.who === 'crew' ? '<span class="who">crew</span>' : ''}${esc(a.text)}</li>`).join('')}</ol>`
-    : `<p class="coach-ok">Trim's right. ${crew ? 'The crew has it.' : 'Keep it there.'}</p>`;
-  html += coachWhy || w.paused ? r.items.map(i => `<div class="coach-item${i.ok ? '' : ' fix'}"><b>${esc(i.head)}</b>${esc(i.text)}</div>`).join('') + (w.paused ? '' : '<button type="button" class="linkbtn coach-why" data-why="0">Hide why</button>')
-    : '<button type="button" class="linkbtn coach-why" data-why="1">Why? Show the reasons</button>';
+  const r = coachShown; if (!r) return;
+  const v = r.view, top = v.top;
+  $('coachSum').textContent = v.situation.label;
+  let html = r.done ? `<p class="c-done">${ce(r.done)}</p>` : '';
+  html += `<p class="c-head ${top.kind}">${ce(top.head)}</p>`;
+  if (top.why) html += `<p class="c-why">${ce(top.why)}</p>`;
+  if (top.look) html += `<p class="c-look"><b>Look at</b> ${ce(top.look)}</p>`;
+  if (v.crew) html += `<p class="c-crew">${ce(v.crew)}</p>`;
+  if (v.more.length) {
+    html += `<button type="button" class="linkbtn coach-why" data-more="${coachMore ? 0 : 1}">${v.more.length} smaller thing${v.more.length > 1 ? 's' : ''} ${coachMore ? '▾' : '▸'}</button>`;
+    if (coachMore) html += `<ul class="c-more">${v.more.map(l => `<li><span class="gain">+${(l.gain * 100).toFixed(l.gain < 0.01 ? 1 : 0)}%</span>${ce(l.head)}${w.paused ? `<small>${ce(l.why)}</small>` : ''}</li>`).join('')}</ul>`;
+  }
   $('coachBody').innerHTML = html;
 }
 $('bCoach').onclick = () => { const p = $('coachPanel'); p.hidden = !p.hidden; if (!p.hidden) renderCoach(); };
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
-// the reasons, on a click (no need to pause: they update live, like the rest of the coach)
-$('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-why]'); if (!b) return; coachWhy = b.dataset.why === '1'; renderCoach(); });
-function coachTick(dt: number): void { if ($('coachPanel').hidden) return; coachT += dt; if (coachT > 0.6) { coachT = 0; renderCoach(); } }
+$('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
+/** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
+function coachTick(dt: number): void {
+  if (!w.running) { $('coachTip').classList.remove('on'); return; }
+  const u = w.user;
+  if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
+  coachT += dt; if (coachT < 0.5 && coachShown) { tipFade(); return; }
+  coachT = 0;
+  coachShown = coachMem.step(u, w.t, { preStart: !w.freeSail && w.t < 0, justRounded: w.t - legT < 12 });
+  const r = coachShown;
+  $('tpHint').textContent = r.done ?? r.view.top.head;
+  $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : r.view.top.kind);
+  // the headline on the water: only when the panel's shut (it says the same), for six seconds of real time, and it
+  // follows the coach while it's up (it never contradicts the panel or the trim panel)
+  const tip = $('coachTip'), open = !$('coachPanel').hidden;
+  if (r.fresh && !w.paused && !open) { tip.textContent = r.fresh; tip.className = 'on ' + (r.done ? 'done' : r.view.top.kind); coachTipUntil = performance.now() + 6000; }
+  else if (tip.classList.contains('on') && !r.done) { if (r.view.top.kind === 'fix') tip.textContent = r.view.top.head; else coachTipUntil = 0; }
+  if (open) coachTipUntil = 0;
+  tipFade();
+  if (!$('coachPanel').hidden) renderCoach();
+}
+function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 /** Sheets read backwards on their bars (full = trimmed in), the traveller from windward to leeward. */
 const barOf = (k: CtlKey, v: number) => (k === 'mainsheet' || k === 'jibsheet' || k === 'jibsheetW' ? 1 - v : k === 'traveller' ? (1 - v) / 2 : v);
 const valOf = (k: CtlKey, fx: number) => (k === 'mainsheet' || k === 'jibsheet' || k === 'jibsheetW' ? 1 - fx : k === 'traveller' ? 1 - 2 * fx : fx);
