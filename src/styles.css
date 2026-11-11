@@ -640,6 +640,14 @@ body.lashed .tg-cur{background:#c9a36a}
 .tg-lash{display:none;position:absolute;top:calc(74% + 6px);left:50%;transform:translateX(-50%);padding:5px 10px;border-radius:6px;
   background:rgba(9,22,33,.78);border:1px dashed #c9a36a;color:#f0dcb8;font:600 11px/1.2 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
 body.lashed .tg-lash{display:block}
+/* the map's key (ui/legend.ts), under the layer switches */
+.layerpop{max-height:calc(100vh - 240px);overflow-y:auto}
+#chartLayersPop{max-height:calc(100vh - 120px);width:290px}
+#mapLayersPop{width:280px}
+.layerpop .lp-kh{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule)}
+.lp-key .lk-h{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 3px}
+.lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}
+.lp-key .lk-row canvas{flex:none;border-radius:2px;border:1px solid var(--rule)}
 
 /* ---------- crystal-clear trim controls (owner, Nov 2026) ---------- */
 /* the Crew · You switch, on every row: green Crew while the crew does it (auto), amber You once it's yours */
