@@ -32,6 +32,10 @@ export interface Ink {
   none: string; land: string; built: string; structure: string; coast: string; contour: string; magenta: string; ink: string; sounding: string; soundingDeep: string; waterText: string;
   // the sim's own overlays
   current: string; lull: (a: number) => string; lullHatch?: boolean; puff?: (a: number) => string; windTick: string; ship: string; shipText: string; text: string; boatEdge: string; pick: string; mark: string; markPass: string; line: string;
+  // the sim's overlays stand clear of the chart: a halo under them and a dark edge round them; your boat in a colour of
+  // its own (cyan), the course and the destination in vivid orange: neither is used by the chart (its magenta, the
+  // buoys' red, green and yellow, the blue depth tints)
+  halo: string; edge: string; you: string; markHi: string; starboard: string; port: string; shipHalo: string; fog: (a: number) => string; fogText: string; sea: (a: number) => string; seaText: string;
 }
 export const INK: Record<ChartPalette, Ink> = {
   // US Chart No. 1 on paper: buff land, white deep water, blue shoal tints, green where it dries, magenta for regulated areas
@@ -39,14 +43,18 @@ export const INK: Record<ChartPalette, Ink> = {
     dry: '#c6d7a4', vshoal: '#8fc3ea', shoal: '#b9dbf2', mid: '#e1eff9', deep: '#ffffff', none: '#d9dcdf',
     land: '#f3e2a9', built: '#e6cf8f', structure: '#d4c08a', coast: '#2e3236', contour: '#7f9bb0', magenta: '#b8188f', ink: '#1d2328', sounding: '#1d2328', soundingDeep: '#6a7781', waterText: '#1f4f7a',
     current: 'rgba(0,96,170,.8)', lull: a => `rgba(196,140,50,${a})`, lullHatch: true, puff: a => `rgba(20,60,110,${a})`, windTick: 'rgba(20,40,60,.35)', ship: 'rgba(30,30,34,.95)', shipText: 'rgba(30,30,34,.95)', text: '#1d2328',
-    boatEdge: '#000000', pick: '#000000', mark: '#e09a00', markPass: '#9c8a3a', line: 'rgba(200,130,0,.9)'
+    boatEdge: '#000000', pick: '#000000', mark: '#ff6a00', markPass: '#ffa45c', line: '#ff6a00',
+    halo: 'rgba(255,255,255,.92)', edge: '#111111', you: '#00d8ff', markHi: '#ff3d00', starboard: '#00b050', port: '#e8112d', shipHalo: 'rgba(255,255,255,.9)',
+    fog: a => `rgba(120,128,138,${a})`, fogText: '#2b3238', sea: a => `rgba(20,90,160,${a})`, seaText: '#0d3a66'
   },
   // the ECDIS night-time look: dark water, deeper is darker
   dusk: {
     dry: '#3e4e36', vshoal: '#2c6491', shoal: '#21496b', mid: '#17344e', deep: '#0e2233', none: '#1a1f24',
     land: '#4f4a39', built: '#5d5641', structure: '#7a7258', coast: '#b9b2a2', contour: '#3e6b8c', magenta: '#d670c8', ink: '#d5dde2', sounding: '#c3d0d9', soundingDeep: '#7d93a3', waterText: '#8fb8d6',
     current: 'rgba(111,208,255,.55)', lull: a => `rgba(200,230,245,${a})`, windTick: 'rgba(232,238,246,.28)', ship: 'rgba(230,230,225,.9)', shipText: 'rgba(230,230,225,.85)', text: '#e9f2f5',
-    boatEdge: '#ffffff', pick: '#ffffff', mark: '#ffc21a', markPass: '#c9b25a', line: 'rgba(255,216,74,.75)'
+    boatEdge: '#ffffff', pick: '#ffffff', mark: '#ff6a00', markPass: '#ffa45c', line: '#ff7a1a',
+    halo: 'rgba(0,0,0,.85)', edge: '#000000', you: '#00e5ff', markHi: '#ff5a1f', starboard: '#2ee67a', port: '#ff4d5e', shipHalo: 'rgba(0,0,0,.85)',
+    fog: a => `rgba(120,132,145,${a * 0.8})`, fogText: '#e6ecf1', sea: a => `rgba(120,200,255,${a})`, seaText: '#bfe6ff'
   }
 };
 
