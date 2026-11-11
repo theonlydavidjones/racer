@@ -126,6 +126,8 @@ export interface Boat {
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
   crewPlan?: CrewSettings | null; crewPlanT?: number;
+  /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
+  crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
@@ -147,6 +149,26 @@ export interface Boat {
   heelMag?: number; helmNeed?: number; weatherHeld?: number; forces?: { heel: number; drive: number };
   /** The people aboard and where their weight is (crewPhys.ts). */
   crew?: CrewState;
+  /** The crew has set her up (the first time they trim, their lines start where they want them). */
+  crewReady?: boolean;
+  /** The lazy jib car you've asked the crew to move to (pins), until it's done (crewWork.ts). */
+  carCmd?: { fore: number; ins: number } | null;
+  /** The lazy jib car the crew's own plan wants, and how long (s) the car has been off it. */
+  carPlan?: { fore: number; ins: number } | null; carOff?: number;
+  /** Heel rate (deg/s, + rolling to port) and the boat's roll: heel follows its equilibrium as a damped oscillator (balance.ts rollStep). */
+  heelRate?: number;
+  /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
+  seaShare?: number; seaShareT?: number;
+  /** Speed factor from the power she carries against the polar crew's (physics.ts powerFactor), and seconds until it's worked out again. */
+  powerK?: number; powerT?: number;
+  /** The depowering step (0..1) that's fastest for her crew now (physics.ts powerFactor): what the crew works toward. */
+  depowerBest?: number;
+  /** The heel the moments balanced at last step (deg), to start the next solve from (balance.ts heelWithCrew). */
+  heelEqLast?: number;
+  /** The tiller pilot is steering her this step (sim/world.ts). */
+  pilotSteers?: boolean;
+  /** The drive share from the sheet angles against where they should be (physics.ts trimSails). */
+  trimDriveK?: number;
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */

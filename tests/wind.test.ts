@@ -99,6 +99,18 @@ describe('puffs and lulls', () => {
     p.step(1, { from: 270, kt: 15 }); // wind from the west: puffs move east
     if (c.age > age0) { expect(c.x).toBeGreaterThan(x0 + 5); expect(Math.abs(c.y - y0)).toBeLessThan(0.01); }
   });
+  it('each puff travels and streams along the wind where it is, not the course-wide mean (the wind turns across the Bay)', () => {
+    const p = new Puffs(makeRng(3), { x: 0, y: 0 }), local = (q: { x: number }) => ({ turn: q.x > 0 ? 12 : -8, k: 1 });
+    p.step(1.5, { from: 250, kt: 12 }, local);
+    for (const c of p.cells.slice(0, 30)) {
+      const x0 = c.x, y0 = c.y, want = 250 + local(c).turn + 180; p.step(0.1, { from: 250, kt: 12 }, local);
+      if (c.age < 0.1 || Math.sign(c.x) !== Math.sign(x0)) continue; // (just respawned, or crossed the line)
+      expect(Math.abs(wrap(brg(c.x - x0, c.y - y0) - want))).toBeLessThan(0.5);
+      const ahead = Puffs.weight(c, c.x + Math.sin(want * Math.PI / 180) * c.r, c.y + Math.cos(want * Math.PI / 180) * c.r, p.dir);
+      const side = Puffs.weight(c, c.x + Math.cos(want * Math.PI / 180) * c.r, c.y - Math.sin(want * Math.PI / 180) * c.r, p.dir);
+      if (ahead > 0) expect(ahead).toBeGreaterThan(side); // longer along its own wind than across it
+    }
+  });
   it('a puff is stronger and veered; a lull is lighter', () => {
     const p = new Puffs(makeRng(5), { x: 0, y: 0 });
     p.cells.length = 0;

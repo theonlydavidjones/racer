@@ -171,10 +171,11 @@ export function drawWindField(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x
 }
 
 /** Puffs (dark) and lulls (pale) as soft streaks along the wind, as you'd see them on the water from aloft. */
-export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: number; y: number; r: number; amp: number; age: number; life: number }[],
-  dir: { x: number; y: number }, gustiness: number, ink: OverlayInk = {}): void {
+export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: number; y: number; r: number; amp: number; age: number; life: number; dx?: number; dy?: number }[],
+  mean: { x: number; y: number }, gustiness: number, ink: OverlayInk = {}): void {
   ctx.save();
   for (const c of cells) {
+    const dir = c.dx != null && c.dy != null ? { x: c.dx, y: c.dy } : mean; // along the wind where the puff is
     const env = Math.sin(Math.PI * c.age / c.life), a = c.amp * gustiness * env;
     if (Math.abs(a) < 0.03) continue;
     const p = tf(c.x, c.y), e = tf(c.x + dir.x * c.r * 1.5, c.y + dir.y * c.r * 1.5), s = tf(c.x + dir.y * c.r * 0.75, c.y - dir.x * c.r * 0.75);

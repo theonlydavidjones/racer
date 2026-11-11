@@ -1,11 +1,11 @@
 import type { Boat, LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
 import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
-import { crewMoment, displacement } from './crewPhys';
+import { crewMass, crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
 import { hullResistance } from './dynamics';
 import { beatAngle, polar } from './polar';
-import { byHand, crewMainAngle, leeDrift, sailPlan } from './physics';
+import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { KT, clamp } from '../core/math';
 
@@ -99,7 +99,9 @@ export function situation(b: Boat, ctx: CoachContext = {}): Situation {
  * angle of attack and shape as drive, heel past her best, and the drag of the helm the sails demand).
  */
 function speedFactor(b: Boat, c: Controls): number {
-  const tws = b.ww.kt, awa = b.awa, aws = b.aws / KT, plan = sailPlan(b), cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  // (in the wind the sails see as she heels, as the boat does: physics.ts sailWind, ORC eqs. 7.2–7.3)
+  const sw = sailWind(b.ww.from, b.ww.kt, b.h, b.v, 0, b.heelMag ?? 0);
+  const tws = b.ww.kt, awa = sw.awa, aws = sw.aws / KT, plan = sailPlan(b), cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
   const main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max), clew = jibClew(c, b.tack);
   if (clew < 0) return 0; // backed: not sailing
   const jib = clamp(clew, SAILS.jib.min, SAILS.jib.max);
@@ -107,15 +109,23 @@ function speedFactor(b: Boat, c: Controls): number {
   const ms = mainShape(c, tws, cond?.main, aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
-  let f = Math.sqrt(Math.max(0, trimDrive(tm, tj) * eff));
+  // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
+  // as physics.ts trimSails counts it; the deliberate ease is in the sails' power, below)
+  const ease = crewMainAngle(b) - optimalSheet('main', b.awaSlow);
+  let f = Math.sqrt(Math.max(0, trimDrive(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max)), tj) * eff));
   // heel and helm, with the crew where they are now
-  const sf = sailForces(b.aws, awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
+  const sf = sailForces(sw.aws, sw.awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
   const cs = b.crew;
   if (cs) {
     const disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
-    const heel = heelWithCrew(F, sf.twist, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0)) * (b.twa > 120 ? 0.6 : 1);
+    const heel = heelWithCrew(F, sf.ceh, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0), crewMass(cs.spec)) * (b.twa > 120 ? 0.6 : 1);
     f *= heelFactor(heel);
-    const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.twist);
+    const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.ceh);
+    // the drive the sails make less the keel's drag for their side force (balance.ts netDrive): flatter sails push less,
+    // but heel her less and ask less of the keel; against the drive as she is, as physics.ts powerFactor weighs it
+    // (exactly as the boat weighs it: physics.ts sailPush, against the push with her lines as they are)
+    const pushNow = sailPush(tws, b.twa, plan, b.shape.main, plan === 'jib' ? b.shape.jib : null, b.heelMag ?? 0, b.depower ?? 0);
+    if (pushNow > 1) f *= Math.sqrt(Math.max(0, sailPush(tws, b.twa, plan, ms, js, heel, b.depower ?? 0)) / pushNow);
     f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
   }
   return f;
