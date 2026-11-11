@@ -252,3 +252,25 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
     b.crew.place = undefined; sail(b, 20); expect(['hike', 'windward']).toContain(b.crew.mode);
   });
 });
+
+describe('How often the crew move (crewPhys.ts HOLD)', () => {
+  /** Ten minutes upwind in a puffy breeze (10 kt, ±2 kt over half a minute, flickering ±0.7 kt every few seconds): how many times each crew member sets off for a new place. */
+  function moves(windKt: number) {
+    const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4, windKt }); b.crew = newCrew(crewOf(0.6), 'S');
+    sail(b, 30, () => { b.h = 360 - twa; });
+    const last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0);
+    sail(b, 600, t => {
+      b.h = 360 - twa; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
+      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { n[i]++; last[i] = { ...p.goal }; } });
+    });
+    return n.slice(1);
+  }
+  it('they sit still through the flicker and move on the real puffs and lulls', () => {
+    // in 10 kt they're up on the windward deck whatever the puffs do: they stay there
+    for (const m of moves(10)) expect(m).toBeLessThan(10);
+    // in 7 kt the same ±2 kt takes her from light air (weight to leeward) to a breeze (up to windward) every half minute:
+    // out on the puff and in on the lull, not every flicker (twenty cycles: under three moves a cycle; without the dead
+    // band it was over 700)
+    for (const m of moves(7)) expect(m).toBeLessThan(60);
+  }, 30000);
+});

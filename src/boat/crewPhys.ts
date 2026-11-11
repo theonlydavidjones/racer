@@ -130,8 +130,10 @@ export interface CrewState {
   mastPays?: boolean;
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
   tgt?: Target[]; decideT?: number;
-  /** Seconds until they look round for the next job (crewWork.ts). */
-  jobT?: number;
+  /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
+  held?: (Held | null)[]; clock?: number; holdT?: number; placeKey?: string;
+  /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
+  jobT?: number; lineWant?: Record<string, number>;
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -157,13 +159,15 @@ export function deckHalf(z: number): number {
   return HALF_BREADTH[i] * (1 - f) + HALF_BREADTH[i + 1] * f;
 }
 /**
- * Stations along the boat (m, + aft; the stem at −3.82): the helm at the tiller, the cockpit's forward and after ends
+ * Stations along the boat (m, + aft; the stem at −3.82): the helm at the tiller (sitting on the after deck or the
+ * coaming's after end, just aft of the cockpit, which ends at station 3, z 2.82 (CR 3.22), legs down into its after
+ * end and steering with the tiller extension: the owner's photos of Josephine and CircleSea under way, reference/photos), the cockpit's forward and after ends
  * where the crew sit, the cabin top's control lines at its after end, the mast (its forward face 2000 mm aft of where
  * the forestay meets the deck, which is 800 mm aft of the stem: construction plan, CR 6.1.7), and the jib cars (North
  * Sails' Nordic Folkboat tuning guide: the cabin-top lead 2.65 m from the forestay pin, the track centred 58 cm off the
  * centreline: on the cabin top about 0.6 m aft of the mast).
  */
-export const Z = { helm: 2.7, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.6 };
+export const Z = { helm: 2.95, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.6 };
 /** Half-beam at the sheer where the crew sit (between the cockpit's forward end and its middle), from the plan. */
 export const EDGE = deckHalf(1.3);
 /** Where the person moving a jib car kneels: on the side deck beside the cabin, reaching in to the track (58 cm out). */
@@ -233,7 +237,29 @@ export interface CrewCall {
   heel?: number;
   /** A tack is coming: she's turning up toward the wind to tack (a roll tack starts here). */
   tackComing?: boolean;
+  /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
+  rmPerDeg?: number;
 }
+
+/**
+ * How often a crew moves. A real crew moves on a puff, a lull, a tack or a job, and otherwise sits still: coaches have
+ * the crew hold a steady angle of heel, not a precise one (weight first in light to moderate air, and once the boat is
+ * set up only small, smooth moves: Sailing World, North Sails, Yachting World on keelboat heel), and the main is played
+ * for the short puffs. So each free person keeps the place they've settled in until the change the crew would make is
+ * worth a move:
+ * - `heel`: it would change her heel by more than this many degrees (the dead band, sized by her stiffness there:
+ *   about 0.2 m of arm for three people on a Folkboat);
+ * - `last`: and it has lasted this long (s) — a puff that's gone again isn't worth moving for (gusts mostly last under
+ *   20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High Performance
+ *   Sailing);
+ * - `dwell`: and it's this long (s) since they last moved, so they don't shuffle back and forth;
+ * - `urgent`: unless it's this many times the dead band (a real puff or lull, a bear-away at a mark): then they go as
+ *   soon as it has lasted, however lately they moved.
+ * Through a tack or gybe, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
+ * source gives them, and no count of a Folkboat crew's moves on a beat was found.
+ */
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 4, fore: 0.3 };
+interface Held { arm: number; z: number; since: number; off: number }
 
 /**
  * Where the crew go now, at a human pace. Each free person goes where the weight is wanted (or where you've put them);
@@ -331,8 +357,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
     if (c.roll?.phase === 'flatten') for (const i of free) tgt[i] = { arm: maxOf(i), z: tgt[i].z, pose: 'hike' };
     if (c.roll?.phase === 'hold' && !helmBusy) tgt[0] = { arm: c.people[0].x * w, z: Z.helm, pose: 'helm' };
+    hold(c, tgt, k, tacked, W);
     c.tgt = tgt;
   }
+  c.clock = (c.clock ?? 0) + dt;
   const tgt = c.tgt;
   // move each person toward their target: decide (after a reaction time, for a big change), then go at a human pace
   c.people.forEach((a, i) => {
@@ -364,6 +392,41 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     a.fatigue = clamp(a.fatigue + dt * (e * e / ENDURE(p) - (1 - e) * a.fatigue / RECOVER), 0, 1);
   });
   summarise(c, w, downwind, k.pole, k.extraMoment ?? 0);
+}
+
+/**
+ * The dead band (HOLD): each free person (and the helm, when not steering from a job) stays where they've settled
+ * unless the new place is worth a move. Run as the crew decide (20 times a second); changes `tgt` in place.
+ */
+function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: number[]): void {
+  const held = c.held ??= [], now = c.clock ?? 0, step = Math.max(0, now - (c.holdT ?? now));
+  c.holdT = now;
+  const key = c.place ? `${c.place.across}/${c.place.fore}` : '';
+  // (where you've put them, they stay on your word, not their own judgment)
+  const reset = tacked || !!c.roll || key !== c.placeKey || !!c.place?.across;
+  c.placeKey = key;
+  // the arm a move has to be worth: the dead band's heel over her stiffness, shared by everyone who'd move
+  let movers = 0; c.people.forEach((a, i) => { if (!a.job?.station && tgt[i]?.pose !== 'mast') movers += W[i]; });
+  const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * Math.max(60, movers));
+  const ppl = c.ppl!;
+  c.people.forEach((a, i) => {
+    const t = tgt[i], h = held[i];
+    // (at a job or the mast: settled afresh wherever they come back to)
+    if (!t || a.job?.station || t.pose === 'mast') { held[i] = null; return; }
+    if (reset || !h) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; return; }
+    h.since += step;
+    // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire, is the body, not a move)
+    const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i]);
+    if (t.arm > sa + 0.04 && h.arm > sa + 0.04) { h.arm = t.arm; h.z = t.z; return; }
+    const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z);
+    const worth = dArm > dead || dz > HOLD.fore;
+    h.off = worth ? h.off + step : 0;
+    if (worth && h.off >= HOLD.last && (h.since >= HOLD.dwell || dArm > HOLD.urgent * dead)) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; return; }
+    // (stay put: sitting, hiking or to leeward by where they stay)
+    t.arm = h.arm; t.z = h.z;
+    if (i === 0) t.pose = 'helm';
+    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit';
+  });
 }
 
 /** How far out a person can lean now, as a fraction of the span from sitting to a full hike (the scale `lean` is on):
