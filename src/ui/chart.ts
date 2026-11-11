@@ -18,7 +18,7 @@ export class Chart {
   private wasPaused = false;
   private c = $<HTMLCanvasElement>('chartC');
 
-  constructor(private hud: Hud, private onClose: () => void) {
+  constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
     this.c.addEventListener('pointermove', e => {
@@ -32,11 +32,16 @@ export class Chart {
     this.c.addEventListener('wheel', e => {
       e.preventDefault();
       const r = this.c.getBoundingClientRect(), before = this.at(e.clientX - r.left, e.clientY - r.top);
-      this.scale = Math.min(3, Math.max(0.02, this.scale * Math.exp(-e.deltaY * 0.0015)));
+      this.scale = Math.min(3, Math.max(Math.min(innerWidth, innerHeight) / 26000, this.scale * Math.exp(-e.deltaY * 0.0015))); // out to the whole chart (the sim's world, about 21 by 23 km)
       const after = this.at(e.clientX - r.left, e.clientY - r.top); // zoom about the cursor
       this.cx += before.x - after.x; this.cy += before.y - after.y; this.draw();
     }, { passive: false });
     $('bChartClose').onclick = () => this.close();
+    $('bChartPal').onclick = () => {
+      if (!this.w) return;
+      this.setPal((this.w.settings.chartPal ?? 'day') === 'day' ? 'dusk' : 'day');
+      this.palLabel(); this.draw();
+    };
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
       if (!this.w || !this.pick) return;
@@ -56,9 +61,11 @@ export class Chart {
     $('chart').hidden = false;
     $('chartTitle').textContent = w.freeSail ? 'Chart · pick a destination' : 'Chart';
     $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
-    this.info();
+    this.info(); this.palLabel();
     this.draw();
   }
+
+  private palLabel(): void { $('bChartPal').textContent = (this.w?.settings.chartPal ?? 'day') === 'day' ? 'Dusk colours' : 'Day colours'; }
 
   close(): void {
     if (!this.isOpen) return;

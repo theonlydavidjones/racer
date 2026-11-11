@@ -36,8 +36,9 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawCurrentArrows, drawWindField, drawLand, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCourse, drawCurrentArrows, drawWindField, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
+import { INK, chartCredit, drawEncChart, drawEncLand } from './encChart';
 import { laylinesFor } from '../sim/laylines';
 
 export function fmtClock(t: number): string {
@@ -403,15 +404,17 @@ export class Hud {
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
-    this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom);
-    ctx.fillStyle = '#94abb7'; ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+    this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
+    const day = (wd.settings.chartPal ?? 'day') === 'day';
+    ctx.fillStyle = day ? '#3d4a54' : '#94abb7'; ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
     ctx.fillText('WIND ↓', 6, 12);
     const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
     if (ckt > 0.05) {
       // the current where you are
       const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w - 18, oy = 16;
-      ctx.strokeStyle = '#6fd0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
-      ctx.fillStyle = '#6fd0ff'; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
+      const cc = day ? '#0060aa' : '#6fd0ff';
+      ctx.strokeStyle = cc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
+      ctx.fillStyle = cc; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
       ctx.textAlign = 'right'; ctx.fillText('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6);
     }
   }
@@ -421,25 +424,32 @@ export class Hud {
    * spot you've picked. Same picture as the inset map: land, wind, puffs, current, the course or your destination, boats, ships.
    */
   drawChart(c: HTMLCanvasElement, wd: World, cx: number, cy: number, scale: number, pick: Vec | null): void {
-    const [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h);
-    ctx.fillStyle = '#123247'; ctx.fillRect(0, 0, w, h);
-    this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true);
+    const [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[wd.settings.chartPal ?? 'day'];
+    // the places' names go over the chart: its own print keeps clear of them
+    ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
+    const avoid = PLACES.filter(pl => scale > 0.12 || !pl.buoy).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
+    this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+    const placed: [number, number, number, number][] = [];
     for (const pl of PLACES) {
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
-      if (!pl.buoy) { ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }
-      if (scale > 0.12 || !pl.buoy) { ctx.fillStyle = pl.buoy ? 'rgba(255,214,90,.85)' : 'rgba(233,242,245,.85)'; ctx.fillText(pl.name, q[0] + 6, q[1] + 4); }
+      // (the sim's own places: the racing marks in amber, under the chart's print)
+      if (!pl.buoy) { ctx.fillStyle = I.text; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }
+      const bw = ctx.measureText(pl.name).width; // (zoomed out, the names would pile up: each only where it fits)
+      if (placed.some(b => q[0] + 6 < b[0] + b[2] && q[0] + 6 + bw > b[0] && q[1] - 17 < b[1] + b[3] && q[1] - 3 > b[1])) continue;
+      placed.push([q[0] + 6, q[1] - 17, bw, 14]);
+      if (scale > 0.12 || !pl.buoy) { ctx.fillStyle = pl.buoy ? I.mark : I.text; ctx.fillText(pl.name, q[0] + 6, q[1] - 6); }
     }
     if (pick) { // the spot you've picked: a ring, and the line from you to it
       const a = tf(u.x, u.y), b = tf(pick.x, pick.y);
-      ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.5;
+      ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = I.pick; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b[0], b[1], 9, 0, 6.29); ctx.stroke();
+      ctx.strokeStyle = I.pick; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b[0], b[1], 9, 0, 6.29); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(b[0] - 14, b[1]); ctx.lineTo(b[0] + 14, b[1]); ctx.moveTo(b[0], b[1] - 14); ctx.lineTo(b[0], b[1] + 14); ctx.stroke();
     }
     // north, the wind, and a scale bar
-    ctx.fillStyle = '#e9f2f5'; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('N', w - 28, 22); ctx.beginPath(); ctx.moveTo(w - 28, 28); ctx.lineTo(w - 23, 42); ctx.lineTo(w - 33, 42); ctx.closePath(); ctx.fill();
     const wf = wd.wind.from * D2R, ox = w - 28, oy = 80;
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
@@ -447,39 +457,44 @@ export class Hud {
     ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
     ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(`WIND ${Math.round(wd.wind.kt)} KT`, ox - 6, oy + 34);
     const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
-    ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
+    ctx.strokeStyle = I.text; ctx.fillStyle = I.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
     ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
+    ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
+    const cw = ctx.measureText(chartCredit()).width; ctx.fillStyle = I.deep; ctx.globalAlpha = 0.85; ctx.fillRect(w - cw - 16, h - 19, cw + 12, 15);
+    ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
   }
 
-  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean): void {
+  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
+    const pal = wd.settings.chartPal ?? 'day', I = INK[pal];
+    drawEncChart(ctx, tf, scale, w, h, pal, detail, avoid); // NOAA's chart underneath everything the sim draws
     if (wd.settings.aids) { // the wind across the course: where it blows harder and lighter, and which way
       const half = Math.max(w, h) / scale * 0.75, spacing = Math.max(250, half / 7);
-      drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, spacing, onLand);
+      drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, spacing, onLand, I);
     }
-    drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness);
-    drawLand(ctx, tf);
+    drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I);
+    drawEncLand(ctx, tf, pal);
     { // the current across the water around you, from the sim's own current field
       const half = Math.max(w, h) / scale * 0.75, mid = ctr;
-      drawCurrentArrows(ctx, tf, p => wd.currentAt(p), mid.x, mid.y, half, Math.max(60, half / 4), 9, onLand);
+      drawCurrentArrows(ctx, tf, p => wd.currentAt(p), mid.x, mid.y, half, Math.max(60, half / 4), 9, onLand, I);
     }
-    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h);
-    else drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1);
+    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, pal === 'day');
+    else drawCourse(ctx, wd.C, !!wd.settings.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (wd.settings.aids) drawLaylines(ctx, tf, laylinesFor(wd, u), wd.freeSail ? 2500 : 450);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     for (const v of wd.vessels) {
       const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);
-      ctx.strokeStyle = 'rgba(230,230,225,.9)'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(3, ty.beam * scale);
+      ctx.strokeStyle = I.ship; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(3, ty.beam * scale);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); ctx.lineCap = 'butt';
       if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = 'rgba(230,230,225,.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); }
-      if (labels) { ctx.fillStyle = 'rgba(230,230,225,.85)'; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
+      if (labels) { ctx.fillStyle = I.shipText; ctx.font = '9px system-ui, sans-serif'; ctx.fillText(ty.name, (a[0] + b2[0]) / 2 + 6, (a[1] + b2[1]) / 2 - 6); }
     }
     if (wd.settings.aids && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
     for (const b of wd.boats) {
       const p = tf(b.x, b.y), s = b.isUser ? 5 : 4;
       ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate((b.h - W) * D2R);
       ctx.fillStyle = b.color; ctx.beginPath(); ctx.moveTo(0, -s * 1.6); ctx.lineTo(s * 0.8, s); ctx.lineTo(-s * 0.8, s); ctx.closePath(); ctx.fill();
-      if (b.isUser) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); }
+      if (b.isUser) { ctx.strokeStyle = I.boatEdge; ctx.lineWidth = 1; ctx.stroke(); } else if (pal === 'day') { ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 0.8; ctx.stroke(); }
       ctx.restore();
     }
     ctx.restore();
@@ -490,17 +505,18 @@ export class Hud {
  * Just sailing, on the map: the buoys around you, and where you're heading. If that's off the map, an arrow at the
  * edge points to it.
  */
-function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number): void {
+function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, light = false): void {
   for (const pl of PLACES) if (pl.buoy) {
     const s = tf(pl.p.x, pl.p.y);
-    ctx.fillStyle = 'rgba(255,210,26,.55)'; ctx.beginPath(); ctx.arc(s[0], s[1], 2.2, 0, 6.29); ctx.fill();
+    ctx.fillStyle = light ? 'rgba(224,154,0,.8)' : 'rgba(255,210,26,.55)'; ctx.beginPath(); ctx.arc(s[0], s[1], 2.2, 0, 6.29); ctx.fill();
   }
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
-  ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,210,26,.7)'; ctx.lineWidth = 1.2;
+  ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = light ? 'rgba(190,120,0,.9)' : 'rgba(255,210,26,.7)'; ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
   if (inside) {
     ctx.fillStyle = '#ffd21a'; ctx.beginPath(); ctx.moveTo(b[0], b[1] - 6); ctx.lineTo(b[0] + 5, b[1]); ctx.lineTo(b[0], b[1] + 6); ctx.lineTo(b[0] - 5, b[1]); ctx.closePath(); ctx.fill();
+    if (light) { ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke(); }
   } else {
     // pinned to the edge of the map, pointing the way
     const dx = b[0] - a[0], dy = b[1] - a[1], k = Math.min((w / 2 - 12) / Math.abs(dx || 1e-6), (h / 2 - 12) / Math.abs(dy || 1e-6));
