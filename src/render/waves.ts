@@ -28,7 +28,7 @@ const SWELL_F = [0.8, 1, 1.25]; // × the swell's wavelength
 const SWELL_SPREAD = [-8, 0, 6];
 const PHASES = [0.3, 2.1, 4.4, 1.2, 5.6, 3.3, 0.8, 2.7, 5.1, 1.9, 3.9, 0.1, 4.8, 2.4, 5.9];
 
-export interface WaveComp { dir: number; k: number; w: number; amp: number; phase: number; q: number; swell: boolean }
+export interface WaveComp { dir: number; k: number; w: number; amp: number; phase: number; q: number; swell: boolean; /** (sin, cos of dir, kept for the dir they were worked out for: height() is asked thousands of times a frame) */ sd?: number; cd?: number; at?: number }
 
 /** JONSWAP spectral density (shape only) at frequency f for peak period tp. */
 function jonswap(f: number, tp: number): number {
@@ -89,7 +89,8 @@ export class WaveSet {
     let h = 0;
     for (const c of this.comps) {
       if (c.amp <= 0) continue;
-      const dx = Math.sin(c.dir * D2R), dy = Math.cos(c.dir * D2R);
+      if (c.at !== c.dir) { c.sd = Math.sin(c.dir * D2R); c.cd = Math.cos(c.dir * D2R); c.at = c.dir; }
+      const dx = c.sd!, dy = c.cd!;
       h += c.amp * (c.swell ? kS : kW) * Math.sin(c.k * (dx * p.x + dy * p.y) - c.w * t + c.phase);
     }
     return h;

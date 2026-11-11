@@ -60,6 +60,9 @@ export class Wakes {
     });
   }
 
+  /** Show or hide the wakes (a ship that isn't out now). */
+  show(on: boolean): void { for (const t of this.trails) t.mesh.visible = t.bow.visible = t.spray.visible = on; }
+
   /** `t` race time (s), `dt` frame time; `sea(x, y)` the water height there; `pitch` each boat's pitch now (rad, bow up). */
   update(boats: (Mover | Boat)[], t: number, dt: number, sea: (x: number, y: number) => number, pitch: number[]): void {
     const N = this.N, SAMPLE = this.SAMPLE, HALF = this.HALF, sc = this.scale;
@@ -81,7 +84,7 @@ export class Wakes {
         else { off = (s === 1 ? 1 : -1) * Math.min(14 * sc * sc, p.v * age * KELVIN); half = (0.18 + age * 0.03) * sc; alpha = spd * spd * 0.55 * Math.exp(-age / (5 * sc)) * Math.min(1, age * 2); } // the Kelvin arms
         if (i >= n) alpha = 0;
         const cx = p.x + nx * off, cy = p.y + ny * off;
-        for (const e of [0, 1]) {
+        for (let e = 0; e < 2; e++) {
           const side = e ? 1 : -1, x = cx + nx * half * side, y = cy + ny * half * side, o = ((s * N + i) * 2 + e);
           P[o * 3] = x; P[o * 3 + 1] = sea(x, y) + 0.05; P[o * 3 + 2] = -y;
           C[o * 4] = C[o * 4 + 1] = C[o * 4 + 2] = 1; C[o * 4 + 3] = alpha;

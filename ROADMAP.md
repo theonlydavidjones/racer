@@ -113,22 +113,46 @@ on different but equally good settings. Speed (November 2026, the same race five
 fleet of 5): the training course 461 against main's 420 (+10%), Seaweed Soup 444 against 422 (+5%), down from +40% and
 +18% (the hull's resistance tabled, the heel solve warm-started, the depowering search cached and simpler, no per-step
 allocations in the puffs and the crew). What's left is spread thin: the crew's per-step placement and jobs, the heel
-solve, and the search's first look at a new wind (it fills in over a race). For the performance review.
+solve, and the search's first look at a new wind (it fills in over a race). (Since: the performance review below.)
 Also found on the way: the outhaul's range was five points of camber, past what its black band allows (now about 1.5,
 the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
 car, an estimate between the end points).
 
-**Performance review** (owner, November 2026; 6–10 h): no lag or crashes as the sim grows. Set a budget first (a
-steady 60 fps on a typical laptop in a full race: fleet, ships, wildlife, charts; page load under a few seconds; memory
-that doesn't climb over a long session; the page well under the 16 MB limit, 3.1 MB today), then measure against it:
-frame time by part (physics step, AI, onLand/shoreDist calls, the sea model, the 3D scene's draw calls and triangles,
-the map and chart redraws, the sails' canvas textures), memory over an hour's sail (leaks from scenes, textures and
-listeners not freed between races), and the worst cases (big fleet, heavy weather, the chart zoomed out). Fix the
-hot spots (measured in November 2026: `shoreDist`, which the wind's terrain model and the current's shore relief ask
-for every boat every step, is over half of a race step on a course out toward the Gate; a distance field on a grid
-would take most of it); add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
-quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
-sessions changing the scene or the physics while it measures.
+~~**Performance review**~~ (owner, November 2026: no lag or crashes as the sim grows; done). **The budget**: a steady
+60 fps on a typical laptop in a full race (eight boats, ships, wildlife, the chart): a frame's JS (the sim's steps, the
+scene's update, labels, HUD and maps) within about 8 ms of the 16.7, and the sim's steps within 3 ms of that at 4×
+speed; at most 2,000 draw calls and 2 million triangles in any view, day or night; the page up in under a few seconds;
+GPU memory and the JS heap level from race to race (no climb over a long session); the page well under the 16 MB
+limit (3.5 MB). **Measured** (headless Chromium with software GL in this container: draw calls and triangles are what
+a real GPU gets, frame JS here is about 3× a laptop's; the sim in Node), before → after:
+- The sim (median µs per step, fleet of eight on course 10 in 22 kt, Node): the whole race 534 → 354 (−34%), its start
+  450 → 349; the training course with five 289 → 216, Seaweed Soup course 2 with three 152 → 113. Every race the same
+  to the last bit (full-precision state after each race compared with main's). From `shoreNearest` (an exact list of
+  the segments that can be nearest anywhere in each 25 m cell, in place of the ring search: it was a third of a step),
+  the chop's added resistance and the drive worked out once per speed search, not 30 times, and the clock's
+  `Intl.DateTimeFormat` made once.
+- Memory: every new race (and every change in the setup, which builds one) left the last fleet's geometry, materials
+  and sail textures on the GPU, about 1,350 geometries and 45 textures a race; now freed (render/dispose.ts), and the
+  counts stay level race after race. Ships hidden when traffic is off (the last race's had stayed where they were).
+- Draw calls (full fleet, before → after): at the start in the chase view 1,780 → 1,740, overhead zoomed out
+  2,020 → 1,160, night at the East Span 2,300 → 1,640, night from the start line 1,990 → 1,120. Each boat is about 180
+  draw calls; her fittings smaller than half a metre are left out while they'd cover less than a pixel (render/fittings.ts),
+  which changes nothing you can see. Triangles 1.0–1.3 million everywhere.
+- Frame JS (here, chase view at the start): about 31 → 21 ms (≈ 7 ms on a laptop): the wind map on the water no longer
+  works out the shore distance it threw away (25,600 points every 0.15 s), the wave height's directions' sin and cos
+  kept (the wakes ask it 5,000 times a frame).
+- Nightfall: the city's and the bridge's lights and the sun's shadows going off needed about 50 new shaders compiled in
+  the frame night fell (0.6 s here); now compiled in the background at the start of each race (scene.ts warmShaders).
+  What's left is a 0.2 s frame here (first upload of the night lights' buffers): a frame or two on a laptop, once.
+- Page load (the published page): about 1.8 s to the start page here, 0.65 s for its first frame; a race starts in 0.2 s.
+- Kept from creeping back: tests/perf.test.ts (the sim's µs per step for the full fleet against a fixed reference
+  workload, so it holds on any machine; in `npm test`, not `test:fast`) and scripts/check/perf.cjs (draw calls, triangles,
+  programs and frame JS for seven views, and GPU memory over six races; exits 1 over budget). The ` key shows the
+  frame time, draw calls and memory on a real machine (ui/perfMeter.ts).
+Left for later: the boats are still most of the draw calls (eight boats ≈ 1,450 near the start); merging each boat's
+fixed parts by material would save about 50 a boat (exact, but it works against the pixel test above). The scene's
+JS is now three.js's own draw submission (proportional to the draw calls), the wakes and the boats' sails. The sim's
+step is spread thin: the AI's look-ahead, the crew, the tide field's blending of its stations.
 
 Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (begun, November 2026: stability from ORC certificates, the sails' forces from ORC's model, the
 wind's gradient and the heeled wind triangle, the keel's induced drag, depowering by a VPP-style speed search; still to
