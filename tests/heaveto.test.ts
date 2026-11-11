@@ -29,7 +29,7 @@ describe('taking one line off the crew', () => {
   });
   it('one tap gives it back: the crew trims it again', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 12 });
-    sail(b, 20); const best = b.sheets.main;
+    sail(b, 20); const best = b.sheets.main, eff = b.shape.eff;
     b.ctlCmd.mainsheet = 1; sail(b, 3); b.ctlCmd = {};
     expect(b.sheets.main).toBeGreaterThan(best + 10);
     // (back up to speed: until then the apparent wind is wider and the trimmer eases for it, which opens the leech)
@@ -37,7 +37,8 @@ describe('taking one line off the crew', () => {
     // back where the crew wants the boom (with the traveller and sheet it likes: more than one way to the same angle), to
     // within the trimmer's deadband (crewWork.ts: a sheet is not touched for less than 0.006, about 0.3° of boom here)
     expect(Math.abs(b.sheets.main - crewMainAngle(b))).toBeLessThan(1); expect(Math.abs(b.sheets.main - best)).toBeLessThan(1);
-    expect(b.shape.eff).toBeGreaterThan(0.99);
+    // (the leech within what the trimmer's deadband leaves: a few tenths of a degree of boom move it, controls.ts mainShape)
+    expect(b.shape.eff).toBeGreaterThan(eff - 0.006);
     expect(linesByHand(b)).toEqual([]);
   });
   it('all back to the crew at once, including lines from the old "trim all" setting', () => {

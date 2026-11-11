@@ -107,7 +107,10 @@ function speedFactor(b: Boat, c: Controls): number {
   const ms = mainShape(c, tws, cond?.main, aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
-  let f = Math.sqrt(Math.max(0, trimDrive(tm, tj) * eff));
+  // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
+  // as physics.ts trimSails counts it; the deliberate ease is in the sails' power, below)
+  const ease = crewMainAngle(b) - optimalSheet('main', b.awaSlow), intended = clamp(optimalSheet('main', awa) + ease, SAILS.main.min, SAILS.main.max);
+  let f = Math.sqrt(Math.max(0, trimDrive(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max)), tj) * eff));
   // heel and helm, with the crew where they are now
   // (in the wind the sails see as she heels, as the boat does: physics.ts sailWind, ORC eqs. 7.2–7.3)
   const sw = sailWind(b.ww.from, b.ww.kt, b.h, b.v, 0, b.heelMag ?? 0);
@@ -120,8 +123,10 @@ function speedFactor(b: Boat, c: Controls): number {
     const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.ceh);
     // the drive the sails make less the keel's drag for their side force (balance.ts netDrive): flatter sails push less,
     // but heel her less and ask less of the keel; against the drive as she is, as physics.ts powerFactor weighs it
+    // (at the intended sheeting, as powerFactor takes it: a sheet set wrong is counted once, above)
+    const sfI = sailForces(sw.aws, sw.awa, { trim: sailTrim('main', sw.awa, intended), shape: ms, out: intended }, tj && js ? { trim: sailTrim('jib', sw.awa, optimalSheet('jib', sw.awa)), shape: js } : null, false);
     const now = b.forces ? b.forces.drive : 0;
-    if (now > 1) f *= Math.sqrt(Math.max(0, netDrive(sf, heel, v)) / now);
+    if (now > 1) f *= Math.sqrt(Math.max(0, netDrive(sfI, heel, v)) / now);
     f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
   }
   return f;

@@ -163,6 +163,8 @@ export interface Boat {
   powerK?: number; powerT?: number;
   /** The depowering step (0..1) that's fastest for her crew now (physics.ts powerFactor): what the crew works toward. */
   depowerBest?: number;
+  /** The drive share from the sheet angles against where they should be (physics.ts trimSails). */
+  trimDriveK?: number;
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */

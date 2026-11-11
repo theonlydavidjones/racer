@@ -202,7 +202,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
-  else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff * wornDrive) * powerFactor(b, ap.aws, ap.awa, jibOn, twa, ww, vPolar, disp, dt); // sheet angles, the sails' shape, worn cloth; flattened more (or less) than the polar's crew needs
+  else target *= Math.sqrt((b.trimDriveK ?? trimDrive(b.trim.main, b.trim.jib)) * b.shape.eff * wornDrive) * powerFactor(b, ap.aws, ap.awa, jibOn, twa, ww, vPolar, disp, dt); // sheet angles, the sails' shape, worn cloth; flattened more (or less) than the polar's crew needs
   if (hm < 1 || hj < 1) {
     // part of the sail plan up: speed with roughly the square root of the drive, which goes with the area hoisted
     const je = jibEfficiency(plan, twa), full = SAIL_AREA.main + SAIL_AREA.jib * je, up = SAIL_AREA.main * hm + SAIL_AREA.jib * je * hj;
@@ -422,13 +422,15 @@ function powerFactor(b: Boat, aws: number, awa: number, jibOn: { trim: NonNullab
   b.powerT = (b.powerT ?? 0) - dt;
   if (b.powerK != null && b.powerT > 0) return b.powerK;
   b.powerT = 0.5;
-  const forces = (m: Shape, j: Shape, w: { aws: number; awa: number }, mainOut = b.sheets.main) =>
-    sailForces(w.aws, w.awa, { trim: mainOut === b.sheets.main ? b.trim.main : sailTrim('main', w.awa, mainOut), shape: m, out: mainOut }, jibOn ? { trim: jibOn.trim, shape: j } : null, false);
+  // (the sails at the crew's intended sheeting: the boom where they want it for this step, the jib at its best. A sheet
+  // set wrong, by you or the crew, is counted once, in the step's trimDrive, against that intended angle)
+  const forces = (m: Shape, j: Shape, w: { aws: number; awa: number }, mainOut: number) =>
+    sailForces(w.aws, w.awa, { trim: sailTrim('main', w.awa, mainOut), shape: m, out: mainOut }, jibOn ? { trim: sailTrim('jib', w.awa, optimalSheet('jib', w.awa)), shape: j } : null, false);
   // the push: drive less the keel's induced drag at the polar speed, for a side force and heel
   const push = (r: ReturnType<typeof sailForces>, heel: number) => netDrive(r, heel, vPolar);
   // the sails as the crew sets them at each step (controls.ts crewShapes), the boom eased down the traveller on the last
   // steps (crewEaseBoom)
-  const jibAng = jibOn ? b.sheets.jib : optimalSheet('jib', awa);
+  const jibAng = optimalSheet('jib', awa);
   const boomAt = (d: number) => clamp(optimalSheet('main', awa) + (awa < 70 ? 7 * clamp((d - 0.6) / 0.4, 0, 1) : 0), SAILS.main.min, SAILS.main.max);
   const shapes = (d: number) => { const c = crewShapes(tws, awa, d, boomAt(d), jibAng); return { m: c.main, j: c.jib }; };
   /** Sailed at depowering step d by a crew hiking with moment crewM: her heel, push and speed. */
@@ -470,7 +472,7 @@ function powerFactor(b: Boat, aws: number, awa: number, jibOn: { trim: NonNullab
   // shape's own cost is shapeEfficiency's), at her own heel; her heel's cost to the hull is in the target already
   // (heelFactor), and her rudder's drag acts on her as a force in the step
   const full = shapes(0), cap = (s: Shape, f: Shape): Shape => ({ ...s, depth: Math.min(s.depth, f.depth) });
-  const now = forces(cap(b.shape.main, full.m), jibOn ? cap(jibOn.shape, full.j) : full.j, { aws, awa });
+  const now = forces(cap(b.shape.main, full.m), jibOn ? cap(jibOn.shape, full.j) : full.j, { aws, awa }, boomAt(b.depower ?? 0));
   const dNow = push(now, b.heelMag ?? 0), dRef = ref.p / heelFactor(ref.h) ** 2;
   b.powerK = dRef > 1 ? clamp(Math.sqrt(Math.max(0, dNow) / dRef), 0.5, 1.05) : 1;
   return b.powerK;
@@ -682,6 +684,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.sheets.jib = clew < 0 ? clew : clamp(clew, SAILS.jib.min, SAILS.jib.max);
   b.trim.main = sailTrim('main', awa, b.sheets.main);
   b.trim.jib = plan === 'jib' ? sailTrim('jib', awa, b.sheets.jib) : null; // poled out or down: the sheet isn't in play
+  // the sheets against where they should be: the main against the crew's intended boom (eased down the traveller on the
+  // last depowering steps on purpose: that's counted with the sails' power, powerFactor), the jib against its best
+  b.trimDriveK = trimDrive(sailTrim('main', awa, clamp(b.sheets.main - easeBoom, SAILS.main.min, SAILS.main.max)), b.trim.jib);
   // shape
   const ms = mainShape(c, tws, cond?.main, b.aws / KT), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, b.aws / KT) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;

@@ -28,8 +28,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
       crew sheets in to keep the boom angle it wants, so with the traveller yours the mainsheet should follow your intent.
    c. ~~Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
-      change with trim and heel) from a Folkboat lines plan, and its righting-moment curve from an ORC certificate
-      (sas.orc.org prints RM; the hosts weren't reachable); a roll gybe; the helm's own steering suffering while
+      change with trim and heel) from a Folkboat lines plan, and the righting curve's shape past a few degrees (the
+      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll gybe; the help a roll
+      tack gives in steering her through the wind, heeled, with less rudder (only the rig's swing is modelled, so a roll
+      tack is worth little either way); the helm's own steering suffering while
       single-handed at the cabin top; crew moving in waves (aft in a chop to free the bow).
    d. ~~Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved~~ (done). Later: measured
       timings for Folkboat crew work (the times are estimates); the order of jobs at a mark rounding (pole, vang, cars)
@@ -45,6 +47,19 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Depowering: the physics against the sailmaker** (owner, November 2026: "crew follows the guide for now, but let's keep
+this on the roadmap as something to investigate"; 4–8 h). With ORC's sail and keel physics, a speed search like ORC's
+VPP (physics.ts powerFactor) has a Folkboat carry full power to about 17–18 kt; North Sails' Nordic Folkboat guide has
+the outhaul on its band above 12 kt, the Cunningham hard above 15 and the traveller eased down above 14. Fitting the
+heeled hull's drag to close the gap needs an impossible value (19% of her speed at 16° of heel), so the crew follows
+the guide's line settings and the search decides only the depowering past them. Candidates: ORC's own flat and twist
+optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
+settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
+heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Also found on the way: the outhaul's range was five points of camber, past what its black band allows (now about 1.5,
+the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
+car, an estimate between the end points).
+
 **Performance review** (owner, November 2026; 6–10 h): no lag or crashes as the sim grows. Set a budget first (a
 steady 60 fps on a typical laptop in a full race: fleet, ships, wildlife, charts; page load under a few seconds; memory
 that doesn't climb over a long session; the page well under the 16 MB limit, 3.1 MB today), then measure against it:
@@ -55,7 +70,10 @@ hot spots; add a performance test to the suite (sim steps per second for a full 
 quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
 sessions changing the scene or the physics while it measures.
 
-Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
+Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (begun, November 2026: stability from ORC certificates, the sails' forces from ORC's model, the
+wind's gradient and the heeled wind triangle, the keel's induced drag, depowering by a VPP-style speed search; still to
+do: the depowering question above, waves and puffs in every response, the gusts' peaks against the records; 6–10 h
+left); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
