@@ -211,7 +211,7 @@ export class SceneView {
   private landMonth = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off
+    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, stencil: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off; the boats mark the stencil (navLights.ts)
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;
@@ -395,7 +395,7 @@ export class SceneView {
     const float = markBody(shape, look);
     float.position.copy(P3(p.x, p.y, 0)); add(float);
     const big = shape === 'lighted' ? 1.6 : 1;
-    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshBasicMaterial({ map: this.wakeTex, transparent: true, depthWrite: false }));
+    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshLambertMaterial({ map: this.wakeTex, transparent: true, depthWrite: false })); // lit, so it dims after dark like the sea
     wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(p.x, p.y, 0.12)); add(wake);
     this.markObjs.push({ p, float, wake });
   }
