@@ -68,7 +68,7 @@ type Role = 'underway' | 'anchor';
 /** What she shows (Rules 25 and 30): nothing (in her slip or made fast to a dock, or switched off), under way, at anchor or on a mooring. */
 export type LightsMode = 'off' | 'underway' | 'anchor';
 interface Lamp { pos: THREE.Vector3; color: THREE.Color; arc: Arc | null; range: number; glow: THREE.Sprite; streak: THREE.Mesh; seen: number; role: Role }
-export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: { m: THREE.MeshPhongMaterial; role: Role }[]; fittings: Record<Role, THREE.Group>; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial; below?: THREE.MeshLambertMaterial }
+export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: { m: THREE.MeshPhongMaterial; role: Role }[]; fittings: Record<Role, THREE.Group>; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial; below?: THREE.MeshLambertMaterial; hatch?: THREE.MeshPhongMaterial }
 
 /** Colours of the lights as the eye sees them (inside Annex I §7's chromaticity areas: a deep red, a blue-green, a warm white). */
 const RED = new THREE.Color(1.0, 0.13, 0.08), GREEN = new THREE.Color(0.1, 1.0, 0.55), WHITE = new THREE.Color(1.0, 0.93, 0.8);
@@ -220,7 +220,9 @@ export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): voi
   // (the cabin's lamps are hers to light whatever she's doing: on after dark)
   const on = dark;
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
-  nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * DARK() : 0;
+  nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.15 + 0.55 * DARK() : 0;
   // and below, seen through the open companionway: the cabin's lamplight on its own woodwork
+  // and dimly through the smoked acrylic of the forehatch, when she has one
+  if (nl.hatch) { nl.hatch.emissive.setRGB(1.0, 0.62, 0.3); nl.hatch.emissiveIntensity = on ? 0.03 + 0.1 * DARK() : 0; }
   if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.55 * DARK() : 0; }
 }
