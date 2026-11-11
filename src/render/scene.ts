@@ -67,13 +67,26 @@ const WATER_FRAGMENT = `
   float ph0 = fract(uTime / 6.0), ph1 = fract(uTime / 6.0 + 0.5);
   vec4 texelColor = mix(texture2D( map, vMapUv - fuv * ph0 ), texture2D( map, vMapUv - fuv * ph1 + vec2(0.37, 0.21) ), abs(2.0 * ph0 - 1.0));
   vec2 puv = (vec2(vPuffXZ.x, -vPuffXZ.y) - uPuffO) / uPuffS;
-  float edge = smoothstep(0.0, 0.1, min(min(puv.x, 1.0 - puv.x), min(puv.y, 1.0 - puv.y)));
+  float edge = 1.0 - smoothstep(0.3, 0.5, length(puv - 0.5)); // faded out in a circle over the map's outer part, so its edge never shows
   float kw = mix(1.0, 0.4 + 1.4 * texture2D(uPuff, clamp(puv, 0.0, 1.0)).r, edge);
-  float gust = clamp((kw - 1.0) / 0.22, -1.0, 1.0);
+  // the gusts inside a puff: the map is 20 m cells, but the wind in a puff comes in smaller bursts (turbulence a few
+  // tens of metres across), which roughen the water in ragged patches and cat's paws. Carried along with the
+  // puffs (at their speed, uPuffV), so the whole dark patch and its ragged edge move down the wind together.
+  vec2 adv = vWaveP - uPuffV * uTime;
+  float turb = (vnoise(adv / 46.0) - 0.5) * 0.65 + (vnoise(adv / 13.0 + 5.3) - 0.5) * 0.35;
+  float ex = kw - 1.0 + turb * (0.05 + 0.25 * abs(kw - 1.0)) * edge;
+  // in light air the wind is patchy: cat's paws of ripples on otherwise glassy water
+  float paws = 1.0 - smoothstep(4.0, 8.0, uMeanKt);
+  ex += paws * edge * 0.18 * (smoothstep(0.45, 0.75, vnoise(adv / 28.0 + 1.7)) - 0.45);
+  float gust = clamp(ex / 0.15, -1.0, 1.0); // a 15% puff is plainly darker; a 5% one barely shows
   vec4 fine = texture2D( map, vMapUv * 2.7 + vec2(0.31, 0.17) );
-  float rough = clamp(0.85 + 0.55 * gust, 0.25, 1.4);
+  // how rough the water is: the ripples (capillary and short gravity waves, 2–30 cm) grow with the wind, in seconds
+  float rough = clamp(0.85 + 0.55 * gust - 0.35 * paws * edge, 0.2, 1.4);
   diffuseColor.rgb *= mix(vec3(1.0), texelColor.rgb * mix(vec3(1.0), fine.rgb * 1.12, clamp(rough - 0.6, 0.0, 1.0)), rough);
-  diffuseColor.rgb *= 1.0 - 0.38 * max(gust, 0.0) + 0.28 * max(-gust, 0.0);
+  // a puff is darker and bluer (rough water shows the deep water's colour), a lull paler and greyer (smooth water
+  // shows the sky)
+  diffuseColor.rgb *= 1.0 - 0.34 * max(gust, 0.0) + 0.26 * max(-gust, 0.0);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.95, 1.08), max(gust, 0.0) * 0.6);
   // tidelines: where the current converges, a smooth slick band collects foam and debris (thinned to its ridge)
   float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0;
   float tlG = length(vec2(texture2D(uCur, cuv + vec2(tdx, 0.0)).b - texture2D(uCur, cuv - vec2(tdx, 0.0)).b, texture2D(uCur, cuv + vec2(0.0, tdx)).b - texture2D(uCur, cuv - vec2(0.0, tdx)).b));
@@ -90,7 +103,8 @@ const WATER_FRAGMENT = `
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.83, 0.76), clamp(debris * 0.8, 0.0, 0.8));
   // the waves: their slope tilts the surface (light and reflections), whitecaps break on the crests
   float camDF = length(vPuffXZ - cameraPosition.xz);
-  vec3 ws = waveSlope(vWaveP, vKW, vKS, camDF);
+  float foot = max(length(dFdx(vWaveP)), length(dFdy(vWaveP))); // metres of water under this pixel
+  vec3 ws = waveSlope(vWaveP, vKW, vKS, foot);
   vec3 waveN = normalize((viewMatrix * vec4(normalize(vec3(-ws.x, 1.0, ws.y)), 0.0)).xyz);
   float hsLocal = max(0.04, length(vec2(vKW * uHs.x, vKS * uHs.y)));
   float crest = ws.z / (0.5 * hsLocal) * (1.0 - smoothstep(300.0, 1500.0, camDF));
@@ -102,8 +116,12 @@ const WATER_FRAGMENT = `
   // (Schlick's Fresnel for water: 2% straight down, nearly all at a glancing angle; the wave slopes facing away
   // from you catch the bright sky, the ones facing you look into the dark water)
   float fres = 0.02 + 0.98 * pow(1.0 - clamp(abs(dot(waveN, normalize(vViewPosition))), 0.0, 1.0), 5.0);
+  // Rough water reflects less of the sky at a glancing angle: the ripples' facets tilt toward you and show the dark
+  // water (Cox & Munk 1954: the slope variance grows with the wind). This is what makes a puff a dark band on the
+  // water when you look upwind from the deck, and a lull a bright, glassy one.
+  float mirror = clamp(1.4 - 0.5 * rough, 0.68, 1.28);
   diffuseColor.rgb *= 1.0 - 0.55 * fres * (1.0 - foam);
-  totalEmissiveRadiance += uSkyCol * fres * 0.95 * uDay * (1.0 - 0.3 * max(gust, 0.0)) * (1.0 - foam);
+  totalEmissiveRadiance += uSkyCol * fres * 0.95 * uDay * mirror * (1.0 - foam);
 `;
 
 /** Overhead view state: which way is up, how high the camera is (m), and how far it's panned from the boat (m). */
@@ -132,7 +150,7 @@ export class SceneView {
    * the water shader turns into darker, rougher patches in the puffs and paler, smoother ones in the lulls. */
   private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
   private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
-  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 } };
+  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() } };
   private puffAcc = 1;
   private terrain: TerrainGrid | null = null;
   private terrainKey = '';
@@ -237,7 +255,7 @@ export class SceneView {
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -245,7 +263,7 @@ export class SceneView {
           vPuffXZ = wp0.xz;
           vec2 simP = vec2(wp0.x, -wp0.z);
           vec2 puvV = (simP - uPuffO) / uPuffS;
-          float edgeV = smoothstep(0.0, 0.1, min(min(puvV.x, 1.0 - puvV.x), min(puvV.y, 1.0 - puvV.y)));
+          float edgeV = 1.0 - smoothstep(0.3, 0.5, length(puvV - 0.5));
           vec4 smV = texture2D(uPuff, clamp(puvV, 0.0, 1.0));
           vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 20.0, edgeV);
           vWaveP = simP;
@@ -257,7 +275,10 @@ export class SceneView {
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE)
         .replace('#include <map_fragment>', WATER_FRAGMENT)
-        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;');
+        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;')
+        // the ripple texture's bumps (about 12 cm a texel) fade where a pixel covers more water than they can show, so
+        // the far water doesn't alias into rows parallel to the horizon
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(mix(normal, waveN, smoothstep(0.12, 0.6, foot)));');
     };
     // the water: a mesh that follows the camera, fine near it and coarse far out, displaced by the waves
     const wg = waterGrid(), wgeo = new THREE.BufferGeometry();
@@ -272,6 +293,7 @@ export class SceneView {
     this.moorings = new Moorings(scene, p => landAt(p) === false);
     this.harbor = new Harbor(scene); // West Harbor: docks, breakwaters, boats in their slips
     this.wildlife = new Wildlife(scene, p => landAt(p) === false);
+    if (import.meta.env.DEV) Object.assign(window, { __wild: this.wildlife }); // for the scenery check (scripts/check/scenery.cjs)
     this.vesselView = new VesselView(scene);
     this.landMonth = new Date().getMonth() + 1;
     void addLandscape(scene, this.landMonth).then(t => { this.land = t; t.setSeason(this.landMonth); this.skyAcc = 1; });
@@ -461,6 +483,7 @@ export class SceneView {
     this.puffTex.needsUpdate = true;
     this.puffUni.uPuffO.value.set(x0, y0); this.puffUni.uPuffS.value = span;
     this.puffUni.uMeanKt.value = w.wind.kt;
+    this.puffUni.uPuffV.value.set(w.puffs.dir.x, w.puffs.dir.y).multiplyScalar(w.wind.kt * 0.5144 * 0.8); // as the puffs travel (environment/wind.ts)
   }
 
   /**
@@ -659,6 +682,10 @@ export class SceneView {
       const up = V(overheadUp(over, w)), cx = u.x + over.off.x, cy = u.y + over.off.y;
       camera.position.copy(P3(cx, cy, over.height)); camera.up.set(up.x, 0, -up.y); camera.lookAt(P3(cx, cy, 0));
     }
+    // dev only: a free camera for checking the scenery (window.__cam = { pos: [x, y, z], at: [x, y, z] }, sim coords)
+    const dc = import.meta.env.DEV ? (window as unknown as { __cam?: { pos: number[]; at: number[] } }).__cam : undefined;
+    if (dc) { camera.up.set(0, 1, 0); if (Math.hypot(dc.pos[0] - dc.at[0], dc.pos[1] - dc.at[1]) < 1) camera.up.set(0, 0, -1); // straight down: north at the top
+       camera.position.copy(P3(dc.pos[0], dc.pos[1], dc.pos[2])); camera.lookAt(P3(dc.at[0], dc.at[1], dc.at[2])); }
     // the showroom shifts the picture right, clear of the panel on the left
     const shift = viewMode === 3 ? (look.shift ?? 0) : 0, size = this.renderer.getSize(new THREE.Vector2());
     if (shift) camera.setViewOffset(size.x, size.y, -shift, 0, size.x, size.y); else if (camera.view?.enabled) camera.clearViewOffset();
