@@ -253,14 +253,18 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
    vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
    everywhere (off the Cityfront it should be about twice the slot's).
-4a. **The AI's tacks aren't held** (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
+4a. ~~**The AI's tacks aren't held**~~ (done: a tack or gybe she decides on is held until she's round; the rhumb-line test by
+   her close-hauled course; clear of the whole committee boat) (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
    uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
    boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
    last boat 63% behind the winner where the real SF fleet's median is 12% (sf-folkboat-results.json). Holding the
    decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
    38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
    only) and some never start.
-4b. **The AI sails at the mark** (AI 3, 4, 8, 9): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and gybing on the
+   laylines downwind, headers from her own wind held 10 s; to do: the planner's 8 s a tack; and the AI fouls at the
+   windward mark: 3–7 two-turn penalties among five boats in a 620 m race, the base code as much: mark-room and
+   right-of-way handling there): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
    she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
    620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
    and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
@@ -269,7 +273,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    heave, so no hobby-horsing in the Bay's 2–3 s chop (her pitch period), no rolling on a reach, no surfing, and the
    telltales don't answer the pitching. The drawn hull rolls on the waves the physics doesn't have, so heel, sails and
    flags don't answer the same motion. Needs the wave field shared by the physics and render/waves.ts (render's owners).
-6. **The swell's yaw is wrong in kind** (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
+6. ~~**The swell's yaw is wrong in kind**~~ (done: a slender hull's Froude–Krylov moment) (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
    Froude–Krylov yaw goes as k²), and peaks abeam not on the quarter: up to 16° heading swings and 3% speed lost in a
    2 m 13 s swell outside the Gate, where it should be next to nothing.
 7. **No leeway** (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
@@ -287,8 +291,8 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
    42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own
    hove-to model).
-11. **The chop** (waves 3–6): it follows the wind at the boat, so a puff or a neighbour's lee changes her sea (it is set
-   by the wind over kilometres of fetch); it's fully grown at once (CEM: 3.4 h to fetch-limited on the Berkeley Circle
+11. **The chop** (waves 3–6): ~~it follows the wind at the boat, so a puff or a neighbour's lee changes her sea~~ (done:
+   the wind over the water); ~~it's fully grown at once~~ (done) (CEM: 3.4 h to fetch-limited on the Berkeley Circle
    in 18 kt, so 2.5× too big an hour into the breeze); ORC's polar already has a seaway drag in it (eq. 3.2, D_raw), so
    the chop is partly counted twice and "flat water" isn't flat (est. 1–3% upwind); and its added drag falls off too
    little toward the beam, so footing hardly pays.
@@ -472,7 +476,7 @@ The principle: everything you see on the water comes from the same wind, current
 ### Sea state in the physics — done (see README, Sea state)
 
 Done: wind chop from the wind over the water and the fetch on the real coastline (JONSWAP growth); swell from the SF Bar buoy record by month, dying away inside the Gate; wind against tide from wave–current physics; added resistance (footing pays in chop), wave yaw; flat-water or real, and a small/typical/big swell day. Later:
-- **Duration:** the chop takes time to build when the breeze fills in (today it's as if the wind had been blowing for hours).
+- ~~**Duration:** the chop takes time to build when the breeze fills in~~ (done: CEM's duration-limited growth, run up through the day's own wind from the calm morning; a set strength has been blowing for hours). Later: a sea that lingers as the wind drops.
 - **Pitching in the physics** (today it's visual): hobby-horsing in a short chop, and steering harder through it.
 - **Archived buoy data for a past race day** (with real past races), and the ocean wind sea through the Gate as its own component.
 - **Shoaling** over Harding Rock, Point Blunt and the bar.

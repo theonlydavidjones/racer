@@ -3,6 +3,8 @@ import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatFor, targetFor } from '../boat/seaway';
+import { runAngle } from '../boat/polar';
+import { SLOW_TACK } from '../boat/physics';
 import { V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
@@ -20,14 +22,25 @@ const MARK_CLEAR = 20;
 /** Pass marks with at least this much room between the mark and her centreline, m (Rule 31). */
 const MARK_ROOM = 5;
 
+/** Half a Folkboat's beam, m (2.20 m: NFIA class rules, principal dimensions). */
+const HALF_BEAM = 1.1;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   for (const m of w.touchableMarks(b)) {
-    const d = dist(b, m.p);
+    // (the nearest point of it: a buoy is a point, the committee boat a hull 12 m long, `p` to `q`)
+    let np = m.p;
+    if (m.q) { const ax = m.q.x - m.p.x, ay = m.q.y - m.p.y, k = clamp(((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay || 1), 0, 1); np = { x: m.p.x + ax * k, y: m.p.y + ay * k }; }
+    const d = dist(b, np);
     if (d > 30 || d < 0.5) continue;
-    const rel = wrap(brg(m.p.x - b.x, m.p.y - b.y) - desired); // + = mark to starboard of the course
-    const need = Math.asin(Math.min(1, MARK_ROOM / d)) / (Math.PI / 180);
-    if (Math.abs(rel) < need && Math.abs(rel) < 90) desired = n360(desired + (rel > 0 ? -(need - rel) : need + rel));
+    const rel = wrap(brg(np.x - b.x, np.y - b.y) - desired); // + = mark to starboard of the course
+    // (room between her side and the mark's: MARK_ROOM, plus the mark's own radius and her half beam)
+    const need = Math.asin(Math.min(1, (MARK_ROOM + m.r + HALF_BEAM) / d)) / (Math.PI / 180);
+    if (Math.abs(rel) < need && Math.abs(rel) < 90) {
+      // pass it on the side it's already on; if that means heading up past close-hauled (sailable would undo it, and she'd
+      // sail on into it), pass it on the other side, bearing away
+      const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
+      desired = Math.abs(wrap(sailable(b, keep) - keep)) < 1 ? keep : other;
+    }
   }
   return desired;
 }
@@ -54,6 +67,14 @@ function clearestHeading(w: World, b: Boat, want: number): number {
     if (sc > bestS) { bestS = sc; best = h; }
   }
   return best;
+}
+
+/** The heading (deg) that makes good the bearing `brgT` over the ground at `v` m/s through the water, in current `cur`
+ * (m/s): up-current by as much as the current across the track sets her down. Too strong to stem: as far up-current
+ * as makes sense (64°), losing the least ground. */
+export function crabFor(brgT: number, v: number, cur: Vec): number {
+  const n = V(brgT + 90), k = clamp((cur.x * n.x + cur.y * n.y) / Math.max(v, 0.5), -0.9, 0.9);
+  return n360(brgT - Math.asin(k) / (Math.PI / 180));
 }
 
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
@@ -191,6 +212,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const beat = beatFor(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
   if (b.penalty > 0) {
+    ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
     let near: Vec | null = null, nd = PENALTY_CLEAR;
     for (const o of w.boats) if (o !== b) { const d = dist(o, b); if (d < nd) { nd = d; near = o; } }
@@ -203,6 +225,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   if (b.finished) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % 6 === 0; // heavy predictions 10× a second
+  // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
+  // see the wind she's in, not the course-wide wind); kept from the pre-start on, as crews take readings to learn it
+  ai.avgFrom = ai.avgFrom == null ? ww.from : n360(ai.avgFrom + wrap(ww.from - ai.avgFrom) * Math.min(1, dt / 60));
   if (w.t < 0) {
     if (ai.mode === 'hold') {
       // reach back and forth below the line, each boat below her own part of it
@@ -303,7 +328,19 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)
     else ai.detour = null;
     const bP = brg(P.x - b.x, P.y - b.y);
-    if (Math.abs(wrap(ww.from - bP)) < 44 && !b.ocs) {
+    // a tack (or gybe) she's decided on she carries out, as a sailor does: round onto the new tack's close-hauled (or
+    // running) course, deciding nothing else until she's there (re-deciding each moment, mid-tack, she'd stall head to
+    // wind or wheel round and run off). Dropped once she's round, if it hasn't happened in 20 s (something stopped her),
+    // or if she's on another leg or point of sail than the one she decided it for.
+    const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt), upwind = rel < 44 && !b.ocs;
+    // (running for a mark deeper than her best downwind angle, with some hysteresis so she doesn't flip between sailing
+    // the angle and steering at the mark as the wind swings about it)
+    ai.running = b.started && !b.ocs && (ai.running ? rel > ra - 8 : rel > ra - 2);
+    const mode = upwind ? 'beat' : ai.running ? 'run' : 'reach';
+    if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || w.t - ai.goTack.at > 20 || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
+    let headedNow = false;
+    if (mode === 'beat' && ai.goTack) { beating = true; desired = ai.goTack.to === 'S' ? csS : csP; }
+    else if (mode === 'beat') {
       beating = true;
       desired = b.tack === 'S' ? csS : csP;
       const dirty = (b.shadowK ?? 1) / (b.leeK ?? 1) < 0.9; // in another boat's (or a ship's) wind shadow
@@ -321,17 +358,58 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         let doTack = false;
         if (fOther && !fCur) doTack = true; // on the layline
         else if (!fCur) {
-          const dev = wrap(w.wind.from - w.avgFrom), headed = b.tack === 'S' ? dev < -3.5 : dev > 3.5;
+          // headed: her compass a header of more than 4° held for more than 15 s, as the debrief judges a header worth
+          // tacking on (sim/debrief.ts), not a puff's passing veer
+          const dev = wrap(ww.from - ai.avgFrom!);
+          headedNow = b.tack === 'S' ? dev < -4 : dev > 4;
+          ai.headedT = headedNow ? (ai.headedT ?? 0) + dt : 0;
+          const headed = ai.headedT > 15;
           const u = V(w.C.base), sv = { x: u.y, y: -u.x };
           const lat = (b.x - P.x) * sv.x + (b.y - P.y) * sv.y;
           const width = ai.width * Math.min(1, Math.hypot(d.x, d.y) / 500) + 25;
           if (headed && w.rng() < dt * 0.35) doTack = true; // tack on headers
           else if ((ai.dirtyT ?? 0) > 6 && w.t - b.lastTackT > 15) doTack = true; // stuck in another boat's dirty air: tack for clear air
-          else if (Math.abs(lat) > width && dot(V(b.h), sv) * lat > 0) doTack = true; // don't sail too far off the rhumb line
+          // don't sail too far off the rhumb line (by where this tack takes her, her close-hauled course: not her heading,
+          // which swings across the course's axis as she tacks)
+          else if (Math.abs(lat) > width && dot(V(b.tack === 'S' ? csS : csP), sv) * lat > 0) doTack = true;
         }
-        if (doTack) desired = b.tack === 'S' ? csP : csS;
+        // (too slow to tack, she'd stall head to wind or the turn would become a gybe right round (physics.ts SLOW_TACK):
+        // a sailor bears away a little and builds speed first)
+        // (nor does she tack onto a course the shore blocks close ahead: the shore check would only tack her straight back)
+        if (doTack && blocked(w, b, other === 'S' ? csS : csP, 60)) doTack = false;
+        if (doTack && b.v < SLOW_TACK * 1.15) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
+        else if (doTack) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = other === 'S' ? csS : csP; }
       }
-    } else desired = sailable(b, bP);
+    } else if (mode === 'run') {
+      // running for a mark deeper than her best downwind angle (polar.ts runAngle: wing-on-wing, VMG best at 160–174°):
+      // sail that angle on this gybe and gybe when the other gybe lays the mark, allowing for the current: the laylines
+      // downwind (sim/laylines.ts), as she tacks on them upwind. A gybe she's decided on is held as a tack is.
+      const rS = n360(ww.from - ra), rP = n360(ww.from + ra);
+      desired = (ai.goTack ? ai.goTack.to : b.tack) === 'S' ? rS : rP;
+      if (!ai.goTack && w.t - b.lastTackT > 12) {
+        const d = sub(P, b), vr = targetFor(b, ra);
+        // (the other gybe lays the mark when its track over the ground passes no more than 3° to leeward of it: on
+        // starboard downwind she heads up by turning to starboard, so she lays a mark to the right of her track)
+        const lays = (tk: 'S' | 'P') => {
+          const uu = V(tk === 'S' ? rS : rP), g = unit({ x: uu.x * vr + c.x, y: uu.y * vr + c.y });
+          if (dot(g, d) <= 0) return false;
+          const sinA = cross(g, d) / Math.max(1, Math.hypot(d.x, d.y));
+          return tk === 'S' ? sinA < 0.05 : sinA > -0.05;
+        };
+        const other = b.tack === 'S' ? 'P' : 'S';
+        if (lays(other)) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = other === 'S' ? rS : rP; }
+      }
+    } else {
+      // reaching for the mark: steer up-current of it by as much as the current across her track would set her down, so
+      // she makes good the straight line (as the tiller pilot and the planner do: autopilot.ts, routing.ts), not a curve
+      // that ends with her beating or running to it (a crew that reckons with the current allows for all of it, the
+      // others for some); but never deeper than her best running angle on the gybe she's on (only the run's held gybe
+      // gybes her)
+      const vs = Math.max(b.v, targetFor(b, rel) * 0.8);
+      desired = sailable(b, crabFor(bP, vs, { x: c.x * (ai.aware ? 1 : 0.6), y: c.y * (ai.aware ? 1 : 0.6) }));
+      if (Math.abs(wrap(ww.from - desired)) > ra || Math.sign(wrap(ww.from - desired)) !== (b.tack === 'S' ? 1 : -1) && Math.abs(wrap(ww.from - desired)) > 150) desired = b.tack === 'S' ? n360(ww.from - ra) : n360(ww.from + ra);
+    }
+    if (!headedNow) ai.headedT = 0;
   }
   // keep off the shore (and off the line mid-race)
   let holdForHail = false;
