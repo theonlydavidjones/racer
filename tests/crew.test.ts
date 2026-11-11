@@ -300,3 +300,16 @@ describe('The dead band answers what matters (physics review)', () => {
     for (const p of b.crew.people.slice(1)) expect(p.lean).toBeLessThan(0.3);
   });
 });
+
+describe('A puff with someone away at a job (physics review)', () => {
+  it('the rest still hike out as it hits', () => {
+    const twa = beatAngle(8), b = testBoat({ heading: 360 - twa, kt: 4, windKt: 8 }); b.crew = newCrew(crewOf(0.6), 'S');
+    sail(b, 40, () => { b.h = 360 - twa; });
+    // the forward hand off at the cabin top (a job that keeps them there)
+    const fwd = b.crew.people[2]; fwd.job = { line: 'pole', reach: 0, work: 1, station: { arm: 0.3, z: 0.85, pose: 'piano' } };
+    b.ww = { ...b.ww, kt: 18 };
+    sail(b, 2.5, () => { b.h = 360 - twa; b.crew!.people[2].job = fwd.job; });
+    expect(b.crew.people[1].lean).toBeGreaterThan(0.5);
+    expect(b.crew.people[0].lean).toBeGreaterThan(0.3);
+  });
+});

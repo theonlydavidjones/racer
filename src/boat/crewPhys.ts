@@ -408,9 +408,9 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   if (tacked || c.roll) c.settleT = now;
   const reset = now - (c.settleT ?? -1e9) < HOLD.settle || key !== c.placeKey || !!c.place?.across;
   c.placeKey = key;
-  // the arm a move has to be worth: the dead band's heel over her stiffness, shared by everyone who'd move
-  let movers = 0; c.people.forEach((a, i) => { if (!a.job?.station && tgt[i]?.pose !== 'mast') movers += W[i]; });
-  const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * Math.max(60, movers));
+  // the arm a move has to be worth: the dead band's heel over her stiffness, as if the whole crew moved by it (with one
+  // of them away at a job, a move by the rest is needed more, not less)
+  const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * W.reduce((a, w) => a + w, 0));
   const ppl = c.ppl!;
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];

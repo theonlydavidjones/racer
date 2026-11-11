@@ -141,7 +141,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const look = c.jobT <= 0; if (look) c.jobT = 0.05;
   // (where they've wanted each cabin-top line lately: the wish smoothed over LINE_TAU, kept up whoever is busy)
   const lw = c.lineWant ??= {};
-  if (look) { for (const k of PIANO) if (k in want) { const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); } c.lineT = 0; }
+  if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); } c.lineT = 0; }
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
     const who = ownerOf(k, n), a = c.people[who]; if (!a) continue;
@@ -171,7 +171,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);
     // the sheets are in hand: no walk unless they're away from them
     const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
-    a.job = { line: k, reach, work: 0, station: st, to: want[k], ...(big ? { big } : {}) };
+    // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
+    // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
+    const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
+    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far ? lw[k] : want[k], ...(big ? { big } : {}) };
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {
