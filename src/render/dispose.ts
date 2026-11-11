@@ -27,4 +27,6 @@ export function disposeUnused(removed: THREE.Object3D[], live: THREE.Object3D): 
   if (!removed.length) return;
   const keep = resourcesOf([live]);
   for (const r of resourcesOf(removed)) if (!keep.has(r)) r.dispose();
+  // (a skinned body's bones live in a texture of their own: render/crewBody.ts, one per person)
+  for (const r of removed) r.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) (o as THREE.SkinnedMesh).skeleton.dispose(); });
 }
