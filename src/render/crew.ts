@@ -209,9 +209,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   const zc = Math.min(THWART.z - THWART.half - 0.2, Math.max(COCK0 + 0.42, z));
   if (job === 'piano') {
     // the cabin-top lines at its after end: kneeling on the sole at the forward end of the cockpit,
-    // facing forward, hands on the lines
-    const zk = COCK0 + 0.35, px = s * Math.min(ax, chz(zk) - SEAT.d - 0.14), top = cabinTopAt(uAtZ(COCK0 - 0.12), Math.abs(px));
-    { const p = kneel(px, zk, 0, [V(px - 0.12, top + 0.05, COCK0 - 0.14), V(px + 0.12, top + 0.05, COCK0 - 0.1)], k); p.pitch = -0.25; return p; }
+    // facing forward, hands on the lines at their cleats either side of the companionway
+    const zk = COCK0 + 0.35, px = s * Math.min(ax, chz(zk) - SEAT.d - 0.14);
+    { const p = kneel(px, zk, 0, [V(-0.33, cabinTopAt(uAtZ(COCK0 - 0.12), 0.33) + 0.05, COCK0 - 0.12), V(0.33, cabinTopAt(uAtZ(COCK0 - 0.12), 0.33) + 0.05, COCK0 - 0.12)], k); p.pitch = -0.25; return p; }
   }
   let p: PoseT;
   if (ax >= chz(zc) - 0.06 || job === 'hike') p = onDeck(s, zc, lean, k);
