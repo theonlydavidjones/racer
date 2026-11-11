@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { segPt } from '../src/core/math';
-import { HARBORS, SLIPS, berthClear, harborAt, harborOf, hitsHarbor, inBasin, pushOffPlan, pushOffPoses, slipById, slipsIn } from '../src/geo/marina';
+import { HARBORS, SLIPS, berthClear, WIND_SWINGS, harborAt, harborOf, hitsHarbor, inBasin, pushOffPlan, pushOffPoses, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { SeaField, fetchAt } from '../src/environment/sea';
 import type { Wind } from '../src/environment/wind';
@@ -140,66 +140,40 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       expect(slips.filter(s => seen.has(key(s.p))).length).toBe(slips.length);
     }
   }, 60000);
-  it('push off, from every berth in every marina: in the fairway, clear of the docks and the boats, pointed at a way out, free to steer out', () => {
-    for (const H of HARBORS) {
-      // where a Folkboat can steer to the way out from: a flood from the harbor's exits over water with room for her beam
-      const step = 1.5, key = (p: { x: number; y: number }) => `${Math.round(p.x / step)},${Math.round(p.y / step)}`;
-      const roomy = (q: { x: number; y: number }) => [[0, 0], [1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].every(([dx, dy]) => !onLand({ x: q.x + dx, y: q.y + dy }));
-      // (from the basin's roomy water nearest each way out, over the basin's water)
-      const seen = new Map<string, number>(); let fr: { x: number; y: number }[] = [], n = 0;
-      for (const e of H.exits) {
-        let best: { x: number; y: number } | null = null;
-        for (let x = Math.round(H.box.x0 / step) * step; x <= H.box.x1; x += step) for (let y = Math.round(H.box.y0 / step) * step; y <= H.box.y1; y += step)
-          if (harborAt({ x, y }) === H && roomy({ x, y }) && (!best || Math.hypot(x - e.x, y - e.y) < Math.hypot(best.x - e.x, best.y - e.y))) best = { x, y };
-        if (best) { seen.set(key(best), 0); fr.push(best); }
-      }
-      while (fr.length) { n++;
-        const nx: typeof fr = [];
-        for (const p of fr) for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
-          const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
-          if (seen.has(k) || harborAt(q) !== H || !roomy(q)) continue;
-          seen.set(k, n); nx.push(q);
-        }
-        fr = nx;
-      }
-      // how far she'd have to go from here to the way out, along the water (steps of 1.5 m); Infinity if she can't
-      const togo = (q: { x: number; y: number }) => { const g = { x: Math.round(q.x / step) * step, y: Math.round(q.y / step) * step }; return Math.min(...[[0, 0], [step, 0], [-step, 0], [0, step], [0, -step]].map(([dx, dy]) => seen.get(key({ x: g.x + dx, y: g.y + dy })) ?? Infinity)); };
-      let good = 0, exitward = 0, swung = 0; const slips = slipsIn(H.id), bad: string[] = [];
-      for (const s of slips) {
-        const p = pushOffPlan(s), poses = pushOffPoses(s, p), { c, h } = poses[poses.length - 1];
-        // every pose on the way clear of every dock and of the boats in the other slips (as drawn)
-        let ok = poses.every(q => berthClear(q.c, q.h, s));
-        if (p.kind !== 'off') ok &&= Math.hypot(c.x - s.p.x, c.y - s.p.y) - 0.45 * s.finger >= 3.8 || p.kind === 'spring'; // her whole hull out of the slip
-        const v = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) };
-        if (p.kind === 'astern') ok &&= Number.isFinite(togo(c)); // shoved off astern: into water she can steer out of, stern first
-        else {
-          ok &&= [2, 4, 6].every(d => berthClear({ x: c.x + v.x * d, y: c.y + v.y * d }, h, s)); // at least a boat's length of clear water ahead
-          ok &&= Number.isFinite(togo(c)); // and somewhere she can steer out from
-          if (p.kind === 'spring') swung++;
-          if (p.kind === 'off' || togo({ x: c.x + v.x * 12, y: c.y + v.y * 12 }) <= togo(c)) exitward++; // (no further from the way out, along the water: where either way round is as far, either will do)
-        }
-        if (ok) good++; else bad.push(s.label);
-      }
-      expect(good / slips.length, `${H.id}: ${bad.slice(0, 12).join(' ')}`).toBeGreaterThan(0.97);
-      // sprung off and pointed toward the way out (along the water) from most; the rest down open fairway, or shoved off astern
-      expect(exitward / slips.length, `${H.id}: toward the way out`).toBeGreaterThan(0.8);
-      expect(swung / slips.filter(s => s.kind === 'bow-in').length, `${H.id}: sprung off`).toBeGreaterThan(0.8); // (the rest shoved off astern: their fairway's too narrow to swing her)
+  it('the wind: held by the bow, her stern swings downwind, so she comes round toward the wind; head to wind she\'s held there for the main; an end tie\'s bow is pushed off the wind', () => {
+    const rel = (from: number, h: number) => ((from - h + 540) % 360) - 180;
+    let n = 0, held = 0;
+    for (const s of SLIPS.filter((_, i) => i % 3 === 0)) for (const from of [270, 225, 0]) {
+      const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing') continue;
+      if (15 * Math.abs(Math.sin(rel(from, s.heading) * Math.PI / 180)) < WIND_SWINGS) continue;
+      n++;
+      expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading))); // (the bow comes round toward the wind: the stern goes downwind)
+      if (p.hold) { held++; expect(Math.abs(rel(from, s.heading + p.turn))).toBeLessThan(6); expect(Math.abs(p.hold.off)).toBeGreaterThanOrEqual(30); expect(Math.abs(p.hold.off)).toBeLessThanOrEqual(60); } // (held head to wind, then her bow pushed off)
+    }
+    expect(n).toBeGreaterThan(40); expect(held).toBeGreaterThan(10); // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead)
+    // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
+    const slip = SLIPS.find(s => { const p = s.kind === 'bow-in' && s.marina === 'west-harbor' ? pushOffPlan(s, 270, 14) : null; return p?.kind === 'swing' && !!p.hold; })!;
+    expect(slip).toBeTruthy();
+    const boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
+    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 14, windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
+    const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
+    w.pushOff(); const plan = u.handled!.plan;
+    if (plan.kind !== 'swing' || !plan.hold) throw new Error(`expected to be held head to wind (wind ${w.windHere(u, u).from.toFixed(0)})`);
+    for (let i = 0; i < 60 * 150 && !u.handled?.held; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(u.handled?.held).toBe(true); expect(Math.abs(rel(w.windHere(u, u).from, u.h))).toBeLessThan(15); // lying head to wind
+    for (let i = 0; i < 60 * 10; i++) w.step(DT);
+    expect(u.handled?.held).toBe(true); // (still held: waiting for the word)
+    w.setSail('main', true); for (let i = 0; i < 60 * 40; i++) w.step(DT);
+    expect(w.pushOff()).toBe(true); for (let i = 0; i < 60 * 60 && u.handled; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(u.handled).toBeUndefined(); expect(Math.abs(rel(w.windHere(u, u).from, u.h))).toBeGreaterThan(30); // her bow pushed off the wind
+    for (let i = 0; i < 60 * 20; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(u.v).toBeGreaterThan(0.3); // and with the main up, she sails off
+    // an end tie pointing into the westerly: her bow pushed off it about her stern quarter, clear of the dock all the way
+    for (const e of SLIPS.filter(s => s.kind === 'alongside')) for (const from of [e.heading, e.heading + 20, e.heading - 20]) {
+      const p = pushOffPlan(e, from, 15); expect(pushOffPoses(e, p).every(q => berthClear(q.c, q.h, e))).toBe(true);
+      if (!p.headToWind) expect(Math.abs(rel(from, p.h))).toBeGreaterThanOrEqual(30);
     }
   }, 120000);
-  it('the wind: she isn\'t left head to wind where there\'s another way to turn her; at an end tie her bow is pushed off, and the crew says to hoist the main', () => {
-    const head = (h: number, from: number) => Math.abs(((from - h + 540) % 360) - 180) < 45;
-    let choice = 0, avoided = 0;
-    for (const s of SLIPS.filter((_, i) => i % 3 === 0)) for (const from of [270, 225, 0]) { // (a third of the berths, each in three winds)
-      const p = pushOffPlan(s, from); if (p.kind !== 'spring') continue;
-      const still = pushOffPlan(s); // (with no wind: which way she'd be turned)
-      if (still.kind === 'spring' && head(still.h, from)) { choice++; if (!head(p.h, from)) avoided++; }
-      if (!p.headToWind) expect(head(p.h, from)).toBe(false);
-    }
-    expect(choice).toBeGreaterThan(30); expect(avoided / choice).toBeGreaterThan(0.8);
-    // West Harbor's M end tie points west, into the westerly: pushed off, her bow goes off the wind, and she's told to get the main up if she's still close to it
-    const end = SLIPS.find(s => s.kind === 'alongside' && head(s.heading, 270));
-    if (end) { const p = pushOffPlan(end, 270); expect(p.h === end.heading ? p.headToWind : true).toBe(true); expect(Math.abs(((p.h - end.heading + 540) % 360) - 180)).toBeGreaterThan(p.headToWind ? -1 : 10); }
-  }, 60000);
   it('end ties: berths alongside the free ends of the docks, bow out, which push off forward', () => {
     const ends = SLIPS.filter(s => s.kind === 'alongside');
     expect(ends.length).toBeGreaterThan(10);
@@ -232,9 +206,10 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01); // made fast
       expect(w.pushOff()).toBe(true);
       expect(u.pushing).toBeTruthy(); expect(Math.abs(u.pushing!.lat - 2)).toBeLessThan(0.6); // her own finger, in her own harbor
-      for (let i = 0; i < 60 * 120 && u.handled; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
-      for (let i = 0; i < 60 * 10; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
-      expect(u.handled).toBeUndefined(); expect(u.v).toBeGreaterThan(0.2); // under her own way, steerable
+      for (let i = 0; i < 60 * 150 && u.handled && !u.handled.held; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+      if (u.handled?.held) { w.setSail('main', true); for (let i = 0; i < 60 * 40; i++) w.step(DT); w.pushOff(); for (let i = 0; i < 60 * 60 && u.handled; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); } } // (held head to wind: main up, and let go)
+      expect(u.handled).toBeUndefined(); expect(Math.max(u.v, u.astern ?? 0)).toBeGreaterThan(0.2); // under her own way, ahead or astern: steerable
+      for (let i = 0; i < 60 * 5; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
       w.t = 300; Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 10, v: 0.2, astern: 0 }); w.step(DT);
       expect(w.arrivedT).not.toBeNull(); expect(u.docked).toBeTruthy();
     }

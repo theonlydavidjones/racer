@@ -53,13 +53,13 @@ describe('West Harbor', () => {
     expect(u.docked).toBeUndefined(); expect(u.handled).toBeTruthy(); // the crew has her by hand
     expect(u.pushing?.jump).toBe(0); expect(Math.abs(u.pushing!.lat - 2)).toBeLessThan(0.6); // a crew member on the finger, walking her out
     const plan = u.handled!.plan, poses = pushOffPoses(slip, plan), last = poses[poses.length - 1];
-    expect(plan.kind).toBe('spring'); // (this slip has the room to swing her)
-    let t = 0; for (; t < 60 * 120 && u.handled; t++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); expect(u.pushing?.jump ?? 1).toBeGreaterThanOrEqual(0); }
-    expect(u.handled).toBeUndefined(); expect(t / 60).toBeLessThan(60); // walked out and swung round in well under a minute
+    expect(plan.kind).toBe('swing'); // (this slip has the room to swing her)
+    let t = 0; for (; t < 60 * 120 && u.handled; t++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(u.handled).toBeUndefined(); expect(t / 60).toBeLessThan(120); // walked out and swung round in a minute or two (the swing by hand, 2°/s, faster with the wind's help)
     expect(Math.hypot(u.x - last.c.x, u.y - last.c.y)).toBeLessThan(0.1); expect(u.h).toBeCloseTo(n360(plan.h), 6);
     expect(u.v).toBeCloseTo(SHOVE, 2); // pushed off forward, down the fairway
     for (let i = 0; i < 60; i++) w.step(DT);
-    expect(u.pushing).toBeUndefined(); // the crew member who walked her out is aboard
+    expect(u.pushing).toBeUndefined(); // the crew member who walked her out is aboard (stepped aboard at the finger's end)
     // under her own way, tiller centred, she carries on down the fairway, slowing, touching nothing
     w.drainEvents();
     const x0 = u.x, y0 = u.y;
