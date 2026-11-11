@@ -53,6 +53,32 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
+
+- **Now — crew buttons fight auto** (bug; 1–2 h): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
+  on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
+  (one line off auto, one tap back), and hold until changed.
+- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h): water shows through the cockpit sole, and it's
+  unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
+  or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
+  Lights on the boats). Check from both sides on both tacks.
+- **Now — bow spray** (bug; 1–2 h): at night the spray against the bow is "white squares… they look fake and read as
+  sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
+  that take the scene's light, so they go dark at night and catch only the boat's own lights.
+- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h): "a transparent seem between the keel and the
+  hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
+  the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
+  the keel's rabbet). Check from both sides.
+- **Next — the bow wave** (polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
+  wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
+  angle (19.5°) already used for ship wakes. Do with the spray.
+- **Next — instruments** (feature; 1–2 h): the TWD dial's big number should be **wind speed** ("I already have the windex
+  for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
+  the **windex** dial's subtext should add the **point of sail**.
+- **Next — the buttons at bottom-left** (polish; 3–5 h): "starting to overload". They mix trim, navigation, pausing and
+  more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
+  "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
+
 **Depowering: the physics against the sailmaker** (owner, November 2026: "crew follows the guide for now, but let's keep
 this on the roadmap as something to investigate"; 4–8 h). With ORC's sail and keel physics, a speed search like ORC's
 VPP (physics.ts powerFactor) has a Folkboat carry full power to about 17–18 kt; North Sails' Nordic Folkboat guide has
