@@ -273,7 +273,8 @@ export function deckGeometry(): THREE.BufferGeometry {
   for (const side of [1, -1]) {
     const base = pos.length / 3;
     for (const u of us) {
-      const b = Math.max(0.001, halfBeam(u) - 0.01), xi = Math.min(inner(u), b - 0.05);
+      // out to the sheer and a hair over it (under the toerail), so no slit opens between the deck and the planking
+      const b = Math.max(0.001, halfBeam(u) + 0.004), xi = Math.min(inner(u), b - 0.05);
       for (let j = 0; j <= NX; j++) { const x = xi + (b - xi) * j / NX; pos.push(x * side, deckY(u, x), zAt(u)); }
     }
     for (let i = 0; i < us.length - 1; i++) for (let j = 0; j < NX; j++) {
