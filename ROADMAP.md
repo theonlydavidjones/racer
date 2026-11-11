@@ -86,6 +86,15 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
   sides on both tacks.
+- **Now — push off doesn't get her out of the slip** (bug; 2–3 h): "push off action is still not getting me far
+  enough into the fairway of any marina to be able to get out of the slip. also, push off should move me forward if
+  I'm at a dock that doesn't require me to be nosed in." Today (geo/marina.ts planPushOff) every berth is treated as
+  bow-in: the crew walks her back until her bow is level with the finger's end, swings her and shoves, and she stops
+  short of a fairway she can sail or steer out along. True to life: the crew walks her right out of the slip and into
+  the fairway, pointed down it toward the exit, before stepping aboard with a shove, so she keeps steerage way; at
+  an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
+  in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
+  the shove from her real mass and low-speed drag, not a set distance.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
