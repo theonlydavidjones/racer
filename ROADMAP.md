@@ -149,6 +149,12 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
+- **Later — the boat cards' pictures** (polish; 2–3 h): owner, "make the background of these models more true to life
+  and less ugly af, or just show the model suspended in empty space and slowly rotating? find something beautiful to do
+  here." Today (render/thumbs.ts) each boat card (name, flag, sail number) shows her on a flat blue sky over a flat blue
+  sea. Options to show the owner as pictures before building: her on the real Bay water and sky at golden hour; or alone
+  in soft studio light on a dark gradient, turning slowly (live on hover, still otherwise); either with her heel and sails
+  set as she'd sail, and her own colours. A design change, so the owner picks.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
