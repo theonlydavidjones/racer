@@ -54,3 +54,35 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
   ];
   for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); });
 });
+
+/** The fastest any point of anyone moved in one frame (m/s), and how much they moved at all, over `frames`. */
+function motion(o: { kt: number; twa?: number; tack?: boolean; puff?: number }, secs: number) {
+  const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
+  b.crew = newCrew(DEFAULT_CREW, 'S');
+  const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), dt = 1 / 30;
+  let hold = true;
+  sail(b, 20, () => { b.h = 360 - twa; });
+  const step = () => { sail(b, dt, () => { if (hold && b.turnTarget == null) b.h = 360 - twa; }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, dt, false, undefined, b.heel); };
+  for (let i = 0; i < 60; i++) step();
+  if (o.tack) { hold = false; startTack(b); }
+  if (o.puff) b.ww = { ...b.ww, kt: o.puff };
+  const pts = () => [cr.helm, ...cr.crew].flatMap((f, w) => bones(f).map(q => ({ n: `${w ? 'crew' + w : 'helm'} ${q.name}`, p: q.p })));
+  let prev = pts(), fastest = 0, total = 0, where = '';
+  for (let i = 0; i < secs * 30; i++) {
+    step(); const now = pts();
+    now.forEach((p, j) => { const d = p.p.distanceTo(prev[j].p); if (d / dt > fastest) { fastest = d / dt; where = `${p.n} at frame ${i}`; } total += d; });
+    prev = now;
+  }
+  return { fastest, total, where };
+}
+
+describe('The crew move like people (render/crew.ts)', () => {
+  it('sitting in a steady breeze, they sit still: no jitter', () => {
+    const m = motion({ kt: 12 }, 20);
+    expect(m.total / 20 / 60).toBeLessThan(0.002); // (under 2 mm a second for any point, on average)
+  });
+  // (a knee or a hand in a quick step or reach goes 4–5 m/s at most (an estimate); faster than that, at 30 frames a
+  // second, is a part jumping from place to place)
+  for (const [name, o] of [['a tack', { kt: 10, tack: true }], ['a gybe', { kt: 12, twa: 160, tack: true }], ['a puff', { kt: 8, puff: 18 }], ['a lull', { kt: 18, puff: 8 }]] as const)
+    it(`${name}: nothing jumps (no limb faster than a person moves)`, () => { const m = motion(o, 15); expect(m.fastest, m.where).toBeLessThan(5.2); });
+});

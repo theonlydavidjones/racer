@@ -259,6 +259,12 @@ export interface CrewCall {
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
+/**
+ * The longest a crew holds the old high side once she's through the wind (s), before crossing under the boom as it
+ * comes over. A 2-tonne keelboat's roll is a small one: the crew go across with the boom, not seconds after it (the
+ * owner, watching it: they sat on the old side long after she'd tacked). An estimate.
+ */
+export const ROLL_HOLD = 2;
 export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
 interface Held { arm: number; z: number; since: number; off: number }
 
@@ -288,7 +294,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
-    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > 3.5)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }

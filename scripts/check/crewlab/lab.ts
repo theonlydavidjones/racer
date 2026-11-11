@@ -62,9 +62,11 @@ const lab = {
     render();
   },
   /** Sail `s` seconds drawing every frame, calling `shot(i)` every `every` frames (for sequences through a tack). */
-  frames(s: number) { for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { t += 1 / 60; }); syncBoatMesh(m!, b, t); } render(); },
+  frames(s: number) { const hold = (lab as any).hold; for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { if (hold != null && b.turnTarget == null && !b.tacking) b.h = hold; t += 1 / 60; }); syncBoatMesh(m!, b, t); } render(); },
   tack() { (lab as any).hold = null; startTack(b); },
   holdNow() { (lab as any).hold = b.h; },
+  /** The wind on the water now (kt): a puff or a lull. */
+  wind(kt: number) { b.ww = { ...b.ww, kt }; },
   cam(yaw: number, pitch: number, dist: number, at?: number[]) { cam = { yaw, pitch, dist, at: at ?? cam.at }; render(); },
   boat: () => b,
   info: () => (document.getElementById('i') as HTMLElement).textContent,

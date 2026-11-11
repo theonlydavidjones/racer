@@ -19,15 +19,29 @@ export const BONE = { thigh: 0.43, shin: 0.43, upper: 0.30, fore: 0.255, shoulde
 export interface Limb { root: THREE.Object3D; mid: THREE.Object3D }
 export interface Body { root: THREE.Group; torso: THREE.Bone; head: THREE.Bone; arm: [Limb, Limb]; leg: [Limb, Limb]; scale: number; mesh: THREE.SkinnedMesh }
 
-const SKINS = [0xe0b99a, 0xc99b78, 0x9c6b4c, 0x6e4a33, 0xf0cfb4, 0xd9a886];
-const HAIR = [0x3b2a1e, 0x1d1712, 0x8a6a3e, 0xc9b28a, 0x6b4a2e, 0x9a9a96];
-/** Life jackets: an inflatable's slim yoke (dark, with a coloured trim, as the Gill in Josephine's photo) or a foam vest. */
+/**
+ * Who they are: a crew's looks drawn from realistic ranges, each choice from its own hash of the person's seed (stable
+ * race to race for the same boat). Skin from very fair to very dark, about evenly across the range (the Bay's sailors
+ * aren't all one people); hair by skin (dark hair with dark skin, the full range with fair), some worn long in a ponytail
+ * out of the back of a cap (as in the CircleSea photo); a cap, a visor, a beanie or nothing; the life jacket an
+ * inflatable's yoke or a foam vest in its makers' usual colours; a spray top in their own colour or the boat's team one.
+ */
+const SKINS = [0xf3d6c4, 0xe9c3a6, 0xdcae8c, 0xc9966f, 0xb27c57, 0x986445, 0x7d4f35, 0x633c28, 0x4b2d1f, 0x3a2219];
+const HAIR_FAIR = [0x2b2018, 0x4a3322, 0x6b4a2e, 0x8a6a3e, 0xb89466, 0xd8be8a, 0x8c3f22, 0x9a9a96, 0xd9d6cf];
+const HAIR_DARK = [0x15110e, 0x1d1712, 0x2b2018, 0x3b2a1e, 0x9a9a96];
 const PFDS: { body: number; trim: number; foam: boolean }[] = [
   { body: 0x1c2026, trim: 0xe0482c, foam: false }, { body: 0x24406e, trim: 0x1c2026, foam: true },
-  { body: 0x1c2026, trim: 0x2e8fbf, foam: false }, { body: 0xd8432e, trim: 0x1c2026, foam: true }
+  { body: 0x1c2026, trim: 0x2e8fbf, foam: false }, { body: 0xd8432e, trim: 0x1c2026, foam: true },
+  { body: 0x22314f, trim: 0xe8b21c, foam: false }, { body: 0xe8b21c, trim: 0x1c2026, foam: true },
+  { body: 0xb8322a, trim: 0xd8d4cc, foam: false }, { body: 0x2a2d33, trim: 0x8fc93a, foam: true }
 ];
-const BIBS = [0x23272e, 0x2c3440, 0x3a3f47, 0x1e2a3a];
-const HATS = [0x1d2330, 0xe8e4d8, 0xc8372d, 0x2b4f8a, 0xd9c9a3];
+const BIBS = [0x23272e, 0x2c3440, 0x3a3f47, 0x1e2a3a, 0x8f2a24, 0x4a4f57];
+const HATS = [0x1d2330, 0xe8e4d8, 0xc8372d, 0x2b4f8a, 0xd9c9a3, 0x2e6b4f, 0x5d6670, 0xf0f0ea];
+/** Foul-weather tops in the colours they come in. */
+const TOPS = [0xc8372d, 0x1f3a5f, 0xe8b21c, 0x3a3f47, 0xd8d4c8, 0x2b8a8a, 0xe36a1e, 0x6f8fb3, 0x23272e, 0x8a2f4a, 0x4e7a3a];
+/** A hash of a seed and a salt to 0..1 (each choice independent of the others). */
+const hash = (seed: number, salt: number) => { let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(salt + 0x632be5ab, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
+const pick = <T,>(arr: readonly T[], seed: number, salt: number) => arr[Math.floor(hash(seed, salt) * arr.length)];
 
 /** A piece of the body on one bone: its geometry in that bone's frame, and its colour. */
 interface Piece { g: THREE.BufferGeometry; bone: number; color: number }
@@ -42,8 +56,12 @@ const lathe = (pts: [number, number][], flat: number, seg = 14) => { const g = n
 
 export function buildBody(p: Person, jacket: number, seed: number): Body {
   const s = p.h / 1.75, girth = Math.max(0.85, Math.min(1.35, Math.sqrt(p.w / (p.h * p.h) / 24))), g = girth;
-  const skin = SKINS[seed % SKINS.length], hair = HAIR[(seed * 7) % HAIR.length], pfd = PFDS[seed % PFDS.length], bib = BIBS[(seed * 3) % BIBS.length];
-  const hat = HATS[(seed * 5) % HATS.length], glove = 0x15171a, boot = 0x2a2d33, sole = 0xd8d4cc;
+  const tone = Math.floor(hash(seed, 1) * SKINS.length), skin = SKINS[tone];
+  const hair = pick(tone >= 6 ? HAIR_DARK : HAIR_FAIR, seed, 2), pfd = pick(PFDS, seed, 3), bib = pick(BIBS, seed, 4), hat = pick(HATS, seed, 5);
+  const headwear = (['cap', 'cap', 'cap', 'visor', 'beanie', 'none'] as const)[Math.floor(hash(seed, 6) * 6)];
+  const ponytail = hash(seed, 7) < 0.3, shades = hash(seed, 8) < 0.7, glove = 0x15171a, boot = pick([0x2a2d33, 0x3a3f47, 0x1e2a3a], seed, 9), sole = 0xd8d4cc;
+  // their spray top: the boat's team colour, or their own
+  if (hash(seed, 10) < 0.5) jacket = pick(TOPS, seed, 11);
   // the bones, at rest (standing, arms down): the hips the root
   const root = new THREE.Group(); root.scale.setScalar(s);
   const B = (parent: THREE.Object3D | null, x: number, y: number, z: number) => { const b = new THREE.Bone(); b.position.set(x, y, z); parent?.add(b); return b; };
@@ -79,11 +97,13 @@ export function buildBody(p: Person, jacket: number, seed: number): Body {
   add(at(ball(0.022, 6, 5), 0, 0.115, -0.098, 0.8, 1.1, 1), 2, skin); // nose
   for (const sx of [-1, 1]) add(at(ball(0.022, 6, 5), sx * 0.09, 0.125, 0.005, 0.5, 1, 0.8), 2, skin);
   add(at(ball(0.103, 12, 8), 0, 0.14, 0.012, 0.92, 1.0, 1.0), 2, hair);
-  add(at(new THREE.CylinderGeometry(0.098, 0.098, 0.03, 12, 1, true, Math.PI - 1.05, 2.1), 0, 0.145, -0.004, 0.92, 1, 1.02), 2, 0x101214); // sunglasses, wrapped round the face
-  const visor = seed % 4 === 2;
-  if (!visor) add(at(new THREE.SphereGeometry(0.107, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0, 0.17, 0.008, 0.95, 0.85, 1.0), 2, hat);
-  else add(at(tube(0.104, 0.104, 0.035, 12), 0, 0.2, 0.008, 0.93, 1, 1), 2, hat);
-  add(at(new THREE.CylinderGeometry(0.085, 0.085, 0.01, 12, 1, false, -Math.PI / 2, Math.PI), 0, 0.175, -0.07, 1, 1, 1.15, 0.12, 0, 0), 2, hat); // the peak
+  if (ponytail) add(at(new THREE.CapsuleGeometry(0.03, 0.12, 3, 8), 0, 0.09, 0.115, 1, 1, 1, -0.5, 0, 0), 2, hair);
+  if (shades) add(at(new THREE.CylinderGeometry(0.098, 0.098, 0.03, 12, 1, true, Math.PI - 1.05, 2.1), 0, 0.145, -0.004, 0.92, 1, 1.02), 2, 0x101214); // sunglasses, wrapped round the face
+  if (headwear === 'cap' || headwear === 'visor') {
+    if (headwear === 'cap') add(at(new THREE.SphereGeometry(0.107, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0, 0.17, 0.008, 0.95, 0.85, 1.0), 2, hat);
+    else add(at(tube(0.104, 0.104, 0.035, 12), 0, 0.2, 0.008, 0.93, 1, 1), 2, hat);
+    add(at(new THREE.CylinderGeometry(0.085, 0.085, 0.01, 12, 1, false, -Math.PI / 2, Math.PI), 0, 0.175, -0.07, 1, 1, 1.15, 0.12, 0, 0), 2, hat); // the peak
+  } else if (headwear === 'beanie') add(at(new THREE.SphereGeometry(0.11, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.55), 0, 0.15, 0.01, 0.95, 1.05, 1.0), 2, pick([0x1d2330, 0x8f2a24, 0x2b4f8a, 0x3a3f47], seed, 12));
   // arms: the spray top's sleeves (a deltoid at the shoulder), the cuffs, sailing gloves
   for (const i of [0, 1]) {
     add(at(ball(0.057 * g, 10, 8), 0, -0.02, 0, 1, 1, 0.95), 3 + 2 * i, jacket);
