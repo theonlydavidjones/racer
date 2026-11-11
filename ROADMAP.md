@@ -165,6 +165,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
+- **Later — aluminium spars look like white plastic** (polish; 1–2 h): owner, "the aluminum on the masts and booms
+  looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
+  fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
+  a long highlight down the mast. For every aluminium rig (the wooden spars stay wood). Check in daylight and at night.
 - **Later — the boat cards' pictures** (polish; 2–3 h): owner, "make the background of these models more true to life
   and less ugly af, or just show the model suspended in empty space and slowly rotating? find something beautiful to do
   here." Today (render/thumbs.ts) each boat card (name, flag, sail number) shows her on a flat blue sky over a flat blue
