@@ -276,7 +276,7 @@ export class CourseView {
         if (!shown(L.i) || L.kind === 'reach') return;
         for (const k of ['left', 'right', 'middle'] as Plan[]) {
           const r = L.plans[k]; if (!r.ok || k === L.best) continue;
-          ctx.strokeStyle = PC[k]; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+          ctx.strokeStyle = PC[k]; ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
           ctx.beginPath(); r.path.forEach((q, j) => { const s = S(q.p); if (j) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); }); ctx.stroke();
         }
         ctx.setLineDash([]); ctx.globalAlpha = 1;
@@ -309,7 +309,11 @@ export class CourseView {
       const tip: P = [ox + Math.sin(cb) * 14, oy - Math.cos(cb) * 14];
       ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 14, oy + Math.cos(cb) * 14); ctx.lineTo(tip[0], tip[1]); ctx.stroke();
       arrowHead(ctx, tip, [Math.sin(cb), -Math.cos(cb)], 7);
-      ctx.textAlign = 'right'; ctx.fillText(w.cur.label.toUpperCase(), cw - 12, oy + 32); ctx.textAlign = 'left';
+      { // on a dark pill, so it stays readable over marks and lines
+        const t = w.cur.label.toUpperCase(), tw = ctx.measureText(t).width;
+        ctx.save(); ctx.fillStyle = 'rgba(9,22,33,.85)'; ctx.beginPath(); ctx.roundRect(cw - 12 - tw - 6, oy + 32 - 13, tw + 12, 18, 4); ctx.fill(); ctx.restore();
+        ctx.fillStyle = '#6fd0ff'; ctx.textAlign = 'right'; ctx.fillText(t, cw - 12, oy + 32); ctx.textAlign = 'left';
+      }
     }
     const nb = -W * D2R, nx = cw - 34, ny = 22;
     ctx.strokeStyle = ctx.fillStyle = '#94abb7'; ctx.lineWidth = 1.5;

@@ -50,7 +50,7 @@ export class NavView {
     const w = this.world, [ctx, cw, ch] = fitCanvas(this.canvas);
     ctx.fillStyle = '#0c2534'; ctx.fillRect(0, 0, cw, ch);
     if (!w) return;
-    const pl = this.plan, pts: Vec[] = pl ? [...pl.route, ...pl.track.map(q => q.p)] : [{ x: w.user.x, y: w.user.y }];
+    const pl = this.plan, pts: Vec[] = pl ? [...pl.route, ...pl.track.map(q => q.p)] : [{ x: w.user.x - 2500, y: w.user.y - 2000 }, { x: w.user.x + 2500, y: w.user.y + 2000 }];
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
     const scale = Math.min((cw - 80) / Math.max(600, Math.max(...xs) - Math.min(...xs)), (ch - 80) / Math.max(600, Math.max(...ys) - Math.min(...ys)));
@@ -65,6 +65,10 @@ export class NavView {
       ctx.beginPath(); r.forEach((p, i) => { const s = S(p); if (i) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); }); ctx.stroke();
     }
     ctx.setLineDash([]);
+    if (!pl) { // no passage yet: at least show where she is
+      const a = S({ x: w.user.x, y: w.user.y });
+      ctx.fillStyle = '#ffb627'; ctx.beginPath(); ctx.arc(a[0], a[1], 6, 0, 2 * Math.PI); ctx.fill(); label(ctx, a, 'You', '#ffb627');
+    }
     if (pl) {
       // her track leaving now, coloured by time (light early, amber late)
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,182,39,.95)';

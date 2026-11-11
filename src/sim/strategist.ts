@@ -28,6 +28,8 @@ import { amount, deg3, kt1, mins, sideWords, type Brief, type BriefItem, type Br
 /** A leg as planned: where it goes, the plans tried, the best, and how sure. */
 export interface LegPlan {
   i: number; name: string; from: Vec; to: Vec; kind: LegKind;
+  /** The mark is an island (Alcatraz), rounded at a berth off its shore. */
+  island: boolean;
   t0: number; minutes: number;
   plans: Record<Plan, SailResult>; best: Plan;
   certainty: 'clear' | 'likely' | 'open';
@@ -76,7 +78,7 @@ export function planLegs(w: World, o: Outlook): LegPlan[] {
     }
     const certainty = kind === 'reach' ? 'clear' : flips.length === 0 && margin > 0.04 ? 'clear' : flips.length <= 2 && margin > 0.015 ? 'likely' : 'open';
     const name = i < C.marks.length ? C.marks[i].name : 'the finish';
-    out.push({ i, name, from, to, kind, t0: t, minutes: plans[best].minutes, plans, best, certainty, flips });
+    out.push({ i, name, from, to, kind, island: !!(i < C.marks.length && C.marks[i].reach), t0: t, minutes: plans[best].minutes, plans, best, certainty, flips });
     t += plans[best].minutes + extra;
   }
   return out;
@@ -161,6 +163,7 @@ function startSection(w: World, o: Outlook, legs: LegPlan[]): BriefSection {
 function legItems(o: Outlook, L: LegPlan): BriefItem[] {
   const items: BriefItem[] = [], P = L.plans, best = P[L.best];
   const head = `Leg ${L.i + 1}: to ${L.name}, ${KIND_WORD[L.kind]}`;
+  if (L.island) items.push({ head: `Rounding ${L.name}`, src: 'model', text: `The plans are worked out to a berth about 200 m off the island's shore, not to its middle: give the rocks room and swing wide round its downwind side, out of the near-calm in its lee. Allow about ${Math.round(ISLAND_ROUNDING_S / 60)} minutes for the rounding.` });
   const when = `${clockOf(L.t0)}–${clockOf(L.t0 + L.minutes)}, about ${mins(L.minutes)}`;
   if (L.kind === 'reach') {
     const wd = o.wind(L.from, L.t0), c = o.current(L.from, L.t0), u = unit(sub(L.to, L.from)), v = polar(wd.kt, Math.abs(wrap(brg(u.x, u.y) - wd.from)));
@@ -201,7 +204,7 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
 }
 
 function courseSection(o: Outlook, legs: LegPlan[]): BriefSection {
-  const items = legs.flatMap(L => legItems(o, L));
+  const items = legs.flatMap(L => { const it = legItems(o, L); if (L.island) it.push(it.shift()!); return it; });
   return { id: 'legs', title: 'The course: which way on each leg', lede: 'Each leg is sailed on paper three ways, at the Folkboat\'s polar speeds in the wind and current the day brings along the way: going left first and tacking (or gybing) on the layline, going right first, and staying near the middle. Left and right are looking upwind, as sailors say it; the direction in brackets says where on the water that is. The best plan is drawn on the map. Each is then tested against the forecast being off, to say how sure the call is.', items };
 }
 
