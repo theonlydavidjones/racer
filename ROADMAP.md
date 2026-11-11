@@ -65,6 +65,17 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
+- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
+  right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
+  (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
+  piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
+  the south tower's fender, the Bay Bridge's piers and towers (their positions are still approximate, from the
+  overpass-api note under the Bay Bridge), and anything else drawn in the water. Solid for collisions, for the AI's and the
+  tiller pilot's look-ahead (landAlong) and the navigator's routes, on the chart, and as obstructions under Rule 19/20
+  (obstruction.ts). A test that sails a boat at each one. And their lee: owner, "there should also be a lee on the lee
+  side of the tower bases, no?" A bluff body leaves a wind shadow downwind (like the ships' and the committee boat's,
+  already in), and in the current a wake of slack water and eddies on its downstream side, shifting with flood and ebb;
+  size both from sourced bluff-body wake lengths, not by eye.
 - **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
@@ -104,6 +115,27 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
   offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
   outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
+- **Next — heavy weather: how she copes in 30+ kt, and reefing for cruising only** (accuracy + feature; 8–12 h; owner:
+  "not for now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner:
+  "that boat would have sunk by now… How would an IRL skipper handle this situation? can't Folkboats handle heavy weather
+  like this?" and, after: "I don't know of any Folkboats skipper on the Bay who reefs, or even has reefing capabilities…
+  I've heard that Folkboats don't *need* to reef because of their heavy keel… If we introduce a reefing mode, make sure
+  it's true to life, and keep it hidden in racing mode."
+  What's sourced: ballast about 50% of displacement, cast-iron keel (Folkboat Year Book 2023; NFIA class rules
+  2025–2028, rule 4.10); capsize screening 1.78 (keelindex.com). The NFIA rules (March 2026 update) say nothing about
+  reefing either way; the UK Folkboat Association's rules (10.0) allow reef points "at the discretion of the owner" and
+  ban flattening-reef zips. A self-draining cockpit is optional (NFIA 3.21) and pumping only while racing (12.40).
+  Not found: the SF Bay fleet's practice in 25–30+ kt, first-hand accounts of a Folkboat in 30+ kt, how classic boats
+  reefed, the AVS. So "they don't need to reef" is the owner's report of Bay practice, not yet sourced either way; to
+  try next: sfbayfolkboats.org and the YRA sailing instructions, the Year Books, North Sails' Folkboat guide.
+  To build:
+  (1) first, the physics: with the main eased or luffing, traveller down and backstay on, what does she really do in
+  30+ kt under full sail? The heel past a few degrees still needs the righting curve from the hull's offsets (see crew
+  weight, above); if Bay racers sail on unreefed, she must be able to too, not lie at 60° at 0 kt;
+  (2) the auto crew's heavy-air handling as Bay sailors do it (dump the main, sail on the jib, feather);
+  (3) water in the cockpit: water shipped, its weight, the pump;
+  (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
+  many reefs, at what wind).
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
@@ -127,7 +159,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
   (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
   (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
-  current tack, and what auto is doing now. Layout to the owner first.
+  current tack, and what auto is doing now. Every line's setting, too: owner, "can't tell which way is 'on' for the
+  backstay. is 0% on? or 100%?" (100% is on: controls.ts, 0 off … 1 bar tight). Label each end in sailors' words
+  (eased … on, or for the traveller windward … leeward) and what that end does to the sail. Layout to the owner first.
 - **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
