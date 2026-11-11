@@ -88,6 +88,12 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
+- **The Bay Bridge and the city at night** (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+  suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
+  the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
+  night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
+  and time, so the lights come on at real dusk. Sources: Caltrans and OSM for the bridge's geometry; the Bay Lights' own
+  published specifications for its LEDs and patterns.
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
