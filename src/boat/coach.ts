@@ -124,7 +124,8 @@ export function coach(b: Boat): CoachReport {
   const heel = b.heelMag ?? 0, hn = b.helmNeed ?? 0, v = Math.max(0.5, b.v);
   const helmCost = rudderDrag(Math.min(12, hn), v) / Math.max(1, hullResistance(v)), heelCost = 1 - heelFactor(heel);
   let ht = `Heeling ${deg(heel)}${upwind ? ' (a Folkboat is happiest at 12–20° upwind)' : ''}. `;
-  ht += `The sails push sideways with about ${Math.round((b.forces?.heel ?? 0) / 9.81)} kgf, high up the mast; the keel and three crew on the rail hold her up. `;
+  const aboard = (b.crew?.spec.crew.length ?? 2) + 1, armM = b.crew?.arm ?? 0;
+  ht += `The sails push sideways with about ${Math.round((b.forces?.heel ?? 0) / 9.81)} kgf, high up the mast; the keel holds her up, and ${aboard === 1 ? 'your weight' : `the ${aboard} aboard`} ${armM > 0.05 ? `${armM > 1 ? 'hiking' : 'sitting up to windward'} (${armM.toFixed(1)} m out on average) add${aboard === 1 ? 's' : ''} to it` : armM < -0.05 ? 'to leeward add to the heel' : 'in the middle make little difference'}. `;
   if (upwind && heel > 22) ht += `Too much heel: she slips sideways and the rudder fights. Costing about ${pct(heelCost)}. Depower: backstay on first (flattens both sails and opens the main's leech), then Cunningham and outhaul, then the traveller down; ease the main last, since it costs pointing.`;
   else if (upwind && heel < 8 && tws > 9) ht += 'Quite upright for this breeze: you could use more power (fuller sails, traveller up) if the boat feels sluggish.';
   items.push({ head: 'Heel', text: ht, ok: !(upwind && heel > 22) });

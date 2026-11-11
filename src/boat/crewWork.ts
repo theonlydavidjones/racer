@@ -112,6 +112,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (a.job?.line === k) continue;
     if (e < startThreshold(k, skill, want[k])) continue;
     const sheet = k === 'jibsheet' || k === 'mainsheet';
+    // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
+    if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
       const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';

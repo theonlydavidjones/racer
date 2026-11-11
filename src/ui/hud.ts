@@ -1,4 +1,5 @@
 import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
+import { crewWords } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { PLACES } from '../sim/places';
@@ -220,6 +221,7 @@ export class Hud {
     const [mw, mc] = u.luff ? ['Eased', 'off'] : word(u.trim.main, '');
     const backed = (u.jibBacked ?? 0) > 0.3, sheetsMine = byHand(u, 'mainsheet') || byHand(u, 'jibsheet');
     const [jw, jc] = backed ? ['Aback', 'backed'] : u.luff ? ['Eased', 'off'] : word(u.trim.jib, plan === 'wing' ? 'Poled out' : 'Down');
+    $('tpCrew').textContent = crewWords(u);
     const tm = $('tpMain'), tj = $('tpJib');
     tm.textContent = mw; tm.className = 'tp-state ' + mc;
     tj.textContent = jw; tj.className = 'tp-state ' + jc;

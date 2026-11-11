@@ -198,6 +198,11 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
   border-radius:7px;padding:0 12px;min-width:68px;height:40px;cursor:pointer;touch-action:none}
 .tp-btn.on,.tp-btn:active{background:var(--btn-hi);border-color:var(--accent)}
 .tp-state.backed{color:#7cc4ff}
+/* placing the crew yourself: lit when you've put them there */
+.tp-seg{display:flex;gap:4px}
+.tp-btn.sm{min-width:50px;padding:0 8px}
+.tp-seg .tp-btn.on{background:var(--accent);color:#13202b;border-color:var(--accent)}
+.tp-crew{color:var(--text)}
 /* who has the line: shown only when it's yours, one tap gives it back to the crew */
 .tp-auto{font:700 12px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#13202b;background:var(--accent);border:1px solid var(--accent);
   border-radius:7px;padding:0 10px;height:40px;min-width:60px;cursor:pointer}

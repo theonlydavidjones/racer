@@ -121,7 +121,8 @@ export const allAboard = (s: CrewSpec): Person[] => [s.helm, ...s.crew];
 export const EDGE = 1.05;
 /** Stations along the boat (m, + aft; the bow at −3.84): the helm at the tiller, the cockpit's forward and after ends where the crew sit, the cabin top's control lines at its after end, the jib cars (North Sails' Folkboat guide: the cabin-top lead 2.65 m from the forestay, the track 58 cm off the centreline), the mast. */
 export const Z = { helm: 2.7, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, car: -1.0, mast: -0.95, gap: 0.6 };
-export const CAR_ARM = 0.58;
+/** Where the person moving a jib car kneels: on the side deck beside the cabin, reaching the track (58 cm out) on its top. */
+export const CAR_ARM = 0.8;
 /** The reference places (m) the polar is sailed from: the crew in the middle of the cockpit, the helm at the tiller. */
 const zRef = (i: number, n: number) => (i === 0 ? Z.helm : n === 1 ? 1.5 : i === 1 ? 1.2 : 1.8);
 
