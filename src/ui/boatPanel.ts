@@ -4,7 +4,7 @@ import { BURGEES, CLUBS } from '../render/burgees';
 import { ENSIGNS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
-import { HARBOR, MARINAS, SLIPS } from '../geo/marina';
+import { harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
 
 /**
  * Editing one of your boats (from the Fleet): her particulars (name, number, club, skipper, home marina and slip),
@@ -106,8 +106,8 @@ export class BoatPanel {
       case 'number': if (final) this.set(b => { b.sails.number = t.value; }); return;
       case 'country': this.set(b => { b.sails.country = t.value; }); return;
       case 'club': this.set(b => { b.club = t.value; }); return;
-      case 'marina': this.set(b => { if (t.value) b.marina = t.value; else { delete b.marina; delete b.slip; } }); return;
-      case 'slip': this.set(b => { if (t.value) { b.slip = t.value; b.marina ||= 'west-harbor'; } else delete b.slip; }); return;
+      case 'marina': this.set(b => { if (t.value) { if (t.value !== b.marina) delete b.slip; b.marina = t.value; } else { delete b.marina; delete b.slip; } }); return; // (a slip belongs to its marina)
+      case 'slip': this.set(b => { if (t.value) { b.slip = t.value; b.marina = slipById(t.value)?.marina ?? b.marina; } else delete b.slip; }); return;
       case 'weeks': { const out = this.el.querySelector('#bpWeeksV'); if (out) out.textContent = weeksLabel(Number(t.value)); if (final) this.set(b => { b.perf.cleanedWeeks = Number(t.value); }, false); return; }
       case 'gear': if (final) this.set(b => { b.perf.gearKg = Number(t.value) * 0.4536; }, false); return;
     }
@@ -178,8 +178,8 @@ export class BoatPanel {
         <div class="field"><span>Skipper</span>${seg('skipper', [['you', 'You'], ['ai', 'AI skipper (generic)']], b.skipper)}
           <small>Skippers come with the Yacht Club; for now she's yours to skipper, or a generic AI's.</small></div>
         <div class="field"><span>Home marina</span><select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div>
-        ${b.marina ? `<div class="field"><span>Her slip in ${HARBOR.name}</span><select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>
-          <small>She lies bow in (boats nose into a slip here, never back in): to leave, push off. The docks are mapped from OpenStreetMap; the dock letters and slip numbers are this sim's.</small></div>` : ''}
+        ${b.marina ? `<div class="field"><span>Her slip in ${esc(harborOf(b.marina)?.short ?? '')}</span><select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>
+          <small>She lies bow in (boats nose into a slip here, never back in): to leave, push off. The docks are mapped from OpenStreetMap. ${SLIP_NOTE[b.marina] ?? ''}</small></div>` : ''}
         <div class="field"><span>Her flags</span><small id="bpFlagNote">${flagNote(b)}</small></div>
       </section>
       <section><h3>Hull</h3>
@@ -218,11 +218,19 @@ export class BoatPanel {
 
 /** The slips, by dock; those other boats of yours have are shown as taken. */
 function slipOptions(b: BoatSpec, boats: BoatSpec[]): string {
-  const taken = new Map(boats.filter(x => x.id !== b.id && x.slip).map(x => [x.slip!, x.name]));
-  const docks = [...new Set(SLIPS.map(s => s.dock))];
-  return '<option value="">No slip</option>' + docks.map(d => `<optgroup label="Dock ${d}">${SLIPS.filter(s => s.dock === d).map(s =>
-    `<option value="${s.id}"${s.id === b.slip ? ' selected' : ''}${taken.has(s.id) ? ' disabled' : ''}>${s.id}${taken.has(s.id) ? ` · ${esc(taken.get(s.id)!)}` : ''}</option>`).join('')}</optgroup>`).join('');
+  const id = (x: string | undefined) => slipById(x)?.id; // (older saves name West Harbor's slips without the marina)
+  const taken = new Map(boats.filter(x => x.id !== b.id && id(x.slip)).map(x => [id(x.slip)!, x.name])), mine = id(b.slip);
+  const slips = slipsIn(b.marina), docks = [...new Set(slips.map(s => s.dock))];
+  return '<option value="">No slip</option>' + docks.map(d => `<optgroup label="Dock ${d}">${slips.filter(s => s.dock === d).map(s =>
+    `<option value="${s.id}"${s.id === mine ? ' selected' : ''}${taken.has(s.id) ? ' disabled' : ''}>${s.label}${taken.has(s.id) ? ` · ${esc(taken.get(s.id)!)}` : ''}</option>`).join('')}</optgroup>`).join('');
 }
+/** What's real about each marina's dock letters and slip numbers (geo/marina.ts). */
+const SLIP_NOTE: Record<string, string> = {
+  'west-harbor': 'The dock letters and slip numbers are this sim\'s (the harbor\'s own aren\'t published).',
+  'gashouse-cove': 'The dock letters and slip numbers are this sim\'s (the harbor\'s own aren\'t published).',
+  'south-beach': 'Docks A to G are the harbor\'s own; the slip numbers are this sim\'s.',
+  corinthian: 'A dock, along the breakwater, is the club\'s own; B and C, the fingers and the slip numbers are this sim\'s.'
+};
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
 function flagNote(b: BoatSpec): string {

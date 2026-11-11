@@ -21,8 +21,9 @@ const SHORE_LL: [number, number][] = [
 
 // From Crissy Field past the Marina to Fort Mason, the real shoreline (OpenStreetMap, scripts/make-marina-coast.mjs):
 // the Marina Green seawall, the West Harbor's basin and its jetty out to the entrance beacon, in place of the hand-drawn one
-// (only as far east as Gashouse Cove: OpenStreetMap's coastline leaves out the Fort Mason piers, which the hand-drawn shore has)
-const COAST = (marinaCoast as unknown as { coast: [number, number][] }).coast.filter(p => p[1] <= -122.4345);
+// and round Gashouse Cove (the Marina's East Harbor) and Fort Mason's three piers, to their east (the hand-drawn shore had
+// the piers 50–200 m too far east and too long)
+const COAST = (marinaCoast as unknown as { coast: [number, number][] }).coast;
 const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > COAST[COAST.length - 1][1])];
 export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
@@ -54,9 +55,9 @@ function inTerrain(p: Vec): boolean {
 /** The terrain land grid, for drawing maps: cells, bounds, and whether a cell is inside the hand-drawn Cityfront area. */
 export const landGrid = () => ({ ...M, grid: GRID, cityfront: { south: 37.79, north: 37.815, west: -122.48, east: -122.40 } });
 
-/** Is this point land a boat would run aground on? (In the West Harbor basin: only its docks and breakwaters.) */
+/** Is this point land a boat would run aground on? (In a marina's basin: only its docks and breakwaters; and those are solid just outside it too.) */
 export const onLand = (p: Vec): boolean =>
-  inBasin(p) ? hitsHarbor(p) : p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : inTerrain(p) || inCityfront(p);
+  inBasin(p) ? hitsHarbor(p) : hitsHarbor(p) || (p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : inTerrain(p) || inCityfront(p));
 
 export function shoreDist(p: Vec): number {
   let m = 1e9;
