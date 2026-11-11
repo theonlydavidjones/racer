@@ -19,8 +19,9 @@ const SHORE_LL: [number, number][] = [
 // the Marina Green seawall, the West Harbor's basin and its jetty out to the entrance beacon, in place of the hand-drawn one
 // and round Gashouse Cove (the Marina's East Harbor) to the end of Fort Mason's Pier 1 (only that far east: the hand-drawn
 // shore has the other Fort Mason piers)
-const COAST = (() => { const c = (marinaCoast as unknown as { coast: [number, number][] }).coast; return c.slice(0, c.findIndex(p => p[1] > -122.4335 && p[0] > 37.8083) + 1); })(); // (west to east: the last point is Pier 1's north-west corner)
-const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > COAST[COAST.length - 1][1] + 0.0001)];
+const COAST = (() => { const c = (marinaCoast as unknown as { coast: [number, number][] }).coast; return c.slice(0, c.findIndex(p => p[1] > -122.4325 && p[0] > 37.8085) + 1); })(); // (west to east: the last point is the north-east corner of Pier 1's end)
+// (east of it, the hand-drawn shore from its next pier on: its own Pier 1, which ran on to 37.8100, is left out)
+const SHORE_ALL: [number, number][] = [...SHORE_LL.filter(p => p[1] < COAST[0][1]), ...COAST, ...SHORE_LL.filter(p => p[1] > -122.4314)];
 export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
 // (closed round the far side of the city, out to the edges of the area the Cityfront shore governs (onLand's CF box), so

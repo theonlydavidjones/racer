@@ -42,6 +42,27 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     const bw = harborOf('south-beach')!.breakwaters.find(b => !b.area)!, p = bw.pts[1];
     expect(inBasin(p)).toBe(false); expect(hitsHarbor(p)).toBe(true); expect(onLand(p)).toBe(true);
   });
+  it('their walls are where they really are: South Beach\'s fishing pier, the Corinthian\'s shore, Fort Mason\'s Pier 1', () => {
+    for (const t of [0.3, 0.7]) expect(onLand(LL(37.7784719 + (37.7783532 - 37.7784719) * t, -122.3853896 + (-122.3873783 + 122.3853896) * t))).toBe(true); // the fishing pier (OSM), the harbor's south side
+    expect(onLand(LL(37.77815, -122.3849))).toBe(false); // and the way in at the south end, between it and the breakwater
+    // the Corinthian: no sailing out of the basin onto the waterfront: from inside, the only way onto water outside the basin is its entrance
+    const H = harborOf('corinthian')!, start = LL(37.8718, -122.4560), key = (p: { x: number; y: number }) => `${Math.round(p.x)},${Math.round(p.y)}`;
+    const seen = new Set([key(start)]); let fr = [start]; const leaks: { x: number; y: number }[] = [];
+    while (fr.length) {
+      const nx: typeof fr = [];
+      for (const p of fr) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
+        if (seen.has(k) || onLand(q)) continue;
+        seen.add(k);
+        if (harborAt(q) === H) nx.push(q); else leaks.push(q);
+      }
+      fr = nx;
+    }
+    expect(leaks.length).toBeGreaterThan(0);
+    for (const q of leaks) expect(Math.hypot(q.x - H.exits[0].x, q.y - H.exits[0].y)).toBeLessThan(60);
+    // Pier 1 ends where OpenStreetMap has it, with open water north of its end
+    expect(onLand(LL(37.8084, -122.4325))).toBe(true); expect(onLand(LL(37.8092, -122.4324))).toBe(false);
+  });
   it('the way out from every slip to the open Bay (a fine path search from offshore)', () => {
     for (const id of NEW) {
       const goal = LL(...OFFSHORE[id]), step = 1.5, key = (p: { x: number; y: number }) => `${Math.round(p.x / step)},${Math.round(p.y / step)}`;

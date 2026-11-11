@@ -42,6 +42,7 @@ const HARBORS = {
       [37.8730092, -122.4553782], [37.872105, -122.455378], [37.871381, -122.455759], [37.871284, -122.456821], [37.871326, -122.456853],
       [37.871322, -122.457025], [37.871381, -122.45711]] },
     breakwaterIds: ['125807786'], skipIds: ['28808643'],
+    shore: [0, 11], // the basin's edge along the club's point and the decks is the shore: solid (the 50 m terrain grid is too coarse here)
     letter: { 125807759: 'A', 125807777: 'B', 125807775: 'C' },
     // fingers along the mapped docks: [way, side (+1 left of the way's direction), length m, from m, to m along it, every m]
     fingers: [['125807759', -1, 14, 54, 125, 11.5], ['125807777', 1, 12, 6, 104], ['125807777', -1, 12, 6, 104], ['125807775', 1, 11, 6, 44]],
@@ -76,7 +77,9 @@ async function make(id, H) {
   const skip = new Set(H.skipIds ?? []), bwIds = new Set(H.breakwaterIds ?? []);
   const breakwaters = ways.filter(w => (w.tags.man_made === 'breakwater' || bwIds.has(w.id)) && pts(w).some(q => near(xy(q), 40)))
     .map(w => ({ area: w.tags.area === 'yes', pts: pts(w) }));
-  const piers = ways.filter(w => w.tags.man_made === 'pier' && !skip.has(w.id) && !bwIds.has(w.id) && pts(w).some(q => inBasin(xy(q))));
+  // the piers in the basin, and those running along just outside it (South Beach's fishing pier, the harbor's south wall)
+  const piers = ways.filter(w => w.tags.man_made === 'pier' && !skip.has(w.id) && !bwIds.has(w.id)
+    && (pts(w).some(q => inBasin(xy(q))) || (w.tags.area !== 'yes' && len(pts(w)) > 35 && pts(w).every(q => near(xy(q), 15)))));
   const areas = piers.filter(w => w.tags.area === 'yes').map(w => pts(w));
   const docks = piers.filter(w => w.tags.area !== 'yes').map(w => ({ id: w.id, name: w.tags.name ?? '', pts: pts(w) }));
   const walkways = docks.filter(d => len(d.pts) >= 35), fingers = [];
@@ -159,7 +162,7 @@ async function make(id, H) {
     source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? 'Dock letters are the docks\' names in OSM; slip numbers are this sim\'s.' : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}`,
     fetched: new Date().toISOString().slice(0, 10), name: H.name,
     basin, breakwaters, walkways: walkways.map(w => w.pts), fingers: fingers.map(f => f.pts), areas,
-    beacons, exits: H.exits, slips: out
+    beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : {}), slips: out
   }) + '\n');
   const docksUsed = [...new Set(out.map(s => s.dock))].join('');
   console.log(`${id}: basin ${basin.length} pts, ${breakwaters.length} breakwaters, ${walkways.length} walkways (docks ${docksUsed}), ${fingers.length} fingers (${fingers.filter(f => f.made).length} inferred), ${areas.length} pier areas, ${beacons.length} beacons, ${out.length} slips`);

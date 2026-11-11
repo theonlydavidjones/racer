@@ -20,7 +20,7 @@ import corinthian from './data/corinthian.json';
 type LLs = [number, number][];
 interface HarborData {
   name?: string; basin: LLs; breakwaters: { area: boolean; pts: LLs }[]; walkways: LLs[]; fingers: LLs[]; areas: LLs[];
-  beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs;
+  beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[];
   slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number }[];
 }
 const SOURCES: { id: string; name: string; short: string; data: HarborData }[] = [
@@ -29,7 +29,7 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
   { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData }
 ];
-export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6;
+export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
 const v = (pts: LLs) => pts.map(([la, lo]) => LL(la, lo));
 /** The dock's centre line, with an end that's within a few metres of another dock's centre line moved to meet that dock's edge (trimmed back if it crossed it, run out to it if it stopped short). */
@@ -61,6 +61,8 @@ export interface Harbor {
   basin: Vec[]; breakwaters: { area: boolean; pts: Vec[] }[];
   /** Main walkways (2.4 m wide) and slip fingers (1.0 m), as centre lines; and solid pier areas. */
   walkways: Vec[][]; fingers: Vec[][]; areas: Vec[][];
+  /** Stretches of the basin's edge that are the shore itself, solid (where the terrain grid is too coarse to stop a boat). */
+  shore: Vec[][];
   /** Entrance beacons (lateral marks), and the ways out of the harbor (the middle of each entrance). */
   beacons: { p: Vec; colour: 'red' | 'green' }[]; exits: Vec[];
   /** The basin's bounding box, and a box round everything solid that belongs to the harbor. */
@@ -78,7 +80,7 @@ export const HARBORS: Harbor[] = SOURCES.map(({ id, name, short, data: D }) => {
   // (an end that stops short of a walkway, or runs on over it, is made to meet its edge: as drawn, and as solid)
   const walkways = walks.map(w => meetEdge(w, walks.filter(o => o !== w), WALKWAY_W)), areas = D.areas.map(v);
   return {
-    id, name, short, basin, breakwaters, walkways, fingers: fingers.map(f => meetEdge(f, walks, WALKWAY_W)), areas, beacons, exits,
+    id, name, short, basin, breakwaters, shore: (D.shore ?? []).map(v), walkways, fingers: fingers.map(f => meetEdge(f, walks, WALKWAY_W)), areas, beacons, exits,
     box: boxOf(basin), reach: boxOf([...basin, ...breakwaters.flatMap(b => b.pts), ...walkways.flat(), ...areas.flat()], BREAKWATER_W)
   };
 });
@@ -107,6 +109,7 @@ export function hitsHarbor(p: Vec): boolean {
     if (!inBox(p, H.reach)) continue;
     for (const b of H.breakwaters) if (b.area ? inPoly(p, b.pts) : nearLine(p, b.pts, BREAKWATER_W / 2)) return true;
     for (const a of H.areas) if (inPoly(p, a)) return true;
+    for (const l of H.shore) if (nearLine(p, l, SHORE_W / 2)) return true;
     for (const w of H.walkways) if (nearLine(p, w, WALKWAY_W / 2)) return true;
     for (const f of H.fingers) if (nearLine(p, f, FINGER_W / 2)) return true;
   }
