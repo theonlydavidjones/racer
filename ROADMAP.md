@@ -126,13 +126,13 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
-- **The Bay Bridge and the city at night** (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
   suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
   the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
   night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
   and time, so the lights come on at real dusk. Sources: Caltrans and OSM for the bridge's geometry; the Bay Lights' own
   published specifications for its LEDs and patterns.
-- **Lights on the boats at night** (owner, November 2026: "make them beautiful"; 4–6 h): the real navigation lights for a
+- ~~**Lights on the boats at night**~~ (done, v69: sidelights and sternlight or a masthead tricolour, by the Rule 25 arcs; the rule text couldn't be fetched here, so arcs and ranges are flagged in src/render/navLights.ts for checking) (owner, November 2026: "make them beautiful"; 4–6 h): the real navigation lights for a
   sailing vessel under 20 m (Inland/International Rules 25): red and green sidelights over 112.5° each, the white
   sternlight over 135°, or the masthead tricolour as an option under sail; the steaming light when motoring and the
   all-round white anchor light at anchor or on a mooring. Their sectors exact, so you can read another boat's heading
