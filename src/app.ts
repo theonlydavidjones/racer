@@ -27,6 +27,7 @@ import { DT, World, describeTide } from './sim/world';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
+import { autoAcross, showCrewRow } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { PerfMeter } from './ui/perfMeter';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
@@ -440,33 +441,32 @@ function showLines(): void {
 const sheetBtn = (id: string, key: 'mainsheet' | 'jibsheet', dir: -1 | 1) =>
   holdBtn(id, () => { btnCmd[key] = dir; applyHeld(); }, () => { if (btnCmd[key] === dir) delete btnCmd[key]; applyHeld(); });
 sheetBtn('bMainIn', 'mainsheet', -1); sheetBtn('bMainOut', 'mainsheet', 1); sheetBtn('bJibIn', 'jibsheet', -1); sheetBtn('bJibOut', 'jibsheet', 1);
-/* Placing the crew yourself (boat/crewPhys.ts): their weight across the boat and fore and aft. Tap the lit one again
- * (or Auto) and it's their call again. They still go where their jobs take them (a winch, the cabin top, the car). */
+/* Placing the crew yourself (boat/crewPhys.ts): their weight across the boat and fore and aft. Choosing a place takes
+ * the crew off auto and they stay there (through tacks, puffs and lulls) until you choose another or tap Auto, as a
+ * sail line stays yours until you give it back. They still go where the sheets take them through a tack. */
 const ACROSS: PlaceAcross[] = ['lee', 'mid', 'up', 'hike'], FORE: PlaceFore[] = ['aft', 'mid', 'fwd'];
-function setPlace(part: 'across' | 'fore', v: PlaceAcross | PlaceFore | null): void {
+function setPlace(part: 'across' | 'fore', v: PlaceAcross | PlaceFore): void {
   const c = w.user.crew; if (!c || !w.running) return;
-  const pl = c.place ?? { across: null, fore: null };
-  if (part === 'across') pl.across = v as PlaceAcross | null; else pl.fore = v as PlaceFore | null;
-  c.place = pl.across == null && pl.fore == null ? undefined : pl;
-  if (!c.spec.crew.length && part === 'fore' && v) toast('Single-handed, you can\'t leave the tiller to move forward: only your own weight across the boat moves.', 3500);
-  showCrewPlace();
+  if (!c.spec.crew.length && part === 'fore') { toast('Single-handed, you can\'t leave the tiller to move forward: only your own weight across the boat moves.', 3500); return; }
+  const was = !!c.place, pl = c.place ?? { across: null, fore: null };
+  if (part === 'across') pl.across = v as PlaceAcross; else pl.fore = v as PlaceFore;
+  c.place = pl;
+  if (!was) toast('Crew off auto: they stay where you put them until you move them or tap Auto.', 3000);
+  showCrewRow(w.user);
 }
 function stepCrew(part: 'across' | 'fore', d: number): void {
   const c = w.user.crew; if (!c) return;
-  const list: string[] = part === 'across' ? ACROSS : FORE, cur = c.place?.[part] ?? (part === 'across' ? autoAcross() : 'mid');
+  const list: string[] = part === 'across' ? ACROSS : FORE, cur = c.place?.[part] ?? (part === 'across' ? autoAcross(w.user) : 'mid');
   setPlace(part, list[Math.max(0, Math.min(list.length - 1, list.indexOf(cur) + d))] as PlaceAcross | PlaceFore);
 }
-/** Where the crew have put themselves, in the buttons' terms (to step from). */
-function autoAcross(): PlaceAcross { const m = w.user.crew?.mode; return m === 'leeward' ? 'lee' : m === 'hike' ? 'hike' : m === 'centre' || m === 'downwind' || m === 'foredeck' ? 'mid' : 'up'; }
-function showCrewPlace(): void {
-  const pl = w.user.crew?.place;
-  document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => bt.classList.toggle('on', pl?.across === bt.dataset.ca));
-  document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.classList.toggle('on', pl?.fore === bt.dataset.cf));
-  $('bCrewAuto').hidden = !pl;
-}
-document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => bt.onclick = () => setPlace('across', w.user.crew?.place?.across === bt.dataset.ca ? null : bt.dataset.ca as PlaceAcross));
-document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.onclick = () => setPlace('fore', w.user.crew?.place?.fore === bt.dataset.cf ? null : bt.dataset.cf as PlaceFore));
-$('bCrewAuto').onclick = () => { const c = w.user.crew; if (c) { c.place = undefined; showCrewPlace(); toast('The crew places their own weight again.', 2500); } };
+const showCrewPlace = () => showCrewRow(w.user);
+document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => bt.onclick = () => setPlace('across', bt.dataset.ca as PlaceAcross));
+document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.onclick = () => setPlace('fore', bt.dataset.cf as PlaceFore));
+$('bCrewAuto').onclick = () => {
+  const c = w.user.crew; if (!c) return;
+  if (!c.place) { toast('The crew are on auto, placing their own weight (the outline shows where). Tap a place to put them there yourself.', 3500); return; }
+  c.place = undefined; showCrewPlace(); toast('Crew back on auto: they place their own weight again.', 2500);
+};
 function togglePole(): void {
   if (!w.running || w.paused) return;
   const u = w.user; u.poleWant = !u.poleWant;
