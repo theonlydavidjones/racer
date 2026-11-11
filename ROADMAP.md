@@ -89,7 +89,8 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
-  (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. Also check whether the "big white V" at the
+  (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
+  and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
 - **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
