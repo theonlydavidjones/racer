@@ -88,6 +88,8 @@ export interface Job {
   side?: 'S' | 'P'; target?: { fore: number; ins: number };
   /** (A control line) where they're setting it. */
   to?: number;
+  /** A trip a crew you've placed makes only for a big change (crewWork.ts PLACED_TRIP). */
+  big?: boolean;
 }
 /** Where a job puts a person: across (m, + to windward), fore-and-aft (m), and how they're posed. */
 export interface Station { arm: number; z: number; pose: Pose }

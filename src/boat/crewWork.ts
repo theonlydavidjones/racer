@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type Station } from './crewPhys';
+import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -33,6 +33,19 @@ export const PRIORITY: readonly Ctl[] = ['jibsheet', 'mainsheet', 'traveller', '
 const PIANO = new Set<string>(['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham']);
 /** The cabin-top lines led to both sides (controls.ts: vang, outhaul and jib Cunningham are dual-ended): worked from the windward side deck. */
 const BOTH_SIDES = new Set<string>(['vang', 'outhaul', 'jibCunningham']);
+
+/**
+ * The crew's own lines that wait while you've placed them across the boat: the ones they'd have to leave their place
+ * for, so they make the trip only for a big change (PLACED_TRIP), not every tweak. With crew, the main Cunningham (led to the port side) and the downhaul (the middle); the dual-ended vang, outhaul
+ * and jib Cunningham are led to both side decks, so they work those from where they sit. Alone, the helm would have to
+ * leave the tiller for any of the cabin-top lines.
+ */
+/** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
+export const PLACED_TRIP = 0.3;
+export function waitingLines(c: CrewState): readonly string[] {
+  if (c.place?.across == null) return [];
+  return c.spec.crew.length ? ['cunningham', 'downhaul'] : [...PIANO];
+}
 
 /** Who works a line (an index into [helm, crew…]): by the number of crew. */
 export function ownerOf(line: string, nCrew: number): number {
@@ -98,10 +111,14 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const n = c.spec.crew.length, ppl = allAboard(c.spec), windward = c.wind;
   const err = (k: Ctl) => Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
   const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet';
+  const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
   // finish or drop jobs on lines that are done, or that you've taken. A control line is set to where the crew wanted it
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
   c.people.forEach(a => {
     const j = a.job; if (!j) return;
+    // (placed by you: they leave a tweak they'd have to leave their place for, and work the dual-ended lines from there)
+    if (waits.includes(j.line) && !j.big) { a.job = null; return; }
+    if (placed && BOTH_SIDES.has(j.line)) j.station = null;
     if (j.line in want) { const to = sheetOf(j.line) ? want[j.line as Ctl]! : j.to ?? want[j.line as Ctl]!; if (Math.abs(to - b.ctl[j.line as Ctl]) < DONE) a.job = null; }
     else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
   });
@@ -118,6 +135,11 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const sheet = k === 'jibsheet' || k === 'mainsheet';
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
+    // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
+    // main Cunningham (port side) and the downhaul (the middle) wait, and the crew's plan sets the rest around them
+    // main Cunningham (port side) and the downhaul (the middle) get a trip only for a big change (a new wind, not a tweak)
+    const big = waits.includes(k) && e >= PLACED_TRIP;
+    if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
       const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
@@ -125,10 +147,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (!sheet || committed || onSheet) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
-    const st = stationFor(k, who, windward, k === 'jibsheet' && hauling && e > 0.08, breeze);
+    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > 0.08, breeze);
     // the sheets are in hand: no walk unless they're away from them
     const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
-    a.job = { line: k, reach, work: 0, station: st, to: want[k] };
+    a.job = { line: k, reach, work: 0, station: st, to: want[k], ...(big ? { big } : {}) };
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {
@@ -173,8 +195,8 @@ function carJob(b: Boat, dt: number): void {
   const skill = skillOf(p);
   b.carOff = (b.carOff ?? 0) + dt;
   // your call: as soon as they're free. Their own: a change that has lasted, worth a pin (a novice: two), and not while
-  // she needs their weight on the rail
-  const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20);
+  // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)
+  const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && c.place?.across == null);
   if (!worth || a.job) return;
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
 }

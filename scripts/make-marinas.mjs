@@ -19,7 +19,7 @@
  *   Its basin is closed off along the coastline of the club's point, the breakwater and the Main Street decks.
  * Output: src/geo/data/<id>.json
  */
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 
 const HARBORS = {
   'gashouse-cove': {
@@ -43,6 +43,17 @@ const HARBORS = {
     basin: { marina: 'South Beach Harbor' }, letter: 'named',
     // two ways in, each between a pair of lateral beacons (OSM seamarks, from NOAA's chart): north by Pier 40, and south by the fishing pier
     exits: [[37.78194, -122.38469], [37.77830, -122.38524]]
+  },
+  'horseshoe-bay': {
+    name: 'Travis Marina, Horseshoe Bay', bbox: [-122.4800, 37.8300, -122.4715, 37.8360],
+    // the basin: the water inside OSM's Travis Marina outline (which takes in Marina Road's lot and the north shore's
+    // buildings), worked out by scripts/make-horseshoe-basin.py; the beach below the Presidio Yacht Club is solid shore
+    basin: { file: 'horseshoe-basin.json' },
+    // the paved path along the breakwater's top (OSM footway 225654086, surface=paved; the owner's photo from ashore)
+    pathIds: ['225654086'],
+    letter: 'north-south', piles: 'white', // (floating docks on white piles: the owner's photos)
+    // the way in: between the south breakwater's west end and the Coast Guard station's breakwater, looking west to the bridge
+    exits: [[37.8324, -122.4764]]
   },
   corinthian: {
     name: 'Corinthian Yacht Club', bbox: [-122.4600, 37.8700, -122.4535, 37.8740],
@@ -81,7 +92,8 @@ async function make(id, H) {
   const pts = w => w.nds.map(i => nodes.get(i)).filter(Boolean).map(n => [r7(n.lat), r7(n.lon)]);
   const len = p => p.slice(1).reduce((a, q, i) => { const A = xy(p[i]), B = xy(q); return a + Math.hypot(B.x - A.x, B.y - A.y); }, 0);
 
-  const basin = H.basin.pts ?? pts(ways.find(w => w.tags.leisure === 'marina' && w.tags.name === H.basin.marina) ?? fail(`no marina ${H.basin.marina}`));
+  const basinFile = H.basin.file ? JSON.parse(await readFile(new URL(`./data/${H.basin.file}`, import.meta.url), 'utf8')) : null;
+  const basin = basinFile?.basin ?? H.basin.pts ?? pts(ways.find(w => w.tags.leisure === 'marina' && w.tags.name === H.basin.marina) ?? fail(`no marina ${H.basin.marina}`));
   const BP = basin.map(xy), inBasin = p => inPoly(p, BP);
   const near = (p, d) => inBasin(p) || BP.some((a, i) => segDist(p, a, BP[(i + 1) % BP.length]) < d);
   const skip = new Set(H.skipIds ?? []), bwIds = new Set(H.breakwaterIds ?? []);
@@ -184,7 +196,8 @@ async function make(id, H) {
     source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? 'Dock letters are the docks\' names in OSM; slip numbers are this sim\'s.' : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}`,
     fetched: new Date().toISOString().slice(0, 10), name: H.name,
     basin, breakwaters, walkways: walkways.map(w => w.pts), fingers: fingers.map(f => f.pts), areas,
-    beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : {}), slips: out
+    beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : basinFile?.shore ? { shore: basinFile.shore } : {}), ...(H.piles ? { piles: H.piles } : {}),
+    ...(H.pathIds ? { paths: ways.filter(w => H.pathIds.includes(w.id)).map(pts) } : {}), slips: out
   }) + '\n');
   const docksUsed = [...new Set(out.map(s => s.dock))].join('');
   console.log(`${id}: basin ${basin.length} pts, ${breakwaters.length} breakwaters, ${walkways.length} walkways (docks ${docksUsed}), ${fingers.length} fingers (${fingers.filter(f => f.made).length} inferred), ${areas.length} pier areas, ${beacons.length} beacons, ${out.length} slips`);
