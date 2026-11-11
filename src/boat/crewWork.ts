@@ -34,8 +34,9 @@ const PIANO = new Set<string>(['vang', 'outhaul', 'cunningham', 'downhaul', 'jib
 /** The cabin-top lines led to both sides (controls.ts: vang, outhaul and jib Cunningham are dual-ended): worked from the windward side deck. */
 const BOTH_SIDES = new Set<string>(['vang', 'outhaul', 'jibCunningham']);
 /**
- * The cabin-top lines are set for the wind there is, not each puff: the forward hand goes to one when it's off from
- * where the crew have wanted it lately (their wish over about the last LINE_TAU s), not from this moment's. The puffs
+ * The cabin-top lines are set for the wind there is, not each puff: the forward hand goes to one only when it's off
+ * both from where the crew have wanted it lately (their wish over about the last LINE_TAU s) and from where they want
+ * it now, the same way: a change that has come to stay. The puffs
  * are the mainsheet's and the traveller's; the gust-lull cycle on the water is about a minute (Bethwaite, High
  * Performance Sailing), so the wind of the last 20 s or so is the wind there is. (An estimate.) A line knocked off, or
  * a new wind that has come to stay, is seen to as before.
@@ -136,17 +137,22 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   });
   // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
   // times a second: quicker than anyone reacts)
-  c.jobT = (c.jobT ?? 0) - dt;
+  c.jobT = (c.jobT ?? 0) - dt; c.lineT = (c.lineT ?? 0) + dt;
   const look = c.jobT <= 0; if (look) c.jobT = 0.05;
+  // (where they've wanted each cabin-top line lately: the wish smoothed over LINE_TAU, kept up whoever is busy)
+  const lw = c.lineWant ??= {};
+  if (look) { for (const k of PIANO) if (k in want) { const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); } c.lineT = 0; }
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
     const who = ownerOf(k, n), a = c.people[who]; if (!a) continue;
     const skill = skillOf(ppl[who]), e = err(k);
     if (a.job?.line === k) continue;
     if (PIANO.has(k)) {
-      const lw = c.lineWant ??= {}; lw[k] = lw[k] == null ? want[k]! : lw[k] + (want[k]! - lw[k]) * 0.05 / LINE_TAU;
-      if (Math.abs(lw[k] - b.ctl[k]) < startThreshold(k, skill, want[k])) continue;
-    } else if (e < startThreshold(k, skill, want[k])) continue;
+      // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
+      const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
+      if (Math.abs(dl) < th || Math.abs(dn) < th || dl * dn <= 0) continue;
+    }
+    else if (e < startThreshold(k, skill, want[k])) continue;
     const sheet = k === 'jibsheet' || k === 'mainsheet';
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;

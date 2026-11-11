@@ -131,9 +131,9 @@ export interface CrewState {
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
   tgt?: Target[]; decideT?: number;
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
-  held?: (Held | null)[]; clock?: number; holdT?: number; placeKey?: string;
+  held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>;
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number;
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -247,18 +247,19 @@ export interface CrewCall {
  * set up only small, smooth moves: Sailing World, North Sails, Yachting World on keelboat heel), and the main is played
  * for the short puffs. So each free person keeps the place they've settled in until the change the crew would make is
  * worth a move:
- * - `heel`: it would change her heel by more than this many degrees (the dead band, sized by her stiffness there:
- *   about 0.2 m of arm for three people on a Folkboat);
- * - `last`: and it has lasted this long (s) — a puff that's gone again isn't worth moving for (gusts mostly last under
- *   20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High Performance
- *   Sailing);
- * - `dwell`: and it's this long (s) since they last moved, so they don't shuffle back and forth;
- * - `urgent`: unless it's this many times the dead band (a real puff or lull, a bear-away at a mark): then they go as
- *   soon as it has lasted, however lately they moved.
- * Through a tack or gybe, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
+ * - `heel`: the move would change her heel by more than this many degrees if the crew all moved by it together (the
+ *   dead band, sized by her stiffness there: about 0.18 m of arm each for three people on a Folkboat);
+ * - `last`: and the change has lasted this long (s) — a flicker that's gone again isn't worth moving for (gusts mostly
+ *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
+ *   Performance Sailing);
+ * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
+ * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time):
+ *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
+ *   body, not a move.
+ * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 4, fore: 0.3 };
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
 interface Held { arm: number; z: number; since: number; off: number }
 
 /**
@@ -357,7 +358,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
     if (c.roll?.phase === 'flatten') for (const i of free) tgt[i] = { arm: maxOf(i), z: tgt[i].z, pose: 'hike' };
     if (c.roll?.phase === 'hold' && !helmBusy) tgt[0] = { arm: c.people[0].x * w, z: Z.helm, pose: 'helm' };
-    hold(c, tgt, k, tacked, W);
+    hold(c, tgt, k, tacked, W, maxOf);
     c.tgt = tgt;
   }
   c.clock = (c.clock ?? 0) + dt;
@@ -398,12 +399,14 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
  * The dead band (HOLD): each free person (and the helm, when not steering from a job) stays where they've settled
  * unless the new place is worth a move. Run as the crew decide (20 times a second); changes `tgt` in place.
  */
-function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: number[]): void {
+function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: number[], maxOf: (i: number) => number): void {
   const held = c.held ??= [], now = c.clock ?? 0, step = Math.max(0, now - (c.holdT ?? now));
   c.holdT = now;
   const key = c.place ? `${c.place.across}/${c.place.fore}` : '';
-  // (where you've put them, they stay on your word, not their own judgment)
-  const reset = tacked || !!c.roll || key !== c.placeKey || !!c.place?.across;
+  // (through a tack or gybe and for a few seconds after, while they settle on the new side, they go where they're
+  // wanted; where you've put them, they stay on your word, not their own judgment)
+  if (tacked || c.roll) c.settleT = now;
+  const reset = now - (c.settleT ?? -1e9) < HOLD.settle || key !== c.placeKey || !!c.place?.across;
   c.placeKey = key;
   // the arm a move has to be worth: the dead band's heel over her stiffness, shared by everyone who'd move
   let movers = 0; c.people.forEach((a, i) => { if (!a.job?.station && tgt[i]?.pose !== 'mast') movers += W[i]; });
@@ -415,14 +418,19 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     if (!t || a.job?.station || t.pose === 'mast') { held[i] = null; return; }
     if (reset || !h) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; return; }
     h.since += step;
-    // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire, is the body, not a move)
+    // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
+    // again, is the body, not a move)
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i]);
-    if (t.arm > sa + 0.04 && h.arm > sa + 0.04) { h.arm = t.arm; h.z = t.z; return; }
-    const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z);
+    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
+    const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
-    if (worth && h.off >= HOLD.last && (h.since >= HOLD.dwell || dArm > HOLD.urgent * dead)) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; return; }
-    // (stay put: sitting, hiking or to leeward by where they stay)
+    // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
+    // change of place for the trim, waits until it has lasted, and the dwell
+    const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
+    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; return; }
+    // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
+    h.arm = Math.min(h.arm, maxOf(i));
     t.arm = h.arm; t.z = h.z;
     if (i === 0) t.pose = 'helm';
     else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit';

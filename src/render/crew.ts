@@ -132,8 +132,8 @@ function onDeck(s: number, z: number, lean: number, k: number): PoseT {
   const knee = V(s * (c - 0.07), deckY(u, c) + coamH(z) + 0.07, z - 0.04);
   const hipY = deckY(u, e - 0.1) + 0.09 * k, dy = hipY - knee.y, l1 = BONE.thigh * k;
   const hipX = Math.min(e + 0.06 * lean, Math.abs(knee.x) + Math.sqrt(Math.max(0.01, l1 * l1 - dy * dy)));
-  const yaw = s * (Math.PI / 2 - 0.35 + 0.25 * lean), r = right(yaw);
-  const foot = (j: number) => onGround(V(s * (c - 0.16), 0, z - 0.06).addScaledVector(r, (j ? 1 : -1) * 0.09 * k));
+  const yaw = s * (Math.PI / 2 - 0.2 + 0.15 * lean), r = right(yaw);
+  const foot = (j: number) => onGround(V(s * (c - 0.19), 0, z - 0.06).addScaledVector(r, (j ? 1 : -1) * 0.09 * k));
   const hip = V(s * hipX, hipY, z), f = fwd(yaw);
   // hands: sitting, on the knees; hiking, one on the coaming beside them and one across the chest (on the sheet)
   const hands: [THREE.Vector3, THREE.Vector3] = lean > 0.15
@@ -178,7 +178,7 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     return p;
   }
   // in the cockpit: crouched under the boom, stepping over the seats and the thwart (with room ahead for the knees)
-  z = Math.max(z, COCK0 + 0.5);
+  z = Math.max(z, COCK0 + 0.5); if (z < THWART.z) z = Math.min(z, THWART.z - THWART.half - 0.24);
   const hip = V(x, g + 0.42 * k, z);
   const foot = (j: number) => { const sw = Math.sin(ph + j * Math.PI), p = V(x, 0, z).addScaledVector(f, 0.12 * sw * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k); return p.setY(ground(p.x, p.z) + 0.06 + 0.07 * Math.max(0, Math.cos(ph + j * Math.PI))); };
   // hands down to the seat or the coaming for balance
@@ -211,7 +211,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // the cabin-top lines at its after end: kneeling on the sole at the forward end of the cockpit,
     // facing forward, hands on the lines
     const zk = COCK0 + 0.35, px = s * Math.min(ax, chz(zk) - SEAT.d - 0.14), top = cabinTopAt(uAtZ(COCK0 - 0.12), Math.abs(px));
-    return kneel(px, zk, 0, [V(px - 0.12, top + 0.05, COCK0 - 0.14), V(px + 0.12, top + 0.05, COCK0 - 0.1)], k);
+    { const p = kneel(px, zk, 0, [V(px - 0.12, top + 0.05, COCK0 - 0.14), V(px + 0.12, top + 0.05, COCK0 - 0.1)], k); p.pitch = -0.25; return p; }
   }
   let p: PoseT;
   if (ax >= chz(zc) - 0.06 || job === 'hike') p = onDeck(s, zc, lean, k);
@@ -340,13 +340,13 @@ function track(f: Figure, x: number, z: number, dt: number): number {
 export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3): void {
   const ppl = c?.people;
   // (two of them on the same side don't sit in each other's laps: at least a shoulder's width apart fore and aft)
-  const ZMIN = COCK0 + 0.42, ZMAX = THWART.z - THWART.half - 0.2, inC = (z: number) => z > COCK0 - 0.1 && z < THWART.z;
+  const ZMIN = COCK0 + 0.5, ZMAX = THWART.z - THWART.half - 0.2, inC = (z: number) => z > COCK0 - 0.1 && z < THWART.z;
   const zs = cr.crew.map((_, i) => { const z = ppl?.[i + 1]?.z ?? 1.3 + 0.6 * i; return inC(z) ? Math.min(ZMAX, Math.max(ZMIN, z)) : z; });
   for (let i = 1; i < zs.length; i++) for (let j = 0; j < i; j++) {
     const a = ppl?.[i + 1], o = ppl?.[j + 1];
-    if (a && o && Math.sign(o.x) === Math.sign(a.x) && inC(zs[i]) && inC(zs[j]) && Math.abs(zs[i] - zs[j]) < 0.55) {
-      const fore = Math.min(zs[i], zs[j]), lo = Math.min(fore, ZMAX - 0.55);
-      if (zs[i] >= zs[j]) { zs[j] = lo; zs[i] = lo + 0.55; } else { zs[i] = lo; zs[j] = lo + 0.55; }
+    if (a && o && Math.sign(o.x) === Math.sign(a.x) && inC(zs[i]) && inC(zs[j]) && Math.abs(zs[i] - zs[j]) < 0.47) {
+      const fore = Math.min(zs[i], zs[j]), lo = Math.min(fore, ZMAX - 0.47);
+      if (zs[i] >= zs[j]) { zs[j] = lo; zs[i] = lo + 0.47; } else { zs[i] = lo; zs[j] = lo + 0.47; }
     }
   }
   // (two of them in the middle sit side by side on the sole)

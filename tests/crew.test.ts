@@ -141,8 +141,8 @@ describe('Crew work: one job at a time, at their pace (2d)', () => {
     const most = (n: number) => {
       const twa = beatAngle(18), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 18 }); b.crew = newCrew(crewOf(0.6, n), 'S');
       sail(b, 0.5); // (set up before she sails)
-      // then the lines knocked off, so there's work to do
-      Object.assign(b.ctl, { backstay: 0, vang: 0, cunningham: 0, outhaul: 0 });
+      // then the lines knocked off (the backstay right on: a long ease for the helm), so there's work to do
+      Object.assign(b.ctl, { backstay: 1, vang: 0, cunningham: 0, outhaul: 0 });
       let prev = { ...b.ctl }, top = 0;
       sail(b, 40, () => { b.h = 360 - twa; const moving = lines.filter(k => Math.abs(b.ctl[k] - prev[k]) > 1e-6).length; top = Math.max(top, moving); prev = { ...b.ctl }; });
       return top;
@@ -210,7 +210,7 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
       c.people.forEach((p, i) => {
         if (p.job?.station && PIANO.includes(p.job.line) && !p.job.big) bad.push(`${when}: #${i} left the rail for the ${p.job.line}`);
         if (p.job?.big) trips++;
-        if (i > 0 && !p.job && c.tgt![i].pose !== 'hike') bad.push(`${when}: #${i} ${c.tgt![i].pose}`);
+        if (i > 0 && !p.job && c.tgt![i].pose !== 'hike' && !['piano', 'winch', 'car', 'mast'].includes(c.tgt![i].pose)) bad.push(`${when}: #${i} ${c.tgt![i].pose}`); // (a job just done: the plan catches up within 0.05 s)
       });
     };
     const leg = (secs: number, kt: number, label: string) => { b.ww.kt = kt; sail(b, secs, t => { if (t > 5 && Math.abs(t % 1) < 1 / 120) check(`${label} ${t.toFixed(0)}s`); }); };
@@ -266,11 +266,37 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     return n.slice(1);
   }
   it('they sit still through the flicker and move on the real puffs and lulls', () => {
-    // in 10 kt they're up on the windward deck whatever the puffs do: they stay there
-    for (const m of moves(10)) expect(m).toBeLessThan(10);
+    // in 10 kt they're up on the windward deck whatever the puffs do: they stay there, but for a hike as a puff hits
+    for (const m of moves(10)) expect(m).toBeLessThan(20);
     // in 7 kt the same ±2 kt takes her from light air (weight to leeward) to a breeze (up to windward) every half minute:
-    // out on the puff and in on the lull, not every flicker (twenty cycles: under three moves a cycle; without the dead
+    // out on the puff and in on the lull (a step more at most), not every flicker (twenty cycles: under four moves a cycle; without the dead
     // band it was over 700)
-    for (const m of moves(7)) expect(m).toBeLessThan(60);
+    for (const m of moves(7)) expect(m).toBeLessThan(80);
   }, 30000);
+});
+
+describe('The dead band answers what matters (physics review)', () => {
+  const puffy = (W: number) => (t: number) => W + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3);
+  it("the forward hand isn't parked at the cabin top in a puffy breeze: the lines are set for the wind there is", () => {
+    for (const W of [7, 12, 18]) {
+      const twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 4, windKt: W }); b.crew = newCrew(crewOf(0.6), 'S');
+      const wind = puffy(W); let at = 0, n = 0;
+      sail(b, 300, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: wind(t) }; if (t > 30) { n++; if (b.crew!.people[2].pose === 'piano') at++; } });
+      expect(at / n).toBeLessThan(0.35); // (before the dead band: 26–40% of the time, and up to 91% with a naive one)
+    }
+  }, 60000);
+  it('they hike out as a strong puff hits, not seconds later', () => {
+    const twa = beatAngle(8), b = testBoat({ heading: 360 - twa, kt: 4, windKt: 8 }); b.crew = newCrew(crewOf(0.6), 'S');
+    sail(b, 40, () => { b.h = 360 - twa; });
+    b.ww = { ...b.ww, kt: 18 };
+    sail(b, 2.5, () => { b.h = 360 - twa; });
+    expect(b.crew.hike).toBeGreaterThan(0.5);
+  });
+  it('after a roll tack in a moderate breeze they settle to sitting on the new side within a few seconds', () => {
+    const b = testBoat({ heading: 360 - beatAngle(9), kt: 4.5, windKt: 9 }); b.crew = newCrew(crewOf(0.7), 'S');
+    sail(b, 30, () => { b.h = 360 - beatAngle(9); });
+    startTack(b); let t0 = -1;
+    sail(b, 25, t => { if (t0 < 0 && !b.crew!.roll && b.tack === 'P' && !b.tacking) t0 = t; if (t0 > 0 && t > t0 + 8) return true; });
+    for (const p of b.crew.people.slice(1)) expect(p.lean).toBeLessThan(0.3);
+  });
 });
