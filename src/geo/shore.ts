@@ -26,8 +26,10 @@ const SHORE_LL: [number, number][] = [
 // the piers 50–200 m too far east and too long)
 // and on from Fort Mason past Aquatic Park, Fisherman's Wharf and Pier 39 to Pier 27 (OpenStreetMap,
 // scripts/make-wharf.mjs; the hand-drawn shore ran across Aquatic Park and south of the Wharf, so Pier 39 and the
-// Wharf's piers were water). The coastline runs round the solid-fronted piers (45, 39, 35 to 27); the open piers,
-// breakwaters and floating docks it leaves out are solid below (WHARF).
+// Wharf's piers were water). OSM's coastline runs round the big shed piers (45, 39, 35 to 27): built on piles, but their
+// sheds and dense pile fields make the pier-head line act as the bank, for the wind and for the current. The open piers,
+// breakwaters and floating docks it leaves out are solid below (WHARF), and shelter the water from the current
+// (wharfDist, used by the current's shore relief).
 type WharfData = { coast: [number, number][]; piers: { name?: string; kind: string; pts: [number, number][] }[]; lines: { name?: string; kind: string; width: number; pts: [number, number][] }[] };
 const W = wharf as unknown as WharfData;
 const COAST = [...(marinaCoast as unknown as { coast: [number, number][] }).coast, ...W.coast];
@@ -86,6 +88,46 @@ export function hitsWharf(p: Vec): boolean {
   return false;
 }
 
+/**
+ * The nearest of the Wharf's piers, breakwaters and docks (m; 0 inside one; Infinity beyond `max`), the direction away
+ * from it, and whether that's along its side (a continuing obstruction, as a breakwater or a pier's flank) or at an end
+ * or corner (a pier head).
+ */
+export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; side: boolean } | null {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  if (p.x < WHARF_BOX.x0 - max || p.x > WHARF_BOX.x1 + max || p.y < WHARF_BOX.y0 - max || p.y > WHARF_BOX.y1 + max) return null;
+  let best: { d: number; q: Vec; side: boolean } | null = null;
+  const near = (b: WharfPart['box']) => p.x >= b.x0 - max && p.x <= b.x1 + max && p.y >= b.y0 - max && p.y <= b.y1 + max;
+  const seg = (a: Vec, b: Vec, half: number) => {
+    const abx = b.x - a.x, aby = b.y - a.y, L2 = abx * abx + aby * aby || 1, t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / L2));
+    const q = { x: a.x + abx * t, y: a.y + aby * t }, d = Math.hypot(p.x - q.x, p.y - q.y) - half;
+    if (!best || d < best.d) best = { d, q, side: t > 0.02 && t < 0.98 };
+  };
+  for (const a of WHARF.areas) if (near(a.box)) { for (let i = 0; i < a.pts.length; i++) seg(a.pts[i], a.pts[(i + 1) % a.pts.length], 0); if (inPoly(p, a.pts)) best!.d = 0; }
+  for (const l of WHARF.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l.pts[i - 1], l.pts[i], l.width! / 2);
+  const b = best as { d: number; q: Vec; side: boolean } | null;
+  if (!b || b.d > max) return null;
+  const dx = p.x - b.q.x, dy = p.y - b.q.y, L = Math.hypot(dx, dy) || 1;
+  return { d: Math.max(0, b.d), n: { x: dx / L, y: dy / L }, side: b.side };
+}
+export const wharfDist = (p: Vec, max = 400): number => wharfNearest(p, max)?.d ?? Infinity;
+
+/** Does the straight line from a to b touch any of the Wharf's piers, breakwaters or docks? (Exact: they're 1–10 m wide.) */
+export function wharfCrossed(a: Vec, b: Vec): boolean {
+  const bx0 = Math.min(a.x, b.x), bx1 = Math.max(a.x, b.x), by0 = Math.min(a.y, b.y), by1 = Math.max(a.y, b.y);
+  if (bx1 < WHARF_BOX.x0 || bx0 > WHARF_BOX.x1 || by1 < WHARF_BOX.y0 || by0 > WHARF_BOX.y1) return false;
+  const hit = (bb: WharfPart['box']) => !(bx1 < bb.x0 || bx0 > bb.x1 || by1 < bb.y0 || by0 > bb.y1);
+  const cr = (o: Vec, p: Vec, q: Vec) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const crosses = (p: Vec, q: Vec, r: Vec, s: Vec) => (cr(p, q, r) > 0) !== (cr(p, q, s) > 0) && (cr(r, s, p) > 0) !== (cr(r, s, q) > 0);
+  const segSeg = (p: Vec, q: Vec, r: Vec, s: Vec) => crosses(p, q, r, s) ? 0 : Math.min(segPt(p, r, s), segPt(q, r, s), segPt(r, p, q), segPt(s, p, q));
+  for (const A of WHARF.areas) if (hit(A.box)) {
+    if (inPoly(a, A.pts) || inPoly(b, A.pts)) return true;
+    for (let i = 0; i < A.pts.length; i++) if (crosses(a, b, A.pts[i], A.pts[(i + 1) % A.pts.length])) return true;
+  }
+  for (const L of WHARF.lines) if (hit(L.box)) for (let i = 1; i < L.pts.length; i++) if (segSeg(a, b, L.pts[i - 1], L.pts[i]) <= L.width! / 2) return true;
+  return false;
+}
+
 /** Is this point land a boat would run aground on? (In a marina's basin: only its docks and breakwaters; and those are solid just outside it too.) */
 export const onLand = (p: Vec): boolean => onGround(p) || hitsWharf(p);
 
@@ -108,6 +150,7 @@ const SG = (() => {
   return { x0, y0, nx, ny, cells };
 })();
 export function shoreDist(p: Vec): number {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return NaN; // (the ring search would never end)
   const { x0, y0, nx, ny, cells } = SG;
   const ci = Math.floor((p.x - x0) / SC), cj = Math.floor((p.y - y0) / SC);
   // start from the ring that first reaches the grid, if the point is outside it

@@ -1,7 +1,7 @@
 import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
-import { onLand, shoreDist } from '../geo/shore';
+import { onLand, shoreDist, wharfCrossed, wharfNearest } from '../geo/shore';
 import type { Outlook } from './outlook';
 
 /**
@@ -180,7 +180,7 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
 
 /**
  * A way round the land from a to b for a cruise, as you'd draw it on the chart: the straight line if it keeps `clear`
- * metres off the land, or else the shortest way through the water on a 50 m grid (A*), pulled straight between the
+ * metres off the land, or else the shortest way through the water on a 50 m grid (10 m by the Wharf; A*), pulled straight between the
  * turns. Near either end (a slip, a cove) it may come closer, as it has to.
  */
 export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
@@ -191,9 +191,12 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
     for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
-  const visible = (p: Vec, q: Vec) => { const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  // (the Wharf's piers, breakwaters and docks are 1–10 m wide: sampling would step over them, so they're tested exactly)
+  const visible = (p: Vec, q: Vec) => { if (wharfCrossed(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   if (visible(a, b)) return [a, b];
-  const cell = 50, pad = 2500;
+  // among the Wharf's piers and docks the fairways are 20–30 m wide: a finer grid there, so the way out of a marina is found
+  const fine = wharfNearest(a, 150) !== null || wharfNearest(b, 150) !== null;
+  const cell = fine ? 10 : 50, pad = fine ? 800 : 2500;
   const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
   const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
   const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
@@ -217,6 +220,7 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
       const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
       const kk = jj * nx + ii; if (kk !== goal && isBlocked(kk)) continue;
       if (di && dj && (isBlocked(j * nx + ii) || isBlocked(jj * nx + i))) continue; // no cutting a corner of the land
+      if (wharfCrossed(at(i, j), at(ii, jj))) continue; // nor through a pier or a dock
       const g = gs[k] + cell * Math.hypot(di, dj);
       if (g < gs[kk]) { gs[kk] = g; from[kk] = k; push([g + h(kk), kk]); }
     }
