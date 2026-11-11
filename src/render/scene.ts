@@ -19,6 +19,7 @@ import { REFLECTIVE } from './boatMesh';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
+import { setRestrictedVisibility } from './navLights';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
 import { Harbor } from './marina';
@@ -586,6 +587,7 @@ export class SceneView {
     if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
     const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3500 : rain === 1 ? 12000 : 70000;
     Object.assign(this.scene.fog as THREE.Fog, { near: fogN, far: fogF });
+    setRestrictedVisibility(fog === 1 || fog === 2 || rain === 2); // the boats' lights by day too (navLights.ts)
     (this.scene.fog as THREE.Fog).color.copy(haze);
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
     (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up);
