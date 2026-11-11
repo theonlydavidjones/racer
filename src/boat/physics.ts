@@ -199,7 +199,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // upwind, flat downwind), then where they actually are (they move at a human pace, and go where their jobs are)
   const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
-  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
+  // (off the wind the heel is the same balance of moments as upwind: the eased sails' smaller side force is what heels her
+  // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
+  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt);
   rollTo(b, heelT, rel, disp, dt);
   b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.ceh, clrShift(cs.trim));
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
@@ -448,10 +450,9 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  * solvers looks for each boat at the ideal heel angle"). Here the same search, over the crew's depowering steps
  * (controls.ts targetShape): for each step, her heel where the moments balance with the crew hiking (the wind triangle
  * heeled with her, eqs. 7.2–7.3), and the speed that gives. What pushes her along is the sails' drive less:
- * - the keel's induced drag, growing with the square of the side force and as she heels (ORC eq. 6.37:
- *   DI = FH² / (π·½ρV²·Te²)). The effective draft is the sim's own keel model's (slender-wing lift, Newman §5.12, the
- *   water's surface mirroring the keel: Te² = 2·T²), its depth shortened by cos(heel); ORC works it from the hull's
- *   offsets (MHSD), which aren't published for the Folkboat;
+ * - the keel's induced drag, growing with the square of the side force square to her centre plane (ORC eq. 6.37:
+ *   DI = FH² / (π·½ρV²·Te²); balance.ts netDrive), with Te ORC's effective draft along the keel's own span (MHSD, 0.92 ×
+ *   the draft standing in for the deepest reduced draft, which ORC works from the hull's offsets);
  * - the rudder held over against her weather helm (balance.ts rudderDrag): North Sails' Nordic Folkboat guide eases the
  *   traveller in a breeze "to decrease heel and thus rudder pressure", and pulls the backstay "until the rudder feels
  *   light again";

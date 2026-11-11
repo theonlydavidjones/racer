@@ -4,6 +4,9 @@ import { beatAngle } from '../src/boat/polar';
 import type { Controls } from '../src/boat/controls';
 import type { Boat } from '../src/boat/boat';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
+import { netDrive } from '../src/boat/balance';
+import { polar } from '../src/boat/polar';
+import { KT } from '../src/core/math';
 
 /** Beat at `windKt` with the crew's settings, then (optionally) change the controls yourself and settle again. */
 /** Sail her close-hauled; `full`: the crew held at full power (no depowering of their own), so one line's own effect shows. */
@@ -52,6 +55,31 @@ describe('Heel from the forces on the sails', () => {
     const on = beat(16, c => { c.vang = 1; c.traveller = 0; c.mainsheet = 0.35; }), off = beat(16, c => { c.vang = 0; c.traveller = 0; c.mainsheet = 0.35; });
     expect(on.heelMag!).toBeLessThan(beat(16, undefined, true).heelMag!);
     expect(on.shape.main.twist).toBeLessThan(off.shape.main.twist - 4);
+  });
+});
+
+describe('The keel and the heel, by the same balance everywhere', () => {
+  it("the keel's induced drag is for the force square to her centre plane (ORC VPP Documentation 2022, §3, eq. 6.33), so heeling her doesn't lighten it", () => {
+    // the same sail forces at 15°, 22° and 30° of heel: the keel answers the same push along its own heeled span
+    // (ORC's MHSD), so the drag, and what's left to push her along, are the same (past 15°, where ORC's
+    // nearly-upright multiplier, Fig. 6.8, has gone)
+    const f = { main: { heel: 700, drive: 260 }, jib: { heel: 300, drive: 140 } };
+    const at = (h: number) => netDrive(f, h, 2.5);
+    expect(at(22)).toBeCloseTo(at(15), 6);
+    expect(at(30)).toBeCloseTo(at(15), 6);
+    expect(at(15)).toBeLessThan(400); // (and it is a drag: less than the sails' 400 N of drive)
+  });
+  it('off the wind she heels as far as the balance of moments says, with no step at a broad reach', () => {
+    // the crew held in the middle, so only the sails' force heels her: it eases smoothly as she bears away
+    const heelAt = (twa: number) => {
+      const b = testBoat({ heading: 360 - twa, kt: polar(28, twa, 'jib') / KT, windKt: 28 });
+      b.crew = newCrew(DEFAULT_CREW, 'S'); b.crew.place = { across: 'mid', fore: null };
+      sail(b, 40, () => { b.h = 360 - twa; });
+      return { heel: b.heelMag!, eq: b.heelEqLast! };
+    };
+    const a = heelAt(118), c = heelAt(122);
+    expect(Math.abs(a.heel - c.heel)).toBeLessThan(2);
+    expect(Math.abs(c.heel - c.eq)).toBeLessThan(1);
   });
 });
 
