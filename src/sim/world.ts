@@ -440,6 +440,15 @@ export class World {
     const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
     return { turn: bl(g.turn), k: bl(g.k) };
   }
+  /** fieldAt(p).extra alone, without the shore and the slot at p (for drawing the wind on the water: it has its own terrain grid). */
+  fieldExtra(p: Vec): number {
+    const g = this.field;
+    if (!g) return this.fieldAt(p).extra;
+    const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
+    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) return this.fieldAt(p).extra;
+    const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n, a = g.extra;
+    return (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
+  }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
   fieldAt(p: Vec): { k: number; turn: number; extra: number } {
     const g = this.field;

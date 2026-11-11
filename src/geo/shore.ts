@@ -402,8 +402,54 @@ const SG = (() => {
   return { x0, y0, nx, ny, cells };
 })();
 export const shoreDist = (p: Vec): number => shoreNearest(p).d;
-/** The distance to the shore, and which of SHORE's segments (k: from SHORE[k − 1] to SHORE[k]) is nearest. */
+/*
+ * Which segments can be nearest anywhere in a 25 m cell, worked out the first time a point in the cell is asked about.
+ * Exact: the distance to the shore changes by at most the distance moved, so nowhere in the cell is the shore further
+ * than U = (its distance from the cell's centre) + (the cell's half-diagonal), and a segment further than U from the
+ * whole cell can't be the nearest (nor tie with it) for any point in it. So scanning the cell's list gives the same
+ * answer as scanning every segment, for a handful of them (the ring search below finds the centre's distance).
+ */
+const NC = 25, NR = NC * Math.SQRT1_2, nearCells = new Map<number, Int32Array>();
+const shoreSeen = new Int32Array(SHORE.length); let shoreStamp = 0;
+function boxSegDist(bx0: number, by0: number, bx1: number, by1: number, a: Vec, b: Vec): number {
+  // (0 if the segment enters the box: clipped to it, Liang–Barsky)
+  const dx = b.x - a.x, dy = b.y - a.y; let t0 = 0, t1 = 1, inside = true;
+  for (const [pp, qq] of [[-dx, a.x - bx0], [dx, bx1 - a.x], [-dy, a.y - by0], [dy, by1 - a.y]]) {
+    if (pp === 0) { if (qq < 0) { inside = false; break; } continue; }
+    const r = qq / pp; if (pp < 0) { if (r > t1) { inside = false; break; } if (r > t0) t0 = r; } else { if (r < t0) { inside = false; break; } if (r < t1) t1 = r; }
+  }
+  if (inside && t0 <= t1) return 0;
+  const toBox = (q: Vec) => Math.hypot(Math.max(bx0 - q.x, 0, q.x - bx1), Math.max(by0 - q.y, 0, q.y - by1));
+  return Math.min(toBox(a), toBox(b), segPt({ x: bx0, y: by0 }, a, b), segPt({ x: bx1, y: by0 }, a, b), segPt({ x: bx0, y: by1 }, a, b), segPt({ x: bx1, y: by1 }, a, b));
+}
+function nearCell(ci: number, cj: number): Int32Array {
+  const key = (ci + 32768) * 65536 + (cj + 32768);
+  let list = nearCells.get(key);
+  if (list) return list;
+  const bx0 = ci * NC, by0 = cj * NC, bx1 = bx0 + NC, by1 = by0 + NC;
+  const U = ringNearest({ x: bx0 + NC / 2, y: by0 + NC / 2 }).d + NR + 1e-6;
+  // every segment filed in the search grid's cells within U of the cell
+  const { x0, y0, nx, ny, cells } = SG, stamp = ++shoreStamp, out: number[] = [];
+  const ia = Math.max(0, Math.floor((bx0 - U - x0) / SC)), ib = Math.min(nx - 1, Math.floor((bx1 + U - x0) / SC));
+  const ja = Math.max(0, Math.floor((by0 - U - y0) / SC)), jb = Math.min(ny - 1, Math.floor((by1 + U - y0) / SC));
+  for (let j = ja; j <= jb; j++) for (let i = ia; i <= ib; i++) for (const k of cells[j * nx + i]) {
+    if (shoreSeen[k] === stamp) continue; shoreSeen[k] = stamp;
+    if (boxSegDist(bx0, by0, bx1, by1, SHORE[k - 1], SHORE[k]) <= U) out.push(k);
+  }
+  out.sort((a, b) => a - b);
+  list = Int32Array.from(out); nearCells.set(key, list);
+  return list;
+}
+/** The distance to the shore, and which of SHORE's segments (k: from SHORE[k − 1] to SHORE[k]) is nearest (the lowest k on a tie). */
 export function shoreNearest(p: Vec): { d: number; k: number } {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return { d: NaN, k: -1 };
+  const list = nearCell(Math.floor(p.x / NC), Math.floor(p.y / NC));
+  let m = Infinity, mk = -1;
+  for (let i = 0; i < list.length; i++) { const k = list[i], d = segPt(p, SHORE[k - 1], SHORE[k]); if (d < m) { m = d; mk = k; } }
+  return { d: m, k: mk };
+}
+/** The same, by a search spreading out ring by ring through the 100 m grid from the point's cell (used once per 25 m cell above). */
+function ringNearest(p: Vec): { d: number; k: number } {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return { d: NaN, k: -1 }; // (the ring search would never end)
   const { x0, y0, nx, ny, cells } = SG;
   const ci = Math.floor((p.x - x0) / SC), cj = Math.floor((p.y - y0) / SC);

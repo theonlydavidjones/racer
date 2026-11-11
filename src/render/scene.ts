@@ -9,6 +9,8 @@ import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { sunPosition } from '../environment/sun';
 import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
+import { disposeUnused } from './dispose';
+import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
@@ -33,8 +35,9 @@ export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
  * not data: the marine layer is a summer thing (June–September), thickest from mid-afternoon into the night,
  * often still there in the morning; thinner in spring and autumn; rare in winter.
  */
+const FOG_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'numeric', hour: 'numeric', hourCycle: 'h23' }); // (made once: it's slow to build)
 export function fogBankAmount(tMin: number): number {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'numeric', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(tMin * 60000));
+  const parts = FOG_FMT.formatToParts(new Date(tMin * 60000));
   const mo = +parts.find(p => p.type === 'month')!.value, h = +parts.find(p => p.type === 'hour')!.value;
   const season = [0.05, 0.05, 0.1, 0.2, 0.4, 0.7, 0.85, 0.85, 0.6, 0.3, 0.1, 0.05][mo - 1];
   const daily = h < 10 ? 0.7 : h < 13 ? 0.35 : h < 15 ? 0.6 : h < 21 ? 1 : 0.9; // burns back by midday, pours in again from mid-afternoon
@@ -141,6 +144,7 @@ export class SceneView {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(62, 1, 0.1, 90000);
+  private fittings = new FittingCull();
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
@@ -152,6 +156,7 @@ export class SceneView {
   /* Wind on the water: a map of the wind strength around the camera, refreshed several times a second, that
    * the water shader turns into darker, rougher patches in the puffs and paler, smoother ones in the lulls. */
   private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
+  private puffSum = new Float32Array(PUFF_N * PUFF_N);
   private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
   private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() } };
   private puffT: number | null = null;
@@ -347,13 +352,16 @@ export class SceneView {
     if (month !== this.landMonth) { this.landMonth = month; this.land?.setSeason(month); }
     const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)},${Math.round(w.C.base)}`;
     if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y, 5000, 50, w.C.base); this.terrainKey = key; } // with the lee of the land
+    const oldBoats = this.boatMeshes.map(m => m.grp);
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => {
       const m = buildBoatMesh(b); this.scene.add(m.grp);
       m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       return m;
     });
+    this.fittings.set(this.boatMeshes.map(m => m.grp));
     this.buildCourse(w);
+    disposeUnused(oldBoats, this.scene);
   }
 
   /** A buoy on the water, leaning and trailing a wake in the current (see update). */
@@ -379,6 +387,11 @@ export class SceneView {
   refreshCourse(w: World): void { this.buildCourse(w); }
 
   private buildCourse(w: World): void {
+    const old = this.courseObjs;
+    this.placeCourse(w);
+    disposeUnused(old, this.scene); // (the last course's marks, freed once the new ones are in)
+  }
+  private placeCourse(w: World): void {
     this.courseObjs.forEach(o => this.scene.remove(o)); this.courseObjs = [];
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.courseObjs.push(o); return o; };
     const C = w.C, aids = !!w.settings.aids;
@@ -459,7 +472,7 @@ export class SceneView {
   /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
   private drawWindOnWater(w: World, at: { x: number; y: number }, span: number): void {
     const PUFF_SPAN = span, cell = span / PUFF_N, x0 = Math.round((at.x - PUFF_SPAN / 2) / cell) * cell, y0 = Math.round((at.y - PUFF_SPAN / 2) / cell) * cell;
-    const sum = new Float32Array(PUFF_N * PUFF_N), g = w.puffs.gustiness;
+    const sum = this.puffSum.fill(0), g = w.puffs.gustiness;
     for (const p of w.puffs.cells) {
       const R = p.r * 1.5;
       const i0 = Math.max(0, Math.floor((p.x - R - x0) / cell)), i1 = Math.min(PUFF_N - 1, Math.ceil((p.x + R - x0) / cell));
@@ -472,7 +485,7 @@ export class SceneView {
     const tg = this.terrain, d = this.puffData;
     for (let j = 0; j < PUFF_N; j++) for (let i = 0; i < PUFF_N; i++) {
       const px = x0 + (i + 0.5) * cell, py = y0 + (j + 0.5) * cell; // the land's effect, and the day's wind across the course
-      const kk = Math.min(1.8, Math.max(0.4, (1 + sum[j * PUFF_N + i]) * (tg ? tg.at(px, py) : 1) * w.fieldAt({ x: px, y: py }).extra));
+      const kk = Math.min(1.8, Math.max(0.4, (1 + sum[j * PUFF_N + i]) * (tg ? tg.at(px, py) : 1) * w.fieldExtra({ x: px, y: py })));
       const o = (j * PUFF_N + i) * 4;
       d[o] = Math.round((kk - 0.4) / 1.4 * 255);
       const sg = this.seaGrid;
@@ -705,6 +718,7 @@ export class SceneView {
     this.updateRain(w, dt, camera);
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
+    this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
     this.renderer.render(this.scene, camera);
   }
 }
