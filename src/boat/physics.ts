@@ -9,7 +9,7 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewMass, crewMoment, crewSkill, hikingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
+import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, trimSpeedFactor } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -424,7 +424,7 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
   b.powerT = 0.5;
   // (the search, and her sails against it, in the wind rounded to a knot and 2°: cached, and like for like)
   const twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
-  const ref = fastestStep(twsR, twaR, plan, STANDARD_DISP, crewMass(DEFAULT_CREW), standardCrewMoment(), crewBestHeel(twaR, twsR));
+  const ref = fastestStep(twsR, twaR, plan, STANDARD_DISP, crewMass(DEFAULT_CREW), standardCrewMoment(), crewBestHeel(twaR, twsR), sittingMoment(DEFAULT_CREW));
   b.depowerBest = herFastestStep(b, twa, tws, plan, disp).d;
   // hers: her sails as they are (no fuller than the full-power shape: fuller gains nothing the polar doesn't have, the
   // shape's own cost is shapeEfficiency's), at the crew's intended sheeting (a sheet set wrong, by you or the crew, is
@@ -444,7 +444,7 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
 /** The fastest depowering step for her own crew as they are (how many, how heavy, how tired), in this wind. */
 function herFastestStep(b: Boat, twa: number, tws: number, plan: SailPlan, disp: number): StepPick {
   const cs = b.crew, spec = cs?.spec ?? DEFAULT_CREW, twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
-  return fastestStep(twsR, twaR, plan, disp, crewMass(spec), hikingMoment(spec, cs?.people.map(p => p.fatigue)), crewBestHeel(twaR, twsR, crewSkill(cs)));
+  return fastestStep(twsR, twaR, plan, disp, crewMass(spec), hikingMoment(spec, cs?.people.map(p => p.fatigue)), crewBestHeel(twaR, twsR, crewSkill(cs)), sittingMoment(spec));
 }
 /** The boom where the crew wants it at depowering step d: eased down the traveller on the last steps (crewEaseBoom). */
 const stepBoom = (awa: number, d: number) => clamp(optimalSheet('main', awa) + (awa < 70 ? 7 * clamp((d - 0.6) / 0.4, 0, 1) : 0), SAILS.main.min, SAILS.main.max);
@@ -461,11 +461,11 @@ const intendedForces = (m: Shape, j: Shape | null, aws: number, awa: number, mai
  */
 interface StepPick { d: number; h: number; p: number; speed: number }
 const stepCache = new Map<string, StepPick>();
-function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crewKg: number, crewM: number, bestHeel: number): StepPick {
+function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crewKg: number, crewM: number, bestHeel: number, sitM: number): StepPick {
   // (worked out from the rounded values themselves, so the answer doesn't depend on which boat asked first)
-  dsp = Math.round(dsp / 20) * 20; crewKg = Math.round(crewKg / 10) * 10; crewM = Math.round(crewM / 100) * 100;
+  dsp = Math.round(dsp / 20) * 20; crewKg = Math.round(crewKg / 10) * 10; crewM = Math.round(crewM / 100) * 100; sitM = Math.round(sitM / 100) * 100;
   bestHeel = Math.round(bestHeel);
-  const key = `${tws}|${twa}|${plan}|${dsp}|${crewKg}|${crewM}|${bestHeel}`;
+  const key = `${tws}|${twa}|${plan}|${dsp}|${crewKg}|${crewM}|${bestHeel}|${sitM}`;
   const hit = stepCache.get(key); if (hit) return hit;
   if (stepCache.size > 20000) stepCache.clear();
   const vP = Math.max(0.3, polar(tws, twa, plan)), jibOn = plan === 'jib';
@@ -487,8 +487,9 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
       return (lo + hi) / 2;
     };
     // (the crew hike only as far as it takes to hold her at the heel they sail her at, as they do on the water
-    // (crewPhys.ts): no further over than she goes with them sitting in, except in light air, where they sit to leeward)
-    const hike = balance(crewM), h = hike >= bestHeel ? hike : tws < 7 ? bestHeel : Math.min(bestHeel, balance(0));
+    // (crewPhys.ts): no further over than she goes with them sitting out on the windward deck, except in light air, where
+    // they sit to leeward)
+    const hike = balance(crewM), h = hike >= bestHeel ? hike : tws < 7 ? bestHeel : Math.min(bestHeel, balance(sitM));
     const r = at(h), out = stepBoom(wind(h).awa, d);
     // (and the rudder held over against her weather helm: North Sails' Folkboat guide eases the traveller in a breeze "to
     // decrease heel and thus rudder pressure", and pulls the backstay "until the rudder feels light again")
@@ -641,12 +642,14 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   }
   // (hike first, then depower: the crew adds depowering only once they're out as far as they go, and takes it off
   // first whenever they've room to hike; you placing the crew, they work with where you've put them)
-  const cs0 = b.crew, maxed = !cs0 || !!cs0.place?.across || cs0.hike > 0.85 || (cs0.spec.crew.length === 0 && cs0.people[0].lean > 0.85);
+  const cs0 = b.crew, maxed = !cs0 || !!cs0.place?.across || !!cs0.allOut; // (out as far as they can go now, tired or not)
   // the step they work toward: the fastest for this crew in this wind (powerFactor), which a skilled crew follows closely
   // and a novice only once it's well off (the search weighs the rudder's drag already: North Sails' "until the rudder
   // feels light again"); past about 6° of helm they can't steer her, whatever it costs
-  const goal = b.depowerBest ?? (up ? clamp((tws - 14) / 10, 0, 1) : 0), slack = 0.05 + 0.15 * (1 - crewSkill(b.crew));
-  const over = !up ? -1 : (b.depower < goal - slack || helmLoad > 6) && maxed ? 1 : (b.depower > goal + slack && helmLoad < 6) || (!maxed && helmLoad < 6) ? -1 : 0;
+  // (they add depowering only once they're hiking as far as they can: hike first; while they're getting out they hold
+  // what they have)
+  const goal = b.depowerBest ?? (up ? clamp((tws - 14) / 10, 0, 1) : 0), slack = 0.03 + 0.07 * (1 - crewSkill(b.crew));
+  const over = !up ? -1 : (b.depower < goal - slack || helmLoad > 6) && maxed ? 1 : b.depower > goal + slack && helmLoad < 6 ? -1 : 0;
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
   const easeBoom = crewEaseBoom(b);

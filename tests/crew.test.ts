@@ -37,6 +37,18 @@ describe('Hiking a Folkboat, by the class rules', () => {
   });
 });
 
+describe('A tired crew', () => {
+  it('still counts as hiking flat out when tired (their own reach), so they keep her depowered, not easing it off', () => {
+    const twa = beatAngle(20), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 20 }); b.crew = newCrew(crewOf(0.6), 'S');
+    sail(b, 60, () => { b.h = 360 - twa; }); const fresh = { dep: b.depower!, heel: b.heelMag! };
+    sail(b, 600, () => { b.h = 360 - twa; });
+    expect(Math.max(...b.crew!.people.slice(1).map(p => p.fatigue))).toBeGreaterThan(0.5);
+    expect(b.crew!.allOut).toBe(true);
+    expect(b.depower!).toBeGreaterThanOrEqual(fresh.dep - 0.02);
+    expect(b.heelMag!).toBeLessThan(fresh.heel + 1.5);
+  }, 30000);
+});
+
 describe('Where the weight goes, and what she does', () => {
   it('light air: a good crew sits to leeward and heels her; a novice sits in the middle', () => {
     const good = steady(4, beatAngle(4)), novice = steady(4, beatAngle(4), { skill: 0.1 });

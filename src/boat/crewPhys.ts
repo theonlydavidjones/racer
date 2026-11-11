@@ -109,6 +109,8 @@ export interface CrewState {
   mode: CrewMode;
   /** 0..1: how hard the crew are hiking (the hardest of them). */
   hike: number;
+  /** Everyone free is hiking as far as they can now (their own reach, by skill and how tired they are). */
+  allOut?: boolean;
   /** The tack they were set up for. */
   side: 'S' | 'P';
   /** Trim (m, + bow down) their weight gives her, and the fore-and-aft moment (kg·m, + forward of the reference). */
@@ -376,12 +378,18 @@ function momentOfCrewFore(c: CrewState, f: number): number {
 function summarise(c: CrewState, w: number, downwind = false, pole = false, extra = 0): void {
   // (plain loops: this runs every step for every boat)
   const ppl = c.ppl ??= allAboard(c.spec), total = c.total ??= crewMass(c.spec), n = c.spec.crew.length, P = c.people;
-  let arm = 0, m = 0, hike = 0, fore = 0, mast = false;
+  let arm = 0, m = 0, hike = 0, fore = 0, mast = false, out = n > 0;
   for (let i = 0; i < P.length; i++) {
     const q = P[i], wt = ppl[i].w;
     arm += wt * q.x * w; m += wt * (zRef(i, n) - q.z);
-    if (i > 0) { hike = Math.max(hike, q.lean); fore += clamp((Z.helm - q.z) / (Z.helm - Z.mast), 0, 1); if (q.pose === 'mast') mast = true; }
+    if (i > 0) {
+      hike = Math.max(hike, q.lean); fore += clamp((Z.helm - q.z) / (Z.helm - Z.mast), 0, 1); if (q.pose === 'mast') mast = true;
+      // (out as far as they can go now: their own reach, which tires; someone away at a job doesn't count either way)
+      const onRail = q.pose === 'sit' || q.pose === 'hike' || q.pose === 'lee' || q.pose === 'cross';
+      if (onRail && (q.pose !== 'hike' || q.lean < 0.93 * leanCap(ppl[i], q.fatigue))) out = false;
+    }
   }
+  c.allOut = n ? out : P[0].lean >= 0.93 * leanCap(ppl[0], P[0].fatigue);
   c.arm = arm / total;
   c.trimMoment = m + extra; c.trim = trimFromMoment(m + extra, HULL.displacement);
   c.hike = n ? hike : P[0].lean;
@@ -415,3 +423,8 @@ export function hikingMoment(s: CrewSpec, fatigue: number[] = []): number {
   return 9.81 * (s.helm.w * helmArms(s.helm, fatigue[0] ?? 0).max + s.crew.reduce((a, p, i) => a + p.w * hikeArm(p, leanCap(p, fatigue[i + 1] ?? 0)), 0));
 }
 export const standardCrewMoment = () => hikingMoment(DEFAULT_CREW);
+/** The righting moment (N·m, upright) of a crew sitting out on the windward deck, not hiking: the least a crew that's
+ * sitting up to windward gives her (placeCrew). */
+export function sittingMoment(s: CrewSpec): number {
+  return 9.81 * (s.helm.w * helmArms(s.helm).sit + s.crew.reduce((a, p) => a + p.w * sitArm(p), 0));
+}

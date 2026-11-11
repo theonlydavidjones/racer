@@ -215,17 +215,6 @@ export function heelWithCrew(heelForce: number, ceh: number, disp: number, crewM
   return (lo + hi) / 2;
 }
 
-/** Heel (deg, ≥ 0) where the heeling moment balances the righting moment. The crew hike once she's heeling. */
-export function equilibriumHeel(heelForce: number, ceh: number = CE_HEIGHT): number {
-  const ce = ceh;
-  let lo = -40, hi = 75;
-  for (let i = 0; i < 30; i++) {
-    const h = (lo + hi) / 2, hike = clamp((h - 4) / 8, 0, 1);
-    if (heelForce * ce * Math.cos(h * D2R) > rightingMoment(h, hike)) lo = h; else hi = h;
-  }
-  return (lo + hi) / 2;
-}
-
 /**
  * Helm balance: the rudder angle (deg) she needs to sail straight. Positive is weather helm (she wants to turn
  * toward the wind; you hold the tiller to windward), negative lee helm. `boomOut` is the boom's angle off the
@@ -271,7 +260,9 @@ export function rudderDrag(weather: number, v: number): number {
  * offsets), so the full draft stands in for the deepest one: the largest Te, the least drag ORC's formula allows (an
  * estimate). And ORC's multiplier for a boat sailed nearly upright (Fig. 6.9: the keel and rudder sharing the lift
  * badly, even a little lee helm, at small heel), "fully active upwind", gone once the drive is more than 0.4 of the side
- * force: read off the figure, 1.57 upright, 1.31 at 5°, 1.08 at 10°, 1 from 15°.
+ * force: read off the figure, 1.57 upright, 1.31 at 5°, 1.08 at 10°, 1 from 15°. (A Folkboat's drive is 0.4–0.5 of
+ * her side force even close-hauled, so by ORC's own rule the multiplier hardly applies to her.) Te is taken as fixed
+ * with heel, as ORC prints MHSD; with FH the side force across the water, the drag falls as cos² of the heel.
  */
 const DI_FACTOR = [1.57, 1.45, 1.31, 1.18, 1.08, 1.03, 1.0]; // every 2.5° of heel, ORC Fig. 6.9
 export function diFactor(heelDeg: number, drive: number, side: number): number {
