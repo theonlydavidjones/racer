@@ -9,8 +9,9 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
-import { buildNavLights, syncNavLights, type NavLights } from './navLights';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, cabinInterior, companionwayLid, slidingHatch, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, luffTellStates, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -152,7 +153,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   grp.add(new THREE.Mesh(hullGeometry(), hullMat));
   // the sea is never drawn inside the hull: a lid over the cockpit at deck level, in the depth buffer only (drawn after
   // the boat and before the water, which scene.ts draws last of the solid things)
-  const lid = new THREE.Mesh(cockpitLid(), new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
+  // (the companionway's openings too: one mesh for both)
+  const lid = new THREE.Mesh(mergeGeometries([cockpitLid().toNonIndexed(), companionwayLid()], false)!, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
   const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
@@ -178,15 +180,20 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   }
   const topAft = cab.topY(CABIN.u1), zAft = zc(CABIN.u1);
   // companionway, sliding hatch and the compass on the aft end of the cabin (as on Josephine)
-  const cw = new THREE.Mesh(new THREE.PlaneGeometry(0.5, CABIN.h * 0.8), MAT.dark); cw.position.set(0, topAft - CABIN.h * 0.45, zAft + 0.004); grp.add(cw);
-  const hatch = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.06, 0.62), MAT.wood); hatch.position.set(0, topAft + CABIN.crown + 0.02, zAft - 0.28); grp.add(hatch);
+  // the companionway open, its hatch slid forward, and the cabin below: dim by day, lit warm by its lamps after dark
+  // (navLights.ts syncNavLights, the same clock as the ports' glow)
+  const below = new THREE.MeshLambertMaterial({ color: 0x5a4030, side: THREE.DoubleSide, emissive: 0x000000 });
+  grp.add(new THREE.Mesh(mergeGeometries(cabinInterior().map(g => (g.index ? g.toNonIndexed() : g)), false)!, below));
+  grp.userData.below = below;
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
-  // wooden grab rails on the cabin top
+  // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
+  const woodTop = [slidingHatch().toNonIndexed()];
   for (const s of [1, -1]) {
-    const gr = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 1.2), MAT.wood);
     const gu = (CABIN.u0 + CABIN.u1) / 2 + 0.03, gx = s * (CABIN.w - 0.2);
-    gr.position.set(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)); grp.add(gr);
+    woodTop.push(new THREE.BoxGeometry(0.04, 0.05, 1.2).toNonIndexed().translate(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)));
   }
+  for (const g of woodTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+  grp.add(new THREE.Mesh(mergeGeometries(woodTop, false)!, MAT.wood));
   // cockpit well, seats, and coamings
   // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
   const cockpitTeak = new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide });
@@ -525,11 +532,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
+  // she stands in front of the lights' reflections on the water (the streaks are drawn over the waves, so they can't
+  // use the depth buffer): everything of hers marks the stencil, and the streaks leave those pixels alone (navLights.ts)
+  grp.traverse(o => { const m = (o as THREE.Mesh).material; for (const x of Array.isArray(m) ? m : m ? [m] : []) markBoat(x); });
   // her lights: the bicolour on the stemhead, the sternlight on the transom to port of the rudder head (clear of the
   // tiller, the backstay's bridle and the ensign staff), or the tricolour just above the masthead, under the windex
   const sternY = sheer(1) - 0.07;
   const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z) },
     b.paint?.navLights ?? 'deck', MAT.glass);
+  nav.below = grp.userData.below;
   return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false, nav };
 }
 
@@ -619,7 +630,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   syncPole(m, plan === 'wing');
   syncLines(m, b);
   for (const r of m.ribbons) syncRibbon(r, b, t);
-  syncNavLights(m.nav);
+  // her lights: none in her slip or when switched off, the anchor light at anchor, else under way's (navLights.ts)
+  syncNavLights(m.nav, b.docked || b.lightsOff ? 'off' : b.atAnchor ? 'anchor' : 'underway');
 }
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
