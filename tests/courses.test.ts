@@ -4,7 +4,8 @@ import { buildCourse, type CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { brg, dist, markDist, wrap } from '../src/core/math';
-import { onLand } from '../src/geo/shore';
+import { onLand, shoreDist } from '../src/geo/shore';
+import { LL } from '../src/geo/geo';
 
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, current: 'slack', tideDate: '2026-11-14', ...o });
 const ss = COURSES.filter(c => c.id.startsWith('ss'));
@@ -23,6 +24,21 @@ describe('the Seaweed Soup course sheet (Addendum B)', () => {
         if (m.shape !== 'island') expect(onLand(m.p), `${f.id} ${m.name}`).toBe(false);
         if (m.key === 'X') expect(m.type).toBe('pass');
       }
+    }
+  });
+
+  it('the start line: from GGYC\'s race deck on the jetty\'s seawall out to X, about 410 m on 351°, all of it water', () => {
+    // GGYC's clubhouse is OpenStreetMap's way 239024736 (37.8077 N 122.4426 W); the deck end is on its Bay side, on
+    // the seawall (OSM coastline 37.8080 N); X is the YRA's position (37.811667 N 122.443333 W)
+    for (const f of ss) {
+      const C = buildCourse(f, { bias: 0, fleet: 3 }), c = C.committee, p = C.pin;
+      expect(C.committeeKind, f.id).toBe('shore');
+      expect(onLand(c), f.id).toBe(true); // ashore, on the jetty
+      expect(shoreDist(c), f.id).toBeLessThan(5); // at the seawall's edge
+      expect(dist(c, LL(37.80773, -122.44259)), f.id).toBeLessThan(35); // in front of the clubhouse
+      expect(C.lineLen, f.id).toBeGreaterThan(395); expect(C.lineLen, f.id).toBeLessThan(430);
+      expect(Math.abs(wrap(brg(p.x - c.x, p.y - c.y) - 351)), f.id).toBeLessThan(2);
+      for (let k = 0.02; k <= 1; k += 0.02) expect(onLand({ x: c.x + (p.x - c.x) * k, y: c.y + (p.y - c.y) * k }), `${f.id} ${k}`).toBe(false);
     }
   });
 

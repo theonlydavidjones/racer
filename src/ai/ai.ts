@@ -4,8 +4,9 @@ import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatFor, targetFor } from '../boat/seaway';
 import { V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
-import { onLand } from '../geo/shore';
+import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
+import { obstructionAhead } from '../sim/obstruction';
 import type { World } from '../sim/world';
 
 /** Extra seconds of caution at the start under each preparatory flag. */
@@ -63,9 +64,11 @@ export function sailable(b: Boat, desired: number): number {
   return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
 }
 
+/** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
+ * a few metres wide is in the way even if the water beyond it is clear. */
 function blocked(w: World, b: Boat, h: number, d: number): boolean {
   const u = V(h), q = { x: b.x + u.x * d, y: b.y + u.y * d };
-  if (onLand(q)) return true;
+  if (landAlong(b, q) <= d) return true;
   if (w.obstructed(b) && segCross(b, q, w.pin, w.committee)) return true;
   return false;
 }
@@ -111,13 +114,15 @@ export function detour(b: Vec, P: Vec): Vec | null {
   }
   return null;
 }
-/** Clear water all the way from a to b, with some room either side? With `lee` (the wind direction), out of any island's wind shadow too. */
+/** Clear water all the way from a to b, with some room either side (her track, and 25 m to each side of it, exactly,
+ * so no pier slips between samples)? With `lee` (the wind direction), out of any island's wind shadow too. */
 function clearRun(a: Vec, b: Vec, lee?: number): boolean {
   const L = dist(a, b), ux = (b.x - a.x) / (L || 1), uy = (b.y - a.y) / (L || 1);
-  for (let s = 0; s <= L; s += 15) {
-    for (const k of [0, -25, 25]) if (onLand({ x: a.x + ux * s - uy * k, y: a.y + uy * s + ux * k })) return false;
-    if (lee != null && s > 40 && s % 30 === 0 && inIslandLee({ x: a.x + ux * s, y: a.y + uy * s }, lee)) return false;
+  for (const k of [0, -25, 25]) {
+    const o = { x: -uy * k, y: ux * k };
+    if (landAlong({ x: a.x + o.x, y: a.y + o.y }, { x: b.x + o.x, y: b.y + o.y }) < Infinity) return false;
   }
+  if (lee != null) for (let s = 60; s <= L; s += 30) if (inIslandLee({ x: a.x + ux * s, y: a.y + uy * s }, lee)) return false;
   return true;
 }
 /** In an island's near-calm: land within ~220 m straight upwind (about five Alcatraz heights; shadows.ts has the full model). */
@@ -314,11 +319,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // keep off the shore (and off the line mid-race)
   let holdForHail = false;
   if (blocked(w, b, desired, 45)) {
-    // Pinned by a boat to windward? Hail for room to tack (Rule 20) and hold on while she responds.
-    const blocker = beating ? w.roomBlocker(b) : null;
-    if (blocker && w.t - ai.lastHail > 40) { w.hail(b, blocker, 'room'); ai.lastHail = w.t; }
-    if (blocker && w.t - ai.lastHail < HAIL_RESPONSE + 1 && !blocked(w, b, desired, 12)) holdForHail = true;
-    else if (beating && w.t - b.lastTackT > 4) desired = b.tack === 'S' ? csP : csS;
+    // Pinned by a boat to windward that she'd hit if she tacked? Hail for room to tack (Rule 20) as soon as she may
+    // (close enough to the obstruction that she'll soon have to change course substantially: rule 20.1(a)), and hold on
+    // while the other boat responds. If she may not hail (the obstruction is an island mark the other boat is fetching,
+    // or a small bear-away clears it), she bears away round it instead of tacking into that boat.
+    const pinned = beating ? w.tackBlocker(b) : null, may = pinned ? w.roomBlocker(b) : null;
+    if (may && w.t - ai.lastHail > 40) { w.hail(b, may, 'room'); ai.lastHail = w.t; }
+    const waiting = pinned && (may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
+    if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;
+    else if (beating && !pinned && w.t - b.lastTackT > 4) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   }
   // collision avoidance under the rules

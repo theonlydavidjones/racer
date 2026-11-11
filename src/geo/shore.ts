@@ -3,13 +3,13 @@ import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
 import wharf from './data/wharf.json';
-import { hitsHarbor, inBasin } from './marina';
+import { BREAKWATER_W, FINGER_W, HARBORS, SHORE_W, WALKWAY_W, hitsHarbor, inBasin } from './marina';
 
-// Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); from Crissy Field east
-// it's replaced below by the real one.
-// Fort Point itself (the brick fort, 37.81056 N 122.47722 W, Wikipedia "Fort Point National Historic Site") stands on
-// the point under the Golden Gate Bridge's south end: the shore runs out round it, so the fort and the bridge's
-// arch over it are on land.
+// Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); from the Gate to Pier 27
+// it's replaced below by the real one, so only its stretch east of Pier 27 is still used.
+// (Fort Point itself, the brick fort at 37.81056 N 122.47722 W (Wikipedia, "Fort Point National Historic Site"), stands
+// on the point under the Golden Gate Bridge's south end: OpenStreetMap's coast runs out round it, so the fort and the
+// bridge's arch over it are on land.)
 const SHORE_LL: [number, number][] = [
   [37.8100, -122.4790], [37.8108, -122.4782], [37.8112, -122.4773], [37.8110, -122.4764], [37.8100, -122.4757],
   [37.8092, -122.4747], [37.8065, -122.4720], [37.8045, -122.4620], [37.8040, -122.4520], [37.8055, -122.4490],
@@ -20,8 +20,9 @@ const SHORE_LL: [number, number][] = [
   [37.8086, -122.4214], [37.8080, -122.4180], [37.8062, -122.4100], [37.8045, -122.4000]
 ];
 
-// From Crissy Field past the Marina to Fort Mason, the real shoreline (OpenStreetMap, scripts/make-marina-coast.mjs):
-// the Marina Green seawall, the West Harbor's basin and its jetty out to the entrance beacon, in place of the hand-drawn one
+// From the Gate's south shore (37.8015 N, under the Presidio's bluffs) round Fort Point, along Crissy Field and past
+// the Marina to Fort Mason, the real shoreline (OpenStreetMap, scripts/make-marina-coast.mjs): the beach, the Marina
+// Green seawall, the West Harbor's basin and its jetty out to the entrance beacon, in place of the hand-drawn one
 // and round Gashouse Cove (the Marina's East Harbor) and Fort Mason's three piers, to their east (the hand-drawn shore had
 // the piers 50–200 m too far east and too long)
 // and on from Fort Mason past Aquatic Park, Fisherman's Wharf and Pier 39 to Pier 27 (OpenStreetMap,
@@ -38,7 +39,7 @@ export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 /** Land polygon: the shoreline closed off to the south. */
 // (closed round the far side of the city, out to the edges of the area the Cityfront shore governs (onLand's CF box), so
 // the Presidio's edge and the city behind the waterfront are land, not a channel or a lake a boat could sail into)
-export const LAND: Vec[] = SHORE.concat([LL(37.7795, -122.3995), LL(37.7795, -122.4805), LL(37.8015, -122.4805), LL(37.8015, -122.4790)]); // (north of 37.8015, off the Presidio at the Gate, is water)
+export const LAND: Vec[] = SHORE.concat([LL(37.7795, -122.3995), LL(37.7795, -122.4805), LL(37.8015, -122.4805)]); // (back to the coast's start on the Gate's south shore at 37.8015 N: north of it, off the Presidio, is water)
 
 /*
  * Inside the Cityfront's land polygon, exactly as inPoly(p, LAND) but fast (it's asked for every boat, every step):
@@ -49,6 +50,7 @@ const LB = (() => {
   const xs = LAND.map(q => q.x), ys = LAND.map(q => q.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
   const BAND = 10, nb = Math.ceil((y1 - y0) / BAND) + 1, bands: number[][] = Array.from({ length: nb }, () => []);
   const C = 20, cx = Math.ceil((x1 - x0) / C) + 1, cy = Math.ceil((y1 - y0) / C) + 1, crossed = new Uint8Array(cx * cy);
+  const edges = new Map<number, number[]>(); // the edges in or next to each crossed cell (for landAlong)
   for (let i = 0, j = LAND.length - 1; i < LAND.length; j = i++) {
     const a = LAND[i], b = LAND[j];
     for (let k = Math.floor((Math.min(a.y, b.y) - y0) / BAND); k <= Math.floor((Math.max(a.y, b.y) - y0) / BAND); k++) bands[k].push(i);
@@ -56,10 +58,14 @@ const LB = (() => {
     const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L / (C / 4)));
     for (let t = 0; t <= n; t++) {
       const x = a.x + (b.x - a.x) * t / n, y = a.y + (b.y - a.y) * t / n, ci = Math.floor((x - x0) / C), cj = Math.floor((y - y0) / C);
-      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ii = ci + di, jj = cj + dj; if (ii >= 0 && jj >= 0 && ii < cx && jj < cy) crossed[jj * cx + ii] = 1; }
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = ci + di, jj = cj + dj; if (ii < 0 || jj < 0 || ii >= cx || jj >= cy) continue;
+        const k = jj * cx + ii; crossed[k] = 1;
+        const l = edges.get(k); if (!l) edges.set(k, [i]); else if (l[l.length - 1] !== i) l.push(i);
+      }
     }
   }
-  return { x0, x1, y0, y1, BAND, bands, C, cx, cy, crossed, known: new Int8Array(cx * cy).fill(-1) };
+  return { x0, x1, y0, y1, BAND, bands, C, cx, cy, crossed, edges, known: new Int8Array(cx * cy).fill(-1) };
 })();
 function inLandBands(p: Vec): boolean {
   let c = false;
@@ -207,6 +213,171 @@ export function wharfCrossed(a: Vec, b: Vec): boolean {
 
 /** Is this point land a boat would run aground on? (In a marina's basin: only its docks and breakwaters; and those are solid just outside it too.) */
 export const onLand = (p: Vec): boolean => onGround(p) || hitsWharf(p);
+
+/*
+ * Land along a line, exactly: for the look-ahead of the AI, the tiller pilot and the Rule 20 hail, which used to sample
+ * points every 15–45 m and so could step over a 1–10 m pier, breakwater or dock finger. Every place the line could
+ * pass from water onto land is found from the geometry itself (each pier, breakwater, dock and finger as it's drawn;
+ * the Cityfront shore's edges, filed in its 20 m cells; the terrain's 50 m land cells; the edges of the marinas' basins
+ * and of the box where the Cityfront shore takes over from the terrain), and the first of them that onLand agrees is
+ * land is the answer. So it says what onLand would for every point on the line, for a few cells' work.
+ */
+const EPS = 0.05; // m: how far past a crossing onLand is asked
+/** The first t in [0, 1] at which a + t(b − a) comes within `half` of the segment pq (Infinity if it never does). */
+function lineHit(a: Vec, b: Vec, p: Vec, q: Vec, half: number): number {
+  const dx = b.x - a.x, dy = b.y - a.y, ex = q.x - p.x, ey = q.y - p.y, den = dx * ey - dy * ex;
+  // where the two lines cross, if they do within both segments; else the nearest approach (at an end of one of them)
+  let tc = -1;
+  if (den !== 0) {
+    const t = ((p.x - a.x) * ey - (p.y - a.y) * ex) / den, u = ((p.x - a.x) * dy - (p.y - a.y) * dx) / den;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) tc = t;
+  }
+  if (tc < 0) {
+    const L2 = dx * dx + dy * dy || 1, proj = (v: Vec) => Math.max(0, Math.min(1, ((v.x - a.x) * dx + (v.y - a.y) * dy) / L2));
+    const c: [number, number][] = [[segPt(a, p, q), 0], [segPt(b, p, q), 1], [segPt(p, a, b), proj(p)], [segPt(q, a, b), proj(q)]];
+    let m = c[0]; for (const x of c) if (x[0] < m[0]) m = x;
+    if (m[0] > half) return Infinity;
+    tc = m[1];
+  }
+  // the distance to pq is convex along the line, so it falls all the way to tc: find where it first reaches `half`
+  const d = (t: number) => segPt({ x: a.x + dx * t, y: a.y + dy * t }, p, q);
+  if (d(0) <= half) return 0;
+  let lo = 0, hi = tc;
+  for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (d(m) <= half) hi = m; else lo = m; }
+  return hi;
+}
+/** The first t at which a + t(b − a) is within `r` of the point c (Infinity if never). */
+function circleHit(a: Vec, b: Vec, c: Vec, r: number): number {
+  const dx = b.x - a.x, dy = b.y - a.y, fx = a.x - c.x, fy = a.y - c.y, A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - r * r;
+  if (C < 0) return 0;
+  const disc = B * B - 4 * A * C; if (disc < 0 || A === 0) return Infinity;
+  const t = (-B - Math.sqrt(disc)) / (2 * A);
+  return t >= 0 && t <= 1 ? t : Infinity;
+}
+/** As marina.ts draws a dock: within `half` of its centre line, square at its ends and round only at its bends. The first t on it. */
+function dockHit(a: Vec, b: Vec, pts: Vec[], half: number): number {
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1], q = pts[i], L = Math.hypot(q.x - p.x, q.y - p.y); if (L < 1e-4) continue;
+    const n = { x: -(q.y - p.y) / L * half, y: (q.x - p.x) / L * half };
+    const R = [{ x: p.x + n.x, y: p.y + n.y }, { x: q.x + n.x, y: q.y + n.y }, { x: q.x - n.x, y: q.y - n.y }, { x: p.x - n.x, y: p.y - n.y }];
+    if (inPoly(a, R)) return 0;
+    for (let k = 0; k < 4; k++) best = Math.min(best, edgeCross(a, b, R[k], R[(k + 1) % 4]));
+    if (i > 1) best = Math.min(best, circleHit(a, b, p, half));
+  }
+  return best;
+}
+/** Where a + t(b − a) crosses the segment pq (t), or Infinity. */
+function edgeCross(a: Vec, b: Vec, p: Vec, q: Vec): number {
+  const dx = b.x - a.x, dy = b.y - a.y, ex = q.x - p.x, ey = q.y - p.y, den = dx * ey - dy * ex;
+  if (den === 0) return Infinity;
+  const t = ((p.x - a.x) * ey - (p.y - a.y) * ex) / den, u = ((p.x - a.x) * dy - (p.y - a.y) * dx) / den;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : Infinity;
+}
+/** Walk the cells of a grid that the line from (x0, y0) to (x1, y1) (in cells) passes through, in order; `visit` gets
+ * the cell and the t at which the line enters it, and returns true to stop. */
+function gridWalk(x0: number, y0: number, x1: number, y1: number, nx: number, ny: number, visit: (i: number, j: number, t: number) => boolean): void {
+  const dx = x1 - x0, dy = y1 - y0;
+  let ta = 0, tb = 1; // clip to the grid (Liang–Barsky)
+  for (const [p, q] of [[-dx, x0], [dx, nx - x0], [-dy, y0], [dy, ny - y0]]) {
+    if (p === 0) { if (q < 0) return; continue; }
+    const r = q / p; if (p < 0) { if (r > tb) return; if (r > ta) ta = r; } else { if (r < ta) return; if (r < tb) tb = r; }
+  }
+  let i = Math.min(nx - 1, Math.max(0, Math.floor(x0 + dx * ta))), j = Math.min(ny - 1, Math.max(0, Math.floor(y0 + dy * ta)));
+  const si = Math.sign(dx), sj = Math.sign(dy), tdx = dx ? 1 / Math.abs(dx) : Infinity, tdy = dy ? 1 / Math.abs(dy) : Infinity;
+  let tx = dx > 0 ? (i + 1 - x0) / dx : dx < 0 ? (i - x0) / dx : Infinity, ty = dy > 0 ? (j + 1 - y0) / dy : dy < 0 ? (j - y0) / dy : Infinity, t = ta;
+  for (;;) {
+    if (visit(i, j, t)) return;
+    if (tx < ty) { t = tx; i += si; tx += tdx; } else { t = ty; j += sj; ty += tdy; }
+    if (t > tb || i < 0 || j < 0 || i >= nx || j >= ny) return;
+  }
+}
+type Box = { x0: number; x1: number; y0: number; y1: number };
+const overlaps = (A: Box, B: Box) => !(A.x1 < B.x0 || A.x0 > B.x1 || A.y1 < B.y0 || A.y0 > B.y1);
+const HARBOR_BASINS = HARBORS.map(H => ({ H, basinBox: boxOf(H.basin, 0) }));
+/**
+ * How far along the straight line from a to b (m) she'd first be on land a boat runs aground on (onLand), or Infinity
+ * if the whole line is water. Exact: nothing, however narrow, slips between samples.
+ */
+export function landAlong(a: Vec, b: Vec): number {
+  const L = Math.hypot(b.x - a.x, b.y - a.y);
+  if (!Number.isFinite(L)) return Infinity;
+  if (onLand(a)) return 0;
+  if (L === 0) return Infinity;
+  const bb: Box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
+  const at = (t: number): Vec => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+  let best = Infinity; // t of the first land found
+  const solid = (t: number) => { if (t < best) best = t; };
+  // a place the line may pass onto land: land if onLand says so just past it
+  const maybe = (t: number) => { if (t < best && onLand(at(Math.min(1, t + EPS / L)))) best = t; };
+  const poly = (pts: Vec[], f: (t: number) => void) => { for (let i = 0; i < pts.length; i++) { const t = edgeCross(a, b, pts[i], pts[(i + 1) % pts.length]); if (t < best) f(t); } };
+  const line = (pts: Vec[], half: number) => { for (let i = 1; i < pts.length; i++) { const t = lineHit(a, b, pts[i - 1], pts[i], half); if (t < best) solid(t); } };
+  const dock = (pts: Vec[], half: number) => { const t = dockHit(a, b, pts, half); if (t < best) solid(t); };
+  // the Wharf's piers, breakwaters and docks, and the marinas' (always solid, in a basin or out of it)
+  if (overlaps(bb, WHARF_BOX)) {
+    for (const A of WHARF.areas) if (overlaps(bb, A.box)) poly(A.pts, solid);
+    for (const W of WHARF.lines) if (overlaps(bb, W.box)) line(W.pts, W.width! / 2);
+  }
+  for (const { H, basinBox } of HARBOR_BASINS) {
+    if (!overlaps(bb, H.reach)) continue;
+    for (const w of H.breakwaters) if (w.area) poly(w.pts, solid); else dock(w.pts, BREAKWATER_W / 2);
+    for (const A of H.areas) poly(A, solid);
+    for (const l of H.shore) dock(l, SHORE_W / 2);
+    for (const l of H.walkways) dock(l, WALKWAY_W / 2);
+    for (const l of H.fingers) dock(l, FINGER_W / 2);
+    if (overlaps(bb, basinBox)) poly(H.basin, maybe); // out of the basin, onto whatever's there
+  }
+  // the Cityfront shore: its edges in the cells the line passes through
+  gridWalk((a.x - LB.x0) / LB.C, (a.y - LB.y0) / LB.C, (b.x - LB.x0) / LB.C, (b.y - LB.y0) / LB.C, LB.cx, LB.cy, (i, j, t) => {
+    if (t > best) return true;
+    const es = LB.crossed[j * LB.cx + i] ? LB.edges.get(j * LB.cx + i) : undefined;
+    if (es) {
+      const ts: number[] = [];
+      for (const k of es) { const tt = edgeCross(a, b, LAND[k], LAND[(k + LAND.length - 1) % LAND.length]); if (tt < best) ts.push(tt); }
+      ts.sort((x, y) => x - y); for (const tt of ts) { maybe(tt); if (best <= tt) break; }
+    }
+    return false;
+  });
+  // where the terrain takes over from the Cityfront shore (onGround's box)
+  for (const [p, q] of [[{ x: CF.x0, y: CF.y0 }, { x: CF.x1, y: CF.y0 }], [{ x: CF.x1, y: CF.y0 }, { x: CF.x1, y: CF.y1 }], [{ x: CF.x1, y: CF.y1 }, { x: CF.x0, y: CF.y1 }], [{ x: CF.x0, y: CF.y1 }, { x: CF.x0, y: CF.y0 }]] as const) {
+    const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
+  }
+  // the terrain's land cells (lat and lon are linear in x and y, so the line is straight on the grid too)
+  const gx = (p: Vec) => ((LON0 + p.x / MLON) - M.west) / (M.east - M.west) * M.nx, gy = (p: Vec) => (M.north - (LAT0 + p.y / MLAT)) / (M.north - M.south) * M.ny;
+  gridWalk(gx(a), gy(a), gx(b), gy(b), M.nx, M.ny, (i, j, t) => {
+    if (t > best) return true;
+    if (GRID[j * M.nx + i] === 1) maybe(t);
+    return false;
+  });
+  if (best > 1 && onLand(b)) best = 1; // (a crossing too fine to find: the far end, at least, is land)
+  return best <= 1 ? best * L : Infinity;
+}
+
+/**
+ * The nearest of the terrain's land beyond the Cityfront (Alcatraz, Angel Island, the Marin shore, Treasure Island, the
+ * city east of North Beach), within `max` m: how far, and the way out from it. Exact for the 50 m land cells.
+ */
+export function terrainNearest(p: Vec, max = 30): { d: number; n: Vec } | null {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON, cw = (M.east - M.west) / M.nx, ch = (M.north - M.south) / M.ny;
+  const i0 = Math.floor((lon - M.west) / cw), j0 = Math.floor((M.north - lat) / ch);
+  const ri = Math.ceil(max / (cw * MLON)) + 1, rj = Math.ceil(max / (ch * MLAT)) + 1;
+  let best: { d: number; q: Vec } | null = null;
+  for (let j = j0 - rj; j <= j0 + rj; j++) for (let i = i0 - ri; i <= i0 + ri; i++) {
+    if (i < 0 || j < 0 || i >= M.nx || j >= M.ny || GRID[j * M.nx + i] !== 1) continue;
+    // the cell, in course metres; inside onGround's Cityfront box the terrain doesn't count (the Cityfront shore does)
+    const x0 = (M.west + i * cw - LON0) * MLON, x1 = x0 + cw * MLON, y1 = (M.north - j * ch - LAT0) * MLAT, y0 = y1 - ch * MLAT;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    if (cx > CF.x0 && cx < CF.x1 && cy > CF.y0 && cy < CF.y1) continue;
+    const q = { x: Math.max(x0, Math.min(x1, p.x)), y: Math.max(y0, Math.min(y1, p.y)) }, d = Math.hypot(p.x - q.x, p.y - q.y);
+    if (d <= max && (!best || d < best.d)) best = { d, q };
+  }
+  if (!best) return null;
+  const b = best as { d: number; q: Vec }, dx = p.x - b.q.x, dy = p.y - b.q.y, l = Math.hypot(dx, dy);
+  if (l > 1e-9) return { d: b.d, n: { x: dx / l, y: dy / l } };
+  // (inside a land cell: out the way the nearest water lies, roughly: away from the cell's middle)
+  return { d: 0, n: { x: 0, y: 1 } };
+}
 
 /*
  * The distance to the shore, exactly (the nearest of SHORE's segments), but fast: the segments are filed in a 100 m grid

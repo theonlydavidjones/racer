@@ -125,8 +125,8 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
         tip = you ? 'Only hail when you need to tack, and tack as soon as they respond.' : 'You answered the hail properly.';
         break;
       }
-      what = you ? `${o} was being squeezed against the shore and hailed you for room to tack. You didn't respond.` : `You hailed ${o} for room to tack and they didn't respond.`;
-      tip = you ? 'When a boat to leeward near the shore (or any obstruction) hails "Room to tack!", tack right away (or reply "You tack" and give them room). They may not be able to hold their course much longer.' : 'You did the right thing: hail early, clearly, and only when you really need to tack to clear the obstruction.';
+      what = you ? `${o} was being squeezed against an obstruction (the shore, a pier or an island) and hailed you for room to tack. You didn't respond.` : `You hailed ${o} for room to tack and they didn't respond.`;
+      tip = you ? 'When a boat to leeward near an obstruction (the shore, a pier, an island) hails "Room to tack!", tack right away (or reply "You tack" and give them room). They may not be able to hold their course much longer.' : 'You did the right thing: hail early, clearly, and only when you really need to tack to clear the obstruction.';
       break;
     case '21.1':
       what = you ? `You were returning to start after being over early, so you had to keep clear of ${o}.` : `${o} was returning after being over early and had to keep clear.`;

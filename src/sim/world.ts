@@ -1,7 +1,7 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { asternCoast, crewRig, moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
@@ -9,7 +9,8 @@ import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } fro
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
 import { Puffs, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
-import { SHORE, alongside, onLand, shoreDist, shoreNearest, wharfNearest } from '../geo/shore';
+import { hailRange, obstructionAhead } from './obstruction';
+import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
@@ -61,6 +62,7 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
 }
 /** How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. */
 const SAME_INCIDENT = 8;
+
 /** A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. */
 const COMPELLED_WINDOW = 3;
 
@@ -343,7 +345,7 @@ export class World {
     const u = V(this.C.base), c = this.C.committee;
     return { name: 'the committee boat', p: { x: c.x + u.x * 6, y: c.y + u.y * 6 }, q: { x: c.x - u.x * 6, y: c.y - u.y * 6 }, r: 2 };
   }
-  /** Rule 19: the nearest obstruction (the shore, the Wharf's piers and breakwaters; after the start, the committee boat) within 30 m. */
+  /** Rule 19: the nearest obstruction (the shore, the islands and the Marin shore, the Wharf's piers and breakwaters; after the start, the committee boat) within 30 m. */
   private obstacle = (p: Vec, committee: boolean): { d: number; n: Vec; continuing: boolean } | null => {
     let best: { d: number; n: Vec; continuing: boolean } | null = null;
     const sn = shoreNearest(p), ds = sn.d;
@@ -354,6 +356,10 @@ export class World {
       const q = { x: p.x - n.x * ds, y: p.y - n.y * ds };
       best = { d: ds, n, continuing: alongside(SHORE, false, sn.k, q, n) >= 3 * LOA };
     }
+    // beyond the Cityfront (Alcatraz, Angel Island, the Marin shore, Treasure Island): the terrain's shore, in 50 m
+    // cells, so any stretch of it she passes is more than three of her lengths (Definitions, Continuing Obstruction)
+    const tn = terrainNearest(p, 30);
+    if (tn && (!best || tn.d < best.d)) best = { d: tn.d, n: tn.n, continuing: true };
     // the Wharf's piers, breakwaters and docks: along a side, a continuing obstruction; at a pier head, not
     const wf = wharfNearest(p, 30);
     if (wf && (!best || wf.d < best.d)) best = { d: wf.d, n: wf.n, continuing: wf.along >= 3 * LOA };
@@ -943,16 +949,9 @@ export class World {
 
   /* ---------- hails ---------- */
 
-  /**
-   * Rule 20.1: may `b` hail for room to tack? She must be sailing close-hauled (or above), approaching an
-   * obstruction (here, the shore) so that she'll soon have to tack, with a boat on the same tack to
-   * windward that she'd hit if she tacked. Returns that boat, or null.
-   */
-  roomBlocker(b: Boat): Boat | null {
-    if (b.twa > beatAngle(b.ww.kt) + 8 || b.tacking) return null;
-    const u = V(b.h), ahead = { x: b.x + u.x * 3 * LOA, y: b.y + u.y * 3 * LOA };
-    if (!onLand(ahead) && shoreDist(ahead) > 15) return null;
-    const wv = V(this.wind.from);
+  /** The boat on the same tack she'd hit if she tacked now: to windward of her, not astern, within 30 m; or null. */
+  tackBlocker(b: Boat): Boat | null {
+    const u = V(b.h), wv = V(this.wind.from);
     let best: Boat | null = null, bd = 30;
     for (const o of this.boats) {
       if (o === b || o.tack !== b.tack || o.finished) continue;
@@ -961,6 +960,45 @@ export class World {
       if (d < bd && toWindward && notAstern) { bd = d; best = o; }
     }
     return best;
+  }
+
+  /**
+   * Rule 20.1 (RRS 2025–2028): may `b` hail "Room to tack" (to tack and avoid a boat on the same tack)? Only when
+   * (a) she is approaching an obstruction and will soon need to make a substantial course change to avoid it safely
+   * (obstructionAhead: the shore, a pier, an island, the Marin shore; any of them), and (b) she is sailing close-hauled
+   * or above; and not if the obstruction is a mark and a boat that is fetching it would be required to change course as
+   * a result of the hail (an island rounded as a mark, with the boat she'd hail fetching it). Returns that boat, or null.
+   */
+  roomBlocker(b: Boat): Boat | null {
+    if (b.twa > beatAngle(b.ww.kt) + 8 || b.tacking) return null; // 20.1(b)
+    const ob = obstructionAhead(b, b.h, b.tack, hailRange(b.v)); // 20.1(a)
+    if (!ob) return null;
+    const o = this.tackBlocker(b);
+    if (!o || this.markFetchedBy(b, ob.at, o)) return null;
+    return o;
+  }
+  /** Rule 20.1's last sentence: is the obstruction at `at` her next mark (an island), with `o` fetching it? */
+  private markFetchedBy(b: Boat, at: Vec, o: Boat): boolean {
+    const m = this.nextMark(b);
+    return !!m?.reach && m === this.nextMark(o) && dist(at, m.p) <= markReach(m, at) + 60 && this.fetchingIsland(o, m);
+  }
+  /** Pinned against an island mark by a boat fetching it, so she may not hail (Rule 20.1): she must find another way round. */
+  roomBlockedByMark(b: Boat): boolean {
+    const ob = obstructionAhead(b, b.h, b.tack, 4 * hailRange(b.v)), o = this.tackBlocker(b);
+    return !!ob && !!o && this.markFetchedBy(b, ob.at, o);
+  }
+
+  /**
+   * Definitions, Fetching: "in a position to pass to windward of it and leave it on the required side without changing
+   * tack", for an island mark: close-hauled on her present tack she'd leave the island on the required side, and her
+   * course clears its shore.
+   */
+  fetchingIsland(o: Boat, m: CourseMark): boolean {
+    const beat = beatAngle(o.ww.kt), u = V(o.tack === 'S' ? o.ww.from - beat : o.ww.from + beat), r = sub(m.p, o), along = dot(r, u), far = Math.max(...(m.reach ?? [0]));
+    if (along + far <= 0) return false; // she's past all of it
+    if ((cross(u, r) > 0) !== (m.side === 'p')) return false; // (cross > 0: the island lies to port of her course)
+    const L = Math.max(0, along) + far + 200;
+    return landAlong(o, { x: o.x + u.x * L, y: o.y + u.y * L }) === Infinity;
   }
 
   /** Make a hail. Returns false if one is already pending between the pair. */
@@ -1007,7 +1045,7 @@ export class World {
         .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
       if (port) { this.hail(u, port.o, 'starboard'); return; }
     }
-    this.emit({ type: 'toast', ms: 5000, msg: 'Nothing to hail. "Room to tack!" is for when you\'re close-hauled near the shore with a boat to windward stopping you tacking (Rule 20). "Starboard!" is for a port-tack boat on a collision course with you.' });
+    this.emit({ type: 'toast', ms: 5000, msg: 'Nothing to hail. "Room to tack!" is for when you\'re close-hauled and will soon have to change course a lot to clear an obstruction (the shore, a pier, an island), with a boat to windward stopping you tacking (Rule 20). "Starboard!" is for a port-tack boat on a collision course with you.' });
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
