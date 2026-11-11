@@ -21,6 +21,9 @@ export interface DayWeather {
   kind: WindKind;
   /** The wind at a time (minutes since epoch, UTC): open-water speed, direction, gust factor, steadiness. */
   at(tMin: number): Breeze;
+  /** Whether the source has the wind at this time (minutes since epoch, UTC): a past day's record runs 10:00–18:00, and
+   * outside it `at` holds the nearest sample. Always, for the others. */
+  covers(tMin: number): boolean;
   /** The swell outside the Gate (`day`: small/typical/big, for a day without a real one). */
   swell(day: SwellDay): Swell;
   /** Whether the swell is the real one (observed or forecast). */
@@ -222,6 +225,7 @@ export function dayWeather(date: string, kind: WindKind | 'auto' = 'auto', windD
       const field = obs ? observedField(date, k) : R.grid.days[date] ? forecastField(date) : (p: Vec, _t: number, from: number) => ({ k: windTerrain(p, from), turn: 0 });
       return {
         source, kind: k, realSwell: !!realSwell, swell, issued: obs ? undefined : R.forecastIssued, field,
+        covers: tMin => { const m = localMin(tMin); return m >= samples[0][0] && m <= samples[samples.length - 1][0]; },
         fieldSource: obs ? 'the lie of the land, set by what the stations around the Bay saw that day (Pier 1, Oakland, Point Potrero, Richmond)' : R.grid.days[date] ? 'the National Weather Service forecast grid (2.5 km cells)' : 'the lie of the land',
         at: tMin => { const w = interp(samples, localMin(tMin)); return { kind: k, from: w.from, kt: w.kt, gust: w.kt > 0.5 ? Math.max(1.05, w.gust / w.kt) : 1.4, steady: obs ? 1 : (k === 'light' ? 0.35 : 0.9), freq: 1 }; }
       };
@@ -229,7 +233,7 @@ export function dayWeather(date: string, kind: WindKind | 'auto' = 'auto', windD
   }
   const k = windKindFor(date, kind);
   return {
-    source: kind === 'auto' ? 'records' : 'chosen', kind: breezeAt(Date.parse(date + 'T20:00:00Z') / 60000, windDay, k).kind, realSwell: false, swell, at: tMin => breezeAt(tMin, windDay, k),
+    source: kind === 'auto' ? 'records' : 'chosen', kind: breezeAt(Date.parse(date + 'T20:00:00Z') / 60000, windDay, k).kind, realSwell: false, swell, at: tMin => breezeAt(tMin, windDay, k), covers: () => true,
     field: (p, _t, from) => ({ k: windTerrain(p, from), turn: 0 }), fieldSource: 'the lie of the land'
   };
 }

@@ -134,7 +134,7 @@ describe('the chop takes time to build (duration-limited growth)', () => {
     const U = 18 * 0.5144, open = LL(37.865, -122.345), still = { x: 0, y: 0 }, cur = () => still; // (the Berkeley Circle)
     const sea = (f: SeaField) => f.at(open, { from: 250, kt: 18 }, still, cur).hsW, full = new SeaField({ hs: 0, tp: 10, from: 285 });
     expect(full.fetch(open, 250)).toBeGreaterThan(15000); // (about 18 km of open water to the WSW)
-    const f = new SeaField({ hs: 0, tp: 10, from: 285 }); f.developed = 0; // (flat calm)
+    const f = new SeaField({ hs: 0, tp: 10, from: 285 }); f.duration = 0; // (flat calm)
     for (let t = 0; t < 3600; t += 1) f.develop(U, 1);
     expect(sea(f)).toBeLessThan(0.6 * sea(full));
     expect(sea(f) / windSea(U, durationFetch(U, 3600)).hs).toBeGreaterThan(0.85); expect(sea(f) / windSea(U, durationFetch(U, 3600)).hs).toBeLessThan(1.15);
@@ -144,10 +144,31 @@ describe('the chop takes time to build (duration-limited growth)', () => {
   it("a light morning's small sea is a head start, worth the minutes the fresh breeze would take to make it", () => {
     const U = 18 * 0.5144, open = LL(37.865, -122.345), still = { x: 0, y: 0 }, cur = () => still;
     const calm = new SeaField({ hs: 0, tp: 10, from: 285 }), light = new SeaField({ hs: 0, tp: 10, from: 285 });
-    calm.developed = 0; light.developed = 0;
+    calm.duration = 0; light.duration = 0;
     for (let t = 0; t < 4 * 3600; t += 600) light.develop(4 * 0.5144, 600);
     for (let t = 0; t < 3600; t += 10) { calm.develop(U, 10); light.develop(U, 10); }
     const a = calm.at(open, { from: 250, kt: 18 }, still, cur).hsW, b = light.at(open, { from: 250, kt: 18 }, still, cur).hsW;
     expect(b).toBeGreaterThan(a); expect(b).toBeLessThan(1.4 * a);
   });
+});
+
+describe('the growing sea, more', () => {
+  it("a sea still growing is limited by the time the wind has blown, which a current doesn't change", () => {
+    const U = 18 * 0.5144, open = LL(37.865, -122.345), f = new SeaField({ hs: 0, tp: 10, from: 285 }); f.duration = 3600;
+    const at = (c: Vec) => f.at(open, { from: 250, kt: 18 }, c, () => c).hsW, along = { x: Math.sin(70 * Math.PI / 180), y: Math.cos(70 * Math.PI / 180) };
+    const still = at({ x: 0, y: 0 });
+    expect(at({ x: along.x * 1.3, y: along.y * 1.3 }) / still).toBeCloseTo(1, 2);
+    expect(at({ x: -along.x * 1.3, y: -along.y * 1.3 }) / still).toBeCloseTo(1, 2);
+    void U;
+  });
+  it("in the race, the sea she's in holds steady through the wind's pulses and quick shifts", async () => {
+    const { World } = await import('../src/sim/world');
+    const { DEFAULT_SETTINGS } = await import('../src/settings');
+    const ss2 = (await import('../src/courses/data/seaweed-soup-2026-course2.json')).default;
+    const w = new World(ss2 as never, { ...DEFAULT_SETTINGS, windKind: 'west', tideDate: '2027-07-10', tideTime: '15:00', fleet: 0 }, 3);
+    const p = { x: w.boats[0].x, y: w.boats[0].y + 500 }, hs: number[] = [], from: number[] = [];
+    for (let i = 0; i < 120 * 60; i++) { w.step(); if (i % 60 === 0) { const s = w.seaHere(p); hs.push(s.hsW); from.push(s.fromW); } }
+    expect(Math.max(...hs) / Math.min(...hs)).toBeLessThan(1.05);
+    expect(Math.max(...from) - Math.min(...from)).toBeLessThan(2);
+  }, 60000);
 });

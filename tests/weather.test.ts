@@ -81,3 +81,13 @@ describe('the wind across the course', () => {
     expect(Math.abs(a.k - c.k) + Math.abs(a.turn - c.turn) / 20).toBeGreaterThan(0.05);
   });
 });
+
+describe("a past day's record covers its hours, and no more", () => {
+  it('Fort Point 10:00–18:00: before that, the records stand in (for the chop grown through the morning: World.seaDurationAt)', () => {
+    const day = dayWeather('2025-07-05');
+    expect(day.source).toBe('observed');
+    expect(day.covers(sfLocalToUtcMin('2025-07-05', '06:00'))).toBe(false);
+    expect(day.covers(sfLocalToUtcMin('2025-07-05', '12:00'))).toBe(true);
+    expect(dayWeather('2025-07-05', 'west').covers(sfLocalToUtcMin('2025-07-05', '06:00'))).toBe(true);
+  });
+});
