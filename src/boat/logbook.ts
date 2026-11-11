@@ -23,7 +23,11 @@ export interface LogEntry {
   crew: string;
   /** The day's wind, in words ("W 14 kt"). */
   wind: string;
+  /** Races you sailed: what's needed to sail the same race again (Race → Run a past race). Older entries have none. */
+  setup?: RaceSetup;
 }
+/** A race's setup: the seed (the same boats, wind and positions), the course sailed, and the settings it was raced in. */
+export interface RaceSetup { seed: number; course: string; s: Record<string, unknown> }
 
 const KEY = 'fbsim-logbook-v1', MAX = 600;
 
