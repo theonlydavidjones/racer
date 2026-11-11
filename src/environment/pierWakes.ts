@@ -23,7 +23,7 @@ import { WindSum, bluffDeficit } from './shadows';
  *    rectangles differ with their side ratio (up to about 2.8 near 2.5 : 1 along the flow, Norberg 1993, less beyond);
  *    not modelled: about ±15% on the wake's width and depth, which go as √C_D.
  *  - Close behind it, where that law would take more than all the stream, the water is slack (the deficit is capped at
- *    the whole stream): a slack patch about 2½ widths long. The real recirculating bubble is shorter, about 1–1½ widths,
+ *    the whole stream): a slack patch about three widths long (W/(8·S·0.235·C_D)). The real recirculating bubble is shorter, about 1–1½ widths,
  *    with a little back-flow in it; the law only holds well once the deficit is under a tenth (some 200 widths on).
  *  - The bed's friction wears the wake down as it goes. Depth-averaged momentum with quadratic friction, the free
  *    stream in balance with the slope of the water (c_f·U²/h): for a small deficit w, U·dw/dx = −2·c_f·U·w/h, so the
