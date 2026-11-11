@@ -101,7 +101,25 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
   and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
-- **Next — a broader review of the trim controls** (polish/clarity; 4–6 h): owner, "we need a broader review of trim
+- **Now — the crew, drawn and animated as well as the boat** (accuracy + bug; 10–16 h; moved up from the unranked
+  "crew figures and animation"): owner, "crew movement animations are clumsy, ugly, and distracting… we have so much
+  beauty and accuracy in this game and the physics of crew movement are super cool, but the animations are complete
+  garbage… we need crew drawings and animations to be commensurate with what we have for the boat." Found: (1) the crew
+  move through the hull (their paths must go over the deck, coamings and thwart, never through them); (2) in auto they
+  move "with a frequency that isn't true to life": a real crew moves on a puff, a lull, a tack or a job, and otherwise
+  sits still, so the auto crew needs a dead band and a minimum time between moves (source it: racing coaches'
+  guidance, or video of Folkboat crews); (3) in "mid" they're "sitting on an invisible chair": they need a real seat
+  (the cockpit seat, the thwart, the floor, the bridge deck). Real bodies (proportions, clothing, lifejackets as in
+  reference/photos), poses for each job (helm on the aft deck or aft rail per the thwart item, hiking with feet under
+  the straps, sitting to leeward, at the winch, at the piano, crossing on a tack), and moves that follow the physics.
+  Check from both sides on both tacks.
+- **Now — crystal clarity on the crew and trim controls** (polish/clarity; 4–6 h; merged with the trim controls review
+  below): owner, "I also can't understand the buttons, even after using them for a while. how do I get them to hike on
+  the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
+  (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
+  (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
+  current tack, and what auto is doing now. Layout to the owner first.
+- **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
 - **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
@@ -178,7 +196,7 @@ wind's gradient and the heeled wind triangle, the keel's induced drag, depowerin
 do: the depowering question above, waves and puffs in every response, the gusts' peaks against the records; 6–10 h
 left); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
-in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
+in depth (~~done~~, published); crew figures and animation (moved up to now, above); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); ~~accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands~~ (done);
