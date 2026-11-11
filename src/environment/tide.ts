@@ -113,8 +113,11 @@ export class CurrentField {
 const TZ = 'America/Los_Angeles';
 
 /** UTC offset (minutes, negative west of Greenwich) in San Francisco at a UTC instant. */
+// (the formatters made once: building one is slow, and the clock is shown every frame)
+const OFFSET_FMT = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+const CLOCK_FMT = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
 function sfOffsetMin(utcMs: number): number {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const parts = OFFSET_FMT
     .formatToParts(new Date(utcMs)).reduce<Record<string, string>>((a, p) => { a[p.type] = p.value; return a; }, {});
   const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
   return Math.round((asUtc - Math.floor(utcMs / 60000) * 60000) / 60000);
@@ -131,7 +134,7 @@ export function sfLocalToUtcMin(date: string, time: string): number {
 
 /** Minutes since epoch, UTC → "14:05", San Francisco local time. */
 export function sfClock(tMin: number): string {
-  return new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(new Date(tMin * 60e3));
+  return CLOCK_FMT.format(new Date(tMin * 60e3));
 }
 
 /** Next Saturday (or today if it is one), as YYYY-MM-DD in San Francisco: club racing day. */

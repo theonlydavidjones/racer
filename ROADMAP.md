@@ -1,6 +1,6 @@
 # Build plan
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). In progress (Marinas): Horseshoe Bay (Travis Marina, Presidio YC). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
 - **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
   neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
@@ -55,21 +55,43 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
-- **Now — crew buttons fight auto** (bug; 1–2 h): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
+- **Now — crew buttons fight auto** (bug; 1–2 h; queued: starts when Night Lights or Marinas frees a slot): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
-- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h): water shows through the cockpit sole, and it's
+- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
-- **Now — bow spray** (bug; 1–2 h): at night the spray against the bow is "white squares… they look fake and read as
+- **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
-- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h): "a transparent seem between the keel and the
+- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
   the keel's rabbet). Check from both sides.
-- **Next — the bow wave** (polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
+- **Next — the thwart, the cockpit's proportions and where the skipper sits** (accuracy; 4–6 h; owner: "when time is
+  right"): the thwart is drawn as "a horizontal plank", and "the skipper is crammed behind the thwart with the thwart in
+  their lap. That's not true to life. While underway, skippers often (but not always) sit on the stern… or along the rear
+  rail." From the owner's three photos (Josephine at the dock, Josephine under way looking aft, CircleSea side-on; the
+  photos are in reference/photos: josephine-cockpit-at-dock.jpg, josephine-helm-on-aft-deck-underway.jpg,
+  circlesea-helm-on-aft-rail-side.jpg):
+  (1) the thwart is a deep wooden beam spanning the cockpit at about coaming height, with a vertical face, not a flat
+  plank; the black traveller track and car with the mainsheet blocks run along its top, and the green cam cleats for the
+  traveller (and the backstay ends) sit at each end where it meets the coamings;
+  (2) aft of it there's real room: the helm sits on the aft deck (green non-skid, the ensign staff at the stern) with legs
+  in the cockpit, or on the aft coaming, steering with the tiller extension; under way side-on, crew forward by the
+  shrouds and the helm well aft on the rail;
+  (3) the first photo shows how the mainsheet and traveller attach to the boom (mainsheet blocks from the car up to the
+  boom).
+  Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
+  position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
+  sides on both tacks.
+- **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
+  please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
+  up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
+  (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. Also check whether the "big white V" at the
+  bow (below) is partly the sidelights' glitter streaks on the water.
+- **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
 - **Next — instruments** (feature; 1–2 h): the TWD dial's big number should be **wind speed** ("I already have the windex
@@ -97,22 +119,46 @@ on different but equally good settings. Speed (November 2026, the same race five
 fleet of 5): the training course 461 against main's 420 (+10%), Seaweed Soup 444 against 422 (+5%), down from +40% and
 +18% (the hull's resistance tabled, the heel solve warm-started, the depowering search cached and simpler, no per-step
 allocations in the puffs and the crew). What's left is spread thin: the crew's per-step placement and jobs, the heel
-solve, and the search's first look at a new wind (it fills in over a race). For the performance review.
+solve, and the search's first look at a new wind (it fills in over a race). (Since: the performance review below.)
 Also found on the way: the outhaul's range was five points of camber, past what its black band allows (now about 1.5,
 the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
 car, an estimate between the end points).
 
-**Performance review** (owner, November 2026; 6–10 h): no lag or crashes as the sim grows. Set a budget first (a
-steady 60 fps on a typical laptop in a full race: fleet, ships, wildlife, charts; page load under a few seconds; memory
-that doesn't climb over a long session; the page well under the 16 MB limit, 3.1 MB today), then measure against it:
-frame time by part (physics step, AI, onLand/shoreDist calls, the sea model, the 3D scene's draw calls and triangles,
-the map and chart redraws, the sails' canvas textures), memory over an hour's sail (leaks from scenes, textures and
-listeners not freed between races), and the worst cases (big fleet, heavy weather, the chart zoomed out). Fix the
-hot spots (measured in November 2026: `shoreDist`, which the wind's terrain model and the current's shore relief ask
-for every boat every step, is over half of a race step on a course out toward the Gate; a distance field on a grid
-would take most of it); add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
-quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
-sessions changing the scene or the physics while it measures.
+~~**Performance review**~~ (owner, November 2026: no lag or crashes as the sim grows; done, v78). **The budget**: a steady
+60 fps on a typical laptop in a full race (eight boats, ships, wildlife, the chart): a frame's JS (the sim's steps, the
+scene's update, labels, HUD and maps) within about 8 ms of the 16.7, and the sim's steps within 3 ms of that at 4×
+speed; at most 2,000 draw calls and 2 million triangles in any view, day or night; the page up in under a few seconds;
+GPU memory and the JS heap level from race to race (no climb over a long session); the page well under the 16 MB
+limit (3.5 MB). **Measured** (headless Chromium with software GL in this container: draw calls and triangles are what
+a real GPU gets, frame JS here is about 3× a laptop's; the sim in Node), before → after:
+- The sim (median µs per step, fleet of eight on course 10 in 22 kt, Node): the whole race 534 → 354 (−34%), its start
+  450 → 349; the training course with five 289 → 216, Seaweed Soup course 2 with three 152 → 113. Every race the same
+  to the last bit (full-precision state after each race compared with main's). From `shoreNearest` (an exact list of
+  the segments that can be nearest anywhere in each 25 m cell, in place of the ring search: it was a third of a step),
+  the chop's added resistance and the drive worked out once per speed search, not 30 times, and the clock's
+  `Intl.DateTimeFormat` made once.
+- Memory: every new race (and every change in the setup, which builds one) left the last fleet's geometry, materials
+  and sail textures on the GPU, about 1,350 geometries and 45 textures a race; now freed (render/dispose.ts), and the
+  counts stay level race after race. Ships hidden when traffic is off (the last race's had stayed where they were).
+- Draw calls (full fleet, before → after): at the start in the chase view 1,780 → 1,740, overhead zoomed out
+  2,020 → 1,160, night at the East Span 2,300 → 1,640, night from the start line 1,990 → 1,120. Each boat is about 180
+  draw calls; her fittings smaller than half a metre are left out while they'd cover less than a pixel (render/fittings.ts),
+  which changes nothing you can see. Triangles 1.0–1.3 million everywhere.
+- Frame JS (here, chase view at the start): about 31 → 21 ms (≈ 7 ms on a laptop): the wind map on the water no longer
+  works out the shore distance it threw away (25,600 points every 0.15 s), the wave height's directions' sin and cos
+  kept (the wakes ask it 5,000 times a frame).
+- Nightfall: the city's and the bridge's lights and the sun's shadows going off needed about 50 new shaders compiled in
+  the frame night fell (0.6 s here); now compiled in the background at the start of each race (scene.ts warmShaders).
+  What's left is a 0.2 s frame here (first upload of the night lights' buffers): a frame or two on a laptop, once.
+- Page load (the published page): about 1.8 s to the start page here, 0.65 s for its first frame; a race starts in 0.2 s.
+- Kept from creeping back: tests/perf.test.ts (the sim's µs per step for the full fleet against a fixed reference
+  workload, so it holds on any machine; in `npm test`, not `test:fast`) and scripts/check/perf.cjs (draw calls, triangles,
+  programs and frame JS for seven views, and GPU memory over six races; exits 1 over budget). The ` key shows the
+  frame time, draw calls and memory on a real machine (ui/perfMeter.ts).
+Left for later: the boats are still most of the draw calls (eight boats ≈ 1,450 near the start); merging each boat's
+fixed parts by material would save about 50 a boat (exact, but it works against the pixel test above). The scene's
+JS is now three.js's own draw submission (proportional to the draw calls), the wakes and the boats' sails. The sim's
+step is spread thin: the AI's look-ahead, the crew, the tide field's blending of its stations.
 
 Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (begun, November 2026: stability from ORC certificates, the sails' forces from ORC's model, the
 wind's gradient and the heeled wind triangle, the keel's induced drag, depowering by a VPP-style speed search; still to
@@ -155,7 +201,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
-- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable; in progress, Night Lights: the skyline is overlit) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
   suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
   the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
   night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
@@ -200,7 +246,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
-- **Your boat** (done: looks, flags, condition). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
+- **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)

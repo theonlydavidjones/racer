@@ -28,6 +28,7 @@ import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
+import { PerfMeter } from './ui/perfMeter';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
@@ -621,6 +622,7 @@ addEventListener('keydown', e => {
   if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
   if (!$('keepAsk').hidden) return; // save or discard first
   const a = keymap.actionFor(e.key);
+  if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
     if (courseView.isOpen) { courseView.close(); return; }
     if (navView.isOpen) { navView.close(); return; }
@@ -1116,15 +1118,19 @@ addEventListener('resize', resize); resize();
 let last = performance.now();
 /** The showroom's point of sail: a close reach, port tack (the wind 55° on her port bow); negative: starboard tack. */
 let showroomTwa = 55;
+const perf = new PerfMeter();
 function frame(now: number): void {
   requestAnimationFrame(frame);
+  const t0 = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  let simMs = 0;
   if (w.running && !w.paused) {
     acc += dt * w.speed;
     while (acc >= DT) {
       w.step(DT); acc -= DT;
       if (w.paused) { acc = 0; break; }
     }
+    simMs = performance.now() - t0;
     if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   } else if (!w.running) {
@@ -1136,10 +1142,13 @@ function frame(now: number): void {
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && !!w.user.docked); sailButtons();
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
+  const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
+  const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
+  if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer);
 }
 
 /* Your boat: the panel, with the boat in the showroom view beside it. */
