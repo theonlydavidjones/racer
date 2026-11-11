@@ -39,7 +39,7 @@ import { horn, logMessage, messageLog, setLogClock, sound, toast } from './ui/fe
 import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
-import { onSaveTrouble, saveStatus } from './store/cloud';
+import { onSaveTrouble } from './store/cloud';
 import { layerMenu, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
@@ -1136,7 +1136,6 @@ function settleLog(next: () => void): void {
   $('bKeep').onclick = () => done(true); $('bDiscard').onclick = () => done(false);
 }
 onSaveTrouble(msg => toast(msg, 6000));
-$('saveNote').textContent = saveStatus();
 
 function showResults(): void {
   w.finishShown = true;
@@ -1264,7 +1263,6 @@ const fleet: Fleet = new Fleet(S, {
 });
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
-  $('saveNote').textContent = saveStatus();
   courseView.close(); navView.close(); w.running = false; w.paused = false;
   for (const id of ['setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (boatPanel.open) boatPanel.hide();
