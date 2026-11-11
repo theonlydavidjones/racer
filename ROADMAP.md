@@ -19,9 +19,14 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
       shape, so in a gale (k ≈ 0.2 at 35 kt) it stands in for the reefing and depowering it leaves out; from rest a
       backed-jib boat there gathers way quickly (5 kt in about 10 s). Holding the traveller down doesn't depower her: the
       crew sheets in to keep the boom angle it wants, so with the traveller yours the mainsheet should follow your intent.
-   c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
-      skill; an option to place the crew yourself (6–10 h).
-   d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).
+   c. ~~Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
+      skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
+      change with trim and heel) from a Folkboat lines plan, and its righting-moment curve from an ORC certificate
+      (sas.orc.org prints RM; the hosts weren't reachable); a roll gybe; the helm's own steering suffering while
+      single-handed at the cabin top; crew moving in waves (aft in a chop to free the bow).
+   d. ~~Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved~~ (done). Later: measured
+      timings for Folkboat crew work (the times are estimates); the order of jobs at a mark rounding (pole, vang, cars)
+      planned ahead of the mark by a skilled crew.
 3. ~~Race strategist in the course view, and a navigator for cruising~~ (done; published with the combined build of
    the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
    slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
@@ -57,11 +62,11 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **A navigator** in cruising, doing the same for the route: timeliness and safety (current gates, the slot, shipping lanes).
 - **Easier sail controls:** bigger targets; adjusting one line takes only that line off auto, and it's easy to put it
   back. Longer term: working the lines on the boat itself.
-- **Crew weight in the physics:** the low side in light air, hiking in a breeze, body-tacking, moving forward downwind; the AI
-  crew doing it by skill; the boat answering every shift; an option to move the crew yourself.
-- **Real timing and sequencing of adjustments:** cars rarely moved (it takes time, means leaving the cockpit, which moves
+- ~~**Crew weight in the physics:** the low side in light air, hiking in a breeze, body-tacking, moving forward downwind; the AI
+  crew doing it by skill; the boat answering every shift; an option to move the crew yourself.~~ (done)
+- ~~**Real timing and sequencing of adjustments:** cars rarely moved (it takes time, means leaving the cockpit, which moves
   weight, and the working car usually can't be moved under load); the order and pace of every adjustment set by the number
-  of crew and their skill.
+  of crew and their skill.~~ (done)
 - **A deep pass on sail and boat physics:** every crew move, wave, puff and line adjustment makes a response, from real
   science and maths.
 - **Cleaner start screens.** Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
