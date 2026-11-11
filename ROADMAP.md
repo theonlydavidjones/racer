@@ -69,6 +69,22 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
   the keel's rabbet). Check from both sides.
+- **Next — the thwart, the cockpit's proportions and where the skipper sits** (accuracy; 4–6 h; owner: "when time is
+  right"): the thwart is drawn as "a horizontal plank", and "the skipper is crammed behind the thwart with the thwart in
+  their lap. That's not true to life. While underway, skippers often (but not always) sit on the stern… or along the rear
+  rail." From the owner's three photos (Josephine at the dock, Josephine under way looking aft, CircleSea side-on; the
+  photos are in the Roadmap session, so attach them again to the session that builds this):
+  (1) the thwart is a deep wooden beam spanning the cockpit at about coaming height, with a vertical face, not a flat
+  plank; the black traveller track and car with the mainsheet blocks run along its top, and the green cam cleats for the
+  traveller (and the backstay ends) sit at each end where it meets the coamings;
+  (2) aft of it there's real room: the helm sits on the aft deck (green non-skid, the ensign staff at the stern) with legs
+  in the cockpit, or on the aft coaming, steering with the tiller extension; under way side-on, crew forward by the
+  shrouds and the helm well aft on the rail;
+  (3) the first photo shows how the mainsheet and traveller attach to the boom (mainsheet blocks from the car up to the
+  boom).
+  Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
+  position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
+  sides on both tacks.
 - **Next — the bow wave** (polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
