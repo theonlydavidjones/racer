@@ -25,7 +25,14 @@ const HARBORS = {
   'gashouse-cove': {
     name: 'Gashouse Cove', bbox: [-122.4390, 37.8040, -122.4295, 37.8100],
     basin: { marina: 'East Harbor' }, letter: 'north-south',
-    // the way in: the gap between the end of the hooked pier along the north side and Fort Mason's Pier 1
+    // the seawall along the north side, and its hook out to the entrance: NOAA's chart (ENC US5CA13M) has both as
+    // breakwaters, always dry, on the same lines as these OSM ways (which OSM tags as piers). The chart gives their line,
+    // not their width: the line is taken as the wall's harbor face, the rock running 6 m out toward the Bay from it
+    // (A dock floats only 4–5 m inside it).
+    breakwaterIds: ['23605116', '153269402'], breakwaterFace: { 23605116: 'right', 153269402: 'left' }, breakwaterWidth: 6,
+    // the light on the hook's end: San Francisco East Yacht Harbor Light 2, red, Iso R 6s, 4.0 m (NOAA ENC US5CA13M)
+    beaconsExtra: [{ at: [37.807983, -122.432906], colour: 'red' }],
+    // the way in: the gap between the end of the seawall's hook and Fort Mason's Pier 1
     exits: [[37.80795, -122.43272]]
   },
   'south-beach': {
@@ -76,7 +83,17 @@ async function make(id, H) {
   const near = (p, d) => inBasin(p) || BP.some((a, i) => segDist(p, a, BP[(i + 1) % BP.length]) < d);
   const skip = new Set(H.skipIds ?? []), bwIds = new Set(H.breakwaterIds ?? []);
   const breakwaters = ways.filter(w => (w.tags.man_made === 'breakwater' || bwIds.has(w.id)) && pts(w).some(q => near(xy(q), 40)))
-    .map(w => ({ area: w.tags.area === 'yes', pts: pts(w) }));
+    .map(w => H.breakwaterFace?.[w.id] ? { area: true, pts: faceToArea(pts(w), H.breakwaterFace[w.id] === 'right' ? 1 : -1, H.breakwaterWidth) } : { area: w.tags.area === 'yes', pts: pts(w) });
+  /** A wall charted as a line along its harbor face: the area of rock from that line out to one side (right or left of the way's direction), `w` m wide. */
+  function faceToArea(line, side, w) {
+    const q = line.map(xy), out = [];
+    for (let i = 0; i < q.length; i++) {
+      const a = q[Math.max(0, i - 1)], b = q[Math.min(q.length - 1, i + 1)], L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const n = { x: (b.y - a.y) / L * side, y: -(b.x - a.x) / L * side }; // to the right of the way's direction, × side
+      out.push({ x: q[i].x + n.x * w, y: q[i].y + n.y * w });
+    }
+    return [...line, ...out.reverse().map(toLL), line[0]];
+  }
   // the piers in the basin, and those running along just outside it (South Beach's fishing pier, the harbor's south wall)
   const piers = ways.filter(w => w.tags.man_made === 'pier' && !skip.has(w.id) && !bwIds.has(w.id)
     && (pts(w).some(q => inBasin(xy(q))) || (w.tags.area !== 'yes' && len(pts(w)) > 35 && pts(w).every(q => near(xy(q), 15)))));
@@ -156,7 +173,7 @@ async function make(id, H) {
   }
   // the entrance beacons (lateral marks, from NOAA's chart via OSM seamarks)
   const beacons = [...nodes.values()].filter(n => n.tags['seamark:type'] === 'beacon_lateral' && near(xy([n.lat, n.lon]), 80))
-    .map(n => ({ at: [r7(n.lat), r7(n.lon)], colour: n.tags['seamark:beacon_lateral:colour'] === 'green' ? 'green' : 'red' }));
+    .map(n => ({ at: [r7(n.lat), r7(n.lon)], colour: n.tags['seamark:beacon_lateral:colour'] === 'green' ? 'green' : 'red' })).concat(H.beaconsExtra ?? []);
 
   await writeFile(new URL(`../src/geo/data/${id}.json`, import.meta.url), JSON.stringify({
     source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? 'Dock letters are the docks\' names in OSM; slip numbers are this sim\'s.' : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}`,

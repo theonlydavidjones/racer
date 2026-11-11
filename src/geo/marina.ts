@@ -116,6 +116,17 @@ export function hitsHarbor(p: Vec): boolean {
   return false;
 }
 
+/** A wall that stops the waves here: a breakwater, a solid pier or the shore (not the floating docks, which ride on them). */
+export function hitsWall(p: Vec): boolean {
+  for (const H of HARBORS) {
+    if (!inBox(p, H.reach)) continue;
+    for (const b of H.breakwaters) if (b.area ? inPoly(p, b.pts) : nearLine(p, b.pts, BREAKWATER_W / 2)) return true;
+    for (const a of H.areas) if (inPoly(p, a)) return true;
+    for (const l of H.shore) if (nearLine(p, l, SHORE_W / 2)) return true;
+  }
+  return false;
+}
+
 const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger })));
 
 /** The slips a Folkboat fits in: her length (7.6 m) along it and her beam (2.2 m) across it, clear of every dock. */

@@ -163,7 +163,7 @@ export class Harbor {
     for (const b of H.breakwaters) {
       if (b.area) {
         const s = new THREE.Shape(); b.pts.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
-        const g = new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 1.2, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); g.translate(0, -0.6, 0);
+        const g = new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.3, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); g.translate(0, -0.6, 0); // (a small bevel: the rock you see is the rock you hit)
         this.group.add(new THREE.Mesh(g, rock));
       } else for (let i = 1; i < b.pts.length; i++) {
         const a = b.pts[i - 1], c = b.pts[i], len = Math.hypot(c.x - a.x, c.y - a.y);

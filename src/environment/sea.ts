@@ -1,6 +1,7 @@
 import { D2R, KT, V, brg, clamp, dot, wrap, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import { onLand } from '../geo/shore';
+import { harborAt, hitsWall, inBasin } from '../geo/marina';
 import mask from './data/land-mask.json';
 import climate from './data/sf-swell-climate.json';
 import type { Wind } from './wind';
@@ -47,8 +48,25 @@ export function landAt(p: Vec): boolean | null {
 const CF = { x0: LL(0, -122.48).x, x1: LL(0, -122.40).x, y0: LL(37.79, 0).y, y1: LL(37.815, 0).y };
 const onLandNear = (p: Vec) => p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 && onLand(p);
 
+/**
+ * In a marina, the waves from `from` (deg) at `p`: traced finely (every 2 m) out of the basin, since its walls are only
+ * metres away. `d`, m: how far to the wall or shore that stops them; or, if they come in through the entrance, how far
+ * to where they're out past the harbor's walls (`out`), from where they're open water again.
+ */
+function basinRay(p: Vec, from: number): { d: number; out: Vec | null } {
+  const u = V(from), H = harborAt(p)!;
+  for (let d = 2; d < 3000; d += 2) {
+    const q = { x: p.x + u.x * d, y: p.y + u.y * d };
+    if (inBasin(q) ? hitsWall(q) : onLand(q)) return { d, out: null };
+    if (q.x < H.reach.x0 || q.x > H.reach.x1 || q.y < H.reach.y0 || q.y > H.reach.y1) return { d, out: q };
+  }
+  return { d: 3000, out: null };
+}
+
 /** Open water straight upwind of `p` for wind from `from` (deg), m: to the first land, or MAX_FETCH. */
 export function fetchRay(p: Vec, from: number): number {
+  // in a marina: the breakwaters and the shore stop the chop within metres; through the entrance it comes in from the Bay
+  if (inBasin(p)) { const r = basinRay(p, from); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
   const u = V(from);
   for (let d = 50; d < MAX_FETCH; d += 100) {
     const l = landAt({ x: p.x + u.x * d, y: p.y + u.y * d });
@@ -162,11 +180,13 @@ export class SeaField {
 
   /** Fetch, cached on a 150 m grid by wind direction (to 2°). */
   fetch(p: Vec, from: number): number {
-    const key = `${Math.round(from / 2)}:${Math.round(p.x / 150)}:${Math.round(p.y / 150)}`;
+    const g = inBasin(p) ? 10 : 150; // (in a marina, on a 10 m grid: its walls shelter it within metres)
+    const key = `${Math.round(from / 2)}:${g}:${Math.round(p.x / g)}:${Math.round(p.y / g)}`;
     let f = this.cache.get(key);
     if (f === undefined) {
       if (this.cache.size > 60000) this.cache.clear();
-      f = fetchAt({ x: Math.round(p.x / 150) * 150, y: Math.round(p.y / 150) * 150 }, Math.round(from / 2) * 2);
+      const c = { x: Math.round(p.x / g) * g, y: Math.round(p.y / g) * g };
+      f = fetchAt(inBasin(c) ? c : p, Math.round(from / 2) * 2);
       this.cache.set(key, f);
     }
     return f;
@@ -189,7 +209,10 @@ export class SeaField {
     let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * this.chop; // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
-    const s = this.swell, reach = swellReach(p), sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
+    const s = this.swell, reach = swellReach(p);
+    // in a marina, the swell is stopped by its walls unless it runs straight in through the entrance (then only what diffracts round them)
+    if (inBasin(p) && !basinRay(p, reach.toward + 180).out) reach.k *= 0.15;
+    const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
     const hsS = Math.min(sc.H, 0.1 * sc.L);
     // whitecaps: the classic fraction-vs-wind law (Monahan), more where the chop is steep or blocked
     const steep = hsW / Math.max(1, wc.L);

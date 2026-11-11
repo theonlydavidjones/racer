@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HARBORS, SLIPS, harborAt, harborOf, hitsHarbor, hullClear, inBasin, pushOffPlan, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
+import { SeaField } from '../src/environment/sea';
+import type { Wind } from '../src/environment/wind';
 import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
@@ -65,6 +67,18 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     // and Piers 2 and 3 too (OpenStreetMap's coast), with water between them and north of their ends
     for (const [la, lo] of [[37.8088, -122.4315], [37.8090, -122.4304]]) expect(onLand(LL(la, lo))).toBe(true);
     for (const [la, lo] of [[37.8095, -122.4316], [37.8095, -122.4304], [37.8088, -122.43185]]) expect(onLand(LL(la, lo))).toBe(false);
+  });
+  it('Gashouse Cove\'s seawall (NOAA ENC US5CA13M: breakwater along the north side, hooking out to the entrance light) is solid rock; the entrance between it and Pier 1 is open', () => {
+    const H = harborOf('gashouse-cove')!;
+    expect(H.breakwaters.filter(b => b.area).length).toBe(2);
+    expect(onLand(LL(37.80790, -122.4345))).toBe(true); // the main wall, 3 m out from its harbor face
+    expect(onLand(LL(37.80806, -122.43320))).toBe(true); // the hook
+    expect(onLand(LL(37.80790, -122.43272))).toBe(false); // the entrance
+    expect(H.beacons.some(b => b.colour === 'red' && Math.hypot(b.p.x - LL(37.807983, -122.432906).x, b.p.y - LL(37.807983, -122.432906).y) < 1)).toBe(true); // East Yacht Harbor Light 2
+    // and the cove is sheltered: a north-westerly's chop and the swell barely get in, while outside they run
+    const sea = new SeaField({ hs: 1.5, tp: 12, from: 270 } as never), nw = { from: 315, kt: 18 } as Wind, still = () => ({ x: 0, y: 0 });
+    const inside = sea.at(LL(37.8075, -122.4345), nw, still(), still), outside = sea.at(LL(37.8095, -122.4340), nw, still(), still);
+    expect(inside.hsW).toBeLessThan(0.25 * outside.hsW); expect(inside.hsS).toBeLessThan(0.25 * outside.hsS);
   });
   it('the way out from every slip to the open Bay (a fine path search from offshore)', () => {
     for (const id of NEW) {
