@@ -125,13 +125,14 @@ export class Harbor {
     const deck = new THREE.MeshLambertMaterial({ map: deckTexture(), side: THREE.DoubleSide });
     const fascia = new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide });
     const rock = new THREE.MeshLambertMaterial({ color: 0x8a8176 });
+    const concrete = new THREE.MeshLambertMaterial({ color: 0xcfcbc2 }), white = new THREE.MeshLambertMaterial({ color: 0xf2f2ee }); // weathered white-grey concrete; white pipe rails
     const pileMat = new THREE.MeshLambertMaterial({ color: 0x5b4a3a }), capMat = new THREE.MeshLambertMaterial({ color: 0x8a8c8e });
     const pileGeo = new THREE.CylinderGeometry(0.17, 0.19, 4.2, 10), capGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10);
-    for (const H of HARBORS) this.build(H, deck, fascia, rock, pileMat, capMat, pileGeo, capGeo);
+    for (const H of HARBORS) this.build(H, deck, fascia, rock, concrete, white, pileMat, capMat, pileGeo, capGeo);
     scene.add(this.group);
   }
 
-  private build(H: HarborGeo, deck: THREE.Material, fascia: THREE.Material, rock: THREE.Material, pileMat: THREE.Material, capMat: THREE.Material, pileGeo: THREE.BufferGeometry, capGeo: THREE.BufferGeometry): void {
+  private build(H: HarborGeo, deck: THREE.Material, fascia: THREE.Material, rock: THREE.Material, concrete: THREE.Material, white: THREE.Material, pileMat: THREE.Material, capMat: THREE.Material, pileGeo: THREE.BufferGeometry, capGeo: THREE.BufferGeometry): void {
     // the docks: each walkway one continuous strip with mitred corners; each finger a strip from the walkway's edge
     // (trimmed or extended to meet it) to its end; decked in boards laid across, with darker fascias down the sides
     const walks = H.walkways, fingers = H.fingers; // (their ends already meet the walkways' edges: geo/marina.ts)
@@ -159,9 +160,26 @@ export class Harbor {
     piles.forEach((p, i) => { m.compose(P3(p.x, p.y, 0.6), q, one); pile.setMatrixAt(i, m); m.compose(P3(p.x, p.y, 2.73), q, one); cap.setMatrixAt(i, m); });
     pile.computeBoundingSphere(); cap.computeBoundingSphere();
     this.group.add(pile, cap);
-    // the breakwaters: rubble mounds of rock
+    // the breakwaters: rubble mounds of rock; or a vertical concrete seawall, walked along its top, with a pipe railing
     for (const b of H.breakwaters) {
-      if (b.area) {
+      if (b.seawall) {
+        const s = new THREE.Shape(); b.pts.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
+        const g = new THREE.ExtrudeGeometry(s, { depth: b.seawall.top + 1.5, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -1.5, 0); // (square-sided: what you see is what you hit)
+        this.group.add(new THREE.Mesh(g, concrete));
+        // the railing: posts every 2 m and two rails, 0.5 m and 1.0 m above the walkway, just in from the outer edge
+        const r = b.seawall.rail, y0 = b.seawall.top, posts: Vec[] = [];
+        for (let i = 1; i < r.length; i++) {
+          const a = r[i - 1], c = r[i], len = Math.hypot(c.x - a.x, c.y - a.y); if (len < 0.3) continue;
+          for (let d = 0; d <= len; d += 2) posts.push({ x: a.x + (c.x - a.x) * d / len, y: a.y + (c.y - a.y) * d / len });
+          for (const h of [0.5, 1.0]) {
+            const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, len, 5), white); rail.rotation.x = Math.PI / 2;
+            const holder = new THREE.Group(); holder.add(rail); holder.position.copy(P3((a.x + c.x) / 2, (a.y + c.y) / 2, y0 + h)); holder.rotation.y = -Math.atan2(c.x - a.x, c.y - a.y);
+            this.group.add(holder);
+          }
+        }
+        const post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5), white, posts.length), m1 = new THREE.Matrix4();
+        posts.forEach((p, i) => { m1.makeTranslation(P3(p.x, p.y, y0 + 0.5)); post.setMatrixAt(i, m1); }); post.computeBoundingSphere(); this.group.add(post);
+      } else if (b.area) {
         const s = new THREE.Shape(); b.pts.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
         const g = new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.3, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); g.translate(0, -0.6, 0); // (a small bevel: the rock you see is the rock you hit)
         this.group.add(new THREE.Mesh(g, rock));

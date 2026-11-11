@@ -68,13 +68,15 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     for (const [la, lo] of [[37.8088, -122.4315], [37.8090, -122.4304]]) expect(onLand(LL(la, lo))).toBe(true);
     for (const [la, lo] of [[37.8095, -122.4316], [37.8095, -122.4304], [37.8088, -122.43185]]) expect(onLand(LL(la, lo))).toBe(false);
   });
-  it('Gashouse Cove\'s seawall (NOAA ENC US5CA13M: breakwater along the north side, hooking out to the entrance light) is solid rock; the entrance between it and Pier 1 is open', () => {
+  it('Gashouse Cove\'s seawall (NOAA ENC US5CA13M: breakwater along the north side, hooking out to the entrance light) is a solid concrete wall; the entrance between it and Pier 1 is open', () => {
     const H = harborOf('gashouse-cove')!;
     expect(H.breakwaters.filter(b => b.area).length).toBe(2);
-    expect(onLand(LL(37.80790, -122.4345))).toBe(true); // the main wall, 3 m out from its harbor face
-    expect(onLand(LL(37.80806, -122.43320))).toBe(true); // the hook
+    expect(onLand(LL(37.80789, -122.4345))).toBe(true); // the main wall, 2 m out from its harbor face
+    expect(onLand(LL(37.807885, -122.4345))).toBe(true); expect(onLand(LL(37.80792, -122.4345))).toBe(false); // 3 m wide
+    expect(onLand(LL(37.808042, -122.433258))).toBe(true); // the hook
+    expect(H.breakwaters.filter(b => b.seawall).length).toBe(2);
     expect(onLand(LL(37.80790, -122.43272))).toBe(false); // the entrance
-    expect(H.beacons.some(b => b.colour === 'red' && Math.hypot(b.p.x - LL(37.807983, -122.432906).x, b.p.y - LL(37.807983, -122.432906).y) < 1)).toBe(true); // East Yacht Harbor Light 2
+    expect(H.beacons.some(b => b.colour === 'red' && Math.hypot(b.p.x - LL(37.807983, -122.432906).x, b.p.y - LL(37.807983, -122.432906).y) < 8)).toBe(true); // East Yacht Harbor Light 2 (on the arm's end, within the chart's precision)
     // and the cove is sheltered: a north-westerly's chop and the swell barely get in, while outside they run
     const sea = new SeaField({ hs: 1.5, tp: 12, from: 270 } as never), nw = { from: 315, kt: 18 } as Wind, still = () => ({ x: 0, y: 0 });
     const inside = sea.at(LL(37.8075, -122.4345), nw, still(), still), outside = sea.at(LL(37.8095, -122.4340), nw, still(), still);

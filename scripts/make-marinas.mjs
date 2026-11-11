@@ -26,12 +26,15 @@ const HARBORS = {
     name: 'Gashouse Cove', bbox: [-122.4390, 37.8040, -122.4295, 37.8100],
     basin: { marina: 'East Harbor' }, letter: 'north-south',
     // the seawall along the north side, and its hook out to the entrance: NOAA's chart (ENC US5CA13M) has both as
-    // breakwaters, always dry, on the same lines as these OSM ways (which OSM tags as piers). The chart gives their line,
-    // not their width: the line is taken as the wall's harbor face, the rock running 6 m out toward the Bay from it
-    // (A dock floats only 4–5 m inside it).
-    breakwaterIds: ['23605116', '153269402'], breakwaterFace: { 23605116: 'right', 153269402: 'left' }, breakwaterWidth: 6,
-    // the light on the hook's end: San Francisco East Yacht Harbor Light 2, red, Iso R 6s, 4.0 m (NOAA ENC US5CA13M)
-    beaconsExtra: [{ at: [37.807983, -122.432906], colour: 'red' }],
+    // breakwaters, always dry, on the same lines as these OSM ways (which OSM tags as piers). It's a vertical concrete wall
+    // with a walkway and a pipe railing on top, standing about 1.5–2 m above the water (the owner's photos from the water;
+    // the hook's arms are lighter, a narrower walkway). The chart gives the line, not the width: the line is taken as the
+    // wall's harbor face (A dock floats 4–5 m inside it), the wall 3 m wide (the hook 2 m) out toward the Bay.
+    breakwaterIds: ['23605116', '153269402'],
+    seawalls: { 23605116: { side: 'right', width: 3, top: 1.8 }, 153269402: { side: 'left', width: 2, top: 1.8 } },
+    // the light on the hook's end: San Francisco East Yacht Harbor Light 2, red, Iso R 6s, 4.0 m (NOAA ENC US5CA13M, which
+    // charts it at 37.807983 −122.432906, 6 m off the arm's end: within the chart's precision; stood on the end of the arm here)
+    beaconsExtra: [{ at: [37.807931, -122.432936], colour: 'red' }],
     // the way in: the gap between the end of the seawall's hook and Fort Mason's Pier 1
     exits: [[37.80795, -122.43272]]
   },
@@ -83,7 +86,9 @@ async function make(id, H) {
   const near = (p, d) => inBasin(p) || BP.some((a, i) => segDist(p, a, BP[(i + 1) % BP.length]) < d);
   const skip = new Set(H.skipIds ?? []), bwIds = new Set(H.breakwaterIds ?? []);
   const breakwaters = ways.filter(w => (w.tags.man_made === 'breakwater' || bwIds.has(w.id)) && pts(w).some(q => near(xy(q), 40)))
-    .map(w => H.breakwaterFace?.[w.id] ? { area: true, pts: faceToArea(pts(w), H.breakwaterFace[w.id] === 'right' ? 1 : -1, H.breakwaterWidth) } : { area: w.tags.area === 'yes', pts: pts(w) });
+    .map(w => { const sw = H.seawalls?.[w.id]; if (!sw) return { area: w.tags.area === 'yes', pts: pts(w) };
+      const a = faceToArea(pts(w), sw.side === 'right' ? 1 : -1, sw.width), n = pts(w).length;
+      return { area: true, pts: a, seawall: { top: sw.top, rail: a.slice(n, 2 * n) } }; }); // (the railing along its outer edge)
   /** A wall charted as a line along its harbor face: the area of rock from that line out to one side (right or left of the way's direction), `w` m wide. */
   function faceToArea(line, side, w) {
     const q = line.map(xy), out = [];
