@@ -15,7 +15,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself (6–10 h).
    d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).
-3. **Race strategist** in the course view, and a **navigator** for cruising (8–12 h).
+3. ~~Race strategist in the course view, and a navigator for cruising~~ (done; published with the combined build of
+   the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
+   slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
+   chart data; the crew-trim model's traveller (boat/controls.ts puts it to leeward in medium air: found in review).
 
 Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
