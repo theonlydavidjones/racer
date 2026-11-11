@@ -18,7 +18,7 @@ import { L as HULL_L, hullHalfAt } from './hull';
  */
 const G = 9.81, MAXDROPS = 60;
 /** The sea's colour (scene.ts, the water's material), for the bow wave's unbroken water. */
-const SEA = new THREE.Color(0x3b6d84), FOAM = new THREE.Color(0xf2f5f6);
+const SEA = new THREE.Color(0x3b6d84), FOAM = new THREE.Color(0xf2f5f6), TMP_C = new THREE.Color();
 /** The bicolour's colours as they fall on spray (navLights.ts). */
 const GREEN = new THREE.Color(0.1, 1.0, 0.6), RED = new THREE.Color(1.0, 0.12, 0.1);
 /** The bow wave's ridge: samples along each arm, and across it. */
@@ -134,13 +134,15 @@ export class Wakes {
         for (let side = 0; side < 2; side++) for (let i = 0; i <= NS; i++) {
           const f = i / NS, along = armLen * f, lat = (side ? 1 : -1) * crestOff(along, f), wid = (0.12 + 0.3 * f) * sc;
           const hgt = h0 * Math.pow(1 - f, 1.3) * Math.min(1, f * 8 + 0.35);
+          // the sea's height once at the crest: the waves don't change across the ridge's half metre
+          const cx0 = b.x + u.x * (stemFwd - along) + px * lat, cy0 = b.y + u.y * (stemFwd - along) + py * lat, s0 = sea(cx0, cy0);
           for (let j = 0; j < NT; j++) {
             const t = j / (NT - 1) * 2 - 1, lt = lat + (side ? 1 : -1) * t * wid; // across the ridge, from its inner foot out
             const x = b.x + u.x * (stemFwd - along) + px * lt, y = b.y + u.y * (stemFwd - along) + py * lt, o = (side * (NS + 1) + i) * NT + j;
             const prof = Math.cos(t * Math.PI / 2) ** 2;
-            BP[o * 3] = x; BP[o * 3 + 1] = sea(x, y) + 0.02 + hgt * prof; BP[o * 3 + 2] = -y;
+            BP[o * 3] = x; BP[o * 3 + 1] = s0 + 0.02 + hgt * prof; BP[o * 3 + 2] = -y;
             // sea-coloured water, white where the crest breaks; it fades into the sea at its feet and its far end
-            const wh = brk * Math.pow(1 - f, 0.6) * Math.max(0, 1 - Math.abs(t) * 2.2), c = SEA.clone().lerp(FOAM, Math.min(1, wh));
+            const wh = brk * Math.pow(1 - f, 0.6) * Math.max(0, 1 - Math.abs(t) * 2.2), c = TMP_C.copy(SEA).lerp(FOAM, Math.min(1, wh));
             BC[o * 4] = c.r; BC[o * 4 + 1] = c.g; BC[o * 4 + 2] = c.b; BC[o * 4 + 3] = Math.min(1, h0 / 0.05) * prof * Math.min(1, (1 - f) * 4) * (0.55 + 0.45 * wh);
           }
         }
