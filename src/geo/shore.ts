@@ -40,7 +40,42 @@ export const SHORE: Vec[] = SHORE_ALL.map(p => LL(p[0], p[1]));
 // the Presidio's edge and the city behind the waterfront are land, not a channel or a lake a boat could sail into)
 export const LAND: Vec[] = SHORE.concat([LL(37.7795, -122.3995), LL(37.7795, -122.4805), LL(37.8015, -122.4805), LL(37.8015, -122.4790)]); // (north of 37.8015, off the Presidio at the Gate, is water)
 
-const inCityfront = (p: Vec): boolean => inPoly(p, LAND);
+/*
+ * Inside the Cityfront's land polygon, exactly as inPoly(p, LAND) but fast (it's asked for every boat, every step):
+ * the polygon's edges are filed in 10 m bands of y, so the crossing count looks only at edges that span the point's
+ * y; and in 20 m cells that no edge crosses, the answer is worked out once and remembered.
+ */
+const LB = (() => {
+  const xs = LAND.map(q => q.x), ys = LAND.map(q => q.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const BAND = 10, nb = Math.ceil((y1 - y0) / BAND) + 1, bands: number[][] = Array.from({ length: nb }, () => []);
+  const C = 20, cx = Math.ceil((x1 - x0) / C) + 1, cy = Math.ceil((y1 - y0) / C) + 1, crossed = new Uint8Array(cx * cy);
+  for (let i = 0, j = LAND.length - 1; i < LAND.length; j = i++) {
+    const a = LAND[i], b = LAND[j];
+    for (let k = Math.floor((Math.min(a.y, b.y) - y0) / BAND); k <= Math.floor((Math.max(a.y, b.y) - y0) / BAND); k++) bands[k].push(i);
+    // mark the cells this edge passes through (stepping finely along it)
+    const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L / (C / 4)));
+    for (let t = 0; t <= n; t++) {
+      const x = a.x + (b.x - a.x) * t / n, y = a.y + (b.y - a.y) * t / n, ci = Math.floor((x - x0) / C), cj = Math.floor((y - y0) / C);
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ii = ci + di, jj = cj + dj; if (ii >= 0 && jj >= 0 && ii < cx && jj < cy) crossed[jj * cx + ii] = 1; }
+    }
+  }
+  return { x0, x1, y0, y1, BAND, bands, C, cx, cy, crossed, known: new Int8Array(cx * cy).fill(-1) };
+})();
+function inLandBands(p: Vec): boolean {
+  let c = false;
+  for (const i of LB.bands[Math.floor((p.y - LB.y0) / LB.BAND)]) {
+    const a = LAND[i], b = LAND[(i + LAND.length - 1) % LAND.length];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
+}
+export const inCityfront = (p: Vec): boolean => {
+  if (!(p.x >= LB.x0 && p.x <= LB.x1 && p.y >= LB.y0 && p.y <= LB.y1)) return false;
+  const k = Math.floor((p.y - LB.y0) / LB.C) * LB.cx + Math.floor((p.x - LB.x0) / LB.C);
+  if (LB.crossed[k]) return inLandBands(p);
+  if (LB.known[k] < 0) LB.known[k] = inLandBands(p) ? 1 : 0; // (no edge in or next to this cell: all of it is the same)
+  return LB.known[k] === 1;
+};
 
 /*
  * Beyond the Cityfront (Alcatraz, Angel Island, the Marin shore, Treasure Island, the city east of North Beach):
@@ -89,28 +124,70 @@ export function hitsWharf(p: Vec): boolean {
 }
 
 /**
- * The nearest of the Wharf's piers, breakwaters and docks (m; 0 inside one; Infinity beyond `max`), the direction away
- * from it, and whether that's along its side (a continuing obstruction, as a breakwater or a pier's flank) or at an end
- * or corner (a pier head).
+ * How far a boat at p passes alongside an outline (m), from its nearest segment k (from pts[k − 1] to pts[k]): the
+ * stretch of the outline on either side that stays within a few metres of the line she'd sail along it (square to n,
+ * the way out from it to her), measured along that line. RRS 2025–2028, Definitions, Obstruction: it's a continuing
+ * obstruction if she'd pass alongside it for at least three of her hull lengths.
  */
-export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; side: boolean } | null {
+export function alongside(pts: Vec[], closed: boolean, k: number, q: Vec, n: Vec, flat = 4): number {
+  const t = { x: -n.y, y: n.x }, N = pts.length;
+  let lo = 0, hi = 0;
+  const take = (v: Vec) => { const along = (v.x - q.x) * t.x + (v.y - q.y) * t.y, depth = Math.abs((v.x - q.x) * n.x + (v.y - q.y) * n.y); if (depth > flat) return false; lo = Math.min(lo, along); hi = Math.max(hi, along); return true; };
+  // walk back from the segment's start, and on from its end, while the outline stays on her side's face
+  for (let s = 0, i = k - 1; s < N; s++, i--) { if (i < 0) { if (!closed) break; i += N; } if (!take(pts[i])) break; }
+  for (let s = 0, i = k; s < N; s++, i++) { if (i >= N) { if (!closed) break; i -= N; } if (!take(pts[i])) break; }
+  return hi - lo;
+}
+
+/**
+ * The nearest of the Wharf's piers, breakwaters and docks (m; 0 inside one; null beyond `max`), the direction away
+ * from it, and how far a boat there passes alongside it (see alongside).
+ */
+export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; along: number } | null {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
   if (p.x < WHARF_BOX.x0 - max || p.x > WHARF_BOX.x1 + max || p.y < WHARF_BOX.y0 - max || p.y > WHARF_BOX.y1 + max) return null;
-  let best: { d: number; q: Vec; side: boolean } | null = null;
+  type Best = { d: number; q: Vec; part: WharfPart; closed: boolean; k: number };
+  let best: Best | null = null;
   const near = (b: WharfPart['box']) => p.x >= b.x0 - max && p.x <= b.x1 + max && p.y >= b.y0 - max && p.y <= b.y1 + max;
-  const seg = (a: Vec, b: Vec, half: number) => {
+  const seg = (part: WharfPart, closed: boolean, k: number, a: Vec, b: Vec, half: number) => {
     const abx = b.x - a.x, aby = b.y - a.y, L2 = abx * abx + aby * aby || 1, t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / L2));
     const q = { x: a.x + abx * t, y: a.y + aby * t }, d = Math.hypot(p.x - q.x, p.y - q.y) - half;
-    if (!best || d < best.d) best = { d, q, side: t > 0.02 && t < 0.98 };
+    if (!best || d < best.d) best = { d, q, part, closed, k };
   };
-  for (const a of WHARF.areas) if (near(a.box)) { for (let i = 0; i < a.pts.length; i++) seg(a.pts[i], a.pts[(i + 1) % a.pts.length], 0); if (inPoly(p, a.pts)) best!.d = 0; }
-  for (const l of WHARF.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l.pts[i - 1], l.pts[i], l.width! / 2);
-  const b = best as { d: number; q: Vec; side: boolean } | null;
+  let inside = false;
+  for (const a of WHARF.areas) if (near(a.box)) { const n = a.pts.length; for (let i = 0; i < n; i++) seg(a, true, i + 1, a.pts[i], a.pts[(i + 1) % n], 0); if (inPoly(p, a.pts)) inside = true; }
+  for (const l of WHARF.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l, false, i, l.pts[i - 1], l.pts[i], l.width! / 2);
+  const b = best as Best | null;
   if (!b || b.d > max) return null;
-  const dx = p.x - b.q.x, dy = p.y - b.q.y, L = Math.hypot(dx, dy) || 1;
-  return { d: Math.max(0, b.d), n: { x: dx / L, y: dy / L }, side: b.side };
+  const dx = p.x - b.q.x, dy = p.y - b.q.y, L = Math.hypot(dx, dy) || 1, n = { x: dx / L, y: dy / L };
+  return { d: inside ? 0 : Math.max(0, b.d), n, along: alongside(b.part.pts, b.closed, b.k, b.q, n) };
 }
 export const wharfDist = (p: Vec, max = 400): number => wharfNearest(p, max)?.d ?? Infinity;
+
+/**
+ * How enclosed the water here is by the Wharf's piers and breakwaters and the shore (0 open … 1 enclosed): of 16
+ * lines 400 m out from this 20 m cell, how many meet a pier, a breakwater or the land, past half of them. Inside
+ * Aquatic Park and the Pier 39 marina the water is enclosed; off a pier head it isn't. Worked out once per cell.
+ */
+const shelterCache = new Map<number, number>();
+export function wharfShelter(p: Vec): number {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !wharfNearest(p, 350)) return 0;
+  const i = Math.floor(p.x / 20), j = Math.floor(p.y / 20), key = i * 100003 + j;
+  let v = shelterCache.get(key);
+  if (v == null) {
+    const c = { x: (i + 0.5) * 20, y: (j + 0.5) * 20 };
+    let hit = 0;
+    for (let k = 0; k < 16; k++) {
+      const a = k * Math.PI / 8, e = { x: c.x + Math.sin(a) * 400, y: c.y + Math.cos(a) * 400 };
+      let h = wharfCrossed(c, e);
+      for (let r = 20; !h && r <= 400; r += 20) h = onGround({ x: c.x + Math.sin(a) * r, y: c.y + Math.cos(a) * r });
+      if (h) hit++;
+    }
+    v = Math.max(0, Math.min(1, (hit / 16 - 0.5) / 0.3));
+    shelterCache.set(key, v);
+  }
+  return v;
+}
 
 /** Does the straight line from a to b touch any of the Wharf's piers, breakwaters or docks? (Exact: they're 1–10 m wide.) */
 export function wharfCrossed(a: Vec, b: Vec): boolean {
@@ -149,24 +226,26 @@ const SG = (() => {
   }
   return { x0, y0, nx, ny, cells };
 })();
-export function shoreDist(p: Vec): number {
-  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return NaN; // (the ring search would never end)
+export const shoreDist = (p: Vec): number => shoreNearest(p).d;
+/** The distance to the shore, and which of SHORE's segments (k: from SHORE[k − 1] to SHORE[k]) is nearest. */
+export function shoreNearest(p: Vec): { d: number; k: number } {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return { d: NaN, k: -1 }; // (the ring search would never end)
   const { x0, y0, nx, ny, cells } = SG;
   const ci = Math.floor((p.x - x0) / SC), cj = Math.floor((p.y - y0) / SC);
   // start from the ring that first reaches the grid, if the point is outside it
   const r0 = Math.max(0, -ci, ci - (nx - 1), -cj, cj - (ny - 1));
-  let m = Infinity;
+  let m = Infinity, mk = -1;
   for (let r = r0; ; r++) {
     const ja = Math.max(0, cj - r), jb = Math.min(ny - 1, cj + r), ia = Math.max(0, ci - r), ib = Math.min(nx - 1, ci + r);
     for (let j = ja; j <= jb; j++) {
       const edgeRow = j === cj - r || j === cj + r;
       for (let i = ia; i <= ib; i++) {
         if (!edgeRow && i !== ci - r && i !== ci + r) continue; // only the ring itself
-        for (const k of cells[j * nx + i]) { const d = segPt(p, SHORE[k - 1], SHORE[k]); if (d < m) m = d; }
+        for (const k of cells[j * nx + i]) { const d = segPt(p, SHORE[k - 1], SHORE[k]); if (d < m || (d === m && k < mk)) { m = d; mk = k; } }
       }
     }
     // everything not yet searched lies outside the square of cells round the point's cell
     const lb = Math.min(p.x - (x0 + (ci - r) * SC), x0 + (ci + r + 1) * SC - p.x, p.y - (y0 + (cj - r) * SC), y0 + (cj + r + 1) * SC - p.y);
-    if (m <= lb || (ci - r <= 0 && ci + r >= nx - 1 && cj - r <= 0 && cj + r >= ny - 1)) return m;
+    if (m <= lb || (ci - r <= 0 && ci + r >= nx - 1 && cj - r <= 0 && cj + r >= ny - 1)) return { d: m, k: mk };
   }
 }
