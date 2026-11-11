@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt, startTack } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, hikeArm, newCrew, sitArm, type CrewPlace, type CrewSpec } from '../src/boat/crewPhys';
-import { bestTrim, mct } from '../src/boat/hullTrim';
+import { bestTrim, heelWetted, heelWettedFactor, mct } from '../src/boat/hullTrim';
 import { moveLazyCar } from '../src/boat/physics';
 import { KT } from '../src/core/math';
 import type { Boat } from '../src/boat/boat';
@@ -64,6 +64,10 @@ describe('Where the weight goes, and what she does', () => {
     const fwd = steady(6, beatAngle(6), { place: { across: null, fore: 'fwd' } }), aft = steady(6, beatAngle(6), { place: { across: null, fore: 'aft' } });
     expect(fwd.b.crew!.trim).toBeGreaterThan(aft.b.crew!.trim + 0.02);
     expect(fwd.v).toBeGreaterThan(aft.v * 1.003);
+  });
+  it('heeling her 5–10° hardly changes her wetted area (the Delft series regression, for a narrow deep hull): the low side in light air pays through the sails', () => {
+    expect(Math.abs(heelWetted(5))).toBeLessThan(0.01); expect(Math.abs(heelWetted(10))).toBeLessThan(0.01);
+    expect(Math.abs(heelWettedFactor(1, 8, 0) - 1)).toBeLessThan(0.002);
   });
   it('the best trim moves aft as she speeds up (wave-making grows with the bow down)', () => {
     expect(bestTrim(1.2)).toBeGreaterThan(0.03);

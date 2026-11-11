@@ -100,3 +100,37 @@ export function trimSpeedFactor(vt: number, t: number, sea = 0): number {
 }
 /** How far forward (m) the centre of lateral resistance moves with trim t (m, + bow down). */
 export const clrShift = (t: number) => (t / TRIM.lwl) * TRIM.keelL ** 2 / (12 * TRIM.keelT);
+
+/**
+ * The canoe body's wetted surface as she heels, from the Delft Systematic Yacht Hull Series regression (Keuning &
+ * Sonnenberg 1999, TU Delft report 1177-P, as tabulated in Yerkes Medina, ULiège master's thesis 2022–23, pp. 64–67):
+ * Sc(φ) = Sc(0)·[1 + (s0 + s1·B/T + s2·(B/T)² + s3·Cm)/100], a row of coefficients for each heel angle. Upright,
+ * Sc(0) = (1.97 + 0.171·B/T)·(0.65/Cm)^⅓·√(∇c·LWL). For a narrow, deep hull like the Folkboat's it changes by well under
+ * 1% at 5–10° (it saves wetted area only on beamy, shallow hulls): heeling her in light air is for the sails' shape,
+ * not the wetted area. The Folkboat's waterline beam over canoe-body draft (1.85 / 0.55 m) and midship coefficient
+ * (0.70) aren't published (the lines plan is the class's): estimates, inside the series' range (B/T 2.46–19.4,
+ * Cm 0.65–0.78); ∇c ≈ 1.90 m³ the canoe body without its keel (an estimate).
+ */
+const DSYHS_HEEL: [number, number, number, number, number][] = [ // φ, s0, s1, s2, s3
+  [5, -4.112, 0.054, -0.027, 6.329], [10, -4.522, -0.132, -0.077, 8.738], [15, -3.291, -0.389, -0.118, 8.949],
+  [20, 1.850, -1.200, -0.109, 5.364], [25, 6.510, -2.305, -0.066, 3.443], [30, 12.334, -3.911, 0.024, 1.767],
+  [35, 14.648, -5.182, 0.102, 3.497]
+];
+const HULL_BT = 1.85 / 0.55, HULL_CM = 0.70, CANOE_VOL = 1.90;
+/** The canoe body's share of the whole hull's wetted surface (ORC's 14.75 m², keel and rudder included). */
+const CANOE_SHARE = clamp((1.97 + 0.171 * HULL_BT) * Math.cbrt(0.65 / HULL_CM) * Math.sqrt(CANOE_VOL * TRIM.lwl) / 14.75, 0.3, 0.9);
+/** The change (fraction) in the canoe body's wetted surface at heel (deg) against upright. */
+export function heelWetted(heelDeg: number): number {
+  const h = Math.min(35, Math.abs(heelDeg)), row = (r: number[]) => (r[1] + r[2] * HULL_BT + r[3] * HULL_BT ** 2 + r[4] * HULL_CM) / 100;
+  if (h <= 5) return row(DSYHS_HEEL[0]) * h / 5;
+  const i = Math.min(DSYHS_HEEL.length - 2, Math.floor(h / 5) - 1), f = (h - DSYHS_HEEL[i][0]) / 5;
+  return row(DSYHS_HEEL[i]) * (1 - f) + row(DSYHS_HEEL[i + 1]) * f;
+}
+/**
+ * Speed factor from the wetted surface at her heel against the polar crew's heel `refHeel` (the polar has theirs in it):
+ * the change in skin friction (the canoe body's share of it) against a resistance R ∝ vⁿ.
+ */
+export function heelWettedFactor(vt: number, heelDeg: number, refHeel: number): number {
+  const bt = best(Math.max(0.5, vt));
+  return 1 / (1 + bt.fF * CANOE_SHARE * (heelWetted(heelDeg) - heelWetted(refHeel))) ** (1 / Math.max(1.5, bt.n));
+}

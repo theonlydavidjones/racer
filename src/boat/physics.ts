@@ -11,7 +11,7 @@ import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
-import { clrShift, trimSpeedFactor } from './hullTrim';
+import { clrShift, heelWettedFactor, trimSpeedFactor } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag } from './condition';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
@@ -199,7 +199,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // heel past her best; the weight aboard (displacement) and where it sits fore and aft (the trim's resistance); in a
   // drifter, the sails' own weight (heeled to leeward, gravity helps hold them in shape)
   const vPolar = polar(ww.kt, twa, plan);
-  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
+  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * heelWettedFactor(vPolar, b.heelMag!, crewBestHeel(twa, ww.kt)) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
   else target *= Math.sqrt((b.trimDriveK ?? trimDrive(b.trim.main, b.trim.jib)) * b.shape.eff * wornDrive) * powerFactor(b, jibOn, twa, ww, disp, dt, plan); // sheet angles, the sails' shape, worn cloth; flattened more (or less) than the polar's crew needs
