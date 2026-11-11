@@ -72,7 +72,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the south tower's fender, the Bay Bridge's piers and towers (their positions are still approximate, from the
   overpass-api note under the Bay Bridge), and anything else drawn in the water. Solid for collisions, for the AI's and the
   tiller pilot's look-ahead (landAlong) and the navigator's routes, on the chart, and as obstructions under Rule 19/20
-  (obstruction.ts). A test that sails a boat at each one.
+  (obstruction.ts). A test that sails a boat at each one. And their lee: owner, "there should also be a lee on the lee
+  side of the tower bases, no?" A bluff body leaves a wind shadow downwind (like the ships' and the committee boat's,
+  already in), and in the current a wake of slack water and eddies on its downstream side, shifting with flood and ebb;
+  size both from sourced bluff-body wake lengths, not by eye.
 - **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
