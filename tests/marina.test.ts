@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { HARBOR, SLIPS, hitsHarbor, hullClear, inBasin, pushOffPlan, slipById } from '../src/geo/marina';
+import { HARBOR, SLIPS, hitsHarbor, inBasin, pushOffPlan, slipById } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
-import { DT, World, midFairway, slipLeadTime } from '../src/sim/world';
+import { DT, SHOVE, World, slipLeadTime } from '../src/sim/world';
 
 describe('West Harbor', () => {
   it('a basin you can sail in, with its docks and breakwaters solid', () => {
@@ -39,7 +39,7 @@ describe('West Harbor', () => {
     expect(onLand(LL(37.8079, -122.4430))).toBe(true);
     expect(onLand(LL(37.8080, -122.4393))).toBe(false);
   });
-  it('Cruise from her slip: bow in, made fast, sails down; push off shoves her clear astern, steerable; hoist; home bow first', () => {
+  it('Cruise from her slip: bow in, made fast, sails down; push off walks her out and turns her down the fairway, then a shove; she steers out; hoist; home bow first', () => {
     const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
     const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
@@ -49,16 +49,24 @@ describe('West Harbor', () => {
     for (let i = 0; i < 300; i++) w.step(DT); // made fast: she stays put, wind or no wind
     expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01);
     expect(w.pushOff()).toBe(true);
-    expect(u.docked).toBeUndefined(); expect(u.astern).toBeGreaterThan(0.2); expect(u.astern).toBeLessThan(1.3); // a shove, about walking pace
+    expect(u.docked).toBeUndefined(); expect(u.handled).toBeTruthy(); // the crew has her by hand
     expect(u.pushing?.jump).toBe(0); expect(Math.abs(u.pushing!.lat - 2)).toBeLessThan(0.6); // a crew member on the finger, walking her out
-    // she coasts back clear of her finger, straight (tiller centred), without touching anything
-    const plan = pushOffPlan(slip), back = (q: { x: number; y: number }) => -((q.x - slip.p.x) * Math.sin(slip.heading * Math.PI / 180) + (q.y - slip.p.y) * Math.cos(slip.heading * Math.PI / 180));
-    for (let i = 0; i < 60 * 40 && (u.astern ?? 0) > 0; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
-    expect(back(u)).toBeGreaterThan(plan.back);
-    expect(Math.abs(back(u) - midFairway(slip))).toBeLessThan(1.5); // she comes to rest in the middle of the fairway
-    expect(u.pushing).toBeUndefined(); // the crew member who pushed her off has jumped aboard
+    const plan = pushOffPlan(slip); if (plan.kind !== 'walk') throw new Error('a bow-in slip');
+    const back = (q: { x: number; y: number }) => -((q.x - slip.p.x) * Math.sin(slip.heading * Math.PI / 180) + (q.y - slip.p.y) * Math.cos(slip.heading * Math.PI / 180));
+    let t = 0; for (; t < 60 * 120 && u.handled; t++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(u.handled).toBeUndefined(); expect(t / 60).toBeLessThan(60); // walked out and turned in well under a minute
+    expect(Math.abs(back(u) - plan.back)).toBeLessThan(0.1); expect(Math.abs(back(u) - 0.45 * slip.finger)).toBeGreaterThan(3.8); // her whole hull past the finger's end
+    expect(u.h).toBe(plan.h); expect(u.v).toBeCloseTo(SHOVE, 2); // pointed down the fairway, let go with a shove
+    for (let i = 0; i < 60; i++) w.step(DT);
+    expect(u.pushing).toBeUndefined(); // the crew member who walked her out is aboard
+    // under her own way, tiller centred, she carries on down the fairway, slowing, touching nothing
+    const ev = w.drainEvents().length; void ev;
+    const x0 = u.x, y0 = u.y;
+    for (let i = 0; i < 60 * 15; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+    expect(w.drainEvents().some(e => e.type === 'toast' && /Bump|Aground/.test(e.msg))).toBe(false);
+    expect(Math.hypot(u.x - x0, u.y - y0)).toBeGreaterThan(4); expect(u.v).toBeLessThan(SHOVE);
     // going astern the tiller still steers her (the bow goes the way the tiller's pushed)
-    w.pushOff(); Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, astern: 0.8 });
+    Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, handled: undefined, v: 0, astern: 0.8 });
     const h0 = u.h; u.tiller = -0.8; for (let i = 0; i < 120; i++) w.step(DT); u.tiller = 0;
     expect(((u.h - h0 + 540) % 360) - 180).toBeLessThan(-3); // tiller to port: bow to port
     // the crew hoists: the jib in about 15 s, the main in about 30 s (slower off the wind)
@@ -84,17 +92,6 @@ describe('West Harbor', () => {
     expect(bare).toBeLessThan(0.3); expect(jibOnly).toBeLessThan(mainOnly); expect(mainOnly).toBeLessThan(full);
     expect(full).toBeGreaterThan(2);
   });
-  it('room to push off and swing her round from nearly every slip', () => {
-    let ok = 0;
-    for (const s of SLIPS) {
-      const p = pushOffPlan(s), c = { x: s.p.x - Math.sin(s.heading * Math.PI / 180) * p.back, y: s.p.y - Math.cos(s.heading * Math.PI / 180) * p.back };
-      // and facing open fairway, not a dead end: clear water at least 10 m ahead
-      const v = { x: Math.sin(p.h * Math.PI / 180), y: Math.cos(p.h * Math.PI / 180) };
-      if (hullClear(c, p.h) && [2, 4, 6, 8, 10].every(d => hullClear({ x: c.x + v.x * d, y: c.y + v.y * d }, p.h))) ok++;
-      expect(Math.abs(p.turn)).toBe(90);
-    }
-    expect(ok / SLIPS.length).toBeGreaterThan(0.97);
-  }, 40000);
   it('Race from her slip: in it, with time to sail out to the line before the warning signal', () => {
     const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'race', raceFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14' };

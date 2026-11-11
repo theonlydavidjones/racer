@@ -57,6 +57,8 @@ export interface Slip {
   /** Unique across the marinas: `<marina>:<label>` (West Harbor's older saves have the bare label: slipById takes those too). */
   id: string; label: string; dock: string; marina: string; p: Vec;
   /** bow-in heading (toward the walkway), deg */ heading: number; finger: number;
+  /** A slip between fingers she lies in bow first, or an end tie she lies alongside, bow out along the dock's end. */
+  kind: 'bow-in' | 'alongside';
 }
 export interface Harbor {
   id: string; name: string; short: string;
@@ -157,7 +159,7 @@ export function hitsWall(p: Vec): boolean {
   return false;
 }
 
-const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger })));
+const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: 'bow-in' as const })));
 
 /** The slips a Folkboat fits in: her length (7.6 m) along it and her beam (2.2 m) across it, clear of every dock. */
 export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
@@ -168,6 +170,32 @@ export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
   }
   return true;
 });
+/**
+ * End ties: a berth alongside the free end of each main dock (the last few metres of a walkway that doesn't run into
+ * another), where a boat lies parallel to the dock, bow out toward its end, as most marinas let a visitor or a boat
+ * without a slip lie. Only where a Folkboat fits clear of every dock, finger and slip, with open water ahead.
+ */
+const END_TIES: Slip[] = HARBORS.flatMap(H => {
+  const out: Slip[] = [], mine = SLIPS.filter(s => s.marina === H.id), count = new Map<string, number>();
+  for (const w of H.walkways) for (const [i, j] of [[w.length - 1, w.length - 2], [0, 1]]) {
+    const e = w[i], f = w[j], L = Math.hypot(e.x - f.x, e.y - f.y); if (L < 8) continue;
+    const u = { x: (e.x - f.x) / L, y: (e.y - f.y) / L }; // along the dock, out toward its end
+    if (H.walkways.some(o => o !== w && o.some((q, k) => k > 0 && segPt(e, o[k - 1], q) < 3))) continue; // it runs into another dock: not a free end
+    const near = mine.filter(s => Math.hypot(s.p.x - e.x, s.p.y - e.y) < 40).sort((a, b) => Math.hypot(a.p.x - e.x, a.p.y - e.y) - Math.hypot(b.p.x - e.x, b.p.y - e.y))[0];
+    if (!near) continue;
+    for (const side of [1, -1]) {
+      const n = { x: u.y * side, y: -u.x * side }, c = { x: e.x - u.x * 4.6 + n.x * (WALKWAY_W / 2 + 1.1 + 0.3), y: e.y - u.y * 4.6 + n.y * (WALKWAY_W / 2 + 1.1 + 0.3) };
+      const h = (Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360;
+      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
+      let run = 0; while (run < 12 && hullClear({ x: c.x + u.x * (run + 2), y: c.y + u.y * (run + 2) }, h)) run += 2;
+      if (run < 12) continue; // no open water ahead to leave by
+      const k = (count.get(near.dock) ?? 0) + 1; count.set(near.dock, k);
+      out.push({ id: `${H.id}:${near.dock} end ${k}`, label: `${near.dock} end ${k}`, dock: near.dock, marina: H.id, p: c, heading: Math.round(h), finger: 0, kind: 'alongside' });
+    }
+  }
+  return out;
+});
+SLIPS.push(...END_TIES);
 const BY_ID = new Map(SLIPS.map(s => [s.id, s]));
 /** A slip by its id (a bare label is one of West Harbor's: saves from before the other marinas). */
 export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(id.includes(':') ? id : `west-harbor:${id}`) ?? null;
@@ -190,41 +218,147 @@ export function hullClear(c: Vec, h: number): boolean {
   return true;
 }
 
+/** Where the boat in another slip lies (a little under the length of its finger, as drawn: render/marina.ts), for keeping clear of her. */
+const boatIn = (o: Slip) => ({ half: o.kind === 'alongside' ? 3.9 : 0.5 * Math.min(13, Math.max(7, o.finger * 1.05)), beam: o.kind === 'alongside' ? 1.2 : 1.4 });
+/** The slips filed in 10 m cells, per harbor, each in its own cell and the eight round it (no boat reaches more than 7 m from her slip's middle). */
+const byHarbor = new Map<string, Map<string, Slip[]>>();
+const CELL = 10, cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
+function slipsNear(q: Vec, marina: string): Slip[] {
+  let g = byHarbor.get(marina);
+  if (!g) {
+    g = new Map();
+    for (const s of SLIPS) if (s.marina === marina) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const k = cellKey(s.p.x + dx * CELL, s.p.y + dy * CELL); let l = g.get(k); if (!l) g.set(k, l = []); l.push(s); }
+    byHarbor.set(marina, g);
+  }
+  return g.get(cellKey(q.x, q.y)) ?? [];
+}
+/** Clear of the boats lying in the other slips (all of them: most have a boat in them)? */
+function clearOfBoats(q: Vec, except: Slip): boolean {
+  for (const o of slipsNear(q, except.marina)) {
+    if (o === except) continue;
+    const dx = q.x - o.p.x, dy = q.y - o.p.y; if (dx * dx + dy * dy > 50) continue;
+    const u = { x: Math.sin(o.heading * Math.PI / 180), y: Math.cos(o.heading * Math.PI / 180) }, b = boatIn(o);
+    if (Math.abs(dx * u.x + dy * u.y) < b.half && Math.abs(dx * u.y - dy * u.x) < b.beam) return false;
+  }
+  return true;
+}
+/** Her whole hull here, at this heading, clear of every dock and of the boats in the other slips? */
+export function berthClear(c: Vec, h: number, except: Slip): boolean {
+  if (!hullClear(c, h)) return false;
+  const u = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }, n = { x: u.y, y: -u.x };
+  for (const a of [-3.7, -1.85, 0, 1.85, 3.7]) for (const b of [-1.05, 0, 1.05]) if (!clearOfBoats({ x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b }, except)) return false;
+  return true;
+}
+
 /**
- * Leaving a slip she lies in bow first (boats nose in here, never back in): the crew walks her back along the finger
- * until her bow is about at its end, then swings her bow round toward the way out of the harbor and steps aboard
- * with a shove. `back` is how far she's walked astern (m), `turn` the swing (deg, + to starboard), `h` her heading
- * after it. If there isn't room to swing where she'd usually be, she's walked back a little further first.
+ * Leaving her berth under no engine, as it's done.
+ * - **Bow in, between fingers** (`walk`): the crew walks her straight back out of the slip by hand, past the finger's end
+ *   and the boats either side, to the middle of the fairway; turns her there to point down it toward the nearer way out
+ *   (or the other way, if that's a dead end); and steps aboard with a shove forward. `back` is how far she's walked astern
+ *   (m), `turn` the turn (deg, + to starboard), `h` her heading after it.
+ * - **Alongside an end tie, bow out** (`off`): the crew pushes her off the dock and forward. `out` is where she's pushed
+ *   out to (her middle, about a metre and a half off), `h` her heading (as she lay).
+ * Either way she then goes on under her own way, slowing on the water's drag (physics.ts), and steers from the start.
  */
-export interface PushOff { back: number; turn: number; h: number }
+export type PushOff = { kind: 'walk'; back: number; turn: number; h: number; /** no room to turn her: let go without a shove */ still?: boolean } | { kind: 'off'; out: Vec; h: number };
 const plans = new Map<string, PushOff>();
 export function pushOffPlan(s: Slip): PushOff {
   let p = plans.get(s.id); if (!p) { p = planPushOff(s); plans.set(s.id, p); }
   return p;
 }
+const dirOf = (h: number) => ({ x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) });
+/** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 40). */
+function runAhead(c: Vec, h: number, s: Slip): number {
+  const v = dirOf(h); let d = 0;
+  while (d < 40 && berthClear({ x: c.x + v.x * (d + 2), y: c.y + v.y * (d + 2) }, h, s)) d += 2;
+  return d;
+}
+/**
+ * How far it is to the way out of the harbor from here, along the water (m, in 3 m steps; Infinity off the water): a flood
+ * out from its entrances, worked out once per harbor. In a long harbor the way out can lie the other way round the docks
+ * from where the entrance is as the crow flies.
+ */
+const ways = new Map<string, (q: Vec) => number>();
+function toExit(H: Harbor): (q: Vec) => number {
+  let f = ways.get(H.id); if (f) return f;
+  const G = 3, key = (x: number, y: number) => `${Math.round(x / G)},${Math.round(y / G)}`, d = new Map<string, number>();
+  // started from the basin's water nearest each way out (an exit can lie out past the entrance, or on its beacon)
+  let fr: Vec[] = [];
+  for (const e of H.exits) {
+    let best: Vec | null = null, bd = Infinity;
+    for (let x = Math.floor((H.box.x0) / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
+      const q = { x, y }, dd = Math.hypot(q.x - e.x, q.y - e.y);
+      if (dd < bd && harborAt(q) === H && !hitsHarbor(q)) { bd = dd; best = q; }
+    }
+    if (best && !d.has(key(best.x, best.y))) { d.set(key(best.x, best.y), bd); fr.push(best); }
+  }
+  while (fr.length) {
+    const nx: Vec[] = [];
+    for (const p of fr) for (const [dx, dy] of [[G, 0], [-G, 0], [0, G], [0, -G]]) {
+      const q = { x: p.x + dx, y: p.y + dy }, k = key(q.x, q.y);
+      if (d.has(k) || hitsHarbor(q) || harborAt(q) !== H) continue; // (over the basin's water)
+      d.set(k, d.get(key(p.x, p.y))! + G); nx.push(q);
+    }
+    fr = nx;
+  }
+  f = q => Math.min(...[[0, 0], [G, 0], [-G, 0], [0, G], [0, -G]].map(([dx, dy]) => d.get(key(q.x + dx, q.y + dy)) ?? Infinity));
+  ways.set(H.id, f);
+  return f;
+}
 function planPushOff(s: Slip): PushOff {
-  const u = { x: Math.sin(s.heading * Math.PI / 180), y: Math.cos(s.heading * Math.PI / 180) };
-  const exits = harborOf(s.marina)?.exits ?? [], exit = exits.length ? exits.reduce((a, b) => Math.hypot(b.x - s.p.x, b.y - s.p.y) < Math.hypot(a.x - s.p.x, a.y - s.p.y) ? b : a) : s.p; // the nearer way out
-  const base = 0.45 * s.finger + 4.1; // her bow (3.8 m ahead of her middle) level with the end of the finger
-  const at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
-  const toward = (d: number) => { const c = at(base), v = { x: Math.sin((s.heading + d) * Math.PI / 180), y: Math.cos((s.heading + d) * Math.PI / 180) }; return v.x * (exit.x - c.x) + v.y * (exit.y - c.y); };
-  const dirs = toward(90) >= toward(-90) ? [90, -90] : [-90, 90];
-  for (const extra of [0, 1.5, 3, 4.5, 6]) {
-    const back = base + extra;
-    let ok = true;
-    for (let d = 1; d <= back && ok; d += 1) ok = hullClear(at(d), s.heading);
-    if (!ok) break; // walking her back any further runs her into something
-    // of the ways she can swing, the one with the most clear fairway ahead (not a dead end); about even, toward the entrance
-    const c = at(back), runs = dirs.map(turn => {
-      for (let k = 1; k <= 6; k++) if (!hullClear(c, s.heading + turn * k / 6)) return -1;
-      const h = s.heading + turn, v = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) };
-      let d = 0; while (d < 40 && hullClear({ x: c.x + v.x * (d + 2), y: c.y + v.y * (d + 2) }, h)) d += 2;
-      return d;
-    });
-    if (runs.some(r => r >= 0)) {
-      const i = runs[0] >= 0 && runs[0] >= runs[1] - 5 ? 0 : 1;
-      return { back, turn: dirs[i], h: (s.heading + dirs[i] + 360) % 360 };
+  if (s.kind === 'alongside') {
+    // pushed off sideways from the dock (away from the nearest walkway), and forward along it
+    const H = harborOf(s.marina)!, u = dirOf(s.heading), n = { x: u.y, y: -u.x };
+    let side = 1, best = Infinity;
+    for (const w of H.walkways) for (let k = 1; k < w.length; k++) { const d = segPt(s.p, w[k - 1], w[k]); if (d < best) { best = d; const m = { x: (w[k - 1].x + w[k].x) / 2 - s.p.x, y: (w[k - 1].y + w[k].y) / 2 - s.p.y }; side = m.x * n.x + m.y * n.y > 0 ? -1 : 1; } }
+    return { kind: 'off', out: { x: s.p.x + n.x * side * 1.5, y: s.p.y + n.y * side * 1.5 }, h: s.heading };
+  }
+  const u = dirOf(s.heading), at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
+  const tip = 0.45 * s.finger; // her middle to the end of her finger
+  // how far she can be walked straight back before she'd touch a dock or a boat (across the fairway, or a dead end)
+  let reach = 0; while (reach < tip + 40 && berthClear(at(reach + 0.5), s.heading, s)) reach += 0.5;
+  // the fairway's far side: the first dock or boat behind her
+  let far = tip + 1; while (far < tip + 40) { const q = at(far); if (!inBasin(q) || hitsHarbor(q) || !clearOfBoats(q, s)) break; far += 0.5; }
+  // (no dock across within a fairway's width: open water, so where a fairway's middle would be)
+  const mid = far >= tip + 24 ? tip + 8 : (tip + far) / 2, togo = toExit(harborOf(s.marina)!);
+  const toward = (h: number) => { const v = dirOf(h), c = at(mid); return -togo({ x: c.x + v.x * 12, y: c.y + v.y * 12 }); }; // (the nearer way out, along the water)
+  const dirs = toward(s.heading + 90) >= toward(s.heading - 90) ? [90, -90] : [-90, 90];
+  // from the middle of the fairway outward, the first place she can be turned there and has clear water ahead
+  const backs: number[] = [];
+  for (let k = 0; k <= 60; k++) for (const b of k ? [mid + k * 0.5, mid - k * 0.5] : [mid]) if (b >= tip + 3.9 && b <= reach) backs.push(b);
+  for (const back of backs) {
+    // a square turn down the fairway; failing that (a corner slip, a dock end in the way), a little more or less
+    const c = at(back);
+    for (const sq of [90, 75, 105, 60, 120]) {
+      const turns = dirs.map(d => Math.sign(d) * sq), ok = turns.map(turn => { for (let k = 1; k <= 9; k++) if (!berthClear(c, s.heading + turn * k / 9, s)) return -1; return runAhead(c, s.heading + turn, s); });
+      const pick = ok[0] >= 6 ? 0 : ok[1] >= 10 ? 1 : -1; // toward the way out (a boat's length of fairway before it turns a corner will do), unless that's a dead end
+      if (pick >= 0) return { kind: 'walk', back, turn: turns[pick], h: (s.heading + turns[pick] + 360) % 360 };
     }
   }
-  return { back: base, turn: dirs[0], h: (s.heading + dirs[0] + 360) % 360 }; // tight: she'll bump on the way round
+  // tight (a corner slip, a narrow fairway): turned only as far as there's room, with a boat's length clear ahead; else
+  // walked straight out and let go with no shove, to be steered out from there
+  for (const back of backs) {
+    const c = at(back);
+    for (let sq = 80; sq >= 20; sq -= 10) for (const d of dirs) {
+      const turn = Math.sign(d) * sq; let ok = true;
+      for (let k = 1; k <= 9 && ok; k++) ok = berthClear(c, s.heading + turn * k / 9, s);
+      if (ok && runAhead(c, s.heading + turn, s) >= 6) return { kind: 'walk', back, turn, h: (s.heading + turn + 360) % 360 };
+    }
+  }
+  const back = backs.length ? backs[0] : Math.max(0, Math.min(reach, tip + 3.9));
+  return { kind: 'walk', back, turn: 0, h: s.heading, still: true };
 }
+
+/**
+ * Only the slips she can be got out of by hand: walked straight back past her finger's end (her whole hull out of it)
+ * without touching a dock or the boats either side or across (a few mapped slips face a dock or another row too closely).
+ */
+for (let i = SLIPS.length - 1; i >= 0; i--) {
+  const s = SLIPS[i]; if (s.kind !== 'bow-in') continue;
+  const u = dirOf(s.heading), tip = 0.45 * s.finger;
+  let ok = true;
+  for (let d = Math.max(1, tip - 3); d <= tip + 4 && ok; d += 1.5) ok = berthClear({ x: s.p.x - u.x * d, y: s.p.y - u.y * d }, s.heading, s); // (from where her stern comes to the finger's end)
+  if (!ok) SLIPS.splice(i, 1);
+}
+BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
+byHarbor.clear();
