@@ -73,6 +73,11 @@ function blocked(w: World, b: Boat, h: number, d: number): boolean {
   return false;
 }
 
+/** Land within 45 m ahead on both tacks' close-hauled courses, with land between her and where she's going: boxed in. */
+function pocketed(w: World, b: Boat, csS: number, csP: number): boolean {
+  return blocked(w, b, csS, 45) && blocked(w, b, csP, 45);
+}
+
 /** Where the AI steers for its next mark: a little wide of rounding marks, well clear of pass marks. */
 export function aimPoint(w: World, b: Boat): Vec {
   const m = w.nextMark(b);
@@ -284,7 +289,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
       if (ai.detour) P = ai.detour;
-    } else ai.detour = null;
+    } else if (b.started && (refresh || ai.detour === undefined) && pocketed(w, b, csS, csP)) {
+      // beating, but boxed in with land ahead on both tacks (in a harbor's mouth, behind a jetty): tacking off the shore
+      // only takes her back and forth inside, so she steers for clear water round it first, as on a reach
+      ai.detour = detour(b, P);
+      if (ai.detour) P = ai.detour;
+    } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 60) P = ai.detour; // (on her way out of it)
+    else ai.detour = null;
     const bP = brg(P.x - b.x, P.y - b.y);
     if (Math.abs(wrap(ww.from - bP)) < 44 && !b.ocs) {
       beating = true;
@@ -327,7 +338,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (may && w.t - ai.lastHail > 40) { w.hail(b, may, 'room'); ai.lastHail = w.t; }
     const waiting = pinned && (may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
     if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;
-    else if (beating && !pinned && w.t - b.lastTackT > 4) desired = b.tack === 'S' ? csP : csS;
+    else if (beating && w.t - b.lastTackT > 4 && !(pinned && w.roomBlockedByMark(b))) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   }
   // collision avoidance under the rules
