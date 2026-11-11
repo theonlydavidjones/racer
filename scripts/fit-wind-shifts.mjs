@@ -11,11 +11,13 @@
  * straight-line drift taken out (the hourly records carry the afternoon's veer and build). Then, by kind and by mean
  * speed, the structure function D(τ) = <(x(t + τ) − x(t))²> at lags of 6 to 90 minutes, and a fit
  *
- *   D(τ) = 2σn² + 2σ1²(1 − e^(−τ/T1)) + 2σ2²(1 − e^(−τ/T2)),   T1 = 8 min, T2 = 120 min
+ *   D(τ) = 2σn² + 2σ1²(1 − e^(−τ/T1)) + 2σ2²(1 − e^(−τ/T2))
  *
- * (exact non-negative least squares): white noise at the 6-minute sampling (shifts quicker than a few minutes, and
- * the station's own turbulence in its 2-minute means: environment/wind.ts Puffs is that part), and two
- * Ornstein–Uhlenbeck processes, the oscillating shifts of several minutes and the persistent ones that last the race.
+ * (exact non-negative least squares, with T1 and T2 fitted for each class): white noise at the 6-minute sampling
+ * (shifts quicker than a few minutes, and the station's own turbulence in its 2-minute means: environment/wind.ts
+ * Puffs is that part), and two Ornstein–Uhlenbeck processes, the shifts of several minutes and the persistent ones that
+ * last the race. Each day's direction is unwrapped sample to sample and its differences wrapped, so a wind swinging
+ * through ±180° of its mean counts as the small change it is.
  * The sim's shift field (environment/shifts.ts) is σ1 and σ2. A speed band with fewer than 20 days is folded into
  * the band below it.
  *
@@ -25,7 +27,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const R = JSON.parse(await readFile(new URL('../src/environment/data/sf-real-days.json', import.meta.url), 'utf8'));
 const OUT = new URL('../src/environment/data/sf-wind-shifts.json', import.meta.url);
-const T1 = 8, T2 = 120, LAGS = 15, BANDS = [0, 6, 10, 15, 20, 99];
+const LAGS = 15, BANDS = [0, 6, 10, 15, 20, 99];
 const wrap = d => ((d % 360) + 540) % 360 - 180;
 
 const acc = {};
@@ -43,7 +45,11 @@ for (const [date, s] of Object.entries(R.wind)) {
   const kind = mean < 4 || vec < 0.5 * mean ? 'light' : dir >= 200 && dir < 330 ? 'west' : dir >= 100 && dir < 200 ? 'south' : 'north';
   const band = kind === 'light' ? 0 : BANDS.findIndex((b, i) => mean >= b && mean < BANDS[i + 1]);
   // (a direction only where there's wind enough to have one: 2 kt)
-  const th = pts.map(p => p && p[0] >= 2 ? wrap(p[1] - dir) : null), u = pts.map(p => p && p[0] >= 2 ? p[0] / mean : null);
+  // (the direction unwrapped sample to sample, so a wind swinging through ±180° of the day's mean reads as the small
+  // change it is, not a 358° one)
+  let prev = null;
+  const th = pts.map(p => { if (!p || p[0] < 2) return null; const v = prev == null ? wrap(p[1] - dir) : prev + wrap(p[1] - dir - prev); prev = v; return v; });
+  const u = pts.map(p => p && p[0] >= 2 ? p[0] / mean : null);
   const detrend = a => {
     let sx = 0, sy = 0, sxx = 0, sxy = 0, c = 0;
     a.forEach((v, i) => { if (v == null) return; sx += i; sy += v; sxx += i * i; sxy += i * v; c++; });
@@ -74,9 +80,20 @@ function nnls(X, y) {
   return best;
 }
 const lags = [...Array(LAGS)].map((_, i) => (i + 1) * R.slotMin);
+/**
+ * The fit at fixed time scales; and the time scales themselves, by the least error over a grid (T1 6–40 min, T2 50–240).
+ * (Lags of 6 to 90 minutes can't tell a slow process's time scale from a longer one with a bigger σ, D ≈ 2σ²τ/T while
+ * τ ≪ T: past four hours, longer than any race, it's capped. And nothing quicker than about 12 minutes is resolved by
+ * 6-minute samples: σn holds it, and T1 near its 6-minute floor is an extrapolation.)
+ */
+const fitAt = (D, t1, t2) => {
+  const X = lags.map(t => [1, 1 - Math.exp(-t / t1), 1 - Math.exp(-t / t2)]), y = lags.map((_, i) => D[i + 1]), r = nnls(X, y);
+  return { T: [t1, t2], sigma: r.w.map(v => +Math.sqrt(Math.max(0, v) / 2).toFixed(4)), err: +(Math.sqrt(r.err / lags.length) / y[y.length - 1]).toFixed(4) };
+};
 const fit = D => {
-  const X = lags.map(t => [1, 1 - Math.exp(-t / T1), 1 - Math.exp(-t / T2)]), y = lags.map((_, i) => D[i + 1]), r = nnls(X, y);
-  return { sigma: r.w.map(v => +Math.sqrt(Math.max(0, v) / 2).toFixed(4)), err: +(Math.sqrt(r.err / lags.length) / y[y.length - 1]).toFixed(4) };
+  let best = null;
+  for (let t1 = 6; t1 <= 40; t1 += 2) for (let t2 = 50; t2 <= 240; t2 += 10) { const f = fitAt(D, t1, t2); if (!best || f.err < best.err) best = f; }
+  return best;
 };
 
 const classes = {};
@@ -91,15 +108,15 @@ for (const [kind, bands] of Object.entries(acc)) {
   if (merged.length > 1 && merged[0].days < 20) { const a = merged.shift(), b = merged[0]; b.days += a.days; b.kt += a.kt; for (let L = 0; L <= LAGS; L++) { b.d[L] += a.d[L]; b.u[L] += a.u[L]; b.c[L] += a.c[L]; } }
   classes[kind] = merged.map(o => {
     const D = o.d.map((v, i) => i ? v / o.c[i] : 0), Du = o.u.map((v, i) => i ? v / o.c[i] : 0), dir = fit(D), spd = fit(Du);
-    return { kt: +(o.kt / o.days).toFixed(2), days: o.days, dir: dir.sigma, spd: spd.sigma, fitErr: [dir.err, spd.err],
+    return { kt: +(o.kt / o.days).toFixed(2), days: o.days, dir: dir.sigma, dirT: dir.T, spd: spd.sigma, spdT: spd.T, fitErr: [dir.err, spd.err],
       rms: { dir: [1, 5, 10].map(L => +Math.sqrt(D[L]).toFixed(2)), spd: [1, 5, 10].map(L => +Math.sqrt(Du[L]).toFixed(4)) } };
   });
 }
 const out = {
   source: 'NOAA CO-OPS 9414290 (NDBC FTPC1) 6-minute wind, racing hours 11:00–16:59, via src/environment/data/sf-real-days.json',
-  updated: R.updated, T: [T1, T2], lagsMin: lags,
-  note: 'kt: the class mean at the station (open water is wind.ts OPEN_WATER times this). dir (deg) and spd (share of the mean): [σn, σ1, σ2] of D(τ) = 2σn² + 2σ1²(1 − e^(−τ/T1)) + 2σ2²(1 − e^(−τ/T2)). rms: the measured rms change at 6, 30 and 60 min.',
+  updated: R.updated, lagsMin: lags,
+  note: 'kt: the class mean at the station (open water is wind.ts OPEN_WATER times this). dir (deg) and spd (share of the mean): [σn, σ1, σ2] of D(τ) = 2σn² + 2σ1²(1 − e^(−τ/T1)) + 2σ2²(1 − e^(−τ/T2)), with [T1, T2] (min) in dirT and spdT, fitted. rms: the measured rms change at 6, 30 and 60 min.',
   classes
 };
 await writeFile(OUT, JSON.stringify(out, null, 1));
-for (const [k, cs] of Object.entries(classes)) for (const c of cs) console.log(k.padEnd(6), String(c.kt).padStart(6), String(c.days).padStart(5), 'dir', c.dir.join(' '), 'spd', c.spd.join(' '), 'err', c.fitErr.join(' '));
+for (const [k, cs] of Object.entries(classes)) for (const c of cs) console.log(k.padEnd(6), String(c.kt).padStart(6), String(c.days).padStart(5), 'dir', c.dir.join(' '), 'T', c.dirT.join('/'), 'spd', c.spd.join(' '), 'T', c.spdT.join('/'), 'err', c.fitErr.join(' '), 'rms', c.rms.dir.join(' '));

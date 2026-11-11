@@ -540,7 +540,7 @@ export class World {
     this.steps++;
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
-    this.shifts?.step(dt, this.windModel.kt * KT); // (the air, and its shifts, move on downwind)
+    this.shifts?.step(dt, this.windModel.kt * KT, this.wind.from); // (the air, and its shifts, move on downwind)
     this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
