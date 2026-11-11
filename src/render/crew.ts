@@ -214,15 +214,15 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   if (job === 'piano' && ax > 0.55) {
     // the dual-ended lines worked from the side deck (crewWork.ts BOTH_SIDES): sitting at its forward end, leaning
     // forward to them on the cabin top beside the companionway
-    const p = onDeck(s, COCK0 + 0.5, 0, k), zl = COCK0 - 0.12, cl = V(s * 0.42, cabinTopAt(uAtZ(zl), 0.42) + 0.05, zl);
+    const p = onDeck(s, COCK0 + 0.5, 0, k), zl = COCK0 - 0.08, cl = V(s * 0.47, cabinTopAt(uAtZ(zl), 0.47) + 0.05, zl);
     p.pitch = -0.4; p.hands = [cl.clone().add(V(-0.05, 0, 0.03)), cl.clone().add(V(0.05, 0, -0.03))]; p.look = cl;
     return p;
   }
   if (job === 'piano') {
     // the cabin-top lines at its after end: kneeling on the sole at the forward end of the cockpit,
-    // facing forward, hands on the lines at their cleats either side of the companionway
+    // facing forward, hands on the lines at their jammers on the cabin top's after edge, either side of the hatch (Boat Detail: |x| 0.37–0.50)
     const zk = COCK0 + 0.35, px = s * Math.min(ax, chz(zk) - SEAT.d - 0.14);
-    { const p = kneel(px, zk, 0, [V(-0.33, cabinTopAt(uAtZ(COCK0 - 0.12), 0.33) + 0.05, COCK0 - 0.12), V(0.33, cabinTopAt(uAtZ(COCK0 - 0.12), 0.33) + 0.05, COCK0 - 0.12)], k); p.pitch = -0.25; return p; }
+    { const p = kneel(px, zk, 0, [V(-0.43, cabinTopAt(uAtZ(COCK0 - 0.08), 0.43) + 0.05, COCK0 - 0.08), V(0.43, cabinTopAt(uAtZ(COCK0 - 0.08), 0.43) + 0.05, COCK0 - 0.08)], k); p.pitch = -0.25; return p; }
   }
   let p: PoseT;
   if (ax >= chz(zc) - 0.06 || job === 'hike') p = onDeck(s, zc, lean, k);

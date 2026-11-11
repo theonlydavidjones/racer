@@ -242,6 +242,12 @@ export interface CrewCall {
 }
 
 /**
+ * The longest a crew holds the old high side once she's through the wind (s), before crossing under the boom as it
+ * comes over. A 2-tonne keelboat's roll is a small one: the crew go across just after the boom, not seconds after it (the
+ * owner, watching it: they sat on the old side long after she'd tacked). An estimate.
+ */
+export const ROLL_HOLD = 2;
+/**
  * How often a crew moves. A real crew moves on a puff, a lull, a tack or a job, and otherwise sits still: coaches have
  * the crew hold a steady angle of heel, not a precise one (weight first in light to moderate air, and once the boat is
  * set up only small, smooth moves: Sailing World, North Sails, Yachting World on keelboat heel), and the main is played
@@ -259,12 +265,6 @@ export interface CrewCall {
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-/**
- * The longest a crew holds the old high side once she's through the wind (s), before crossing under the boom as it
- * comes over. A 2-tonne keelboat's roll is a small one: the crew go across with the boom, not seconds after it (the
- * owner, watching it: they sat on the old side long after she'd tacked). An estimate.
- */
-export const ROLL_HOLD = 2;
 export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
 interface Held { arm: number; z: number; since: number; off: number }
 
