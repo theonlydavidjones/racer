@@ -44,6 +44,18 @@ const HARBORS = {
     // two ways in, each between a pair of lateral beacons (OSM seamarks, from NOAA's chart): north by Pier 40, and south by the fishing pier
     exits: [[37.78194, -122.38469], [37.77830, -122.38524]]
   },
+  'horseshoe-bay': {
+    name: 'Travis Marina, Horseshoe Bay', bbox: [-122.4800, 37.8300, -122.4715, 37.8360],
+    // the basin: OSM's Travis Marina outline takes in Marina Road's lot and the buildings along the north shore, so it's the
+    // water inside it: the outline less the stone breakwaters and revetments (OSM areas, man_made=breakwater; NOAA ENC
+    // US5CA13M charts the same breakwater and riprap), less the land behind the coastline, the piece that holds the docks
+    // (worked out with shapely from the OSM ways, and grown 1 m into the breakwaters so no sliver lies between; the bay west of the outline, by the Coast Guard station, is open water)
+    basin: { pts: [[37.8336373, -122.4741336], [37.8335755, -122.4741513], [37.8335408, -122.4741501], [37.8333166, -122.4741093], [37.8332423, -122.4740809], [37.8329375, -122.4739564], [37.8328706, -122.473909], [37.8328043, -122.4738852], [37.832747, -122.4738566], [37.8324352, -122.4736558], [37.8323411, -122.4736053], [37.8322565, -122.4735801], [37.8321963, -122.4735716], [37.8321462, -122.473551], [37.8320869, -122.4735997], [37.832028, -122.473702], [37.8319767, -122.4738094], [37.8319482, -122.4738884], [37.8319372, -122.4740518], [37.8319106, -122.47423], [37.8318452, -122.47515], [37.831832, -122.4752667], [37.8318475, -122.475301], [37.8320627, -122.4755128], [37.8321666, -122.4756055], [37.8321923, -122.4756425], [37.8322012, -122.4756923], [37.8321791, -122.4757339], [37.8338399, -122.4754951], [37.8338007, -122.4753873], [37.8338223, -122.4752771], [37.8338208, -122.4751395], [37.8337942, -122.4749779], [37.8338105, -122.4749171], [37.833853, -122.4749046], [37.8338871, -122.4749212], [37.8339068, -122.4749116], [37.8339078, -122.4748996], [37.8339414, -122.4749008], [37.8339073, -122.4747297], [37.8338323, -122.4745044], [37.833771, -122.4743937], [37.8337175, -122.4742814], [37.8337048, -122.4742307], [37.8337115, -122.4741831], [37.8336888, -122.4741259]] },
+    shoreLines: [[[37.8338871, -122.4749212], [37.8339068, -122.4749116], [37.8339078, -122.4748996], [37.8339414, -122.4749008], [37.8339073, -122.4747297], [37.8338323, -122.4745044], [37.833771, -122.4743937], [37.8337175, -122.4742814], [37.8337048, -122.4742307], [37.8337115, -122.4741831], [37.8336888, -122.4741259]]], // (the basin's edge where it's the beach itself, below the Presidio Yacht Club: solid)
+    letter: 'north-south', piles: 'white', pavedCrest: true, // (floating docks on white piles; a paved path along the breakwater's top: the owner's photos)
+    // the way in: between the south breakwater's west end and the Coast Guard station's breakwater, looking west to the bridge
+    exits: [[37.8324, -122.4764]]
+  },
   corinthian: {
     name: 'Corinthian Yacht Club', bbox: [-122.4600, 37.8700, -122.4535, 37.8740],
     basin: { pts: [ // the coastline round the club's point and the Main Street decks (OSM way 157393812), the entrance, the breakwater (OSM way 125807786)
@@ -184,7 +196,7 @@ async function make(id, H) {
     source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? 'Dock letters are the docks\' names in OSM; slip numbers are this sim\'s.' : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}`,
     fetched: new Date().toISOString().slice(0, 10), name: H.name,
     basin, breakwaters, walkways: walkways.map(w => w.pts), fingers: fingers.map(f => f.pts), areas,
-    beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : {}), slips: out
+    beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : H.shoreLines ? { shore: H.shoreLines } : {}), ...(H.piles ? { piles: H.piles } : {}), ...(H.pavedCrest ? { pavedCrest: true } : {}), slips: out
   }) + '\n');
   const docksUsed = [...new Set(out.map(s => s.dock))].join('');
   console.log(`${id}: basin ${basin.length} pts, ${breakwaters.length} breakwaters, ${walkways.length} walkways (docks ${docksUsed}), ${fingers.length} fingers (${fingers.filter(f => f.made).length} inferred), ${areas.length} pier areas, ${beacons.length} beacons, ${out.length} slips`);

@@ -4,6 +4,7 @@ import westHarbor from './data/west-harbor.json';
 import gashouseCove from './data/gashouse-cove.json';
 import southBeach from './data/south-beach.json';
 import corinthian from './data/corinthian.json';
+import horseshoeBay from './data/horseshoe-bay.json';
 
 /**
  * The marinas your boats can call home, from OpenStreetMap (scripts/make-west-harbor.mjs, scripts/make-marinas.mjs): each
@@ -20,14 +21,15 @@ import corinthian from './data/corinthian.json';
 type LLs = [number, number][];
 interface HarborData {
   name?: string; basin: LLs; breakwaters: { area: boolean; pts: LLs; seawall?: { top: number; rail: LLs } }[]; walkways: LLs[]; fingers: LLs[]; areas: LLs[];
-  beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[];
+  beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[]; piles?: 'white'; pavedCrest?: boolean;
   slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number }[];
 }
 const SOURCES: { id: string; name: string; short: string; data: HarborData }[] = [
   { id: 'west-harbor', name: 'West Harbor, San Francisco Marina', short: 'West Harbor', data: westHarbor as unknown as HarborData },
   { id: 'gashouse-cove', name: 'Gashouse Cove, San Francisco Marina East Harbor', short: 'Gashouse Cove', data: gashouseCove as unknown as HarborData },
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
-  { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData }
+  { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
+  { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
@@ -66,6 +68,8 @@ export interface Harbor {
   shore: Vec[][];
   /** Entrance beacons (lateral marks), and the ways out of the harbor (the middle of each entrance). */
   beacons: { p: Vec; colour: 'red' | 'green' }[]; exits: Vec[];
+  /** The dock pilings' colour (white: plastic-sleeved, as at Horseshoe Bay; else timber), and whether the breakwaters' tops are paved paths. */
+  piles: 'white' | 'timber'; pavedCrest: boolean;
   /** The basin's bounding box, and a box round everything solid that belongs to the harbor. */
   box: Box; reach: Box;
 }
@@ -81,7 +85,7 @@ export const HARBORS: Harbor[] = SOURCES.map(({ id, name, short, data: D }) => {
   // (an end that stops short of a walkway, or runs on over it, is made to meet its edge: as drawn, and as solid)
   const walkways = walks.map(w => meetEdge(w, walks.filter(o => o !== w), WALKWAY_W)), areas = D.areas.map(v);
   return {
-    id, name, short, basin, breakwaters, shore: (D.shore ?? []).map(v), walkways, fingers: fingers.map(f => meetEdge(f, walks, WALKWAY_W)), areas, beacons, exits,
+    id, name, short, basin, breakwaters, shore: (D.shore ?? []).map(v), walkways, fingers: fingers.map(f => meetEdge(f, walks, WALKWAY_W)), areas, beacons, exits, piles: D.piles ?? 'timber', pavedCrest: !!D.pavedCrest,
     box: boxOf(basin), reach: boxOf([...basin, ...breakwaters.flatMap(b => b.pts), ...walkways.flat(), ...areas.flat()], BREAKWATER_W)
   };
 });
