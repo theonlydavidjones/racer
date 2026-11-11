@@ -93,8 +93,12 @@ function keelHalf(u: number): number {
   if (u <= BOW) return 0;
   return 0.03 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - BOW) / 0.73)), 0.7);
 }
-/** Section fullness: V-shaped forward, slack round bilge amidships, firmer aft. */
-const sectionN = (u: number) => 1.35 + 1.0 * ease(u / 0.5) - 0.25 * ease((u - 0.6) / 0.4);
+/**
+ * Section fullness: V-shaped forward, slack round bilge amidships, and V-shaped again aft, so the sides run nearly
+ * straight into the sternpost and the flat transom is shield-shaped, wide at the deck and coming to a point at the
+ * sternpost near the waterline (as the boats are: the owner's photos of Josephine and her neighbours).
+ */
+const sectionN = (u: number) => 1.35 + 1.0 * ease(u / 0.5) - 1.2 * ease((u - 0.62) / 0.38);
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
 
@@ -284,10 +288,12 @@ export function cockpitGeometry(): THREE.BufferGeometry[] {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
   };
   const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-  const out = [strip(us.map(u => [V(-cockpitHalf(u), sole, zAt(u)), V(cockpitHalf(u), sole, zAt(u))]), true)]; // sole
-  for (const s of [1, -1]) out.push(strip(us.map(u => [V(s * cockpitHalf(u), sole, zAt(u)), V(s * cockpitHalf(u), deckY(u, cockpitHalf(u)), zAt(u))]), s > 0));
-  const w1 = cockpitHalf(u1), ya = deckY(u1, 0);
-  out.push(quad(V(w1, sole, zAt(u1)), V(-w1, sole, zAt(u1)), V(-w1, ya, zAt(u1)), V(w1, ya, zAt(u1)))); // aft wall
+  // the well's sole narrows aft with the V of her sections, inside the hull; its sides slope up to the deck opening
+  const soleHalf = (u: number) => Math.min(cockpitHalf(u), hullHalfAt(u, sole) - 0.05);
+  const out = [strip(us.map(u => [V(-soleHalf(u), sole, zAt(u)), V(soleHalf(u), sole, zAt(u))]), true)]; // sole
+  for (const s of [1, -1]) out.push(strip(us.map(u => [V(s * soleHalf(u), sole, zAt(u)), V(s * cockpitHalf(u), deckY(u, cockpitHalf(u)), zAt(u))]), s > 0));
+  const w1 = cockpitHalf(u1), ws = soleHalf(u1), ya = deckY(u1, 0);
+  out.push(quad(V(ws, sole, zAt(u1)), V(-ws, sole, zAt(u1)), V(-w1, ya, zAt(u1)), V(w1, ya, zAt(u1)))); // aft wall
   return out;
 }
 
@@ -396,3 +402,6 @@ export function cockpitLid(): THREE.BufferGeometry {
 
 /** Station u for a z position (m, aft positive). */
 export const uAtZ = (z: number) => (z + L / 2) / L;
+
+/** The hull's half-breadth (m) at station u and height y on the topsides: what the inside of her has room for. */
+export const hullHalfAt = (u: number, y: number) => sectionPoint(u, pAtY(u, y)).x;
