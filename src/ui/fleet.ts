@@ -29,32 +29,31 @@ const VIEW_KEY = 'fbsim-fleet-view';
 export class Fleet {
   private list = document.getElementById('fleet')!;
   private page = document.getElementById('fleetBoat')!;
-  private pick = document.getElementById('sailHer')!;
   private view: 'grid' | 'list' = 'grid';
   private boatId = '';
   private confirmDelete = false;
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
-    for (const el of [this.list, this.page, this.pick]) el.addEventListener('click', e => this.click(e));
+    for (const el of [this.list, this.page]) el.addEventListener('click', e => this.click(e));
   }
 
   /** Her page is open (she's in the showroom). */
   get boatOpen(): boolean { return !this.page.hidden; }
   get showing(): BoatSpec | null { return this.boatOpen ? this.cur : null; }
   private get cur(): BoatSpec | null { return this.S.boats.find(b => b.id === this.boatId) ?? null; }
-  get open(): boolean { return !this.list.hidden || this.boatOpen || !this.pick.hidden; }
+  get open(): boolean { return !this.list.hidden || this.boatOpen; }
 
   openList(): void {
-    this.page.hidden = true; this.pick.hidden = true; this.hooks.showroom(null);
+    this.page.hidden = true; this.hooks.showroom(null);
     this.drawList(); this.list.hidden = false;
   }
   openBoat(id: string): void {
     const b = this.S.boats.find(x => x.id === id); if (!b) { this.openList(); return; }
     this.boatId = id; this.confirmDelete = false;
-    this.list.hidden = true; this.pick.hidden = true;
+    this.list.hidden = true;
     this.drawBoat(); this.page.hidden = false; this.hooks.showroom(b);
   }
-  close(): void { this.list.hidden = true; this.page.hidden = true; this.pick.hidden = true; this.hooks.showroom(null); }
+  close(): void { this.list.hidden = true; this.page.hidden = true; this.hooks.showroom(null); }
 
   private click(e: Event): void {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-f]'); if (!t) return;
@@ -80,10 +79,8 @@ export class Fleet {
         if (this.S.boatId === gone) { this.S.boat = this.S.boats[0]; this.S.boatId = this.S.boat.id; }
         this.hooks.changed(); this.openList(); return;
       }
-      case 'sail': this.drawPick(); this.pick.hidden = false; return;
-      case 'pickNo': this.pick.hidden = true; return;
-      case 'go': {
-        const slip = (this.pick.querySelector('#shSlip') as HTMLInputElement | null)?.checked ?? false;
+      case 'go': { // straight to the setup with her chosen; from her slip if she has one (the setup can change it)
+        const slip = !!slipById(this.cur?.slip);
         this.close(); this.hooks.sail(this.boatId, v === 'cruise' ? 'cruise' : 'race', slip); return;
       }
     }
@@ -102,7 +99,7 @@ export class Fleet {
         <div class="seg"><button type="button" data-f="view" data-v="grid" aria-pressed="${this.view === 'grid'}">Grid</button><button type="button" data-f="view" data-v="list" aria-pressed="${this.view === 'list'}">List</button></div>
         <button type="button" class="cta" data-f="new">New boat</button></div>
       ${body}
-      <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or sail her.</small></div>`;
+      <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or race or cruise her.</small></div>`;
     // her pictures: drawn one at a time once the list is up (each is a 3D render of her as she's set up)
     const imgs = [...this.list.querySelectorAll<HTMLImageElement>('img[data-thumb]')], job = ++this.thumbJob;
     const next = () => {
@@ -126,7 +123,7 @@ export class Fleet {
     this.page.innerHTML = `
       <div class="bphead"><button type="button" class="linkbtn" data-f="toList">‹ Fleet</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
       <div class="garage">
-        <div class="gbtns"><button type="button" class="cta" data-f="sail">Sail her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
+        <div class="gbtns"><button type="button" class="cta" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
         ${this.confirmDelete ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')} and her record? <button type="button" class="ghost danger" data-f="delYes">Delete</button><button type="button" class="ghost" data-f="delNo">Keep her</button></div>` : ''}
       </div>
       <div class="bpbody">
@@ -159,19 +156,6 @@ export class Fleet {
       </div>`;
   }
 
-  /* ---------- Sail her: race or cruise ---------- */
-  private drawPick(): void {
-    const b = this.cur!, slip = slipById(b.slip);
-    this.pick.innerHTML = `<div class="panel">
-      <button type="button" class="linkbtn back" data-f="pickNo">‹ Back</button>
-      <div class="eyebrow">Sail her</div><h2>${esc(b.name || 'Unnamed')} · ${esc(sailNo(b))}</h2>
-      <label class="fslip${slip ? '' : ' off'}"><input type="checkbox" id="shSlip"${slip ? ' checked' : ' disabled'}> Start in her slip${slip ? ` (${harborOf(slip.marina)?.short ?? ''}, ${slip.label})` : ': she has none yet (give her one under Edit)'}</label>
-      <small>${slip ? 'She lies bow in, made fast. Push off (the crew walks her back out of the slip and swings her bow round), then sail her out of the harbor. Racing, you start in good time to sail out to the line before the warning signal.' : 'She starts on the water: by the line for a race, or where you choose for a cruise.'}</small>
-      <div class="modes">
-        <button type="button" class="modecard" data-f="go" data-v="race"><b>Race</b><span>Choose the day, the course, who you race against and your crew.</span></button>
-        <button type="button" class="modecard" data-f="go" data-v="cruise"><b>Cruise</b><span>Sail anywhere on the Bay; choose where you're going, if anywhere.</span></button>
-      </div></div>`;
-  }
 }
 
 /* ---------- helpers ---------- */
