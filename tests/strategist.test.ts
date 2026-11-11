@@ -92,6 +92,17 @@ describe('the strategist', () => {
       expect(it.text).toContain(`The ${upEnd} end`);
     }
   });
+  it('on a reach across the current, you steer up-current: the opposite way to the set', () => {
+    let seen = 0;
+    for (const course of ['ss12', 'ss3', 'ss5']) for (const current of ['flood', 'bigebb']) for (const windDir of [200, 250, 300]) {
+      const b = raceBrief(race({ course, current, windDir, windKt: 12 }));
+      for (const it of b.sections[2].items) {
+        const set = it.text.match(/sets you to the (left|right)/), steer = it.text.match(/steer about \d+° (left|right)/);
+        if (set && steer) { seen++; expect(steer[1]).not.toBe(set[1]); }
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
   it('the ebb pushing over the line is called out', () => {
     const w = race({ current: 'bigebb', windKt: 12 }), b = raceBrief(w), it = b.sections[1].items.find(i => i.head === 'The current at the line');
     expect(it?.text).toMatch(/carrying you over the line/);

@@ -42,8 +42,8 @@ export interface RaceBrief extends Brief { legs: LegPlan[]; finishT: number }
 const SCENARIOS: { label: string; sc: Scenario }[] = [
   { label: 'the wind veers 8° more', sc: { ...AS_FORECAST, dFrom: 8 } },
   { label: 'the wind backs 8° more', sc: { ...AS_FORECAST, dFrom: -8 } },
-  { label: 'it all comes 30 min early', sc: { ...AS_FORECAST, early: 30 } },
-  { label: 'it all comes 30 min late', sc: { ...AS_FORECAST, early: -30 } },
+  { label: 'the wind\'s changes come 30 min early', sc: { ...AS_FORECAST, early: 30 } },
+  { label: 'the wind\'s changes come 30 min late', sc: { ...AS_FORECAST, early: -30 } },
   { label: 'it blows a quarter harder', sc: { ...AS_FORECAST, kMul: 1.25 } },
   { label: 'it blows a quarter lighter', sc: { ...AS_FORECAST, kMul: 0.75 } }
 ];
@@ -72,7 +72,7 @@ export function planLegs(w: World, o: Outlook): LegPlan[] {
     const flips: { label: string; plan: Plan }[] = [];
     if (kind !== 'reach') for (const s of SCENARIOS) {
       const r = comparePlans(o, from, to, t, s.sc), b = bestPlan(r);
-      if (b !== best && r[best].minutes - r[b].minutes > 0.01 * r[b].minutes) flips.push({ label: s.label, plan: b });
+      if (b !== best && (!r[best].ok || r[best].minutes - r[b].minutes > 0.01 * r[b].minutes)) flips.push({ label: s.label, plan: b });
     }
     const certainty = kind === 'reach' ? 'clear' : flips.length === 0 && margin > 0.04 ? 'clear' : flips.length <= 2 && margin > 0.015 ? 'likely' : 'open';
     const name = i < C.marks.length ? C.marks[i].name : 'the finish';
@@ -107,14 +107,14 @@ function daySection(w: World, o: Outlook, finishT: number): BriefSection {
   const trend = Math.abs(dk) < 1.5 ? `holds at about ${Math.round((b0.kt + b1.kt) / 2)} kt` : `${dk > 0 ? 'builds' : 'eases'} from ${Math.round(b0.kt)} to ${Math.round(b1.kt)} kt`;
   const swing = Math.abs(dd) < 4 ? 'and holds its direction' : `and ${dd > 0 ? 'veers (swings clockwise)' : 'backs (swings anticlockwise)'} ${Math.round(Math.abs(dd))}°, from ${deg3(b0.from)} to ${deg3(b1.from)}`;
   items.push({ head: 'The breeze', src: 'data', text: `Over the race it ${trend} ${swing}.` });
-  if (Math.abs(dd) >= 4) items.push({ head: 'A persistent shift', src: 'practice', text: `A wind that swings one way through the race isn't an oscillation you can tack on and wait out: it's a persistent shift. The boats on the side it swings toward (the ${dd > 0 ? 'right' : 'left'}, looking upwind) sail toward the new wind and get lifted into it; the others sail in a header. Go toward the new wind early, and don't tack away from it on a small header.` });
+  if (Math.abs(dd) >= 4) items.push({ head: 'A persistent shift', src: 'practice', text: `A wind that swings one way through the race isn't an oscillation you can tack on and wait out: it's a persistent shift. The boats on the side it swings toward (the ${dd > 0 ? 'right' : 'left'}, looking upwind) gain. Sailing toward the shift you're headed more and more (your bow falls off as it swings), which feels wrong but isn't: don't tack on it. When you do tack you're lifted, pointing higher and higher at the mark. The boats on the other side are lifted the whole time, but lifted the wrong way, away from the mark, and fall behind. Go toward the new wind early.` });
   if (Math.abs(dk) >= 3) items.push({ head: 'Changing gears', src: 'practice', text: `A breeze that ${dk > 0 ? 'builds' : 'dies'} ${Math.abs(Math.round(dk))} kt over an hour or so means the boat set up for the start is wrong by the finish. Plan the changes now (see Trim and tuning) and make them before you're overpowered${dk > 0 ? '' : ' or underpowered'}, not after.` });
   // where it blows harder or lighter across the course, at the start
   const pts: { name: string; p: Vec }[] = [{ name: `the line (${C.committeeLabel})`, p: C.center }, ...C.marks.filter((m, i, a) => a.findIndex(x => x.key === m.key) === i).map(m => ({ name: m.name, p: m.reach ? legEnds(C, C.marks.indexOf(m)).to : m.p }))];
   if (pts.length > 1) {
     const ws = pts.map(q => ({ ...q, kt: o.wind(q.p, gun + 15).kt })).sort((a, b) => b.kt - a.kt), hi = ws[0], lo = ws[ws.length - 1];
     const slot = slotFlow(o.breeze(gun).from) > 0.5;
-    if (hi.kt - lo.kt > 1) items.push({ head: 'Where it blows', src: 'model', text: `At the start, about ${Math.round(hi.kt)} kt at ${hi.name} and ${Math.round(lo.kt)} kt at ${lo.name}. ${slot ? 'The westerly comes in through the Gate and blows hardest in a band toward Alcatraz and Angel Island (the slot); ' : 'In this wind there\'s no slot (that\'s the westerly, funnelled through the Gate); '}the land slows the wind within a few hundred metres of the shore, and an island leaves a near-calm in its lee, a few times its height downwind. (From ${w.weather.fieldSource}.)` });
+    if (hi.kt - lo.kt > 1) items.push({ head: 'Where it blows', src: 'model', text: `At the start, about ${Math.round(hi.kt)} kt at ${hi.name} and ${Math.round(lo.kt)} kt at ${lo.name}. ${slot ? 'The westerly comes in through the Gate and blows hardest in a band toward Alcatraz and Angel Island (the slot); ' : 'In this wind there\'s no slot (that\'s the westerly, funnelled through the Gate); '}the land slows the wind within a few hundred metres of the shore, and an island leaves a near-calm close behind it and lighter air for kilometres downwind (behind Angel Island, 3–5 km). (From ${w.weather.fieldSource}.)` });
   }
   // the tide: the nearest NOAA station's slacks and peaks around the race
   if (o.stations) {
@@ -129,13 +129,14 @@ function daySection(w: World, o: Outlook, finishT: number): BriefSection {
   }
   // wind against tide: steep chop
   const steep = times.map(t => ({ t, s: o.sea(C.center, t), c: o.current(C.center, t), w: o.wind(C.center, t) })).filter(x => dot(x.c, V(x.w.from)) / KT > 0.4 && x.s.hsW > 0.15);
-  if (steep.length) items.push({ head: 'Wind against tide', src: 'model', text: `From about ${clockOf(steep[0].t)} the ebb runs into the wind, and the chop gets shorter and steeper (${describeSea(steep[0].s)}). Upwind in a short chop the boat slows on every wave: foot a few degrees lower and keep her powered up rather than pinching.` });
+  if (steep.length) items.push({ head: 'Wind against tide', src: 'model', text: `From about ${clockOf(steep[0].t)} the tide (${currentWords(steep[0].c, flood)}) runs into the wind, and the chop gets shorter and steeper (${describeSea(steep[0].s)}). Upwind in a short chop the boat slows on every wave: foot a few degrees lower and keep her powered up rather than pinching.` });
   return { id: 'day', title: 'The day: wind, tide and sea', lede: srcWords(w).lede, table: { cols: ['Time', 'Wind (course-wide)', 'Current at the line', 'Sea at the line'], rows }, items };
 }
 
 /** The start: which end is favoured, what the current does at the line, which end leads to the favoured side. */
 function startSection(w: World, o: Outlook, legs: LegPlan[]): BriefSection {
-  const C = w.C, gun = o.t0, wd = o.wind(C.center, gun), up = V(wd.from), items: BriefItem[] = [];
+  // the wind on the water (air minus tide), which is what you see heading to wind on the line, and what the boats sail in
+  const C = w.C, gun = o.t0, wd = o.windOnWater(C.center, gun), up = V(wd.from), items: BriefItem[] = [];
   const line = sub(C.committee, C.pin), len = Math.hypot(line.x, line.y), gain = dot(line, up); // + committee end upwind
   const fav = gain > 0 ? C.committeeLabel : C.pinLabel, m = Math.abs(gain), bias = Math.asin(clamp(m / len, -1, 1)) / D2R;
   const first = legs[0];
@@ -144,14 +145,14 @@ function startSection(w: World, o: Outlook, legs: LegPlan[]): BriefSection {
   } else items.push({ head: 'A reaching start', src: 'model', text: `The first leg is ${KIND_WORD[first.kind]}, so the line's bias matters less than being at full speed in clear air at the gun. The boats to windward have clear air and can roll the boats below them; the end nearer the first mark is the shorter way.` });
   // the current at the line
   const c = o.current(C.center, gun - 1), toward = dot(c, C.N), perMin = toward * 60;
-  if (Math.abs(toward) > 0.1) items.push({ head: 'The current at the line', src: 'model', text: toward > 0 ? `The current is carrying you over the line at ${Math.round(perMin)} m a minute (${(perMin / LOA).toFixed(1)} boat lengths). In the last minute hold back further than feels right, approach from below rather than sitting on the line, and watch the transit: being over early in an ebb is the classic Cityfront mistake. (Rule 29.1: an OCS boat must come back and start again.)` : `The current is carrying you back from the line at ${Math.round(-perMin)} m a minute (${(-perMin / LOA).toFixed(1)} boat lengths): you'll be late if you time it as in still water. Set up closer, and keep moving; a boat stopped on the line drifts back.` });
+  if (Math.abs(toward) > 0.1) items.push({ head: 'The current at the line', src: 'model', text: toward > 0 ? `The current is carrying you over the line at ${Math.round(perMin)} m a minute (${(perMin / LOA).toFixed(1)} boat lengths). In the last minute hold back further than feels right, approach from below rather than sitting on the line, and watch the transit: being over early with the tide under you is the classic Cityfront mistake. (A boat over the line at the signal hasn't started: she must come back to the pre-start side and start, by the definition of Start and rule 28.1; the committee signals it with the X flag, rule 29.1.)` : `The current is carrying you back from the line at ${Math.round(-perMin)} m a minute (${(-perMin / LOA).toFixed(1)} boat lengths): you'll be late if you time it as in still water. Set up closer, and keep moving; a boat stopped on the line drifts back.` });
   const cp = o.current(C.pin, gun), cc = o.current(C.committee, gun), dcp = (Math.hypot(cp.x, cp.y) - Math.hypot(cc.x, cc.y)) / KT;
   if (Math.abs(dcp) > 0.25) items.push({ head: 'Different at each end', src: 'model', text: `It runs ${kt1(Math.hypot(cp.x, cp.y) / KT)} kt at the ${C.pinLabel} end and ${kt1(Math.hypot(cc.x, cc.y) / KT)} kt at the ${C.committeeLabel} end. Time your run from the end you're starting at.` });
   // which end leads to the favoured side of the first beat
   if (first.kind === 'beat' && first.best !== 'middle' && first.certainty !== 'open') {
     const leftN = { x: -up.y, y: up.x }, leftEnd = dot(sub(C.pin, C.committee), leftN) > 0 ? C.pinLabel : C.committeeLabel, rightEnd = leftEnd === C.pinLabel ? C.committeeLabel : C.pinLabel;
     const want = first.best === 'left' ? leftEnd : rightEnd;
-    items.push({ head: 'Start toward your plan', src: 'practice', text: `The first beat favours the ${first.best} (see the legs below), and the ${want} end is on that side. ${want === fav ? 'It\'s also the favoured end: a clear call, so expect a crowd there and win the end with timing, not by barging (Rule 18 doesn\'t apply at a start mark surrounded by navigable water, and a windward boat must keep clear, Rule 11).' : `The favoured end is the other one, so weigh the ${Math.round(m)} m you'd give away there against the gain of getting ${first.best} first. Usually, if the gain on the beat is bigger than the line's bias, start toward the side.`}` });
+    items.push({ head: 'Start toward your plan', src: 'practice', text: `The first beat favours the ${first.best} (see the legs below), and the ${want} end is on that side. ${want === fav ? `It's also the favoured end: a clear call, so expect a crowd there and win the end with timing, not by barging. ${(want === C.committeeLabel ? C.committeeKind : C.pinKind) === 'shore' ? 'This end is the shore, an obstruction: Rule 19 room applies there, but don\'t count on being given it; a windward boat must keep clear of a leeward one (Rule 11).' : 'Approaching a starting mark surrounded by navigable water there\'s no mark-room or obstruction room (the preamble to Section C switches off rules 18 and 19 there), and a windward boat must keep clear of a leeward one (Rule 11).'}` : `The favoured end is the other one, so weigh the ${Math.round(m)} m you'd give away there against the gain of getting ${first.best} first. Usually, if the gain on the beat is bigger than the line's bias, start toward the side.`}` });
   }
   return { id: 'start', title: 'The start', items };
 }
@@ -166,8 +167,8 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
     const across = cross(u, c) / KT, crab = Math.asin(clamp(cross(u, c) / Math.max(0.3, v), -0.95, 0.95)) / D2R, twa = Math.abs(wrap(brg(u.x, u.y) - wd.from));
     const kind = twa < 75 ? 'a close reach: sheets well in, ease in the puffs and keep her flat' : twa < 115 ? 'a beam reach: ease to the telltales; the vang holds the leech as the sheet comes out' : twa < 150 ? 'a broad reach: sails well out, vang on, crew back a little in a breeze' : 'nearly a run: wing on wing with the whisker pole is fastest this deep';
     let txt = `${when}. ${kind[0].toUpperCase()}${kind.slice(1)}.`;
-    if (Math.abs(crab) > 30) txt += ` The current across the leg (${kt1(Math.abs(across))} kt, setting you to the ${across > 0 ? 'right' : 'left'}) is nearly as fast as she'll sail here: you can't hold a straight line. Get up-current early, while you have speed, and let it carry you down to the mark at the end.`;
-    else if (Math.abs(across) > 0.2) txt += ` The current sets you ${across > 0 ? 'to the right' : 'to the left'} of the line to the mark at ${kt1(Math.abs(across))} kt: steer about ${Math.round(Math.abs(crab))}° ${crab > 0 ? 'right' : 'left'} of the mark (up-current) from the start of the leg and keep the mark steady against the shore behind it. Aim straight at it and the current sweeps you down-current in a curve, and the end of the leg is a slow climb back against it.`;
+    if (Math.abs(crab) > 30) txt += ` The current across the leg (${kt1(Math.abs(across))} kt, setting you to the ${across > 0 ? 'left' : 'right'}) is nearly as fast as she'll sail here: you can't hold a straight line. Get up-current early, while you have speed, and let it carry you down to the mark at the end.`;
+    else if (Math.abs(across) > 0.2) txt += ` The current sets you ${across > 0 ? 'to the left' : 'to the right'} of the line to the mark at ${kt1(Math.abs(across))} kt: steer about ${Math.round(Math.abs(crab))}° ${crab > 0 ? 'right' : 'left'} of the mark (up-current) from the start of the leg and keep the mark steady against the shore behind it. Aim straight at it and the current sweeps you down-current in a curve, and the end of the leg is a slow climb back against it.`;
     items.push({ head, src: 'model', text: txt });
     return items;
   }
@@ -195,7 +196,7 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
     items.push({ head: 'Plan B', src: 'model', text: [...byPlan].map(([p, ls]) => `go ${PLAN_WORD[p]} if ${ls.join(' or ')}`).join('; ').replace(/^./, s => s.toUpperCase()) + '. Check the wind against the forecast before the start (the compass heading on each tack, the flags on shore, the dark water upwind), and decide then.' });
   }
   if (best.tacks > 0 || L.kind === 'run') items.push({ head: 'Laylines', src: 'model', text: `${L.kind === 'beat' ? `About ${best.tacks} tack${best.tacks === 1 ? '' : 's'} on this plan.` : `About ${best.tacks} gybe${best.tacks === 1 ? '' : 's'}.`} The current bends the layline: with it setting you toward the mark you can tack early; against you, carry on a little past where the mark looks right. The laylines on the map allow for it.` });
-  if (best.minShore < 150 && L.kind === 'beat') items.push({ head: 'Near the shore', src: 'model', text: `This plan takes you within ${Math.round(best.minShore)} m of the shore: short-tacking along a shore means you can be forced to tack by a boat to windward (Rule 20: hail for room to tack, and the hailed boat must respond).` });
+  if (best.minShore < 150 && L.kind === 'beat') items.push({ head: 'Near the shore', src: 'model', text: `This plan takes you within ${Math.round(best.minShore)} m of the shore: short-tacking along a shore, a boat close-hauled and approaching it may hail a boat to windward on the same tack for room to tack (Rule 20.1); the hailed boat must respond, by tacking, or by replying "You tack" and giving her room. So you can hail the boat to windward of you, and a boat to leeward can hail you. Since 2025 the hail must be the words "Room to tack".` });
   return items;
 }
 

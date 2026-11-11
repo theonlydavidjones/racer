@@ -113,7 +113,7 @@ export function stationEvents(s: TideStation, from: number, to: number): TideEve
   // a harmonic station's series is regular (6 min); a subordinate's is already its events
   const regular = s.t.length > 20 && Math.abs((s.t[2] - s.t[1]) - (s.t[1] - s.t[0])) < 0.01;
   const ev: [number, number, number][] = regular ? events(s.t, s.v)
-    : s.t.map((t, i) => [t, s.v[i], s.v[i] === 0 ? (s.v[i - 1] ?? s.v[i + 1] ?? 0) > 0 ? 1 : 3 : s.v[i] > 0 ? 0 : 2] as [number, number, number]);
+    : s.t.map((t, i) => [t, s.v[i], s.v[i] === 0 ? (i > 0 ? s.v[i - 1] > 0 : (s.v[i + 1] ?? 0) < 0) ? 1 : 3 : s.v[i] > 0 ? 0 : 2] as [number, number, number]);
   return ev.filter(e => e[0] >= from && e[0] <= to).map(([t, kt, k]) => ({ t, kind: KINDS[k], kt }));
 }
 
