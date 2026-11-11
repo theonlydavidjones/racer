@@ -110,6 +110,19 @@ function sectionShape(u: number): { al: number; be: number } {
 }
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
+/** Where strake k's top edge is (p; the last strake, the garboard, ends on the keel's side at 0.8). */
+const strakeP = (k: number) => (k >= STRAKES ? 0.8 : 0.8 * k / STRAKES);
+/**
+ * How far the plank stands out at fraction t down strake k: clinker, so each plank's lower edge laps over the outside
+ * of the plank below and the plank lies at a slight angle, out toward its lower edge. The garboard's lower edge isn't
+ * lapped: it's let into the rabbet in the keel, flush with it (the class construction plan), so it lies flush.
+ */
+const strakeLap = (k: number, t: number) => (k >= STRAKES - 1 ? 0 : LAP * t);
+/** Moves a point on the section out (along the section's outward normal) by `lap` m. */
+function lapOut(pt: { x: number; y: number }, u: number, p: number, lap: number) {
+  const q = hullPoint(u, Math.min(0.8, p + 0.01)), dx = pt.x - q.x, dy = pt.y - q.y, l = Math.hypot(dx, dy) || 1;
+  pt.x += (dy / l) * lap; pt.y -= (dx / l) * lap; // (q is below pt on the section, so (dy, −dx) points outboard)
+}
 
 /** The section point at station u: p from 0 at the sheer to 0.8 at the keel's side (canoe body), 1 at the keel bottom. */
 function sectionPoint(u: number, p: number): { x: number; y: number } {
@@ -148,16 +161,17 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const white = new THREE.Color(1, 1, 1), colorAt = (_y: number) => white;
   // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel
-  type Row = { p: number; lap: number; shade?: number }[];
+  type Row = { p: number; lap: number; shade?: number; land?: boolean }[];
   const strips: Row[] = [];
   for (let k = 0; k < STRAKES; k++) {
-    const p0 = 0.8 * k / STRAKES, p1 = 0.8 * (k + 1) / STRAKES, row: Row = [];
-    if (k > 0) row.push({ p: p0 - 0.02, lap: 0, shade: 1 }); // the land: this plank's top edge, hidden behind the plank above
-    for (let j = 0; j <= 3; j++) row.push({ p: p0 + (p1 - p0) * j / 3, lap: LAP * j / 3, shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
+    const p0 = strakeP(k), p1 = strakeP(k + 1), row: Row = [];
+    if (k > 0) row.push({ p: p0 - 0.02, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
+    for (let j = 0; j <= 3; j++) row.push({ p: j === 3 ? p1 : p0 + (p1 - p0) * j / 3, lap: strakeLap(k, j / 3), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
     strips.push(row);
     if (k < STRAKES - 1) strips.push([{ p: p1, lap: LAP }, { p: p1, lap: 0 }]); // the lap's edge, facing down
   }
-  { const row: Row = []; for (let j = 0; j <= NF; j++) row.push({ p: 0.8 + 0.2 * j / NF, lap: 0 }); strips.push(row); }
+  // the keel, from the garboard's lower edge (the same vertices: the garboard lands in the keel's rabbet, no gap)
+  { const row: Row = []; for (let j = 0; j <= NF; j++) row.push({ p: j === 0 ? 0.8 : 0.8 + 0.2 * j / NF, lap: 0 }); strips.push(row); }
   for (const side of [1, -1]) {
     for (const row of strips) {
       const base = pos.length / 3;
@@ -166,23 +180,27 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
         // push the lap outward across the section (along the section's outward normal); the planks run out
         // flush at the stem and the transom
         const lap = r.lap * Math.min(1, f / 0.04, (1 - f) / 0.03);
-        if (lap > 0) { const q = hullPoint(u, Math.min(0.8, r.p + 0.01)), dx = pt.x - q.x, dy = pt.y - q.y, l = Math.hypot(dx, dy) || 1; pt.x += (-dy / l) * lap; pt.y += (dx / l) * lap; }
+        if (lap > 0) lapOut(pt, u, r.p, lap);
         pos.push(pt.x * side, pt.y, pt.z);
         const c = colorAt(pt.y), k = row.length === 2 && row[0].p === row[1].p ? 0.55 : r.shade ?? 1; col.push(c.r * k, c.g * k, c.b * k);
       }
-      const W = row.length, ledge = W === 2 && row[0].p === row[1].p; // a lap's edge faces down, into its own shadow
+      // (a plank's faces look outboard; a lap's edge, running from the plank's outer face in to the plank below, faces
+      // down into its own shadow: the same winding does both)
+      const W = row.length;
       for (let i = 0; i < NU; i++) for (let j = 0; j < W - 1; j++) {
         const a = base + i * W + j, b = a + 1, c = a + W, d = c + 1;
-        if ((side > 0) !== ledge) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+        if (side > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
       }
     }
   }
   // transom and sternpost: the hull's aft ends, all on the raked plane. Its outline (the wide transom above the
   // waterline, the narrow sternpost and deadwood below it) isn't convex, so it's triangulated as a shape, not fanned
   // from a centre, and each face turned to look aft, out of the hull.
-  { const P = 60, outline: THREE.Vector3[] = [];
-    for (let j = 0; j <= P; j++) { const p = j / P; outline.push(hullPoint(uMax(p), p)); }
-    for (let j = P - 1; j >= 0; j--) { const p = j / P, pt = hullPoint(uMax(p), p); outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
+  // Its outline runs through the planks' own end points (no others, and not the lands hidden behind them), so the hull
+  // and the transom share every vertex along their join and no crack opens between them.
+  { const ps = [...new Set(strips.flatMap(row => row.filter(r => !r.land).map(r => r.p)))].sort((a, b) => a - b), outline: THREE.Vector3[] = [];
+    for (const p of ps) outline.push(hullPoint(uMax(p), p));
+    for (let j = ps.length - 2; j >= 0; j--) { const pt = hullPoint(uMax(ps[j]), ps[j]); outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
     const ring = outline.filter((q, i) => i === 0 || q.distanceTo(outline[i - 1]) > 1e-4);
     const base = pos.length / 3; transomFrom = base; transomTo = base + ring.length;
     for (const q of ring) { pos.push(q.x, q.y, q.z); const c = colorAt(q.y); col.push(c.r, c.g, c.b); }
@@ -401,9 +419,9 @@ export function hullFrame(u: number, p: number): { pos: THREE.Vector3; normal: T
 export function lappedPoint(u: number, p: number): THREE.Vector3 {
   const pt = hullPoint(u, p);
   if (p >= 0.8) return pt;
-  const k = Math.min(STRAKES - 1, Math.floor(p / 0.8 * STRAKES)), p0 = 0.8 * k / STRAKES, p1 = 0.8 * (k + 1) / STRAKES;
-  const f = u / Math.max(0.01, uMax(p)), lap = LAP * ((p - p0) / (p1 - p0)) * Math.min(1, f / 0.04, (1 - f) / 0.03);
-  if (lap > 0) { const q = hullPoint(u, Math.min(0.8, p + 0.01)), dx = pt.x - q.x, dy = pt.y - q.y, l = Math.hypot(dx, dy) || 1; pt.x += (-dy / l) * lap; pt.y += (dx / l) * lap; }
+  const k = Math.min(STRAKES - 1, Math.floor(p / 0.8 * STRAKES)), p0 = strakeP(k), p1 = strakeP(k + 1);
+  const f = u / Math.max(0.01, uMax(p)), lap = strakeLap(k, (p - p0) / (p1 - p0)) * Math.min(1, f / 0.04, (1 - f) / 0.03);
+  if (lap > 0) lapOut(pt, u, p, lap);
   return pt;
 }
 /** p (girth position) at station u for a height y on the topsides (between the sheer and the turn of the bilge). */
