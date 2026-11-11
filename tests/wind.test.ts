@@ -141,3 +141,17 @@ describe('in the race', () => {
     expect(w.windModel.kt).toBeGreaterThan(k0 + 1);
   }, 60000);
 });
+
+describe('the sea is made by the wind over the water, not the wind at the boat', () => {
+  it("a neighbour's dirty air or a passing puff doesn't change the chop she's in", () => {
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', tideDate: '2027-07-10', tideTime: '15:00', fleet: 1 }, 3);
+    const [a, o] = w.boats, p = { x: a.x, y: a.y };
+    const seaWithout = w.seaHere(p);
+    // another boat parked 30 m dead upwind of the point, and the strongest puff there is right over it
+    const up = { x: Math.sin(w.wind.from * Math.PI / 180), y: Math.cos(w.wind.from * Math.PI / 180) };
+    o.x = p.x + up.x * 30; o.y = p.y + up.y * 30; o.h = w.wind.from; o.v = 2;
+    const c = w.puffs.cells[0]; c.x = p.x; c.y = p.y; c.amp = 0.3; c.age = c.life / 2;
+    expect(w.windHere(p).kt).not.toBeCloseTo(w.wind.kt * w.fieldAt(p).k, 2); // (the wind at the point has changed)
+    expect(w.seaHere(p).hsW).toBeCloseTo(seaWithout.hsW, 6);
+  });
+});

@@ -99,6 +99,16 @@ export function windSea(U: number, F: number): { hs: number; tp: number } {
   return { hs, tp: Math.max(1, tp) };
 }
 
+/**
+ * Duration-limited growth: a sea takes time to build when the wind fills in. The time for a wind U (m/s, at 10 m) to
+ * make the fetch-limited sea over a fetch X (m) is t = 77.23·X^0.67 / (U^0.34·g^0.33) (Coastal Engineering Manual,
+ * EM 1110-2-1100, Part II-2, eq. II-2-35: 3.4 h for 18 km in 18 kt, the Berkeley Circle; 40 min for 1.4 km): a sea
+ * blowing for less than that is the one a shorter fetch would make, its "equivalent fetch" (eq. II-2-38).
+ */
+export const durationFetch = (U: number, t: number): number => U < 0.3 || t <= 0 ? 0 : (t * U ** 0.34 * G ** 0.33 / 77.23) ** (1 / 0.67);
+/** ... and the time it takes (s), the other way round. */
+export const fetchDuration = (U: number, X: number): number => U < 0.3 || X <= 0 ? 0 : 77.23 * X ** 0.67 / (U ** 0.34 * G ** 0.33);
+
 /** Deep-water group speed (m/s) for a wave period (s). */
 export const groupSpeed = (T: number) => G * T / (4 * Math.PI);
 /** Deep-water wavelength (m). */
@@ -179,6 +189,27 @@ export class SeaField {
 
   get flat(): boolean { return !this.swell; }
 
+  /**
+   * How far the wind sea has developed, course-wide, as the fetch that would make it (m; Infinity: fully, as if the wind
+   * had blown for hours). Each point's sea is the one its own fetch or this makes, whichever is less. The changing-wind
+   * method of the Coastal Engineering Manual (Part II-2, §II-2-2.g): the sea there is now has the duration it would have
+   * taken the wind blowing now to make it; the wind blows on for `dt` s and the sea is the one that longer duration
+   * makes. As the wind drops the sea keeps its height, up to what the lighter wind makes over each point's own fetch
+   * (a real sea lingers longer, as swell: not modelled).
+   */
+  developed = Infinity;
+  /** The wind the development is reckoned in (m/s). */
+  private devU = 0;
+  /** The wind sea grows for `dt` s in a wind of `U` m/s (the open water's, without the puffs). */
+  develop(U: number, dt: number): void {
+    if (!Number.isFinite(this.developed)) return;
+    // (the sea there is, in the wind now: the same height, and fetch-limited Hs goes as U·√X, so the fetch that makes it
+    // goes as (U_then/U_now)²; then the duration that takes, plus dt, in the wind now)
+    if (U < 0.3) return;
+    const X = this.devU > 0 ? this.developed * (this.devU / U) ** 2 : this.developed;
+    this.developed = durationFetch(U, fetchDuration(U, X) + dt); this.devU = U;
+  }
+
   /** Fetch, cached on a 150 m grid by wind direction (to 2°). */
   fetch(p: Vec, from: number): number {
     // by where `p` is: open water on a 150 m grid, a marina on a 10 m one (its walls shelter it within metres); always worked
@@ -205,7 +236,7 @@ export class SeaField {
     if (!this.swell) return FLAT_SEA;
     // the wind sea, made by the wind over the water across the fetch
     const U = ww.kt * KT, to = V(ww.from + 180), Uc = dot(cur, to);
-    const F = this.fetch(p, ww.from);
+    const F = Math.min(this.fetch(p, ww.from), this.developed);
     let w = windSea(U, F);
     for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = windSea(U, F * cg / Math.max(0.3 * cg, cg + Uc)); }
     // ... then steepened (or eased) by the change in current since the water the waves came through, ~1 km upwind

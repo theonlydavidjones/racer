@@ -253,6 +253,14 @@ export class World {
     { // the sea: the day's swell (or the adjuster's), and its chop × the adjuster's
       const sw = this.weather.swell(settings.swellDay ?? 1);
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs } : sw, settings.chop ?? 1);
+      // the chop as developed as the day's wind has made it (sea.ts SeaField.develop): when the wind follows the clock,
+      // grown from flat 8 hours before she sets out (the Bay's mornings are mostly calm) through the day's own wind,
+      // 10 minutes at a time; a set strength has been blowing for hours (fully grown for its fetch)
+      if (this.seaBreeze) {
+        const t1 = this.gunUtc - this.startAt / 60;
+        this.sea.developed = 0;
+        for (let t = t1 - 8 * 60; t < t1; t += 10) this.sea.develop(this.weather.at(t + 5).kt * KT, 600);
+      }
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -487,7 +495,17 @@ export class World {
   /** The sea at any point, for the wind and current there. */
   seaHere(p: Vec): SeaHere {
     const c = this.currentAt(p);
-    return this.sea.at(p, windOnWater(this.windHere(p), c), c, q => this.currentAt(q));
+    return this.sea.at(p, windOnWater(this.seaWind(p), c), c, q => this.currentAt(q));
+  }
+  /**
+   * The wind the sea is made by at p: the wind over the water around it (the day's field, the land's lee), not the
+   * puff passing or the sails a few lengths upwind. The chop is grown by the wind over kilometres of fetch over an
+   * hour or more (sea.ts), so a 30-second puff, a lull or another boat's dirty air doesn't change the sea she's in.
+   * `lee`: the land's lee here, if it's known (a boat's, refreshed twice a second).
+   */
+  seaWind(p: Vec, lee?: number): Wind {
+    const f = this.fieldAt(p);
+    return { from: n360(this.wind.from + f.turn), kt: this.wind.kt * f.k * (lee ?? landLee(p, this.wind.from)) };
   }
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
@@ -529,8 +547,9 @@ export class World {
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
     for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur); }
     this.vessels = this.traffic.vessels(this.trafficT);
+    if (this.steps % 30 === 1) this.sea.develop(this.windModel.kt * KT, 30 * dt); // (the open water's mean wind: puffs don't grow a sea)
     if (this.steps % 30 === 1) for (const b of this.boats) {
-      b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));
+      b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q));
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
@@ -932,7 +951,7 @@ export class World {
     const h = twa != null ? n360(this.wind.from + twa) : u.h;
     u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.luff = false;
     u.cur = this.currentAt(u); u.ww = windOnWater(this.windHere(u, u), u.cur);
-    if (this.steps % 30 === 0) u.sea = this.sea.at(u, u.ww, u.cur, q => this.currentAt(q));
+    if (this.steps % 30 === 0) u.sea = this.sea.at(u, windOnWater(this.seaWind(u, u.leeK), u.cur), u.cur, q => this.currentAt(q));
     this.steps++;
     moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
     u.h = h; // held there
