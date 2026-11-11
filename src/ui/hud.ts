@@ -262,9 +262,9 @@ export class Hud {
     tm.textContent = mw; tm.className = 'tp-state ' + mc;
     tj.textContent = jw; tj.className = 'tp-state ' + jc;
     // what each state means, and what fixes it (on hover)
-    const why: Record<string, string> = { good: 'Drawing well: the telltales stream on both sides.',
-      luffing: 'Luffing: eased too far (or she\'s pointing too high), so the front of the sail lifts. Trim in until it stops.',
-      stalled: 'Stalled: trimmed in too far for this wind, so the flow breaks away off the back. Ease until the leeward and leech telltales fly.',
+    const why: Record<string, string> = { good: 'Drawing well. Upwind and reaching, the telltales stream on both sides; on a broad reach or run they hang, and the sail wants easing out square to the wind.',
+      luffing: 'Luffing: eased too far, or she\'s pointing too high, so the front of the sail lifts. Trim in, or if it\'s already in hard, bear away until it stops.',
+      stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the leeward and leech telltales stream.',
       backed: 'Aback: the jib is sheeted to windward and pushes her bow away (heaving to).', off: '' };
     tm.title = why[mc] ?? ''; tj.title = why[jc] ?? '';
     // the sails' shape against the best shape for the conditions, and which line fixes it

@@ -23,7 +23,7 @@ export function crewWords(u: Boat): string {
   let where: string;
   if (pl) {
     const across = pl.across == null ? '' : { lee: `sitting to leeward on the ${lw} side`, mid: 'in the middle', up: `sitting up on the ${ww} side`, hike: `hiking out on the ${ww} rail` }[pl.across];
-    const fore = pl.fore == null ? '' : pl.fore === 'fwd' ? 'weight forward' : 'weight aft';
+    const fore = pl.fore == null ? '' : { fwd: 'weight forward', mid: 'weight in the middle', aft: 'weight aft' }[pl.fore];
     where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; tap Crew for auto`;
   } else {
     where = 'Auto: ' + (c.roll ? (c.roll.phase === 'hold' ? 'roll tack, holding the old high side' : 'roll tack, out hard to flatten her')
@@ -49,12 +49,12 @@ let lastRow = '', crewOpen = false;
 export function toggleCrewOpen(): void { crewOpen = !crewOpen; lastRow = ''; }
 /** The full sailing reason for each place, on hover. */
 const PLACE_TIP: Record<string, string> = {
-  lee: 'Sit to leeward: on the low side. In light air it heels her a few degrees, so the sails hold their shape and less hull is wet.',
-  mid: 'Middle: weight on the centreline. Downwind, or to keep her flat.',
+  lee: 'Sit to leeward: on the low side. In light air your weight heels her about 6°, so the sails fall into their shape instead of slatting.',
+  mid: 'Middle: weight on the centreline: downwind, where she sails flat.',
   up: 'Sit up: on the windward side deck, without leaning out. Weight to windward in a moderate breeze.',
   hike: 'Hike out: lean out over the windward rail to hold her up in a breeze. Hiking is always to windward: to put weight to leeward, sit to leeward.',
-  fwd: 'Forward: weight forward in the cockpit. The bow goes down and the transom lifts clear: less drag in light air.',
-  aft: 'Aft: weight back by the helm. The stern goes down and the bow lifts: for a breeze and downwind, when she starts to surf.'
+  fwd: 'Forward: weight forward in the cockpit. The bow goes down and the transom lifts clear: less drag in light air and flat water.',
+  aft: 'Aft: weight back by the helm. The stern goes down and the bow lifts: once she\'s going fast (about 5½ kt and up, near hull speed) or punching into a chop, so the bow rides over her bow wave and the waves.'
 };
 /**
  * The trim panel's crew section. One line while the crew place themselves (tap it to open): what they're doing and why.

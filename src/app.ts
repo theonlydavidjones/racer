@@ -286,9 +286,9 @@ const CTL_UI: CtlItem[] = [
 /** What each line does, in a sentence (standard trim practice: controls.ts). */
 const LINE_WHAT: Record<CtlItem['key'], string> = {
   mainsheet: 'Pulls the boom in: in for power and pointing upwind; eased to spill a puff, or on a reach.',
-  traveller: 'Moves the boom across: up to windward for power in light air, down to leeward to depower in a puff.',
-  backstay: 'Bends the mast and tightens the forestay: a flatter main, a straighter jib luff. On in a breeze.',
-  vang: 'Holds the boom down so the leech doesn\'t twist open: on downwind and in a breeze.',
+  traveller: 'Moves the boom across: up to windward in light air (boom in the middle, the sheet eased so the leech stays open), middle in medium air, down to leeward to depower in a breeze or a puff.',
+  backstay: 'Bends the mast and tightens the forestay: a flatter main (its draft moves aft and its top opens, so the Cunningham follows), a straighter jib luff. On in a breeze.',
+  vang: 'Holds the boom down so the leech doesn\'t twist open when the sheet is eased: on reaching and running, and upwind only in a real breeze (18 kt and more).',
   outhaul: 'Stretches the foot of the main: tight is flatter (a breeze), eased is fuller (light air, reaching).',
   cunningham: 'Pulls the main\'s luff down: brings the draft forward as the wind builds.',
   downhaul: 'The main\'s coarse luff tension, set for the wind range; the Cunningham fine-tunes it.',
@@ -319,8 +319,8 @@ function showTrimOwner(): void {
     setWho(id, yours, yours ? `You have the ${name}: it stays where you put it. Tap Crew to give it back.` : `The crew trims the ${name}. Trim or Ease (or You) takes it.`);
   }
   const backed = (w.user.jibBacked ?? 0) > 0.3;
-  word('bJibBack', backed ? 'Release' : 'Back'); $('bJibBack').querySelector('small')!.textContent = backed ? 'jib to leeward' : 'heave to';
-  $('bJibBack').title = backed ? 'Let the windward jib sheet go: the jib comes across to leeward' : 'Haul the windward jib sheet: the jib backs to windward (heaving to)';
+  word('bJibBack', backed ? 'Release' : 'Back'); $('bJibBack').querySelector('small')!.textContent = backed ? 'jib to leeward' : 'jib to windward';
+  $('bJibBack').title = backed ? 'Let the windward jib sheet go: the jib comes across to leeward' : 'Haul the windward jib sheet: the jib backs to windward. To heave to, also ease the main and lash the tiller to leeward';
 }
 function giveBack(k: LineKey): void { takeLine(w.user, k, false); showTrimOwner(); }
 /** Every Crew · You switch in the trim panel: a line's (data-line), or the crew's weight ("crew"). */
