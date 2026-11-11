@@ -250,6 +250,18 @@ export function rudderDrag(weather: number, v: number): number {
 }
 
 /**
+ * What pushes her along (N): the sails' drive less the keel's induced drag for the side force it answers, at boat speed
+ * v (m/s) and heel (deg). ORC VPP Documentation 2025, eq. 6.37: DI = FH² / (π·½ρV²·Te²). The effective draft is the
+ * sim's own keel model's (slender-wing lift, Newman, Marine Hydrodynamics §5.12, the water's surface mirroring the
+ * keel: Te² = 2·T²), its depth shortened by cos(heel); ORC works it from the hull's offsets (MHSD), which aren't
+ * published for the Folkboat.
+ */
+export function netDrive(f: { main: SailForce; jib: SailForce }, heelDeg: number, v: number): number {
+  const q = 0.5 * RHO_W * Math.max(0.5, v) ** 2, c = Math.cos(Math.min(60, Math.abs(heelDeg)) * D2R), fh = (f.main.heel + f.jib.heel) * c;
+  return f.main.drive + f.jib.drive - fh * fh / (Math.PI * q * 2 * orc.boat.draft ** 2 * c * c);
+}
+
+/**
  * Speed lost to the hull heeling past about 20°: the heeled hull's own resistance as the lee rail nears the water. ORC's
  * VPP works it from the hull's offsets (VPP Documentation 2025, §6.4), which aren't published for the Folkboat (ORC
  * and the NFIA hold them), so this curve is an estimate. (Fitting it so that the speed search depowers where North

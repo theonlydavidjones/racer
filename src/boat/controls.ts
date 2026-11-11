@@ -276,7 +276,11 @@ export function depowerLimits(depower: number, awa: number, tws?: number): { min
 export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}): CrewSettings {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
   // lines you hold are fixed where you have them: the crew sets the rest around them
-  const lo = (k: keyof CrewSettings) => fixed[k] ?? lim.min[k] ?? (k === 'traveller' ? -1 : 0), hi = (k: keyof CrewSettings) => fixed[k] ?? lim.max[k] ?? 1;
+  // (with your mainsheet held, the traveller is their only way to put the boom where it should be: the guide's traveller
+  // settings assume a main sheeted for the conditions, so then only the depowering floor holds it)
+  const free = fixed.mainsheet != null ? depowerLimits(depower ?? 0, awa) : null;
+  const lo = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? free.min.traveller : lim.min[k]) ?? (k === 'traveller' ? -1 : 0);
+  const hi = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? 1 : lim.max[k]) ?? 1;
   // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle
   const carIn = clamp(Math.floor((jibAng - 1 - 8) / 1.25), 0, CAR_IN_PINS - 1);
   const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, carFore: 3, carIn, ...from };

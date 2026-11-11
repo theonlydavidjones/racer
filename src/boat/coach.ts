@@ -1,11 +1,11 @@
 import type { Boat, LineKey } from './boat';
-import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
+import { heelFactor, heelWithCrew, helmNeeded, netDrive, rudderDrag, sailForces } from './balance';
 import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
 import { crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
 import { hullResistance } from './dynamics';
 import { beatAngle, polar } from './polar';
-import { byHand, crewMainAngle, leeDrift, sailPlan } from './physics';
+import { byHand, crewMainAngle, leeDrift, sailPlan, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { KT, clamp } from '../core/math';
 
@@ -109,13 +109,19 @@ function speedFactor(b: Boat, c: Controls): number {
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
   let f = Math.sqrt(Math.max(0, trimDrive(tm, tj) * eff));
   // heel and helm, with the crew where they are now
-  const sf = sailForces(b.aws, awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
+  // (in the wind the sails see as she heels, as the boat does: physics.ts sailWind, ORC eqs. 7.2–7.3)
+  const sw = sailWind(b.ww.from, b.ww.kt, b.h, b.v, 0, b.heelMag ?? 0);
+  const sf = sailForces(sw.aws, sw.awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
   const cs = b.crew;
   if (cs) {
     const disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
     const heel = heelWithCrew(F, sf.ceh, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0)) * (b.twa > 120 ? 0.6 : 1);
     f *= heelFactor(heel);
     const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.ceh);
+    // the drive the sails make less the keel's drag for their side force (balance.ts netDrive): flatter sails push less,
+    // but heel her less and ask less of the keel; against the drive as she is, as physics.ts powerFactor weighs it
+    const now = b.forces ? b.forces.drive : 0;
+    if (now > 1) f *= Math.sqrt(Math.max(0, netDrive(sf, heel, v)) / now);
     f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
   }
   return f;
@@ -130,7 +136,7 @@ const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] }
 function withCrew(b: Boat, k: LineKey, v: number): Controls {
   const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
   if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
-  if (k === 'mainsheet' && !byHand(b, 'traveller') && !b.hove && !byHand(b, 'jibsheetW')) c.traveller = travellerFor(want, v, depowerLimits(b.depower ?? 0, b.awaSlow, b.ww.kt).min.traveller ?? -1);
+  if (k === 'mainsheet' && !byHand(b, 'traveller') && !b.hove && !byHand(b, 'jibsheetW')) c.traveller = travellerFor(want, v, depowerLimits(b.depower ?? 0, b.awaSlow).min.traveller ?? -1);
   return c;
 }
 /** The best setting for one line with the crew answering it, and the speed it's worth. */

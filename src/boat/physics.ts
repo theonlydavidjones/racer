@@ -8,7 +8,7 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
+import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewMass, crewMoment, crewSkill, hikingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, trimSpeedFactor } from './hullTrim';
@@ -425,11 +425,7 @@ function powerFactor(b: Boat, aws: number, awa: number, jibOn: { trim: NonNullab
   const forces = (m: Shape, j: Shape, w: { aws: number; awa: number }, mainOut = b.sheets.main) =>
     sailForces(w.aws, w.awa, { trim: mainOut === b.sheets.main ? b.trim.main : sailTrim('main', w.awa, mainOut), shape: m, out: mainOut }, jibOn ? { trim: jibOn.trim, shape: j } : null, false);
   // the push: drive less the keel's induced drag at the polar speed, for a side force and heel
-  const q = 0.5 * 1025 * Math.max(0.5, vPolar) ** 2, T2 = 2 * orc.boat.draft ** 2;
-  const push = (r: ReturnType<typeof sailForces>, heel: number) => {
-    const c = Math.cos(Math.min(60, Math.abs(heel)) * D2R), fh = (r.main.heel + r.jib.heel) * c;
-    return r.main.drive + r.jib.drive - fh * fh / (Math.PI * q * T2 * c * c);
-  };
+  const push = (r: ReturnType<typeof sailForces>, heel: number) => netDrive(r, heel, vPolar);
   // the sails as the crew sets them at each step (controls.ts crewShapes), the boom eased down the traveller on the last
   // steps (crewEaseBoom)
   const jibAng = jibOn ? b.sheets.jib : optimalSheet('jib', awa);
@@ -597,9 +593,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // first whenever they've room to hike; you placing the crew, they work with where you've put them)
   const cs0 = b.crew, maxed = !cs0 || !!cs0.place?.across || cs0.hike > 0.85 || (cs0.spec.crew.length === 0 && cs0.people[0].lean > 0.85);
   // the step they work toward: the fastest for this crew in this wind (powerFactor), which a skilled crew follows closely
-  // and a novice only once it's well off; past about 6° of helm they can't steer her, whatever it costs
+  // and a novice only once it's well off (the search weighs the rudder's drag already: North Sails' "until the rudder
+  // feels light again"); past about 6° of helm they can't steer her, whatever it costs
   const goal = b.depowerBest ?? (up ? clamp((tws - 14) / 10, 0, 1) : 0), slack = 0.05 + 0.15 * (1 - crewSkill(b.crew));
-  const over = !up ? -1 : (b.depower < goal - slack || helmLoad > 6) && maxed ? 1 : (b.depower > goal + slack && helmLoad < 3.5) || (!maxed && helmLoad < 6) ? -1 : 0;
+  const over = !up ? -1 : (b.depower < goal - slack || helmLoad > 6) && maxed ? 1 : (b.depower > goal + slack && helmLoad < 6) || (!maxed && helmLoad < 6) ? -1 : 0;
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
   const easeBoom = crewEaseBoom(b);
