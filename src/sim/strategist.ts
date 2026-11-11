@@ -84,6 +84,31 @@ export function planLegs(w: World, o: Outlook): LegPlan[] {
   return out;
 }
 
+/**
+ * The trend of the course-wide wind over a window: a straight line fitted through it every 2 minutes (speed, and the
+ * direction unwrapped), and how far it swings about that line. On an observed day the wind is Fort Point's record every
+ * 6 minutes, oscillations and all: two snapshots would call an oscillation a shift. A shift is persistent only when the
+ * fitted change is bigger than the swings about it.
+ */
+export function windTrend(o: Outlook, t0: number, t1: number): { kt0: number; kt1: number; from0: number; from1: number; dFrom: number; swing: number; lo: number; hi: number } {
+  const ts: number[] = [], ks: number[] = [], ds: number[] = [];
+  let prev = o.breeze(t0).from;
+  const step = Math.max(1, Math.min(2, (t1 - t0) / 4));
+  for (let t = t0; t <= t1 + 1e-6; t += step) { const b = o.breeze(t), d = prev + wrap(b.from - prev); ts.push(t - t0); ks.push(b.kt); ds.push(d); prev = d; }
+  const fit = (ys: number[]) => {
+    const n = ys.length, mx = ts.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+    let sxy = 0, sxx = 0; for (let i = 0; i < n; i++) { sxy += (ts[i] - mx) * (ys[i] - my); sxx += (ts[i] - mx) ** 2; }
+    const k = sxx > 0 ? sxy / sxx : 0, c = my - k * mx, res = Math.sqrt(ys.reduce((a, y, i) => a + (y - (c + k * ts[i])) ** 2, 0) / n);
+    return { y0: c, y1: c + k * (t1 - t0), res };
+  };
+  const fk = fit(ks), fd = fit(ds);
+  return { kt0: fk.y0, kt1: fk.y1, from0: fd.y0, from1: fd.y1, dFrom: fd.y1 - fd.y0, swing: fd.res, lo: Math.min(...ds), hi: Math.max(...ds) };
+}
+
+/** The side a persistent shift favours: toward the new wind upwind (a veer: the right, looking upwind); downwind it's
+ * the other way round (the routing finds the left pays on a run in a veer, the right in a back). */
+const shiftSide = (dFrom: number, kind: LegKind): 'left' | 'right' => ((dFrom > 0) === (kind !== 'run') ? 'right' : 'left');
+
 /* ---------- the sections ---------- */
 
 const srcWords = (w: World) => {
@@ -105,11 +130,14 @@ function daySection(w: World, o: Outlook, finishT: number): BriefSection {
     return [`${clockOf(t)} · ${lab}`, `${Math.round(b.kt)} kt from ${deg3(b.from)}, gusts ~${Math.round(b.kt * b.gust)} (${Math.round(wd.kt)} at the line)`, currentWords(o.current(C.center, t), flood), describeSea(s)];
   });
   const items: BriefItem[] = [];
-  const b0 = o.breeze(gun), b1 = o.breeze(finishT), dk = b1.kt - b0.kt, dd = wrap(b1.from - b0.from);
-  const trend = Math.abs(dk) < 1.5 ? `holds at about ${Math.round((b0.kt + b1.kt) / 2)} kt` : `${dk > 0 ? 'builds' : 'eases'} from ${Math.round(b0.kt)} to ${Math.round(b1.kt)} kt`;
-  const swing = Math.abs(dd) < 4 ? 'and holds its direction' : `and ${dd > 0 ? 'veers (swings clockwise)' : 'backs (swings anticlockwise)'} ${Math.round(Math.abs(dd))}°, from ${deg3(b0.from)} to ${deg3(b1.from)}`;
-  items.push({ head: 'The breeze', src: 'data', text: `Over the race it ${trend} ${swing}.` });
-  if (Math.abs(dd) >= 4) items.push({ head: 'A persistent shift', src: 'practice', text: `A wind that swings one way through the race isn't an oscillation you can tack on and wait out: it's a persistent shift. The boats on the side it swings toward (the ${dd > 0 ? 'right' : 'left'}, looking upwind) gain. Sailing toward the shift you're headed more and more (your bow falls off as it swings), which feels wrong but isn't: don't tack on it. When you do tack you're lifted, pointing higher and higher at the mark. The boats on the other side are lifted the whole time, but lifted the wrong way, away from the mark, and fall behind. Go toward the new wind early.` });
+  const tr = windTrend(o, gun, finishT), dk = tr.kt1 - tr.kt0, dd = tr.dFrom, persistent = Math.abs(dd) >= 5 && Math.abs(dd) > 1.5 * tr.swing;
+  const trend = Math.abs(dk) < 1.5 ? `holds at about ${Math.round((tr.kt0 + tr.kt1) / 2)} kt` : `${dk > 0 ? 'builds' : 'eases'} from about ${Math.round(tr.kt0)} to ${Math.round(tr.kt1)} kt`;
+  const swing = persistent ? `and ${dd > 0 ? 'veers (swings clockwise)' : 'backs (swings anticlockwise)'} about ${Math.round(Math.abs(dd))}°, from ${deg3(tr.from0)} to ${deg3(tr.from1)}`
+    : tr.swing >= 4 ? `and oscillates rather than shifting: it swings ${Math.round(tr.swing)}° or so either side of ${deg3((tr.from0 + tr.from1) / 2)} (between ${deg3(tr.lo)} and ${deg3(tr.hi)}), with no steady trend`
+    : 'and holds its direction';
+  items.push({ head: 'The breeze', src: 'data', text: `Over the race it ${trend} ${swing}. (A straight line fitted through the wind every 2 minutes, so one gusty reading doesn't count as a trend.)` });
+  if (persistent) items.push({ head: 'A persistent shift', src: 'practice', text: `A wind that swings one way through the race isn't an oscillation you can tack on and wait out: it's a persistent shift. Upwind, the boats on the side it swings toward (the ${dd > 0 ? 'right' : 'left'}, looking upwind) gain. Sailing toward the shift you're headed more and more (your bow falls off as it swings), which feels wrong but isn't: don't tack on it. When you do tack you're lifted, pointing higher and higher at the mark. The boats on the other side are lifted the whole time, but lifted the wrong way, away from the mark, and fall behind. Go toward the new wind early. (On a run it works the other way round.)` });
+  else if (tr.swing >= 4) items.push({ head: 'Oscillating', src: 'practice', text: `An oscillating wind swings back and forth about a mean. Upwind, tack on the headers: when the compass says you've been knocked several degrees below your mean heading on this tack and it holds for a few seconds, tack, and you come out lifted on the other board. Know your mean headings on each tack before the start, so you can tell a header from the mean.` });
   if (Math.abs(dk) >= 3) items.push({ head: 'Changing gears', src: 'practice', text: `A breeze that ${dk > 0 ? 'builds' : 'dies'} ${Math.abs(Math.round(dk))} kt over an hour or so means the boat set up for the start is wrong by the finish. Plan the changes now (see Trim and tuning) and make them before you're overpowered${dk > 0 ? '' : ' or underpowered'}, not after.` });
   // where it blows harder or lighter across the course, at the start
   const pts: { name: string; p: Vec }[] = [{ name: `the line (${C.committeeLabel})`, p: C.center }, ...C.marks.filter((m, i, a) => a.findIndex(x => x.key === m.key) === i).map(m => ({ name: m.name, p: m.reach ? legEnds(C, C.marks.indexOf(m)).to : m.p }))];
@@ -188,8 +216,16 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
     const dc = b.meanCurAlong - a.meanCurAlong, dk = b.meanKt - a.meanKt, why: string[] = [];
     if (Math.abs(dc) > 0.08) why.push(dc > 0 ? `the current is ${kt1(Math.abs(dc))} kt kinder there (${b.meanCurAlong >= 0 ? `${kt1(b.meanCurAlong)} kt helping` : `${kt1(-b.meanCurAlong)} kt against`}, against ${a.meanCurAlong >= 0 ? `${kt1(a.meanCurAlong)} kt helping` : `${kt1(-a.meanCurAlong)} kt against`} on the ${other})` : `even though the current is ${kt1(-dc)} kt worse there`);
     if (Math.abs(dk) > 0.4) why.push(dk > 0 ? `there's ${kt1(dk)} kt more wind (${kt1(b.meanKt)} against ${kt1(a.meanKt)})` : `even with ${kt1(-dk)} kt less wind`);
-    const s0 = o.breeze(L.t0).from, s1 = o.breeze(L.t0 + L.minutes).from, sh = wrap(s1 - s0);
-    if (Math.abs(sh) >= 3) why.push(`the wind ${sh > 0 ? 'veers' : 'backs'} ${Math.round(Math.abs(sh))}° during the leg, which favours the ${sh > 0 ? 'right' : 'left'}`);
+    const lt = windTrend(o, L.t0, L.t0 + L.minutes), sh = lt.dFrom;
+    // a swing over one leg counts as a shift only when the race-long trend is a persistent shift the same way: on an
+    // oscillating day, a leg's worth of the record is just half an oscillation
+    const day = windTrend(o, o.t0, Math.max(o.t0 + 60, L.t0 + L.minutes)), dayShift = Math.abs(day.dFrom) >= 5 && Math.abs(day.dFrom) > 1.5 * day.swing;
+    if (Math.abs(sh) >= 3 && !(dayShift && Math.sign(day.dFrom) === Math.sign(sh))) why.push(`the wind swings about ${Math.round(Math.abs(sh))}° ${sh > 0 ? 'right (veers)' : 'left (backs)'} during this leg, but over the race it oscillates rather than shifts one way, so treat it as a shift to tack (or gybe) on, not a side to bank on`);
+    else if (Math.abs(sh) >= 3 && Math.abs(sh) > 1.5 * lt.swing) {
+      const side = shiftSide(sh, L.kind);
+      why.push(side === L.best ? `the wind ${sh > 0 ? 'veers' : 'backs'} about ${Math.round(Math.abs(sh))}° during the leg, which favours the ${side}${L.kind === 'run' ? ' on a run' : ''}`
+        : `the wind ${sh > 0 ? 'veers' : 'backs'} about ${Math.round(Math.abs(sh))}° during the leg, which on its own would favour the ${side}${L.kind === 'run' ? ' on a run' : ''}, but the rest outweighs it`);
+    } else if (lt.swing >= 4) why.push(`the wind oscillates about ${Math.round(lt.swing)}° either way during the leg with no steady trend, so the shifts don't favour a side: tack (or gybe) on them`);
     if (why.length) items.push({ head: 'Why', src: 'model', text: `${why.join('; ')}.`.replace(/^./, s => s.toUpperCase()) });
   }
   if (L.best === 'middle' || L.certainty === 'open') items.push({ head: 'How to sail it', src: 'practice', text: `When the sides are close, play what you can see: tack on the headers (when the compass says you've been knocked 5° or more and it's held for a few seconds), sail toward the dark patches of pressure coming down the course, and stay between the fleet and the mark rather than banking on a corner.` });
@@ -295,7 +331,7 @@ export function raceBrief(w: World): RaceBrief {
   const sections = [daySection(w, o, finishT), startSection(w, o, legs), courseSection(o, legs), fleetSection(w), trimSection(w, o, legs, finishT)];
   return {
     title: `${w.C.title}: the strategist's briefing`,
-    sub: `${new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}, start ${clockOf(o.t0)}. Finish in about ${mins(finishT - o.t0)} for the leaders, on these plans. Confidence in the wind: ${sure}.`,
+    sub: `${new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}, start ${clockOf(o.t0)}. About ${mins(finishT - o.t0)} round at the polar speeds on these plans; real fleets, and the sim's, take about 15% longer (puffs, lulls, tacks and each other's wind, as the committee's course table allows). Confidence in the wind: ${sure}.`,
     sections, legs, finishT
   };
 }

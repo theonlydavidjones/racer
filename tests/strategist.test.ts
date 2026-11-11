@@ -8,7 +8,7 @@ import { onLand } from '../src/geo/shore';
 import type { Outlook } from '../src/sim/outlook';
 import { outlookFor, stationEvents } from '../src/sim/outlook';
 import { bestPlan, comparePlans, routeAround, sailLeg } from '../src/sim/routing';
-import { raceBrief } from '../src/sim/strategist';
+import { raceBrief, windTrend } from '../src/sim/strategist';
 import { passagePlan } from '../src/sim/navigator';
 import { place } from '../src/sim/places';
 
@@ -43,6 +43,12 @@ describe('sailing a leg on paper', () => {
     const r = comparePlans(day, A, UP, 0);
     expect(bestPlan(r)).toBe('right');
     expect(r.left.minutes - r.right.minutes).toBeGreaterThan(0.5);
+  });
+  it('on a run it\'s the other way round: in a veer the left pays', () => {
+    const day = fakeDay((_p, t) => ({ kt: 10, from: 180 + Math.min(20, t) })); // the wind from the south, veering; the leg runs north
+    const r = comparePlans(day, A, UP, 0);
+    expect(r.left.kind).toBe('run');
+    expect(bestPlan(r)).toBe('left');
   });
   it('reaching across a current, she crabs up-current and still gets there in a straight line', () => {
     const day = fakeDay(() => ({ kt: 12, from: 270 }), () => ({ x: 0, y: -1 * KT })); // a beam reach north, 1 kt setting south… along
@@ -82,6 +88,26 @@ describe('the strategist', () => {
     for (const s of b.sections) for (const it of s.items) { expect(it.text.length).toBeGreaterThan(10); expect(['data', 'model', 'practice', 'rule']).toContain(it.src); }
     // the race takes about as long as the committee's table says for this course (within reason)
     expect(b.finishT - w.gunUtc).toBeGreaterThan(30); expect(b.finishT - w.gunUtc).toBeLessThan(240);
+  });
+  it('tells a persistent shift from an oscillation', () => {
+    const veer = windTrend(fakeDay((_p, t) => ({ kt: 10, from: 250 + t / 3 })), 0, 60);
+    expect(veer.dFrom).toBeCloseTo(20, 0); expect(veer.swing).toBeLessThan(1);
+    const osc = windTrend(fakeDay((_p, t) => ({ kt: 10, from: 250 + 15 * Math.sin(2 * Math.PI * t / 12) })), 0, 60);
+    expect(Math.abs(osc.dFrom)).toBeLessThan(5); expect(osc.swing).toBeGreaterThan(8);
+  });
+  it('the gusts it states are ones the sim\'s puffs can make, and the shift it cites agrees with the plan', () => {
+    const w = race(), b = raceBrief(w);
+    for (const row of b.sections[0].table!.rows) {
+      const m = row[1].match(/^(\d+) kt .*gusts ~(\d+)/)!;
+      expect(+m[2]).toBeLessThanOrEqual(Math.round(+m[1] * 1.46) + 1);
+    }
+    // a shift the 'Why' says favours a side is the side the plan goes (or it says the rest outweighs it)
+    let leg = -1;
+    for (const it of b.sections[2].items) {
+      const h = it.head?.match(/^Leg (\d+):/); if (h) { leg = +h[1] - 1; continue; }
+      const m = it.text.match(/which favours the (left|right)/);
+      if (it.head === 'Why' && m) expect(m[1]).toBe(b.legs[leg].best);
+    }
   });
   it('names the favoured end: the end further upwind', () => {
     for (const windDir of [240, 300]) {

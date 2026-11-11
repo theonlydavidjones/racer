@@ -46,7 +46,7 @@ export function sideWords(a: Vec, b: Vec, track: Vec[], left: boolean): string {
   const u = unit(sub(b, a)), n = left ? { x: -u.y, y: u.x } : { x: u.y, y: -u.x };
   let far = track[0], farD = -Infinity;
   for (const q of track) { const d = cross(u, sub(q, a)) * (left ? 1 : -1); if (d > farD) { farD = d; far = q; } }
-  const dir = compass(brg(n.x, n.y)), f = nearFeature(far, 1500, [a, b]), shore = shoreDist(far) < 350;
+  const shore = shoreDist(far) < 350, f = nearFeature(far, shore ? 900 : 1500, [a, b]), dir = compass(brg(n.x, n.y));
   const toward = shore ? `in along the shore${f ? ` by ${f}` : ''}` : f ? `toward ${f}` : '';
   return `${dir.length === 1 ? { N: 'north', S: 'south', E: 'east', W: 'west' }[dir] : dir}${toward ? `, ${toward}` : ''}`;
 }

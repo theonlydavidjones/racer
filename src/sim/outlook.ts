@@ -1,4 +1,4 @@
-import { KT, V, brg, dot, type Vec } from '../core/math';
+import { KT, V, brg, clamp, dot, type Vec } from '../core/math';
 import { CURRENTS, currentAt, currentVector, windOnWater } from '../environment/current';
 import type { SeaHere } from '../environment/sea';
 import { CurrentField, events, sfClock, type TideStation } from '../environment/tide';
@@ -47,7 +47,11 @@ export function outlookFor(w: World): Outlook {
     const b = wx.at(t);
     // as World.updateBreeze: the westerly from the records follows the clock; a set strength holds the gun's direction
     const kt = w.seaBreeze ? b.kt : fixedKt, from = S.windDir ?? (w.seaBreeze ? b.from : fixedFrom);
-    return { kt, from, gust: Math.max(1.05, b.gust) };
+    // the gusts she'll actually meet: the sim's strongest puffs (environment/wind.ts Puffs: up to 0.3 × gustiness over
+    // the mean, gustiness set from the day's gust factor as World.updateBreeze sets it), not the station's instantaneous
+    // peak gust over its 6-minute mean, which reads 2–5 × on a light, puffy day
+    const gIn = w.seaBreeze ? b.gust : w.windKind !== 'west' || w.realWind ? Math.max(1.5, b.gust) : 1.5;
+    return { kt, from, gust: 1 + 0.3 * clamp((gIn - 1) / 0.55, 0.5, 1.5) };
   };
   const field = w.tide ? new CurrentField(w.tide.stations) : null;
   let fieldT = NaN;

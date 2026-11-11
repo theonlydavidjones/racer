@@ -103,14 +103,14 @@ export function passagePlan(w: World): PassagePlan | null {
         if (ev) turn = ` It turns at ${clockOf(ev.t)} (NOAA, ${st.name}).`;
       }
       marks.push({ p: q.p, kind: 'gate', label: s.v < 0 ? `${kt1(-s.v)} kt against` : `${kt1(s.v)} kt with you` });
-      gi.push({ head: name, src: 'data', text: s.v < 0
+      gi.push({ head: name, src: 'model', text: s.v < 0
         ? `About ${clockOf(q.t)}: ${kt1(-s.v)} kt of current against you here, out of a boat speed of 4–5 kt.${turn} ${-s.v > 2 ? 'That\'s a gate: arrive at slack or on the fair tide if you can, or go close inshore where the current is weaker.' : 'Keep out of the strongest stream; it\'s weaker near the shore and in the lee of points.'}`
         : `About ${clockOf(q.t)}: ${kt1(s.v)} kt with you: a free ride.${turn}` });
     }
   }
   if (!gi.length) gi.push({ text: o.stations ? 'No strong current on the way: the tide barely matters for this passage at this time.' : 'Practice current: the same everywhere but near the shore, so there are no gates.', src: o.stations ? 'model' : 'data' });
   gi.push({ head: 'Reading it on the water', src: 'practice', text: 'Check what the tide is doing as you go: look at the buoys and moored boats (they lean and trail a wake downstream), and at your track over the ground against your heading on the chart. A tide line (a line of foam and debris, a change in the ripples) is where the current changes.' });
-  sections.push({ id: 'gates', title: 'Current gates', lede: 'Where the tide is strongest on your way, from NOAA\'s current stations. The Golden Gate, Raccoon Strait and the water off Alcatraz and Point Blunt run hardest; the tide turns along the shores before it turns in the middle.', items: gi });
+  sections.push({ id: 'gates', title: 'Current gates', lede: 'Where the tide is strongest on your way, from NOAA\'s current stations. The Golden Gate, Raccoon Strait and the water off Alcatraz and Point Blunt run hardest. Sailors say the tide turns along the shores before it turns in the middle (general practice: the sim weakens the current near the shore, but doesn\'t turn it earlier).', items: gi });
 
   /* ---------- the wind on the way ---------- */
   const wi: BriefItem[] = [];
