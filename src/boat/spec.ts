@@ -22,6 +22,8 @@ export interface BoatSpec {
   /** The forehatch: a varnished teak cover on a wooden frame, or a smoked acrylic lid in an aluminium frame (the usual
    * modern production hatch, as Lewmar's). */
   hatch?: 'teak' | 'acrylic';
+  /** The colour her name is lettered in on the cabin sides ('' or absent: one that stands out). */
+  nameColor?: string;
   /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
   sails: { country: string; number: string; color: 'white' | 'black' };
   /** (Older saves: chosen flags. Now her club gives the burgee and her country the ensign; officers' flags go with skippers.) */
@@ -96,6 +98,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
     navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
     hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
+    ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's
     ...(typeof x.slip === 'string' && x.slip ? { marina: x.slip.includes(':') ? x.slip.split(':')[0] : 'west-harbor', slip: x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}` } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})

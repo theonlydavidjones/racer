@@ -104,7 +104,7 @@ function keelHalf(u: number): number {
  */
 function sectionShape(u: number): { al: number; be: number } {
   const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38);
-  return { al: 1.6 + 2.4 * mid - 1.2 * aft, be: 1.0 + 0.6 * mid + 0.3 * aft };
+  return { al: 1.6 + 2.4 * mid + 1.8 * aft, be: 1.0 + 0.6 * mid + 0.9 * aft };
 }
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
@@ -207,13 +207,23 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
  * deck forward (CR 3.11), the after end within 300 mm forward of station 6 (CR 3.12): drawn 1.85 m, ending 0.26 m
  * forward of station 6, which starts it 0.10 m aft of the mast; the mast goes through the foredeck at the sheer (the
  * boom's band 1.00 m above the deck, CR 6.1.11). The cockpit from the main bulkhead aft to station 3 (CR 3.22), 1.0 m
- * from the transom, leaving a long after deck; its side decks 250–310 mm wide (CR 3.22). Heights are estimates.
+ * from the transom, leaving a long after deck; its side decks 250–310 mm wide (CR 3.22).
+ * Its section, from the construction plan's main section at St. 8 and CR 3.13–3.14: about 1580 mm wide there (at least
+ * 1550), the sides upright and about 200 mm above the deck (at least 190), the top arched about 170 mm above the sides'
+ * tops (at least 150); the side decks about 300 mm, and the cockpit coamings carry the cabin sides' line on aft, faired
+ * into them (CR 3.25, the plan's "cockpit coaming to fair into cabin sides").
  */
 const zU = (z: number) => (z + L / 2) / L;
-export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.62, h: 0.32 };
-export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), w: 0.7, sole: 0.24 };
-/** Cockpit half-width: narrows aft with the hull, leaving a side deck. */
-export const cockpitHalf = (u: number) => Math.min(COCKPIT.w, halfBeam(u) - 0.28); // (a 280 mm side deck)
+/** The side deck's width, sheer to cabin side or coaming (m). */
+export const SIDE_DECK = 0.30;
+/** The line of the cabin sides and the coamings' outer face: the sheer less the side deck. */
+export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
+export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
+export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: 0.24 };
+/** The coaming's thickness (m): the cockpit opening is its inside face. */
+export const COAMING_T = 0.025;
+/** Cockpit half-width: inside the coaming, which follows the side line, narrowing aft with the hull. */
+export const cockpitHalf = (u: number) => sideLine(u) - COAMING_T;
 const CAMBER = 0.05;
 export const deckY = (u: number, x: number) => sheer(u) + CAMBER * Math.max(0, 1 - (x / Math.max(0.05, halfBeam(u))) ** 2) * halfBeam(u) / 1.1;
 
@@ -246,18 +256,22 @@ export function deckGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-/** Cabin trunk half-width: rounded in plan at the front. */
-function cabinHalf(u: number): number {
-  const r = 0.05; // the rounded front, as a fraction of the length
-  if (u < CABIN.u0 + r) { const f = (CABIN.u0 + r - u) / r; return CABIN.w * Math.sqrt(Math.max(0, 1 - f * f * 0.85)); }
-  return CABIN.w;
+/** Cabin trunk half-width: the side line, rounded in plan at the front. */
+export function cabinHalf(u: number): number {
+  const r = 0.05, w = sideLine(u); // the rounded front, as a fraction of the length
+  if (u < CABIN.u0 + r) { const f = (CABIN.u0 + r - u) / r; return w * Math.sqrt(Math.max(0, 1 - f * f * 0.85)); }
+  return w;
 }
+/** How far the cabin sides lean in over their height (m). */
+const CABIN_LEAN = 0.015;
 
-/** Height of the cabin top (at its sides' top edge) at station u. */
-export const cabinTopY = (u: number) => deckY(u, CABIN.w) + CABIN.h + 0.02 * (u - CABIN.u1) / (CABIN.u0 - CABIN.u1);
+/** Height of the cabin sides' top edge at station u. */
+export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + CABIN.h;
+/** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
+export const cabinTopAt = (u: number, x: number) => { const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN); return cabinTopY(u) + CABIN.crown * Math.max(0, 1 - (x / w) ** 2); };
 
-/** The cabin trunk: sides from below the deck up to a cambered top with rounded edges. Returns [sides, top]. */
-export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; topY: (u: number) => number } {
+/** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
+export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } {
   const N = 40, topY = cabinTopY;
   const outline: { u: number; x: number }[] = [];
   for (let i = 0; i <= N; i++) { const u = CABIN.u0 + (CABIN.u1 - CABIN.u0) * i / N; outline.push({ u, x: cabinHalf(u) }); }
@@ -265,20 +279,25 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   const ring = [...outline.map(o => ({ u: o.u, x: o.x })), ...outline.slice().reverse().map(o => ({ u: o.u, x: -o.x }))];
   ring.push(ring[0]); // close the front
   for (const o of ring) {
-    const lean = 0.06; // sides lean in toward the top
-    sides.push(o.x, 0.45, zAt(o.u), o.x - Math.sign(o.x) * lean, topY(o.u), zAt(o.u));
+    sides.push(o.x, 0.45, zAt(o.u), o.x - Math.sign(o.x) * CABIN_LEAN, topY(o.u), zAt(o.u));
   }
   for (let i = 0; i < ring.length - 1; i++) { const a = i * 2; sIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
-  // aft face (closing the ring at the back)
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3)); sg.setIndex(sIdx); sg.computeVertexNormals();
   const top: number[] = [], tIdx: number[] = [], NX = 8;
   for (let i = 0; i <= N; i++) {
-    const u = outline[i].u, w = outline[i].x - 0.06;
-    for (let j = 0; j <= NX; j++) { const x = -w + 2 * w * j / NX; top.push(x, topY(u) + 0.06 * (1 - (x / CABIN.w) ** 2), zAt(u)); }
+    const u = outline[i].u, w = outline[i].x - CABIN_LEAN;
+    for (let j = 0; j <= NX; j++) { const x = -w + 2 * w * j / NX; top.push(x, cabinTopAt(u, x), zAt(u)); }
   }
   for (let i = 0; i < N; i++) for (let j = 0; j < NX; j++) { const a = i * (NX + 1) + j, b = a + 1, c = a + NX + 1, d = c + 1; tIdx.push(a, b, c, b, d, c); }
   const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); tg.setIndex(tIdx); tg.computeVertexNormals();
-  return { sides: sg, top: tg, topY };
+  // the after end: from the deck up the sides and over the arch of the top, facing aft into the cockpit
+  const u1 = CABIN.u1, w1 = cabinHalf(u1), z1 = zAt(u1) + 0.002, rim: THREE.Vector2[] = [new THREE.Vector2(w1, COCKPIT.sole)];
+  for (let j = 0; j <= 16; j++) { const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 16); rim.push(new THREE.Vector2(x, cabinTopAt(u1, x))); }
+  rim.push(new THREE.Vector2(-w1, COCKPIT.sole));
+  const ap: number[] = []; for (const q of rim) ap.push(q.x, q.y, z1);
+  const ag = new THREE.BufferGeometry(); ag.setAttribute('position', new THREE.Float32BufferAttribute(ap, 3));
+  ag.setIndex(THREE.ShapeUtils.triangulateShape(rim, []).flat()); ag.computeVertexNormals();
+  return { sides: sg, top: tg, aft: ag, topY };
 }
 
 /** A flat quad from four corners (counter-clockwise seen from the side it faces). */
@@ -413,3 +432,19 @@ export const uAtZ = (z: number) => (z + L / 2) / L;
 
 /** The hull's half-breadth (m) at station u and height y on the topsides: what the inside of her has room for. */
 export const hullHalfAt = (u: number, y: number) => sectionPoint(u, pAtY(u, y)).x;
+
+/**
+ * A patch on the starboard cabin side and the coaming that carries its line aft (they're one surface on the boats), for
+ * paint and fittings on it: her name, the cabin window. Centred at station uc, `width` m long, from h0 to h1 above the
+ * deck at the side. UVs run 0..1 aft→forward (so it reads left to right seen from starboard) and bottom→top.
+ */
+export function sidePatch(uc: number, width: number, h0: number, h1: number, nu = 40, nv = 8): THREE.BufferGeometry {
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
+    const u = uc + (i / nu - 0.5) * width / L, h = h0 + (h1 - h0) * j / nv, w = sideLine(u);
+    const x = w - (u < CABIN.u1 ? CABIN_LEAN * h / CABIN.h : 0) + 0.012; // a hair off the surface
+    pos.push(x, deckY(u, w) + h, zAt(u)); uv.push(1 - i / nu, j / nv);
+  }
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
