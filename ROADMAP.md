@@ -578,6 +578,25 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
+- **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
+  getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the
+  technical port, plus the business setup):
+  - Wrap the same TypeScript and three.js code as a Mac and Windows app: Tauri for a small download, or Electron for
+    consistent graphics.
+  - Sell it on Steam, itch.io, or direct through Paddle or Lemon Squeezy.
+  - Move saves from the artifact's database and localStorage to local files, with Steam cloud sync.
+  - Cache NOAA, NWS and chart data for offline use, and check the ENC chart data's terms for bundling.
+  - Add a graphics-quality setting, an installer, and code-signing (Apple and Microsoft certificates, about $100 a year
+    each).
+  - Store page, trailer, privacy policy, price and refunds.
+  - Keep real skippers' names out of the shipped product without permission.
+
+  **Watch note:** move off the browser when any of these becomes true (the Coordinator flags it when one comes close):
+  - the artifact's 16 MB size limit is in sight (3.5 MB today);
+  - performance needs native threads or a GPU budget the browser can't give;
+  - saves outgrow the artifact database;
+  - we need things a page can't have: file access, game controllers, a full-screen app.
+
 - Real past races with real wind and current (goal 4).
 - More courses, and race-committee options (course changes, shortened courses).
 - Phone and tablet layout (on hold: desktop first).
