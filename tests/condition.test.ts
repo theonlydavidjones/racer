@@ -77,7 +77,9 @@ describe('equipment the class rules make equal', () => {
   it('a wooden mast is within a fraction of a percent: a little heavier aloft', () => {
     const a = benchAngles(20).up;
     expect(Math.abs(loss(20, a, { mast: 'wood' }))).toBeLessThan(0.006);
-    expect(benchSpeed(20, a, spec({ mast: 'wood' })).heel).toBeGreaterThan(benchSpeed(20, a, spec()).heel);
+    // (heavier aloft: she heels more, or the crew hike harder or depower more to hold her)
+    const wood = benchSpeed(20, a, spec({ mast: 'wood' })), alu = benchSpeed(20, a, spec());
+    expect(wood.heel > alu.heel + 0.01 || wood.arm > alu.arm + 0.005 || wood.depower > alu.depower + 0.005).toBe(true);
   });
 
   it('extra weight: slower in light air, no worse (a little stiffer) in a breeze', () => {

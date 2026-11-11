@@ -28,10 +28,10 @@ describe('Hiking a Folkboat, by the class rules', () => {
     const twa = beatAngle(22), b = testBoat({ heading: 360 - twa, kt: 5, windKt: 22 });
     sail(b, 5, () => { b.h = 360 - twa; b.depower = 0; });
     const fresh = Math.max(...b.crew!.people.slice(1).map(p => p.x));
-    sail(b, 300, () => { b.h = 360 - twa; b.depower = 0; });
+    sail(b, 420, () => { b.h = 360 - twa; b.depower = 0; });
     const tired = b.crew!.people.slice(1);
     expect(Math.max(...tired.map(p => p.fatigue))).toBeGreaterThan(0.3);
-    expect(Math.max(...tired.map(p => p.x))).toBeLessThan(fresh - 0.05);
+    expect(Math.max(...tired.map(p => p.x))).toBeLessThan(fresh - 0.03);
     b.ww = { ...b.ww, kt: 8 }; sail(b, 240, () => { b.h = 360 - beatAngle(8); });
     expect(Math.max(...b.crew!.people.slice(1).map(p => p.fatigue))).toBeLessThan(0.15);
   });

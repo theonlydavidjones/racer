@@ -198,7 +198,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // heel past her best; the weight aboard (displacement) and where it sits fore and aft (the trim's resistance); in a
   // drifter, the sails' own weight (heeled to leeward, gravity helps hold them in shape)
   const vPolar = polar(ww.kt, twa, plan);
-  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
+  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
   else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff * wornDrive); // sheet angles, the sails' shape, worn cloth
@@ -375,24 +375,33 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   sailVisuals(b, 'jib', dt);
 }
 
-/** The rig's sideways speed through the air at the sails' centre of effort (m/s, + to starboard) from her rolling. */
-const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * CE_HEIGHT * Math.cos((b.heel ?? 0) * D2R);
+/** The rig's sideways speed through the air at the sails' centre of effort (m/s, + to starboard) from her rolling: the
+ * roll rate times the centre of effort's height above the roll axis (near the waterline: CE_HEIGHT is measured from the
+ * keel's centre of lateral resistance, about 0.6 m below it, an estimate). */
+const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * (CE_HEIGHT - 0.6) * Math.cos((b.heel ?? 0) * D2R);
+/** The waves' added resistance at speed v as a share of the calm-water resistance (for the trim: hullTrim.ts). */
+const seaShare = (b: Boat, v: number) => { const r = hullResistance(Math.max(0.5, v)); return r > 0 ? seaDrag(b.sea, b.h, Math.max(0.5, v)) / r : 0; };
+/** (Worked out twice a second, as the sea is refreshed.) */
+const seaNow = (b: Boat, dt: number) => { b.seaShareT = (b.seaShareT ?? 0) - dt; if (b.seaShareT <= 0 || b.seaShare == null) { b.seaShareT = 0.5; b.seaShare = seaShare(b, b.v); } return b.seaShare; };
 
 /**
  * The crew decide where to be (crewPhys.ts placeCrew) for the heel they want, and the heel she'd settle at with them
  * there (deg, + to leeward). `bestHeel`: a fixed heel to aim for (hove to), else the crew's own by the conditions.
  */
 function crewAndHeel(b: Boat, cs: CrewState, F: number, twist: number, disp: number, rmExtra: (h: number) => number, twa: number, tws: number, rel: number, extraMoment: number, dt: number, bestHeel?: number): number {
+  void rel;
   const n = cs.spec.crew.length, skill = n ? cs.spec.crew.reduce((a, p) => a + skillOf(p), 0) / n : skillOf(cs.spec.helm);
   const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
   const need = heelingMoment(F, twist, bh) - hullRighting(bh, disp) - rmExtra(bh);
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: rel >= 0 ? 1 : -1, beat: beatAngle(tws), extraMoment }, dt);
+  // (the windward side by her tack, which holds through a moment by the lee until the boom crosses)
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return heelWithCrew(F, twist, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h));
 }
 /** Roll her toward the heel `heelLee` (deg, + to leeward) as a damped oscillator (balance.ts rollStep). */
 function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number): void {
-  const side = rel >= 0 ? 1 : -1; // b.heel is + to port: to leeward with the wind over the starboard side
+  void rel;
+  const side = b.tack === 'S' ? 1 : -1; // b.heel is + to port: to leeward with the wind over the starboard side (by her tack, as the boom)
   const r = rollStep(b.heel ?? 0, b.heelRate ?? 0, heelLee * side, disp, dt);
   b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
@@ -417,8 +426,9 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
     bump(hitsHarbor(stern(b)) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }
-  // trim to the apparent wind: wind over the water minus the boat's own motion through it
-  const aw = apparent(ww.from, ww.kt, b.h, b.v, sw);
+  // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
+  // so the flags, the windex and the crew see what the sails see)
+  const aw = apparent(ww.from, ww.kt, b.h, b.v, sw + rigSway(b));
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
@@ -506,7 +516,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // end to end); starting out, from the wind
   const up = Math.abs(b.awaSlow) < 70, heel = b.heelMag ?? 0, helmLoad = b.helmNeed ?? 0;
   b.depower ??= up ? clamp((tws - 14) / 10, 0, 1) : 0;
-  const over = !up ? -1 : heel > 18 || helmLoad > 6 ? 1 : heel < 13 && helmLoad < 3.5 ? -1 : 0;
+  // (hike first, then depower: the crew adds depowering only once they're out as far as they go, and takes it off
+  // first whenever they've room to hike; you placing the crew, they work with where you've put them)
+  const cs0 = b.crew, maxed = !cs0 || !!cs0.place?.across || cs0.hike > 0.85 || (cs0.spec.crew.length === 0 && cs0.people[0].lean > 0.85);
+  const over = !up ? -1 : (heel > 18 || helmLoad > 6) && maxed ? 1 : (heel < 13 && helmLoad < 3.5) || (!maxed && heel < 18 && helmLoad < 6) ? -1 : 0;
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
   const easeBoom = up ? 7 * clamp((b.depower - 0.6) / 0.4, 0, 1) : 0;

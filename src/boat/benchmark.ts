@@ -28,7 +28,7 @@ export function benchBoat(heading: number, windKt: number, spec?: BoatSpec, mont
 }
 
 /** Settled speed (kt), heel and helm at a true wind angle, after `seconds` (averaged over the last third). */
-export function benchSpeed(windKt: number, twa: number, spec?: BoatSpec, month = 9, seconds = 40): { kt: number; heel: number; helm: number } {
+export function benchSpeed(windKt: number, twa: number, spec?: BoatSpec, month = 9, seconds = 40): { kt: number; heel: number; helm: number; arm: number; depower: number } {
   const b = benchBoat(twa, windKt, spec, month), dt = 1 / 60, g = { t: -99 }, noop = () => {};
   let v = 0, heel = 0, helm = 0, n = 0;
   for (let i = 0; i < seconds * 60; i++) {
@@ -37,7 +37,7 @@ export function benchSpeed(windKt: number, twa: number, spec?: BoatSpec, month =
     moveBoat(b, dt, i * dt, noop, g);
     if (i > seconds * 40) { v += b.v; heel += b.heelMag ?? 0; helm += b.helmNeed ?? 0; n++; }
   }
-  return { kt: v / n / KT, heel: heel / n, helm: helm / n };
+  return { kt: v / n / KT, heel: heel / n, helm: helm / n, arm: b.crew?.arm ?? 0, depower: b.depower ?? 0 };
 }
 
 /** The angles the panel measures at: close-hauled, a beam reach, a broad run. */

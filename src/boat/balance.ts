@@ -150,10 +150,11 @@ export const heelFactor = (heelDeg: number) => 1 - 0.55 * Math.max(0, (Math.abs(
  * a crew move rolls her over in a second or so, and a crew throwing their weight out rolls her up. Stiffness K is the
  * hull's righting moment per radian at small angles (Δ·g·GM); the inertia is the boat's mass about a roll radius of
  * gyration of about 0.4 × beam (the usual figure for a yacht with her rig, an estimate) plus about 20% added mass of
- * water: a natural period of about 2 s. Under sail it's heavily damped: the long keel moving sideways through the water,
- * and the sails (ζ ≈ 0.6 in all, an estimate: a keelboat under sail heels to a gust and stops, without rocking back);
- * part of the sails' damping also comes through the apparent wind (the rig sweeping to leeward takes wind out of them:
- * physics.ts), so a roll-tack's snap upright gives a pull.
+ * water: a natural period of about 2 s (with her tall rig the gyration may be nearer 0.5 × beam, 2.5 s). The hull and
+ * long keel moving sideways through the water, and the sails' own drag across them, damp it (ζ ≈ 0.6, an estimate: a
+ * keelboat under sail heels to a gust and stops, without rocking back). The sails' lift adds more through the apparent
+ * wind (the rig sweeping to leeward takes wind out of them: physics.ts rigSway), which also gives a roll-tack's snap
+ * upright its small pull.
  */
 export const ROLL = { gyration: 0.4 * orc.boat.beam, added: 0.2, zeta: 0.6 };
 export function rollStep(heel: number, rate: number, heelEq: number, disp: number, dt: number): { heel: number; rate: number } {

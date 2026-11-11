@@ -73,7 +73,7 @@ describe('Helm balance (weather helm)', () => {
     // the crew's own trim, once they've worked through the depowering steps (one job at a time): they take the helm off her
     const balanced = beat(18, undefined, false, 60);
     const loaded = beat(18, c => { c.backstay = 0; c.traveller = -0.6; c.mainsheet = 0; }, false, 60);
-    expect(loaded.helmNeed!).toBeGreaterThan(balanced.helmNeed! + 2);
+    expect(loaded.helmNeed!).toBeGreaterThan(balanced.helmNeed! + 1.5); // (the crew hikes harder to hold her up, which takes some of it off)
     expect(loaded.v).toBeLessThan(balanced.v);
   });
 });

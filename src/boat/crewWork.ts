@@ -104,8 +104,11 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (j.line in want) { const to = sheetOf(j.line) ? want[j.line as Ctl]! : j.to ?? want[j.line as Ctl]!; if (Math.abs(to - b.ctl[j.line as Ctl]) < DONE) a.job = null; }
     else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
   });
-  // each free person takes the most urgent of their lines that's off by more than they'd bother with
-  for (const k of PRIORITY) {
+  // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
+  // times a second: quicker than anyone reacts)
+  c.jobT = (c.jobT ?? 0) - dt;
+  const look = c.jobT <= 0; if (look) c.jobT = 0.05;
+  if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
     const who = ownerOf(k, n), a = c.people[who]; if (!a) continue;
     const skill = skillOf(ppl[who]), e = err(k);
