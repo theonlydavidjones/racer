@@ -966,7 +966,7 @@ function beginRaceNow(seed?: number): void {
   const m0 = w.C.marks[0];
   if (w.fromSlip) {
     const m = Math.round((w.startAt - S.seq * 60) / 60);
-    toast(`In her slip in ${harborOf(w.homeSlip!.marina)?.short ?? 'her marina'}, ${w.homeSlip!.label}, bow in and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to shove her out astern, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
+    toast(`In her slip in ${harborOf(w.homeSlip!.marina)?.short ?? 'her marina'}, ${w.homeSlip!.label}, bow in and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to have the crew spring her off by hand into the fairway, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
     return;
   }
   toast(S.mode === 'sail'

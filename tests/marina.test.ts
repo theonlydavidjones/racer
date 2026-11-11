@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { HARBOR, SLIPS, hitsHarbor, inBasin, pushOffPlan, slipById } from '../src/geo/marina';
+import { HARBOR, SLIPS, hitsHarbor, inBasin, pushOffPoses, slipById } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
 import { DT, SHOVE, World, slipLeadTime } from '../src/sim/world';
+import { n360 } from '../src/core/math';
 
 describe('West Harbor', () => {
   it('a basin you can sail in, with its docks and breakwaters solid', () => {
@@ -51,20 +52,20 @@ describe('West Harbor', () => {
     expect(w.pushOff()).toBe(true);
     expect(u.docked).toBeUndefined(); expect(u.handled).toBeTruthy(); // the crew has her by hand
     expect(u.pushing?.jump).toBe(0); expect(Math.abs(u.pushing!.lat - 2)).toBeLessThan(0.6); // a crew member on the finger, walking her out
-    const plan = pushOffPlan(slip); if (plan.kind !== 'walk') throw new Error('a bow-in slip');
-    const back = (q: { x: number; y: number }) => -((q.x - slip.p.x) * Math.sin(slip.heading * Math.PI / 180) + (q.y - slip.p.y) * Math.cos(slip.heading * Math.PI / 180));
-    let t = 0; for (; t < 60 * 120 && u.handled; t++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
-    expect(u.handled).toBeUndefined(); expect(t / 60).toBeLessThan(60); // walked out and turned in well under a minute
-    expect(Math.abs(back(u) - plan.back)).toBeLessThan(0.1); expect(Math.abs(back(u) - 0.45 * slip.finger)).toBeGreaterThan(3.8); // her whole hull past the finger's end
-    expect(u.h).toBe(plan.h); expect(u.v).toBeCloseTo(SHOVE, 2); // pointed down the fairway, let go with a shove
+    const plan = u.handled!.plan, poses = pushOffPoses(slip, plan), last = poses[poses.length - 1];
+    expect(plan.kind).toBe('spring'); // (this slip has the room to swing her)
+    let t = 0; for (; t < 60 * 120 && u.handled; t++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); expect(u.pushing?.jump ?? 1).toBeGreaterThanOrEqual(0); }
+    expect(u.handled).toBeUndefined(); expect(t / 60).toBeLessThan(60); // walked out and swung round in well under a minute
+    expect(Math.hypot(u.x - last.c.x, u.y - last.c.y)).toBeLessThan(0.1); expect(u.h).toBeCloseTo(n360(plan.h), 6);
+    expect(u.v).toBeCloseTo(SHOVE, 2); // pushed off forward, down the fairway
     for (let i = 0; i < 60; i++) w.step(DT);
     expect(u.pushing).toBeUndefined(); // the crew member who walked her out is aboard
     // under her own way, tiller centred, she carries on down the fairway, slowing, touching nothing
-    const ev = w.drainEvents().length; void ev;
+    w.drainEvents();
     const x0 = u.x, y0 = u.y;
     for (let i = 0; i < 60 * 15; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
     expect(w.drainEvents().some(e => e.type === 'toast' && /Bump|Aground/.test(e.msg))).toBe(false);
-    expect(Math.hypot(u.x - x0, u.y - y0)).toBeGreaterThan(4); expect(u.v).toBeLessThan(SHOVE);
+    expect(Math.hypot(u.x - x0, u.y - y0)).toBeGreaterThan(4);
     // going astern the tiller still steers her (the bow goes the way the tiller's pushed)
     Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, handled: undefined, v: 0, astern: 0.8 });
     const h0 = u.h; u.tiller = -0.8; for (let i = 0; i < 120; i++) w.step(DT); u.tiller = 0;

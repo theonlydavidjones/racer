@@ -1,5 +1,5 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { crewRig, moveBoat } from '../boat/physics';
+import { asternCoast, crewRig, moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -89,10 +89,10 @@ export interface WorldOptions {
   courseSignal?: { no: number; why: string };
 }
 
-/** How far back out of her slip the crew walks her before turning her down the fairway, m (0 for an end tie). */
+/** How far back out of her slip the crew walks her before they let her go, m (0 for an end tie). */
 export function midFairway(slip: Slip): number {
   const p = pushOffPlan(slip);
-  return p.kind === 'walk' ? p.back : 0;
+  return p.kind === 'off' ? 0 : p.back;
 }
 /** The shove the crew gives her as they step aboard, m/s: about a slow walk. From then on her own way carries her (physics.ts). */
 export const SHOVE = 0.5;
@@ -884,61 +884,75 @@ export class World {
   }
 
   /**
-   * Push off, as it's done with no engine (geo/marina.ts pushOffPlan). From a slip she lies in bow first: the crew walks
-   * her back out by hand, past the finger's end, to the middle of the fairway, turns her to point down it toward the way
-   * out, and steps aboard with a shove forward. From an end tie: they push her off the dock and forward. Either way
-   * she's then under her own way (a slow walk, slowing on the water's drag) and answers the tiller: steer her out, and
-   * get sail on her.
+   * Push off, as it's done with no engine (geo/marina.ts pushOffPlan, for the wind where she lies). From a slip she lies in
+   * bow first: a crew member walks her back along the finger by the shroud until her bow's just past its end, holds the bow
+   * there while the stern swings out across the fairway until she points down it toward the way out, then pushes her off
+   * forward and steps aboard over the bow. Where the fairway's too narrow to swing her, they shove her off astern into it
+   * instead (steer her stern first). From an end tie they push her off the dock and forward. Then she's under her own way
+   * (a slow walk, slowing on the water's drag, and the wind on her rig) and answers the tiller: steer her out, and get sail
+   * on her. Left head to wind she'd soon stop: the crew says so, so the main can go up first.
    */
   pushOff(): boolean {
     const u = this.user, d = u.docked; if (!d) return false;
     const slip = slipById(d.slip);
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip) { u.v = SHOVE; return true; }
-    const plan = pushOffPlan(slip);
+    const plan = pushOffPlan(slip, this.windHere(u, u).from);
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0 };
     // the finger she lay against: the nearest one, and which side of her it's on (a crew member walks her out along it)
-    if (plan.kind === 'walk' && (u.crew?.spec.crew.length ?? 0) > 0) {
+    if (plan.kind !== 'off' && (u.crew?.spec.crew.length ?? 0) > 0) {
       const f = V(slip.heading), r = { x: f.y, y: -f.x }; // forward, and to starboard
       let best = { d: Infinity, lat: 2, side: 1 };
       for (const fg of harborOf(slip.marina)?.fingers ?? []) for (let k = 1; k < fg.length; k++) {
         const d = segPt(slip.p, fg[k - 1], fg[k]);
         if (d < best.d) { const m = { x: (fg[k - 1].x + fg[k].x) / 2 - slip.p.x, y: (fg[k - 1].y + fg[k].y) / 2 - slip.p.y }; const along = m.x * r.x + m.y * r.y; best = { d, lat: Math.min(2.6, d), side: along >= 0 ? 1 : -1 }; }
       }
-      // the crew member walks her back by the shroud (about half a metre forward of her middle) and jumps aboard as the
-      // finger runs out under them: her middle lies 0.45 of the finger's length in from its end
-      u.pushing = { side: best.side, lat: best.lat, moved: 0, clear: 0.45 * slip.finger + 0.25, jump: 0 };
+      // the crew member walks her back by the shroud, and stays on the finger's end until they let her go
+      u.pushing = { side: best.side, lat: best.lat, moved: 0, clear: Infinity, jump: 0 };
     }
-    this.emit({ type: 'toast', msg: plan.kind === 'walk'
-      ? 'Pushing off: your crew walks her back out of the slip and turns her down the fairway, then steps aboard with a shove. Steer her out (she has a little way on) and hoist the sails when you\'re clear.'
-      : 'Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on) and hoist the sails when you\'re clear.', ms: 5000 });
+    const wind = plan.headToWind ? ' She\'ll be head to wind: get the main up first (U), or she\'ll soon stop.' : '';
+    this.emit({ type: 'toast', ms: 6000, msg: plan.kind === 'spring'
+      ? `Pushing off: your crew walks her back out of the slip, swings her stern out across the fairway to point her down it, and pushes her off forward as they step aboard. Steer her out (she has a little way on).${wind}`
+      : plan.kind === 'astern'
+        ? `Pushing off: the fairway's too narrow to swing her, so your crew walks her back and shoves her off astern into it. She's going astern: steer with the tiller (the bow goes the way you push it), then get sail on her.${wind}`
+        : `Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on).${wind}` });
     return true;
   }
 
-  /** The crew handling her out of her berth by hand (pushOff): walked back and turned, or pushed off; then let go with a shove. */
+  /** The crew handling her off her berth by hand (pushOff), then letting her go with a shove: kinematic, the physics waits. */
   private handStep(b: Boat, dt: number): void {
     const H = b.handled!, P = H.plan, x0 = b.x, y0 = b.y;
     this.dockStep(b, dt); // (sails weathervane, hoisting goes on)
-    if (P.kind === 'walk') {
+    if (P.kind === 'off') {
+      H.s = Math.min(1, H.s + dt / 3); // pushed out over about three seconds, her bow pushed off as needed
+      b.x = H.from.x + (P.out.x - H.from.x) * H.s; b.y = H.from.y + (P.out.y - H.from.y) * H.s; b.h = n360(H.h0 + wrap(P.h - H.h0) * H.s);
+      if (H.s >= 1) this.letGo(b, P.h, SHOVE, 0);
+    } else {
       const u = V(H.h0);
       if (H.s < P.back) {
+        // walked back by the shroud, a crew member on the finger
         const step = Math.min(WALK * dt, P.back - H.s); H.s += step;
         b.x = H.from.x - u.x * H.s; b.y = H.from.y - u.y * H.s;
-        const p = b.pushing; if (p) { p.moved += step; if (p.jump === 0 && p.moved >= p.clear) p.jump = 1e-3; }
-      } else if (Math.abs(H.a) < Math.abs(P.turn)) {
+        if (b.pushing) b.pushing.moved += step;
+      } else if (P.kind === 'spring' && Math.abs(H.a) < Math.abs(P.turn)) {
+        // the bow held at the finger's end, the stern swung out across the fairway about it
         H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + TURN * dt); b.h = n360(H.h0 + H.a);
-      } else this.letGo(b, P.h, P.still ? 0 : SHOVE);
-    } else {
-      H.s = Math.min(1, H.s + dt / 3); // pushed out over about three seconds
-      b.x = H.from.x + (P.out.x - H.from.x) * H.s; b.y = H.from.y + (P.out.y - H.from.y) * H.s;
-      if (H.s >= 1) this.letGo(b, P.h, SHOVE);
+        const bow = { x: H.from.x + u.x * (3.8 - P.back), y: H.from.y + u.y * (3.8 - P.back) }, v = V(b.h);
+        b.x = bow.x - v.x * 3.8; b.y = bow.y - v.y * 3.8;
+      } else if (P.kind === 'spring') this.letGo(b, P.h, SHOVE, 0);
+      else {
+        // shoved off astern: enough to coast her into the fairway on the water's drag
+        let lo = 0, hi = 1.5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
+        this.letGo(b, P.h, 0, lo);
+      }
     }
     if (b.pushing && b.pushing.jump > 0) { b.pushing.jump += dt / 0.7; if (b.pushing.jump >= 1) b.pushing = undefined; }
-    b.vx = (b.x - x0) / dt; b.vy = (b.y - y0) / dt;
+    if (b.handled) { b.vx = (b.x - x0) / dt; b.vy = (b.y - y0) / dt; }
   }
-  /** The crew lets her go with a shove forward as they step aboard: from here she's under her own way. */
-  private letGo(b: Boat, h: number, shove: number): void {
-    b.handled = undefined; b.h = h; b.v = shove; b.astern = 0; b.turnTarget = null; b.steer = 0;
+  /** The crew lets her go with a shove as they step aboard (ahead, or astern): from here she's under her own way. */
+  private letGo(b: Boat, h: number, ahead: number, astern: number): void {
+    b.handled = undefined; b.h = h; b.v = ahead; b.astern = astern; b.turnTarget = null; b.steer = 0;
+    const u = V(h); b.vx = u.x * (ahead - astern); b.vy = u.y * (ahead - astern);
     if (b.pushing && b.pushing.jump === 0) b.pushing.jump = 1e-3;
   }
 

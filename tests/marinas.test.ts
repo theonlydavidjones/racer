@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { segPt } from '../src/core/math';
-import { HARBORS, SLIPS, berthClear, harborAt, harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipsIn } from '../src/geo/marina';
+import { HARBORS, SLIPS, berthClear, harborAt, harborOf, hitsHarbor, inBasin, pushOffPlan, pushOffPoses, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { SeaField, fetchAt } from '../src/environment/sea';
 import type { Wind } from '../src/environment/wind';
@@ -164,35 +164,49 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       }
       // how far she'd have to go from here to the way out, along the water (steps of 1.5 m); Infinity if she can't
       const togo = (q: { x: number; y: number }) => { const g = { x: Math.round(q.x / step) * step, y: Math.round(q.y / step) * step }; return Math.min(...[[0, 0], [step, 0], [-step, 0], [0, step], [0, -step]].map(([dx, dy]) => seen.get(key({ x: g.x + dx, y: g.y + dy })) ?? Infinity)); };
-      let good = 0; const slips = slipsIn(H.id), bad: string[] = [];
+      let good = 0, exitward = 0, swung = 0; const slips = slipsIn(H.id), bad: string[] = [];
       for (const s of slips) {
-        const p = pushOffPlan(s), u = { x: Math.sin(s.heading * Math.PI / 180), y: Math.cos(s.heading * Math.PI / 180) };
-        const c = p.kind === 'walk' ? { x: s.p.x - u.x * p.back, y: s.p.y - u.y * p.back } : p.out;
-        // the way there clear of every dock and boat (walked back, then turned; or pushed off)
-        let ok = berthClear(c, p.h, s);
-        if (p.kind === 'walk') {
-          for (let d = 0.5; d <= p.back && ok; d += 0.5) ok = berthClear({ x: s.p.x - u.x * d, y: s.p.y - u.y * d }, s.heading, s);
-          for (let k = 1; k <= 9 && ok; k++) ok = berthClear(c, s.heading + p.turn * k / 9, s);
-          ok &&= Math.abs(p.back - 0.45 * s.finger) >= 3.8; // her whole hull out past her finger's end: in the fairway
+        const p = pushOffPlan(s), poses = pushOffPoses(s, p), { c, h } = poses[poses.length - 1];
+        // every pose on the way clear of every dock and of the boats in the other slips (as drawn)
+        let ok = poses.every(q => berthClear(q.c, q.h, s));
+        if (p.kind !== 'off') ok &&= Math.hypot(c.x - s.p.x, c.y - s.p.y) - 0.45 * s.finger >= 3.8 || p.kind === 'spring'; // her whole hull out of the slip
+        const v = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) };
+        if (p.kind === 'astern') ok &&= Number.isFinite(togo(c)); // shoved off astern: into water she can steer out of, stern first
+        else {
+          ok &&= [2, 4, 6].every(d => berthClear({ x: c.x + v.x * d, y: c.y + v.y * d }, h, s)); // at least a boat's length of clear water ahead
+          ok &&= Number.isFinite(togo(c)); // and somewhere she can steer out from
+          if (p.kind === 'spring') swung++;
+          if (p.kind === 'off' || togo({ x: c.x + v.x * 12, y: c.y + v.y * 12 }) <= togo(c)) exitward++; // (no further from the way out, along the water: where either way round is as far, either will do)
         }
-        // clear water ahead, pointed toward a way out, and somewhere she can steer out from
-        const v = { x: Math.sin(p.h * Math.PI / 180), y: Math.cos(p.h * Math.PI / 180) };
-        ok &&= [2, 4, 6].every(d => berthClear({ x: c.x + v.x * d, y: c.y + v.y * d }, p.h, s)); // (at least a boat's length of clear water ahead)
-        // (pointed at a way out: a boat's length on she's nearer it along the water; or, if that way's a dead end, it's the open way)
-        const here = togo(c), on = togo({ x: c.x + v.x * 6, y: c.y + v.y * 6 }), back = togo({ x: c.x - v.x * 6, y: c.y - v.y * 6 });
-        ok &&= Number.isFinite(here); // somewhere she can steer out from
-        // (or, where that way's blocked within a boat's length, down open fairway with room to turn her: 10 m clear ahead)
-        const open = [8, 10].every(d => berthClear({ x: c.x + v.x * d, y: c.y + v.y * d }, p.h, s));
-        const toward = on < here || !Number.isFinite(back) || open || p.kind === 'off';
-        if (ok && toward) good++; else bad.push(s.label);
+        if (ok) good++; else bad.push(s.label);
       }
       expect(good / slips.length, `${H.id}: ${bad.slice(0, 12).join(' ')}`).toBeGreaterThan(0.97);
+      // sprung off and pointed toward the way out (along the water) from most; the rest down open fairway, or shoved off astern
+      expect(exitward / slips.length, `${H.id}: toward the way out`).toBeGreaterThan(0.8);
+      expect(swung / slips.filter(s => s.kind === 'bow-in').length, `${H.id}: sprung off`).toBeGreaterThan(0.8); // (the rest shoved off astern: their fairway's too narrow to swing her)
     }
   }, 120000);
+  it('the wind: she isn\'t left head to wind where there\'s another way to turn her; at an end tie her bow is pushed off, and the crew says to hoist the main', () => {
+    const head = (h: number, from: number) => Math.abs(((from - h + 540) % 360) - 180) < 45;
+    let choice = 0, avoided = 0;
+    for (const s of SLIPS.filter((_, i) => i % 3 === 0)) for (const from of [270, 225, 0]) { // (a third of the berths, each in three winds)
+      const p = pushOffPlan(s, from); if (p.kind !== 'spring') continue;
+      const still = pushOffPlan(s); // (with no wind: which way she'd be turned)
+      if (still.kind === 'spring' && head(still.h, from)) { choice++; if (!head(p.h, from)) avoided++; }
+      if (!p.headToWind) expect(head(p.h, from)).toBe(false);
+    }
+    expect(choice).toBeGreaterThan(30); expect(avoided / choice).toBeGreaterThan(0.8);
+    // West Harbor's M end tie points west, into the westerly: pushed off, her bow goes off the wind, and she's told to get the main up if she's still close to it
+    const end = SLIPS.find(s => s.kind === 'alongside' && head(s.heading, 270));
+    if (end) { const p = pushOffPlan(end, 270); expect(p.h === end.heading ? p.headToWind : true).toBe(true); expect(Math.abs(((p.h - end.heading + 540) % 360) - 180)).toBeGreaterThan(p.headToWind ? -1 : 10); }
+  }, 60000);
   it('end ties: berths alongside the free ends of the docks, bow out, which push off forward', () => {
     const ends = SLIPS.filter(s => s.kind === 'alongside');
     expect(ends.length).toBeGreaterThan(10);
-    for (const s of ends) { const p = pushOffPlan(s); expect(p.kind).toBe('off'); expect(p.h).toBe(s.heading); }
+    for (const s of ends) {
+      const p = pushOffPlan(s); expect(p.kind).toBe('off'); expect(p.h).toBe(s.heading);
+      expect(pushOffPoses(s, p).every(q => berthClear(q.c, q.h, s))).toBe(true); // pushed off clear of everything, all the way out
+    }
     // in her end tie and pushed off: she goes off forward, touching nothing
     const s = ends[0], boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };

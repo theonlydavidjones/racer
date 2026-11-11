@@ -219,7 +219,7 @@ export function hullClear(c: Vec, h: number): boolean {
 }
 
 /** Where the boat in another slip lies (a little under the length of its finger, as drawn: render/marina.ts), for keeping clear of her. */
-const boatIn = (o: Slip) => ({ half: o.kind === 'alongside' ? 3.9 : 0.5 * Math.min(13, Math.max(7, o.finger * 1.05)), beam: o.kind === 'alongside' ? 1.2 : 1.4 });
+const boatIn = (o: Slip) => { const len = o.kind === 'alongside' ? 7 : Math.min(13, Math.max(7, o.finger * 1.05)); return { half: len / 2, beam: 0.17 * len }; }; // (as drawn, at their longest: render/marina.ts)
 /** The slips filed in 10 m cells, per harbor, each in its own cell and the eight round it (no boat reaches more than 7 m from her slip's middle). */
 const byHarbor = new Map<string, Map<string, Slip[]>>();
 const CELL = 10, cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
@@ -236,7 +236,7 @@ function slipsNear(q: Vec, marina: string): Slip[] {
 function clearOfBoats(q: Vec, except: Slip): boolean {
   for (const o of slipsNear(q, except.marina)) {
     if (o === except) continue;
-    const dx = q.x - o.p.x, dy = q.y - o.p.y; if (dx * dx + dy * dy > 50) continue;
+    const dx = q.x - o.p.x, dy = q.y - o.p.y; if (dx * dx + dy * dy > 64) continue; // (no moored boat reaches 8 m from her slip's middle)
     const u = { x: Math.sin(o.heading * Math.PI / 180), y: Math.cos(o.heading * Math.PI / 180) }, b = boatIn(o);
     if (Math.abs(dx * u.x + dy * u.y) < b.half && Math.abs(dx * u.y - dy * u.x) < b.beam) return false;
   }
@@ -246,49 +246,71 @@ function clearOfBoats(q: Vec, except: Slip): boolean {
 export function berthClear(c: Vec, h: number, except: Slip): boolean {
   if (!hullClear(c, h)) return false;
   const u = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }, n = { x: u.y, y: -u.x };
-  for (const a of [-3.7, -1.85, 0, 1.85, 3.7]) for (const b of [-1.05, 0, 1.05]) if (!clearOfBoats({ x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b }, except)) return false;
+  for (const a of [-3.7, -2.5, -1.25, 0, 1.25, 2.5, 3.7]) for (const b of [-1.05, 0, 1.05]) if (!clearOfBoats({ x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b }, except)) return false;
   return true;
 }
 
 /**
  * Leaving her berth under no engine, as it's done.
- * - **Bow in, between fingers** (`walk`): the crew walks her straight back out of the slip by hand, past the finger's end
- *   and the boats either side, to the middle of the fairway; turns her there to point down it toward the nearer way out
- *   (or the other way, if that's a dead end); and steps aboard with a shove forward. `back` is how far she's walked astern
- *   (m), `turn` the turn (deg, + to starboard), `h` her heading after it.
- * - **Alongside an end tie, bow out** (`off`): the crew pushes her off the dock and forward. `out` is where she's pushed
- *   out to (her middle, about a metre and a half off), `h` her heading (as she lay).
- * Either way she then goes on under her own way, slowing on the water's drag (physics.ts), and steers from the start.
+ * - **Springing her off a bow-in slip** (`spring`): a crew member walks her back along the finger by the shroud until her
+ *   bow is just past the finger's end (`back`: how far her middle goes back, m), and, holding the bow there, swings her
+ *   stern out across the fairway about the bow (`turn`, deg, + to starboard) until she points down it toward the way out
+ *   (`h`). Then they push her off forward and step aboard over the bow. It needs a boat's length of fairway behind her.
+ * - **Shoving her off astern** (`astern`), where the fairway's too narrow to swing her: walked back until her bow is at the
+ *   finger's end, then given a shove astern as the crew steps aboard, enough to coast her `coast` m on into the fairway on
+ *   the water's drag (physics.ts asternCoast), steered stern first.
+ * - **Pushing her off an end tie** (`off`): the crew pushes her off the dock (`out`: where her middle's pushed to) and
+ *   forward, her bow pushed off a little (`h`) if she'd otherwise be left head to wind.
+ * With the wind given (where it's from, deg), she's turned the way that doesn't leave her head to wind where there's a
+ * choice; `headToWind` says she will be anyway (hoist the main first, and push her bow off).
  */
-export type PushOff = { kind: 'walk'; back: number; turn: number; h: number; /** no room to turn her: let go without a shove */ still?: boolean } | { kind: 'off'; out: Vec; h: number };
+export type PushOff = ({ kind: 'spring'; back: number; turn: number } | { kind: 'astern'; back: number; coast: number } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean };
+/** Her bow is 3.8 m ahead of her middle. */
+const BOW = 3.8;
 const plans = new Map<string, PushOff>();
-export function pushOffPlan(s: Slip): PushOff {
-  let p = plans.get(s.id); if (!p) { p = planPushOff(s); plans.set(s.id, p); }
+export function pushOffPlan(s: Slip, windFrom?: number): PushOff {
+  const k = `${s.id}:${windFrom == null ? '' : Math.round(windFrom / 10)}`; // (the wind to 10 degrees)
+  let p = plans.get(k); if (!p) { p = planPushOff(s, windFrom == null ? undefined : Math.round(windFrom / 10) * 10); plans.set(k, p); }
   return p;
 }
 const dirOf = (h: number) => ({ x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) });
+/** Pointing within 45 degrees of where the wind's coming from: she can't sail or keep way on there with no sail up. */
+const headUp = (h: number, windFrom: number | undefined) => windFrom != null && Math.abs(((windFrom - h + 540) % 360) - 180) < 45;
 /** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 40). */
 function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
   while (d < 40 && berthClear({ x: c.x + v.x * (d + 2), y: c.y + v.y * (d + 2) }, h, s)) d += 2;
   return d;
 }
+/** Every pose she passes through as she's handled off her berth, in order (her middle and heading; shoved off astern, to where her coast ends), for checking it's all clear. */
+export function pushOffPoses(s: Slip, p: PushOff): { c: Vec; h: number }[] {
+  const u = dirOf(s.heading), at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back }), out: { c: Vec; h: number }[] = [];
+  if (p.kind === 'off') { for (let k = 0; k <= 6; k++) out.push({ c: { x: s.p.x + (p.out.x - s.p.x) * k / 6, y: s.p.y + (p.out.y - s.p.y) * k / 6 }, h: s.heading + (p.h - s.heading) * k / 6 }); return out; }
+  for (let d = 0.5; d < p.back; d += 0.5) out.push({ c: at(d), h: s.heading });
+  out.push({ c: at(p.back), h: s.heading });
+  if (p.kind === 'astern') { for (let d = p.back + 0.5; d < p.back + p.coast; d += 0.5) out.push({ c: at(d), h: s.heading }); out.push({ c: at(p.back + p.coast), h: s.heading }); } // (and her coast astern, where she comes to rest)
+  if (p.kind === 'spring') {
+    const bow = { x: s.p.x + u.x * (BOW - p.back), y: s.p.y + u.y * (BOW - p.back) };
+    for (let k = 1; k <= 12; k++) { const h = s.heading + p.turn * k / 12, v = dirOf(h); out.push({ c: { x: bow.x - v.x * BOW, y: bow.y - v.y * BOW }, h }); }
+  }
+  return out;
+}
 /**
- * How far it is to the way out of the harbor from here, along the water (m, in 3 m steps; Infinity off the water): a flood
- * out from its entrances, worked out once per harbor. In a long harbor the way out can lie the other way round the docks
- * from where the entrance is as the crow flies.
+ * How far it is to the way out of the harbor from here, along the water (m, in 1.5 m steps; Infinity off the water): a flood
+ * over the basin from its water nearest each entrance, worked out once per harbor (each step checked at its middle too, so
+ * it can't hop a finger or a dock, and with room for her beam). In a long harbor the way out can lie
+ * the other way round the docks from where the entrance is as the crow flies.
  */
 const ways = new Map<string, (q: Vec) => number>();
-function toExit(H: Harbor): (q: Vec) => number {
+export function toExit(H: Harbor): (q: Vec) => number {
   let f = ways.get(H.id); if (f) return f;
-  const G = 3, key = (x: number, y: number) => `${Math.round(x / G)},${Math.round(y / G)}`, d = new Map<string, number>();
-  // started from the basin's water nearest each way out (an exit can lie out past the entrance, or on its beacon)
+  const G = 1.5, key = (x: number, y: number) => `${Math.round(x / G)},${Math.round(y / G)}`, d = new Map<string, number>();
   let fr: Vec[] = [];
   for (const e of H.exits) {
     let best: Vec | null = null, bd = Infinity;
-    for (let x = Math.floor((H.box.x0) / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
+    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
       const q = { x, y }, dd = Math.hypot(q.x - e.x, q.y - e.y);
-      if (dd < bd && harborAt(q) === H && !hitsHarbor(q)) { bd = dd; best = q; }
+      if (dd < bd && harborAt(q) === H && ![[0, 0], [1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].some(([ex, ey]) => hitsHarbor({ x: q.x + ex, y: q.y + ey }))) { bd = dd; best = q; }
     }
     if (best && !d.has(key(best.x, best.y))) { d.set(key(best.x, best.y), bd); fr.push(best); }
   }
@@ -296,7 +318,8 @@ function toExit(H: Harbor): (q: Vec) => number {
     const nx: Vec[] = [];
     for (const p of fr) for (const [dx, dy] of [[G, 0], [-G, 0], [0, G], [0, -G]]) {
       const q = { x: p.x + dx, y: p.y + dy }, k = key(q.x, q.y);
-      if (d.has(k) || hitsHarbor(q) || harborAt(q) !== H) continue; // (over the basin's water)
+      // (over the basin's water, with room for her beam: no squeezing through a gap narrower than she is)
+      if (d.has(k) || harborAt(q) !== H || hitsHarbor({ x: p.x + dx / 2, y: p.y + dy / 2 }) || [[0, 0], [1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].some(([ex, ey]) => hitsHarbor({ x: q.x + ex, y: q.y + ey }))) continue;
       d.set(k, d.get(key(p.x, p.y))! + G); nx.push(q);
     }
     fr = nx;
@@ -305,48 +328,47 @@ function toExit(H: Harbor): (q: Vec) => number {
   ways.set(H.id, f);
   return f;
 }
-function planPushOff(s: Slip): PushOff {
+function planPushOff(s: Slip, windFrom?: number): PushOff {
+  const H = harborOf(s.marina)!, togo = toExit(H), u = dirOf(s.heading), n = { x: u.y, y: -u.x };
   if (s.kind === 'alongside') {
     // pushed off sideways from the dock (away from the nearest walkway), and forward along it
-    const H = harborOf(s.marina)!, u = dirOf(s.heading), n = { x: u.y, y: -u.x };
     let side = 1, best = Infinity;
     for (const w of H.walkways) for (let k = 1; k < w.length; k++) { const d = segPt(s.p, w[k - 1], w[k]); if (d < best) { best = d; const m = { x: (w[k - 1].x + w[k].x) / 2 - s.p.x, y: (w[k - 1].y + w[k].y) / 2 - s.p.y }; side = m.x * n.x + m.y * n.y > 0 ? -1 : 1; } }
-    return { kind: 'off', out: { x: s.p.x + n.x * side * 1.5, y: s.p.y + n.y * side * 1.5 }, h: s.heading };
+    const out = { x: s.p.x + n.x * side * 1.5, y: s.p.y + n.y * side * 1.5 };
+    if (!headUp(s.heading, windFrom)) return { kind: 'off', out, h: s.heading };
+    // head to wind: the crew pushes her bow off, away from the dock, as far as there's open water for
+    for (const a of [35, 25, 15]) { const h = (s.heading + a * side + 360) % 360; if (berthClear(out, h, s) && runAhead(out, h, s) >= 8) return { kind: 'off', out, h, headToWind: headUp(h, windFrom) }; }
+    return { kind: 'off', out, h: s.heading, headToWind: true };
   }
-  const u = dirOf(s.heading), at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
+  const at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
   const tip = 0.45 * s.finger; // her middle to the end of her finger
-  // how far she can be walked straight back before she'd touch a dock or a boat (across the fairway, or a dead end)
+  // how far she can be walked straight back before she'd touch a dock or a boat
   let reach = 0; while (reach < tip + 40 && berthClear(at(reach + 0.5), s.heading, s)) reach += 0.5;
-  // the fairway's far side: the first dock or boat behind her
+  // sprung off about her bow, held just past the finger's end: the stern swung out across the fairway
+  type Way = { back: number; turn: number; h: number; exitward: boolean; head: boolean; run: number; gain: number };
+  const ways: Way[] = [];
+  for (const gap of [2, 2.5, 3, 1.6]) {
+    const back = tip + gap + BOW; if (back > reach) continue;
+    const bow = { x: s.p.x + u.x * (BOW - back), y: s.p.y + u.y * (BOW - back) };
+    for (const sq of [90, 75, 105, 60, 120]) for (const sign of [1, -1]) {
+      const turn = sign * sq; let ok = true;
+      for (let k = 1; k <= 12 && ok; k++) { const h = s.heading + turn * k / 12, v = dirOf(h); ok = berthClear({ x: bow.x - v.x * BOW, y: bow.y - v.y * BOW }, h, s); }
+      if (!ok) continue;
+      const h = (s.heading + turn + 360) % 360, v = dirOf(h), c = { x: bow.x - v.x * BOW, y: bow.y - v.y * BOW }, run = runAhead(c, h, s);
+      const gain = togo({ x: c.x - v.x * 12, y: c.y - v.y * 12 }) - togo({ x: c.x + v.x * 12, y: c.y + v.y * 12 }), exitward = gain > 0; // (how much nearer the way out, along the water, she's pointed)
+      if (run >= (exitward ? 6 : 10)) ways.push({ back, turn, h, exitward, head: headUp(h, windFrom), run, gain: Number.isFinite(gain) ? gain : 0 }); // (toward the way out, a boat's length of fairway before it turns a corner will do)
+    }
+    if (ways.some(w => w.gain > 15 && !w.head)) break; // (pointed well toward the way out: no need to look further)
+  }
+  // the best: not head to wind; pointed most toward the way out (to within a couple of metres); the squarest turn (found first)
+  const best = [...ways].sort((a, b) => (+a.head - +b.head) || (Math.round(b.gain / 3) - Math.round(a.gain / 3)))[0];
+  if (best) return { kind: 'spring', back: best.back, turn: best.turn, h: best.h, ...(best.head ? { headToWind: true } : {}) };
+  // no room to swing her: walked back until her bow's at the finger's end, then shoved off astern into the fairway, to the
+  // middle of it (8 m past the finger where it's open water), with the drag in physics.ts
   let far = tip + 1; while (far < tip + 40) { const q = at(far); if (!inBasin(q) || hitsHarbor(q) || !clearOfBoats(q, s)) break; far += 0.5; }
-  // (no dock across within a fairway's width: open water, so where a fairway's middle would be)
-  const mid = far >= tip + 24 ? tip + 8 : (tip + far) / 2, togo = toExit(harborOf(s.marina)!);
-  const toward = (h: number) => { const v = dirOf(h), c = at(mid); return -togo({ x: c.x + v.x * 12, y: c.y + v.y * 12 }); }; // (the nearer way out, along the water)
-  const dirs = toward(s.heading + 90) >= toward(s.heading - 90) ? [90, -90] : [-90, 90];
-  // from the middle of the fairway outward, the first place she can be turned there and has clear water ahead
-  const backs: number[] = [];
-  for (let k = 0; k <= 60; k++) for (const b of k ? [mid + k * 0.5, mid - k * 0.5] : [mid]) if (b >= tip + 3.9 && b <= reach) backs.push(b);
-  for (const back of backs) {
-    // a square turn down the fairway; failing that (a corner slip, a dock end in the way), a little more or less
-    const c = at(back);
-    for (const sq of [90, 75, 105, 60, 120]) {
-      const turns = dirs.map(d => Math.sign(d) * sq), ok = turns.map(turn => { for (let k = 1; k <= 9; k++) if (!berthClear(c, s.heading + turn * k / 9, s)) return -1; return runAhead(c, s.heading + turn, s); });
-      const pick = ok[0] >= 6 ? 0 : ok[1] >= 10 ? 1 : -1; // toward the way out (a boat's length of fairway before it turns a corner will do), unless that's a dead end
-      if (pick >= 0) return { kind: 'walk', back, turn: turns[pick], h: (s.heading + turns[pick] + 360) % 360 };
-    }
-  }
-  // tight (a corner slip, a narrow fairway): turned only as far as there's room, with a boat's length clear ahead; else
-  // walked straight out and let go with no shove, to be steered out from there
-  for (const back of backs) {
-    const c = at(back);
-    for (let sq = 80; sq >= 20; sq -= 10) for (const d of dirs) {
-      const turn = Math.sign(d) * sq; let ok = true;
-      for (let k = 1; k <= 9 && ok; k++) ok = berthClear(c, s.heading + turn * k / 9, s);
-      if (ok && runAhead(c, s.heading + turn, s) >= 6) return { kind: 'walk', back, turn, h: (s.heading + turn + 360) % 360 };
-    }
-  }
-  const back = backs.length ? backs[0] : Math.max(0, Math.min(reach, tip + 3.9));
-  return { kind: 'walk', back, turn: 0, h: s.heading, still: true };
+  const mid = far >= tip + 24 ? tip + 8 : (tip + far) / 2, back = Math.min(reach, tip + BOW);
+  const coast = Math.max(0, Math.min(reach, Math.max(mid, tip + BOW + 1)) - back);
+  return { kind: 'astern', back, coast, h: s.heading };
 }
 
 /**
