@@ -47,8 +47,8 @@ export const TRIM = {
   keelL: 5.9, keelT: 0.5 * orc.boat.draft,
   /** Added resistance in waves per metre of bow-down trim (fraction), an estimate. */
   seaK: 2,
-  /** The trim a standard crew can give her from the cockpit (m): the polar is the boat sailed well, within this. */
-  reach: [-0.02, 0.02] as [number, number]
+  /** The trim a standard crew (two, 150 kg) can give her from the cockpit, aft end to forward end (m): the polar is the boat sailed well, within this. */
+  reach: [-0.016, 0.011] as [number, number]
 };
 
 /** Moment to change trim one centimetre (kg·m/cm) at displacement `disp` kg. */
