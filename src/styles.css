@@ -292,6 +292,8 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 /* sail controls: every line, grouped as on the boat */
 .tp-shape{font:600 11px/1.35 var(--f-body);color:var(--text);max-width:260px}
 .tp-shape:empty{display:none}
+/* the shape readout is detail: with the Lines open, not under the coach's headline */
+#trimPanel:not(.lines) .tp-shape{display:none}
 .tp-shape b{color:var(--muted);font-weight:600}
 .tp-more{align-self:flex-start;font:700 12px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);background:none;border:0;padding:10px 4px;cursor:pointer}
 .ctl-list{display:flex;flex-direction:column;gap:4px;width:400px;min-height:0;overflow-y:auto}

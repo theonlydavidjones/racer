@@ -346,11 +346,16 @@ function coachTick(dt: number): void {
   const r = coachShown;
   $('tpHint').textContent = r.done ?? r.view.top.head;
   $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : r.view.top.kind);
-  if (r.fresh && !w.paused) { $('coachTip').textContent = r.fresh; $('coachTip').className = 'on ' + (r.done ? 'done' : r.view.top.kind); coachTipUntil = w.t + 6; }
+  // the headline on the water: only when the panel's shut (it says the same), for six seconds of real time, and it
+  // follows the coach while it's up (it never contradicts the panel or the trim panel)
+  const tip = $('coachTip'), open = !$('coachPanel').hidden;
+  if (r.fresh && !w.paused && !open) { tip.textContent = r.fresh; tip.className = 'on ' + (r.done ? 'done' : r.view.top.kind); coachTipUntil = performance.now() + 6000; }
+  else if (tip.classList.contains('on') && !r.done) { if (r.view.top.kind === 'fix') tip.textContent = r.view.top.head; else coachTipUntil = 0; }
+  if (open) coachTipUntil = 0;
   tipFade();
   if (!$('coachPanel').hidden) renderCoach();
 }
-function tipFade(): void { if (w.t > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
+function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 /** Sheets read backwards on their bars (full = trimmed in), the traveller from windward to leeward. */
 const barOf = (k: CtlKey, v: number) => (k === 'mainsheet' || k === 'jibsheet' || k === 'jibsheetW' ? 1 - v : k === 'traveller' ? (1 - v) / 2 : v);
 const valOf = (k: CtlKey, fx: number) => (k === 'mainsheet' || k === 'jibsheet' || k === 'jibsheetW' ? 1 - fx : k === 'traveller' ? 1 - 2 * fx : fx);

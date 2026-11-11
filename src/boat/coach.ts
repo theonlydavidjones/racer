@@ -1,11 +1,11 @@
 import type { Boat, LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
-import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle, jibClew, jibShape, loadedCar, mainShape, shapeEfficiency, targetShape, type Controls } from './controls';
+import { boomAngle, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls } from './controls';
 import { crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
 import { hullResistance } from './dynamics';
 import { beatAngle, polar } from './polar';
-import { byHand, leeDrift, sailPlan } from './physics';
+import { byHand, crewMainAngle, leeDrift, sailPlan } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { KT, clamp } from '../core/math';
 
@@ -57,7 +57,7 @@ export interface Situation {
 export type LessonSource = (b: Boat, s: Situation, ctx: CoachContext) => Lesson[];
 const SOURCES: LessonSource[] = [];
 /** Add a teacher (e.g. crew weight: "everyone to leeward"). Its lessons are ranked with the rest by `gain`. */
-export function addLessonSource(src: LessonSource): void { SOURCES.push(src); }
+export function addLessonSource(src: LessonSource): () => void { SOURCES.push(src); return () => { const i = SOURCES.indexOf(src); if (i >= 0) SOURCES.splice(i, 1); }; }
 
 /** What the coach shows. */
 export interface CoachView {
@@ -122,13 +122,23 @@ function speedFactor(b: Boat, c: Controls): number {
 }
 
 const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] };
-/** The best setting for one line with everything else as it is, and the speed it's worth. */
+/**
+ * The controls as they'd be with one line moved, and the crew answering it as they do (physics.ts trimSails): the
+ * mainsheet and traveller set the boom together: with the traveller yours, the crew re-sheets to keep the boom where they
+ * want it (with the mainsheet yours, they leave the traveller where it's set for the conditions).
+ */
+function withCrew(b: Boat, k: LineKey, v: number): Controls {
+  const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
+  if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
+  return c;
+}
+/** The best setting for one line with the crew answering it, and the speed it's worth. */
 function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: number; gain: number } {
-  const [lo, hi] = RANGE[k] ?? [0, 1], base = speedFactor(b, b.ctl);
+  const [lo, hi] = RANGE[k] ?? [0, 1], base = speedFactor(b, withCrew(b, k, b.ctl[k]));
   if (!(base > 0)) return { to: b.ctl[k], gain: 0 };
   let to = b.ctl[k], best = base;
   for (let i = 0; i <= 40; i++) {
-    const v = lo + (hi - lo) * i / 40, f = speedFactor(b, { ...b.ctl, [k]: v });
+    const v = lo + (hi - lo) * i / 40, f = speedFactor(b, withCrew(b, k, v));
     if (f > best * 1.0005) { best = f; to = v; }
   }
   return { to, gain: best / base - 1 };
@@ -144,11 +154,11 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
   const tws = Math.round(s.tws), jibName = 'jib';
   switch (k) {
     case 'mainsheet': {
-      const was = b.sheets.main, will = clamp(boomAngle({ ...c, mainsheet: to }), SAILS.main.min, SAILS.main.max), n = Math.abs(will - was);
+      const was = b.sheets.main, will = clamp(boomAngle(withCrew(b, 'mainsheet', to)), SAILS.main.min, SAILS.main.max), n = Math.abs(will - was);
       if (!more) return { ...base, head: `Trim the main in, about ${deg(n)}.`,
-        why: s.run || s.awa > 120 ? 'It\'s eased past where the wind can fill it: the boom wants to be nearly square, not swinging forward.'
+        why: s.awa > 110 ? 'Eased right out, the main pushes from far outboard and she wants to round up: in a touch, the helm lightens.'
           : b.trim.main.flow === 'luffing' ? 'The main is luffing: its front is lifting, so it isn\'t pulling.' : 'The leech is too open: the top of the main is spilling wind you could use.',
-        look: b.trim.main.flow === 'luffing' ? 'the bubble behind the mast, and the windward side of the luff lifting' : 'the top batten: parallel to the boom when it\'s right',
+        look: s.awa > 110 ? 'the weight on the tiller' : b.trim.main.flow === 'luffing' ? 'the bubble behind the mast, and the windward side of the luff lifting' : 'the top batten: parallel to the boom when it\'s right',
         done: 'main drawing' };
       return { ...base, head: `Ease the main, about ${deg(n)}.`,
         why: s.awa > 110 ? 'Off the wind the main works by presenting area: eased out, square to the wind, it catches the most.'
@@ -168,7 +178,7 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
     case 'traveller': return { ...base,
       head: to < from ? `Traveller up to windward, ${amount(d)}.` : `Traveller down to leeward, ${amount(d)}.`,
       why: to < from ? 'It brings the boom toward the centreline without hauling the leech shut: more power and height.'
-        : s.over ? `In ${tws} kt she's overpowered: dropping the boom to leeward takes heel and weather helm off her and lets the leech open.` : 'The boom is further up than the main can use: it\'s pinning the leech closed.',
+        : s.over ? `In ${tws} kt she's overpowered: dropping the boom to leeward without opening the leech takes heel and weather helm off her while the main keeps its shape.` : 'The boom is too close to the centreline for this breeze: the main is over-trimmed.',
       look: to < from ? 'the boom: over the centreline, close-hauled in this breeze' : 'the heel and the tiller: both should come off',
       done: to < from ? 'boom where it pays' : 'helm lighter' };
     case 'backstay': return { ...base,
@@ -180,9 +190,9 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
     case 'vang': return { ...base,
       head: more ? `Vang on, ${amount(d)}.` : `Ease the vang, ${easeAmount(d)}.`,
       why: more ? (s.awa > 70 ? 'Off the wind the sheet no longer holds the boom down: without the vang the top of the main twists away and spills.' : 'It holds the leech, so the main keeps its shape when the sheet\'s eased.')
-        : 'The leech is too tight: the top of the main stalls.',
-      look: more ? 'the upper battens: in line with the boom, not falling off to leeward; and the boom end lifting in the puffs' : 'the top leech telltale: it should stream',
-      done: more ? 'top of the main working' : 'top telltale streaming' };
+        : 'The leech is too tight for this breeze: she needs more twist.',
+      look: more ? 'the upper battens: in line with the boom, not falling off to leeward' : 'the top batten: angled a little to leeward of the boom',
+      done: more ? 'top of the main working' : 'leech eased' };
     case 'outhaul': return { ...base,
       head: more ? `Outhaul on, ${amount(d)}.` : `Ease the outhaul, ${easeAmount(d)}.`,
       why: more ? `It flattens the bottom of the main: in ${tws} kt that's power she can't use.` : 'It deepens the bottom of the main, for power.',
@@ -191,32 +201,14 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
       const name = k === 'cunningham' ? 'Cunningham' : 'downhaul', Name = name[0].toUpperCase() + name.slice(1);
       return { ...base,
         head: more ? `${Name} on, ${amount(d)}.` : `Ease the ${name}, ${easeAmount(d)}.`,
-        why: more ? 'The breeze has blown the main\'s draft aft: luff tension pulls it forward again, and opens the leech.' : 'The draft is too far forward: the main is flat at the front and hooked at the back.',
+        why: more ? 'The breeze has blown the main\'s draft aft: luff tension pulls it forward again.' : 'The draft is too far forward: the front is round and the leech flat. Easing it lets the draft move back toward the middle, for power.',
         look: 'the draft stripes: the deepest point a little less than halfway back', done: 'draft where it should be' };
     }
     case 'jibCunningham': return { ...base,
       head: more ? `Jib Cunningham on, ${amount(d)}.` : `Ease the jib Cunningham, ${easeAmount(d)}.`,
       why: more ? 'The jib\'s draft has blown aft: luff tension brings it forward.' : 'The jib\'s draft is too far forward.',
-      look: 'the jib\'s draft stripes, and horizontal creases at the luff (too little tension) or a vertical one (too much)', done: 'jib draft right' };
+      look: 'the jib\'s draft stripes: the deepest point a little forward of halfway', done: 'jib draft right' };
   }
-}
-
-/** The lazy jib car, for the next tack: is a pin either way worth it? */
-function carLesson(b: Boat): Lesson | null {
-  const loaded = loadedCar(b.ctl, b.tack), base = speedFactor(b, b.ctl);
-  if (!(base > 0)) return null;
-  let best = { gain: 0, fore: 0, ins: 0 };
-  for (const [fore, ins] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-    const car = { fore: clamp(loaded.fore + fore, 0, CAR_FORE_PINS - 1), ins: clamp(loaded.ins + ins, 0, CAR_IN_PINS - 1) };
-    const c = { ...b.ctl, car: { ...b.ctl.car, [b.tack === 'S' ? 'P' : 'S']: car } }, g = speedFactor(b, c) / base - 1;
-    if (g > best.gain) best = { gain: g, fore, ins };
-  }
-  if (best.gain < FIX_MIN) return null;
-  const head = best.fore ? `Jib car ${best.fore < 0 ? 'forward' : 'aft'} a pin, on the lazy side for the next tack.` : `Jib car ${best.ins < 0 ? 'inboard' : 'outboard'} a pin, on the lazy side for the next tack.`;
-  const why = best.fore < 0 ? 'Forward closes the jib\'s leech and deepens it: it\'s twisting open at the top.' : best.fore > 0 ? 'Aft opens the top of the jib and flattens it: it\'s too closed up high.'
-    : best.ins < 0 ? 'Inboard sheets it closer, for pointing in flat water.' : 'Outboard opens the slot, for power and speed.';
-  // (a loaded car can't be moved: half the gain, since it waits for the next tack)
-  return { id: 'line:car', who: 'you', line: 'car', head, why, look: 'the jib telltales up the luff: they should all break together as you head up', done: 'car set', gain: best.gain * 0.5, kind: 'fix' };
 }
 
 /* ---------- the helm, and heaving to ---------- */
@@ -227,13 +219,13 @@ function helmLessons(b: Boat, s: Situation, lineFixes: number): Lesson[] {
   // pinching: both sails luffing upwind, with the sheets in
   if (s.up && tm.flow === 'luffing' && tm.amount > 0.15 && (!tj || tj.flow === 'luffing') && b.sheets.main <= optimalSheet('main', s.awa) + 2) {
     const g = Math.sqrt(1 / Math.max(0.05, trimDrive(tm, tj))) - 1;
-    out.push({ id: 'steer:pinching', who: 'helm', head: `Bear away about ${deg(Math.max(3, -tm.err - 1))}.`, why: 'You\'re pinching: both sails are luffing, so they\'ve stopped pulling.',
+    out.push({ id: 'steer:pinching', who: 'helm', head: `Bear away about ${deg(Math.max(3, beatAngle(s.tws) - s.twa + 2))}.`, why: 'You\'re pinching: both sails are luffing, so they\'ve stopped pulling.',
       look: 'the windward jib telltales lifting: steer down until they stream', done: 'sails drawing again', gain: g, kind: 'fix' });
   }
   // overpowered with everything on: the helm's job
   const hn = b.helmNeed ?? 0, heel = b.heelMag ?? 0;
   // (only once there's nothing left on the lines: the crew's at the end of its depowering, and yours are right)
-  if (s.up && (b.depower ?? 0) > 0.95 && (hn > 5 || heel > 22) && lineFixes === 0) {
+  if (s.twa < beatAngle(s.tws) + 8 && (b.depower ?? 0) > 0.95 && (hn > 5 || heel > 22) && lineFixes === 0) { // close-hauled: on a reach, feathering leaves the course
     const v = Math.max(0.8, b.v);
     out.push({ id: 'steer:feather', who: 'helm', head: 'Feather in the puffs: head up a touch as each one hits.',
       why: 'Every depowering line is on. What\'s left is to sail a little higher in the gusts, letting the main lift, so she stays on her feet.',
@@ -246,14 +238,22 @@ function helmLessons(b: Boat, s: Situation, lineFixes: number): Lesson[] {
 function hoveLessons(b: Boat, s: Situation): Lesson[] {
   if (!b.hove) return [];
   const lee = kt(leeDrift(b)), ahead = s.speedKt, twa = s.twa, lashed = b.lashed != null;
-  const toLee = lashed && (b.lashed! < 0) === (b.tack === 'S'), mainDrawing = b.trim.main.flow !== 'luffing' || b.trim.main.amount < 0.15;
+  const mid = lashed && Math.abs(b.lashed!) < 0.04, toLee = lashed && !mid && (b.lashed! < 0) === (b.tack === 'S'), mainDrawing = b.trim.main.flow !== 'luffing' || b.trim.main.amount < 0.15;
   if (lashed && toLee && twa >= 35 && twa <= 75 && ahead < 2.2) return [{ id: 'hove:balanced', who: 'you', kind: 'ok', gain: 0,
     head: `Hove to and balanced: bow ${deg(twa)} off the wind, ${ahead.toFixed(1)} kt ahead, slipping ${lee.toFixed(1)} kt to leeward.`,
     why: 'The backed jib pushes her bow off; the eased main and the lashed tiller turn her back up. The main is the trim tab.',
     look: 'the front of the main lifting while its back still draws. Ease it and she lies lower and slower; trim it and she comes up and fore-reaches.' }];
+  if (lashed && toLee && twa > 75) return [{ id: 'hove:beamon', who: 'you', kind: 'fix', gain: 0,
+    head: `She's lying beam-on (${deg(twa)} off the wind${ahead >= 1.5 ? `, reaching off at ${ahead.toFixed(1)} kt` : ''}): trim the main in a little to bring her up.`,
+    why: 'With the main eased right off, nothing turns her back up against the backed jib.', look: 'the bow coming up to about 50° off the wind', done: 'lying hove to' }];
+  if (lashed && toLee && twa < 35) return [{ id: 'hove:high', who: 'you', kind: 'fix', gain: 0,
+    head: `She's lying nearly head to wind (${deg(twa)}): ease the main a little more.`, why: 'The main is turning her up past where the backed jib can hold her off.', look: 'the bow falling off to about 50° off the wind', done: 'lying hove to' }];
   if (lashed && toLee && ahead >= 2.2) return [{ id: 'hove:forereach', who: 'you', kind: 'fix', gain: 0,
-    head: `She's fore-reaching at ${ahead.toFixed(1)} kt: ease the main more, or lash the tiller further to leeward.`,
+    head: b.ctl.mainsheet > 0.95 ? `She's fore-reaching at ${ahead.toFixed(1)} kt: lash the tiller further to leeward.` : `She's fore-reaching at ${ahead.toFixed(1)} kt: ease the main more, or lash the tiller further to leeward.`,
     why: 'The main is still driving her faster than the rudder and backed jib can hold.', look: 'the speedo: about a knot when she\'s settled', done: 'settled hove to' }];
+  if (mid) return [{ id: 'hove:lashmid', who: 'you', kind: 'fix', gain: 0,
+    head: 'The tiller is lashed amidships: move the lashing to leeward (◀ ▶).', why: 'The rudder only holds her up against the backed jib when it\'s turned toward the wind.',
+    look: 'the tiller: on the side away from the wind', done: 'lashed to leeward' }];
   if (lashed && !toLee) return [{ id: 'hove:lashwrong', who: 'you', kind: 'fix', gain: 0,
     head: 'The tiller is lashed to windward: move the lashing to leeward.', why: 'To windward it turns her away from the wind, the same way the backed jib does, so nothing holds her up.',
     look: 'the tiller: on the side away from the wind', done: 'lashed to leeward' }];
@@ -280,10 +280,10 @@ function crewLine(b: Boat, s: Situation): string {
   const c = b.ctl, mine = (k: LineKey) => byHand(b, k), said: string[] = [];
   const crewHas = (k: LineKey) => !mine(k);
   if (s.up && s.over) {
-    const on = (['backstay', 'outhaul', 'cunningham', 'vang'] as const).filter(k => crewHas(k) && c[k] > 0.7).map(k => k === 'cunningham' ? 'Cunninghams' : NAME[k]);
+    const on = (['backstay', 'outhaul', 'cunningham', 'vang'] as const).filter(k => crewHas(k) && c[k] > 0.7).map(k => NAME[k]);
     if (on.length) said.push(`${listWords(on)} on`);
     if (crewHas('traveller') && c.traveller > 0.3) said.push('traveller down');
-    if (crewHas('mainsheet') && (b.depower ?? 0) > 0.6 && b.trim.main.flow === 'luffing') said.push('easing the main in the puffs to keep her on her feet (the front lifting is deliberate)');
+    if (crewHas('mainsheet') && (b.depower ?? 0) > 0.6 && b.trim.main.flow === 'luffing') said.push('easing the main to keep her on her feet (the front lifting is deliberate)');
     return said.length ? `Crew: depowering: ${said.join(', ')}.${(b.depower ?? 0) > 0.95 ? ' They\'ve done all they can.' : ''}` : '';
   }
   if (s.awa > 110) {
@@ -315,7 +315,6 @@ export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: 
       const r = bestFor(b, k);
       if (r.gain >= FIX_MIN) list.push(lineLesson(b, s, k, r.to, r.gain));
     }
-    if (byHand(b, 'car') && s.up) { const l = carLesson(b); if (l) list.push(l); }
     list.push(...helmLessons(b, s, list.filter(l => l.line).length));
   }
   for (const src of SOURCES) list.push(...src(b, s, ctx));
@@ -331,7 +330,13 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   if (b.luff) return { ...base, kind: 'info', head: 'Sails eased right out: she\'s slowing.', why: 'Easing both sails until they flog is the brake: she coasts to a stop.', look: 'the speedo; trim back in to go' };
   if (b.tacking || b.turnTarget != null) return { ...base, kind: 'info', head: s.twa < 90 ? 'Through the tack: the crew is changing the jib over.' : 'Through the gybe: the boom is coming across.', why: '', look: s.twa < 90 ? 'the new jib telltales once she\'s settled on the new tack' : 'the boom: duck' };
   if (ctx.preStart) return { ...base, kind: 'info', head: `Pre-start: trim's set. ${s.speedKt.toFixed(1)} kt; ease to slow, trim to go.`, why: '', look: 'the line and the clock' };
+  // the crew's sheets a moment behind a change of course, or she's still getting going: not "right" yet
+  // (not the main eased on purpose in a breeze: that's the crew depowering)
+  const lag = ([['main', b.trim.main, 'mainsheet'], ['jib', b.trim.jib, 'jibsheet']] as const).find(([n, t, k]) => t && t.flow !== 'good' && t.amount > 0.1 && !byHand(b, k) && !(n === 'main' && s.over && (b.depower ?? 0) > 0.6 && t.flow === 'luffing'));
+  if (lag && s.awa < 110) return { ...base, kind: 'info', head: `The crew is catching up: the ${lag[0]} is ${lag[1]!.flow === 'stalled' ? 'stalled' : 'luffing'} for a moment.`, why: 'They trim at a human pace, a second or two behind a change of course or a shift.', look: `the ${lag[0]}'s telltales: watch them settle` };
+  if (s.speedKt < 0.85 * s.targetKt && !s.over) return { ...base, kind: 'info', head: `Building speed: ${s.speedKt.toFixed(1)} kt, the polar's ${s.targetKt.toFixed(1)}.`, why: 'The sails are set: a two-tonne boat takes a while to get going. Sail her straight and let her build.', look: 'the speedo climbing' };
   const steer = s.up ? 'Steer to the jib telltales: both sides streaming.' : s.awa > 110 ? 'Keep the boom out and steer smoothly through the waves.' : 'Ease the sheets until the luffs just lift, then trim back a touch.';
+  if (s.over) return { ...base, head: `Trim's right for ${Math.round(s.tws)} kt: ${s.speedKt.toFixed(1)} kt.`, why: `The polar's ${s.targetKt.toFixed(1)} kt assumes she can carry full power; in this breeze she can't, so she's depowered.`, look: 'the heel: under about 20°, and a light helm' };
   return { ...base, head: `Trim's right: ${s.speedKt.toFixed(1)} kt against the polar's ${s.targetKt.toFixed(1)}.`, why: '', look: steer };
 }
 
@@ -347,12 +352,25 @@ export function teach(b: Boat, ctx: CoachContext = {}): CoachView {
  * and when the one it's been teaching is fixed, it says so, with the speed it made, for a few seconds.
  */
 export class CoachMemory {
-  top: { id: string; done?: string; speedKt: number; since: number } | null = null;
+  top: { id: string; done?: string; line?: LineKey; from?: number; to?: number; speedKt: number; since: number } | null = null;
   doneText: { text: string; until: number } | null = null;
   /** A fix just made: announced once she's had a few seconds to pick up the speed it's worth. */
   pending: { done: string; speedKt: number; at: number } | null = null;
   /** When a lesson was last put on screen (for the brief headline while sailing). */
   shown = new Map<string, number>();
+
+  /** Was the lesson we were teaching fixed by you (not handed back, not left behind by easing to slow down or a tack)? */
+  private fixed(b: Boat, prev: NonNullable<CoachMemory['top']>, nextId: string): boolean {
+    if (b.luff || b.tacking || b.turnTarget != null || b.docked) return false;
+    if (prev.line && prev.from != null && prev.to != null) {
+      if (!byHand(b, prev.line)) return false; // given back: the crew fixed it, not you
+      const now = (b.ctl as unknown as Record<string, number>)[prev.line];
+      // (moved toward where the coach said, a good part of the way: the lesson goes once what's left is too small to say)
+      return (prev.from - now) * (prev.from - prev.to) > 0 && Math.abs(prev.from - now) >= 0.3 * Math.abs(prev.from - prev.to);
+    }
+    if (prev.id.startsWith('hove:')) return nextId === 'hove:balanced' || ((prev.id === 'hove:takemain' || prev.id === 'hove:easemain') && nextId === 'hove:lash');
+    return prev.id.startsWith('steer:');
+  }
 
   /** Look again: the view to show, and `fresh` when it's a new thing to say (the headline goes on screen briefly). */
   step(b: Boat, t: number, ctx: CoachContext = {}): { view: CoachView; done: string | null; fresh: string | null } {
@@ -364,20 +382,18 @@ export class CoachMemory {
       if (still && still.gain >= 0.6 * view.top.gain) view = { ...view, top: still, more: [view.top, ...view.more.filter(l => l !== still)] };
     }
     let fresh: string | null = null;
-    // the lesson we were teaching is gone: fixed (unless she's just started doing something else)
-    if (prev && view.top.id !== prev.id && prev.done && !(b.tacking || b.turnTarget != null)) {
-      const stillThere = view.more.some(l => l.id === prev.id);
-      if (!stillThere) this.pending = { done: prev.done, speedKt: prev.speedKt, at: t + 5 };
-    }
+    if (prev && view.top.id !== prev.id && prev.done && !view.more.some(l => l.id === prev.id) && this.fixed(b, prev, view.top.id))
+      this.pending = { done: prev.done, speedKt: prev.speedKt, at: t + 5 };
     if (this.pending && t >= this.pending.at) {
       const p = this.pending, dv = s.speedKt - p.speedKt; this.pending = null;
-      this.doneText = { text: `That's it: ${p.done}${Math.abs(dv) >= 0.05 ? `, ${p.speedKt.toFixed(1)} → ${s.speedKt.toFixed(1)} kt` : ''}.`, until: t + 5 };
+      this.doneText = { text: `That's it: ${p.done}${dv >= 0.05 ? `, ${p.speedKt.toFixed(1)} → ${s.speedKt.toFixed(1)} kt` : ''}.`, until: t + 5 };
       fresh = this.doneText.text;
     }
     if (!prev || view.top.id !== prev.id) {
-      this.top = view.top.kind === 'fix' || view.top.id.startsWith('hove:') ? { id: view.top.id, done: view.top.done, speedKt: s.speedKt, since: t } : null;
+      const tp = view.top;
+      this.top = tp.kind === 'fix' || tp.id.startsWith('hove:') ? { id: tp.id, done: tp.done, line: tp.line, from: tp.line ? (b.ctl as unknown as Record<string, number>)[tp.line] : undefined, to: tp.to, speedKt: s.speedKt, since: t } : null;
       // a new thing to fix goes on screen (not the same one again within half a minute)
-      if (!fresh && view.top.kind === 'fix' && t - (this.shown.get(view.top.id) ?? -1e9) > 30) { fresh = view.top.head; this.shown.set(view.top.id, t); }
+      if (!fresh && tp.kind === 'fix' && t - (this.shown.get(tp.id) ?? -1e9) > 30) { fresh = tp.head; this.shown.set(tp.id, t); }
     }
     const done = this.doneText && t < this.doneText.until ? this.doneText.text : null;
     return { view, done, fresh };
