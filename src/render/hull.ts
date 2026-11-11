@@ -103,8 +103,9 @@ function keelHalf(u: number): number {
  * nearly upright-sided at the deck, curving in to meet the sternpost near the waterline (the owner's photos).
  */
 function sectionShape(u: number): { al: number; be: number } {
-  const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38);
-  return { al: 1.6 + 2.4 * mid + 1.8 * aft, be: 1.0 + 0.6 * mid + 0.9 * aft };
+  // at the transom itself the hollow eases out, so the transom's foot is a broad round under the rudder head, not a point
+  const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.84) / 0.12);
+  return { al: 1.6 + 2.4 * mid + 1.8 * aft, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.7 * tr };
 }
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
