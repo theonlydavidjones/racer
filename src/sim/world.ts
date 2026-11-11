@@ -1,7 +1,7 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { asternCoast, crewRig, moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
@@ -30,7 +30,7 @@ import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
-import { DEFAULT_CREW, newCrew, type CrewSpec } from '../boat/crewPhys';
+import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
@@ -106,6 +106,17 @@ export function midFairway(slip: Slip): number {
 export function slipLeadTime(slip: Slip, line: Vec): number {
   const d = Math.hypot(line.x - slip.p.x, line.y - slip.p.y) * 1.4 + 250; // not a straight line: the fairways, the entrance, tacking
   return Math.min(120, Math.max(15, Math.ceil((d / 1.8 / 60 + 8) / 5) * 5)) * 60; // at about 3.5 kt, plus pushing off and getting the sails up (up to two hours: from South Beach or Tiburon it's 5–7 km)
+}
+
+/**
+ * How good each club boat's (generic AI) crew is, 0 novice … 1 expert (boat/crewPhys.ts): where they put their weight,
+ * how quickly and how well they work the boat. Until the Yacht Club has crews of its own, a spread like a club fleet's.
+ * Your own saved boats raced against you have a club-level crew.
+ */
+const AI_CREW_SKILL: Record<string, number> = { Red: 0.75, Blue: 0.6, Green: 0.5, Black: 0.85, Varnish: 0.45 };
+function aiCrew(name: string): CrewSpec {
+  const skill = AI_CREW_SKILL[name] ?? DEFAULT_SKILL;
+  return { helm: { ...DEFAULT_CREW.helm, skill }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill })) };
 }
 
 /** Your crew from the settings (0–2 crew besides you at the helm). */
@@ -326,7 +337,7 @@ export class World {
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
-      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : DEFAULT_CREW, 'S'),
+      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
@@ -417,6 +428,18 @@ export class World {
   }
   /** The average wind factor over the water around the course (the map shades relative to it). */
   fieldMeanK = 1;
+  /**
+   * The day's wind across the course at p, from the grid alone (the turn, deg, and the factor on the course-wide speed,
+   * without the shore's slowing close in): what carries the puffs (environment/wind.ts Puffs.step), cheaply.
+   */
+  fieldDrift(p: Vec): { turn: number; k: number } {
+    const g = this.field;
+    if (!g) return { turn: 0, k: 1 };
+    const fx = clamp((p.x - g.x0) / g.step, 0, g.n - 1.001), fy = clamp((p.y - g.y0) / g.step, 0, g.n - 1.001);
+    const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n;
+    const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
+    return { turn: bl(g.turn), k: bl(g.k) };
+  }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
   fieldAt(p: Vec): { k: number; turn: number; extra: number } {
     const g = this.field;
@@ -491,7 +514,7 @@ export class World {
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
     this.wind = windAt(this.windModel, this.t);
-    this.puffs.step(dt, this.wind);
+    this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
@@ -506,6 +529,7 @@ export class World {
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
       const x0 = b.x, y0 = b.y;
+      if (b.isUser) b.pilotSteers = this.freeSail && this.pilot.mode !== 'off';
       if (b.isUser && this.freeSail && this.pilot.mode !== 'off') {
         pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
