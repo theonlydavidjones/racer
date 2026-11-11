@@ -54,10 +54,15 @@ const lab = {
   },
   /** Sail on for `s` seconds (holding her heading unless a tack is under way), then draw. */
   sail(s: number) {
-    sail(b, s, () => { if (b.turnTarget == null && !b.tacking && (lab as any).hold != null) b.h = (lab as any).hold; t += 1 / 60; });
-    // the mesh smooths with dt: give it the frame steps
+    const step = () => { if (b.turnTarget == null && !b.tacking && (lab as any).hold != null) b.h = (lab as any).hold; t += 1 / 60; };
+    const quiet = Math.max(0, s - 0.6);
+    sail(b, quiet, step);
+    // the last moments drawn frame by frame (the figures ease and track their movement from frame to frame)
+    for (let i = 0; i < Math.round((s - quiet) * 60); i++) { sail(b, 1 / 60, step); syncBoatMesh(m!, b, t); }
     render();
   },
+  /** Sail `s` seconds drawing every frame, calling `shot(i)` every `every` frames (for sequences through a tack). */
+  frames(s: number) { for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { t += 1 / 60; }); syncBoatMesh(m!, b, t); } render(); },
   tack() { (lab as any).hold = null; startTack(b); },
   holdNow() { (lab as any).hold = b.h; },
   cam(yaw: number, pitch: number, dist: number, at?: number[]) { cam = { yaw, pitch, dist, at: at ?? cam.at }; render(); },
