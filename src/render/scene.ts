@@ -14,6 +14,7 @@ import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import { updateNight } from './night';
 import { REFLECTIVE } from './boatMesh';
+import { BOAT_LIGHTS } from './navLights';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
@@ -534,6 +535,8 @@ export class SceneView {
     sm.uniforms.sunPosition.value.copy(dir);
     const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
     const day = ss(-8, 8, el), up = ss(-1, 14, el), warm = 1 - ss(2, 25, el);
+    // the boats' lights: lit from sunset (the sun's upper edge on the horizon) to sunrise (Rule 20(b)), showing as it darkens
+    BOAT_LIGHTS.on = el < -0.833 ? 1 : 0; BOAT_LIGHTS.dark = 1 - ss(-9, 0, el);
     // the sun: warm and weak near the horizon, gone below it
     this.sun.color.setRGB(1, 0.95 - 0.33 * warm, 0.87 - 0.5 * warm);
     this.sun.intensity = 0.75 * Math.PI * up;

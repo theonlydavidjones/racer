@@ -63,13 +63,15 @@ export function mainsheetFor(angle: number, traveller: number): number {
 }
 /** Where the traveller puts the boom at `angle` with the mainsheet at `sheet` (inverse of boomAngle), within [floor, 1]. */
 export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.min(1, Math.max(floor, (angle - 80 * Math.pow(sheet, 1.5)) / 9.5));
+/** The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins`. */
+export const carLead = (ins: number) => 8 + 1.25 * ins;
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). */
 export function jibAngle(c: Controls, tack: Tack): number {
-  const lead = 8 + 1.25 * c.car[tack === 'S' ? 'P' : 'S'].ins; // the loaded car is the leeward one
+  const lead = carLead(c.car[tack === 'S' ? 'P' : 'S'].ins); // the loaded car is the leeward one
   return Math.min(68, lead + 70 * Math.pow(c.jibsheet, 1.4));
 }
 export function jibsheetFor(angle: number, c: Controls, tack: Tack): number {
-  const lead = 8 + 1.25 * c.car[tack === 'S' ? 'P' : 'S'].ins;
+  const lead = carLead(c.car[tack === 'S' ? 'P' : 'S'].ins);
   return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - lead) / 70, 1 / 1.4)));
 }
 /**
@@ -79,12 +81,12 @@ export function jibsheetFor(angle: number, c: Controls, tack: Tack): number {
  * hard home it holds the clew at its own car, as far to windward as the leeward car is to leeward.
  */
 export function jibClew(c: Controls, tack: Tack): number {
-  const lee = jibAngle(c, tack), wlead = 8 + 1.25 * c.car[tack].ins; // the windward car is on the tack's own side
+  const lee = jibAngle(c, tack), wlead = carLead(c.car[tack].ins); // the windward car is on the tack's own side
   return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
 }
 /** Windward-sheet setting that holds the clew `angle` deg to windward (inverse of jibClew's windward stop). */
 export function jibsheetWFor(angle: number, c: Controls, tack: Tack): number {
-  const wlead = 8 + 1.25 * c.car[tack].ins;
+  const wlead = carLead(c.car[tack].ins);
   return clamp(Math.pow(Math.max(0, wlead - angle) / 140, 1 / 1.4), 0, 1);
 }
 /** The leeward (loaded) jib car. */

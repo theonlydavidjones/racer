@@ -2,52 +2,86 @@ import './three-setup';
 import * as THREE from 'three';
 
 /**
- * A Nordic Folkboat hull, built from a few functions of position along the boat. Class figures: 7.64 m
- * overall, about 6.0 m on the waterline, 2.20 m beam, 1.20 m draft. The rest (freeboard, sheer, sections,
- * keel profile, cabin and cockpit sizes) is estimated from the boat's well-known look, not from the lines
- * plan: long overhangs, a sweeping sheer, slack bilges into a long keel with a cutaway forefoot, the rudder
- * hung on a small raked transom with the tiller over its top, and clinker (lapstrake) planking, which the
- * glassfibre boats copy in their moulding.
+ * A Nordic Folkboat hull, built from a few functions of position along the boat. Class figures (NFIA Class Rules
+ * 2025–2028, Appendix): about 6.00 m on the waterline, 2.20 m beam, 1.20 m draft, lowest freeboard 0.568 m. The
+ * length on deck, 7.64 m, isn't confirmed (the rules and ORC give 7.68 overall). The deck's half-breadths come from the
+ * class lines (below); the rest (sheer at the ends, sections, keel profile, cabin and cockpit sizes) is estimated from
+ * the boat's well-known look, not from the lines plan: long overhangs, a sweeping sheer, slack bilges into a long keel
+ * with a cutaway forefoot, the rudder hung on a small raked transom with the tiller over its top, and clinker
+ * (lapstrake) planking, which the glassfibre boats copy in their moulding.
  *
  * Frame: x to starboard, y up (waterline at 0), z aft; the bow is at z = −L/2.
  */
 export const L = 7.64;
 const zAt = (u: number) => -L / 2 + u * L;
 
-/** Sheer height above the waterline: high bow, lowest about 60% aft, a little rise to the transom. */
+/** Sheer height above the waterline: high bow, lowest about 60% aft (0.568 m, the class's lowest freeboard), a little rise to the transom. */
 export function sheer(u: number): number {
-  return u < 0.62 ? 0.56 + 0.40 * Math.pow((0.62 - u) / 0.62, 1.8) : 0.56 + 0.14 * ((u - 0.62) / 0.38) ** 2;
+  return u < 0.62 ? 0.568 + 0.40 * Math.pow((0.62 - u) / 0.62, 1.8) : 0.568 + 0.14 * ((u - 0.62) / 0.38) ** 2;
 }
-/** Half-beam at the sheer: fine bow, full amidships, a small transom (about 0.9 m wide at the top). */
-export function halfBeam(u: number): number {
-  return u <= 0.5 ? 1.1 * Math.pow(Math.max(0, 1 - ((0.5 - u) / 0.5) ** 2), 0.62) : 1.1 * (1 - 0.58 * Math.pow((u - 0.5) / 0.5, 2.2));
+/**
+ * Half-breadth of the deck (m) at the class's measuring stations, 0.5 m apart (CR 2.14), station 1 at the transom.
+ * Station 11's beam, 1910 mm, is the class rule's (CR 2.161); the other given stations are from the class lines as
+ * read for the audit (stations 1–4 and 12–15; not reproduced in the rules, so unconfirmed); the maximum, 1100 mm (the
+ * 2.20 m beam), is at station 8; stations 5–7, 9 and 10 are faired between them (estimates).
+ */
+const HB_MM = [655, 760, 860, 948, 1015, 1062, 1090, 1100, 1088, 1040, 955, 849, 705, 530, 315]; // stations 1..15
+/**
+ * A fair curve through points (x increasing): a monotone cubic (Fritsch–Carlson), so between two points it never
+ * bulges past them, the way a batten bent through a table of offsets lies.
+ */
+export function fairCurve(pts: [number, number][]): (x: number) => number {
+  const n = pts.length, d: number[] = [];
+  for (let i = 0; i < n - 1; i++) d.push((pts[i + 1][1] - pts[i][1]) / (pts[i + 1][0] - pts[i][0]));
+  const m = [d[0], ...d.slice(1).map((di, i) => (d[i] * di <= 0 ? 0 : (d[i] + di) / 2)), d[n - 2]];
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], h = Math.hypot(a, b);
+    if (h > 3) { m[i] = 3 * a / h * d[i]; m[i + 1] = 3 * b / h * d[i]; }
+  }
+  return (x: number) => {
+    let i = 0; while (i < n - 2 && x > pts[i + 1][0]) i++;
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], h = x1 - x0, t = Math.min(1, Math.max(0, (x - x0) / h));
+    return (2 * t ** 3 - 3 * t * t + 1) * y0 + (t ** 3 - 2 * t * t + t) * h * m[i] + (-2 * t ** 3 + 3 * t * t) * y1 + (t ** 3 - t * t) * h * m[i + 1];
+  };
 }
+/** (z, half-breadth) from the stem aft. */
+const STATIONS: [number, number][] = [[-L / 2, 0]];
+for (let k = 15; k >= 1; k--) STATIONS.push([L / 2 - 0.5 * (k - 1), HB_MM[k - 1] / 1000]);
+const deckLine = fairCurve(STATIONS);
+/** Half-beam at the sheer (m) at station u: fine bow, full a little aft of amidships, a 1.31 m transom. */
+export const halfBeam = (u: number) => Math.max(0, deckLine(zAt(Math.min(1, Math.max(0, u)))));
 const ease = (f: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, f)))) / 2;
 
 /**
  * The stern: the raked transom and the sternpost are one straight line, from the heel of the keel up to the
  * top of the transom, and the rudder hangs on it. The waterline ends where it crosses y = 0.
  */
-export const HEEL = { z: 2.75, y: -1.15 }, TRANSOM_TOP = { z: L / 2, y: sheer(1) };
+export const HEEL = { z: 2.73, y: -1.15 }, TRANSOM_TOP = { z: L / 2, y: sheer(1) };
 export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - HEEL.z) / (TRANSOM_TOP.y - HEEL.y);
 
-/** Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. */
+/**
+ * Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. The stem meets the
+ * water 1.21 m aft of the bow at deck level, so with the raked transom's crossing (aftLineZ(0)) she's 6.0 m on the
+ * waterline (class Appendix: LWL 6.00 m); the shares of the overhangs between bow and stern are estimates.
+ */
+const BOW = 0.17; // where the stem's curve meets the forefoot (fraction of L)
 function canoe(u: number): number {
-  if (u < 0.15) return 0.96 - 1.06 * Math.pow(u / 0.15, 0.85);
-  if (u < 0.45) return -0.1 - 0.38 * ease((u - 0.15) / 0.3);
+  if (u < BOW) return 0.96 - 1.06 * Math.pow(u / BOW, 1.34);
+  if (u < 0.45) return -0.1 - 0.38 * ease((u - BOW) / (0.45 - BOW));
   if (u < 0.62) return -0.48;
   return -0.48 + 0.65 * ease((u - 0.62) / 0.38);
 }
 /** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band). */
 function keel(u: number): number {
-  if (u <= 0.15) return canoe(u);
-  if (u < 0.33) return -0.1 + (-0.95 + 0.1) * ease((u - 0.15) / 0.18);
+  if (u <= BOW) return canoe(u);
+  if (u < 0.33) return -0.1 + (-0.95 + 0.1) * ease((u - BOW) / (0.33 - BOW));
   return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / 0.53);
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
-  if (u <= 0.15) return 0;
-  return 0.03 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - 0.15) / 0.75)), 0.7);
+  if (u <= BOW) return 0;
+  return 0.03 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - BOW) / 0.73)), 0.7);
 }
 /** Section fullness: V-shaped forward, slack round bilge amidships, firmer aft. */
 const sectionN = (u: number) => 1.35 + 1.0 * ease(u / 0.5) - 0.25 * ease((u - 0.6) / 0.4);
@@ -138,7 +172,13 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
 /* ---------- deck, cabin, cockpit ---------- */
 
 /** Openings in the deck: the cabin trunk and the cockpit well (u range, half-width). */
-export const CABIN = { u0: 0.355, u1: 0.6, w: 0.62, h: 0.32 };
+/**
+ * The cabin trunk starts just aft of the mast, which goes through the foredeck at the sheer's height (the boom's band is
+ * 1.00 m above the deck there, CR 6.1.11; a coachroof "extended forward of the mast" is a variation, not the class
+ * norm). Its after end and the sizes are estimates. (CR 3.12 puts the cabin's after end within 300 mm forward of
+ * station 6; with station 1 at the transom that would be 0.25–0.55 m further aft than drawn, which isn't confirmed.)
+ */
+export const CABIN = { u0: 0.402, u1: 0.6, w: 0.62, h: 0.32 };
 export const COCKPIT = { u0: 0.6, u1: 0.93, w: 0.7, sole: 0.24 };
 /** Cockpit half-width: narrows aft with the hull, leaving a side deck. */
 export const cockpitHalf = (u: number) => Math.min(COCKPIT.w, halfBeam(u) - 0.24);
@@ -176,7 +216,7 @@ export function deckGeometry(): THREE.BufferGeometry {
 
 /** Cabin trunk half-width: rounded in plan at the front. */
 function cabinHalf(u: number): number {
-  const r = 0.09; // the rounded front, as a fraction of the length
+  const r = 0.05; // the rounded front, as a fraction of the length
   if (u < CABIN.u0 + r) { const f = (CABIN.u0 + r - u) / r; return CABIN.w * Math.sqrt(Math.max(0, 1 - f * f * 0.85)); }
   return CABIN.w;
 }
