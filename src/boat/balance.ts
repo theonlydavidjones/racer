@@ -169,12 +169,12 @@ export function rollStep(heel: number, rate: number, heelEq: number, disp: numbe
  * Light air: the sails' own weight. A sail holds its shape when the wind's pressure across it beats the cloth's
  * weight; in a drifter it doesn't, and the sails slat and hang in folds. Heeling her to leeward lets gravity hold
  * the cloth out to leeward (the weight's component across the sail, w·g·sin φ), which is why a crew sits to leeward in
- * light air. Working sailcloth for a boat this size is woven polyester of about 7 oz (US sailmakers' ounces, 43 g/m²
- * each): about 0.3 kg/m² (an estimate). The drive lost while the pressure is less than about three times the cloth's
+ * light air. The class rules set the main's and jib's woven cloth at no less than 250 g/m²
+ * (NFIA Class Rules 2025–2028, CR 9.12): the lightest a Folkboat's sails may be, used here (heavier cloth slats sooner). The drive lost while the pressure is less than about three times the cloth's
  * weight, up to 30% when it's nothing, is an estimate; relative to the sails held out by a 6° heel (as a good crew
  * sails her in light air), since the polar is the boat sailed well.
  */
-export const CLOTH = 0.3;
+export const CLOTH = 0.25;
 const slat = (aws: number, cl: number, heelDeg: number) => {
   const wg = CLOTH * G, r = (0.5 * RHO_AIR * aws * aws * Math.max(0.3, cl) + wg * Math.sin(heelDeg * D2R)) / wg;
   const x = clamp(r / 3, 0, 1);

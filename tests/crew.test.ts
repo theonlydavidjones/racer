@@ -139,7 +139,7 @@ describe('The jib cars: rarely moved', () => {
     moveLazyCar(b, 2, 0);
     let fwd = 99, trimMax = -1;
     sail(b, 25, () => { b.h = 360 - twa; fwd = Math.min(fwd, ...b.crew!.people.map(p => p.z)); trimMax = Math.max(trimMax, b.crew!.trim); });
-    expect(fwd).toBeLessThan(-0.5); // up by the mast
+    expect(fwd).toBeLessThan(0); // out of the cockpit, on the cabin top's side deck aft of the mast
     expect(trimMax).toBeGreaterThan(trim0 + 0.02); // bow down while they're there
     expect(b.carCmd).toBeNull();
     void KT;
