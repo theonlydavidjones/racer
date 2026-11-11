@@ -299,8 +299,8 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
   #dial{width:120px;height:120px;top:calc(env(safe-area-inset-top,0px) + 82px)}
   #map{width:200px;height:250px;top:calc(env(safe-area-inset-top,0px) + 82px)}
   #mapHint{width:200px;top:calc(env(safe-area-inset-top,0px) + 338px)}
-  #situ{top:calc(env(safe-area-inset-top,0px) + 86px)}
-  #linebox{top:calc(env(safe-area-inset-top,0px) + 146px)}
+  #situ{top:calc(env(safe-area-inset-top,0px) + 126px)}
+  #linebox{top:calc(env(safe-area-inset-top,0px) + 184px)}
 }
 @media (max-width:759px){ .keys{display:none} }
 @media (prefers-reduced-motion:reduce){ #situ.alarm{animation:none;background:rgba(120,24,18,.9)} #toast{transition:none} }
@@ -690,3 +690,12 @@ body.lashed .tg-lash{display:block}
 /* (rows keep their height in the scrolling list: the sentence under each needs its room) */
 .ctl-row,.ctl-group{flex-shrink:0}
 .ctl-list{width:100%}
+
+/* ---------- clear of each other at 1280×720 (Coordinator's visual review, Nov 2026) ---------- */
+/* toasts beside the trim panel, not over it */
+@media (min-width:760px){ #toast{left:calc(max(16px,env(safe-area-inset-left,0px)) + 452px + 16px);top:calc(env(safe-area-inset-top,0px) + 316px);max-width:min(340px,calc(100vw - 452px - 330px))} }
+/* the messages panel stops above the keys line and the view buttons; older messages scroll */
+#msgLog{max-height:calc(100vh - 356px - 112px);overflow:hidden;box-sizing:border-box}
+#msgRecent{overflow-y:auto;min-height:0}
+/* the keys line on a dark strip, above the view buttons */
+#keysHint{background:var(--pod-solid);border:1px solid var(--rule);border-radius:6px;padding:5px 9px;color:var(--text);bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
