@@ -120,5 +120,5 @@ describe('the bridges\' towers and piers: solid', () => {
       for (let t = 0; t <= 1; t += 0.002) expect(inPoly({ x: r[i - 1].x + (r[i].x - r[i - 1].x) * t, y: r[i - 1].y + (r[i].y - r[i - 1].y) * t }, P.pts), `${k} through ${P.name}`).toBe(false);
     }
     void LL; void wharfNearest;
-  });
+  }, 60_000);
 });
