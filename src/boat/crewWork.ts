@@ -151,6 +151,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
       const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
       if (Math.abs(dl) < th || Math.abs(dn) < th || dl * dn <= 0) continue;
+      // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
+      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9);
+      if (since < LINE_TAU && Math.abs(dl) < 0.5) continue;
     }
     else if (e < startThreshold(k, skill, want[k])) continue;
     const sheet = k === 'jibsheet' || k === 'mainsheet';
@@ -175,6 +178,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
     a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far ? lw[k] : want[k], ...(big ? { big } : {}) };
+    if (PIANO.has(k)) (c.lineSet ??= {})[k] = c.clock ?? 0;
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {
