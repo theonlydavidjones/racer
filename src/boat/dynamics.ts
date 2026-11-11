@@ -97,8 +97,10 @@ export function resistanceParts(v: number): { friction: number; residuary: numbe
 /** Sail drive (N) at speed v when the trimmed target speed is vt. */
 export function drive(v: number, vt: number): number {
   if (vt <= 0) return 0;
-  return hullResistance(vt) * (1 + HANDLING.driveBoost * Math.max(0, 1 - v / vt));
+  return driveFrom(hullResistance(vt), v, vt);
 }
+/** drive(v, vt), given hullResistance(vt) (`rvt`): for a search over v at one vt, which needn't look it up each time. */
+export const driveFrom = (rvt: number, v: number, vt: number): number => rvt * (1 + HANDLING.driveBoost * Math.max(0, 1 - v / vt));
 
 /**
  * Air drag (N) against forward motion when the sails aren't drawing: rig windage plus flogging sails.

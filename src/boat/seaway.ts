@@ -1,6 +1,6 @@
 import { D2R, KT, wrap } from '../core/math';
 import type { SeaHere } from '../environment/sea';
-import { HULL, drive, hullResistance } from './dynamics';
+import { HULL, driveFrom, hullResistance } from './dynamics';
 import { beatAngle as beatAngleCalm, polar } from './polar';
 
 /**
@@ -26,11 +26,17 @@ export const C_AW = 0.045;
 /** Added resistance (N) in waves of height H (m) and period T (s) meeting the bow at `enc` deg (0 head-on, 180 from astern), at speed v (m/s). */
 export function addedResistance(H: number, T: number, enc: number, v: number): number {
   if (H < 0.01) return 0;
+  return awAt(H, T, enc) * awSpeed(v);
+}
+/** The part of addedResistance that doesn't depend on her speed (H ≥ 0.01): worked out once for a search over speed. */
+function awAt(H: number, T: number, enc: number): number {
   const lambda = G * T * T / (2 * Math.PI), r = lambda / LWL;
   const len = Math.exp(-((Math.log(r / 1.2)) ** 2) / (2 * 0.6 * 0.6)); // worst at about a boat-length
   const head = 0.05 + 0.95 * Math.pow((1 + Math.cos(enc * D2R)) / 2, 1.3);
-  return C_AW * RHO * G * H * H * BEAM * BEAM / LWL * len * head * (0.4 + 0.6 * Math.min(1, v / 2.5));
+  return C_AW * RHO * G * H * H * BEAM * BEAM / LWL * len * head;
 }
+/** ... and how it grows with her speed (slow, she pitches less into each wave). */
+const awSpeed = (v: number): number => 0.4 + 0.6 * Math.min(1, v / 2.5);
 
 /** Added resistance from the whole sea (chop from the wind's direction, swell from its own) for heading h, at speed v. */
 export function seaDrag(s: SeaHere, h: number, v: number): number {
@@ -42,14 +48,17 @@ export function seaDrag(s: SeaHere, h: number, v: number): number {
 export function steadySpeed(vt: number, drag: (v: number) => number): number {
   if (vt <= 0) return 0;
   let lo = 0, hi = vt;
-  for (let i = 0; i < 30; i++) { const v = (lo + hi) / 2; if (drive(v, vt) > hullResistance(v) + drag(v)) lo = v; else hi = v; }
+  const rvt = hullResistance(vt); // (drive(v, vt) at every v of the search)
+  for (let i = 0; i < 30; i++) { const v = (lo + hi) / 2; if (driveFrom(rvt, v, vt) > hullResistance(v) + drag(v)) lo = v; else hi = v; }
   return (lo + hi) / 2;
 }
 
 /** Target speed (m/s) for wind `kt` at true wind angle `twa`, in chop of height `hs` and period `tp` coming from the wind's direction. */
 export function speedInChop(kt: number, twa: number, hs: number, tp: number): number {
   const vt = polar(kt, twa);
-  return hs < 0.01 ? vt : steadySpeed(vt, v => addedResistance(hs, tp, twa, v));
+  if (hs < 0.01) return vt;
+  const k = awAt(hs, tp, twa);
+  return steadySpeed(vt, v => k * awSpeed(v)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once)
 }
 
 const beatCache = new Map<string, number>();

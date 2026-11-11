@@ -60,6 +60,9 @@ export class Wakes {
     });
   }
 
+  /** Show or hide the wakes (a ship that isn't out now). */
+  show(on: boolean): void { for (const t of this.trails) t.mesh.visible = t.bow.visible = t.spray.visible = on; }
+
   /** `t` race time (s), `dt` frame time; `sea(x, y)` the water height there; `pitch` each boat's pitch now (rad, bow up). */
   update(boats: (Mover | Boat)[], t: number, dt: number, sea: (x: number, y: number) => number, pitch: number[]): void {
     const N = this.N, SAMPLE = this.SAMPLE, HALF = this.HALF, sc = this.scale;

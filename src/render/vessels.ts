@@ -64,6 +64,9 @@ export class VesselView {
   private acc = 0;
   sync(vs: Vessel[], t: number, dt: number, sea: (x: number, y: number) => number): void {
     this.acc += dt; const wakeNow = this.acc >= 0.1 || dt === 0, wdt = this.acc; if (wakeNow) this.acc = 0;
+    const on = new Set(vs.map(v => v.id));
+    // (a ship not on the water now, e.g. traffic turned off for this race: not left where the last race had her)
+    for (const [id, m] of this.meshes) if (m.visible !== on.has(id)) { m.visible = on.has(id); this.wakes.get(id)?.show(m.visible); }
     for (const v of vs) {
       let m = this.meshes.get(v.id);
       if (!m) {
