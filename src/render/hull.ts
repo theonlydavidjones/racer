@@ -15,9 +15,13 @@ import * as THREE from 'three';
 export const L = 7.64;
 const zAt = (u: number) => -L / 2 + u * L;
 
-/** Sheer height above the waterline: high bow, lowest about 60% aft (0.568 m, the class's lowest freeboard), a little rise to the transom. */
+/**
+ * Sheer height above the waterline: high bow, lowest about 60% aft (0.568 m, the class's lowest freeboard), and only a
+ * little rise to the transom: the class's construction plan (1:10, folkboat.com, rev. 2024) dimensions the deck line
+ * 598 mm above the waterline at the transom, then 588, 578 and 573 going forward, which this curve meets within a few mm.
+ */
 export function sheer(u: number): number {
-  return u < 0.62 ? 0.568 + 0.40 * Math.pow((0.62 - u) / 0.62, 1.8) : 0.568 + 0.14 * ((u - 0.62) / 0.38) ** 2;
+  return u < 0.62 ? 0.568 + 0.40 * Math.pow((0.62 - u) / 0.62, 1.8) : 0.568 + 0.030 * ((u - 0.62) / 0.38) ** 2;
 }
 /**
  * Half-breadth of the deck (m) at the class's measuring stations, 0.5 m apart (CR 2.14), station 1 at the transom:
@@ -55,29 +59,34 @@ export const halfBeam = (u: number) => Math.max(0, deckLine(zAt(Math.min(1, Math
 const ease = (f: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, f)))) / 2;
 
 /**
- * The stern: the raked transom and the sternpost are one straight line, from the heel of the keel up to the
- * top of the transom, and the rudder hangs on it. The waterline ends where it crosses y = 0.
+ * The stern: the raked transom and the sternpost are one straight line, from the heel of the keel up to the top of the
+ * transom, and the rudder hangs on it. From the class's construction plan (1:10, rev. 2024): the waterline crosses
+ * that line 620 mm forward of the transom's top, and the heel is 1216 mm further forward at the 1200 mm draft, so it
+ * rakes about 46° from the vertical; the transom is flat (CR 2.16), 1310 mm wide at the deck (station 1, 655 mm
+ * half-breadth). The waterline ends where it crosses y = 0.
  */
-export const HEEL = { z: 2.73, y: -1.15 }, TRANSOM_TOP = { z: L / 2, y: sheer(1) };
+export const HEEL = { z: L / 2 - 0.620 - 1.216, y: -1.2 }, TRANSOM_TOP = { z: L / 2, y: sheer(1) };
 export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - HEEL.z) / (TRANSOM_TOP.y - HEEL.y);
 
 /**
  * Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. The stem meets the
- * water 1.21 m aft of the bow at deck level, so with the raked transom's crossing (aftLineZ(0)) she's 6.0 m on the
- * waterline (class Appendix: LWL 6.00 m); the shares of the overhangs between bow and stern are estimates.
+ * water about 1.02 m aft of the bow at deck level, so with the raked transom's crossing (aftLineZ(0), 0.62 m forward
+ * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem's curve itself
+ * is estimated.
  */
-const BOW = 0.17; // where the stem's curve meets the forefoot (fraction of L)
+const BOW = 0.144; // where the stem's curve meets the forefoot (fraction of L)
 function canoe(u: number): number {
   if (u < BOW) return 0.96 - 1.06 * Math.pow(u / BOW, 1.34);
   if (u < 0.45) return -0.1 - 0.38 * ease((u - BOW) / (0.45 - BOW));
   if (u < 0.62) return -0.48;
   return -0.48 + 0.65 * ease((u - 0.62) / 0.38);
 }
-/** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band). */
+/** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band), where the sternpost rises. */
+const U_HEEL = (HEEL.z + L / 2) / L;
 function keel(u: number): number {
   if (u <= BOW) return canoe(u);
   if (u < 0.33) return -0.1 + (-0.95 + 0.1) * ease((u - BOW) / (0.33 - BOW));
-  return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / 0.53);
+  return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / (U_HEEL - 0.33));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
@@ -311,17 +320,24 @@ export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number),
  */
 export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
 export function rudderGeometry(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
-  const len = Math.hypot(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y) + 0.1, a = (y: number) => (y - HEEL.y) / Math.cos(RUDDER_RAKE);
-  // outline in (chord aft, along the hinge): deep blade, narrowing to the head above the transom
+  // the class's rudder (CR 5.20): breadth square off the fore edge (the hinge), at distances up the fore edge from the
+  // blade's lower edge, ±20 mm; 1528 mm up is at the waterline, and the head runs on, 160 mm wide, to 2700 mm
+  const OFF: [number, number][] = [[0, 0.105], [0.289, 0.240], [0.640, 0.385], [0.991, 0.470], [1.220, 0.490], [1.342, 0.480], [1.528, 0.415], [1.693, 0.270], [2.006, 0.160], [2.700, 0.160]];
+  const toWL = -HEEL.y / Math.cos(RUDDER_RAKE), s0 = toWL - 1.528; // the blade's lower edge, up the hinge from the heel
   const sh = new THREE.Shape();
-  sh.moveTo(0, 0); sh.lineTo(0.42, 0.02); sh.quadraticCurveTo(0.5, 0.12, 0.47, 0.4); sh.lineTo(0.36, a(0)); sh.lineTo(0.2, a(0.45)); sh.lineTo(0.1, len); sh.lineTo(0, len); sh.closePath();
-  const blade = new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2 });
+  sh.moveTo(0, s0); sh.lineTo(OFF[0][1], s0);
+  sh.splineThru(OFF.slice(1, 8).map(([a, w]) => new THREE.Vector2(w, s0 + a)));
+  sh.lineTo(OFF[8][1], s0 + OFF[8][0]); sh.lineTo(OFF[9][1], s0 + OFF[9][0]); sh.lineTo(0, s0 + OFF[9][0]); sh.closePath();
+  // at most 50 mm thick (CR 5.30)
+  const blade = new THREE.ExtrudeGeometry(sh, { depth: 0.036, bevelEnabled: true, bevelThickness: 0.007, bevelSize: 0.007, bevelSegments: 2, curveSegments: 10 });
   // shape (x, y) → (z, y); extrusion → x, centred
-  blade.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.025, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+  blade.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.018, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
   blade.computeVertexNormals();
-  // tiller: from the rudder head, forward and a little up into the cockpit
-  const head = new THREE.Vector3(0, len - 0.03, 0.04), dir = new THREE.Vector3(0, -0.317, -0.949).normalize();
-  const tl = 1.3, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 8);
+  // tiller (CR 5.50, above the deck): from the rudder head, forward over the after deck and a little up into the
+  // cockpit, about 12° above level in the boat's frame (worked back into the rudder's raked frame)
+  const up = 12 * Math.PI / 180, r = RUDDER_RAKE, wy = Math.sin(up), wz = -Math.cos(up);
+  const dir = new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize();
+  const head = new THREE.Vector3(0, s0 + 2.62, 0.06), tl = 1.3, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 8);
   tiller.translate(0, tl / 2, 0); tiller.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)); tiller.translate(head.x, head.y, head.z);
   return { blade, tiller };
 }
