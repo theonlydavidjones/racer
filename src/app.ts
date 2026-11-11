@@ -36,6 +36,7 @@ import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { onSaveTrouble, saveStatus } from './store/cloud';
+import { layerMenu, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
@@ -238,7 +239,7 @@ function releaseTiller(): void {
   if (!tillerHeld) return;
   tillerHeld = false; document.body.classList.remove('tiller-held'); $('tiller').classList.remove('held');
 }
-const overControl = (t: EventTarget | null) => t instanceof Element && !!t.closest('button, a, input, select, #tiller, #msgLog, #map, #trimPanel, .overlay');
+const overControl = (t: EventTarget | null) => t instanceof Element && !!t.closest('button, a, input, select, #tiller, #msgLog, #map, #trimPanel, .overlay, .layerpop');
 addEventListener('mousemove', e => { lastCursorX = e.clientX; if (tillerHeld && !panning && !overControl(e.target) && w.running && !w.paused) tillerFromCursor(e.clientX); });
 addEventListener('blur', releaseTiller);
 /** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
@@ -531,6 +532,13 @@ $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 let chartDest: unknown = null;
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
   pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
+// the map's layers: the same choices on the inset map and the full chart, saved with your settings
+{
+  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = { ...S.mapLayers, [k]: on }; w.settings.mapLayers = S.mapLayers; saveSettings(S); };
+  const redraw = () => { if (chart.isOpen) chart.draw(); };
+  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw);
+  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw);
+}
 $('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */

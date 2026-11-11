@@ -14,8 +14,10 @@
  *    averaged over 11:00–16:59 local.
  *  - Wind across the Bay, observed: NOAA CO-OPS shore stations Pier 1 (9414311), Oakland Middle Harbor (9414769),
  *    Point Potrero (9414847) and Richmond (9414863), hourly vector means 10:00–17:59 local.
+ *  - Visibility observed: NOAA CO-OPS 9414296 (Pier 17, a PORTS visibility sensor), hourly 09:00–18:00 local.
  *  - Forecast: NWS gridded forecast (api.weather.gov): wind on the 2.5 km grid cell over the Cityfront race area
- *    (MTR 84,107), hourly; the wind on every cell over the race area (MTR x 81–88, y 105–111), 09:00–18:00; swell at
+ *    (MTR 84,107), hourly; the wind, visibility, sky cover and cloud ceiling on every cell over the race area
+ *    (MTR x 81–88, y 105–111), 09:00–18:00; swell at
  *    the cell by the Bar buoy (MTR 77,107).
  *
  * Output: src/environment/data/sf-real-days.json
@@ -150,6 +152,31 @@ for (const [date, v] of byDay) {
 }
 console.log(`swell: ${Object.keys(swell).length} days`);
 
+/* ---------- observed visibility (fog), hourly ---------- */
+// NOAA CO-OPS 9414296, "Pier 17 Visibility" (37.8031 N 122.3971 W): a PORTS visibility sensor on the waterfront
+// under the Bay Bridge approach, about 7 km in from the Gate, the nearest visibility sensor to the race area (Fort
+// Point and the other shore stations have none; NDBC's stations don't report it). It reads up to 10 km (its cap).
+// Hourly, on the hour, local time; stored as base64 of VIS_HOURS bytes, tenths of a km (0–100), 255 = missing.
+const VIS_STATION = '9414296', VIS_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const visObs = { ...(prev?.visObs ?? {}) }, visRaw = new Map();
+const visStart = prev?.visObs ? start : new Date(Date.UTC(FROM_YEAR, 0, 1)); // (the first time: the whole history)
+for (let t = new Date(visStart); t <= yesterday;) {
+  const end = new Date(Math.min(t.getTime() + 364 * 86400e3, yesterday.getTime() + 86400e3));
+  const j = await fetchRetry(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=visibility&station=${VIS_STATION}&begin_date=${ymd(t)}&end_date=${ymd(end)}&interval=h&time_zone=gmt&units=metric&format=json&application=folkboat-sim`);
+  let n = 0;
+  for (const r of j?.data ?? []) {
+    const v = parseFloat(r.v); if (!Number.isFinite(v)) continue;
+    const L = local(Date.parse(r.t.replace(' ', 'T') + ':00Z')), k = VIS_HOURS.indexOf(L.min / 60);
+    if (k < 0) continue;
+    if (!visRaw.has(L.date)) visRaw.set(L.date, new Uint8Array(VIS_HOURS.length).fill(255));
+    visRaw.get(L.date)[k] = Math.max(0, Math.min(100, Math.round(v * 10))); n++;
+  }
+  console.log(`visibility ${ymd(t)}–${ymd(end)}: ${n} hours`);
+  t = new Date(end.getTime() + 86400e3);
+}
+for (const [date, a] of visRaw) if (a.some(x => x !== 255)) visObs[date] = Buffer.from(a).toString('base64');
+console.log(`visibility: ${Object.keys(visObs).length} days`);
+
 /* ---------- the NWS forecast, the coming week ---------- */
 /** An NWS grid series ("2026-11-10T04:00:00+00:00/PT2H" → value) as hourly values by local date and hour. */
 function hourly(series, conv) {
@@ -186,10 +213,18 @@ for (const gx of GRID_X) for (const gy of GRID_Y) {
   const lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n, lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n;
   const i = cells.push([Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]) - 1;
   const cs = hourly(j.properties.windSpeed, v => r1(v * KMH)), cd = hourly(j.properties.windDirection, v => Math.round(v));
+  // the fog: visibility (m, to the nearest 10), sky cover (%) and the cloud ceiling (m), for the map's fog layer
+  const cv = hourly(j.properties.visibility, v => Math.round(v / 10) * 10), ck = hourly(j.properties.skyCover, v => Math.round(v)), cc = hourly(j.properties.ceilingHeight, v => Math.round(v));
+  // beyond the visibility forecast's ~24 hours, the forecast's weather says whether fog is expected and how widely:
+  // 0 none, 1 slight chance / isolated / patchy, 2 chance / scattered / areas, 3 likely / numerous / widespread, 4 definite
+  const FOG_COVER = { slight_chance: 1, isolated: 1, patchy: 1, chance: 2, scattered: 2, areas: 2, likely: 3, numerous: 3, widespread: 3, definite: 4, occasional: 2, frequent: 3, intermittent: 2, periods: 2 };
+  const cf = hourly(j.properties.weather, v => Math.max(0, ...(Array.isArray(v) ? v : []).filter(w => /fog/.test(w?.weather ?? '')).map(w => FOG_COVER[w.coverage] ?? 2)));
   for (const date of Object.keys(cs)) {
     if (date < today) continue;
-    const day = gridDays[date] ??= { kt: [], from: [] };
+    const day = gridDays[date] ??= { kt: [], from: [], vis: [], sky: [], ceil: [], fog: [] };
     day.kt[i] = GRID_HOURS.map(h => cs[date]?.[h] ?? null); day.from[i] = GRID_HOURS.map(h => cd[date]?.[h] ?? null);
+    day.vis[i] = GRID_HOURS.map(h => cv[date]?.[h] ?? null); day.sky[i] = GRID_HOURS.map(h => ck[date]?.[h] ?? null); day.ceil[i] = GRID_HOURS.map(h => cc[date]?.[h] ?? null);
+    day.fog[i] = GRID_HOURS.map(h => cf[date]?.[h] ?? 0);
   }
 }
 console.log(`forecast grid: ${cells.length} cells, ${Object.keys(gridDays).length} days`);
@@ -201,6 +236,8 @@ await writeFile(OUT, JSON.stringify({
   wind: Object.fromEntries(Object.entries(wind).sort()), swell: Object.fromEntries(Object.entries(swell).sort()), forecast,
   stationHours: HOURS,
   stations: Object.fromEntries(STATIONS.map(st => [st.id, { name: st.name, lat: st.lat, lon: st.lon, days: Object.fromEntries(Object.entries(stationsData[st.id]).sort()) }])),
-  grid: { hours: GRID_HOURS, cells, days: gridDays }
+  grid: { hours: GRID_HOURS, cells, days: gridDays },
+  visStation: { id: VIS_STATION, name: 'Pier 17', lat: 37.8031, lon: -122.3971, hours: VIS_HOURS, note: 'tenths of a km, base64, 255 missing; the sensor reads up to 10 km' },
+  visObs: Object.fromEntries(Object.entries(visObs).sort())
 }) + '\n');
 console.log(`Wrote ${OUT.pathname}: ${Object.keys(wind).length} days of wind, ${Object.keys(swell).length} of swell, ${Object.keys(forecast).length} forecast days`);

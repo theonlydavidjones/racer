@@ -39,7 +39,8 @@ export interface DayWeather {
 interface StationData { name: string; lat: number; lon: number; days: Record<string, string> }
 interface RealData {
   stationHours: number[]; stations: Record<string, StationData>;
-  grid: { hours: number[]; cells: [number, number][]; days: Record<string, { kt: (number | null)[][]; from: (number | null)[][] }> };
+  grid: { hours: number[]; cells: [number, number][]; days: Record<string, { kt: (number | null)[][]; from: (number | null)[][]; vis?: (number | null)[][]; sky?: (number | null)[][]; ceil?: (number | null)[][]; fog?: number[][] }> };
+  visStation?: { id: string; name: string; lat: number; lon: number; hours: number[] }; visObs?: Record<string, string>;
   updated: string; forecastIssued: string; slot0: number; slotMin: number; slots: number;
   wind: Record<string, string>; swell: Record<string, [number, number, number]>;
   forecast: Record<string, { kt: (number | null)[]; from: (number | null)[]; gust: (number | null)[]; swell: [number | null, number | null, number | null] }>;
@@ -230,5 +231,66 @@ export function dayWeather(date: string, kind: WindKind | 'auto' = 'auto', windD
   return {
     source: kind === 'auto' ? 'records' : 'chosen', kind: breezeAt(Date.parse(date + 'T20:00:00Z') / 60000, windDay, k).kind, realSwell: false, swell, at: tMin => breezeAt(tMin, windDay, k),
     field: (p, _t, from) => ({ k: windTerrain(p, from), turn: 0 }), fieldSource: 'the lie of the land'
+  };
+}
+
+/* ---------- visibility (fog), for the map's fog layer ---------- */
+
+export interface Visibility {
+  /** forecast: NWS visibility (m); outlook: beyond its ~24 h, only whether NWS forecasts fog and how widely; observed: Pier 17. */
+  source: 'forecast' | 'outlook' | 'observed';
+  /** Visibility at p, m (the observed sensor reads up to 10 km: 10,000 means 10 km or more). NaN for an outlook. */
+  at(p: Vec): number;
+  /** For an outlook: how widely fog is forecast at p (0 none, 1 patchy, 2 areas, 3 widespread, 4 definite). */
+  cover?(p: Vec): number;
+  /** Where it's known: the forecast grid's cells, or the one sensor (with its name). */
+  points: { p: Vec; m: number; sky?: number; ceil?: number; fog?: number }[];
+  /** In words: whose numbers, where and when. */
+  says: string;
+}
+
+/**
+ * The visibility over the race area at a time (minutes since epoch, UTC), from real data only: the NWS forecast grid
+ * (2.5 km cells, hourly, 09:00–18:00) for the coming week, or what NOAA's Pier 17 visibility sensor saw on a past day.
+ * null (with why) when there's nothing real for that day and hour: the sim doesn't make fog up.
+ */
+export function visibilityFor(date: string, tMin: number): Visibility | { none: string } {
+  const h = localMin(tMin) / 60, g = R.grid.days[date];
+  if (g?.vis) {
+    const hs = R.grid.hours, hf = clamp(h - hs[0], 0, hs.length - 1);
+    if (h < hs[0] - 0.5 || h > hs[hs.length - 1] + 0.5) return { none: `The forecast grid's visibility covers ${hs[0]}:00 to ${hs[hs.length - 1]}:00.` };
+    const h0 = Math.floor(hf), h1 = Math.min(hs.length - 1, h0 + 1), f = hf - h0;
+    const pick = (a: (number | null)[] | undefined) => { const x = a?.[h0], y = a?.[h1]; return x == null ? y ?? null : y == null ? x : x + (y - x) * f; };
+    const points: Visibility['points'] = [];
+    R.grid.cells.forEach(([la, lo], i) => { const m = pick(g.vis![i]); if (m != null) points.push({ p: LL(la, lo), m, sky: pick(g.sky?.[i]) ?? undefined, ceil: pick(g.ceil?.[i]) ?? undefined }); });
+    if (points.length) return { source: 'forecast', points, at: idw(points), says: `National Weather Service forecast (issued ${R.forecastIssued.slice(0, 10)}), 2.5 km grid` };
+    // beyond the visibility forecast's ~24 hours: whether the forecast's weather has fog, and how widely
+    const fogs: Visibility['points'] = [];
+    R.grid.cells.forEach(([la, lo], i) => { const a = g.fog?.[i]; if (a) fogs.push({ p: LL(la, lo), m: NaN, fog: Math.max(a[h0] ?? 0, a[h1] ?? 0) }); });
+    if (!g.fog) return { none: 'The NWS gives visibility figures only about 24 hours ahead.' };
+    if (!fogs.some(c => c.fog)) return { none: 'The NWS forecast has no fog for this hour (and gives visibility figures only about 24 hours ahead).' };
+    const near = (q: Vec) => fogs.reduce((b, c) => ((c.p.x - q.x) ** 2 + (c.p.y - q.y) ** 2 < (b.p.x - q.x) ** 2 + (b.p.y - q.y) ** 2 ? c : b));
+    return { source: 'outlook', points: fogs, at: () => NaN, cover: q => near(q).fog ?? 0, says: `National Weather Service forecast (issued ${R.forecastIssued.slice(0, 10)}): fog, but no visibility figure this far ahead` };
+  }
+  const st = R.visStation, b = R.visObs?.[date];
+  if (st && b) {
+    const a = Uint8Array.from(atob(b), c => c.charCodeAt(0)), hs = st.hours;
+    if (h < hs[0] - 0.5 || h > hs[hs.length - 1] + 0.5) return { none: `Pier 17's visibility is kept for ${hs[0]}:00 to ${hs[hs.length - 1]}:00.` };
+    const k = clamp(Math.round(h - hs[0]), 0, hs.length - 1);
+    let v = a[k];
+    if (v === 255) v = k > 0 && a[k - 1] !== 255 ? a[k - 1] : a[k + 1] ?? 255; // (the hour either side, if this one is missing)
+    if (v === 255) return { none: 'NOAA\'s Pier 17 visibility sensor has no reading for this hour.' };
+    const m = v * 100, p = LL(st.lat, st.lon);
+    return { source: 'observed', points: [{ p, m }], at: () => m, says: `observed at NOAA's Pier 17 sensor (${st.id}), the nearest to the course: one point, about 7 km inside the Gate` };
+  }
+  return { none: date > R.updated.slice(0, 10) ? 'No visibility forecast reaches this day yet (the NWS forecast covers the coming week).' : 'No visibility was recorded for this day (NOAA\'s Pier 17 sensor, since 2021, has gaps).' };
+}
+
+/** Inverse-distance weighting between the grid's cell centres (the forecast's own 2.5 km cells). */
+function idw(points: { p: Vec; m: number }[]): (q: Vec) => number {
+  return q => {
+    let sw = 0, sv = 0;
+    for (const c of points) { const d2 = (c.p.x - q.x) ** 2 + (c.p.y - q.y) ** 2; if (d2 < 1) return c.m; const w = 1 / d2; sw += w; sv += w * c.m; }
+    return sv / sw;
   };
 }

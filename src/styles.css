@@ -408,7 +408,7 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
-body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,
 body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
 
 .garage{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-bottom:1px solid var(--rule)}
@@ -568,3 +568,19 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .pastrow small{color:var(--muted);font-size:12px}
 .pastrow .ghost{flex:none}
 .knote:empty{display:none}
+
+/* the map's layers (ui/layers.ts): a small button on the inset map's corner, and the list of switches it opens */
+.maplayers{position:fixed;top:calc(env(safe-area-inset-top,0px) + 78px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 104px);z-index:6;
+  width:24px;height:24px;padding:0;display:grid;place-items:center;border-radius:5px;border:1px solid var(--rule);background:var(--pod);color:var(--muted);cursor:pointer}
+.maplayers:hover,.maplayers[aria-expanded="true"]{color:var(--text);border-color:currentColor}
+@media (min-width:760px){.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 172px)}}
+.layerpop{position:fixed;z-index:60;min-width:150px;padding:8px 10px;border-radius:6px;border:1px solid var(--rule);background:var(--pod);
+  box-shadow:0 6px 18px rgba(0,0,0,.35);font:600 12px/1.2 var(--f-inst)}
+#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 106px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 140px)}
+@media (min-width:760px){#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 114px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}}
+.layerpop[hidden]{display:none}
+.layerpop .lp-h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.layerpop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;white-space:nowrap}
+.layerpop input{accent-color:#ff6a1a}
+.lp-wrap{position:relative}
+#chartLayersPop{position:absolute;top:calc(100% + 6px);left:0}

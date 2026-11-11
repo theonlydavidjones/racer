@@ -25,11 +25,13 @@
 <canvas id="dial" aria-label="Wind angle dial"></canvas>
 <div id="sigPanel" hidden><div class="sig-lab">Signals</div><div id="sigFlags"></div><div id="sigText"></div></div>
 <canvas id="map" aria-label="Course map, tap to zoom"></canvas>
+<button type="button" id="bMapLayers" class="maplayers" title="Map layers: wind, current, sea, fog, ships…" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5Z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
+<div id="mapLayersPop" class="layerpop" hidden></div>
 <div id="mapHint">Tap map · chart</div>
 <div id="chart" hidden role="dialog" aria-modal="true" aria-labelledby="chartTitle">
   <div class="ch-head">
     <div><h2 id="chartTitle">Chart</h2><p class="ch-sub" id="chartSub"></p></div>
-    <div class="ch-btns"><button class="ghost" type="button" id="bChartPal" title="The chart's colours: NOAA's paper chart (day) or a dark display (dusk)">Dusk colours</button><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
+    <div class="ch-btns"><span class="lp-wrap"><button class="ghost" type="button" id="bChartLayers" aria-expanded="false">Layers</button><div id="chartLayersPop" class="layerpop" hidden></div></span><button class="ghost" type="button" id="bChartPal" title="The chart's colours: NOAA's paper chart (day) or a dark display (dusk)">Dusk colours</button><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
   </div>
   <canvas id="chartC" aria-label="Chart of the Bay: drag to move, scroll to zoom, tap to pick a destination"></canvas>
   <div class="ch-info"><div id="chartInfo"></div><button class="cta" type="button" id="bChartGo" hidden>Sail here</button></div>

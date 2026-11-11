@@ -97,6 +97,14 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Real nautical charts on the map:** NOAA's official charts (the US nautical charts are NOAA's; USGS makes land maps):
   chart 18649 (Entrance to San Francisco Bay) and its neighbours, as raster tiles or drawn from the ENC vector data
   (depths, channels, buoys, lights, restricted areas), on the inset map and the full-screen chart.
+- **Map layers and contrast** (requested): ~~layers on the inset map and the chart (wind, current, sea state, fog from
+  real visibility only, ships, laylines, wind shadows), saved per player; the sim's overlays in colours the chart
+  doesn't use, on halos~~ (done). Next: **fog in the 3D scene and on the water** from the same real visibility (today
+  the 3D fog bank is an estimate by month and hour), and **its effect on sailing**: you can't see marks, boats or ships
+  beyond the visibility, so no transits, laylines by eye or sighting the next mark; ships sound their fog signals (and
+  the bridge's and the lighthouses' horns, with their real characteristics from the chart); the AI navigates by
+  compass and chart in it. Observed visibility comes from one sensor (Pier 17, 7 km inside the Gate): the Gate's own
+  fog can differ.
 - **The Bay to Berkeley, Alameda and Richmond:** the shores, harbors and marks east and north, with the wind and current
   fields extended over them (NOAA current stations and the NWS grid already reach there).
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
