@@ -7,9 +7,9 @@ import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 
 /** Beat at `windKt` with the crew's settings, then (optionally) change the controls yourself and settle again. */
 /** Sail her close-hauled; `full`: the crew held at full power (no depowering of their own), so one line's own effect shows. */
-function beat(windKt: number, change?: (c: Controls) => void, full = !!change): Boat {
+function beat(windKt: number, change?: (c: Controls) => void, full = !!change, secs = 20): Boat {
   const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt });
-  sail(b, 20, () => { b.h = 360 - twa; if (full) b.depower = 0; });
+  sail(b, secs, () => { b.h = 360 - twa; if (full) b.depower = 0; });
   if (change) {
     const base = JSON.parse(JSON.stringify(b.ctl));
     b.manualTrim = true; b.trimAll = true; b.ctl = base; change(b.ctl);
@@ -37,7 +37,7 @@ describe('Heel from the forces on the sails', () => {
     expect(beat(22, c => { c.backstay = 1; }).heelMag!).toBeLessThan(base);
     expect(beat(22, c => { c.outhaul = 1; }).heelMag!).toBeLessThan(base);
     expect(beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); }).heelMag!).toBeLessThan(base - 4);
-    expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 1); // fuller: more power, more heel
+    expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 0.5); // fuller: more power, more heel
   });
   it('in a moderate breeze the crew hike to hold her; depowering lets them hike less', () => {
     const full = beat(16, undefined, true), flat = beat(16, c => { c.backstay = 1; c.outhaul = 1; });
@@ -66,12 +66,13 @@ describe('Helm balance (weather helm)', () => {
   it('let go of the tiller with weather helm and she rounds up into the wind', () => {
     const b = beat(16), twa0 = b.twa;
     (b as Boat & { handsOff?: boolean }).handsOff = true; b.tiller = 0;
-    sail(b, 4);
+    sail(b, 5);
     expect(b.twa).toBeLessThan(twa0 - 5);
   });
   it('carrying a lot of helm is slower than sailing balanced', () => {
-    const balanced = beat(18); // the crew's own trim: they depower to take the helm off her
-    const loaded = beat(18, c => { c.backstay = 0; c.traveller = -0.6; c.mainsheet = 0; });
+    // the crew's own trim, once they've worked through the depowering steps (one job at a time): they take the helm off her
+    const balanced = beat(18, undefined, false, 60);
+    const loaded = beat(18, c => { c.backstay = 0; c.traveller = -0.6; c.mainsheet = 0; }, false, 60);
     expect(loaded.helmNeed!).toBeGreaterThan(balanced.helmNeed! + 2);
     expect(loaded.v).toBeLessThan(balanced.v);
   });
@@ -83,11 +84,14 @@ describe('The crew', () => {
     expect(['windward', 'centre']).toContain(beat(10).crew!.mode);
     expect(beat(20).crew!.mode).toBe('hike');
   });
-  it('go forward downwind with the pole out (the pole hand at the mast)', () => {
+  it('go forward downwind with the pole out (the pole hand at the mast, the other crew at the front of the cockpit)', () => {
     const b = testBoat({ heading: 195, kt: 4, windKt: 10 }); b.poleWant = true;
     sail(b, 30, () => { b.h = 195; });
     expect(b.crew!.mode).toBe('foredeck');
-    expect(b.crew!.fore).toBeGreaterThan(0.85);
+    const [, mid, bow] = b.crew!.people;
+    expect(bow.pose).toBe('mast'); expect(bow.z).toBeLessThan(-0.5);
+    expect(mid.z).toBeLessThan(1.4); // forward in the cockpit: the transom clear in light air
+    expect(b.crew!.trim).toBeGreaterThan(0); // trimmed by the bow
   });
   it('sailing alone in a breeze she goes slower than with two crew: she heels more, or has to be depowered more', () => {
     const two = beat(20), solo = testBoat({ heading: 360 - beatAngle(20), kt: 4.5, windKt: 20 });

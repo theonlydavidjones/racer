@@ -85,9 +85,15 @@ describe('you on the controls', () => {
   });
   it('you can only move the lazy (windward) jib car', () => {
     const b = testBoat({ heading: 318, kt: 4 }); // starboard tack: the port car is loaded
-    const loaded = { ...b.ctl.car.P };
-    moveLazyCar(b, 2, 1);
+    sail(b, 1); // (the crew has set her up)
+    const loaded = { ...b.ctl.car.P }, lazy = { ...b.ctl.car.S };
+    moveLazyCar(b, 2, -1);
+    expect(b.carCmd).toEqual({ fore: lazy.fore + 2, ins: lazy.ins - 1 });
+    sail(b, 2);
+    expect(b.ctl.car.S).toEqual(lazy); // not yet: someone has to go forward and do it
+    sail(b, 25); // the crew goes forward, moves it and comes back
     expect(b.ctl.car.P).toEqual(loaded);
-    expect(b.ctl.car.S.fore).toBe(defaultControls().car.S.fore + 2);
+    expect(b.ctl.car.S).toEqual({ fore: lazy.fore + 2, ins: lazy.ins - 1 });
+    expect(b.carCmd).toBeNull();
   });
 });

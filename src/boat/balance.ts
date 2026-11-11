@@ -72,20 +72,22 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
 export function rightingMoment(heelDeg: number, hike = 1, disp = DISP): number {
   return hullRighting(heelDeg, disp) + CREW.kg * G * CREW.reach * hike * Math.cos(Math.abs(heelDeg) * D2R);
 }
-/** The hull's own righting moment (N·m): displacement (people included, sitting on the centreline) × righting arm. */
+/** The hull's own righting moment (N·m): displacement (people included, sitting on the centreline) × righting arm.
+ * Signed with the heel: it always pushes her back upright. */
 export function hullRighting(heelDeg: number, disp = DISP): number {
-  const t = Math.abs(heelDeg) * D2R;
+  const t = heelDeg * D2R;
   return disp * G * GM * Math.sin(t) * (1 - 0.3 * Math.sin(t) ** 2); // the arm grows, then levels off
 }
 /** The heeling moment (N·m) at heel `heelDeg` from a side force, with the centre of effort lowered by twist. */
 export const heelingMoment = (heelForce: number, twist: number, heelDeg: number) => heelForce * (CE_HEIGHT - 0.03 * (twist - 8)) * Math.cos(heelDeg * D2R);
 
 /**
- * Heel (deg, ≥ 0 to leeward) with the crew where they are: the sails' heeling moment plus the crew's weight to
- * leeward (or minus it to windward) against the hull's righting moment. `crewMoment(h)`: + to windward, N·m.
+ * Heel (deg, + to leeward, − to windward) with the crew where they are: the sails' heeling moment plus the crew's
+ * weight to leeward (or minus it to windward) against the hull's righting moment. `crewMoment(h)`: + to windward, N·m.
+ * With little wind in the sails and the crew up to windward she heels to windward.
  */
 export function heelWithCrew(heelForce: number, twist: number, disp: number, crewMoment: (h: number) => number): number {
-  let lo = 0, hi = 75;
+  let lo = -40, hi = 75;
   for (let i = 0; i < 30; i++) {
     const h = (lo + hi) / 2;
     if (heelingMoment(heelForce, twist, h) - crewMoment(h) > hullRighting(h, disp)) lo = h; else hi = h;
@@ -96,7 +98,7 @@ export function heelWithCrew(heelForce: number, twist: number, disp: number, cre
 /** Heel (deg, ≥ 0) where the heeling moment balances the righting moment. The crew hike once she's heeling. */
 export function equilibriumHeel(heelForce: number, twist: number): number {
   const ce = CE_HEIGHT - 0.03 * (twist - 8); // more twist, lower centre of effort
-  let lo = 0, hi = 75;
+  let lo = -40, hi = 75;
   for (let i = 0; i < 30; i++) {
     const h = (lo + hi) / 2, hike = clamp((h - 4) / 8, 0, 1);
     if (heelForce * ce * Math.cos(h * D2R) > rightingMoment(h, hike)) lo = h; else hi = h;
@@ -109,8 +111,9 @@ export function equilibriumHeel(heelForce: number, twist: number): number {
  * toward the wind; you hold the tiller to windward), negative lee helm. `boomOut` is the boom's angle off the
  * centreline (deg); `v` boat speed (m/s).
  */
-export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, v: number, twist: number): number {
-  const m = sailYaw(f, heelDeg, boomOut, twist);
+export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, v: number, twist: number, clrFwd = 0): number {
+  // (clrFwd: the centre of lateral resistance moved forward by trimming her bow-down, hullTrim.ts: the side force then acts further aft of it)
+  const m = sailYaw(f, heelDeg, boomOut, twist) + (f.main.heel + f.jib.heel) * clrFwd;
   // (below ~3.5 kt the hull's grip falls away as fast as the rudder's, so the balance doesn't run away at low speed)
   const qw = 0.5 * RHO_W * Math.max(1.8, v) ** 2;
   return clamp(m / (qw * RUDDER.area * RUDDER.slope * RUDDER.arm) / D2R, -25, 25);
@@ -121,7 +124,8 @@ export function helmNeeded(f: { main: SailForce; jib: SailForce }, heelDeg: numb
  * lateral resistance, and the drive pushed out to leeward by heel and by an eased boom.
  */
 export function sailYaw(f: { main: SailForce; jib: SailForce }, heelDeg: number, boomOut: number, twist: number): number {
-  const h = Math.abs(heelDeg) * D2R, ce = CE_HEIGHT - 0.03 * (twist - 8);
+  // (heel signed, + to leeward: heeled to windward, the drive pushes from to windward of the keel and turns her away)
+  const h = heelDeg * D2R, ce = CE_HEIGHT - 0.03 * (twist - 8);
   // side forces about the keel: the main aft (+ toward the wind), the jib forward (− away)
   // (a stretched old sail's draft sits further aft, and its force with it, by a share of the chord at the centre of effort)
   let m = -(f.main.heel * (LEVER.main - CHORD.main * 0.5 * (f.main.ceAft ?? 0)) + f.jib.heel * (LEVER.jib - CHORD.jib * 0.5 * (f.jib.ceAft ?? 0)));
@@ -140,3 +144,42 @@ export function rudderDrag(weather: number, v: number): number {
 
 /** Speed lost to heeling past the boat's best angle (about 20° for a Folkboat): leeway, wetted shape, sail area tipped away. */
 export const heelFactor = (heelDeg: number) => 1 - 0.55 * Math.max(0, (Math.abs(heelDeg) - 20) / 30) ** 2;
+
+/**
+ * Roll. Heel follows its balance point (heelWithCrew) as a damped oscillator, I·φ'' = K·(φeq − φ) − c·φ', so a gust or
+ * a crew move rolls her over in a second or so, and a crew throwing their weight out rolls her up. Stiffness K is the
+ * hull's righting moment per radian at small angles (Δ·g·GM); the inertia is the boat's mass about a roll radius of
+ * gyration of about 0.4 × beam (the usual figure for a yacht with her rig, an estimate) plus about 20% added mass of
+ * water: a natural period of about 2 s. Under sail it's heavily damped: the long keel moving sideways through the water,
+ * and the sails (ζ ≈ 0.6 in all, an estimate: a keelboat under sail heels to a gust and stops, without rocking back);
+ * part of the sails' damping also comes through the apparent wind (the rig sweeping to leeward takes wind out of them:
+ * physics.ts), so a roll-tack's snap upright gives a pull.
+ */
+export const ROLL = { gyration: 0.4 * orc.boat.beam, added: 0.2, zeta: 0.6 };
+export function rollStep(heel: number, rate: number, heelEq: number, disp: number, dt: number): { heel: number; rate: number } {
+  const wn = Math.sqrt(G * GM / (ROLL.gyration ** 2 * (1 + ROLL.added)));
+  const acc = wn * wn * (heelEq - heel) - 2 * ROLL.zeta * wn * rate;
+  void disp;
+  const r = rate + acc * dt;
+  return { heel: heel + r * dt, rate: r };
+}
+
+/**
+ * Light air: the sails' own weight. A sail holds its shape when the wind's pressure across it beats the cloth's
+ * weight; in a drifter it doesn't, and the sails slat and hang in folds. Heeling her to leeward lets gravity hold
+ * the cloth out to leeward (the weight's component across the sail, w·g·sin φ), which is why a crew sits to leeward in
+ * light air. Working sailcloth for a boat this size is woven polyester of about 7 oz (US sailmakers' ounces, 43 g/m²
+ * each): about 0.3 kg/m² (an estimate). The drive lost while the pressure is less than about three times the cloth's
+ * weight, up to 30% when it's nothing, is an estimate; relative to the sails held out by a 6° heel (as a good crew
+ * sails her in light air), since the polar is the boat sailed well.
+ */
+export const CLOTH = 0.3;
+const slat = (aws: number, cl: number, heelDeg: number) => {
+  const wg = CLOTH * G, r = (0.5 * RHO_AIR * aws * aws * Math.max(0.3, cl) + wg * Math.sin(heelDeg * D2R)) / wg;
+  const x = clamp(r / 3, 0, 1);
+  return 0.3 * (1 - x * x * (3 - 2 * x));
+};
+/** Drive factor (≤ 1) from the sails' weight at apparent wind `aws` (m/s), heel `heelDeg` (+ to leeward). */
+export function clothFill(aws: number, heelDeg: number, cl = 1.2): number {
+  return Math.min(1, (1 - slat(aws, cl, heelDeg)) / (1 - slat(aws, cl, 6)));
+}

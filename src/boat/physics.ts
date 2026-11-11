@@ -8,11 +8,13 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, crewMoment, displacement, displacementFactor, handsFactor, newCrew, placeCrew, trimFactor } from './crewPhys';
+import { CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
+import { DEFAULT_CREW, crewBestHeel, crewMoment, crewSkill, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
+import { bodyJob, crewJobs } from './crewWork';
+import { clrShift, trimSpeedFactor } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. */
 export const PENALTY_TURN_RATE = 10;
@@ -46,7 +48,9 @@ export const HOIST = { main: 30, jib: 15, strikeMain: 15, strikeJib: 10 };
 export function crewRig(b: Boat, dt: number, emit: Emit): void {
   const r = b.rig; if (!r) return;
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg, ms: 3500 }); };
-  const hands = b.crew ? handsFactor(b.crew.spec) : 1;
+  // (the forward hand on the halyards at the mast, or whoever there is: at their pace)
+  const busy = !!r && ((r.mainUp && r.main < 1) || (!r.mainUp && r.main > 0) || (r.jibUp && r.jib < 1) || (!r.jibUp && r.jib > 0));
+  const hands = bodyJob(b, 'hoist', busy);
   const twa = Math.abs(wrap(b.ww.from - b.h)), offWind = twa <= 45 ? 1 : twa >= 120 ? 0.3 : 1 - 0.7 * (twa - 45) / 75;
   const step = (k: 'main' | 'jib') => {
     const up = k === 'main' ? r.mainUp : r.jibUp, was = r[k];
@@ -66,11 +70,12 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
 /** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
 function crewPole(b: Boat, dt: number, emit: Emit): void {
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg }); };
-  const hands = b.crew ? handsFactor(b.crew.spec) : 1; // short-handed, the pole takes longer
+  // the forward hand (or whoever there is) goes to the mast to set, stow or gybe it, at their own pace
+  const hands = bodyJob(b, 'pole', b.pole === 'setting' || b.pole === 'stowing' || (b.poleWant && b.pole === 'down') || (!b.poleWant && b.pole === 'set'));
   if (b.poleWant && (b.pole === 'down' || b.pole === 'stowing')) { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
   else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
   else if (b.pole === 'set' && b.tack !== b.poleTack) {
-    b.pole = 'setting'; b.poleT = POLE.gybe; b.poleTack = b.tack;
+    b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack;
     say('Gybing the pole end-for-end. The jib is down for a few seconds.');
   }
   if (b.pole === 'setting' || b.pole === 'stowing') {
@@ -79,6 +84,7 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
     if (b.poleT <= 0) {
       if (b.pole === 'setting') { b.pole = 'set'; say('Pole set: jib out to windward, wing-on-wing.'); }
       else { b.pole = 'down'; say('Pole stowed: jib back to leeward.'); }
+      bodyJob(b, 'pole', false);
     }
   }
 }
@@ -163,7 +169,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   crewRig(b, dt, emit);
   crewPole(b, dt, emit);
   const plan = sailPlan(b);
-  const ap = apparent(ww.from, ww.kt, b.h, b.v);
+  // the rig rolling: the sails move through the air sideways at the roll rate times their height (rolling to windward,
+  // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
+  const ap = apparent(ww.from, ww.kt, b.h, b.v, rigSway(b));
   trimSails(b, ap.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
@@ -179,20 +187,18 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     const d0 = s0.main.drive + s0.jib.drive, d1 = sf.main.drive + sf.jib.drive;
     if (d0 > 5) wornDrive = clamp(d1 / d0, 0.6, 1.05);
   }
-  // the crew: where they'd put their weight to hold her at her best heel (a little heel in light air, no more than
-  // about 17° upwind, flat downwind), then where they actually are (they move at a human pace)
+  // the crew: where they'd put their weight to hold her at the heel they want (a little heel in light air, about 16°
+  // upwind, flat downwind), then where they actually are (they move at a human pace, and go where their jobs are)
   const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
-  const bestHeel = twa > 120 ? 1 : ww.kt < 7 ? 6 : 16;
-  const need = heelingMoment(F, sf.twist, bestHeel) - hullRighting(bestHeel, disp) - rmExtra(bestHeel);
-  placeCrew(cs, need, twa, ww.kt, b.pole === 'set', b.tack, dt);
-  const heelT = heelWithCrew(F, sf.twist, disp, h => crewMoment(cs, h) + rmExtra(h)) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
-  b.heelMag = (b.heelMag ?? 0) + (heelT - (b.heelMag ?? 0)) * Math.min(1, dt * 2.2);
-  b.heel = b.heelMag * (rel >= 0 ? 1 : -1);
-  b.helmNeed = helmNeeded(sf, b.heelMag, b.sheets.main, b.v, sf.twist);
+  const heelT = crewAndHeel(b, cs, F, sf.twist, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
+  rollTo(b, heelT, rel, disp, dt);
+  b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.twist, clrShift(cs.trim));
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
-  // heel past her best; the weight aboard (displacement) and where it sits fore and aft
-  let target = polar(ww.kt, twa, plan) * heelFactor(b.heelMag) * displacementFactor(disp, ww.kt) * trimFactor(cs.spec, cs.fore, twa, ww.kt, b.pole === 'set', cond?.extraMoment ?? 0);
+  // heel past her best; the weight aboard (displacement) and where it sits fore and aft (the trim's resistance); in a
+  // drifter, the sails' own weight (heeled to leeward, gravity helps hold them in shape)
+  const vPolar = polar(ww.kt, twa, plan);
+  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
   else target *= Math.sqrt(trimDrive(b.trim.main, b.trim.jib) * b.shape.eff * wornDrive); // sheet angles, the sails' shape, worn cloth
@@ -307,7 +313,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   crewRig(b, dt, emit); crewPole(b, dt, emit);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
   const u0 = b.v, d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.yawRate ?? 0) * D;
-  const ap = apparent(ww.from, ww.kt, b.h, u0, b.sway ?? 0);
+  const ap = apparent(ww.from, ww.kt, b.h, u0, (b.sway ?? 0) + rigSway(b));
   trimSails(b, ap.awa, 'jib', dt);
   const q = 0.5 * RHO_A * ap.aws * ap.aws, awaR = ap.awa * D;
   const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
@@ -346,17 +352,15 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
   const disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = main.heel + jib.heel;
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0;
-  placeCrew(cs, heelingMoment(F, b.shape.main.twist, 6) - hullRighting(6, disp) - rmExtra(6), twa, ww.kt, false, b.tack, dt);
-  const heelT = heelWithCrew(F, b.shape.main.twist, disp, h => crewMoment(cs, h) + rmExtra(h));
-  b.heelMag = (b.heelMag ?? 0) + (heelT - (b.heelMag ?? 0)) * Math.min(1, dt * 2.2);
-  b.heel = b.heelMag * (rel >= 0 ? 1 : -1);
+  const heelT = crewAndHeel(b, cs, F, b.shape.main.twist, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt, 6);
+  rollTo(b, heelT, rel, disp, dt);
   b.forces = { heel: F, drive: main.drive + jib.drive };
   // the equations of motion: surge, sway, yaw
   const sails = { main, jib };
   // (the seaway's added resistance as when sailing; the turning drag the polar model adds is here in the strips' damping)
   const X = main.drive + jib.drive + windX - hullResistance(Math.max(0, u0)) + inducedX + rudX - seaDrag(b.sea, b.h, u0) - (cond ? foulingDrag(cond, u0) : 0);
   const Y = main.heel + jib.heel + windY + hullY + rudY;
-  const M = sailYaw(sails, b.heelMag, b.sheets.main, b.shape.main.twist) - windY * HOVE.windLever + hullM + rudY * RUDDER.arm;
+  const M = sailYaw(sails, b.heelMag!, b.sheets.main, b.shape.main.twist) - windY * HOVE.windLever + hullM + rudY * RUDDER.arm + F * clrShift(cs.trim);
   const mx = HANDLING.mass * disp / HULL.displacement, my = disp * (1 + HOVE.swayAdded), I = disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
   b.v = Math.max(0, u0 + X / mx * dt);
   b.sway = -toWind * (d0 + Y / my * dt);
@@ -369,6 +373,27 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   void CE_HEIGHT; void LEVER;
   travel(b, dt, t, emit, groundToast);
   sailVisuals(b, 'jib', dt);
+}
+
+/** The rig's sideways speed through the air at the sails' centre of effort (m/s, + to starboard) from her rolling. */
+const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * CE_HEIGHT * Math.cos((b.heel ?? 0) * D2R);
+
+/**
+ * The crew decide where to be (crewPhys.ts placeCrew) for the heel they want, and the heel she'd settle at with them
+ * there (deg, + to leeward). `bestHeel`: a fixed heel to aim for (hove to), else the crew's own by the conditions.
+ */
+function crewAndHeel(b: Boat, cs: CrewState, F: number, twist: number, disp: number, rmExtra: (h: number) => number, twa: number, tws: number, rel: number, extraMoment: number, dt: number, bestHeel?: number): number {
+  const n = cs.spec.crew.length, skill = n ? cs.spec.crew.reduce((a, p) => a + skillOf(p), 0) / n : skillOf(cs.spec.helm);
+  const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
+  const need = heelingMoment(F, twist, bh) - hullRighting(bh, disp) - rmExtra(bh);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: rel >= 0 ? 1 : -1, beat: beatAngle(tws), extraMoment }, dt);
+  return heelWithCrew(F, twist, disp, h => crewMoment(cs, h) + rmExtra(h));
+}
+/** Roll her toward the heel `heelLee` (deg, + to leeward) as a damped oscillator (balance.ts rollStep). */
+function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number): void {
+  const side = rel >= 0 ? 1 : -1; // b.heel is + to port: to leeward with the wind over the starboard side
+  const r = rollStep(b.heel ?? 0, b.heelRate ?? 0, heelLee * side, disp, dt);
+  b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
 
 /** Move her over the ground (through the water plus the current), and stop her on a dock or the shore. */
@@ -461,8 +486,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const c = b.ctl, tws = b.ww.kt;
   // working a line takes that line, and only that line, off the crew
   if (b.isUser) for (const k of [...Object.keys(b.ctlCmd), ...Object.keys(b.ctlTarget ?? {})] as Ctl[]) if (b.ctlCmd[k] || b.ctlTarget?.[k] != null) takeLine(b, k);
-  const hands = b.crew ? handsFactor(b.crew.spec) : 1; // fewer crew, slower line handling
-  const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const d = to - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * hands * dt); };
+  // the crew work the lines they have one job at a time, each person at their own pace (crewWork.ts): `on` is filled in
+  // below, once the crew's targets are known
+  let on: Partial<Record<Ctl, { pace: number; to: number }>> = {};
+  const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const j = on[k], d = (j ? j.to : to) - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * (j?.pace ?? 1) * dt); };
   const hand = (k: Ctl, rate = CONTROL_RATE[k]) => {
     const cmd = b.ctlCmd[k] ?? 0, tg = b.ctlTarget?.[k];
     if (cmd === 0 && tg != null) { // dragged to a setting: work the line there at the usual pace
@@ -494,20 +521,40 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     const fixed: Partial<CrewSettings> = {};
     if (b.isUser) {
       for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) if (byHand(b, k)) fixed[k] = c[k];
+      // the traveller and the mainsheet set the boom together: with the mainsheet in your hand, the crew leaves the
+      // traveller where it is (moving it would swing the boom under your sheet)
+      if (byHand(b, 'mainsheet')) fixed.traveller = c.traveller;
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
     const mAng = b.isUser && byHand(b, 'mainsheet') ? boomAngle(c) : wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, cond?.main, cond?.jib, b.aws / KT, b.depower);
   }
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;
-  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) {
-    if (byHand(b, k)) hand(k); else move(k, t[k]);
+  // what the crew would do with each line they have; then who gets to it, and when (crewWork.ts)
+  const backing0 = byHand(b, 'jibsheetW') && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
+  const want: Partial<Record<Ctl, number>> = {};
+  // (a line is moved only if it's worth the trip: a skilled crew sees smaller gains, ~0.1% of drive; a novice ~0.4%)
+  const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
+  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'traveller'] as const) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
+  if (!byHand(b, 'mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
+  if (!byHand(b, 'jibsheetW')) want.jibsheetW = 1;
+  if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
+  // the lazy (windward) jib car: the crew's plan for it (they move it only when it's worth it), or yours
+  b.carPlan = byHand(b, 'car') ? null : { fore: t.carFore, ins: t.carIn };
+  // (the first time: she was set up before she sailed, so the crew's lines start where they want them)
+  if (!b.crewReady) {
+    b.crewReady = true;
+    for (const k of Object.keys(want) as Ctl[]) if (k !== 'mainsheet' && k !== 'jibsheet' && k !== 'jibsheetW') c[k] = want[k]!; // (the sheets are trimmed to the wind as she goes)
+    if (b.carPlan) { c.car.S = { ...b.carPlan }; c.car.P = { ...b.carPlan }; }
   }
-  // the lazy (windward) jib car: the crew sets it for the next tack; you set it with the car controls
-  if (!byHand(b, 'car')) { const lazy = c.car[b.tack]; lazy.fore = t.carFore; lazy.ins = t.carIn; }
+  on = crewJobs(b, want, dt);
+  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) {
+    if (byHand(b, k)) hand(k); else move(k, want[k]!);
+  }
   // the main: traveller and mainsheet together, for the boom angle and the leech tension (whichever the crew has)
-  if (byHand(b, 'traveller')) hand('traveller'); else move('traveller', t.traveller);
+  if (byHand(b, 'traveller')) hand('traveller'); else move('traveller', want.traveller!);
   if (byHand(b, 'mainsheet')) hand('mainsheet'); else move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
   // the jib sheets, one on each winch: hauling in on a winch is slow in a breeze, easing is quick
   const going = (k: 'jibsheet' | 'jibsheetW') => b.ctlCmd[k] ?? (b.ctlTarget?.[k] != null ? b.ctlTarget[k]! - c[k] : 0);
@@ -540,10 +587,13 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.shape = { main: ms, jib: js, eff: js ? SAILS.main.share * em + SAILS.jib.share * ej : em };
 }
 
-/** Move the lazy (windward) jib car one pin: fore–aft (+1 aft) or athwartships (+1 outboard). You can't move the loaded one. */
+/**
+ * Ask for the lazy (windward) jib car one pin further: fore–aft (+1 aft) or athwartships (+1 outboard). The crew goes
+ * forward and moves it (crewWork.ts): it takes a while, and their weight goes with them. Nobody can move the loaded one.
+ */
 export function moveLazyCar(b: Boat, fore: number, ins: number): void {
-  const lazy = b.ctl.car[b.tack];
-  lazy.fore = clamp(lazy.fore + fore, 0, CAR_FORE_PINS - 1); lazy.ins = clamp(lazy.ins + ins, 0, CAR_IN_PINS - 1);
+  const lazy = b.ctl.car[b.tack], from = b.carCmd ?? { fore: lazy.fore, ins: lazy.ins };
+  b.carCmd = { fore: clamp(from.fore + fore, 0, CAR_FORE_PINS - 1), ins: clamp(from.ins + ins, 0, CAR_IN_PINS - 1) };
 }
 
 /** Apparent wind: wind over the water minus the boat's motion through it. aws in m/s, arel signed (+ from starboard). */

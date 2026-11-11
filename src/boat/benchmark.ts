@@ -33,7 +33,7 @@ export function benchSpeed(windKt: number, twa: number, spec?: BoatSpec, month =
   let v = 0, heel = 0, helm = 0, n = 0;
   for (let i = 0; i < seconds * 60; i++) {
     const toWind = wrap(b.ww.from - b.h) >= 0 ? 1 : -1;
-    b.tiller = (b.helmNeed ?? 0) / FULL_RUDDER * toWind;
+    b.tiller = Math.max(-0.4, Math.min(0.4, (b.helmNeed ?? 0) / FULL_RUDDER)) * toWind; // (as much as the boat's own turning, physics.ts balRate)
     moveBoat(b, dt, i * dt, noop, g);
     if (i > seconds * 40) { v += b.v; heel += b.heelMag ?? 0; helm += b.helmNeed ?? 0; n++; }
   }

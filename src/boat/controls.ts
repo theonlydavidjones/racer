@@ -235,12 +235,9 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const carMin = fixed.carFore ?? Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft), carMax = fixed.carFore ?? CAR_FORE_PINS - 1;
   x.carFore = clamp(x.carFore, carMin, carMax); if (fixed.carIn != null) x.carIn = fixed.carIn;
   const score = (v: CrewSettings) => {
-    const c: Controls = { mainsheet: mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
-      backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
-    c.jibsheet = jibsheetFor(jibAng, c, tack);
     // a hair of preference for easy settings, so the crew doesn't haul on lines that make no difference
     let ease = 0; for (const k of keys) ease += (v[k] - (k === 'traveller' ? 0 : 0.2)) ** 2;
-    return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws), tj) - 0.0005 * ease;
+    return settingsDrive(v, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws) - 0.0005 * ease;
   };
   let best = score(x);
   for (const step of [0.25, 0.1, 0.04]) for (let pass = 0; pass < 3; pass++) {
@@ -251,4 +248,30 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
     for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, carMin, carMax) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
   }
   return x;
+}
+
+/** The drive (as a share of the best) the sails' shapes give with these settings, for the sheet angles wanted. */
+function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: number, jibAng: number, tm: Shape, tj: Shape, rig: SailRig, jibWear: SailWear, aws: number): number {
+  const c: Controls = { mainsheet: mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
+    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+  c.jibsheet = jibsheetFor(jibAng, c, tack);
+  return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws), tj);
+}
+
+/**
+ * What moving each line from where it is to the crew's plan is worth: the drive it gains (a share: 0.002 = 0.2%), or 1
+ * when the depowering steps call for it (she's overpowered: it's for her heel and helm, not the sail's shape). A crew
+ * gets up to move a line only when it's worth it (crewWork.ts).
+ */
+export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number): Partial<Record<keyof CrewSettings, number>> {
+  const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa);
+  const loaded = loadedCar(c, tack);
+  const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, carFore: loaded.fore, carIn: loaded.ins };
+  const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws), out: Partial<Record<keyof CrewSettings, number>> = {};
+  for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) {
+    const m = lim.min[k];
+    if (m != null && now[k] < m - 0.02) { out[k] = 1; continue; }
+    out[k] = settingsDrive({ ...now, [k]: plan[k] }, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws) - base;
+  }
+  return out;
 }

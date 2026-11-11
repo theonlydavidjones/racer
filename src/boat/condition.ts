@@ -31,7 +31,7 @@ export interface Condition {
   /** Added skin-friction coefficient (ΔC_F) over the smooth-hull ITTC-57 line, at speed v (m/s): fouling and the paint's finish. */
   dCf: (v: number) => number;
   main: SailRig; jib: SailWear;
-  /** Mass added to the boat (kg) and its fore–aft moment in the crew-trim units of crewPhys (kg × station, 0 helm .. 1 mast, minus 0.5). */
+  /** Mass added to the boat (kg) and its fore–aft moment (kg·m, + forward of the centre of flotation: hullTrim.ts trims her by it). */
   extraKg: number; extraMoment: number;
   /** Change in righting moment (N·m) at heel h (deg): weight aloft (a wooden rig) reduces it. */
   rightingDelta: (heelDeg: number) => number;
@@ -47,8 +47,9 @@ const OUTBOARD_KG = 13;
  * 105–145 mm and aluminium about 125 mm (folkebaad.dk), so a soft wooden mast bends ~16% more, a stiff one ~16% less.
  */
 const MAST_BEND = { soft: 145 / 125, average: 1, stiff: 105 / 125 };
-/** Fore–aft stations in crewPhys units (0 at the helm, 1 at the mast): the transom, and a cockpit locker. */
-const STATION = { transom: -0.28, locker: 0.0 };
+/** Fore–aft places (m aft of the centre of flotation, which sits about 0.3 m aft of the middle of the boat's length: an
+ * estimate): the outboard on its transom bracket, and stowed in a cockpit locker. */
+const STATION = { transom: 3.45, locker: 2.3 };
 
 /** Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water). */
 export function condition(s: BoatSpec, month = 9): Condition {
@@ -56,15 +57,15 @@ export function condition(s: BoatSpec, month = 9): Condition {
   const ob = s.perf.outboard;
   const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : OUTBOARD_KG);
   // gear sits about amidships (no moment); the outboard aft
-  const extraMoment = ob === 'bracket' ? OUTBOARD_KG * (STATION.transom - 0.5) : ob === 'stowed' ? OUTBOARD_KG * (STATION.locker - 0.5) : 0;
+  const extraMoment = ob === 'bracket' ? -OUTBOARD_KG * STATION.transom : ob === 'stowed' ? -OUTBOARD_KG * STATION.locker : 0;
   const wood = s.perf.mast === 'wood';
   return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
     main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1 },
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
-    rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(Math.abs(h) * Math.PI / 180) : 0)
-      + (ob === 'bracket' ? -OUTBOARD_KG * G * 0.9 * Math.sin(Math.abs(h) * Math.PI / 180) : 0) // on the bracket it's up near deck level
+    rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
+      + (ob === 'bracket' ? -OUTBOARD_KG * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
   };
 }
 

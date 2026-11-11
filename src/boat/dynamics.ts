@@ -75,12 +75,17 @@ export function luffDriveFactor(twa: number): number {
 
 /** Calm-water hull resistance at speed v (m/s), newtons. */
 export function hullResistance(v: number): number {
-  if (v <= 0) return 0;
+  const r = resistanceParts(v);
+  return r.friction + r.residuary;
+}
+/** The two parts of the calm-water resistance (N): skin friction (goes with the wetted surface) and wave-making. */
+export function resistanceParts(v: number): { friction: number; residuary: number } {
+  if (v <= 0) return { friction: 0, residuary: 0 };
   const re = Math.max(1e5, v * HULL.length / NU);
   const cf = 0.075 / (Math.log10(re) - 2) ** 2;
   const friction = 0.5 * RHO_WATER * HULL.wettedSurface * cf * v * v * HANDLING.formFactor;
   const fn = v / Math.sqrt(G * HULL.length);
-  return friction + HULL.displacement * G * residuaryFraction(fn);
+  return { friction, residuary: HULL.displacement * G * residuaryFraction(fn) };
 }
 
 /** Sail drive (N) at speed v when the trimmed target speed is vt. */
