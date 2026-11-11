@@ -76,7 +76,7 @@ export const CE_HEIGHT = 4.78;
 export const CE_ABOVE_WL = 4.29;
 /**
  * Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force, at the sail's centre of
- * area. The two are 1.88 m apart: the main's centre 1.26 m aft of the mast's after side, the jib's 0.62 m forward of
+ * area. The two are 1.88 m apart: the main's centre 1.26 m aft of the mast's after side, the jib's 0.49 m forward of
  * the mast's front, with the mast 2.80 m from the bow and the forestay 0.80 m (NFIA Class Rules 7.21, 6.1.7) and the
  * sails as FRIDA's ORC certificate measures them (the drawn rig: render/boatMesh.ts, tests/rig.test.ts). A sail's
  * centre of pressure at its best trim, mostly from camber, is near its centre of area (thin-aerofoil theory: camber's
