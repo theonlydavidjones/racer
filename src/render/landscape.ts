@@ -189,7 +189,12 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   place(block(12, 16, 6, lam(0xf4f1ea)), 37.8090, -122.4433, 0, 2.3); // Golden Gate YC
   place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80925, -122.44325, 0, 2.3);
   // Fort Mason's piers, with the long pier sheds
-  for (const lon of [-122.43185, -122.43025, -122.42875]) place(group(block(26, 150, 3, lam(0x9d968a)), block(22, 140, 13, lam(0xd9cfb8), 3)), 37.8091, lon, 0, 0);
+  // (on the real piers, OpenStreetMap's coast: Piers 1, 2 and 3, ending at 37.8085, 37.8091 and 37.8092; each shed's
+  // north end a few metres short of its pier's, turned to the pier: they run 7–14° west of north)
+  for (const [end, lon, brg] of [[37.8085, -122.4324, 346], [37.8091, -122.4316, 350], [37.8092, -122.4304, 353]]) {
+    const r = brg * Math.PI / 180, back = 80; // the shed's middle, 80 m back along the pier from the end
+    place(group(block(20, 150, 3, lam(0x9d968a)), block(18, 140, 13, lam(0xd9cfb8), 3)), end - back * Math.cos(r) / 111320, lon - back * Math.sin(r) / 88000, brg, 0);
+  }
   // Fort Point: the brick fort (1853–61) at the foot of the bridge, on the rock blasted down to 15 ft (4.6 m) above
   // the sea (Wikipedia, "Fort Point National Historic Site"): three tiers of casemates round a courtyard, with the
   // lighthouse on its roof. Position and footprint from the DataSF building footprints; the bridge's arch crosses its

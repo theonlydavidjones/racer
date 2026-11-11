@@ -1,4 +1,4 @@
-import { inBasin } from '../geo/marina';
+import { hitsHarbor } from '../geo/marina';
 import { KT, V, brg, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand } from '../geo/shore';
 import type { Emit } from '../sim/events';
@@ -384,12 +384,12 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
-  else if (onLand(bow(b))) {
+  else if (onLand(bow(b))) { // (the message by what she hit, a dock or the shore, not by where she is)
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
-    bump(inBasin(b) ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+    bump(hitsHarbor(bow(b)) ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
-    bump(inBasin(b) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
+    bump(hitsHarbor(stern(b)) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it
   const aw = apparent(ww.from, ww.kt, b.h, b.v, sw);
