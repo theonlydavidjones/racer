@@ -22,6 +22,7 @@ import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
+import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
 import { harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
@@ -411,10 +412,23 @@ export class World {
   nextMark(b: Boat): CourseMark | null { return this.freeSail ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
+  /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec): Vec {
-    if (!this.tide) return currentAt(p, this.cvec);
-    return this.tide.atShore(p);
+    return withPierWakes(p, this.streamAt(p), this.pierFlows(), this.t);
   }
+  private streamAt(p: Vec): Vec { return this.tide ? this.tide.atShore(p) : currentAt(p, this.cvec); }
+  /**
+   * The stream meeting each pier, refreshed every half minute (the tide turns over hours): the open water's (the
+   * stations' current there, or the preset), not eased by the shore relief, which would read the pier itself as shore.
+   */
+  private flowsT = NaN; private flows: Vec[] = [];
+  private pierFlows(): Vec[] {
+    if (!(Math.abs(this.t - this.flowsT) < 30) || (!this.tide && this.flowsC !== this.cvec)) {
+      this.flowsT = this.t; this.flowsC = this.cvec; this.flows = WAKE_PIERS.map(w => this.tide ? this.tide.at(w.c) : this.cvec);
+    }
+    return this.flows;
+  }
+  private flowsC: Vec | null = null;
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
@@ -509,6 +523,7 @@ export class World {
       addShipWake(sum, from, kt, v, SHIP_AIR[v.kind], ty.len, ty.beam, p);
     }
     if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
+    addPierWakes(sum, from, p);
     const r = sum.result(from);
     return { k: r.k * lee, shift: r.shift };
   }
@@ -568,7 +583,7 @@ export class World {
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
     f.setTime(now);
-    this.cvec = this.currentAt(this.C.center);
+    this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
 

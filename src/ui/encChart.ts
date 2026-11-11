@@ -1,5 +1,7 @@
 import chart from '../geo/data/enc-chart.json';
 import { LL } from '../geo/geo';
+import { PIERS } from '../geo/shore';
+import { inPoly } from '../core/math';
 import type { Tf } from './draw2d';
 
 /*
@@ -136,6 +138,8 @@ function viewBox(o: [number, number], ex: [number, number], ey: [number, number]
 export const SEEN: Record<Detail, Set<string>> = { inset: new Set(), chart: new Set() };
 
 function polyPath(list: Pts[][]): Path2D { const P = new Path2D(); for (const poly of list) for (const r of poly) addRing(P, r, true); return P; }
+/** The chart's structures, with the Golden Gate's tower bases from OpenStreetMap that the sim makes solid (geo/shore.ts PIERS) and the chart leaves out: the north one (the south one is inside its charted fender). */
+function withPiers(P: Path2D): Path2D { for (const A of PIERS.filter(A => /^Golden Gate Bridge, (north|south) tower$/.test(A.name) && !PIERS.some(B => B !== A && A.pts.every(q => inPoly(q, B.pts))))) { A.pts.forEach((q, i) => i ? P.lineTo(q.x, q.y) : P.moveTo(q.x, q.y)); P.closePath(); } return P; }
 function linePath(list: Pts[]): Path2D { const P = new Path2D(); for (const l of list) addRing(P, l, false); return P; }
 
 interface Built {
@@ -156,7 +160,7 @@ function built(): Built {
   return B = {
     bands: (['deep', 'mid', 'shoal', 'vshoal', 'dry'] as const).filter(k => byBand.has(k)).map(k => ({ k, p: polyPath(byBand.get(k)!) })),
     contours: linePath(ENC.contours.flatMap(c => c.l)),
-    land: polyPath(ENC.land), built: polyPath(ENC.built), structures: polyPath(ENC.structures), shore: linePath(ENC.shore), piers: linePath(ENC.piers),
+    land: polyPath(ENC.land), built: polyPath(ENC.built), structures: withPiers(polyPath(ENC.structures)), shore: linePath(ENC.shore), piers: linePath(ENC.piers),
     areas: ENC.areas.map(a => ({ a, o: a.o?.length ? linePath(a.o) : null, f: a.f?.length ? polyPath(a.f) : null, at: a.at ? at(a.at) : null, box: boxOfLines(a.o ?? []) })),
     hazards: ENC.hazards.map(h => ({ h, p: h.p ? at(h.p) : null, f: h.f?.length ? polyPath(h.f) : null, o: h.o?.length ? linePath(h.o) : null })),
     soundings: snd,

@@ -82,17 +82,12 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   the first press; say so in the tiller hint. Owner: "one issue with double-click in browser is that it surfaces the
   browser menu. need to solve somehow." Over the 3D view only: no context menu, no double-click text selection, no
   double-tap zoom; menus and text selection still work on the panels. Test in Chrome, Safari and Firefox on a trackpad.
-- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h; in progress: Charts): owner, "I just watched her sail
-  right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
-  (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
-  piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
-  the south tower's fender, the Bay Bridge's piers and towers (their positions are still approximate, from the
-  overpass-api note under the Bay Bridge), and anything else drawn in the water. Solid for collisions, for the AI's and the
-  tiller pilot's look-ahead (landAlong) and the navigator's routes, on the chart, and as obstructions under Rule 19/20
-  (obstruction.ts). A test that sails a boat at each one. And their lee: owner, "there should also be a lee on the lee
-  side of the tower bases, no?" A bluff body leaves a wind shadow downwind (like the ships' and the committee boat's,
-  already in), and in the current a wake of slack water and eddies on its downstream side, shifting with flood and ebb;
-  size both from sourced bluff-body wake lengths, not by eye.
+- **Done — she sailed through the Golden Gate Bridge's north tower** (bug): every bridge pier and tower base standing in
+  the water is solid (NOAA's chart and OpenStreetMap; geo/shore.ts PIERS): collisions, the look-ahead, the navigator's
+  routes, Rules 19 and 20; the Golden Gate and the Bay Bridge's West Span re-laid on them. Each casts a wind shadow
+  downwind and a current wake downstream that turns with the tide (environment/pierWakes.ts). Tests: bridges.test.ts,
+  pierWakes.test.ts. Still open: the wake's constants for long rectangular piers (C_D by side ratio, the recirculation
+  length) and the bed friction c_f want primary sources (NACA TN 3038, Norberg 1993, Parnaudeau 2008 were out of reach).
 - **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
