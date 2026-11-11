@@ -182,8 +182,6 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
   const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
-  const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1; // how much of each sail is up: its force goes with its hoisted area
-  if (hm < 1 || hj < 1) { sf.main.heel *= hm; sf.main.drive *= hm; sf.jib.heel *= hj; sf.jib.drive *= hj; }
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
   // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
   let wornDrive = 1;
@@ -193,6 +191,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     const d0 = s0.main.drive + s0.jib.drive, d1 = sf.main.drive + sf.jib.drive;
     if (d0 > 5) wornDrive = clamp(d1 / d0, 0.6, 1.05);
   }
+  // how much of each sail is up: its force goes with its hoisted area (after the wear is worked out, sail for sail, so
+  // a part-hoisted sail isn't counted as worn: the hoist has its own speed term below)
+  const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
+  if (hm < 1 || hj < 1) { sf.main.heel *= hm; sf.main.drive *= hm; sf.jib.heel *= hj; sf.jib.drive *= hj; }
   // the crew: where they'd put their weight to hold her at the heel they want (a little heel in light air, about 16°
   // upwind, flat downwind), then where they actually are (they move at a human pace, and go where their jobs are)
   const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
@@ -229,8 +231,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (Math.abs(sway) > 0.02 && !b.luff) {
     const ap0 = sailWind(ww.from, ww.kt, b.h, b.v, 0, b.heel ?? 0);
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
-    // (each sail as much as is hoisted, as sf is, and worn as it is)
-    sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * wornDrive * driveCalibration(ww.kt, twa);
+    // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
+    sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
   }
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
   b.v = Math.max(0, b.v + a * dt);
