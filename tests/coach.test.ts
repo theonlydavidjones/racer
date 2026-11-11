@@ -126,4 +126,27 @@ describe('the trim coach: from the physics review', () => {
       expect([v.top, ...v.more].some(l => l.id === 'steer:feather')).toBe(false);
     }
   });
+  it('both sheets eased by hand upwind, sails flogging: the coach says to trim, not "building speed"', () => {
+    const b = boat({ heading: 318, windKt: 10 });
+    takeLine(b, 'mainsheet'); takeLine(b, 'jibsheet'); b.ctlTarget = { mainsheet: 0.8, jibsheet: 0.8 }; hold(b, 30);
+    const v = teach(b);
+    expect(v.top.kind).toBe('fix'); expect(['mainsheet', 'jibsheet']).toContain(v.top.line); expect(v.top.gain).toBeGreaterThan(0.3);
+  });
+  it('the main two-blocked in 6 kt: the lesson is about the leech, never "about 0°"', () => {
+    const b = boat({ heading: 318, windKt: 6 }); wrong(b, 'mainsheet', 0);
+    for (const l of [teach(b).top, ...teach(b).more]) expect(l.head).not.toMatch(/about 0°/);
+  });
+  it('the mainsheet held eased in light air: the crew brings the traveller up to put the boom where it should be', () => {
+    for (const [W, min] of [[8, 3.85], [12, 4.7]] as const) {
+      const b = boat({ heading: 318, windKt: W }); wrong(b, 'mainsheet', 0.3);
+      expect(b.ctl.traveller).toBeLessThan(-0.5);
+      expect(kt(b)).toBeGreaterThan(min);
+    }
+  });
+  it('the traveller held up in a breeze: right in the model, but it says why most boats drop it', () => {
+    const b = boat({ heading: 318, windKt: 20, sea: CHOP }); wrong(b, 'traveller', -1);
+    const v = teach(b);
+    expect(v.top.kind).toBe('ok'); expect(v.top.why).toMatch(/Most boats drop it/);
+  });
 });
+

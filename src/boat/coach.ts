@@ -1,6 +1,6 @@
 import type { Boat, LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
-import { boomAngle, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls } from './controls';
+import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
 import { crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
 import { hullResistance } from './dynamics';
@@ -125,23 +125,24 @@ const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] }
 /**
  * The controls as they'd be with one line moved, and the crew answering it as they do (physics.ts trimSails): the
  * mainsheet and traveller set the boom together: with the traveller yours, the crew re-sheets to keep the boom where they
- * want it (with the mainsheet yours, they leave the traveller where it's set for the conditions).
+ * want it; with the mainsheet yours, they move the traveller to put it there (no lower than their depowering floor).
  */
 function withCrew(b: Boat, k: LineKey, v: number): Controls {
   const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
   if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
+  if (k === 'mainsheet' && !byHand(b, 'traveller') && !b.hove && !byHand(b, 'jibsheetW')) c.traveller = travellerFor(want, v, depowerLimits(b.depower ?? 0, b.awaSlow).min.traveller ?? -1);
   return c;
 }
 /** The best setting for one line with the crew answering it, and the speed it's worth. */
 function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: number; gain: number } {
   const [lo, hi] = RANGE[k] ?? [0, 1], base = speedFactor(b, withCrew(b, k, b.ctl[k]));
-  if (!(base > 0)) return { to: b.ctl[k], gain: 0 };
-  let to = b.ctl[k], best = base;
+  // (with both sails flogging the drive is nil: a floor, so the line that brings one back still counts)
+  let to = b.ctl[k], best = Math.max(base, 0);
   for (let i = 0; i <= 40; i++) {
     const v = lo + (hi - lo) * i / 40, f = speedFactor(b, withCrew(b, k, v));
     if (f > best * 1.0005) { best = f; to = v; }
   }
-  return { to, gain: best / base - 1 };
+  return { to, gain: Math.min(3, best / Math.max(base, 0.1) - 1) };
 }
 
 /* ---------- the lessons for a line you hold ---------- */
@@ -155,16 +156,23 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
   switch (k) {
     case 'mainsheet': {
       const was = b.sheets.main, will = clamp(boomAngle(withCrew(b, 'mainsheet', to)), SAILS.main.min, SAILS.main.max), n = Math.abs(will - was);
+      // the boom barely moves (it's at its stop, or the crew's traveller keeps it where they want it): the sheet is the leech
+      if (n < 1.5 && s.awa < 110) return more
+        ? { ...base, head: `Ease the mainsheet ${easeAmount(d)}: open the leech.`, why: `The leech is closed tighter than ${tws} kt wants: the top of the main needs a little twist.`,
+            look: 'the top batten: angled a little to leeward of the boom', done: 'leech open' }
+        : { ...base, head: `Trim the mainsheet ${amount(d)}: close the leech.`, why: 'The top of the main is twisting open and spilling wind you could use.',
+            look: 'the top batten: parallel to the boom', done: 'leech closed' };
       if (!more) return { ...base, head: `Trim the main in, about ${deg(n)}.`,
         why: s.awa > 110 ? 'Eased right out, the main pushes from far outboard and she wants to round up: in a touch, the helm lightens.'
-          : b.trim.main.flow === 'luffing' ? 'The main is luffing: its front is lifting, so it isn\'t pulling.' : 'The leech is too open: the top of the main is spilling wind you could use.',
-        look: s.awa > 110 ? 'the weight on the tiller' : b.trim.main.flow === 'luffing' ? 'the bubble behind the mast, and the windward side of the luff lifting' : 'the top batten: parallel to the boom when it\'s right',
+          : b.trim.main.flow === 'luffing' ? 'The main is luffing: its front is lifting, so it isn\'t pulling.' : 'The boom is further out than this wind angle wants: the main isn\'t pulling its weight.',
+        look: s.awa > 110 ? 'the weight on the tiller' : b.trim.main.flow === 'luffing' ? 'the bubble behind the mast, and the windward side of the luff lifting' : 'the luff of the main: just short of lifting',
         done: 'main drawing' };
       return { ...base, head: `Ease the main, about ${deg(n)}.`,
         why: s.awa > 110 ? 'Off the wind the main works by presenting area: eased out, square to the wind, it catches the most.'
-          : s.over ? 'She\'s overpowered: with the main in this hard she heels and drags her rudder instead of driving.' : 'The main is over-trimmed: the flow is breaking off its back, so it pushes sideways more than forward.',
-        look: s.awa > 110 ? 'the boom: out until it\'s nearly against the shroud' : s.over ? 'the heel and the weight on the tiller: both should ease' : 'the leech telltales: streaming off the back, not curling behind it',
-        done: s.over ? 'she\'s back on her feet' : 'leech telltales streaming' };
+          : s.over ? 'She\'s overpowered: with the main in this hard she heels and drags her rudder instead of driving.'
+          : b.trim.main.flow === 'stalled' ? 'The main is over-trimmed: the flow is breaking off its back, so it pushes sideways more than forward.' : 'The boom is closer to the centreline than this wind angle wants.',
+        look: s.awa > 110 ? 'the boom: out until it\'s nearly against the shroud' : s.over ? 'the heel and the weight on the tiller: both should ease' : b.trim.main.flow === 'stalled' ? 'the leech telltales: streaming off the back, not curling behind it' : 'the luff of the main: ease until it just lifts, then trim a touch',
+        done: s.over ? 'she\'s back on her feet' : 'main drawing' };
     }
     case 'jibsheet': {
       const was = b.sheets.jib, will = clamp(jibClew({ ...c, jibsheet: to }, b.tack), SAILS.jib.min, SAILS.jib.max), n = Math.abs(will - was);
@@ -336,7 +344,14 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   if (lag && s.awa < 110) return { ...base, kind: 'info', head: `The crew is catching up: the ${lag[0]} is ${lag[1]!.flow === 'stalled' ? 'stalled' : 'luffing'} for a moment.`, why: 'They trim at a human pace, a second or two behind a change of course or a shift.', look: `the ${lag[0]}'s telltales: watch them settle` };
   if (s.speedKt < 0.85 * s.targetKt && !s.over) return { ...base, kind: 'info', head: `Building speed: ${s.speedKt.toFixed(1)} kt, the polar's ${s.targetKt.toFixed(1)}.`, why: 'The sails are set: a two-tonne boat takes a while to get going. Sail her straight and let her build.', look: 'the speedo climbing' };
   const steer = s.up ? 'Steer to the jib telltales: both sides streaming.' : s.awa > 110 ? 'Keep the boom out and steer smoothly through the waves.' : 'Ease the sheets until the luffs just lift, then trim back a touch.';
-  if (s.over) return { ...base, head: `Trim's right for ${Math.round(s.tws)} kt: ${s.speedKt.toFixed(1)} kt.`, why: `The polar's ${s.targetKt.toFixed(1)} kt assumes she can carry full power; in this breeze she can't, so she's depowered.`, look: 'the heel: under about 20°, and a light helm' };
+  // (a teaching choice, made deliberately: the traveller held up in a breeze costs almost nothing in the model, since
+  // the vang holds the leech while the crew eases the sheet, so it isn't a fix; but it's worth knowing why most boats
+  // drop it, so it's said here rather than left unsaid)
+  const travUp = byHand(b, 'traveller') && b.ctl.traveller < -0.2;
+  if (s.over) return { ...base, head: `Trim's right for ${Math.round(s.tws)} kt: ${s.speedKt.toFixed(1)} kt.`,
+    why: travUp ? 'The traveller up costs little here: the vang holds the leech while the crew eases the sheet. Most boats drop it in a breeze instead, so the boom goes down to leeward without the leech opening.'
+      : `The polar's ${s.targetKt.toFixed(1)} kt assumes she can carry full power; in this breeze she can't, so she's depowered.`,
+    look: 'the heel: under about 20°, and a light helm' };
   return { ...base, head: `Trim's right: ${s.speedKt.toFixed(1)} kt against the polar's ${s.targetKt.toFixed(1)}.`, why: '', look: steer };
 }
 

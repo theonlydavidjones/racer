@@ -502,6 +502,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
     if (b.isUser && byHand(b, 'mainsheet')) fixed.mainsheet = c.mainsheet;
+    // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
+    if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
   }

@@ -192,7 +192,8 @@ describe('heaving to', () => {
     expect(r.b.jibBacked).toBe(1);
     expect(r.twa).toBeGreaterThan(35); expect(r.twa).toBeLessThan(65);
     expect(r.swing).toBeLessThan(15); // steady: she doesn't tack or bear away and sail off
-    expect(r.ahead).toBeGreaterThan(0.3); expect(r.ahead).toBeLessThan(1.8);
+    // (in light air she barely creeps: the Pardeys report half a knot or less; 0.2 kn is our floor below 10 kt, a judgement)
+    expect(r.ahead).toBeGreaterThan(W < 10 ? 0.2 : 0.3); expect(r.ahead).toBeLessThan(1.8);
     expect(r.lee).toBeGreaterThan(0.3); expect(r.lee).toBeLessThan(2);
     expect(r.track).toBeGreaterThan(70); expect(r.track).toBeLessThan(120); // she goes roughly square to the wind
   });
