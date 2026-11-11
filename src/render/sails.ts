@@ -15,6 +15,11 @@ export interface SailDef {
   battens?: { t: number; len: number }[]; // height fraction and length (m) in from the leech
   /** Draw the battens as lines on the surface too (off when the sail's own picture shows its batten pockets). */
   battenLines?: boolean;
+  /**
+   * The roach: how far (m) the leech stands out beyond the straight line from clew to head, square to that line in the
+   * sail's plane, at height fraction t (0 at the clew; at t = 1 it's the head's width). None: a straight leech.
+   */
+  roach?: (t: number) => number;
 }
 
 export interface SailShape {
@@ -27,6 +32,29 @@ export interface SailShape {
 }
 
 const tmp = new THREE.Vector3();
+
+/** Square to the straight leech (clew to head), in the sail's plane, away from the luff: where the roach stands out. */
+const roachDirs = new WeakMap<SailDef, THREE.Vector3>();
+function roachDir(d: SailDef): THREE.Vector3 {
+  let r = roachDirs.get(d);
+  if (!r) { const leech = d.head.clone().sub(d.clew).normalize(), w = d.clew.clone().sub(d.tack); r = w.addScaledVector(leech, -w.dot(leech)).normalize(); roachDirs.set(d, r); }
+  return r;
+}
+/** The sail's outline at height fraction t: the luff point and the leech point (roach and all), flat, before any camber. */
+export function sailEdges(d: SailDef, t: number): [THREE.Vector3, THREE.Vector3] {
+  const lee = d.clew.clone().lerp(d.head, t);
+  if (d.roach) lee.addScaledVector(roachDir(d), d.roach(t));
+  return [d.tack.clone().lerp(d.head, t), lee];
+}
+/** The flat sail's area (m²), from its outline. */
+export function sailArea(d: SailDef, n = 400): number {
+  let a = 0;
+  for (let i = 0; i < n; i++) {
+    const [l0, e0] = sailEdges(d, i / n), [l1, e1] = sailEdges(d, (i + 1) / n);
+    a += e0.clone().sub(l0).cross(l1.clone().sub(l0)).length() / 2 + e1.clone().sub(e0).cross(l1.clone().sub(e0)).length() / 2;
+  }
+  return a;
+}
 
 export class Sail {
   readonly mesh: THREE.Mesh;
@@ -78,10 +106,7 @@ export class Sail {
   }
 
   /** Luff and leech points at height fraction t. */
-  private edges(t: number): [THREE.Vector3, THREE.Vector3] {
-    const d = this.def;
-    return [d.tack.clone().lerp(d.head, t), d.clew.clone().lerp(d.head, t)];
-  }
+  private edges(t: number): [THREE.Vector3, THREE.Vector3] { return sailEdges(this.def, t); }
 
   /** A point on the sail surface at height fraction t and chord fraction s (0 luff → 1 leech). */
   point(t: number, s: number, sh: SailShape, out = new THREE.Vector3()): THREE.Vector3 {

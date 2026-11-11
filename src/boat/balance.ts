@@ -73,7 +73,12 @@ const CREW = { kg: 240, reach: 1.05 };
 export const CE_HEIGHT = 4.78;
 /** The centre of effort's height above the waterline (m), near the roll axis: the lever for the rig's sweep as she rolls. */
 export const CE_ABOVE_WL = 4.29;
-/** Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force. */
+/**
+ * Fore–aft lever (m, + forward of the centre of lateral resistance) of each sail's side force: an estimate. (The drawn
+ * rig, built to the class rules and FRIDA's ORC certificate, has the sails' centres of area 1.88 m apart, not these
+ * 2.17: render/boatMesh.ts, tests/rig.test.ts. Moving to 1.88 with the centre of effort kept where it is costs the
+ * backed jib the moment that holds her hove to in 8 kt, so the two wait for a sourced centre of lateral resistance.)
+ */
 export const LEVER = { main: -0.62, jib: 1.55 };
 /** Chord of each sail at its centre of effort (m). */
 const CHORD = { main: 2.4, jib: 2.0 };
