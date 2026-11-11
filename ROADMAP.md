@@ -65,6 +65,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
+- **Now — cruise ignores the chosen origin** (bug; ~1 h; for Marinas after the reset): owner, "there's a bug in cruise
+  mode where I have an origin selected but it still starts me in the slip." When a cruise origin other than her slip is
+  chosen, she must start there (sim/world.ts, the slip and docked start, near line 301). Goes with the push-off fix.
 - **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
   right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
   (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
