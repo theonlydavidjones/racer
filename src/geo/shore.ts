@@ -365,7 +365,7 @@ export function terrainNearest(p: Vec, max = 30): { d: number; n: Vec } | null {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON, cw = (M.east - M.west) / M.nx, ch = (M.north - M.south) / M.ny;
   const i0 = Math.floor((lon - M.west) / cw), j0 = Math.floor((M.north - lat) / ch);
   const ri = Math.ceil(max / (cw * MLON)) + 1, rj = Math.ceil(max / (ch * MLAT)) + 1;
-  let best: { d: number; q: Vec } | null = null;
+  let best: { d: number; q: Vec; c: Vec } | null = null;
   for (let j = j0 - rj; j <= j0 + rj; j++) for (let i = i0 - ri; i <= i0 + ri; i++) {
     if (i < 0 || j < 0 || i >= M.nx || j >= M.ny || GRID[j * M.nx + i] !== 1) continue;
     // the cell, in course metres; inside onGround's Cityfront box the terrain doesn't count (the Cityfront shore does)
@@ -373,13 +373,14 @@ export function terrainNearest(p: Vec, max = 30): { d: number; n: Vec } | null {
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     if (cx > CF.x0 && cx < CF.x1 && cy > CF.y0 && cy < CF.y1) continue;
     const q = { x: Math.max(x0, Math.min(x1, p.x)), y: Math.max(y0, Math.min(y1, p.y)) }, d = Math.hypot(p.x - q.x, p.y - q.y);
-    if (d <= max && (!best || d < best.d)) best = { d, q };
+    if (d <= max && (!best || d < best.d)) best = { d, q, c: { x: cx, y: cy } };
   }
   if (!best) return null;
-  const b = best as { d: number; q: Vec }, dx = p.x - b.q.x, dy = p.y - b.q.y, l = Math.hypot(dx, dy);
+  const b = best as { d: number; q: Vec; c: Vec }, dx = p.x - b.q.x, dy = p.y - b.q.y, l = Math.hypot(dx, dy);
   if (l > 1e-9) return { d: b.d, n: { x: dx / l, y: dy / l } };
-  // (inside a land cell: out the way the nearest water lies, roughly: away from the cell's middle)
-  return { d: 0, n: { x: 0, y: 1 } };
+  // (inside a land cell: out roughly the way the nearest water lies, away from the cell's middle)
+  const ex = p.x - b.c.x, ey = p.y - b.c.y, el = Math.hypot(ex, ey);
+  return { d: 0, n: el > 1e-9 ? { x: ex / el, y: ey / el } : { x: 0, y: 1 } };
 }
 
 /*

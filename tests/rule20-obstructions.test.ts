@@ -41,7 +41,7 @@ function sail(w: World, b: World['boats'][number], p: Vec, tack: 'S' | 'P') {
 }
 /**
  * Near `seed`, a spot in open water where a boat close-hauled on `tack` meets the obstruction squarely, 25–35 m ahead
- * (land there, on onLand's own say, and still land if she bore away 20°), with water 9 m to windward of her for Blue.
+ * (land there, on onLand's own say, and still land if she bore away a little more than SUBSTANTIAL_TURN), with water 9 m to windward of her for Blue.
  */
 function pinnedSpot(w: World, seed: Vec, tack: 'S' | 'P'): Vec | null {
   const beat = beatAngle(w.wind.kt), h = tack === 'S' ? w.wind.from - beat : w.wind.from + beat, u = V(h), wv = V(w.wind.from);
@@ -119,8 +119,10 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
     w.pairs = {};
     expect(w.tackBlocker(u)).toBe(red);
     expect(w.roomBlocker(u)).toBeNull();
-    w.userHail();
+    w.drainEvents(); w.userHail();
     expect(w.pairRecord(u, red)?.hail ?? null).toBeNull();
+    const toast = w.drainEvents().find(e => e.type === 'toast');
+    expect(toast && 'msg' in toast ? toast.msg : '').toMatch(/Not yet.*20\.1\(a\)/);
   });
 
   it('not close-hauled: reaching onto Alcatraz, she may not hail (20.1(b))', () => {
@@ -131,8 +133,8 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
     expect(w.roomBlocker(u)).toBeNull();
   });
 
-  it('a pier head she can clear by bearing away a little is no reason to hail: only a substantial course change is (20.1(a))', () => {
-    // aimed at the end of one of the Wharf's piers so that the pier is dead ahead, but 20° lower clears all of it
+  it('a pier head she can clear by bearing away 10° is no reason to hail: only a substantial course change is (20.1(a))', () => {
+    // aimed at the end of one of the Wharf's piers so that the pier is dead ahead, but SUBSTANTIAL_TURN lower clears all of it
     const { w } = race();
     const beat = beatAngle(w.wind.kt);
     let found = 0;
@@ -144,7 +146,7 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
         const p = { x: tip.x - u.x * 30, y: tip.y - u.y * 30 };
         const clear = (v: Vec, len: number, side: number) => { const n = { x: v.y, y: -v.x }; for (let s = 0; s <= len; s += 0.25) if (onLand({ x: p.x + v.x * s + n.x * side, y: p.y + v.y * s + n.y * side })) return false; return true; };
         if (onLand(p) || clear(u, 40, 0)) continue; // the pier really is ahead
-        if (![-1.8, 0, 1.8].every(k => clear(away, 4 * hailRange(2.4), k))) continue; // and 20° lower clears it all
+        if (![-1.8, 0, 1.8].every(k => clear(away, 4 * hailRange(2.4), k))) continue; // and that much lower clears it all
         found++;
         expect(obstructionAhead(p, h, tack, hailRange(2.4)), `${L.name ?? L.kind}`).toBeNull();
       }

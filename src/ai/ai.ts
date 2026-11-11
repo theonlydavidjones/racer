@@ -6,7 +6,7 @@ import { beatFor, targetFor } from '../boat/seaway';
 import { V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
-import { obstructionAhead } from '../sim/obstruction';
+import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
 import type { World } from '../sim/world';
 
@@ -74,6 +74,10 @@ function blocked(w: World, b: Boat, h: number, d: number): boolean {
   return false;
 }
 
+/** Close-hauled with a boat to windward she'd hit tacking, and the obstruction soon ahead: a Rule 20 hail, not a detour. */
+function pinnedAt(w: World, b: Boat): boolean {
+  return b.twa <= beatFor(b) + 8 && !b.tacking && !!w.tackBlocker(b) && obstructionAhead(b, b.h, b.tack, hailRange(b.v)) !== null;
+}
 /** The first turn on the way by water from b to P (sim/routing.ts routeAround), or a clear heading toward it. */
 function escape(b: Vec, P: Vec): Vec | null {
   const r = routeAround(b, P, 30);
@@ -290,7 +294,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
       if (ai.detour) P = ai.detour;
-    } else if (b.started && !ai.detour && refresh && landAlong(b, P) < 500) {
+    } else if (b.started && !ai.detour && refresh && landAlong(b, P) < 500 && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
       // beating toward a point with land close ahead on the straight line to it (a jetty, a point, the harbor's mouth
       // she's in): tacking off the shore would only take her back and forth into the corner it makes, so she lays the
       // end of it first, as a sailor does: the first turn of the way round by water (the navigator's route)
@@ -334,9 +338,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   if (blocked(w, b, desired, 45)) {
     // Pinned by a boat to windward that she'd hit if she tacked? Hail for room to tack (Rule 20) as soon as she may
     // (close enough to the obstruction that she'll soon have to change course substantially: rule 20.1(a)), and hold on
-    // while the other boat responds. If she may not hail (the obstruction is an island mark the other boat is fetching,
-    // or a small bear-away clears it), she bears away round it instead of tacking into that boat.
-    const pinned = beating ? w.tackBlocker(b) : null, may = pinned ? w.roomBlocker(b) : null;
+    // while the other boat responds. If the island-mark rule forbids the hail (the other boat is fetching it), she bears
+    // away round it rather than tack into that boat. (Close-hauled is how she's sailing now, whatever she's aiming for.)
+    const closeHauled = b.twa <= beatFor(b) + 8 && !b.tacking;
+    const pinned = closeHauled ? w.tackBlocker(b) : null, may = pinned ? w.roomBlocker(b) : null;
     if (may && w.t - ai.lastHail > 40) { w.hail(b, may, 'room'); ai.lastHail = w.t; }
     const waiting = pinned && (may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
     if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;

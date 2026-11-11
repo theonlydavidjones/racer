@@ -9,7 +9,7 @@ import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } fro
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
 import { Puffs, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
-import { hailRange, obstructionAhead } from './obstruction';
+import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
@@ -977,6 +977,18 @@ export class World {
     if (!o || this.markFetchedBy(b, ob.at, o)) return null;
     return o;
   }
+  /** With a boat to windward she'd hit tacking, why may she not hail "Room to tack" (Rule 20.1)? Null if she may, or there's no such boat. */
+  whyNoRoomHail(b: Boat): string | null {
+    const o = this.tackBlocker(b);
+    if (!o || this.roomBlocker(b)) return null;
+    if (b.twa > beatAngle(b.ww.kt) + 8 || b.tacking) return `Not yet: you may hail "Room to tack" only when you're close-hauled or above (Rule 20.1(b)).`;
+    const range = hailRange(b.v), ob = obstructionAhead(b, b.h, b.tack, range);
+    if (ob) return `You may not hail: ${this.nextMark(b)?.name ?? 'the island'} is the mark and ${o.name} is fetching it (Rule 20.1). Bear away, or slow down and tack behind them.`;
+    const u = V(b.h), ahead = landAlong(b, { x: b.x + u.x * range, y: b.y + u.y * range });
+    if (landAlong(b, { x: b.x + u.x * 4 * range, y: b.y + u.y * 4 * range }) === Infinity) return null; // (no obstruction ahead at all)
+    if (ahead <= range) return `No need to hail: bearing away about ${SUBSTANTIAL_TURN}° clears it, so it isn't a substantial course change (Rule 20.1(a)). Sail round it.`;
+    return `Not yet: hail "Room to tack" when you'll soon need to change course a lot to clear the obstruction, about ${Math.round(range)} m from it at your speed (Rule 20.1(a)).`;
+  }
   /** Rule 20.1's last sentence: is the obstruction at `at` her next mark (an island), with `o` fetching it? */
   private markFetchedBy(b: Boat, at: Vec, o: Boat): boolean {
     const m = this.nextMark(b);
@@ -1045,6 +1057,8 @@ export class World {
         .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
       if (port) { this.hail(u, port.o, 'starboard'); return; }
     }
+    const why = this.whyNoRoomHail(u);
+    if (why) { this.emit({ type: 'toast', ms: 6000, msg: why }); return; }
     this.emit({ type: 'toast', ms: 5000, msg: 'Nothing to hail. "Room to tack!" is for when you\'re close-hauled and will soon have to change course a lot to clear an obstruction (the shore, a pier, an island), with a boat to windward stopping you tacking (Rule 20). "Starboard!" is for a port-tack boat on a collision course with you.' });
   }
 

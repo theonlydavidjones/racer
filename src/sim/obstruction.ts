@@ -3,11 +3,12 @@ import { landAlong } from '../geo/shore';
 import { HAIL_RESPONSE } from '../rules';
 
 /**
- * Rule 20.1(a)'s "substantial course change". Neither the rules nor World Sailing's cases give a figure; 20° is the
- * conservative reading: a few degrees off is ordinary steering (RULE16_MIN_TURN counts 12° as a course change at all),
- * and if bearing away 20° clears the obstruction she can sail round it rather than hail.
+ * Rule 20.1(a)'s "substantial course change". Neither the rules nor World Sailing's cases give a figure. Dave Perry,
+ * Understanding the Racing Rules of Sailing through 2028 (US Sailing), on 20.1(a): "as my general guideline, a course
+ * change of less than 10 degrees is not very 'substantial'", with any doubt going to the hailing boat. So: if bearing
+ * away 10° clears the obstruction she sails round it; if it takes more, she may hail.
  */
-export const SUBSTANTIAL_TURN = 20;
+export const SUBSTANTIAL_TURN = 10;
 /** Her width either side of the centreline that has to clear the obstruction, m (half her 2.2 m beam, and a little). */
 const HULL_SIDE = 1.8;
 /**
