@@ -299,8 +299,8 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
   #dial{width:120px;height:120px;top:calc(env(safe-area-inset-top,0px) + 82px)}
   #map{width:200px;height:250px;top:calc(env(safe-area-inset-top,0px) + 82px)}
   #mapHint{width:200px;top:calc(env(safe-area-inset-top,0px) + 338px)}
-  #situ{top:calc(env(safe-area-inset-top,0px) + 86px)}
-  #linebox{top:calc(env(safe-area-inset-top,0px) + 146px)}
+  #situ{top:calc(env(safe-area-inset-top,0px) + 126px)}
+  #linebox{top:calc(env(safe-area-inset-top,0px) + 184px)}
 }
 @media (max-width:759px){ .keys{display:none} }
 @media (prefers-reduced-motion:reduce){ #situ.alarm{animation:none;background:rgba(120,24,18,.9)} #toast{transition:none} }
@@ -640,3 +640,85 @@ body.lashed .tg-cur{background:#c9a36a}
 .tg-lash{display:none;position:absolute;top:calc(74% + 6px);left:50%;transform:translateX(-50%);padding:5px 10px;border-radius:6px;
   background:rgba(9,22,33,.78);border:1px dashed #c9a36a;color:#f0dcb8;font:600 11px/1.2 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
 body.lashed .tg-lash{display:block}
+/* the map's key (ui/legend.ts), under the layer switches */
+.layerpop{max-height:calc(100vh - 240px);overflow-y:auto}
+#chartLayersPop{max-height:calc(100vh - 120px);width:290px}
+#mapLayersPop{width:280px}
+.layerpop .lp-kh{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule)}
+.lp-key .lk-h{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 3px}
+.lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}
+.lp-key .lk-row canvas{flex:none;border-radius:2px;border:1px solid var(--rule)}
+
+/* ---------- crystal-clear trim controls (owner, Nov 2026) ---------- */
+/* the Crew · You switch, on every row: green Crew while the crew does it (auto), amber You once it's yours */
+.who{display:inline-flex;flex:0 0 auto;border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin-left:auto}
+.who button{font:700 10.5px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;height:30px;border:0;background:var(--btn);color:var(--muted);cursor:pointer}
+.who button+button{border-left:1px solid var(--rule)}
+.who button[data-who="crew"].on{background:#3fd197;color:#13202b}
+.who button[data-who="you"].on{background:var(--accent);color:#13202b}
+.who button:not(.on):hover{color:var(--text)}
+.who button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* a button with what it does under its name */
+.tp-btn.two{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:44px;line-height:1}
+.tp-btn.two small{font:500 10px/1.1 var(--f-body);letter-spacing:0;text-transform:none;color:var(--muted);white-space:nowrap}
+.tp-btn.two.on small,.tp-seg .tp-btn.two.on small{color:#13202b}
+.tp-head{gap:10px}
+.tp-head #tpWho{margin-left:auto}
+/* the crew: one line on auto, the places when open */
+.tp-crewbox{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--rule);padding-top:6px}
+.tp-crewhead{display:flex;align-items:center;gap:8px}
+.tp-crewline{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;background:none;border:0;padding:4px 0;color:var(--text);cursor:pointer;text-align:left}
+.tp-crewline:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tp-crewstat{font:600 12px/1.3 var(--f-body);color:var(--text);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-crewline.open .tp-crewstat{white-space:normal}
+.tp-fold{color:var(--muted);transition:transform .15s}
+.tp-crewline.open .tp-fold{transform:rotate(90deg)}
+.tp-wind{font:600 11px/1.2 var(--f-inst);letter-spacing:.04em;color:#7cc4ff}
+.tp-seg.tp-across{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.tp-seg.tp-across .tp-btn,.tp-seg.tp-fore .tp-btn{min-width:0;padding:0 4px;font-size:11.5px}
+.tp-seg.tp-fore{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-left:0}
+@media (prefers-reduced-motion:reduce){.tp-fold{transition:none}}
+/* the Lines list: the switch, and what each line does under it */
+.ctl-row{grid-template-columns:104px 1fr 54px auto auto;row-gap:2px}
+.ctl-what{grid-column:1 / -1;font:500 10.5px/1.3 var(--f-body);color:var(--muted);padding-bottom:3px}
+/* (a fixed width, so a long crew line wraps instead of widening the panel) */
+@media (min-width:760px){ #trimPanel{width:452px;box-sizing:border-box} }
+.tp-head .tp-lab{white-space:nowrap}
+/* on auto, the outline that follows the crew is the crew's green */
+.tp-seg .tp-btn.at{border:1px dashed #3fd197;color:#3fd197}
+.tp-seg .tp-btn.at small{color:#3fd197}
+/* (rows keep their height in the scrolling list: the sentence under each needs its room) */
+.ctl-row,.ctl-group{flex-shrink:0}
+.ctl-list{width:100%}
+
+/* ---------- clear of each other at 1280×720 (Coordinator's visual review, Nov 2026) ---------- */
+/* toasts beside the trim panel, not over it */
+@media (min-width:760px){ #toast{left:calc(max(16px,env(safe-area-inset-left,0px)) + 452px + 16px);top:calc(env(safe-area-inset-top,0px) + 316px);max-width:min(340px,calc(100vw - 452px - 330px))} }
+/* the messages panel stops above the keys line and the view buttons; older messages scroll */
+#msgLog{max-height:calc(100vh - 356px - 112px);overflow:hidden;box-sizing:border-box}
+#msgRecent{overflow-y:auto;min-height:0}
+/* the keys line on a dark strip, above the view buttons */
+#keysHint{background:var(--pod-solid);border:1px solid var(--rule);border-radius:6px;padding:5px 9px;color:var(--text);bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
+
+/* settings: quiet on/off rows, laid out like the key list (label left, a slim switch right; on = shown) */
+.togs{display:flex;flex-direction:column}
+.tog{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--rule);cursor:pointer;
+  font:400 13.5px/1.3 var(--f-body);color:var(--text)}
+.tog:first-child{border-top:1px solid var(--rule)}
+.tog input{position:absolute;opacity:0;width:1px;height:1px}
+.tog-sw{position:relative;flex:none;width:30px;height:16px;border-radius:8px;background:rgba(0,0,0,.35);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);transition:background .18s ease,box-shadow .18s ease}
+.tog-sw::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#d6dde2;
+  box-shadow:0 1px 2px rgba(0,0,0,.35);transition:transform .18s ease,background .18s ease}
+.tog input:checked + .tog-sw{background:color-mix(in srgb,var(--accent) 60%,#0d1b26)}
+.tog input:checked + .tog-sw::after{transform:translateX(14px)}
+.tog:hover .tog-sw{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
+.tog:hover input:checked + .tog-sw{background:var(--accent)}
+.tog input:focus-visible + .tog-sw{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),0 0 0 3px rgba(255,255,255,.12)}
+@media (prefers-reduced-motion:reduce){.tog-sw,.tog-sw::after{transition:none}}
+/* the key bindings are the buttons: click one, then press the new key */
+button.kkeys{background:none;border:1px solid transparent;border-radius:6px;padding:2px 4px;cursor:pointer;color:inherit;margin-left:auto}
+button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
+.krow.listening button.kkeys{border-color:var(--accent)}
+/* each bar's two ends, named under it (eased … on, leeward … windward) */
+.ctl-ends{grid-column:2;min-width:0;display:flex;justify-content:space-between;gap:3px;padding:0 8px;font:600 9.5px/1 var(--f-inst);letter-spacing:0;color:var(--muted);margin-top:-2px;white-space:nowrap}
+.ctl-row{grid-template-columns:96px minmax(0,1fr) 54px auto auto}

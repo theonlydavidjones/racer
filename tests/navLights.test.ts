@@ -45,13 +45,14 @@ describe('the lights in use (Rules 25 and 30)', async () => {
     setRestrictedVisibility(true); syncNavLights(nl, 'underway'); expect(shown(nl).length).toBe(3);
     setRestrictedVisibility(false); syncNavLights(nl, 'underway'); expect(shown(nl).length).toBe(0);
   });
-  for (const kind of ['deck', 'tricolour'] as const) it(`${kind}: none in the slip or switched off, the arcs under way, one all-round white at anchor; lanterns only while lit`, () => {
+  for (const kind of ['deck', 'tricolour'] as const) it(`${kind}: none in the slip or switched off, the arcs under way, one all-round white at anchor; the lanterns always on her, dark when not lit`, () => {
     const nl = build(kind);
     NIGHT.uOn.value = 1;
-    syncNavLights(nl, 'off'); expect(shown(nl)).toEqual([]); expect(nl.fittings.underway.visible || nl.fittings.anchor.visible).toBe(false);
-    syncNavLights(nl, 'underway'); expect(shown(nl)).toEqual(['underway:arc', 'underway:arc', 'underway:arc']); expect([nl.fittings.underway.visible, nl.fittings.anchor.visible]).toEqual([true, false]);
-    syncNavLights(nl, 'anchor'); expect(shown(nl)).toEqual(['anchor:round']); expect([nl.fittings.underway.visible, nl.fittings.anchor.visible]).toEqual([false, true]);
-    // by day nothing is lit, and no lantern is drawn
-    NIGHT.uOn.value = 0; syncNavLights(nl, 'underway'); expect(shown(nl)).toEqual([]); expect(nl.fittings.underway.visible).toBe(false);
+    syncNavLights(nl, 'off'); expect(shown(nl)).toEqual([]); expect(nl.fittings.underway.visible && nl.fittings.anchor.visible).toBe(true);
+    expect(nl.lenses.every(l => l.m.emissiveIntensity === 0)).toBe(true);
+    syncNavLights(nl, 'underway'); expect(shown(nl)).toEqual(['underway:arc', 'underway:arc', 'underway:arc']); expect(nl.lenses.filter(l => l.m.emissiveIntensity > 0).every(l => l.role === 'underway')).toBe(true);
+    syncNavLights(nl, 'anchor'); expect(shown(nl)).toEqual(['anchor:round']); expect(nl.lenses.filter(l => l.m.emissiveIntensity > 0).map(l => l.role)).toEqual(['anchor']);
+    // by day nothing is lit, though the lanterns are on her
+    NIGHT.uOn.value = 0; syncNavLights(nl, 'underway'); expect(shown(nl)).toEqual([]); expect(nl.fittings.underway.visible).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { hitsHarbor } from '../geo/marina';
 import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
-import { onLand } from '../geo/shore';
+import { onLand, pierAt } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
@@ -458,7 +458,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing }, dt);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -634,12 +634,14 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
-  else if (onLand(bow(b))) { // (the message by what she hit, a dock or the shore, not by where she is)
+  else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
+    const hit = bow(b), pier = pierAt(hit), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
-    bump(hitsHarbor(bow(b)) ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+    bump(pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {
+    const hit = stern(b), pier = pierAt(hit);
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
-    bump(hitsHarbor(stern(b)) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
+    bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)

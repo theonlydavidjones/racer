@@ -32,6 +32,14 @@ export interface AiState {
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
+  /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
+  goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
+  /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
+  running?: boolean;
+  /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
+  avgFrom?: number;
+  /** How long she's been headed (s), by her compass. */
+  headedT?: number;
 }
 
 export interface Boat {
@@ -196,6 +204,8 @@ export interface Boat {
   spec?: BoatSpec;
   /** Wind shadows on her (environment/shadows.ts): the lee of the land (cached) and everything together (1 = clear air). */
   leeK?: number; shadowK?: number;
+  /** About a minute's running mean of the wind she's in (deg): her compass's average, for lifts and headers. */
+  avgFrom?: number;
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
   cond?: Condition;
 }

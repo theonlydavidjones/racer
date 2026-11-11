@@ -3,6 +3,7 @@ import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
 import wharf from './data/wharf.json';
+import bridgePiers from './data/bridge-piers.json';
 import { HARBORS, harborIndex, hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); from the Gate to Pier 27
@@ -122,7 +123,71 @@ export const WHARF: { areas: WharfPart[]; lines: WharfPart[] } = {
 };
 const WHARF_BOX = boxOf([...WHARF.areas, ...WHARF.lines].flatMap(a => [{ x: a.box.x0, y: a.box.y0 }, { x: a.box.x1, y: a.box.y1 }]), 0);
 const inB = (p: Vec, b: WharfPart['box']) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1;
+
+/**
+ * The bridges' towers and piers standing in the water (scripts/make-bridge-piers.mjs): the Golden Gate Bridge's
+ * two tower bases (OpenStreetMap) and the south tower's fender (NOAA's chart), the Bay Bridge's piers and towers
+ * (NOAA's chart: the West Span's Piers A–F, the East Span's tower and the Skyway's piers), the Richmond–San Rafael
+ * Bridge's. Solid, as the Wharf's piers are, and in the same places: onLand, landAlong, the nearest structure for
+ * Rule 19, the passage planner. They stand alone in open water, so each has its own box and no group box.
+ */
+export interface Pier extends WharfPart { name: string; top: number; depth: number }
+/**
+ * How high each stands out of the water (m): the Golden Gate's tower bases 13 (OpenStreetMap's height), the south
+ * tower's fender 6, the Bay Bridge's piers 10, the others 6 (estimates from photographs: the chart gives only
+ * footprints). The West Span's Pier C is its concrete central anchorage (W4), 450 ft tall from bedrock about 220 ft below
+ * the water (Caltrans, via ketchum.org/papers/sfobbeq.pdf; calisphere.org): about 70 m standing out of the water.
+ */
+const topOf = (n: string) => /tower$/.test(n) ? 13 : /fender/.test(n) ? 6 : n === 'Bay Bridge, Pier C' ? 70 : /^Bay Bridge/.test(n) ? 10 : 6;
+export const PIERS: Pier[] = (bridgePiers as unknown as { piers: { name: string; pts: [number, number][]; depth?: { m: number } }[] }).piers
+  .map(a => { const pts = a.pts.map(q => LL(q[0], q[1])); return { name: a.name, kind: 'bridge', pts, box: boxOf(pts, 0), top: topOf(a.name), depth: Math.max(2, a.depth?.m ?? 10) }; });
+/** The piers bridge by bridge, each bridge's in one box: most of the water is nowhere near any of them. */
+const PIER_GROUPS: { box: WharfPart['box']; piers: Pier[] }[] = (() => {
+  const by = new Map<string, Pier[]>();
+  for (const P of PIERS) { const k = P.name.split(',')[0]; by.set(k, [...(by.get(k) ?? []), P]); }
+  return [...by.values()].map(piers => ({ piers, box: boxOf(piers.flatMap(P => [{ x: P.box.x0, y: P.box.y0 }, { x: P.box.x1, y: P.box.y1 }]), 0) }));
+})();
+/** The bridge pier or tower at p, if she's hit one (for the message: what she hit). */
+export const pierAt = (p: Vec): Pier | null => {
+  for (const G of PIER_GROUPS) if (inB(p, G.box)) for (const a of G.piers) if (inB(p, a.box) && inPoly(p, a.pts)) return a;
+  return null;
+};
+export const hitsPier = (p: Vec): boolean => pierAt(p) !== null;
+
+/*
+ * The terrain's 50 m land grid (from elevation data) has some of the bigger piers in it as blocks of land: the Bay
+ * Bridge's Pier A and centre anchorage stand well above the water. Where a pier is drawn exactly above, those blocks
+ * would make a boat run aground 20–30 m short of it, so a patch of grid land that stands on its own in the water,
+ * everywhere within 80 m of a pier, is water: the pier's outline is what's solid. (Land joined to real shore, such as
+ * Yerba Buena Island's beside the Bay Bridge's Pier F, stays.)
+ */
+{
+  const cw = (M.east - M.west) / M.nx, ch = (M.north - M.south) / M.ny;
+  const cellC = (i: number, j: number): Vec => ({ x: (M.west + (i + 0.5) * cw - LON0) * MLON, y: (M.north - (j + 0.5) * ch - LAT0) * MLAT });
+  const nearPier = (q: Vec, r: number) => PIERS.some(P => q.x > P.box.x0 - r && q.x < P.box.x1 + r && q.y > P.box.y0 - r && q.y < P.box.y1 + r && P.pts.some((v, k) => segPt(q, v, P.pts[(k + 1) % P.pts.length]) < r || inPoly(q, P.pts)));
+  const done = new Uint8Array(M.nx * M.ny);
+  for (const P of PIERS) {
+    const toCell = (v: Vec) => [Math.floor(((LON0 + v.x / MLON) - M.west) / cw), Math.floor((M.north - (LAT0 + v.y / MLAT)) / ch)];
+    const [i0, j0] = toCell({ x: P.box.x0 - 80, y: P.box.y1 + 80 }), [i1, j1] = toCell({ x: P.box.x1 + 80, y: P.box.y0 - 80 });
+    for (let j = Math.max(0, j0); j <= Math.min(M.ny - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(M.nx - 1, i1); i++) {
+      const k = j * M.nx + i; if (!GRID[k] || done[k]) continue;
+      // the patch of land this cell belongs to: is all of it close round a pier?
+      const blob: number[] = [], stack = [k]; let alone = true; done[k] = 1;
+      while (stack.length && blob.length < 64) {
+        const c = stack.pop()!, ci = c % M.nx, cj = (c - ci) / M.nx; blob.push(c);
+        if (!nearPier(cellC(ci, cj), 80)) { alone = false; break; }
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+          const ni = ci + di, nj = cj + dj, n = nj * M.nx + ni;
+          if (ni >= 0 && nj >= 0 && ni < M.nx && nj < M.ny && GRID[n] && !done[n]) { done[n] = 1; stack.push(n); }
+        }
+      }
+      if (alone && !stack.length) for (const c of blob) GRID[c] = 0;
+    }
+  }
+}
+
 export function hitsWharf(p: Vec): boolean {
+  if (hitsPier(p)) return true;
   if (!inB(p, WHARF_BOX)) return false;
   for (const a of WHARF.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return true;
   for (const l of WHARF.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return true;
@@ -149,9 +214,14 @@ export function alongside(pts: Vec[], closed: boolean, k: number, q: Vec, n: Vec
  * The nearest of the Wharf's piers, breakwaters and docks (m; 0 inside one; null beyond `max`), the direction away
  * from it, and how far a boat there passes alongside it (see alongside).
  */
-export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; along: number } | null {
+/**
+ * The nearest of the Wharf's piers, breakwaters and docks, and (with `piers`) the bridges' piers: for Rule 19, the
+ * passage planner. The current's shore relief leaves the bridges' piers out: one standing alone in the stream isn't a
+ * harbour wall, and the water round it isn't slack (environment/pierWakes.ts does its wake).
+ */
+export function wharfNearest(p: Vec, max = 60, piers = true): { d: number; n: Vec; along: number } | null {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
-  if (p.x < WHARF_BOX.x0 - max || p.x > WHARF_BOX.x1 + max || p.y < WHARF_BOX.y0 - max || p.y > WHARF_BOX.y1 + max) return null;
+  const nearWharf = !(p.x < WHARF_BOX.x0 - max || p.x > WHARF_BOX.x1 + max || p.y < WHARF_BOX.y0 - max || p.y > WHARF_BOX.y1 + max);
   type Best = { d: number; q: Vec; part: WharfPart; closed: boolean; k: number };
   let best: Best | null = null;
   const near = (b: WharfPart['box']) => p.x >= b.x0 - max && p.x <= b.x1 + max && p.y >= b.y0 - max && p.y <= b.y1 + max;
@@ -161,14 +231,16 @@ export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; along: numb
     if (!best || d < best.d) best = { d, q, part, closed, k };
   };
   let inside = false;
-  for (const a of WHARF.areas) if (near(a.box)) { const n = a.pts.length; for (let i = 0; i < n; i++) seg(a, true, i + 1, a.pts[i], a.pts[(i + 1) % n], 0); if (inPoly(p, a.pts)) inside = true; }
-  for (const l of WHARF.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l, false, i, l.pts[i - 1], l.pts[i], l.width! / 2);
+  if (piers) for (const G of PIER_GROUPS) if (near(G.box)) for (const a of G.piers) if (near(a.box)) { const n = a.pts.length; for (let i = 0; i < n; i++) seg(a, true, i + 1, a.pts[i], a.pts[(i + 1) % n], 0); if (inPoly(p, a.pts)) inside = true; }
+  if (nearWharf) for (const a of WHARF.areas) if (near(a.box)) { const n = a.pts.length; for (let i = 0; i < n; i++) seg(a, true, i + 1, a.pts[i], a.pts[(i + 1) % n], 0); if (inPoly(p, a.pts)) inside = true; }
+  if (nearWharf) for (const l of WHARF.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l, false, i, l.pts[i - 1], l.pts[i], l.width! / 2);
   const b = best as Best | null;
   if (!b || b.d > max) return null;
   const dx = p.x - b.q.x, dy = p.y - b.q.y, L = Math.hypot(dx, dy) || 1, n = { x: dx / L, y: dy / L };
   return { d: inside ? 0 : Math.max(0, b.d), n, along: alongside(b.part.pts, b.closed, b.k, b.q, n) };
 }
-export const wharfDist = (p: Vec, max = 400): number => wharfNearest(p, max)?.d ?? Infinity;
+/** How far to the nearest of the Wharf's piers, breakwaters and docks (not the bridges'): for the current's shore relief. */
+export const wharfDist = (p: Vec, max = 400): number => wharfNearest(p, max, false)?.d ?? Infinity;
 
 /**
  * How enclosed the water here is by the Wharf's piers and breakwaters and the shore (0 open … 1 enclosed): of 16
@@ -177,7 +249,7 @@ export const wharfDist = (p: Vec, max = 400): number => wharfNearest(p, max)?.d 
  */
 const shelterCache = new Map<number, number>();
 export function wharfShelter(p: Vec): number {
-  if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !wharfNearest(p, 350)) return 0;
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !wharfNearest(p, 350, false)) return 0;
   const i = Math.floor(p.x / 20), j = Math.floor(p.y / 20), key = i * 100003 + j;
   let v = shelterCache.get(key);
   if (v == null) {
@@ -185,7 +257,7 @@ export function wharfShelter(p: Vec): number {
     let hit = 0;
     for (let k = 0; k < 16; k++) {
       const a = k * Math.PI / 8, e = { x: c.x + Math.sin(a) * 400, y: c.y + Math.cos(a) * 400 };
-      let h = wharfCrossed(c, e);
+      let h = wharfCrossed(c, e, false);
       for (let r = 20; !h && r <= 400; r += 20) h = onGround({ x: c.x + Math.sin(a) * r, y: c.y + Math.cos(a) * r });
       if (h) hit++;
     }
@@ -195,14 +267,19 @@ export function wharfShelter(p: Vec): number {
   return v;
 }
 
-/** Does the straight line from a to b touch any of the Wharf's piers, breakwaters or docks? (Exact: they're 1–10 m wide.) */
-export function wharfCrossed(a: Vec, b: Vec): boolean {
+/** Does the straight line from a to b touch any of the Wharf's piers, breakwaters or docks, or (with `piers`) the bridges' piers? (Exact.) */
+export function wharfCrossed(a: Vec, b: Vec, piers = true): boolean {
   const bx0 = Math.min(a.x, b.x), bx1 = Math.max(a.x, b.x), by0 = Math.min(a.y, b.y), by1 = Math.max(a.y, b.y);
-  if (bx1 < WHARF_BOX.x0 || bx0 > WHARF_BOX.x1 || by1 < WHARF_BOX.y0 || by0 > WHARF_BOX.y1) return false;
+  const nearWharf = !(bx1 < WHARF_BOX.x0 || bx0 > WHARF_BOX.x1 || by1 < WHARF_BOX.y0 || by0 > WHARF_BOX.y1);
   const hit = (bb: WharfPart['box']) => !(bx1 < bb.x0 || bx0 > bb.x1 || by1 < bb.y0 || by0 > bb.y1);
   const cr = (o: Vec, p: Vec, q: Vec) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
   const crosses = (p: Vec, q: Vec, r: Vec, s: Vec) => (cr(p, q, r) > 0) !== (cr(p, q, s) > 0) && (cr(r, s, p) > 0) !== (cr(r, s, q) > 0);
   const segSeg = (p: Vec, q: Vec, r: Vec, s: Vec) => crosses(p, q, r, s) ? 0 : Math.min(segPt(p, r, s), segPt(q, r, s), segPt(r, p, q), segPt(s, p, q));
+  if (piers) for (const G of PIER_GROUPS) if (hit(G.box)) for (const A of G.piers) if (hit(A.box)) {
+    if (inPoly(a, A.pts) || inPoly(b, A.pts)) return true;
+    for (let i = 0; i < A.pts.length; i++) if (crosses(a, b, A.pts[i], A.pts[(i + 1) % A.pts.length])) return true;
+  }
+  if (!nearWharf) return false;
   for (const A of WHARF.areas) if (hit(A.box)) {
     if (inPoly(a, A.pts) || inPoly(b, A.pts)) return true;
     for (let i = 0; i < A.pts.length; i++) if (crosses(a, b, A.pts[i], A.pts[(i + 1) % A.pts.length])) return true;
@@ -314,6 +391,8 @@ export function landAlong(a: Vec, b: Vec): number {
   const poly = (pts: Vec[], f: (t: number) => void) => { for (let i = 0; i < pts.length; i++) { const t = edgeCross(a, b, pts[i], pts[(i + 1) % pts.length]); if (t < best) f(t); } };
   const line = (pts: Vec[], half: number) => { for (let i = 1; i < pts.length; i++) { const t = lineHit(a, b, pts[i - 1], pts[i], half); if (t < best) solid(t); } };
   const dock = (pts: Vec[], half: number) => { const t = dockHit(a, b, pts, half); if (t < best) solid(t); };
+  // the bridges' towers and piers
+  for (const G of PIER_GROUPS) if (overlaps(bb, G.box)) for (const A of G.piers) if (overlaps(bb, A.box)) poly(A.pts, solid);
   // the Wharf's piers, breakwaters and docks, and the marinas' (always solid, in a basin or out of it)
   if (overlaps(bb, WHARF_BOX)) {
     for (const A of WHARF.areas) if (overlaps(bb, A.box)) poly(A.pts, solid);

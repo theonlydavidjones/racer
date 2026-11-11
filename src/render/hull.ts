@@ -249,11 +249,12 @@ export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: 0.24 };
 /**
  * The companionway in the after end of the cabin, drawn open (as she's sailed): the sliding hatch 550 mm wide and
  * 460 mm long, from the after bulkhead forward (the construction plan's deck plan, "sliding hatch"), slid forward over
- * the cabin top; the doors (carried while racing, CR 3.18) stowed below. The sill's height isn't on the plan: about
- * 250 mm over the cockpit sole is estimated, enough to keep a sea in the cockpit out of the cabin. Headroom inside is
- * 1230 mm from the cabin floor (CR 3.14, at least, at St. 8).
+ * the cabin top; the doors (carried while racing, CR 3.18) stowed below. The doorway runs from the top down nearly to
+ * the cockpit sole, as on Josephine (the owner's photo): its sill isn't on the plan, about 150 mm over the sole is
+ * estimated. Inside, the companionway's well and its steps down to the cabin floor, 1230 mm under the cabin top
+ * (CR 3.14, at least, at St. 8); `well` how far forward of the bulkhead the well is drawn (m).
  */
-export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.25, headroom: 1.23 };
+export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.15, headroom: 1.23, well: 0.5 };
 /** The coaming's thickness (m): the cockpit opening is its inside face. */
 export const COAMING_T = 0.025;
 /** Cockpit half-width: inside the coaming, which follows the side line, narrowing aft with the hull. */
@@ -316,7 +317,8 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   for (const o of ring) {
     sides.push(o.x, 0.45, zAt(o.u), o.x - Math.sign(o.x) * CABIN_LEAN, topY(o.u), zAt(o.u));
   }
-  for (let i = 0; i < ring.length - 1; i++) { const a = i * 2; sIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  // (all round but the after end: that's the bulkhead, with the companionway in it, below)
+  for (let i = 0; i < ring.length - 1; i++) { if (i === N) continue; const a = i * 2; sIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3)); sg.setIndex(sIdx); sg.computeVertexNormals();
   // the top, open over the companionway aft of where the sliding hatch's opening begins (its edges are grid lines)
   const top: number[] = [], tIdx: number[] = [], NX = 8, hw = COMPANIONWAY.hw, uSlot = CABIN.u1 - COMPANIONWAY.len / L;
@@ -476,25 +478,26 @@ export function cockpitLid(): THREE.BufferGeometry {
 }
 
 /**
- * Below, seen through the open companionway: the cabin's floor, its sides and its forward end (no after wall or
- * deckhead: the bulkhead and the cabin top are those), inside the hull's shell, so the water and the shell's inside
- * aren't what's seen through the opening.
+ * Inside the doorway, all that's seen through it: the companionway's well, its two sides, its forward face and the
+ * cabin floor at its foot, kept within the opening's width and the hatch's length so nothing of it reaches the cabin's
+ * own sides or top. UVs: u across, v from the floor (0) up to the cabin top (1), for the lamplight's fall-off.
  */
-export function cabinInterior(): THREE.BufferGeometry[] {
-  // 1.4 m of it, forward from the bulkhead: as far as the eye reaches through the opening, where the cabin is still full width
-  const z1 = zAt(CABIN.u1) - 0.01, z0 = z1 - 1.4, uF = uAtZ(z0), yf = cabinTopY(CABIN.u1) + CABIN.crown - COMPANIONWAY.headroom;
-  // (inside the cabin sides, and inside the hull's shell down at the floor)
-  const hb = Math.min(cabinHalf(uF) - 0.06, cabinHalf(CABIN.u1) - 0.06, hullHalfAt(uF, yf) - 0.03, hullHalfAt(CABIN.u1, yf) - 0.03), V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-  const roof = (z: number, x: number) => cabinTopAt(uAtZ(z), x) - 0.01; // just under the cabin top
-  const fwd: THREE.Vector3[] = [V(-hb, yf, z0), V(hb, yf, z0)];
-  for (let j = 0; j <= 8; j++) { const x = hb * (1 - 2 * j / 8); fwd.push(V(x, roof(z0, x), z0)); }
-  const fg = new THREE.BufferGeometry().setFromPoints(fwd); fg.setIndex(THREE.ShapeUtils.triangulateShape(fwd.map(q => new THREE.Vector2(q.x, q.y)), []).flat()); fg.computeVertexNormals();
-  return [
-    quad(V(-hb, yf, z1), V(hb, yf, z1), V(hb, yf, z0), V(-hb, yf, z0)), // the floor
-    fg, // forward
-    quad(V(hb, yf, z1), V(hb, roof(z1, hb), z1), V(hb, roof(z0, hb), z0), V(hb, yf, z0)), // the sides
-    quad(V(-hb, yf, z0), V(-hb, roof(z0, -hb), z0), V(-hb, roof(z1, -hb), z1), V(-hb, yf, z1)),
-  ];
+export function companionwayWell(): THREE.BufferGeometry {
+  const { hw, well, headroom } = COMPANIONWAY, z1 = zAt(CABIN.u1) - 0.005, z0 = z1 - well, yt = cabinTopY(CABIN.u1) + CABIN.crown, yf = yt - headroom;
+  const roof = (z: number, x: number) => cabinTopAt(uAtZ(z), x) - 0.01, pos: number[] = [], uv: number[] = [];
+  const tri = (a: number[], b: number[], c: number[]) => { for (const q of [a, b, c]) { pos.push(q[0], q[1], q[2]); uv.push((q[0] + hw) / (2 * hw), (q[1] - yf) / (yt - yf)); } };
+  const quad4 = (a: number[], b: number[], c: number[], d: number[]) => { tri(a, b, c); tri(a, c, d); };
+  quad4([-hw, yf, z1], [hw, yf, z1], [hw, yf, z0], [-hw, yf, z0]); // the floor
+  for (const x of [hw, -hw]) quad4([x, yf, z1], [x, roof(z1, x), z1], [x, roof(z0, x), z0], [x, yf, z0]); // the sides
+  const N = 6; // the forward face, up under the arch of the cabin top
+  for (let j = 0; j < N; j++) { const xa = -hw + 2 * hw * j / N, xb = -hw + 2 * hw * (j + 1) / N; quad4([xa, yf, z0], [xb, yf, z0], [xb, roof(z0, xb), z0], [xa, roof(z0, xa), z0]); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); return g;
+}
+/** The companionway's steps down the well, from the sill to the cabin floor: three treads (boxes, in the boat's frame). */
+export function companionwaySteps(): THREE.BufferGeometry[] {
+  const { hw, well, headroom, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), yf = cabinTopY(CABIN.u1) + CABIN.crown - headroom, out: THREE.BufferGeometry[] = [];
+  for (let i = 1; i <= 3; i++) { const y = yf + (sill - yf) * i / 4, z = z1 - well * (0.15 + 0.2 * i); out.push(new THREE.BoxGeometry(2 * hw - 0.08, 0.03, 0.2).translate(0, y, z)); }
+  return out;
 }
 /** Depth-only covers over the companionway's openings (as cockpitLid): the sea isn't drawn inside her through them. */
 export function companionwayLid(): THREE.BufferGeometry {
