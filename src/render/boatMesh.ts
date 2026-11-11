@@ -5,11 +5,11 @@ import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, carLead } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, type Crew } from './crew';
+import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, cabinInterior, companionwayLid, slidingHatch, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayWell, companionwaySteps, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, luffTellStates, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
@@ -180,14 +180,24 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   }
   const topAft = cab.topY(CABIN.u1), zAft = zc(CABIN.u1);
   // companionway, sliding hatch and the compass on the aft end of the cabin (as on Josephine)
-  // the companionway open, its hatch slid forward, and the cabin below: dim by day, lit warm by its lamps after dark
-  // (navLights.ts syncNavLights, the same clock as the ports' glow)
-  const below = new THREE.MeshLambertMaterial({ color: 0x5a4030, side: THREE.DoubleSide, emissive: 0x000000 });
-  grp.add(new THREE.Mesh(mergeGeometries(cabinInterior().map(g => (g.index ? g.toNonIndexed() : g)), false)!, below));
+  // the companionway open, its hatch slid forward: through the doorway its well and steps, dim varnished wood by day;
+  // after dark lit warm by the cabin's lamp below, brightest low down and fading up the well (navLights.ts, the same
+  // clock as the ports)
+  const below = new THREE.MeshLambertMaterial({ color: 0x4a3426, side: THREE.DoubleSide, emissive: 0x000000, emissiveMap: lampFall() });
+  grp.add(new THREE.Mesh(companionwayWell(), below));
   grp.userData.below = below;
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
   // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
-  const woodTop = [slidingHatch().toNonIndexed()];
+  const woodTop = [slidingHatch().toNonIndexed(), ...companionwaySteps().map(g => g.toNonIndexed())];
+  { // the doorway's frame (a post each side, the sill across its foot) and the hatch's runners along the cabin top
+    const { hw, len, sill } = COMPANIONWAY, z1 = zc(CABIN.u1), top = cabinTopAt(CABIN.u1, hw);
+    for (const sx of [1, -1]) {
+      woodTop.push(new THREE.BoxGeometry(0.04, top - sill, 0.025).toNonIndexed().translate(sx * (hw + 0.02), (top + sill) / 2, z1 + 0.012));
+      const xr = sx * (hw + 0.045), zf = z1 - 2 * len - 0.08, zm = (z1 + zf) / 2;
+      woodTop.push(new THREE.BoxGeometry(0.025, 0.035, z1 - zf).toNonIndexed().translate(xr, cabinTopAt(uAtZ(zm), xr) + 0.017, zm));
+    }
+    woodTop.push(new THREE.BoxGeometry(2 * hw + 0.08, 0.03, 0.05).toNonIndexed().translate(0, sill - 0.015, z1 + 0.005));
+  }
   for (const s of [1, -1]) {
     const gu = (CABIN.u0 + CABIN.u1) / 2 + 0.03, gx = s * (CABIN.w - 0.2);
     woodTop.push(new THREE.BoxGeometry(0.04, 0.05, 1.2).toNonIndexed().translate(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)));
@@ -348,12 +358,17 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const js = line(Array.from({ length: 5 }, () => new THREE.Vector3())); grp.add(js); jibSheets[tk] = js;
   }
   // the piano: three cam cleats a side on the aft end of the cabin, and the lines running forward to the mast
-  const zA = -L / 2 + CABIN.u1 * L, yA = cabinTopY(CABIN.u1) - 0.06;
+  // (on the cabin top at its after edge, beside the companionway: the lines come straight aft along the cabin top
+  // outboard of the hatch's runners, as on Josephine, and turn in to the mast's foot only forward of the hatch)
+  const zA = -L / 2 + CABIN.u1 * L - 0.05, zClear = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.15;
+  const onTop = (x: number, z: number) => new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.025, z);
   for (const side of [1, -1]) for (let i = 0; i < 3; i++) {
-    const x = side * (0.33 + 0.07 * i);
-    const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.set(x, yA, zA + 0.03); grp.add(cl);
-    grp.add(line([new THREE.Vector3(x, yA + 0.02, zA + 0.03), new THREE.Vector3(x * 0.6, cabinTopAt(uAtZ(-0.2), x * 0.6) + 0.02, -0.2), new THREE.Vector3(side * 0.06, deckY(uAtZ(MAST_Z), 0) + 0.06, MAST_AFT_Z + 0.03)]));
-    grp.add(line([new THREE.Vector3(x, yA - 0.01, zA + 0.05), new THREE.Vector3(x + side * 0.02, yA - 0.2 - 0.04 * i, zA + 0.07)])); // the tail
+    const x = side * (0.37 + 0.065 * i), cp = onTop(x, zA);
+    const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
+    const run = [cp]; for (let k = 1; k <= 4; k++) run.push(onTop(x, zA + (zClear - zA) * k / 4));
+    run.push(onTop(side * 0.06 + (x - side * 0.06) * 0.35, (zClear + MAST_AFT_Z) / 2), new THREE.Vector3(side * 0.06, deckY(uAtZ(MAST_Z), 0) + 0.06, MAST_AFT_Z + 0.03));
+    grp.add(line(run));
+    grp.add(line([cp.clone().setZ(zA + 0.02), new THREE.Vector3(x + side * 0.02, cp.y - 0.25 - 0.04 * i, zA + 0.1)])); // the tail, down the bulkhead
   }
   return { travCar, backstay, cars, jibSheets, winches };
 }
@@ -577,7 +592,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   }
   m.card.rotation = b.h * D2R;
   // the crew on the windward side, hiking as hard as she needs
-  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm);
+  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking);
   if (b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
@@ -828,6 +843,15 @@ const teakCache = new Map<boolean, THREE.CanvasTexture>();
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
  * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
  */
+/** The cabin lamp's light up the companionway's well: full on the floor at its foot, faint by the top (v up). */
+let lampTex: THREE.CanvasTexture | null = null;
+function lampFall(): THREE.CanvasTexture {
+  if (lampTex) return lampTex;
+  const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d')!, gr = g.createLinearGradient(0, 64, 0, 0);
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, '#8c8c8c'); gr.addColorStop(0.6, '#262626'); gr.addColorStop(1, '#080808');
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
+  return (lampTex = new THREE.CanvasTexture(c));
+}
 function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   if (!g.attributes.normal) g.computeVertexNormals();
   const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];

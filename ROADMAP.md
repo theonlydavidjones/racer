@@ -53,6 +53,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
+once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
+companionway redo) and Crew Figures; next as each finishes, Crew Controls and Marinas, then Bay East.
+
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
@@ -78,7 +82,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the first press; say so in the tiller hint. Owner: "one issue with double-click in browser is that it surfaces the
   browser menu. need to solve somehow." Over the 3D view only: no context menu, no double-click text selection, no
   double-tap zoom; menus and text selection still work on the panels. Test in Chrome, Safari and Firefox on a trackpad.
-- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
+- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h; in progress: Charts): owner, "I just watched her sail
   right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
   (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
   piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
@@ -581,6 +585,25 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Downhaul: drawn as a gooseneck downhaul, cleat position approximate.
 
 ## Later
+
+- **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
+  getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the
+  technical port, plus the business setup):
+  - Wrap the same TypeScript and three.js code as a Mac and Windows app: Tauri for a small download, or Electron for
+    consistent graphics.
+  - Sell it on Steam, itch.io, or direct through Paddle or Lemon Squeezy.
+  - Move saves from the artifact's database and localStorage to local files, with Steam cloud sync.
+  - Cache NOAA, NWS and chart data for offline use, and check the ENC chart data's terms for bundling.
+  - Add a graphics-quality setting, an installer, and code-signing (Apple and Microsoft certificates, about $100 a year
+    each).
+  - Store page, trailer, privacy policy, price and refunds.
+  - Keep real skippers' names out of the shipped product without permission.
+
+  **Watch note:** move off the browser when any of these becomes true (the Coordinator flags it when one comes close):
+  - the artifact's 16 MB size limit is in sight (3.5 MB today);
+  - performance needs native threads or a GPU budget the browser can't give;
+  - saves outgrow the artifact database;
+  - we need things a page can't have: file access, game controllers, a full-screen app.
 
 - Real past races with real wind and current (goal 4).
 - More courses, and race-committee options (course changes, shortened courses).
