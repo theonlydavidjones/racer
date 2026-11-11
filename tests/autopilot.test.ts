@@ -20,7 +20,7 @@ describe('the tiller pilot', () => {
       fastest = Math.max(fastest, Math.abs(u.tiller - last) / DT); last = u.tiller;
     });
     expect(worst).toBeLessThan(8);
-    expect(fastest).toBeLessThanOrEqual(0.5 + 1e-9);
+    expect(fastest).toBeLessThanOrEqual(2 / 4.5 + 1e-9);
   });
 
   it('AutoTrim learns her standing weather helm, so she holds her course close-hauled in a breeze', () => {
