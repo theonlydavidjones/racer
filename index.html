@@ -101,15 +101,13 @@
   <div class="panel wide home">
     <div class="eyebrow">San Francisco Bay</div>
     <h1>Folkboat Racing Sim</h1>
-    <p class="lede">Nordic Folkboats on the real Bay: real wind, tide, current and sea, observed or forecast for the day you choose.</p>
-    <div class="modes">
-      <button type="button" class="modecard" data-home="race"><b>Race</b><span>Pick a race day and start time, a course or the race committee's choice, the boats you race against, and your crew. The real weather, or adjust it.</span></button>
-      <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay: choose where to start and, if you like, where you're going. The same real conditions, or adjust them.</span></button>
-      <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats: their particulars, race records and who's sailed them. Build and set them up, and sail one.</span></button>
-      <button type="button" class="modecard soon" data-home="club"><b>Yacht Club</b><span>Coming: your crew and skippers, and how well each boat in the fleet is sailed.</span></button>
+    <p class="lede">Nordic Folkboats on the real Bay, in the real wind, tide and sea for the day you choose.</p>
+    <div class="modes three">
+      <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
+      <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
+      <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats and their records</span></button>
     </div>
-    <div class="btnrow"><button class="ghost" id="bKeys0" type="button">Keyboard settings</button></div>
-    <p class="savenote" id="saveNote"></p>
+    <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button><button type="button" class="linkbtn" data-home="club">Yacht Club: coming</button><span class="savenote" id="saveNote"></span></div>
   </div>
 </div>
 <div class="overlay" id="club" hidden>
@@ -121,89 +119,93 @@
     <div class="btnrow"><button class="cta" type="button" data-home="home">Back</button></div>
   </div>
 </div>
+<div class="overlay" id="raceChoose" hidden>
+  <div class="panel wide home">
+    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
+    <h1>Race</h1>
+    <div class="modes">
+      <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
+      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>Sail one of your races again: the same course, fleet, day and start</span></button>
+    </div>
+    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="pastRows"></div></div>
+  </div>
+</div>
 
 <div class="overlay" id="setup" hidden>
+  <div class="panel wide setup">
+    <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="race">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
+    <div class="setgrid">
+      <div class="steps">
+        <div class="field step" id="hostField"><span>Host club</span>
+          <div class="seg" id="hostSeg"><button type="button" data-host="ggyc">Golden Gate YC · Seaweed Soup</button><button type="button" data-host="practice">Practice area (no club)</button></div>
+          <details class="si" id="siBox"><summary><small><span id="siSum"></span> <u>Change</u></small></summary>
+            <div class="sibody">
+              <div class="field" id="seqField"><span>Sequence</span>
+                <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
+              <div class="field" id="prepField"><span>Preparatory flag</span>
+                <div class="seg" data-k="prepFlag"><button type="button" data-v="P">P</button><button type="button" data-v="I">I</button><button type="button" data-v="Z">Z</button><button type="button" data-v="U">U</button><button type="button" data-v="black">Black</button></div>
+                <small id="prepNote"></small></div>
+              <div class="field" id="penaltyField"><span>Penalty for a foul</span>
+                <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (Rule 44.1)</button><button type="button" data-v="1">One turn</button></div></div>
+              <div class="field" id="biasField"><span>Line set by the committee</span>
+                <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
+            </div>
+          </details></div>
+        <div class="field step" id="courseField"><span>Course</span>
+          <div class="seg" id="courseMode"><button type="button" data-cm="rc">The committee's choice</button><button type="button" data-cm="pick">Pick a course</button></div>
+          <div class="seg" data-k="raceLength" id="lengthField"><button type="button" data-v="short">Short · ~30 min</button><button type="button" data-v="medium">Club race · ~60 min</button><button type="button" data-v="long">Long · ~90 min</button></div>
+          <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select>
+          <div class="coursecard" id="courseCard"></div></div>
+        <div class="field step" id="fleetField"><span>Competitors <b id="oppCount"></b></span>
+          <div class="opps" id="oppList"></div></div>
+        <div class="field step" id="fromField"><span>From</span>
+          <select id="sailFromSel" class="pick" aria-label="Start from"></select></div>
+        <div class="field step" id="toField"><span>To</span>
+          <select id="sailToSel" class="pick" aria-label="Sail to"></select></div>
+        <div class="field step" id="crewField"><span>Your boat and crew</span>
+          <div class="boatsum"><select id="boatPick" class="pick" aria-label="The boat you'll sail"></select><button type="button" class="ghost sm" id="bBoat">Your boats…</button></div>
+          <small id="boatSum"></small>
+          <div class="seg" data-k="crewN"><button type="button" data-v="0">Just you</button><button type="button" data-v="1">You + 1</button><button type="button" data-v="2">You + 2</button></div>
+          <details class="crewbox" id="crewBox"><summary><small><span id="crewSum"></span> <u>Edit crew</u></small></summary><div class="crewrows" id="crewRows"></div></details>
+          <div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div>
+          <small id="raceFromNote"></small></div>
+        <div class="field step" id="tideBox"><span id="whenLab">Start time</span>
+          <div class="tiderow"><label>Date <input type="date" id="tideDate"></label><label><span id="timeLab">Start signal</span> <input type="time" id="tideTime" step="300"></label></div></div>
+      </div>
+      <div class="side" id="setSide">
+        <div class="condhead"><span>Conditions</span><b id="condState">real</b></div>
+        <dl class="cond" id="condSum"></dl>
+        <canvas id="tideGraph" aria-label="Current and wind through the day"></canvas>
+        <small id="tideNote"></small>
+        <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
+        <button class="ghost" id="bCond" type="button">Change the conditions…</button>
+        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="condDlg" hidden>
   <div class="panel">
-    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
-    <div class="eyebrow" id="setupEyebrow">Race</div>
-    <h1 id="setupTitle">Race</h1>
-    <p class="lede" id="setupLede">Race Folkboats off a real start line with real current. Every foul pauses the race and replays it from overhead with the rule that applies.</p>
-    <div class="field" id="modeField"><span>Race or practise the start</span>
-      <div class="seg" data-k="mode"><button type="button" data-v="race">Full race</button><button type="button" data-v="drill">Start practice</button></div>
-      <small id="modeNote"></small></div>
-    <div class="field" id="courseField"><span>Course</span>
-      <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select></div>
-    <div class="field" id="lengthField" hidden><span>Race length</span>
-      <div class="seg" data-k="raceLength"><button type="button" data-v="short">Short</button><button type="button" data-v="medium">Club race</button><button type="button" data-v="long">Long</button></div>
-      <small>The committee picks a course to give the leaders about 30 minutes, an hour or 90 minutes in the day's wind and tide.</small></div>
-    <div class="coursecard" id="courseCard"></div>
-    <div class="field" id="sailField" hidden><span>Start from</span>
-      <select id="sailFromSel" class="pick" aria-label="Start from"></select>
-      <span>Sail to</span>
-      <select id="sailToSel" class="pick" aria-label="Sail to"></select>
-      <small>The compass, laylines, map and the readout above the controls all measure to where you're heading.</small></div>
-    <div class="field"><span>Weather</span>
-      <div class="seg" data-k="windKind"><button type="button" data-v="auto">The real day</button><button type="button" data-v="west">Westerly</button><button type="button" data-v="north">Northerly</button><button type="button" data-v="south">Southerly</button><button type="button" data-v="light">Light &amp; variable</button></div>
-      <small id="windKindNote"></small></div>
-    <details class="adjust" id="adjust">
-      <summary>Adjust conditions <small id="adjSum">all real</small></summary>
-      <small>Everything starts as the real day. Move anything to try something else; press Real to put it back.</small>
+    <div class="cvhead"><div><div class="eyebrow">Conditions</div><h2>Change the conditions</h2></div><button class="ghost" id="bCondClose" type="button">Done</button></div>
+    <p class="lede">Everything starts as the real day. Move anything to try something else; Real puts it back. <span id="adjSum">all real</span></p>
+    <div class="field"><span>Kind of wind</span>
+      <div class="seg" data-k="windKind"><button type="button" data-v="auto">The real day</button><button type="button" data-v="west">Westerly</button><button type="button" data-v="north">Northerly</button><button type="button" data-v="south">Southerly</button><button type="button" data-v="light">Light &amp; variable</button></div></div>
+    <div class="adjust" id="adjust">
       <div class="adjrow"><span>Wind speed</span><button type="button" class="realbtn" data-real="windKt">Real</button><input type="range" id="adjWindKt" min="2" max="30" step="1"><b id="adjWindKtV"></b></div>
-      <div class="seg" data-k="windDay" id="windDaySeg"><button type="button" data-v="0">Light day</button><button type="button" data-v="1">Typical day</button><button type="button" data-v="2">Windy day</button></div>
+      <div class="adjrow" id="windDaySeg"><span>Records day</span><div class="seg" data-k="windDay"><button type="button" data-v="0">Light</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Windy</button></div></div>
       <div class="adjrow"><span>Wind from</span><button type="button" class="realbtn" data-real="windDir">Real</button><input type="range" id="adjWindDir" min="0" max="355" step="5"><b id="adjWindDirV"></b></div>
       <div class="adjrow"><span>Current</span><div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div></div>
       <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small>
       <div class="adjrow"><span>Chop</span><button type="button" class="realbtn" data-real="chop">Real</button><input type="range" id="adjChop" min="0" max="3" step="0.1"><b id="adjChopV"></b></div>
       <div class="adjrow"><span>Swell outside</span><button type="button" class="realbtn" data-real="swellHs">Real</button><input type="range" id="adjSwell" min="0" max="5" step="0.1"><b id="adjSwellV"></b></div>
-      <div class="seg" data-k="swellDay" id="swellDaySeg"><button type="button" data-v="0">Small swell</button><button type="button" data-v="1">Typical swell</button><button type="button" data-v="2">Big swell</button></div>
+      <div class="adjrow" id="swellDaySeg"><span>Records swell</span><div class="seg" data-k="swellDay"><button type="button" data-v="0">Small</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Big</button></div></div>
       <div class="adjrow"><span>Rain</span><div class="seg" data-k="rain"><button type="button" data-v="0">None</button><button type="button" data-v="1">Light</button><button type="button" data-v="2">Heavy</button></div></div>
       <div class="adjrow"><span>Fog</span><div class="seg" data-k="fog"><button type="button" data-v="real">Real</button><button type="button" data-v="0">None</button><button type="button" data-v="1">Patchy</button><button type="button" data-v="2">Thick</button></div></div>
-      <small id="seaNote">Chop comes from the wind over the water and the open water upwind (an ebb against the wind makes it bigger and steeper); the swell is the ocean's, from the San Francisco Bar buoy, dying away inside the Gate. Real fog is the summer fog bank at the Gate, by month and hour.</small>
-    </details>
-    <div class="field" id="crewField"><span>Crew</span>
-      <div class="seg" data-k="crewN"><button type="button" data-v="0">Just you</button><button type="button" data-v="1">You + 1</button><button type="button" data-v="2">You + 2</button></div>
-      <div class="crewrows" id="crewRows"></div>
-      <small>Your weight and your crew's goes into the physics: displacement, how far out they can hike (taller reaches further), and where the weight sits fore and aft. Fewer hands means slower pole sets and line handling. Folkboats usually race with three.</small></div>
-    <div class="field"><span>Your boat</span>
-      <div class="boatsum"><select id="boatPick" class="pick" aria-label="The boat you'll sail"></select><button type="button" class="ghost" id="bBoat">Your boats…</button></div>
-      <small id="boatSum"></small>
-      <small>Name, save and set up as many boats as you like: her looks, her flags, and her condition (a dirty bottom, tired sails or extra weight aboard cost speed).</small></div>
-    <div class="field"><span>Ship traffic</span>
-      <div class="seg" data-k="traffic"><button type="button" data-v="1">Ships, ferries &amp; tour boats</button><button type="button" data-v="0">None</button></div>
-      <small>Container ships and tankers in the channel, the Sausalito and Alcatraz ferries, bay-cruise boats and the Coast Guard, on their usual tracks. The racing rules don't apply between you and them; the collision regulations do. Their wakes hit you as a burst of steep waves.</small></div>
-    <div class="field" id="tideBox" hidden><span>Race day</span>
-      <div class="tiderow"><label>Date <input type="date" id="tideDate"></label><label>Start signal <input type="time" id="tideTime" step="300"></label></div>
-      <canvas id="tideGraph" aria-label="Current and wind at the start line through the day"></canvas>
-      <small id="tideNote"></small></div>
-    <div class="field" id="biasField"><span>Line set by the committee</span>
-      <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
-    <div class="field" id="raceFromField"><span>Start from</span>
-      <div class="seg" data-k="raceFrom"><button type="button" data-v="water">On the water, by the line</button><button type="button" data-v="slip" id="raceFromSlip">Her slip</button></div>
-      <small id="raceFromNote"></small></div>
-    <div class="field" id="fleetField"><span>Racing against <b id="oppCount"></b></span>
-      <div class="opps" id="oppList"></div>
-      <small>Tick the boats you'll race. Your own saved boats race as you set them up (a dirty bottom or tired sails slows them too). Make more under <i>Your boats…</i>.</small></div>
-    <div class="field" id="seqField"><span>Sequence</span>
-      <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
-    <div class="field" id="prepField"><span>Preparatory flag</span>
-      <div class="seg" data-k="prepFlag"><button type="button" data-v="P">P</button><button type="button" data-v="I">I</button><button type="button" data-v="Z">Z</button><button type="button" data-v="U">U</button><button type="button" data-v="black">Black</button></div>
-      <small id="prepNote"></small></div>
-    <div class="field" id="penaltyField"><span>Penalty for a foul</span>
-      <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (rulebook)</button><button type="button" data-v="1">One turn</button></div>
-      <small>The Racing Rules default is two turns (Rule 44.1). Some sailing instructions change it to one; check yours. Crossing the Seaweed Soup line mid-race is always two turns.</small></div>
-    <div class="field"><span>Training aids</span>
-      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div>
-      <div class="seg" data-k="windDial"><button type="button" data-v="0">No wind-angle dial</button><button type="button" data-v="1">Show the wind-angle dial</button></div>
-      <small>The wind-angle dial (true and apparent wind around a boat outline) doesn't exist on a real boat; the windex and the telltales do. It's hidden by default.</small></div>
-    <div class="btnrow"><button class="ghost" id="bPreview" type="button">View the course</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
-    <div class="btnrow"><button class="ghost" id="bKeys1" type="button">Keyboard settings</button></div>
-    <div class="help">
-      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
-      <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
-      <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
-      <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
-      <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
+      <div class="adjrow"><span>Ship traffic</span><div class="seg" data-k="traffic"><button type="button" data-v="1">Ships, ferries &amp; tour boats</button><button type="button" data-v="0">None</button></div></div>
     </div>
+    <small>Chop comes from the wind over the water and the open water upwind; the swell is the ocean's, from the San Francisco Bar buoy, dying away inside the Gate. Real fog is the summer fog bank at the Gate, by month and hour. Ships keep to their usual tracks; the collision regulations apply between you and them, not the racing rules.</small>
+    <div class="btnrow"><button class="ghost" id="bCondReal" type="button">Put everything back to real</button><button class="cta" id="bCondDone" type="button">Done</button></div>
   </div>
 </div>
 
@@ -275,7 +277,7 @@
     <ul class="facts" id="dFacts"></ul>
     <div class="verdict" id="dVerdict"><ul class="facts" id="dTips"></ul></div>
     <div class="btnrow"><button class="ghost" id="bDReplay" type="button">Watch again</button><button class="cta" id="bDAgain" type="button">Same start again</button></div>
-    <div class="btnrow"><button class="ghost" id="bDNew" type="button">New start</button><button class="ghost" id="bDKeep" type="button">Keep racing</button><button class="ghost" id="bDSetup" type="button">Change setup</button></div>
+    <div class="btnrow"><button class="ghost" id="bDNew" type="button">New start</button><button class="ghost" id="bDKeep" type="button">Keep racing</button><button class="ghost" id="bDSetup" type="button">Back to setup</button></div>
   </div>
 </div>
 
@@ -289,13 +291,26 @@
 <div class="overlay" id="keysView" hidden>
   <div class="panel">
     <div class="cvhead">
-      <div><div class="eyebrow">Settings</div><h2>Keyboard</h2></div>
+      <div><div class="eyebrow">Settings</div><h2>Settings</h2></div>
       <button class="ghost" id="bKeysClose" type="button">Done</button>
     </div>
-    <p class="lede">Click Change, then press the key you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</p>
+    <div class="field"><span>On screen</span>
+      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div>
+      <div class="seg" data-k="windDial"><button type="button" data-v="0">No wind-angle dial</button><button type="button" data-v="1">Show the wind-angle dial</button></div>
+      <small>Training aids. Real boats have neither: they have the windex and the telltales.</small></div>
+    <details class="more"><summary><u>How to sail her ▸</u></summary>
+    <div class="help">
+      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
+      <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
+      <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
+      <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
+      <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
+    </div></details>
+    <div class="field"><span>Keyboard</span>
+    <small>Click Change, then press the key you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
-    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
+    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
   </div>
 </div>
 
@@ -317,7 +332,7 @@
     <h2>Paused</h2>
     <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
     <div id="pauseDebrief" class="debrief" hidden></div>
-    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Change course or conditions</button><button class="ghost" id="bKeys2" type="button">Keyboard settings</button></div>
+    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Back to setup</button><button class="ghost" id="bKeys2" type="button">Settings</button></div>
     <div class="btnrow"><button class="ghost" id="bExit2" type="button">Exit to the start page</button></div>
   </div>
 </div>
@@ -330,13 +345,12 @@
     <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th></tr></thead><tbody id="resBody"></tbody></table>
     <p id="resFouls" class="lede"></p>
     <div id="resDebrief" class="debrief"></div>
-    <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Change course or conditions</button></div>
+    <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Back to setup</button></div>
   </div>
 </div>
 <div id="boatPanel" class="boatpanel" hidden></div>
 <div class="overlay" id="fleet" hidden></div>
 <div id="fleetBoat" class="boatpanel" hidden></div>
-<div class="overlay" id="sailHer" hidden></div>
 <div class="overlay" id="keepAsk" hidden role="dialog" aria-modal="true" aria-labelledby="keepTitle">
   <div class="panel">
     <h2 id="keepTitle">Keep this sail?</h2>

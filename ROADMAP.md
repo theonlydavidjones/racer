@@ -50,7 +50,7 @@ hot spots; add a performance test to the suite (sim steps per second for a full 
 quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
 sessions changing the scene or the physics while it measures.
 
-Then, unranked: start screens (5–8 h); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
+Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); NOAA charts on the map (4–8 h); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
@@ -81,7 +81,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   of crew and their skill.
 - **A deep pass on sail and boat physics:** every crew move, wave, puff and line adjustment makes a response, from real
   science and maths.
-- **Cleaner start screens.** Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
+- ~~**Cleaner start screens.**~~ (done) Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
   start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
   pared back. First an audit of every start-state screen for redundancy and friction.
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
