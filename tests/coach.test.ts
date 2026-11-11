@@ -32,6 +32,9 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     (b.ctlTarget ??= {})[line as 'vang'] = v.top.to!; hold(b, 30);
     expect(kt(b)).toBeGreaterThan(before + 0.02);
   });
+  // the depowering question (ROADMAP): North Sails has the outhaul to its mark above 12 kt, but in 18–20 kt the speed
+  // search finds it worth next to nothing against the crew's other depowering
+  it.todo('18–20 kt upwind, outhaul off: says to fix it, as North Sails does (the depowering question)');
   it('with two things wrong, the bigger loss comes first', () => {
     const b = boat({ heading: 318, windKt: 10 });
     takeLine(b, 'jibsheet'); takeLine(b, 'vang'); b.ctlTarget = { jibsheet: 0.3, vang: 0.4 }; hold(b, 30);

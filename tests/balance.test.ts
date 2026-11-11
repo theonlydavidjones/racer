@@ -153,4 +153,10 @@ describe('Sailing a little below the beat angle', () => {
       expect(vmg(2) / v0).toBeGreaterThan(0.99);
     }
   });
+  it('but pinching ten degrees too high is a big loss, and inside the no-go zone she stops', () => {
+    const W = 14, beat = beatAngle(W), vb = polar(W, beat, 'jib');
+    const at = (twa: number, secs: number) => { const b = testBoat({ heading: 360 - twa, kt: vb / KT, windKt: W }); sail(b, secs, () => { b.h = 360 - twa; }); return b.v; };
+    expect(at(30, 150) * Math.cos(30 * Math.PI / 180) / (vb * Math.cos(beat * Math.PI / 180))).toBeLessThan(0.75);
+    expect(at(22, 40)).toBeLessThan(0.1); // (from full speed, in 40 s)
+  });
 });
