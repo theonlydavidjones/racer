@@ -67,7 +67,26 @@ function observedSamples(date: string): Sample[] | null {
     if (sp === 255 || d === 255) continue;
     out.push([R.slot0 + k * R.slotMin, sp / 4 * OPEN_WATER, d * 2, (g === 255 ? sp * 1.4 : g) / 4 * OPEN_WATER]);
   }
-  return out.length >= 10 ? out : null;
+  return out.length >= 10 ? smoothed(out) : null;
+}
+/**
+ * The record's samples, each a centred [1, 2, 1]/4 mean with its neighbours (18 minutes), as the course-wide wind. Each
+ * 2-minute mean carries the station's own quick turbulence and the shifts of a minute or two, which aren't the same a
+ * kilometre away (scripts/fit-wind-shifts.mjs: about 5–6° of white noise between samples on a 10–15 kt westerly, against
+ * the coherent shifts of several minutes, σ 6.5°, e^(−τ/8 min)); laid over the whole course they'd shift every boat at
+ * once, every 6 minutes. The mean keeps about 80% of the several-minute shifts and 60% of the noise. (Neighbours more than
+ * 6 minutes away, across a gap in the record, are left out.) The quick part is the puffs' (wind.ts).
+ */
+function smoothed(s: Sample[]): Sample[] {
+  return s.map((x, i) => {
+    let vx = 2 * x[1] * Math.sin(x[2] * Math.PI / 180), vy = 2 * x[1] * Math.cos(x[2] * Math.PI / 180), kt = 2 * x[1], w = 2;
+    for (const j of [i - 1, i + 1]) {
+      const y = s[j]; if (!y || Math.abs(y[0] - x[0]) > R.slotMin) continue;
+      vx += y[1] * Math.sin(y[2] * Math.PI / 180); vy += y[1] * Math.cos(y[2] * Math.PI / 180); kt += y[1]; w++;
+    }
+    // (the direction by the vector mean, so it averages the shorter way round; the speed by the plain mean)
+    return [x[0], kt / w, Math.hypot(vx, vy) > 1e-6 ? n360(Math.atan2(vx, vy) * 180 / Math.PI) : x[2], x[3]];
+  });
 }
 function forecastSamples(date: string): Sample[] | null {
   const f = R.forecast[date]; if (!f) return null;

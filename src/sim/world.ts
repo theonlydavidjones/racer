@@ -9,6 +9,7 @@ import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } fro
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
 import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
+import { ShiftField, shiftStats } from '../environment/shifts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
@@ -176,7 +177,7 @@ export class World {
   running = false;
   paused = false;
   speed = 1;
-  wind: Wind;
+  wind: Wind = { from: 0, kt: 0 };
   avgFrom: number; // ~1 min running mean of the wind direction, for lift/header calls
   boats: Boat[] = [];
   pairs: Record<string, PairRecord> = {};
@@ -281,7 +282,12 @@ export class World {
       this.fieldArea = { c, half: half + 600 };
     }
     this.updateBreeze();
-    this.wind = windAt(this.windModel, this.t);
+    // the wind's shifts: on a past day, the record's own; otherwise a field with Fort Point's statistics for this kind of
+    // day and strength, carried down the course with the wind (environment/shifts.ts; its own random numbers, so the
+    // rest of the race draws what it did)
+    this.windModel.shifted = true;
+    if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
+    this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
@@ -417,7 +423,19 @@ export class World {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
     const f = this.fieldAt(p);
-    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift), kt: this.wind.kt * f.k * q.k * sh.k };
+    // (the shifts here against the course's centre: the boat to windward has the header first)
+    const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
+    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn), kt: this.wind.kt * f.k * q.k * sh.k * sk };
+  }
+  /** The wind's shifts (environment/shifts.ts), off on a past day (the record has its own). */
+  shifts: ShiftField | null = null;
+  /** The shift at the course's centre now, which the course-wide wind carries. */
+  private shiftRef = { turn: 0, k: 1 };
+  /** The course-wide wind now: the day's mean, with the shift at the course's centre. */
+  private courseWind(): void {
+    const w = windAt(this.windModel, this.t);
+    if (this.shifts) { this.shiftRef = this.shifts.at(this.fieldArea.c); w.from = n360(w.from + this.shiftRef.turn); w.kt *= this.shiftRef.k; }
+    this.wind = w;
   }
 
   /* ---------- the wind across the course (environment/weather.ts), cached on a grid ---------- */
@@ -561,7 +579,8 @@ export class World {
     this.steps++;
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
-    this.wind = windAt(this.windModel, this.t);
+    this.shifts?.step(dt, this.windModel.kt * KT, this.wind.from); // (the air, and its shifts, move on downwind)
+    this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
