@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { segPt } from '../src/core/math';
 import { HARBORS, SLIPS, harborAt, harborOf, hitsHarbor, hullClear, inBasin, pushOffPlan, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { SeaField, fetchAt } from '../src/environment/sea';
@@ -13,16 +14,17 @@ import { DT, World, midFairway, slipLeadTime } from '../src/sim/world';
 const OFFSHORE: Record<string, [number, number]> = {
   'gashouse-cove': [37.8105, -122.4335], // north of the entrance, off Fort Mason's Pier 1
   'south-beach': [37.7830, -122.3810], // off the breakwater, toward the Bay Bridge
-  corinthian: [37.8705, -122.4540] // Raccoon Strait, off the club's breakwater
+  corinthian: [37.8705, -122.4540], // Raccoon Strait, off the club's breakwater
+  'horseshoe-bay': [37.8310, -122.4775] // off the bay's mouth, toward the Golden Gate Bridge
 };
 const NEW = Object.keys(OFFSHORE);
 
-describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => {
+describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay', () => {
   it('each a basin you can sail in, with its docks solid, and slips a Folkboat fits', () => {
     for (const id of NEW) {
       const H = harborOf(id)!, slips = slipsIn(id);
       expect(H.walkways.length).toBeGreaterThan(2);
-      expect(slips.length).toBeGreaterThan(id === 'corinthian' ? 40 : 200);
+      expect(slips.length).toBeGreaterThan({ corinthian: 40, 'horseshoe-bay': 60 }[id] ?? 200);
       for (const s of slips) { expect(onLand(s.p)).toBe(false); expect(harborAt(s.p)?.id).toBe(id); }
       const w = H.walkways.find(w => w.length === 2) ?? H.walkways[0], mid = { x: (w[0].x + w[1].x) / 2, y: (w[0].y + w[1].y) / 2 };
       expect(onLand(mid)).toBe(true); // a dock
@@ -81,6 +83,34 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     const sea = new SeaField({ hs: 1.5, tp: 12, from: 270 } as never), nw = { from: 315, kt: 18 } as Wind, still = () => ({ x: 0, y: 0 });
     const inside = sea.at(LL(37.8075, -122.4345), nw, still(), still), outside = sea.at(LL(37.8095, -122.4340), nw, still(), still);
     expect(inside.hsW).toBeLessThan(0.25 * outside.hsW); expect(inside.hsS).toBeLessThan(0.25 * outside.hsS);
+  });
+  it('Horseshoe Bay: no sailing off the basin onto the shore (only out west, into the rest of the bay); sheltered from a south-westerly by its breakwater', () => {
+    const H = harborOf('horseshoe-bay')!, start = LL(37.8327, -122.4748), key = (p: { x: number; y: number }) => `${Math.round(p.x)},${Math.round(p.y)}`;
+    expect(harborAt(start)?.id).toBe('horseshoe-bay');
+    const seen = new Set([key(start)]); let fr = [start]; const leaks: { x: number; y: number }[] = [];
+    while (fr.length) {
+      const nx: typeof fr = [];
+      for (const p of fr) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
+        if (seen.has(k) || onLand(q)) continue;
+        seen.add(k);
+        if (harborAt(q) === H) nx.push(q); else leaks.push(q);
+      }
+      fr = nx;
+    }
+    // the only way off it: across its open west side (its longest edge, the outline's line across the water), nowhere else
+    const edges = H.basin.map((p, i) => [p, H.basin[(i + 1) % H.basin.length]] as const), [wa, wb] = edges.reduce((m, e) => Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) > Math.hypot(m[1].x - m[0].x, m[1].y - m[0].y) ? e : m);
+    expect(Math.hypot(wb.x - wa.x, wb.y - wa.y)).toBeGreaterThan(150);
+    expect(leaks.length).toBeGreaterThan(0);
+    for (const q of leaks) expect(segPt(q, wa, wb)).toBeLessThan(2);
+    const sea = new SeaField({ hs: 1.5, tp: 12, from: 270 } as never), sw = { from: 215, kt: 18 } as Wind, still = () => ({ x: 0, y: 0 });
+    const inside = sea.at(LL(37.8322, -122.4745), sw, still(), still), outside = sea.at(LL(37.8305, -122.4745), sw, still(), still);
+    expect(inside.hsW).toBeLessThan(0.3 * outside.hsW);
+    expect(inside.hsS).toBeLessThan(0.3 * outside.hsS);
+    // and no shadow of the 50 m terrain grid lying across it: the swell (from the south-south-west, so the breakwater shades
+    // both) about the same in line with the entrance as tucked behind the breakwater (it was 8 times less)
+    const open = sea.at({ x: -2804, y: 2479 }, sw, still(), still), tucked = sea.at({ x: -2742, y: 2412 }, sw, still(), still); // (in line with the entrance; behind the breakwater)
+    expect(open.hsS).toBeGreaterThan(0.5 * tucked.hsS);
   });
   it('the sea by a harbor is open water\'s, and the same whichever point asks first (the same seed, the same race)', () => {
     // just north of West Harbor's breakwater, by the GGYC line: its 150 m cell's node lies in the basin
@@ -157,6 +187,6 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian', () => 
     expect(slipById(wh.label)?.id).toBe(wh.id);
     expect(fixSpec({ ...DEFAULT_BOAT, slip: wh.label, marina: undefined })).toMatchObject({ marina: 'west-harbor', slip: wh.id });
     expect(fixSpec({ ...DEFAULT_BOAT, slip: 'south-beach:C12' })).toMatchObject({ marina: 'south-beach', slip: 'south-beach:C12' });
-    expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian']);
+    expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian', 'horseshoe-bay']);
   });
 });

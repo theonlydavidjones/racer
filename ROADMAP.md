@@ -55,7 +55,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
-- **Now — crew buttons fight auto** (bug; 1–2 h; queued: starts when Night Lights or Marinas frees a slot): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
+- **Now — crew buttons fight auto** (bug; 1–2 h; in progress: Crew Controls): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
 - **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; in progress: Boat Detail): water shows through the cockpit sole, and it's
@@ -95,10 +95,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
-- **Next — instruments** (feature; 1–2 h): the TWD dial's big number should be **wind speed** ("I already have the windex
+- **Next — instruments** (feature; 1–2 h; in progress: Crew Controls): the TWD dial's big number should be **wind speed** ("I already have the windex
   for" the angle); the **Sea** dial's big number should be the **tide** (keep the chop/swell subtext, which they like);
   the **windex** dial's subtext should add the **point of sail**.
-- **Next — the buttons at bottom-left** (polish; 3–5 h): "starting to overload". They mix trim, navigation, pausing and
+- **Next — the buttons at bottom-left** (polish; 3–5 h; in progress: Crew Controls, layout to the owner first): "starting to overload". They mix trim, navigation, pausing and
   more, and one isn't a button at all. Audit them, move the ones that don't belong to where they fit, and make the rest
   "smaller iconographic buttons". Show the owner the proposed layout before building (a design change).
 
@@ -202,7 +202,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
-- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable; in progress, Night Lights: the skyline is overlit) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
+- ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable; the overlit skyline fixed in v79: lit windows follow the DOE reference buildings' lighting schedules, offices 50% at 19:00, 10% by 22:30, 5% on weekend nights, clustered by floor. Open for the owner, low priority: Saturday-night towers read faintly (true to the schedule; a knob for more far glow), and the homes' peak lit share (0.3) is a judgement call) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
   suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
   the LED sculpture on the West Span's vertical cables, in its real patterns after dark; and the downtown skyline lit at
   night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day

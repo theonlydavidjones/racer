@@ -141,7 +141,7 @@ const INTO_BAY = 78;
  * bridge it eases off toward the Gate; inside, it fans out from the bridge (diffraction) and dies away over
  * a few kilometres, and islands and points shadow it. An estimate.
  */
-export function swellReach(p: Vec): { k: number; toward: number } {
+export function swellReach(p: Vec, shadow = true): { k: number; toward: number } {
   if (p.x < OUTSIDE.x) return { k: 1, toward: 85 };
   const dx = p.x - BRIDGE.x, dy = p.y - BRIDGE.y, d = Math.hypot(dx, dy);
   if (p.x < BRIDGE.x) { const t = (p.x - OUTSIDE.x) / (BRIDGE.x - OUTSIDE.x); return { k: 1 - 0.45 * t, toward: 80 }; }
@@ -150,7 +150,7 @@ export function swellReach(p: Vec): { k: number; toward: number } {
   const toward = brg(dx, dy), off = Math.min(90, Math.abs(wrap(toward - INTO_BAY))) * clamp(d / 1500, 0, 1);
   let k = 0.55 * Math.exp(-d / 2800) * Math.pow(Math.cos(off * D2R), 1.5);
   // shadowed if land lies between the bridge and here
-  for (let f = 0.1; f < 0.95 && k > 0; f += 0.1) if (landAt({ x: BRIDGE.x + dx * f, y: BRIDGE.y + dy * f })) { k *= 0.15; break; }
+  for (let f = 0.1; f < 0.95 && k > 0 && shadow; f += 0.1) if (landAt({ x: BRIDGE.x + dx * f, y: BRIDGE.y + dy * f })) { k *= 0.15; break; }
   return { k, toward };
 }
 
@@ -214,7 +214,8 @@ export class SeaField {
     let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * this.chop; // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
-    const s = this.swell, reach = swellReach(p);
+    // (in a marina, its own walls shelter it below, traced finely: the 50 m terrain grid's shadow can land on the wrong side of a breakwater)
+    const s = this.swell, reach = swellReach(p, !inBasin(p));
     // in a marina, the swell is stopped by its walls unless it runs straight in through the entrance (then only what diffracts round them)
     if (inBasin(p) && !basinRay(p, reach.toward + 180).out) reach.k *= 0.15;
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
