@@ -136,13 +136,14 @@ describe('Roll tacking (RRS 42.3(b))', () => {
 });
 
 describe('Crew work: one job at a time, at their pace (2d)', () => {
-  const lines = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const;
+  const lines = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'traveller'] as const;
   it('alone, the helm works one control line at a time; three aboard work several at once', () => {
     const most = (n: number) => {
       const twa = beatAngle(18), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 18 }); b.crew = newCrew(crewOf(0.6, n), 'S');
       sail(b, 0.5); // (set up before she sails)
-      // then the lines knocked off (the backstay right on: a long ease for the helm), so there's work to do
-      Object.assign(b.ctl, { backstay: 1, vang: 0, cunningham: 0, outhaul: 0 });
+      // then the lines knocked off, so there's work to do
+      // (and the traveller right up, which the main trimmer plays: with three aboard the middle crew, alongside the others)
+      Object.assign(b.ctl, { backstay: 0, vang: 0, cunningham: 0, outhaul: 0, traveller: -1 });
       let prev = { ...b.ctl }, top = 0;
       sail(b, 40, () => { b.h = 360 - twa; const moving = lines.filter(k => Math.abs(b.ctl[k] - prev[k]) > 1e-6).length; top = Math.max(top, moving); prev = { ...b.ctl }; });
       return top;

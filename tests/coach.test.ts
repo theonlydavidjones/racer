@@ -53,7 +53,9 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     // at most a hair, at the edge of what the coach says)
     const b = boat({ heading: 318, windKt: 20, sea: CHOP }); wrong(b, 'traveller', -1);
     const top = teach(b).top;
-    if (top.kind === 'fix') { expect(top.line).toBe('traveller'); expect(top.gain).toBeLessThan(1.5 * FIX_MIN); } else expect(top.kind).toBe('ok');
+    // (and with the middle crew playing the traveller finely with the sheet, the crew's own trim is a little better, so
+    // holding it up costs about 1%)
+    if (top.kind === 'fix') { expect(top.line).toBe('traveller'); expect(top.gain).toBeLessThan(2.5 * FIX_MIN); } else expect(top.kind).toBe('ok');
   });
   it('in a gale the crew easing the main is explained as deliberate, never "trim in"', () => {
     // (the boom eases out down the traveller only on the last depowering steps: physics.ts crewEaseBoom)
@@ -159,7 +161,7 @@ describe('the trim coach: from the physics review', () => {
     const b = boat({ heading: 318, windKt: 20, sea: CHOP }); wrong(b, 'traveller', -1);
     const v = teach(b);
     // (or, a hair overpowered with the helm aft on the narrower deck: drop it, which is what most boats do)
-    if (v.top.kind === 'fix') { expect(v.top.line).toBe('traveller'); expect(v.top.gain).toBeLessThan(1.5 * FIX_MIN); }
+    if (v.top.kind === 'fix') { expect(v.top.line).toBe('traveller'); expect(v.top.gain).toBeLessThan(2.5 * FIX_MIN); }
     else { expect(v.top.kind).toBe('ok'); expect(v.top.why).toMatch(/Most boats drop it/); }
   });
 });
