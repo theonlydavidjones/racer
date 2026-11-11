@@ -53,6 +53,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
+once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
+companionway redo) and Crew Figures; next as each finishes, Crew Controls and Marinas, then Bay East.
+
 **Owner's feedback, 11 November 2026** (from screenshots at night; ranked now / next / later):
 
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
@@ -78,7 +82,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the first press; say so in the tiller hint. Owner: "one issue with double-click in browser is that it surfaces the
   browser menu. need to solve somehow." Over the 3D view only: no context menu, no double-click text selection, no
   double-tap zoom; menus and text selection still work on the panels. Test in Chrome, Safari and Firefox on a trackpad.
-- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
+- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h; in progress: Charts): owner, "I just watched her sail
   right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
   (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
   piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
