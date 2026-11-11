@@ -178,7 +178,7 @@ function word(id: string, t: string): void { const e = $(id).querySelector('.w')
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
 function setTiller(v: number): void { const u = w.user; u.tiller = Math.max(-1, Math.min(1, v)); if (u.lashed != null) u.lashed = u.tiller; }
 /* Lashing the tiller: a line from the tiller to a cleat holds it where you leave it, hands off (heaving to). It's done on
- * the tiller itself: double-click to lash it where it is (or the key). The lashing shows on the tiller guide; a click
+ * the tiller itself: right-click (or double-click, or the key) to lash it where it is. The lashing shows on the tiller guide; a click
  * or A/D takes the tiller and the lashing comes off; double-click again to lash it somewhere else. */
 const lashWhere = (t: number) => Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'}`;
 function lash(): void {
@@ -190,8 +190,8 @@ function lash(): void {
   const t = u.tiller, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
   const fast = u.v > 2 / 1.944 && lee && Math.abs(t) > 0.15 && !((u.jibBacked ?? 0) > 0.5);
   toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack. To heave to, back the jib first and let her slow to a knot or two, then lash.`
-    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. To lash it elsewhere, take the tiller, move it, and double-click.'
-    : `Tiller lashed ${lashWhere(t)} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Click or ${keymap.label('steerPort')}/${keymap.label('steerStbd')} takes the tiller; double-click lashes it again.`, fast ? 6000 : 4500);
+    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. To lash it elsewhere, take the tiller, move it, and right-click (or double-click).'
+    : `Tiller lashed ${lashWhere(t)} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Click or ${keymap.label('steerPort')}/${keymap.label('steerStbd')} takes the tiller; right-click or double-click lashes it again.`, fast ? 6000 : 4500);
 }
 function unlash(): void { const u = w.user; if (u.lashed == null) return; u.lashed = null; showLash(); toast('Lashing off: you have the tiller.', 2000); }
 function showLash(): void {
@@ -285,19 +285,41 @@ const CTL_UI: CtlItem[] = [
 ];
 /** What each line does, in a sentence (standard trim practice: controls.ts). */
 const LINE_WHAT: Record<CtlItem['key'], string> = {
-  mainsheet: 'Pulls the boom in: in for power and pointing upwind; eased to spill a puff, or on a reach.',
-  traveller: 'Moves the boom across: up to windward in light air (boom in the middle, the sheet eased so the leech stays open), middle in medium air, down to leeward to depower in a breeze or a puff.',
-  backstay: 'Bends the mast and tightens the forestay: a flatter main (its draft moves aft and its top opens, so the Cunningham follows), a straighter jib luff. On in a breeze.',
-  vang: 'Holds the boom down so the leech doesn\'t twist open when the sheet is eased: on reaching and running, and upwind only in a real breeze (18 kt and more).',
-  outhaul: 'Stretches the foot of the main: tight is flatter (a breeze), eased is fuller (light air, reaching).',
-  cunningham: 'Pulls the main\'s luff down: brings the draft forward as the wind builds.',
-  downhaul: 'The main\'s coarse luff tension, set for the wind range; the Cunningham fine-tunes it.',
-  jibCunningham: 'Pulls the jib\'s luff down: keeps its draft forward as the wind builds.',
-  jibsheet: 'The working jib sheet, on the leeward winch: in to point, eased for speed and on a reach.',
-  jibsheetW: 'The lazy sheet, on the windward winch. Haul it with the other eased and the jib backs: heaving to.',
-  carFore: 'Where the jib sheet leads, fore and aft: forward closes the leech (power), aft opens it (depower). Set on the lazy side for the next tack.',
-  carIn: 'Where the jib sheet leads, in and out: inboard to point in flat water, outboard for speed in a chop or reaching.'
+  mainsheet: 'Eased to spill a puff, and on a reach.',
+  traveller: 'Light air: up to windward, the sheet eased. Medium: the middle. A breeze or a puff: down to leeward.',
+  backstay: 'On in a breeze; its draft moves aft as it goes on, so the Cunningham follows.',
+  vang: 'On reaching and running, and upwind only in a real breeze (18 kt and more).',
+  outhaul: 'Eased in light air and reaching; on in a breeze upwind.',
+  cunningham: 'On as the wind builds and blows the draft aft.',
+  downhaul: 'Set for the wind range; the Cunningham fine-tunes it.',
+  jibCunningham: 'On as the wind builds.',
+  jibsheet: 'The working sheet, on the leeward winch.',
+  jibsheetW: 'The lazy sheet, on the windward winch: haul it with the other eased and the jib backs (heaving to).',
+  carFore: 'The lazy car, set ready for the next tack; after it:',
+  carIn: 'The lazy car, set ready for the next tack; after it:'
 };
+/**
+ * Each bar's two ends in sailors' words, and what each end does to the sail (left end first: the bars fill from the
+ * eased end to the on end; the sheets fill as they come in, the traveller toward windward, the cars aft and outboard).
+ * From the model in controls.ts: 0 off … 1 bar tight for the strings, the cars' pins 0 forward/inboard.
+ */
+const LINE_ENDS: Record<CtlItem['key'], [string, string, string, string]> = {
+  mainsheet: ['eased', 'boom out, the leech twisted open: less power', 'in', 'boom to the middle, the leech closed: power and pointing'],
+  traveller: ['leeward', 'boom off the centreline: depowers', 'windward', 'boom to the middle with the sheet eased, the leech open'],
+  backstay: ['eased', 'fuller main, more forestay sag', 'on', 'flatter main, tighter forestay, straighter jib luff'],
+  vang: ['off', 'once the sheet is eased, the boom free to rise and the leech twisting open', 'on', 'the boom held down, the leech closed on a reach or run'],
+  outhaul: ['eased', 'fuller foot, more power', 'on', 'flatter foot: less power and heel, less drag'],
+  cunningham: ['off', 'the luff slack, the draft further aft', 'on', 'the luff tight, the draft pulled forward'],
+  downhaul: ['off', 'the luff slack, the draft further aft', 'on', 'the luff tight, the draft forward'],
+  jibCunningham: ['off', 'the jib\'s draft further aft', 'on', 'the jib\'s draft held forward'],
+  jibsheet: ['eased', 'the clew out, the jib twisted open: speed and reaching', 'in', 'the clew in and down: pointing'],
+  jibsheetW: ['slack', 'as normal, the jib to leeward', 'hauled', 'the jib backed to windward'],
+  carFore: ['forward', 'the leech closed, a fuller foot: power', 'aft', 'the leech open, a flatter foot: depower'],
+  carIn: ['inboard', 'a narrow lead: pointing in flat water', 'outboard', 'a wider lead: speed in a chop or reaching']
+};
+const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+// (the car rows set the lazy car, for after the tack: say so first)
+const lineHelp = (k: CtlItem['key']) => { const [a, ae, b, be] = LINE_ENDS[k], car = k === 'carFore' || k === 'carIn'; return `${car ? LINE_WHAT[k] + ' ' : ''}${cap(a)}: ${ae}. ${cap(b)}: ${be}.${car ? '' : ' ' + LINE_WHAT[k]}`; };
 /** The line a control row works: the two car rows are one line, the lazy car. */
 const lineOf = (k: CtlItem['key']): LineKey => (k === 'carFore' || k === 'carIn' ? 'car' : k);
 let ctlSel = 0;
@@ -406,7 +428,7 @@ const valOf = (k: CtlKey, fx: number) => (k === 'mainsheet' || k === 'jibsheet' 
   CTL_UI.forEach((it, i) => {
     if (it.group !== group) { group = it.group; const g = document.createElement('div'); g.className = 'ctl-group'; g.textContent = group; list.appendChild(g); }
     const row = document.createElement('div'); row.className = 'ctl-row'; row.dataset.i = String(i);
-    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar" title="Drag to set: the line is yours"><span class="ctl-fill"></span><span class="ctl-tgt"></span></span><span class="ctl-val"></span><span class="ctl-btns"><button type="button" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-d="1" aria-label="${it.label}: more">+</button></span><span class="who" data-line="${lineOf(it.key)}" role="group" aria-label="Who works the ${it.label}"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span><span class="ctl-what">${LINE_WHAT[it.key]}</span>`;
+    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar" title="Drag to set: the line is yours"><span class="ctl-fill"></span><span class="ctl-tgt"></span></span><span class="ctl-val"></span><span class="ctl-btns"><button type="button" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-d="1" aria-label="${it.label}: more">+</button></span><span class="who" data-line="${lineOf(it.key)}" role="group" aria-label="Who works the ${it.label}"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span><span class="ctl-ends"><span>${LINE_ENDS[it.key][0]}</span><span>${LINE_ENDS[it.key][2]}</span></span><span class="ctl-what">${lineHelp(it.key)}</span>`;
     row.onclick = () => { ctlSel = i; };
     // drag the bar to where you want the line: it's hauled or eased there at the usual pace (winches, tackles, crew)
     const bar = row.querySelector('.ctl-bar') as HTMLElement;
@@ -624,7 +646,7 @@ const keysView = new KeysView(keymap, () => keysHint());
 const held = new Set<Action>();
 function keysHint(): void {
   const k = (a: Action) => keymap.label(a);
-  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · double-click or ${k('lashTiller')}: lash it · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} all keys`;
+  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · right-click, double-click or ${k('lashTiller')}: lash it · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} all keys`;
   // each cluster button's name and key, on hover (the word under it is short)
   const tip: [string, string, Action][] = [['bHail', 'Hail: "Room to tack!", "Starboard!", or reply "You tack"', 'hail'], ['bPause', 'Pause', 'pause'],
     ['bCourse', w?.freeSail ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
@@ -742,13 +764,28 @@ function panOverhead(dx: number, dy: number): void {
 let drag: { x: number; y: number; yaw0: number; pitch0: number } | null = null, lastTap = 0;
 const touches = new Map<number, [number, number]>();
 let pinch: { d: number; h: number } | null = null;
+// The other ways to lash: a right-click (or a two-finger click) lashes the tiller where it is, with no browser menu; a
+// double-click lashes it at the angle of the first press (the second press would otherwise have moved it). Over the
+// panels the browser behaves as usual.
+let firstPress: number | null = null;
+gl.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!w.running || w.paused || viewMode === 2) return;
+  if (w.user.lashed != null) { unlash(); return; }
+  lash();
+});
+gl.addEventListener('dblclick', e => e.preventDefault()); // (no zoom or text selection on a double-click over the view)
 gl.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return; // (the right button lashes: contextmenu above)
   const now = performance.now(), dbl = now - lastTap < 300; lastTap = now;
-  // a double-click with the mouse lashes the tiller where it is (the first click took it); on a touch screen a double tap looks ahead
-  if (dbl && e.pointerType === 'mouse' && viewMode !== 2 && w.running && !w.paused) { lastTap = 0; lash(); return; }
+  // a double-click with the mouse lashes the tiller at the angle of the first press; on a touch screen a double tap looks ahead
+  if (dbl && e.pointerType === 'mouse' && viewMode !== 2 && w.running && !w.paused) {
+    lastTap = 0; if (firstPress != null) setTiller(firstPress); firstPress = null;
+    if (w.user.lashed == null) lash(); return;
+  }
   if (dbl) { if (viewMode === 2) recentre(); else lookAhead(); }
   if (viewMode === 2) { gl.setPointerCapture?.(e.pointerId); touches.set(e.pointerId, [e.clientX, e.clientY]); pinch = null; panning = true; return; }
-  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); return; }
+  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); firstPress = w.user.tiller; return; }
   drag = { x: e.clientX, y: e.clientY, yaw0: look.yaw, pitch0: look.pitch };
 });
 gl.addEventListener('pointermove', e => {
