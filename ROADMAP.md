@@ -56,6 +56,13 @@ the guide's line settings and the search decides only the depowering past them. 
 optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
 settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
 heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Open items from the physics review (November 2026): the sails' "full" depth (balance.ts RIG.fullDepth) is unsourced, so
+ORC's full-power lift is never reached above about 10 kt (this partly hides the gap above); ORC's default crew for
+the sailing displacement is about 300–330 kg against the sim's 240 (GM 0.50 rather than 0.52); the sails' own weight
+aloft is left out (ORC eq. 4.9); the hove-to force model's keel is a slender wing (Te² = 2T²) while the speed search
+uses ORC's effective draft; the crew's line planner (controls.ts crewSolve) is a local search, so two boats can settle
+on different but equally good settings. Speed: a full race runs about 20% slower than main (the depowering search,
+cached, and the crew's line planning): for the performance review.
 Also found on the way: the outhaul's range was five points of camber, past what its black band allows (now about 1.5,
 the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
 car, an estimate between the end points).

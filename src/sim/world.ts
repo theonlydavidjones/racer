@@ -1,7 +1,7 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { asternCoast, crewRig, moveBoat } from '../boat/physics';
 import { defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
@@ -420,6 +420,18 @@ export class World {
   }
   /** The average wind factor over the water around the course (the map shades relative to it). */
   fieldMeanK = 1;
+  /**
+   * The day's wind across the course at p, from the grid alone (the turn, deg, and the factor on the course-wide speed,
+   * without the shore's slowing close in): what carries the puffs (environment/wind.ts Puffs.step), cheaply.
+   */
+  fieldDrift(p: Vec): { turn: number; k: number } {
+    const g = this.field;
+    if (!g) return { turn: 0, k: 1 };
+    const fx = clamp((p.x - g.x0) / g.step, 0, g.n - 1.001), fy = clamp((p.y - g.y0) / g.step, 0, g.n - 1.001);
+    const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n;
+    const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
+    return { turn: bl(g.turn), k: bl(g.k) };
+  }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
   fieldAt(p: Vec): { k: number; turn: number; extra: number } {
     const g = this.field;
@@ -494,7 +506,7 @@ export class World {
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
     this.wind = windAt(this.windModel, this.t);
-    this.puffs.step(dt, this.wind, p => this.fieldAt(p)); // each puff goes with the wind where it is
+    this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second

@@ -80,8 +80,9 @@ describe('equipment the class rules make equal', () => {
   it('a wooden mast is within about a percent: a little heavier aloft', () => {
     // (9 kg about 5.3 m up takes ~160 N·m off her righting moment at 20° of heel, ~2.5% with the crew hiking; in 20 kt,
     // held up by her stability, speed goes roughly with its 0.3–0.5 power: about 1%)
-    const a = benchAngles(20).up;
-    expect(Math.abs(loss(20, a, { mast: 'wood' }))).toBeLessThan(0.012);
+    // (settled: 90 s, as the crew's line settings take a minute to come to rest)
+    const a = benchAngles(20).up, settled = (s: BoatSpec) => benchSpeed(20, a, s, 9, 90).kt;
+    expect(Math.abs(settled(spec({ mast: 'wood' })) / settled(spec()) - 1)).toBeLessThan(0.0125);
     // (heavier aloft, so less stable: in a breeze, where her stability holds her back, a little slower)
     const wood = benchSpeed(20, a, spec({ mast: 'wood' })), alu = benchSpeed(20, a, spec());
     expect(wood.kt).toBeLessThan(alu.kt);

@@ -47,6 +47,13 @@ export const STAB = {
   crewZ: 0.05 * orc.boat.imsL + 0.36
 };
 const KM = STAB.rm1 / (STAB.light * Math.sin(D2R)) + STAB.vcg;
+/**
+ * The metacentre's height above the centre of buoyancy (m): KM from the certificates (above) less the centre of
+ * buoyancy's height, about 0.22 m below the waterline for the canoe body and the keel's volume (an estimate: the hull's
+ * offsets aren't published). And the heel at which the deck edge reaches the water (deg): the sheer about 0.65 m above
+ * the water at about 1.1 m out (an estimate from the profile and the 2.20 m beam).
+ */
+const BM = KM + 0.22, DECK_EDGE = 30;
 /** Metacentric height (m) in sailing trim at displacement `disp` (kg) with `crewKg` of people aboard. */
 export function gmSailing(disp = DISP, crewKg = 240): number {
   return KM - (STAB.light * STAB.vcg + crewKg * STAB.crewZ) / disp; // (the gear, the rest of the weight, at the waterline)
@@ -180,13 +187,19 @@ export function rightingMoment(heelDeg: number, hike = 1, disp = DISP): number {
 /** The hull's own righting moment (N·m): displacement (people included, sitting on the centreline) × righting arm.
  * Signed with the heel: it always pushes her back upright. */
 export function hullRighting(heelDeg: number, disp = DISP, crewKg = 240): number {
-  const t = heelDeg * D2R;
-  // (the righting arm beyond small angles: GM·sin φ, levelling off as the deck edge nears the water; the curve's shape
-  // past a few degrees isn't on the certificates, which print only the moment at 1°)
-  return disp * G * gmSailing(disp, crewKg) * Math.sin(t) * (1 - 0.3 * Math.sin(t) ** 2);
+  const t = heelDeg * D2R, td = Math.min(Math.abs(t), DECK_EDGE * D2R);
+  // (the righting arm past small angles: the wall-sided formula, GZ = sin φ·(GM + ½·BM·tan²φ) (Rawson & Tupper, Basic
+  // Ship Theory, ch. 4), the waterplane widening as she heels, until the deck edge reaches the water; past that it grows
+  // no further. The certificates print only the moment at 1°, so the curve's shape past a few degrees is this formula)
+  return disp * G * Math.sin(t) * (gmSailing(disp, crewKg) + 0.5 * BM * Math.tan(td) ** 2);
 }
-/** The heeling moment (N·m) at heel `heelDeg` from a side force acting `ceh` m above the hull's centre of pressure (sailForces). */
-export const heelingMoment = (heelForce: number, ceh: number, heelDeg: number) => heelForce * ceh * Math.cos(heelDeg * D2R);
+/**
+ * The heeling moment (N·m) from the sails' heeling force acting `ceh` m above the hull's centre of pressure
+ * (sailForces). The force is already the one square to the heeled mast, from the wind the heeled sails see (sailWind,
+ * ORC eqs. 7.2–7.3), so the moment has no further cos(heel): ORC eq. 5.56, ½ρVa²·Aref·CH·(HBI + ZCE). (`heelDeg` kept
+ * for the callers; unused.)
+ */
+export const heelingMoment = (heelForce: number, ceh: number, heelDeg?: number) => { void heelDeg; return heelForce * ceh; };
 
 /**
  * Heel (deg, + to leeward, − to windward) with the crew where they are: the sails' heeling moment plus the crew's
@@ -235,7 +248,8 @@ export function sailYaw(f: { main: SailForce; jib: SailForce }, heelDeg: number,
   const h = heelDeg * D2R, ce = ceh;
   // side forces about the keel: the main aft (+ toward the wind), the jib forward (− away)
   // (a stretched old sail's draft sits further aft, and its force with it, by a share of the chord at the centre of effort)
-  let m = -(f.main.heel * (LEVER.main - CHORD.main * 0.5 * (f.main.ceAft ?? 0)) + f.jib.heel * (LEVER.jib - CHORD.jib * 0.5 * (f.jib.ceAft ?? 0)));
+  // (the heeling forces are square to the heeled mast: across the water, their horizontal part, cos(heel))
+  let m = -Math.cos(h) * (f.main.heel * (LEVER.main - CHORD.main * 0.5 * (f.main.ceAft ?? 0)) + f.jib.heel * (LEVER.jib - CHORD.jib * 0.5 * (f.jib.ceAft ?? 0)));
   // drive pushed out to leeward by heel, and by the boom eased out: both turn her toward the wind
   m += (f.main.drive + f.jib.drive) * ce * 0.55 * Math.sin(h);
   m += Math.max(0, f.main.drive) * 1.6 * Math.sin(Math.abs(boomOut) * D2R) * 0.5;
@@ -250,15 +264,26 @@ export function rudderDrag(weather: number, v: number): number {
 }
 
 /**
- * What pushes her along (N): the sails' drive less the keel's induced drag for the side force it answers, at boat speed
- * v (m/s) and heel (deg). ORC VPP Documentation 2025, eq. 6.37: DI = FH² / (π·½ρV²·Te²). The effective draft is the
- * sim's own keel model's (slender-wing lift, Newman, Marine Hydrodynamics §5.12, the water's surface mirroring the
- * keel: Te² = 2·T²), its depth shortened by cos(heel); ORC works it from the hull's offsets (MHSD), which aren't
- * published for the Folkboat.
+ * What pushes her along (N): the sails' drive less the hull and keel's induced drag for the side force they answer, at
+ * boat speed v (m/s) and heel (deg). ORC VPP Documentation 2025, eq. 6.37: DI = FH² / (π·½ρV²·Te²), FH the side force
+ * across the water (the sails' heeling force × cos heel). Te is ORC's effective draft, MHSD = 0.92 × the deepest
+ * station's reduced draft (eq. 4.20); the Folkboat's reduced drafts aren't published (ORC works them from the hull's
+ * offsets), so the full draft stands in for the deepest one: the largest Te, the least drag ORC's formula allows (an
+ * estimate). And ORC's multiplier for a boat sailed nearly upright (Fig. 6.9: the keel and rudder sharing the lift
+ * badly, even a little lee helm, at small heel), "fully active upwind", gone once the drive is more than 0.4 of the side
+ * force: read off the figure, 1.57 upright, 1.31 at 5°, 1.08 at 10°, 1 from 15°.
  */
+const DI_FACTOR = [1.57, 1.45, 1.31, 1.18, 1.08, 1.03, 1.0]; // every 2.5° of heel, ORC Fig. 6.9
+export function diFactor(heelDeg: number, drive: number, side: number): number {
+  const x = clamp(Math.abs(heelDeg) / 2.5, 0, DI_FACTOR.length - 1), i = Math.min(DI_FACTOR.length - 2, Math.floor(x));
+  const k = DI_FACTOR[i] + (DI_FACTOR[i + 1] - DI_FACTOR[i]) * (x - i);
+  const r = side > 1 ? drive / side : 1, t = clamp((r - 0.25) / 0.15, 0, 1), on = 1 - t * t * (3 - 2 * t); // (upwind: full; by 0.4: gone)
+  return 1 + (k - 1) * on;
+}
 export function netDrive(f: { main: SailForce; jib: SailForce }, heelDeg: number, v: number): number {
-  const q = 0.5 * RHO_W * Math.max(0.5, v) ** 2, c = Math.cos(Math.min(60, Math.abs(heelDeg)) * D2R), fh = (f.main.heel + f.jib.heel) * c;
-  return f.main.drive + f.jib.drive - fh * fh / (Math.PI * q * 2 * orc.boat.draft ** 2 * c * c);
+  const q = 0.5 * RHO_W * Math.max(0.5, v) ** 2, side = f.main.heel + f.jib.heel, drive = f.main.drive + f.jib.drive;
+  const fh = side * Math.cos(Math.min(60, Math.abs(heelDeg)) * D2R), te = 0.92 * orc.boat.draft;
+  return drive - diFactor(heelDeg, drive, Math.abs(side)) * fh * fh / (Math.PI * q * te * te);
 }
 
 /**

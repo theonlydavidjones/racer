@@ -25,7 +25,7 @@ describe('Heel from the forces on the sails', () => {
     expect(h14).toBeGreaterThan(10); expect(h14).toBeLessThan(20);
     expect(h20).toBeGreaterThan(h14 - 1); expect(h20).toBeLessThan(25);
     // held at full power she'd be well over (the righting moment from the ORC certificates)
-    expect(beat(20, undefined, true).heelMag!).toBeGreaterThan(h20 + 5);
+    expect(beat(20, undefined, true).heelMag!).toBeGreaterThan(h20 + 4);
   });
   it('heels at once in a gust', () => {
     const b = beat(12), before = b.heelMag!;

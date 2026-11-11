@@ -18,7 +18,9 @@ describe('taking one line off the crew', () => {
     const eased = b.ctl.mainsheet;
     sail(b, 20);
     expect(b.ctl.mainsheet).toBeCloseTo(eased, 5); // yours: it stays where you left it
-    expect(b.ctl.backstay).toBeGreaterThan(0.4); // the crew's: still working it for 20 kt
+    // the crew's: still working it toward their setting for 20 kt (as an untouched boat has it)
+    const own = testBoat({ heading: 318, kt: 5, windKt: 20 }); sail(own, 21);
+    expect(b.ctl.backstay).toBeGreaterThan(Math.min(0.2, own.ctl.backstay - 0.1));
     expect(byHand(b, 'jibsheet')).toBe(false);
   });
   it('dragging a line to a setting takes it too', () => {

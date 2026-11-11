@@ -89,6 +89,16 @@ describe('Roll tacking (RRS 42.3(b))', () => {
     expect(tack(0.9).rolled).toBe(true);
     expect(tack(0.2).rolled).toBe(false);
   });
+  it('the flatten after the tack lasts as long onto either tack (it ends once she is upright)', () => {
+    const flatten = (tack: 'S' | 'P') => {
+      const W = 10, twa = beatAngle(W), hd = tack === 'S' ? 360 - twa : twa, b = testBoat({ heading: hd, kt: 4.5, windKt: W });
+      b.crew = newCrew(crewOf(0.9), tack); sail(b, 30); startTack(b);
+      let t = 0; sail(b, 15, () => { if (b.crew!.roll?.phase === 'flatten') t += 1 / 60; });
+      return t;
+    };
+    const s = flatten('S'), p = flatten('P');
+    expect(s).toBeGreaterThan(0.5); expect(p).toBeGreaterThan(0.5); expect(Math.abs(s - p)).toBeLessThan(0.3);
+  });
   it('in a 2-tonne keelboat it is worth little either way, and never makes her faster than she was before it', () => {
     // (the model has the roll's push on the rig (physics.ts rigSway); the help it gives steering her through the wind,
     // heeled, with less rudder, isn't modelled yet: ROADMAP)

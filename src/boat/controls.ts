@@ -231,7 +231,7 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   luff disappear. When the wind exceeds 15 knots it is pulled hard".
  * - Traveller: "In light winds (0-6 knots) pull the traveller cars 15-20 cm to windward. In medium winds (6-14 knots) set
  *   them in the middle. In higher wind the cars are eased to leeward to decrease heel and thus rudder pressure." (The
- *   traveller's ±1 is ±9.5° of boom, about ±0.56 m of car under the end of the 3.38 m boom: 15–20 cm is about −0.3.)
+ *   traveller's ±1 is ±9.5° of boom, ±0.5 m of car under the end of the boom (boomAngle): 15–20 cm is −0.3 to −0.4.)
  * - Vang: "Never use the kickingstrap upwind in less than 18 knots"; above that it's on, to hold the leech when the main
  *   is eased in the gusts.
  * Each line's least and most, upwind (`tws` kt); off the wind, the crew sets them for shape alone. A setting changes
@@ -247,8 +247,8 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
   const lo = (v: number, free = 0) => free + (v - free) * u, hi = (v: number) => 1 + (v - 1) * u;
   return {
     min: { outhaul: lo(Math.max(0, outhaul - 0.05 * (1 - over(12)))), // (above 12 kt "all the way to the mark")
-      cunningham: lo(0.9 * over(15)), traveller: lo(-0.36 + 0.31 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
-    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), traveller: hi(-0.27 + 0.32 * over(6) + 0.95 * over(14)), vang: hi(0.1 + 0.9 * over(18)) }
+      cunningham: lo(0.9 * over(15)), traveller: lo(-0.4 + 0.35 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
+    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(0.1 + 0.9 * over(18)) }
   };
 }
 
