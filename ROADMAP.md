@@ -26,9 +26,19 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
       shape, so in a gale (k ≈ 0.2 at 35 kt) it stands in for the reefing and depowering it leaves out; from rest a
       backed-jib boat there gathers way quickly (5 kt in about 10 s). Holding the traveller down doesn't depower her: the
       crew sheets in to keep the boom angle it wants, so with the traveller yours the mainsheet should follow your intent.
-   c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
-      skill; an option to place the crew yourself (6–10 h).
-   d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).
+   c. ~~Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
+      skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
+      change with trim and heel) from a Folkboat lines plan, and the righting curve's shape past a few degrees (the
+      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll gybe; the help a roll
+      tack: she now rolls through it (in light air too), the rig's sweep adds push while she rolls (quasi-steady, from the
+      sail forces) and a turn costs speed by the rudder it needs net of her helm, but in a 2-tonne keelboat that adds
+      up to nothing measurable; the only measured gains are a Laser's (Kogure et al. 2013, GPS: 5.3% faster through the
+      tack in 2–4 m/s, 2.8% in 4–6 m/s) and Cornell's towing-tank work on the unsteady thrust (APS DFD 2015–19, behind
+      a browser check), and nothing sizes the heeled hull's own turning or the unsteady flow for a keelboat; the helm's own steering suffering while
+      single-handed at the cabin top; crew moving in waves (aft in a chop to free the bow).
+   d. ~~Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved~~ (done). Later: measured
+      timings for Folkboat crew work (the times are estimates); the order of jobs at a mark rounding (pole, vang, cars)
+      planned ahead of the mark by a skilled crew.
 3. ~~Race strategist in the course view, and a navigator for cruising~~ (done; published with the combined build of
    the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
    slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
@@ -40,22 +50,50 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**Depowering: the physics against the sailmaker** (owner, November 2026: "crew follows the guide for now, but let's keep
+this on the roadmap as something to investigate"; 4–8 h). With ORC's sail and keel physics, a speed search like ORC's
+VPP (physics.ts powerFactor) has a Folkboat carry full power to about 17–18 kt; North Sails' Nordic Folkboat guide has
+the outhaul on its band above 12 kt, the Cunningham hard above 15 and the traveller eased down above 14. Fitting the
+heeled hull's drag to close the gap needs an impossible value (19% of her speed at 16° of heel), so the crew follows
+the guide's line settings and the search decides only the depowering past them. Candidates: ORC's own flat and twist
+optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
+settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
+heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Open items from the physics review (November 2026): the sails' "full" depth (balance.ts RIG.fullDepth) is unsourced, so
+ORC's full-power lift is never reached above about 10 kt (this partly hides the gap above); ORC's default crew for
+the sailing displacement is about 300–330 kg against the sim's 240 (GM 0.50 rather than 0.52); the sails' own weight
+aloft is left out (ORC eq. 4.9); the hove-to force model's keel is a slender wing (Te² = 2T²) while the speed search
+uses ORC's effective draft; the crew's line planner (controls.ts crewSolve) is a local search, so two boats can settle
+on different but equally good settings. Speed (November 2026, the same race five times, median µs per world step,
+fleet of 5): the training course 461 against main's 420 (+10%), Seaweed Soup 444 against 422 (+5%), down from +40% and
++18% (the hull's resistance tabled, the heel solve warm-started, the depowering search cached and simpler, no per-step
+allocations in the puffs and the crew). What's left is spread thin: the crew's per-step placement and jobs, the heel
+solve, and the search's first look at a new wind (it fills in over a race). For the performance review.
+Also found on the way: the outhaul's range was five points of camber, past what its black band allows (now about 1.5,
+the guide's range), and the mainsheet's hold on the leech is now from its geometry (the slant from the boom end to the
+car, an estimate between the end points).
+
 **Performance review** (owner, November 2026; 6–10 h): no lag or crashes as the sim grows. Set a budget first (a
 steady 60 fps on a typical laptop in a full race: fleet, ships, wildlife, charts; page load under a few seconds; memory
 that doesn't climb over a long session; the page well under the 16 MB limit, 3.1 MB today), then measure against it:
 frame time by part (physics step, AI, onLand/shoreDist calls, the sea model, the 3D scene's draw calls and triangles,
 the map and chart redraws, the sails' canvas textures), memory over an hour's sail (leaks from scenes, textures and
 listeners not freed between races), and the worst cases (big fleet, heavy weather, the chart zoomed out). Fix the
-hot spots; add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
+hot spots (measured in November 2026: `shoreDist`, which the wind's terrain model and the current's shore relief ask
+for every boat every step, is over half of a race step on a course out toward the Gate; a distance field on a grid
+would take most of it); add a performance test to the suite (sim steps per second for a full race, headless) so later work can't
 quietly slow it down; and a frame-time readout behind a dev key. Do it in a session of its own, with no other
 sessions changing the scene or the physics while it measures.
 
-Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (8–15 h); skipper and crew model (15–25 h); cheating, protests
+Then, unranked: ~~start screens~~ (done: Race → create a race or run a past race; one-screen setups with the day's real conditions beside your choices; Settings); deep physics pass (begun, November 2026: stability from ORC certificates, the sails' forces from ORC's model, the
+wind's gradient and the heeled wind triangle, the keel's induced drag, depowering by a VPP-style speed search; still to
+do: the depowering question above, waves and puffs in every response, the gusts' peaks against the records; 6–10 h
+left); skipper and crew model (15–25 h); cheating, protests
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
 players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
-past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
+past races (8–12 h); ~~accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands~~ (done);
 phone layout (on hold, 8–12 h).
 
 Checked: RRS 52 and the ERS rudder definition (primary sources), and the ST2000+'s 4,500 kg rating (Raymarine). Still
@@ -75,11 +113,11 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **A navigator** in cruising, doing the same for the route: timeliness and safety (current gates, the slot, shipping lanes).
 - **Easier sail controls:** bigger targets; adjusting one line takes only that line off auto, and it's easy to put it
   back. Longer term: working the lines on the boat itself.
-- **Crew weight in the physics:** the low side in light air, hiking in a breeze, body-tacking, moving forward downwind; the AI
-  crew doing it by skill; the boat answering every shift; an option to move the crew yourself.
-- **Real timing and sequencing of adjustments:** cars rarely moved (it takes time, means leaving the cockpit, which moves
+- ~~**Crew weight in the physics:** the low side in light air, hiking in a breeze, body-tacking, moving forward downwind; the AI
+  crew doing it by skill; the boat answering every shift; an option to move the crew yourself.~~ (done)
+- ~~**Real timing and sequencing of adjustments:** cars rarely moved (it takes time, means leaving the cockpit, which moves
   weight, and the working car usually can't be moved under load); the order and pace of every adjustment set by the number
-  of crew and their skill.
+  of crew and their skill.~~ (done)
 - **A deep pass on sail and boat physics:** every crew move, wave, puff and line adjustment makes a response, from real
   science and maths.
 - ~~**Cleaner start screens.**~~ (done) Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
@@ -130,9 +168,9 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). ~~Winter winds~~ (done: westerly, northerly, southerly and light days by their frequency in the records). ~~Real wind for a past race day~~ (done: observed every 6 minutes since 2021) and ~~the forecast~~ (done: NWS, refreshed daily). ~~The wind across the course~~ (done: the NWS grid for forecasts; station-nudged terrain model for past days). Later: the AI sailing to the pressure; a gridded observed analysis (NOAA's URMA) for past days.
 - ~~**Wind shadows**~~ (done: boats' dirty air, ships, the committee boat, the lee of the land). Later: wakes laid down as markers and carried by the wind (so a wake stays where a boat tacked); the AI choosing a clear-air hole on the line; the wind bending round the islands and speeding up on their flanks.
 - ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). Later: show each item on the replay (the header you held, where you overstood), and compare against the boat that won.
-- ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail.
-- **GGYC and StFYC, and the start line.** Dial in the clubs' buildings and the GGYC flagpole (the inner end of the start line) on the spot. The course file has the flagpole at 37.80925 N; the city's building data puts the GGYC clubhouse at 37.8077 N.
-- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). Still to do: replace the hand-traced Cityfront outline with real coastline data (~~Fort Mason's piers~~ done: OSM's coast from Crissy Field to Aquatic Park; ~~Pier 39 and the Wharf~~ done: OSM's coast on to Pier 27, with the open piers, breakwaters and Pier 39's docks; still hand-traced from Fort Point to Crissy Field). Still to do at the Wharf: the AI's and the tiller pilot's look-ahead for land samples every 15–45 m (ai/ai.ts, boat/autopilot.ts), so it can step over a 1–10 m pier, breakwater or dock: test those lines exactly against geo/shore.ts WHARF (wharfCrossed), as the passage planner does; the sea lions' floats at Pier 39 aren't solid, and Rule 20 hails at the islands (today only at the Cityfront).
+- ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
+- ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
+- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 

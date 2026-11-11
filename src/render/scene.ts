@@ -72,8 +72,9 @@ const WATER_FRAGMENT = `
   float kw = mix(1.0, 0.4 + 1.4 * texture2D(uPuff, clamp(puv, 0.0, 1.0)).r, edge);
   // the gusts inside a puff: the map is 20 m cells, but the wind in a puff comes in smaller bursts (turbulence a few
   // tens of metres across), which roughen the water in ragged patches and cat's paws. Carried along with the
-  // puffs (at their speed, uPuffV), so the whole dark patch and its ragged edge move down the wind together.
-  vec2 adv = vWaveP - uPuffV * uTime;
+  // puffs (uPuffOff: how far they've carried, added up step by step at their speed, so a shift of the wind turns the
+  // drift from then on and doesn't swing the whole pattern), so the dark patch and its ragged edge move down the wind together.
+  vec2 adv = vWaveP - uPuffOff;
   float turb = (vnoise(adv / 46.0) - 0.5) * 0.65 + (vnoise(adv / 13.0 + 5.3) - 0.5) * 0.35;
   float ex = kw - 1.0 + turb * (0.05 + 0.25 * abs(kw - 1.0)) * edge;
   // in light air the wind is patchy: cat's paws of ripples on otherwise glassy water
@@ -151,7 +152,8 @@ export class SceneView {
    * the water shader turns into darker, rougher patches in the puffs and paler, smoother ones in the lulls. */
   private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
   private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
-  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() } };
+  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() } };
+  private puffT: number | null = null;
   private puffAcc = 1;
   private terrain: TerrainGrid | null = null;
   private terrainKey = '';
@@ -256,7 +258,7 @@ export class SceneView {
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -333,7 +335,7 @@ export class SceneView {
   private harbor!: Harbor;
   setWorld(w: World): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
-    this.laylineAcc = 1; this.puffAcc = 1; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
     this.ripAngle = -w.windModel.base * D2R; this.wtex.offset.set(0, 0);
     this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
@@ -485,7 +487,8 @@ export class SceneView {
     this.puffTex.needsUpdate = true;
     this.puffUni.uPuffO.value.set(x0, y0); this.puffUni.uPuffS.value = span;
     this.puffUni.uMeanKt.value = w.wind.kt;
-    this.puffUni.uPuffV.value.set(w.puffs.dir.x, w.puffs.dir.y).multiplyScalar(w.wind.kt * 0.5144 * 0.8); // as the puffs travel (environment/wind.ts)
+    const fh = w.fieldAt(at), go = V(w.wind.from + fh.turn + 180); // the wind here: the puffs in view travel with it
+    this.puffUni.uPuffV.value.set(go.x, go.y).multiplyScalar(w.wind.kt * fh.k * 0.5144 * 0.8); // as the puffs travel (environment/wind.ts)
   }
 
   /**
@@ -616,6 +619,9 @@ export class SceneView {
       this.envAcc = 0; this.envCam.update(this.renderer, this.scene);
       for (const r of REFLECTIVE) if (r.mat.envMap !== this.envTarget.texture) { r.mat.envMap = this.envTarget.texture; r.mat.needsUpdate = true; }
     }
+    // the puffs' texture carried down the wind on the sim's clock (paused, sped up and replayed with it; a jump starts afresh)
+    const pdt = this.puffT == null ? 0 : w.t - this.puffT; this.puffT = w.t;
+    if (pdt > 0 && pdt < 5) this.puffUni.uPuffOff.value.addScaledVector(this.puffUni.uPuffV.value, pdt);
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     // the waves: heights for the sea where you are, then the sea map around you (every 2 s)

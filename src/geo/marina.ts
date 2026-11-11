@@ -104,15 +104,40 @@ const nearLine = (p: Vec, pts: Vec[], half: number) => {
   }
   return false;
 };
+/**
+ * Everything solid in a harbor, filed in 10 m cells, so a question about one place (or one line) looks only at the
+ * docks near it, not at all of West Harbor's hundreds of fingers: boats finish beside its jetty, and the AI's
+ * look-ahead asks about the water there every step.
+ */
+export interface HarborSolid { poly: boolean; pts: Vec[]; half: number; seen: number }
+export interface HarborIndex { x0: number; y0: number; C: number; nx: number; ny: number; cells: HarborSolid[][] }
+const INDEX = new Map<Harbor, HarborIndex>();
+export function harborIndex(H: Harbor): HarborIndex {
+  let ix = INDEX.get(H);
+  if (ix) return ix;
+  const C = 10, x0 = H.reach.x0, y0 = H.reach.y0, nx = Math.ceil((H.reach.x1 - x0) / C) + 1, ny = Math.ceil((H.reach.y1 - y0) / C) + 1;
+  const cells: HarborSolid[][] = Array.from({ length: nx * ny }, () => []);
+  const file = (pts: Vec[], poly: boolean, half: number) => {
+    const s: HarborSolid = { poly, pts, half, seen: 0 }, b = boxOf(pts, half + 0.01);
+    for (let j = Math.max(0, Math.floor((b.y0 - y0) / C)); j <= Math.min(ny - 1, Math.floor((b.y1 - y0) / C)); j++)
+      for (let i = Math.max(0, Math.floor((b.x0 - x0) / C)); i <= Math.min(nx - 1, Math.floor((b.x1 - x0) / C)); i++) cells[j * nx + i].push(s);
+  };
+  for (const b of H.breakwaters) file(b.pts, b.area, b.area ? 0 : BREAKWATER_W / 2);
+  for (const a of H.areas) file(a, true, 0);
+  for (const l of H.shore) file(l, false, SHORE_W / 2);
+  for (const w of H.walkways) file(w, false, WALKWAY_W / 2);
+  for (const f of H.fingers) file(f, false, FINGER_W / 2);
+  ix = { x0, y0, C, nx, ny, cells };
+  INDEX.set(H, ix);
+  return ix;
+}
 /** A dock, a pier or a breakwater here (solid: a boat stops against it)? Only meaningful in or by a harbor. */
 export function hitsHarbor(p: Vec): boolean {
   for (const H of HARBORS) {
     if (!inBox(p, H.reach)) continue;
-    for (const b of H.breakwaters) if (b.area ? inPoly(p, b.pts) : nearLine(p, b.pts, BREAKWATER_W / 2)) return true;
-    for (const a of H.areas) if (inPoly(p, a)) return true;
-    for (const l of H.shore) if (nearLine(p, l, SHORE_W / 2)) return true;
-    for (const w of H.walkways) if (nearLine(p, w, WALKWAY_W / 2)) return true;
-    for (const f of H.fingers) if (nearLine(p, f, FINGER_W / 2)) return true;
+    const ix = harborIndex(H), i = Math.floor((p.x - ix.x0) / ix.C), j = Math.floor((p.y - ix.y0) / ix.C);
+    if (i < 0 || j < 0 || i >= ix.nx || j >= ix.ny) continue;
+    for (const s of ix.cells[j * ix.nx + i]) if (s.poly ? inPoly(p, s.pts) : nearLine(p, s.pts, s.half)) return true;
   }
   return false;
 }

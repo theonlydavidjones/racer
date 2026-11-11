@@ -81,7 +81,7 @@ body{
 /* messages: in the left column (under the signals, above the trim panel), clear of the boat; all of them stay in the log */
 #toast{position:fixed;left:16px;top:calc(env(safe-area-inset-top,0px) + 300px);background:var(--pod-solid);border:1px solid var(--accent);
   color:var(--text);font:600 14px/1.35 var(--f-body);padding:9px 12px;border-radius:8px;text-align:left;max-width:min(300px,calc(100% - 32px));
-  pointer-events:none;opacity:0;transition:opacity .25s}
+  pointer-events:none;opacity:0;transition:opacity .25s;z-index:6} /* (above the trim panel, which reaches up to it when it has all its rows) */
 #toast.show{opacity:1}
 
 #controls{position:fixed;left:0;right:0;bottom:0;
@@ -198,6 +198,14 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
   border-radius:7px;padding:0 12px;min-width:68px;height:40px;cursor:pointer;touch-action:none}
 .tp-btn.on,.tp-btn:active{background:var(--btn-hi);border-color:var(--accent)}
 .tp-state.backed{color:#7cc4ff}
+/* placing the crew yourself: lit when you've put them there */
+.tp-seg{display:flex;gap:4px}
+.tp-btn.sm{min-width:44px;padding:0 7px;height:34px;font-size:12px}
+.tp-seg.tp-fore{margin-left:6px}
+.tp-auto.sm{height:34px;min-width:48px;padding:0 8px}
+#tpCrewRow{min-height:36px}
+.tp-seg .tp-btn.on{background:var(--accent);color:#13202b;border-color:var(--accent)}
+.tp-crew{color:var(--text)}
 /* who has the line: shown only when it's yours, one tap gives it back to the crew */
 .tp-auto{font:700 12px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#13202b;background:var(--accent);border:1px solid var(--accent);
   border-radius:7px;padding:0 10px;height:40px;min-width:60px;cursor:pointer}

@@ -26,6 +26,7 @@ import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
+import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
@@ -103,7 +104,7 @@ function newGame(seed = randomSeed()): void {
   w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
     S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) });
   acc = 0; drillShown = false;
-  showTrimOwner(); showLash();
+  showTrimOwner(); showLash(); showCrewPlace();
   $('bCourse').textContent = w.freeSail ? 'Navigator' : 'Course';
   view.setWorld(w);
   labels.build(w);
@@ -438,6 +439,33 @@ function showLines(): void {
 const sheetBtn = (id: string, key: 'mainsheet' | 'jibsheet', dir: -1 | 1) =>
   holdBtn(id, () => { btnCmd[key] = dir; applyHeld(); }, () => { if (btnCmd[key] === dir) delete btnCmd[key]; applyHeld(); });
 sheetBtn('bMainIn', 'mainsheet', -1); sheetBtn('bMainOut', 'mainsheet', 1); sheetBtn('bJibIn', 'jibsheet', -1); sheetBtn('bJibOut', 'jibsheet', 1);
+/* Placing the crew yourself (boat/crewPhys.ts): their weight across the boat and fore and aft. Tap the lit one again
+ * (or Auto) and it's their call again. They still go where their jobs take them (a winch, the cabin top, the car). */
+const ACROSS: PlaceAcross[] = ['lee', 'mid', 'up', 'hike'], FORE: PlaceFore[] = ['aft', 'mid', 'fwd'];
+function setPlace(part: 'across' | 'fore', v: PlaceAcross | PlaceFore | null): void {
+  const c = w.user.crew; if (!c || !w.running) return;
+  const pl = c.place ?? { across: null, fore: null };
+  if (part === 'across') pl.across = v as PlaceAcross | null; else pl.fore = v as PlaceFore | null;
+  c.place = pl.across == null && pl.fore == null ? undefined : pl;
+  if (!c.spec.crew.length && part === 'fore' && v) toast('Single-handed, you can\'t leave the tiller to move forward: only your own weight across the boat moves.', 3500);
+  showCrewPlace();
+}
+function stepCrew(part: 'across' | 'fore', d: number): void {
+  const c = w.user.crew; if (!c) return;
+  const list: string[] = part === 'across' ? ACROSS : FORE, cur = c.place?.[part] ?? (part === 'across' ? autoAcross() : 'mid');
+  setPlace(part, list[Math.max(0, Math.min(list.length - 1, list.indexOf(cur) + d))] as PlaceAcross | PlaceFore);
+}
+/** Where the crew have put themselves, in the buttons' terms (to step from). */
+function autoAcross(): PlaceAcross { const m = w.user.crew?.mode; return m === 'leeward' ? 'lee' : m === 'hike' ? 'hike' : m === 'centre' || m === 'downwind' || m === 'foredeck' ? 'mid' : 'up'; }
+function showCrewPlace(): void {
+  const pl = w.user.crew?.place;
+  document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => bt.classList.toggle('on', pl?.across === bt.dataset.ca));
+  document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.classList.toggle('on', pl?.fore === bt.dataset.cf));
+  $('bCrewAuto').hidden = !pl;
+}
+document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => bt.onclick = () => setPlace('across', w.user.crew?.place?.across === bt.dataset.ca ? null : bt.dataset.ca as PlaceAcross));
+document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.onclick = () => setPlace('fore', w.user.crew?.place?.fore === bt.dataset.cf ? null : bt.dataset.cf as PlaceFore));
+$('bCrewAuto').onclick = () => { const c = w.user.crew; if (c) { c.place = undefined; showCrewPlace(); toast('The crew places their own weight again.', 2500); } };
 function togglePole(): void {
   if (!w.running || w.paused) return;
   const u = w.user; u.poleWant = !u.poleWant;
@@ -620,6 +648,10 @@ addEventListener('keydown', e => {
     case 'lashTiller': lash(); break;
     case 'autopilot': if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); break;
     case 'pole': togglePole(); break;
+    case 'crewLee': stepCrew('across', -1); break;
+    case 'crewUp': stepCrew('across', 1); break;
+    case 'crewFwd': stepCrew('fore', 1); break;
+    case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
     case 'pushOff': pushOff(); break;
     case 'jibHalyard': halyard('jib'); break;
@@ -886,7 +918,9 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'windKind' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
-/* Crew: how many, and each person's height and weight (shown in feet and inches, and pounds). */
+/* Crew: how many, and each person's height, weight (shown in feet and inches, and pounds) and skill. */
+/** Skill levels to choose from (boat/crewPhys.ts: 0 novice … 1 expert). */
+const SKILLS: [number, string][] = [[0.25, 'Novice'], [0.6, 'Club racer'], [0.9, 'Expert']];
 const LB = 0.4536, IN = 0.0254;
 const fmtHeight = (m: number) => { const t = Math.round(m / IN); return `${Math.floor(t / 12)}'${t % 12}"`; };
 const parseHeight = (s: string): number | null => {
@@ -896,7 +930,11 @@ const parseHeight = (s: string): number | null => {
 function crewRows(): void {
   const c = S.crew ??= { ...DEFAULT_SETTINGS.crew }, rows = $('crewRows');
   const people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, c.n).map((p, i) => ({ who: `Crew ${i + 1}`, p }))];
-  rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>`).join('');
+  const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
+  rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}`).join('');
+  rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {
+    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); saveSettings(S); newGame();
+  });
   rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
     const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
     if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
