@@ -707,10 +707,10 @@ body.lashed .tg-lash{display:block}
 .tog:first-child{border-top:1px solid var(--rule)}
 .tog input{position:absolute;opacity:0;width:1px;height:1px}
 .tog-sw{position:relative;flex:none;width:30px;height:16px;border-radius:8px;background:rgba(0,0,0,.35);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);transition:background .18s ease,box-shadow .18s ease}
-.tog-sw::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#8e9aa4;
+.tog-sw::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#d6dde2;
   box-shadow:0 1px 2px rgba(0,0,0,.35);transition:transform .18s ease,background .18s ease}
-.tog input:checked + .tog-sw{background:color-mix(in srgb,var(--accent) 70%,transparent);box-shadow:none}
-.tog input:checked + .tog-sw::after{transform:translateX(14px);background:#fff}
+.tog input:checked + .tog-sw{background:color-mix(in srgb,var(--accent) 60%,#0d1b26)}
+.tog input:checked + .tog-sw::after{transform:translateX(14px)}
 .tog:hover .tog-sw{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
 .tog:hover input:checked + .tog-sw{background:var(--accent)}
 .tog input:focus-visible + .tog-sw{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),0 0 0 3px rgba(255,255,255,.12)}
