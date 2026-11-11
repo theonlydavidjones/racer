@@ -395,7 +395,7 @@ export class SceneView {
     const float = markBody(shape, look);
     float.position.copy(P3(p.x, p.y, 0)); add(float);
     const big = shape === 'lighted' ? 1.6 : 1;
-    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshBasicMaterial({ map: this.wakeTex, transparent: true, depthWrite: false }));
+    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshLambertMaterial({ map: this.wakeTex, transparent: true, depthWrite: false })); // lit, so it dims after dark like the sea
     wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(p.x, p.y, 0.12)); add(wake);
     this.markObjs.push({ p, float, wake });
   }

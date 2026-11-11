@@ -153,7 +153,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   grp.add(new THREE.Mesh(hullGeometry(), hullMat));
   // the sea is never drawn inside the hull: a lid over the cockpit at deck level, in the depth buffer only (drawn after
   // the boat and before the water, which scene.ts draws last of the solid things)
-  const lid = new THREE.Mesh(cockpitLid(), new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
+  // (the companionway's openings too: one mesh for both)
+  const lid = new THREE.Mesh(mergeGeometries([cockpitLid().toNonIndexed(), companionwayLid()], false)!, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
   const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
@@ -181,18 +182,18 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // companionway, sliding hatch and the compass on the aft end of the cabin (as on Josephine)
   // the companionway open, its hatch slid forward, and the cabin below: dim by day, lit warm by its lamps after dark
   // (navLights.ts syncNavLights, the same clock as the ports' glow)
-  grp.add(new THREE.Mesh(slidingHatch(), MAT.wood));
   const below = new THREE.MeshLambertMaterial({ color: 0x5a4030, side: THREE.DoubleSide, emissive: 0x000000 });
   grp.add(new THREE.Mesh(mergeGeometries(cabinInterior().map(g => (g.index ? g.toNonIndexed() : g)), false)!, below));
   grp.userData.below = below;
-  const cwLid = new THREE.Mesh(companionwayLid(), new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); cwLid.renderOrder = 1; grp.add(cwLid);
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
-  // wooden grab rails on the cabin top
+  // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
+  const woodTop = [slidingHatch().toNonIndexed()];
   for (const s of [1, -1]) {
-    const gr = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 1.2), MAT.wood);
     const gu = (CABIN.u0 + CABIN.u1) / 2 + 0.03, gx = s * (CABIN.w - 0.2);
-    gr.position.set(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)); grp.add(gr);
+    woodTop.push(new THREE.BoxGeometry(0.04, 0.05, 1.2).toNonIndexed().translate(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)));
   }
+  for (const g of woodTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+  grp.add(new THREE.Mesh(mergeGeometries(woodTop, false)!, MAT.wood));
   // cockpit well, seats, and coamings
   // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
   const cockpitTeak = new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide });
