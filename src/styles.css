@@ -597,3 +597,11 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .layerpop input{accent-color:#ff6a1a}
 .lp-wrap{position:relative}
 #chartLayersPop{position:absolute;top:calc(100% + 6px);left:0}
+/* the map's key (ui/legend.ts), under the layer switches */
+.layerpop{max-height:calc(100vh - 240px);overflow-y:auto}
+#chartLayersPop{max-height:calc(100vh - 120px);width:290px}
+#mapLayersPop{width:280px}
+.layerpop .lp-kh{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule)}
+.lp-key .lk-h{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 3px}
+.lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}
+.lp-key .lk-row canvas{flex:none;border-radius:2px;border:1px solid var(--rule)}

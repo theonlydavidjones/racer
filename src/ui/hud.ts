@@ -38,9 +38,10 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawCurrentArrows, drawWindField, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf } from './draw2d';
+import { drawCourse, drawCurrentArrows, drawWindField, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { onLand } from '../geo/shore';
-import { INK, chartCredit, drawEncChart, drawEncLand, type Ink } from './encChart';
+import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
+import { keySig, renderKey, type SimKey } from './legend';
 import { layerOn, type LayerKey } from './layers';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { visibilityFor } from '../environment/weather';
@@ -528,6 +529,16 @@ export class Hud {
   }
 
 
+  /** What each map drew last, for its key (ui/legend.ts). */
+  private keyState: Partial<Record<'inset' | 'chart', { sim: SimKey[]; pal: ChartPalette; scale: number }>> = {};
+  /** Fill a layers list's key with what's on that map now (rebuilt only when that changes, unless `force`). */
+  keyInto(el: HTMLElement, detail: 'inset' | 'chart', force: boolean): void {
+    const k = this.keyState[detail]; if (!k) return;
+    const sig = keySig(k.sim, SEEN[detail], k.pal);
+    if (!force && el.dataset.sig === sig) return;
+    renderKey(el, k.sim, SEEN[detail], k.pal, detail, k.scale); el.dataset.sig = sig;
+  }
+
   private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     const S = wd.settings, pal = S.chartPal ?? 'day', I = INK[pal], on = (k: LayerKey) => layerOn(S, k), half = Math.max(w, h) / scale * 0.75;
@@ -537,7 +548,20 @@ export class Hud {
       drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, Math.max(250, half / 7), onLand, I);
       drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I);
     }
-    const fog = on('fog') ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    const fog = on('fog') ? visibilityFor(wd.raceDate, wd.clockUtc) : null, L = laylinesFor(wd, u);
+    // what this map shows, for its key
+    const sim: SimKey[] = ['you'];
+    if (wd.boats.length > 1) sim.push('boats');
+    if (!wd.freeSail) { sim.push('start', 'marks'); if (u.leg < wd.C.marks.length) sim.push('next'); }
+    else if (wd.dest) sim.push('dest', 'destline');
+    if (on('laylines') && L) sim.push('laylines');
+    if (on('ships') && wd.vessels.length) sim.push('ships');
+    if (on('current')) sim.push('current');
+    if (on('wind')) sim.push('wind', 'puffs');
+    if (on('sea') && !wd.sea.flat) sim.push('sea');
+    if (fog && !('none' in fog)) sim.push('fog');
+    if (on('shadows') && !wd.freeSail) sim.push('shadows');
+    this.keyState[detail] = { sim, pal, scale };
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
@@ -545,7 +569,7 @@ export class Hud {
     if (on('current')) drawCurrentArrows(ctx, tf, p => wd.currentAt(p), ctr.x, ctr.y, half, Math.max(60, half / 4), 9, onLand, I);
     if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I);
     else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
-    if (on('laylines')) drawLaylines(ctx, tf, laylinesFor(wd, u), wd.freeSail ? 2500 : 450, 1.2, I);
+    if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     if (on('ships')) for (const v of wd.vessels) {
       const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);
@@ -553,7 +577,7 @@ export class Hud {
       ctx.lineCap = 'round';
       ctx.strokeStyle = I.shipHalo; ctx.lineWidth = bw + 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke();
       ctx.strokeStyle = I.ship; ctx.lineWidth = bw; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); ctx.lineCap = 'butt';
-      if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = I.ship; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+      if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = I.ship; ctx.globalAlpha = PEN.ahead.alpha; ctx.lineWidth = PEN.ahead.w; ctx.setLineDash(PEN.ahead.dash); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
       if (labels) { ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = I.shipHalo; const lx = (a[0] + b2[0]) / 2 + 6, ly = (a[1] + b2[1]) / 2 - 6; ctx.strokeText(ty.name, lx, ly); ctx.fillStyle = I.shipText; ctx.fillText(ty.name, lx, ly); }
     }
     if (on('shadows') && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
@@ -589,8 +613,8 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
   ctx.save();
-  ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-  ctx.setLineDash([5, 4]); ctx.strokeStyle = I.line; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
   const shape = (pts: [number, number][]) => {
     ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = I.mark; ctx.fill(); ctx.strokeStyle = I.edge; ctx.lineWidth = 1.2; ctx.stroke();

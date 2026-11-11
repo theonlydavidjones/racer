@@ -573,8 +573,8 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 {
   const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = { ...S.mapLayers, [k]: on }; w.settings.mapLayers = S.mapLayers; saveSettings(S); };
   const redraw = () => { if (chart.isOpen) chart.draw(); };
-  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw);
-  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw);
+  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f));
+  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f));
 }
 $('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
 
