@@ -163,14 +163,22 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
       }
     }
   }
-  // transom and sternpost: the hull's aft ends, all on the raked plane, closed with a fan
-  { const ring: number[] = [], P = 40;
-    const add = (x: number, y: number, z: number) => { pos.push(x, y, z); const c = colorAt(y); col.push(c.r, c.g, c.b); return pos.length / 3 - 1; };
-    for (let j = 0; j <= P; j++) { const p = j / P, pt = hullPoint(uMax(p), p); ring.push(add(pt.x, pt.y, pt.z)); }
-    for (let j = P; j >= 0; j--) { const p = j / P, pt = hullPoint(uMax(p), p); ring.push(add(-pt.x, pt.y, pt.z)); }
-    const cy = 0.15, ctr = add(0, cy, aftLineZ(cy));
-    for (let j = 0; j < ring.length - 1; j++) idx.push(ctr, ring[j], ring[j + 1]);
-    idx.push(ctr, ring[ring.length - 1], ring[0]);
+  // transom and sternpost: the hull's aft ends, all on the raked plane. Its outline (the wide transom above the
+  // waterline, the narrow sternpost and deadwood below it) isn't convex, so it's triangulated as a shape, not fanned
+  // from a centre, and each face turned to look aft, out of the hull.
+  { const P = 60, outline: THREE.Vector3[] = [];
+    for (let j = 0; j <= P; j++) { const p = j / P; outline.push(hullPoint(uMax(p), p)); }
+    for (let j = P - 1; j >= 0; j--) { const p = j / P, pt = hullPoint(uMax(p), p); outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
+    const ring = outline.filter((q, i) => i === 0 || q.distanceTo(outline[i - 1]) > 1e-4);
+    const base = pos.length / 3;
+    for (const q of ring) { pos.push(q.x, q.y, q.z); const c = colorAt(q.y); col.push(c.r, c.g, c.b); }
+    const out = new THREE.Vector3(0, -(TRANSOM_TOP.z - HEEL.z) / (TRANSOM_TOP.y - HEEL.y), 1); // the plane's aft-facing normal
+    const tris = THREE.ShapeUtils.triangulateShape(ring.map(q => new THREE.Vector2(q.x, q.y)), []);
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+    for (const [a, b, c] of tris) {
+      e1.subVectors(ring[b], ring[a]); e2.subVectors(ring[c], ring[a]);
+      if (e1.cross(e2).dot(out) > 0) idx.push(base + a, base + b, base + c); else idx.push(base + a, base + c, base + b);
+    }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
