@@ -1,6 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
+import { BONE, buildBody, type Body } from './crewBody';
 import { CABIN, COCKPIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, fairCurve, halfBeam, uAtZ } from './hull';
 
 /**
@@ -20,59 +21,15 @@ import { CABIN, COCKPIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHal
  * ducking under the boom, at the physics' pace.
  */
 
-interface Limb { root: THREE.Object3D; mid: THREE.Object3D }
-export interface Figure {
-  root: THREE.Group; torso: THREE.Group; head: THREE.Group;
-  arm: [Limb, Limb]; leg: [Limb, Limb]; scale: number;
-  /** (render state: the pose being eased toward, where they were last frame, a step's phase) */
+export interface Figure extends Body {
+  /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh }
+type Limb = Body['arm'][number];
 
-const SKINS = [0xe0b99a, 0xc99b78, 0x9c6b4c, 0x6e4a33, 0xf0cfb4];
-const mat = (c: number, shine = 0) => shine ? new THREE.MeshPhongMaterial({ color: c, shininess: shine, specular: 0x333333 }) : new THREE.MeshLambertMaterial({ color: c });
-const cap = (r: number, len: number, m: THREE.Material, y: number) => { const o = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), m); o.position.y = y; o.castShadow = true; return o; };
-
-/** The figure's bones (m, before scaling to their height): hip to knee, knee to ankle, shoulder to elbow, elbow to wrist. */
-const BONE = { thigh: 0.44, shin: 0.44, upper: 0.29, fore: 0.28, shoulderY: 0.46, hipX: 0.1 };
-
-/** A jointed sailor. Origin at the hips; facing −z; limbs hang straight down until posed. */
-function figure(p: Person, jacket: number, seed: number): Figure {
-  const s = p.h / 1.75, girth = Math.max(0.85, Math.min(1.35, Math.sqrt(p.w / (p.h * p.h) / 24))); // build from BMI
-  const skin = mat(SKINS[seed % SKINS.length]), J = mat(jacket, 30), PFD = mat(seed % 2 ? 0x1c2733 : 0xd8432e, 20), pants = mat(0x2a2e36), boots = mat(0x1b1d20, 40);
-  const root = new THREE.Group(); root.scale.setScalar(s);
-  // pelvis and torso, a little tapered, with the life jacket over the spray top
-  const pelvis = cap(0.13 * girth, 0.14, pants, 0.02); pelvis.rotation.z = Math.PI / 2; root.add(pelvis);
-  const torso = new THREE.Group(); root.add(torso);
-  const chest = cap(0.15 * girth, 0.3, J, 0.27); chest.scale.set(1.05, 1, 0.75); torso.add(chest);
-  const vest = cap(0.16 * girth, 0.2, PFD, 0.31); vest.scale.set(1.08, 1, 0.82); torso.add(vest);
-  // head: neck, skull, a cap with a peak
-  const head = new THREE.Group(); head.position.y = 0.56; head.rotation.order = 'YXZ'; torso.add(head);
-  head.add(cap(0.05, 0.05, skin, 0.0));
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 10), skin); skull.scale.set(0.92, 1.08, 1); skull.position.y = 0.12; head.add(skull);
-  const hat = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(seed % 3 ? 0x1d2330 : 0xe8e4d8)); hat.position.y = 0.16; head.add(hat);
-  const peak = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.012, 12, 1, false, -Math.PI / 2, Math.PI), hat.material); peak.position.set(0, 0.165, -0.06); peak.scale.set(1, 1, 1.1); head.add(peak);
-  // arms: shoulder → upper arm → elbow → forearm → hand
-  const arm = ([-1, 1] as const).map(sx => {
-    const root2 = new THREE.Group(); root2.position.set(sx * 0.2 * girth, BONE.shoulderY, 0); torso.add(root2);
-    root2.add(cap(0.052 * girth, 0.2, J, -0.14));
-    const mid = new THREE.Group(); mid.position.y = -BONE.upper; root2.add(mid);
-    mid.add(cap(0.045, 0.19, J, -0.13));
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), skin); hand.position.y = -BONE.fore; hand.scale.set(0.8, 1.1, 0.6); mid.add(hand);
-    return { root: root2, mid };
-  }) as unknown as [Limb, Limb];
-  // legs: hip → thigh → knee → shin → foot
-  const leg = ([-1, 1] as const).map(sx => {
-    const root2 = new THREE.Group(); root2.position.set(sx * BONE.hipX, 0, 0); root.add(root2);
-    root2.add(cap(0.075 * girth, 0.3, pants, -0.21));
-    const mid = new THREE.Group(); mid.position.y = -BONE.thigh; root2.add(mid);
-    mid.add(cap(0.06, 0.32, pants, -0.21));
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.26), boots); foot.position.set(0, -BONE.shin, -0.07); mid.add(foot);
-    return { root: root2, mid };
-  }) as unknown as [Limb, Limb];
-  root.traverse(o => { o.castShadow = true; });
-  return { root, torso, head, arm, leg, scale: s, gait: 0, speed: 0 };
-}
+/** A sailor (crewBody.ts): their body, and the state the posing keeps. */
+const figure = (p: Person, jacket: number, seed: number): Figure => ({ ...buildBody(p, jacket, seed), gait: 0, speed: 0 });
 
 export function buildCrew(helm: Person, people: Person[], jackets: number[], seed: number): Crew {
   const group = new THREE.Group();
@@ -275,15 +232,20 @@ function ik(limb: Limb, base: THREE.Vector3, target: THREE.Vector3, l1: number, 
 
 const _p = V(0, 0, 0), _h = V(0, 0, 0), _inv = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _e = new THREE.Euler();
 /** Put a figure in a pose: the hips placed and turned, the torso leaned, each limb reaching its foot or hand. */
-function apply(f: Figure, p: PoseT): void {
+const _ax = V(0, 0, 0), _qc = new THREE.Quaternion();
+/** Put a figure in a pose (`upright` rad: how far the torso leans against the boat's heel, to stay over the hips as she
+ * heels: a sitter keeps their body nearly upright, a hiker braced on the rail less so). */
+function apply(f: Figure, p: PoseT, upright = 0): void {
   const k = f.scale;
   f.root.position.copy(p.hip); f.root.rotation.set(0, p.yaw, 0);
-  f.torso.rotation.set(p.pitch, 0, p.roll);
+  // (the heel's axis, the boat's fore-and-aft line, in the figure's own turned frame)
+  _ax.set(0, 0, 1).applyAxisAngle(V(0, 1, 0), -p.yaw);
+  f.torso.quaternion.setFromEuler(_e.set(p.pitch, 0, p.roll)).premultiply(_qc.setFromAxisAngle(_ax, upright));
   _inv.setFromEuler(_e.set(0, p.yaw, 0)).invert();
   // (into the figure's own frame: unturned, unscaled)
   const local = (w: THREE.Vector3, out: THREE.Vector3) => out.copy(w).sub(p.hip).applyQuaternion(_inv).multiplyScalar(1 / k);
   f.leg.forEach((l, i) => ik(l, l.root.position, local(p.feet[i], _p), BONE.thigh, BONE.shin, V((i ? 1 : -1) * 0.05, 0.3, -1), 1));
-  _tq.setFromEuler(_e.set(p.pitch, 0, p.roll)).invert();
+  _tq.copy(f.torso.quaternion).invert();
   f.arm.forEach((a, i) => ik(a, a.root.position, local(p.hands[i], _p).applyQuaternion(_tq), BONE.upper, BONE.fore, V((i ? 1 : -1) * 0.5, -0.3, 1), -1));
   // the head turns to what they're watching (within a neck's reach)
   local(p.look, _h).applyQuaternion(_tq).sub(f.head.position);
@@ -337,7 +299,9 @@ function track(f: Figure, x: number, z: number, dt: number): number {
  * the mast). `windward` +1 when the wind is over the starboard side; `c` the crew state (null: a default);
  * `hideHelm` when you're looking through the helm's eyes; `dt` for easing; `tip` the tiller's end (tillerTip).
  */
-export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3): void {
+export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0): void {
+  // (sitting, people hold their bodies near upright as she heels; hiking or kneeling at a job, braced, less)
+  const heel = heelDeg * Math.PI / 180, against = (pose: string) => -heel * (pose === 'sit' || pose === 'lee' || pose === 'helm' ? 0.55 : pose === 'cross' ? 0.3 : 0.2);
   const ppl = c?.people;
   // (two of them on the same side don't sit in each other's laps: at least a shoulder's width apart fore and aft)
   const ZMIN = COCK0 + 0.5, ZMAX = THWART.z - THWART.half - 0.2, inC = (z: number) => z > COCK0 - 0.1 && z < THWART.z;
@@ -361,7 +325,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const dir = track(f, x, a?.z ?? z, dt);
     const go = f.speed > 0.18 || pose === 'cross';
     const want = crewPose(f, x, z, lean, pose, windward, go, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i);
-    apply(f, ease(f, want, dt));
+    apply(f, ease(f, want, dt), against(pose));
     f.root.visible = true;
   });
   // the helm
@@ -372,7 +336,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const t = tip ?? V(0, 0.8, 2.6);
   const want = away ? crewPose(h, x, z, hp?.lean ?? 0, 'piano', windward, h.speed > 0.18, dir, 9)
     : hp?.pose === 'cross' && h.speed > 0.18 ? moving(h, x, z, dir, h.scale) : helmPose(h, x, z, hp?.lean ?? 0, windward, t);
-  apply(h, ease(h, want, dt));
+  apply(h, ease(h, want, dt), against(hp?.pose ?? 'helm'));
   h.root.visible = !hideHelm;
   // the extension, from the tiller's end to the helm's hand (and a little past it), unless they've let go
   const hand = h.cur!.hands[cr.helmSide > 0 ? 0 : 1], ex = cr.extension, held = !away && !hideHelm;
