@@ -87,6 +87,7 @@ export class BoatPanel {
       case 'deck': this.set(b => { b.deck = v; }); return;
       case 'cabinTop': this.set(b => { if (v) b.cabinTop = v; else delete b.cabinTop; }); return;
       case 'poleSide': this.set(b => { b.poleSide = v === 'starboard' ? 'starboard' : 'port'; }); return;
+      case 'navLights': this.set(b => { b.navLights = v === 'tricolour' ? 'tricolour' : 'deck'; }); return;
       case 'hatch': this.set(b => { b.hatch = v === 'acrylic' ? 'acrylic' : 'teak'; }); return;
       case 'sailColor': this.set(b => { b.sails.color = v as 'white' | 'black'; }); return;
       case 'mainAge': this.set(b => { b.perf.mainAge = v as SailAge; }); return;
@@ -194,6 +195,7 @@ export class BoatPanel {
         <div class="field"><span>Cabin top · ${b.cabinTop ? name(deckList, b.cabinTop) : b.deck.startsWith('teak') ? 'painted canvas' : 'like the deck'}</span>${sw('cabinTop', deckList, b.cabinTop ?? '', 'Like the deck')}</div>
         <div class="field"><span>Forehatch</span>${seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic (smoked, aluminium frame)']], b.hatch ?? 'teak')}</div>
         <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}<small>Flat alongside the toe rail, by the cabin.</small></div>
+        <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolour']], b.navLights ?? 'deck')}<small>Lit from sunset to sunrise. Under 20 m, a sailing boat may show the three in one masthead lantern instead (Rule 25).</small></div>
       </section>
       <section><h3>Sails</h3>
         <div class="field"><span>Sailcloth</span>${seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)}</div>

@@ -172,7 +172,13 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
 /* ---------- deck, cabin, cockpit ---------- */
 
 /** Openings in the deck: the cabin trunk and the cockpit well (u range, half-width). */
-export const CABIN = { u0: 0.355, u1: 0.6, w: 0.62, h: 0.32 };
+/**
+ * The cabin trunk starts just aft of the mast, which goes through the foredeck at the sheer's height (the boom's band is
+ * 1.00 m above the deck there, CR 6.1.11; a coachroof "extended forward of the mast" is a variation, not the class
+ * norm). Its after end and the sizes are estimates. (CR 3.12 puts the cabin's after end within 300 mm forward of
+ * station 6; with station 1 at the transom that would be 0.25–0.55 m further aft than drawn, which isn't confirmed.)
+ */
+export const CABIN = { u0: 0.402, u1: 0.6, w: 0.62, h: 0.32 };
 export const COCKPIT = { u0: 0.6, u1: 0.93, w: 0.7, sole: 0.24 };
 /** Cockpit half-width: narrows aft with the hull, leaving a side deck. */
 export const cockpitHalf = (u: number) => Math.min(COCKPIT.w, halfBeam(u) - 0.24);
@@ -210,7 +216,7 @@ export function deckGeometry(): THREE.BufferGeometry {
 
 /** Cabin trunk half-width: rounded in plan at the front. */
 function cabinHalf(u: number): number {
-  const r = 0.09; // the rounded front, as a fraction of the length
+  const r = 0.05; // the rounded front, as a fraction of the length
   if (u < CABIN.u0 + r) { const f = (CABIN.u0 + r - u) / r; return CABIN.w * Math.sqrt(Math.max(0, 1 - f * f * 0.85)); }
   return CABIN.w;
 }

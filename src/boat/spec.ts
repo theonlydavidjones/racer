@@ -17,6 +17,8 @@ export interface BoatSpec {
   cabinTop?: string;
   /** Which side deck the whisker pole is stowed on, alongside the toe rail. */
   poleSide?: 'port' | 'starboard';
+  /** Her navigation lights under sail: sidelights and a sternlight on deck, or a tricolour at the masthead (Rule 25(a), (b)). */
+  navLights?: 'deck' | 'tricolour';
   /** The forehatch: a varnished teak cover on a wooden frame, or a smoked acrylic lid in an aluminium frame (the usual
    * modern production hatch, as Lewmar's). */
   hatch?: 'teak' | 'acrylic';
@@ -92,6 +94,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     club: typeof x.club === 'string' ? x.club : x.flags?.burgee ?? '', // older saves: her burgee was her club
     ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
+    navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
     hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's

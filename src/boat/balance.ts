@@ -63,7 +63,8 @@ const CREW = { kg: 240, reach: 1.05 };
 /**
  * Centre of effort height above the centre of lateral resistance (m), at moderate twist. From the ORC sail
  * measurements (P 8.75, E 3.38, girths MQW 2.89, MHW 2.22, MTW 1.32, MUW 0.72, MHB 0.11: the main's centroid 3.23 m above
- * the boom, which is BAS 1.00 m above the sheer; their area integrates to the certificate's 17.89 m²) and the jib's
+ * the boom, which is BAS 1.00 m above the sheer; 3.28 m with the widths at their real heights, as ORC rates them, and on
+ * the drawn sail; their ORC "measured area" is 17.89 m², rule 109.1, the certificate's rated Area_Main 18.51) and the jib's
  * (luff 5.95 m on IG 6.50, J 2.00: centroid about 2.2 m above the sheer), weighted by area (17.89, 7.30 m²): 3.64 m
  * above the sheer, which is about 0.65 m above the waterline at the mast (the Danish class's correction-weight sheet:
  * the waterline 620–665 mm below the deck line), so 4.29 m above the waterline; and ORC puts the hull's hydrodynamic

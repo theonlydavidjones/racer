@@ -9,7 +9,8 @@ import { buildCrew, dockhand, syncCrew, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, HEEL, L, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cockpitLid, topsidesPatch, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cockpitLid, topsidesPatch, cabinTopY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullFrame, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { buildNavLights, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, luffTellStates, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -30,15 +31,23 @@ const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
  * - the forestay meets the mast IG = 6.50 m above the deck (CR 6.1.11: no more than 5.50 m above the lower band), and the
  *   shrouds about there too (CR 7.60: 5.30–5.50 m above it), from chainplates at least 0.90 m out and 0.28–0.36 m aft of
  *   the mast's after side (CR 7.20);
- * - the masthead is 0.10 m above the upper band (an estimate: CR 6.1.10 allows up to 0.30 m).
- * Heights "above the deck" are taken from the sheer at the mast.
+ * - the masthead is 0.28 m above the upper band (CR 6.1.10: 0.25–0.30 m);
+ * - no spreaders: the standing rigging is the main shrouds, the forestay, the jumper stays and the backstay (CR 7.10). The
+ *   jumper struts are 5.50 m above the lower band, 450 mm long, their bearing points 900 mm apart (CR 6.1.12); the jumper
+ *   stays run from 8.50–8.75 m above the band over them down to 2.235–2.265 m (CR 7.60), and the shrouds meet the mast
+ *   below the struts (CR 7.60).
+ * The mast section is the timber mast's; an aluminium one may be 100–112 mm at the deck and tapers above 5.5–7.0 m
+ * (CR 6.2.1, 6.2.3), so its after side, the origin for E, is up to about 1 cm further forward than drawn.
+ * Heights "above the deck" are taken from the sheer at the mast. (CR 6.1.7's 2.00 m is a distance, CR 7.21's 0.80 m
+ * horizontal: with the sheer 0.21 m higher at the stay, 2.00 m horizontally is 2.011 m in a straight line, as ORC's J
+ * measures it horizontally.)
  */
 const MAST_FRONT_Z = -L / 2 + 0.80 + 2.00, MAST_FA = 0.133, MAST_ATH = 0.110;
 const MAST_Z = MAST_FRONT_Z + MAST_FA / 2, MAST_AFT_Z = MAST_FRONT_Z + MAST_FA;
 const DECK_AT_MAST = sheer(uAtZ(MAST_Z));
 const BAS = 1.0, P = 8.75, E = 3.38, IG = 6.5;
 /** The boom's top (the main's tack and foot), and the masthead. */
-const BOOM_TOP = DECK_AT_MAST + BAS, MAST_TOP = BOOM_TOP + P + 0.10, BOOM_R = 0.045;
+const BOOM_TOP = DECK_AT_MAST + BAS, MAST_TOP = BOOM_TOP + P + 0.28, BOOM_R = 0.045;
 const FORESTAY_DECK = V3(0, sheer(uAtZ(-L / 2 + 0.80)), -L / 2 + 0.80);
 /** Where the forestay meets the mast's front (the hounds), and the shrouds its sides. */
 const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
@@ -48,9 +57,11 @@ const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
  * the leech and at the head, from the certificate: MQW 2.89, MHW 2.22, MTW 1.32, MUW 0.72, MHB 0.11 m; the class's limits
  * on the same widths (CR 9.22, measured from the head: 1.31 m at 2.28 m down the leech, 2.225 m at 4.57 m) agree within
  * a centimetre. The sail is laid out by height up the luff rather than distance along the leech, which differ here by a
- * few centimetres. A fair leech through those widths encloses 18.48 m²: the certificate's own sail area is 18.51 m²
- * (ORC's feed, Area_Main; the physics uses the average of four boats', 18.45), while the girth formula's quicker sum of
- * the same widths gives 17.89.
+ * few centimetres (ORC rates the widths at their real heights up the luff: 2.31, 4.58, 6.78, 7.80 m; drawn 2.32, 4.58,
+ * 6.75, 7.77). A fair leech through them encloses 18.48 m². ORC's "measured area" from the same widths is 17.89 m²
+ * (ORC Rating Systems 2026, rule 109.1: P/8·(E + 2·MQW + 2·MHW + 1.5·MTW + MUW + 0.5·MHB)); its rated outline, with
+ * straight leech segments between the widths at their heights, 18.37; the certificate's Area_Main, 18.51 (the rest is
+ * other terms of rule 109, the mast section's perhaps). The physics uses the four certificates' average, 18.45.
  */
 const MAIN_GIRTH = fairCurve([[0, E], [0.25, 2.89], [0.5, 2.22], [0.75, 1.32], [0.875, 0.72], [1, 0.11]]);
 const MAIN_LEECH = Math.hypot(P, E);
@@ -66,8 +77,9 @@ const JIB_AXIS = HOUNDS.clone().sub(FORESTAY_DECK).normalize();
 /**
  * The jib, hanked on the forestay, in its own frame (origin where the stay meets the deck): from the certificate, luff
  * 5.95 m and LP 2.36 m (the clew's distance square from the luff), area 7.30 m². Its tack is on a short strop 0.10 m up
- * the stay; the clew sits 1.20 m above the water (an estimate: it puts the clew a little forward of and above the car,
- * 2.65 m aft of the stay, so the sheet pulls along the clew's bisector); the leech has the small roach that makes up
+ * the stay; the clew sits 1.20 m above the water (an estimate). With the car 2.65 m aft of the stay (also an estimate)
+ * the sheet pulls about 30° more steeply than the clew's bisector, closing the leech a little; the bisector would
+ * want the car about 2.79 m aft. The leech has the small roach that makes up
  * the certificate's area (the class allows a head 0.14 m wide 0.20 m down, CR 9.32).
  */
 const JIB_LUFF = 5.95, JIB_LP = 2.36, JIB_CLEW_Y = 1.20, JIB_ROACH = 0.09;
@@ -230,6 +242,8 @@ export interface BoatMesh {
   crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
   lines: Lines;
+  /** Her navigation lights and the cabin's glow (navLights.ts). */
+  nav: NavLights;
 }
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
@@ -269,7 +283,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     grp.add(line([new THREE.Vector3(x, ty + 0.02, TRAV_Z + 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.04)])); // the tail
   }
   // vang: a tackle from the boom down to the foot of the mast
-  for (const dx of [-0.03, 0.03]) boomPivot.add(line([new THREE.Vector3(dx, BOOM_TOP - 0.08, 0.75), new THREE.Vector3(dx * 0.5, cabinTopY(uAtZ(MAST_Z)) + 0.12, 0.03)]));
+  for (const dx of [-0.03, 0.03]) boomPivot.add(line([new THREE.Vector3(dx, BOOM_TOP - 0.08, 0.75), new THREE.Vector3(dx * 0.5, deckY(uAtZ(MAST_Z), 0) + 0.12, 0.03)]));
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
@@ -288,7 +302,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const side of [1, -1]) for (let i = 0; i < 3; i++) {
     const x = side * (0.33 + 0.07 * i);
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.set(x, yA, zA + 0.03); grp.add(cl);
-    grp.add(line([new THREE.Vector3(x, yA + 0.02, zA + 0.03), new THREE.Vector3(x * 0.6, cabinTopY(0.5) + 0.075, -0.2), new THREE.Vector3(side * 0.06, cabinTopY(uAtZ(MAST_Z)) + 0.075, MAST_AFT_Z + 0.03)]));
+    grp.add(line([new THREE.Vector3(x, yA + 0.02, zA + 0.03), new THREE.Vector3(x * 0.6, cabinTopY(0.5) + 0.075, -0.2), new THREE.Vector3(side * 0.06, deckY(uAtZ(MAST_Z), 0) + 0.06, MAST_AFT_Z + 0.03)]));
     grp.add(line([new THREE.Vector3(x, yA - 0.01, zA + 0.05), new THREE.Vector3(x + side * 0.02, yA - 0.2 - 0.04 * i, zA + 0.07)])); // the tail
   }
   return { travCar, backstay, cars, jibSheets, winches };
@@ -298,8 +312,10 @@ const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Ve
 
 // Rig points in the boat group's frame: x to starboard, y up, z aft (the bow is at z = −3.82).
 const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = sheer(uAtZ(CHAINPLATE_Z));
-/** The spreaders: one pair, about half way up, pushing the shrouds out (tip, starboard side; the class rules don't place them). */
-const SPREADER = new THREE.Vector3(0.68, DECK_AT_MAST + 4.08, MAST_Z + 0.04);
+/** The jumper struts (tip, starboard side): 5.50 m above the lower band, 450 mm long, tips 900 mm apart, raked forward (CR 6.1.12). */
+const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
+/** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
+const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
 const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
 const JIB_CLEW = JIB_DEF.clew; // in the jib pivot's frame
 // Cassette-tape telltales: old audio tape tied to the shrouds, about 1.4 m above the deck (low enough to
@@ -350,10 +366,13 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // upper shrouds, each with a cassette-tape telltale tied on low enough to see from the cockpit
   const ribbons: Ribbon[] = [];
   for (const sx of [-1, 1]) {
-    const foot = new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip = new THREE.Vector3(sx * SPREADER.x, SPREADER.y, SPREADER.z);
-    // the spreader, and the shroud over its tip to the hounds
-    const spr = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, tip.x * sx, 5), spar); spr.rotation.z = Math.PI / 2; spr.position.set(tip.x / 2, SPREADER.y, (SPREADER.z + MAST_Z) / 2); rig.add(spr);
-    rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, tip, V3(sx * MAST_ATH / 2, HOUNDS.y, MAST_Z)]), MAT.wire));
+    const foot = new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip = new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z);
+    // the shroud, straight from its chainplate to the mast; the jumper strut, and the jumper stay over its tip
+    { const st = new THREE.Vector3(sx * STRUT.x, STRUT.y, STRUT.z), root = new THREE.Vector3(sx * MAST_ATH / 2, STRUT_Y, MAST_FRONT_Z + 0.02);
+      const len = st.distanceTo(root), js = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.016, len, 5), spar);
+      js.position.copy(st).lerp(root, 0.5); js.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), st.clone().sub(root).normalize()); rig.add(js);
+      rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, JUMPER_TOP, MAST_FRONT_Z), st, V3(0, JUMPER_FOOT, MAST_FRONT_Z)]), MAT.wire)); }
+    rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, tip]), MAT.wire));
     const anchor = foot.clone().lerp(tip, TAPE_HEIGHT / (tip.y - CHAINPLATE_Y));
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RIBBON_N * 2 * 3), 3));
@@ -404,8 +423,8 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
-  // starboard spreader (the masthead has the windex). Flying a foreign ensign on the Bay, she flies the US flag as a
-  // courtesy flag at the starboard spreader and moves her burgee to port.
+  // starboard jumper strut (she has no spreaders; the masthead has the windex). Flying a foreign ensign on the Bay, she
+  // flies the US flag as a courtesy flag at the starboard strut and moves her burgee to port.
   const flags: FlyingFlag[] = [];
   const hoist = (canvas: HTMLCanvasElement | null, at: THREE.Vector3, h: number, parent: THREE.Object3D, tail = true) => {
     if (!canvas) return;
@@ -419,12 +438,12 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // the burgee, or on the same halyard just below it
   const burgee = b.burgee ? burgeeCanvas(b.burgee) : null, officer = b.special ? flagArtCanvas(b.special) : null;
   const below = !!officer && officerRule(b.burgee) === 'below';
-  const spreader = (side: number) => new THREE.Vector3(side * (SPREADER.x - 0.06), SPREADER.y - 0.06, SPREADER.z);
+  const flagBlock = (side: number) => new THREE.Vector3(side * (STRUT.x - 0.04), STRUT.y - 0.06, STRUT.z); // (the flag halyard's block under the strut's tip)
   const clubHoist = (side: number) => {
-    if (!below) { hoist(officer ?? burgee, spreader(side), 0.3, rig); return; }
-    hoist(burgee, spreader(side), 0.3, rig, false); hoist(officer, spreader(side).add(new THREE.Vector3(0, -0.36, 0)), 0.3, rig);
+    if (!below) { hoist(officer ?? burgee, flagBlock(side), 0.3, rig); return; }
+    hoist(burgee, flagBlock(side), 0.3, rig, false); hoist(officer, flagBlock(side).add(new THREE.Vector3(0, -0.36, 0)), 0.3, rig);
   };
-  if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), spreader(1), 0.25, rig); clubHoist(-1); }
+  if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), flagBlock(1), 0.25, rig); clubHoist(-1); }
   else clubHoist(1);
   if (b.ensign) {
     // on an ensign staff in a socket on the starboard quarter, close to the centreline (the backstay and tiller have the
@@ -463,7 +482,12 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
-  return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false };
+  // her lights: the bicolour on the stemhead, the sternlight on the transom to port of the rudder head (clear of the
+  // tiller, the backstay's bridle and the ensign staff), or the tricolour just above the masthead, under the windex
+  const sternY = sheer(1) - 0.07;
+  const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z) },
+    b.paint?.navLights ?? 'deck', MAT.glass);
+  return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false, nav };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -552,6 +576,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   syncPole(m, plan === 'wing');
   syncLines(m, b);
   for (const r of m.ribbons) syncRibbon(r, b, t);
+  // (the sea's slope from the wind she feels: her apparent wind, which overstates the true wind going upwind)
+  syncNavLights(m.nav, b.aws / 0.5144);
 }
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
@@ -611,7 +637,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
     const sag = loaded ? 0 : 0.25;
     const mid1 = tmpD.copy(clew).lerp(car, 0.5); mid1.y -= sag;
     q.setXYZ(0, clew.x, clew.y, clew.z); q.setXYZ(1, mid1.x, mid1.y, mid1.z); q.setXYZ(2, car.x, car.y + 0.03, car.z);
-    const mid2 = car.clone().lerp(wv, 0.5); mid2.y -= loaded ? 0 : 0.1;
+    // aft from the car along the cabin top, over its after corner, and down to the winch (a straight line from the car
+    // would cut through the cabin's side)
+    const zA = -L / 2 + CABIN.u1 * L, mid2 = tmpD.set(side * (CABIN.w - 0.07), cabinTopY(CABIN.u1) + 0.03 + (loaded ? 0.01 : 0), zA);
     q.setXYZ(3, mid2.x, mid2.y, mid2.z); q.setXYZ(4, wv.x, wv.y, wv.z); q.needsUpdate = true;
   }
 }

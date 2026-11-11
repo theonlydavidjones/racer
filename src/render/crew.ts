@@ -98,8 +98,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const x = a ? a.x : windward * 0.8, z = a ? a.z : 1.2 + 0.6 * i, lean = a?.lean ?? 0, pose = a?.pose ?? 'sit';
     const side = Math.abs(x) > 0.05 ? Math.sign(x) : windward, u = uAtZ(z);
     if (pose === 'mast') {
-      // kneeling on the cabin top by the mast (the pole, a halyard)
-      const zz = Math.max(z, -1.0), uu = uAtZ(zz);
+      // kneeling on the cabin top just aft of the mast (the pole, a halyard)
+      const zz = Math.max(z, -L / 2 + CABIN.u0 * L + 0.12), uu = uAtZ(zz);
       f.root.position.set(side * 0.22, cabinTopY(uu) + 0.02, zz); f.root.rotation.set(0, 0, 0);
       seat(f, { lean: -0.25, kneel: true, arms: [1.9, 0.6], elbows: 0.4 });
       f.root.visible = true; return;

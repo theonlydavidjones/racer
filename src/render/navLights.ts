@@ -56,7 +56,7 @@ export function arcIntensity(arc: Arc | null, b: number): number {
 export const overThreshold = (range: number, d: number) => { const D = Math.max(0.005, d / NM); return (range / D) ** 2 * Math.pow(0.8, D - range); };
 
 interface Lamp { pos: THREE.Vector3; color: THREE.Color; arc: Arc | null; range: number; glow: THREE.Sprite; streak: THREE.Mesh; seen: number }
-export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: THREE.MeshPhongMaterial[]; kind: 'deck' | 'tricolour'; sigma: number; ports: THREE.MeshPhongMaterial }
+export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: THREE.MeshPhongMaterial[]; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial }
 
 /** Colours of the lights as the eye sees them (inside Annex I §7's chromaticity areas: a deep red, a blue-green, a warm white). */
 const RED = new THREE.Color(1.0, 0.13, 0.08), GREEN = new THREE.Color(0.1, 1.0, 0.55), WHITE = new THREE.Color(1.0, 0.93, 0.8);
@@ -72,7 +72,7 @@ function glowTexture(): THREE.Texture {
   if (glowTex) return glowTex;
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d')!;
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.08, 'rgba(255,255,255,0.95)'); r.addColorStop(0.2, 'rgba(255,255,255,0.35)'); r.addColorStop(0.5, 'rgba(255,255,255,0.08)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.1, 'rgba(255,255,255,1)'); r.addColorStop(0.22, 'rgba(255,255,255,0.5)'); r.addColorStop(0.5, 'rgba(255,255,255,0.14)'); r.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = r; g.fillRect(0, 0, 64, 64);
   return (glowTex = new THREE.CanvasTexture(c));
 }
@@ -99,13 +99,15 @@ const X = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vec
 export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; stern: THREE.Vector3; masthead: THREE.Vector3 }, kind: 'deck' | 'tricolour', ports: THREE.MeshPhongMaterial): NavLights {
   const group = new THREE.Group(); group.name = 'navLights'; grp.add(group);
   const housing = new THREE.MeshPhongMaterial({ color: 0x15171a, specular: 0x666666, shininess: 60 });
-  const nl: NavLights = { group, lamps: [], lenses: [], kind, sigma: 0.15, ports };
+  const nl: NavLights = { group, lamps: [], lenses: [], kind, sigma: 0.15, sigmaC: 0.1, ports };
   const lens = (c: THREE.Color) => { const m = new THREE.MeshPhongMaterial({ color: c.clone().multiplyScalar(0.55), emissive: c.clone(), emissiveIntensity: 0, transparent: true, opacity: 0.9, shininess: 100 }); nl.lenses.push(m); return m; };
   const lamp = (pos: THREE.Vector3, color: THREE.Color, arc: Arc | null, range: number) => {
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, sizeAttenuation: false, fog: false }));
     glow.visible = false; glow.renderOrder = 5; glow.frustumCulled = false;
-    const streak = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: streakTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide }));
-    streak.visible = false; streak.matrixAutoUpdate = false; streak.matrixWorldAutoUpdate = false; streak.renderOrder = 3; streak.frustumCulled = false;
+    const streak = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: streakTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, side: THREE.DoubleSide }));
+    // (drawn over the sea, whose waves would hide a quad at its mean level; it lies between the light and the eye, so
+    // nothing of hers stands in front of it)
+    streak.visible = false; streak.matrixAutoUpdate = false; streak.matrixWorldAutoUpdate = false; streak.renderOrder = 10; streak.frustumCulled = false;
     const L: Lamp = { pos, color, arc, range, glow, streak, seen: 0 };
     // what the eye sees of the light, worked out for each camera as it draws: the arc, the range, how dark it is
     glow.onBeforeRender = (r, _s, cam) => {
@@ -115,9 +117,12 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
       L.seen = e;
       // the point grows with how far over the threshold it is (a log response, as the eye's), from a pinprick at its range
       r.getSize(size); const p11 = cam instanceof THREE.PerspectiveCamera ? cam.projectionMatrix.elements[5] : 1;
-      const px = e < 1e-3 ? 0 : Math.min(26, 2.2 + 3.2 * Math.log10(1 + e));
+      const px = e < 1e-3 ? 0 : Math.min(48, 3 + 7 * Math.log10(1 + e));
       glow.scale.setScalar(px * 2 / (size.y * p11));
       (glow.material as THREE.SpriteMaterial).opacity = Math.min(1, e);
+      // far off, the depth buffer can't tell a light 1 m up from the waves its line of sight grazes; out there her own
+      // hull and sails are smaller than the light's point, so it's drawn over them
+      (glow.material as THREE.SpriteMaterial).depthTest = d < 150;
       // just in front of the lantern, so its own housing doesn't hide it
       glow.position.copy(pos).addScaledVector(tmpL.normalize(), 0.08);
       glow.updateMatrixWorld();
@@ -131,11 +136,13 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
       const need = (x: number) => (Math.atan2(h, x) - Math.atan2(Hc, Math.max(0.01, D - x))) / 2;
       const s2 = 2 * nl.sigma, root = (target: number) => { let lo = 0.01, hi = Math.max(0.02, D - 0.01); for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (need(m) > target) lo = m; else hi = m; } return (lo + hi) / 2; };
       const x0 = root(s2), x1 = root(-s2), len = Math.max(0.2, x1 - x0), mid = (x0 + x1) / 2;
-      const wid = Math.min(12, Math.max(0.25, 2.4 * nl.sigma * Math.min(mid, D - mid) * 0.5));
+      // across: a facet x m from the eye mirrors a light w m to one side when tilted w·(1/x + 1/(D − x))/2, so the streak's
+      // half-width at its middle is σ_c·x·(D − x)/D, σ_c the slopes' spread across the line of sight
+      const wid = Math.min(10, Math.max(0.2, 2 * nl.sigmaC * mid * (D - mid) / D));
       X.set(dx / (D || 1), 0, dz / (D || 1)); Z.crossVectors(X, Y);
       // lying on the water: the quad's x across the streak, its y along it toward the eye, its face up
       streak.matrixWorld.makeBasis(Z.clone().multiplyScalar(wid), X.clone().multiplyScalar(len), Y).setPosition(tmpW.x + X.x * mid, 0.03, tmpW.z + X.z * mid);
-      (streak.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, 0.18 * Math.log10(1 + e) * (0.6 + 0.4 * Math.min(1, 0.15 / nl.sigma)));
+      (streak.material as THREE.MeshBasicMaterial).opacity = Math.min(0.7, 0.13 * Math.log10(1 + e) * (0.6 + 0.4 * Math.min(1, 0.15 / nl.sigma)));
     };
     group.add(glow); group.add(streak); nl.lamps.push(L);
   };
@@ -166,7 +173,9 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
 /** Each frame: on or off by the clock (and off under engine for the tricolour), the reflections' spread from the wind. */
 export function syncNavLights(nl: NavLights, windKt: number, motoring = false): void {
   const on = BOAT_LIGHTS.on > 0 && !(motoring && nl.kind === 'tricolour');
-  const U = windKt * 0.5144; nl.sigma = Math.sqrt(0.003 + 0.00512 * U);
+  // the sea's slopes (Cox & Munk 1954): all directions σ² = 0.003 + 0.00512·U; across the wind σ_c² = 0.003 + 0.00192·U
+  // (the streak is taken as if seen across the wind)
+  const U = windKt * 0.5144; nl.sigma = Math.sqrt(0.003 + 0.00512 * U); nl.sigmaC = Math.sqrt(0.003 + 0.00192 * U);
   for (const L of nl.lamps) { L.glow.visible = on; L.streak.visible = on; }
   for (const m of nl.lenses) m.emissiveIntensity = on ? 1.6 : 0;
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
