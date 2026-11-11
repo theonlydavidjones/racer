@@ -65,6 +65,14 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 - **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
+- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h): owner, "I just watched her sail
+  right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
+  (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
+  piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
+  the south tower's fender, the Bay Bridge's piers and towers (their positions are still approximate, from the
+  overpass-api note under the Bay Bridge), and anything else drawn in the water. Solid for collisions, for the AI's and the
+  tiller pilot's look-ahead (landAlong) and the navigator's routes, on the chart, and as obstructions under Rule 19/20
+  (obstruction.ts). A test that sails a boat at each one.
 - **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
