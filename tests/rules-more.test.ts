@@ -134,3 +134,16 @@ describe('Rule 23 · interfering with another boat', () => {
     expect(pair(red, blue).at(300).foul).toBeNull();
   });
 });
+
+describe("the rules judge each boat in the wind she's in", () => {
+  it('Fetching (Definitions): the same boat in the same place fetches the mark or not by her own wind, not the course\'s', async () => {
+    const { fetching } = await import('../src/rules/pairs');
+    // a mark 200 m away, bearing 315° from her on starboard, the course's wind from 0°, close-hauled 42°: she lays it
+    const b = { id: 1, x: 0, y: 0, h: 318, vx: 0, vy: 0, tack: 'S' as const, tacking: false, lastTackT: -99, penalty: 0, ocs: false, started: true, leg: 0 };
+    const mk = { p: { x: -200 * Math.sin(45 * Math.PI / 180), y: 200 * Math.cos(45 * Math.PI / 180) } } as never;
+    const ctx = { t: 10, windFrom: 0, marks: [], beat: 42 } as never;
+    expect(fetching(b, mk, ctx)).toBe(true);
+    // where she is, the wind has backed 8°: she's headed, and no longer lays it on this tack
+    expect(fetching({ ...b, ww: { from: 352 } }, mk, ctx)).toBe(false);
+  });
+});

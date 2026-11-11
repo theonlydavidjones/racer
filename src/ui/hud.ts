@@ -263,7 +263,8 @@ export class Hud {
       const ftS = (m: number) => (m / 0.3048).toFixed(m < 0.3 ? 1 : 0) + ' ft'; // short enough for the box
       $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · ${ftS(s.hsS)} swell` : '');
       $('seaSub').title = `${s.hsW < 0.05 ? 'Glassy' : `${ft(s.hsW)} of ${s.steep > 0.075 ? 'steep ' : ''}chop`}${s.hsS >= 0.05 ? `, ${ft(s.hsS)} of swell` : ''}`; }
-    const dev = wrap(w.wind.from - w.avgFrom), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
+    // (the wind she's in against her own minute's average: the course's wind can be shifting the other way where she is)
+    const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
     if (Math.abs(dev) >= 2 && u.twa < 70) { sl.textContent = `${twd} · ${lifted ? 'lift' : 'head'} ${Math.abs(dev).toFixed(0)}°`; sl.className = 'sub ' + (lifted ? 'lift' : 'head'); sl.title = `True wind from ${twd}, ${lifted ? 'a lift' : 'a header'} of ${Math.abs(dev).toFixed(0)}° on this tack`; }
     else {
       // in a puff or a lull?
