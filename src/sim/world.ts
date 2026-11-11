@@ -523,6 +523,7 @@ export class World {
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
       const x0 = b.x, y0 = b.y;
+      if (b.isUser) b.pilotSteers = this.freeSail && this.pilot.mode !== 'off';
       if (b.isUser && this.freeSail && this.pilot.mode !== 'off') {
         pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }

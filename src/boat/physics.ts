@@ -105,6 +105,11 @@ export const leeDrift = (b: Boat) => -(b.sway ?? 0) * (wrap(b.ww.from - b.h) >= 
 export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   if (b.lashed != null && (b.docked || b.pushing)) b.lashed = null; // made fast in her slip: the lashing comes off
   if (b.isUser && b.lashed != null) { b.tiller = b.lashed; b.steer = 0; b.turnTarget = null; } // lashed: hands off
+  // sailing alone, with the helm gone forward to the jib car or the mast, nobody's steering: an unlashed tiller swings free
+  // and the rudder trails in the flow (unless the tiller pilot has it), so she goes where her balance takes her, rounding
+  // up with weather helm
+  const solo = b.crew && b.crew.spec.crew.length === 0, away = !!solo && b.crew!.people[0].z < 0.5;
+  if (b.isUser && away && !b.pilotSteers && b.lashed == null) { b.tiller = 0; b.steer = 0; b.turnTarget = null; }
   // jib aback: the polar no longer says how she sails, so the forces on her do (heaving to)
   // (it takes the clew a degree to windward to start, and none at all to stop, so she doesn't flicker between the two)
   const canHeave = b.isUser && !b.docked && !b.pushing && !(b.astern ?? 0) && sailPlan(b) === 'jib' && (b.rig?.jib ?? 1) > 0.5;

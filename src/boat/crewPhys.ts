@@ -2,6 +2,7 @@ import { D2R, clamp } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import { HULL } from './dynamics';
 import { bestTrim, trimFromMoment } from './hullTrim';
+import { polar } from './polar';
 
 /**
  * The people aboard and where they put their weight. Each person has a place on the boat (across and fore-and-aft),
@@ -409,9 +410,13 @@ export function displacementFactor(disp: number, tws: number): number {
   return Math.pow(STANDARD_DISP / disp, k);
 }
 
-/** (For the strategist's advice) where a good crew's weight goes fore and aft, 0 at the helm … 1 at the mast. */
+/**
+ * (For the strategist's advice) where a good crew's weight goes fore and aft, 0 at the helm … 1 at the mast: downwind,
+ * by the same test the crew uses on the water (placeCrew: forward to the mast while the hull's best trim at her speed is
+ * more than 3 cm by the bow, hullTrim.ts), at the polar's speed; upwind, toward the front of the cockpit in light air.
+ */
 export function bestFore(twa: number, tws: number, pole: boolean): number {
-  if (twa > 120) return tws > 17 ? 0.35 : pole ? 0.95 : 0.85;
+  if (twa > 120) return bestTrim(Math.max(0.5, polar(tws, twa, pole ? 'wing' : 'jib')), 0) > 0.03 ? (pole ? 0.95 : 0.85) : 0.35;
   return tws < 7 ? 0.8 : tws < 13 ? 0.6 : 0.45;
 }
 

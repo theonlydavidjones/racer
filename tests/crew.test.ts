@@ -174,6 +174,16 @@ describe('The jib cars: rarely moved', () => {
     expect(moves).toBeLessThanOrEqual(1);
     expect(b.ctl.car.P).toEqual(loaded);
   });
+  it('sailing alone, the helm going forward to move it leaves the tiller: she rounds up on her weather helm meanwhile', () => {
+    const twa = beatAngle(12), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 12 }) as Boat; b.isUser = true;
+    b.crew = newCrew(crewOf(0.6, 0), 'S');
+    sail(b, 20, () => { b.h = 360 - twa; }); b.tiller = 0;
+    moveLazyCar(b, 2, 0);
+    let away = false, twaMin = 99;
+    sail(b, 25, () => { if (b.crew!.people[0].z < 0.5) { away = true; twaMin = Math.min(twaMin, b.twa); } });
+    expect(away).toBe(true);
+    expect(twaMin).toBeLessThan(twa - 5);
+  });
   it('moving it takes someone out of the cockpit, forward to the cabin top: their weight goes with them', () => {
     const twa = beatAngle(10), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 10 }) as Boat;
     sail(b, 20, () => { b.h = 360 - twa; }); const trim0 = b.crew!.trim;
