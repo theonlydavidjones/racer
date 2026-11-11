@@ -95,6 +95,31 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
   in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
   the shove from her real mass and low-speed drag, not a set distance.
+- **Next — outside the Gate, the sea dial disagrees with the water and the chart** (bug; 2–3 h; owner: "not for now"):
+  sailing on auto just west of the Golden Gate Bridge (37°48.48'N 122°30.23'W), the dial showed "FLOOD 0.4" and
+  "9 FT SWELL"; owner, "water definitely does not show 9 foot swell, and the chart shows that it's an ebb?"
+  (1) Flood or ebb: the dial calls it by the nearest NOAA station's flood direction (ui/hud.ts: the current dotted with
+  that station's flood bearing), while the chart's current layer draws the current field itself; find which is wrong
+  out there (a station inside the Gate with a different flood bearing, an eddy, or the layer's arrows), and make the
+  dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
+  offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
+  outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
+- **Next — heavy weather: reefing, and what a skipper does in 30+ kt** (accuracy + feature; 8–12 h; owner: "not for
+  now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner: "that
+  boat would have sunk by now… This may very well be true-to-life physics (I don't know)… How would an IRL skipper
+  handle this situation? can't Folkboats handle heavy weather like this?" What's known: a Folkboat is stiff and
+  seaworthy, with ballast about 50% of displacement (Folkboat Year Book 2023, folkboats.com; mauripro 0.52) and a capsize
+  screening figure of 1.78 (keelindex.com; under 2.0 counts as fit offshore). A real skipper would have reefed long
+  before 32 kt, dropped the main and sailed under jib alone, or hove to or run off. The sim has no reefing at all
+  (grep: no "reef" in the code), and the drive calibration stands in for it (see heaving to, above). To build:
+  (1) reefing the main (how a Folkboat reefs, slab or roller, and how many reefs, still to source; general practice is
+  a first reef near 20 kt), dropping the main, jib alone, with the auto crew doing it by skill and the strategist and
+  coach advising it;
+  (2) check the heel she settles at with sheets eased in 30+ kt against the righting curve past a few degrees, which
+  still needs the hull's offsets (see crew weight, above): eased right out she shouldn't lie at 60°;
+  (3) water in the cockpit: a self-draining cockpit is optional (NFIA class rules 2025–2028, 3.21) and most traditional
+  boats aren't, so a knockdown can fill one: model water shipped, its weight, and the pump. The Folkboat's AVS (limit
+  of positive stability) and a sourced reefing wind speed are still unfound.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
@@ -118,7 +143,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
   (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
   (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
-  current tack, and what auto is doing now. Layout to the owner first.
+  current tack, and what auto is doing now. Every line's setting, too: owner, "can't tell which way is 'on' for the
+  backstay. is 0% on? or 100%?" (100% is on: controls.ts, 0 off … 1 bar tight). Label each end in sailors' words
+  (eased … on, or for the traveller windward … leeward) and what that end does to the sail. Layout to the owner first.
 - **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
@@ -139,7 +166,9 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    angle, on top of the polar's own pinch, so 1–2° low cost 1.6–3.5% of VMG at 20 kt (ORC: 0.1–0.3%), teaching "never
    feather". Now they flog as far as they luff (trim.ts), and below the beat by the square of the angle below it (flat
    at the beat, so ORC's optimum stays: 1–2° low costs 0.2–0.6%; ten degrees high still a big loss; she stops in the
-   no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done.
+   no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done. And
+   the crew's deliberate ease of the main on the last depowering steps (up to 7°, half luffing) flogs at no cost, in the
+   speed search and on the water alike: price it in the search, then judge the main where it is.
 2. **No tactical wind shifts on most days.** Off observed days the only shifts are two fixed sine waves (120 s ±6°,
    41 s ±2.5°, unsourced) and a 63 s ±8% pulse: about 1° rms change over 30–60 min, against Fort Point's 13–14° on
    10–15 kt westerlies (6-minute record, 492 days, racing hours) and 26–29° on 6–10 kt days. Beats are drag races; a
