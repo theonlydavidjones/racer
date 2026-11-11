@@ -86,3 +86,36 @@ describe('The crew move like people (render/crew.ts)', () => {
   for (const [name, o] of [['a tack', { kt: 10, tack: true }], ['a gybe', { kt: 12, twa: 160, tack: true }], ['a puff', { kt: 8, puff: 18 }], ['a lull', { kt: 18, puff: 8 }]] as const)
     it(`${name}: nothing jumps (no limb faster than a person moves)`, () => { const m = motion(o, 15); expect(m.fastest, m.where).toBeLessThan(5.5); });
 });
+
+describe('Everyone sits on something (render/crew.ts)', () => {
+  /** How far each seated person's pelvis is off what they're sitting on (m): the seat, the deck or its edge, the coaming. */
+  function gaps(o: { kt: number; twa?: number; place?: CrewPlace; puffy?: boolean }, secs = 40): { worst: number; where: string } {
+    const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
+    b.crew = newCrew(DEFAULT_CREW, 'S'); if (o.place) b.crew.place = o.place;
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), dt = 1 / 30;
+    sail(b, 20, () => { b.h = 360 - twa; });
+    let worst = 0, where = '';
+    for (let i = 0; i < secs * 30; i++) {
+      sail(b, dt, t => { b.h = 360 - twa; if (o.puffy) b.ww = { ...b.ww, kt: o.kt + 3 * Math.sin((i * dt + t) * 2 * Math.PI / 12) }; });
+      syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, dt, false, undefined, b.heel, b.tacking);
+      if (i < 30) continue;
+      [cr.helm, ...cr.crew].forEach((f, w) => {
+        const p = b.crew!.people[w];
+        // (kneeling in the middle of the cockpit is on a knee, not the pelvis: the clipping checks cover it)
+        if (!['sit', 'hike', 'lee', 'helm'].includes(p.pose) || f.going || f.tack || (w > 0 && Math.abs(p.x) < 0.3)) return;
+        f.root.updateMatrixWorld(true);
+        const hip = f.root.getWorldPosition(new THREE.Vector3()), e = halfBeam(uAtZ(hip.z));
+        // (stepping from one seat to another, over the coaming, the pelvis is up for a moment: settled ones only)
+        const was = (f as Figure & { _was?: THREE.Vector3 })._was; (f as Figure & { _was?: THREE.Vector3 })._was = hip.clone();
+        if (!was || was.distanceTo(hip) > 0.01) return;
+        // (the pelvis sits about 9 cm, scaled, above what's under it; a hiker's is over the deck's edge)
+        const under = ground(Math.sign(hip.x) * Math.min(Math.abs(hip.x), e - 0.01), hip.z) + 0.09 * f.scale;
+        const g = Math.abs(hip.y - under);
+        if (g > worst) { worst = g; where = `${w ? 'crew' + w : 'helm'} ${p.pose} frame ${i} hip (${hip.x.toFixed(2)}, ${hip.y.toFixed(2)}, ${hip.z.toFixed(2)}) seat ${under.toFixed(2)}`; }
+      });
+    }
+    return { worst, where };
+  }
+  for (const [name, o] of [['a breeze', { kt: 12 }], ['hiking', { kt: 20 }], ['hiking in puffs', { kt: 17, puffy: true }], ['light air', { kt: 4 }], ['told to hike', { kt: 12, place: { across: 'hike', fore: null } }]] as const)
+    it(`${name}: no pelvis more than 5 cm off its seat`, () => { const g = gaps(o); expect(g.worst, g.where).toBeLessThan(0.05); });
+});
