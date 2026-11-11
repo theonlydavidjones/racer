@@ -58,8 +58,9 @@ players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip n
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
 phone layout (on hold, 8–12 h).
 
-Open check: the tiller pilot's specs from primary sources (the ST2000+ may be 4.5 s lock to lock, not 4.0 s; AutoTrim
-and the RRS 52 wording unconfirmed). Needs docs.raymarine.com and www.sailing.org allowed.
+Checked: RRS 52 and the ERS rudder definition (primary sources), and the ST2000+'s 4,500 kg rating (Raymarine). Still
+unconfirmed: the ST2000+'s hard-over time (now 4.5 s, from secondary sources), its AutoTack default (100°) and AutoTrim;
+the handbook (Raymarine document 81130) wasn't reachable.
 
 ## The owner's list (November 2026, to prioritise)
 
