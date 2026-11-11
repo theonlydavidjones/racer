@@ -188,6 +188,13 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min). And the Hail icon (owner, "the hail button icon is the same as the
   sound icon. let's fix that too."): a distinct icon, a hand cupped to the mouth or a sailor calling, never a speaker or
   megaphone (that reads as Sound).
+- **Next — the flags: bring back the original motion, and strike the ensign in a blow** (polish + feature; 1–2 h; for
+  Boat Detail): owner, "I know we dialed down the flag flapping but the new flag physics are ugly and stiff. let's bring
+  back the original physics, and add an option to strike the ensign in high wind. not urgent. put the 'strike ensign'
+  button with the bottom-right controls, and only during cruise mode when winds are high." Restore the flag motion from
+  before it was toned down (render/boatMesh.ts flags; the earlier version is in git history). Add "Strike ensign" to
+  the bottom-right cluster (#viewBar), shown only in a cruise when the wind is high (threshold to propose, about 20 kt):
+  it lowers the ensign and its staff, and a second press hoists it again.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
