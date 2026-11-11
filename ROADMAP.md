@@ -154,6 +154,18 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
    vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
    everywhere (off the Cityfront it should be about twice the slot's).
+4a. **The AI's tacks aren't held** (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
+   uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
+   boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
+   last boat 63% behind the winner where the real SF fleet's median is 12% (sf-folkboat-results.json). Holding the
+   decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
+   38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
+   only) and some never start.
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
+   she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
+   620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
+   and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
+   US Sailing's 1–2 for keelboats).
 5. **The waves move her only on average** (waves 1): a mean added drag and a synthetic yaw; no surge, roll, pitch or
    heave, so no hobby-horsing in the Bay's 2–3 s chop (her pitch period), no rolling on a reach, no surfing, and the
    telltales don't answer the pitching. The drawn hull rolls on the waves the physics doesn't have, so heel, sails and
@@ -190,7 +202,10 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    angle of attack whatever the camber), so the guide's "sheet tight … pointing ability is improved" has no effect;
    above about 26 kt nothing is left to depower (ORC next reduces the jib, then reefs: VPP 2022 §5.1.3), and ORC's
    flattest is 0.62 × the 8-kt flat in the 2022 documentation against the sim's 0.42 (the 2025 text unconfirmed).
-14. Smaller: the rudder (class rules' offsets give about 0.56 m² below the waterline against RUDDER.area 0.42; its drag's
+14. Smaller: in chop the best beat narrows by 0.2–0.4° where the comment says footing pays (the added drag rises
+   with speed and the acceleration boost is used as a steady drive: AI 6); the leeward-mark round-up loses a third of
+   her speed in 18 kt (unsourced); the results file's 2025-11-01 distance looks wrong (7.8 kt over 6.1 nm in 7 kt);
+   the rudder (class rules' offsets give about 0.56 m² below the waterline against RUDDER.area 0.42; its drag's
    aspect 1.4 against the lift slope's 2.5; a keel-hung blade works partly as a flap); HOVE.latArea 5.01 m² and dragAft
    0.54 m from the drawn profile without the rudder (not 3.39 m² and a tuned 0.3); the crew (DEFAULT_CREW 230 kg against
    the certificates' declared 240–308, mean 276; the light-air heel target steps at 7 kt; legs over the side on a reach,
