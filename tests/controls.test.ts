@@ -62,7 +62,7 @@ describe('the crew', () => {
     sail(light, 40); sail(heavy, 40);
     // 20 kt: outhaul on the band, the Cunningham "pulled hard" past 15 kt, the vang on past 18, the backstay on
     expect(heavy.ctl.outhaul).toBeGreaterThan(0.95); expect(heavy.ctl.cunningham).toBeGreaterThan(0.85);
-    expect(heavy.ctl.vang).toBeGreaterThan(0.25); expect(heavy.ctl.backstay).toBeGreaterThan(light.ctl.backstay + 0.1); // (how much: the fastest step, physics.ts powerFactor)
+    expect(heavy.ctl.vang).toBeGreaterThan(0.25); expect(heavy.ctl.backstay).toBeGreaterThan(light.ctl.backstay + 0.05); // (how much: the fastest step, physics.ts powerFactor; in 20 kt a third of the way)
     // light air: no Cunningham, the outhaul 3 cm off the band, the traveller cars 15–20 cm to windward
     expect(light.ctl.cunningham).toBeLessThan(0.05); expect(light.ctl.outhaul).toBeLessThan(0.1); expect(light.ctl.traveller).toBeLessThan(-0.2);
   });

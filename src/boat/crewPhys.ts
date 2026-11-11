@@ -105,7 +105,7 @@ export interface CrewState {
   /** Where you've put them (absent: the crew's own call). */
   place?: CrewPlace;
   /** A roll tack in progress: holding the old high side, then flattening; and its clock. */
-  roll?: { phase: 'hold' | 'flatten'; t: number } | null;
+  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number } | null;
   /** The windward side last step (+1 starboard), to see a tack or gybe. */
   wind: number;
   // summaries, for the figures, the coach and tests
@@ -229,6 +229,8 @@ export interface CrewCall {
   sea?: number;
   /** Her heel now (deg, + to leeward), for the roll tack's flatten: out hard until she's upright. */
   heel?: number;
+  /** A tack is coming: she's turning up toward the wind to tack (a roll tack starts here). */
+  tackComing?: boolean;
 }
 
 /**
@@ -244,15 +246,20 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   if (!c.sailing) { c.sailing = true; if (w !== c.wind) { for (const a of c.people) a.x = -a.x; c.wind = w; c.side = k.tack; } }
   // a tack or gybe: a skilled crew roll-tacks through the wind
   const tacked = w !== c.wind;
+  // a roll tack starts as she luffs up to tack: they go up onto the windward side (in light air, from sitting to leeward)
+  // so she rolls to windward through the wind
+  const canRoll = skill >= 0.45 && c.place?.across == null;
+  if (!tacked && k.tackComing && canRoll && !c.roll) c.roll = { phase: 'lead', t: 0 };
   if (tacked) {
     const through = k.twa < 90;
-    c.roll = through && skill >= 0.45 && c.place?.across == null ? { phase: 'hold', t: 0 } : null;
+    c.roll = through && canRoll ? { phase: 'hold', t: 0 } : null;
     c.wind = w; c.side = k.tack;
   }
   if (c.roll) {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
-    if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > 3.5)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > 3.5)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }
@@ -316,8 +323,9 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (free.length - 1 - j) * Z.gap;
       tgt[i] = { arm, z: za + (zf - za) * foreF, pose: arm < -0.05 ? 'lee' : arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit' };
     });
-    // the roll tack: as she comes through the wind they're out on the old high side (now the low side: in light air,
-    // sitting to leeward before the tack, they move up onto it), so she rolls onto the new tack; then everyone out hard
+    // the roll tack: as she luffs up they're out on the windward side (in light air, from sitting to leeward), so she rolls
+    // to windward through the wind and comes out heeled on the new tack; they hold there, then everyone out hard
+    if (c.roll?.phase === 'lead') for (const i of free) tgt[i] = { arm: Math.max(c.people[i].x * w, sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
     if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
     if (c.roll?.phase === 'flatten') for (const i of free) tgt[i] = { arm: maxOf(i), z: tgt[i].z, pose: 'hike' };
     if (c.roll?.phase === 'hold' && !helmBusy) tgt[0] = { arm: c.people[0].x * w, z: Z.helm, pose: 'helm' };
@@ -356,6 +364,11 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   summarise(c, w, downwind, k.pole, k.extraMoment ?? 0);
 }
 
+/** How far out a person can lean now, as a fraction of the span from sitting to a full hike (the scale `lean` is on):
+ * their reach (skill, fatigue: leanCap) through the hiking geometry (hikeArm). */
+const reachLean = (p: Person, fatigue: number, edge = EDGE) => {
+  const sit = sitArm(p, edge); return clamp((hikeArm(p, leanCap(p, fatigue), edge) - sit) / Math.max(0.05, hikeArm(p, 1, edge) - sit), 0, 1);
+};
 /** (in place: this runs for everyone aboard every step) */
 const setGoal = (a: Aboard, x: number, z: number) => { if (a.goal) { a.goal.x = x; a.goal.z = z; } else a.goal = { x, z }; };
 const smoothSkill = (s: number) => { const t = clamp((s - 0.2) / 0.4, 0, 1); return t * t * (3 - 2 * t); };
@@ -396,10 +409,10 @@ function summarise(c: CrewState, w: number, downwind = false, pole = false, extr
       hike = Math.max(hike, q.lean); fore += clamp((Z.helm - q.z) / (Z.helm - Z.mast), 0, 1); if (q.pose === 'mast') mast = true;
       // (out as far as they can go now: their own reach, which tires; someone away at a job doesn't count either way)
       const onRail = q.pose === 'sit' || q.pose === 'hike' || q.pose === 'lee' || q.pose === 'cross';
-      if (onRail && (q.pose !== 'hike' || q.lean < 0.93 * leanCap(ppl[i], q.fatigue))) out = false;
+      if (onRail && (q.pose !== 'hike' || q.lean < reachLean(ppl[i], q.fatigue) - 0.03)) out = false;
     }
   }
-  c.allOut = n ? out : P[0].lean >= 0.93 * leanCap(ppl[0], P[0].fatigue);
+  c.allOut = n ? out : P[0].lean >= reachLean(ppl[0], P[0].fatigue, deckHalf(Z.helm)) - 0.03;
   c.arm = arm / total;
   c.trimMoment = m + extra; c.trim = trimFromMoment(m + extra, HULL.displacement);
   c.hike = n ? hike : P[0].lean;

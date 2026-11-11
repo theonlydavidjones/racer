@@ -17,7 +17,8 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     ['8 kt upwind, jib eased', () => { const b = boat({ heading: 318, windKt: 8 }); wrong(b, 'jibsheet', 0.3); return b; }, 'jibsheet'],
     ['12 kt upwind, main eased', () => { const b = boat({ heading: 318, windKt: 12 }); wrong(b, 'mainsheet', 0.6); return b; }, 'mainsheet'],
     ['20 kt upwind in chop, backstay off', () => { const b = boat({ heading: 318, windKt: 20, sea: CHOP }); wrong(b, 'backstay', 0); return b; }, 'backstay'],
-    ['16 kt broad reach in chop, vang off', () => { const b = boat({ heading: 215, windKt: 16, sea: CHOP }); wrong(b, 'vang', 0); return b; }, 'vang']
+    ['16 kt broad reach in chop, vang off', () => { const b = boat({ heading: 215, windKt: 16, sea: CHOP }); wrong(b, 'vang', 0); return b; }, 'vang'],
+    ['18 kt upwind, outhaul off', () => { const b = boat({ heading: 318, windKt: 18 }); wrong(b, 'outhaul', 0); return b; }, 'outhaul']
   ];
   for (const [name, make, line] of cases) it(`${name}: says to fix that line first, and doing it makes her faster`, () => {
     const b = make(), v = teach(b);
@@ -27,12 +28,6 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     const before = kt(b);
     (b.ctlTarget ??= {})[line as 'vang'] = v.top.to!; hold(b, 30);
     expect(kt(b)).toBeGreaterThan(before + 0.02);
-  });
-  it('18 kt upwind, outhaul off: the crew makes up for it with the backstay and vang, so it costs next to nothing and is left alone', () => {
-    // (the outhaul only flattens the foot, 3 cm off the band to on it: about 1.5% of camber, North Sails' range)
-    const ok = boat({ heading: 318, windKt: 18 }), b = boat({ heading: 318, windKt: 18 }); wrong(b, 'outhaul', 0); hold(ok, 30);
-    expect(teach(b).top.kind).toBe('ok');
-    expect(Math.abs(kt(b) - kt(ok))).toBeLessThan(0.05);
   });
   it('with two things wrong, the bigger loss comes first', () => {
     const b = boat({ heading: 318, windKt: 10 });

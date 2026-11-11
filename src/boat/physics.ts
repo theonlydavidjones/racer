@@ -229,7 +229,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (Math.abs(sway) > 0.02 && !b.luff) {
     const ap0 = sailWind(ww.from, ww.kt, b.h, b.v, 0, b.heel ?? 0);
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
-    sweep = (sf.main.drive + sf.jib.drive - sf0.main.drive - sf0.jib.drive) * driveCalibration(ww.kt, twa);
+    // (each sail as much as is hoisted, as sf is, and worn as it is)
+    sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * wornDrive * driveCalibration(ww.kt, twa);
   }
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
   b.v = Math.max(0, b.v + a * dt);
@@ -419,7 +420,10 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
   const need = heelingMoment(F, ceh, bh) - hullRighting(bh, disp, crewMass(cs.spec)) - rmExtra(bh);
   // (the windward side by her tack, which holds through a moment by the lee until the boom crosses)
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag }, dt);
+  // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
+  const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
+  const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -529,19 +533,24 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
     const helm = clamp(helmNeeded(r, h, out, vP, r.ceh), -12, 12), p = netDrive(r, h, vP);
     return { d, h, p, speed: Math.sqrt(Math.max(0, p - rudderDrag(helm, vP))) * heelFactor(h) };
   };
-  let top = sailAt(0);
+  const seen: StepPick[] = [], pick = (d: number) => { const t = sailAt(d); seen.push(t); return t; };
+  let top = pick(0);
   if (twa < 120) {
-    for (let i = 1; i <= 4; i++) { const t = sailAt(i / 4); if (t.speed > top.speed) top = t; }
+    for (let i = 1; i <= 4; i++) { const t = pick(i / 4); if (t.speed > top.speed) top = t; }
     // then the eighths either side, the sixteenths either side of the best of those, and a parabola through the best
     // three for where between them it peaks (so two boats a little different don't land a whole step apart)
-    for (const t of [top.d > 0 ? sailAt(top.d - 1 / 8) : null, top.d < 1 ? sailAt(top.d + 1 / 8) : null]) if (t && t.speed > top.speed) top = t;
+    for (const t of [top.d > 0 ? pick(top.d - 1 / 8) : null, top.d < 1 ? pick(top.d + 1 / 8) : null]) if (t && t.speed > top.speed) top = t;
     const h = 1 / 16;
-    for (const t of [top.d > 0 ? sailAt(top.d - h) : null, top.d < 1 ? sailAt(top.d + h) : null]) if (t && t.speed > top.speed) top = t;
-    const a = top.d > 0 ? sailAt(Math.max(0, top.d - h)) : null, c = top.d < 1 ? sailAt(Math.min(1, top.d + h)) : null;
+    for (const t of [top.d > 0 ? pick(top.d - h) : null, top.d < 1 ? pick(top.d + h) : null]) if (t && t.speed > top.speed) top = t;
+    const a = top.d > 0 ? pick(Math.max(0, top.d - h)) : null, c = top.d < 1 ? pick(Math.min(1, top.d + h)) : null;
     if (a && c) {
       const den = a.speed - 2 * top.speed + c.speed;
       if (den < 0) { const off = clamp(0.5 * (a.speed - c.speed) / den, -0.5, 0.5) * h; if (Math.abs(off) > 1e-4) top = { ...top, d: clamp(top.d + off, 0, 1) }; }
     }
+    // (where the speed hardly changes with the step, as on a reach in a gale, the least depowering within 0.05% of the
+    // best: so the crew doesn't chase a flat curve as the wind wobbles)
+    const floor = top.speed * 0.9995;
+    for (const t of seen) if (t.d < top.d - 1e-6 && t.speed >= floor) top = { ...t };
   }
   stepCache.set(key, top);
   return top;

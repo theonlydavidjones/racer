@@ -124,7 +124,7 @@ function speedFactor(b: Boat, c: Controls): number {
     // the drive the sails make less the keel's drag for their side force (balance.ts netDrive): flatter sails push less,
     // but heel her less and ask less of the keel; against the drive as she is, as physics.ts powerFactor weighs it
     // (exactly as the boat weighs it: physics.ts sailPush, against the push with her lines as they are)
-    const pushNow = sailPush(tws, b.twa, plan, b.shape.main, b.shape.jib, b.heelMag ?? 0, b.depower ?? 0);
+    const pushNow = sailPush(tws, b.twa, plan, b.shape.main, plan === 'jib' ? b.shape.jib : null, b.heelMag ?? 0, b.depower ?? 0);
     if (pushNow > 1) f *= Math.sqrt(Math.max(0, sailPush(tws, b.twa, plan, ms, js, heel, b.depower ?? 0)) / pushNow);
     f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
   }
