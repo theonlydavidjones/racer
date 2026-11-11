@@ -16,6 +16,8 @@
  *    inside its fender. And each charted pier checked against OSM's (bridge:support=pier/pylon, the West Span's
  *    W1–W7 refs): the distance between their centres is recorded.
  *
+ *  - NOAA ENC soundings (src/geo/data/enc-chart.json): the depth round each one.
+ *
  * Output: src/geo/data/bridge-piers.json
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -67,6 +69,20 @@ for (const w of gg.filter(w => w.tags['bridge:support'] === 'pylon')) {
   const c = centre(w.pts), north = c[0] > 37.82;
   piers.push({ name: `Golden Gate Bridge, ${north ? 'north tower' : 'south tower'}`, src: `OpenStreetMap way ${w.id}`, pts: w.pts });
 }
+// 3. the depth of water round each one: the median of NOAA's charted soundings within 150 m of its centre (300, then
+// 600 m where none is that close) (the chart's
+// own, from src/geo/data/enc-chart.json; metres below chart datum, MLLW). It sets how much the bed's friction wears
+// its current wake down (environment/pierWakes.ts).
+const enc = JSON.parse(readFileSync(new URL('../src/geo/data/enc-chart.json', import.meta.url), 'utf8'));
+for (const p of piers) {
+  const c = centre(p.pts);
+  for (const R of [150, 300, 600]) {
+    const ds = [];
+    for (let i = 0; i < enc.soundings.length; i += 3) if (metres(c, [enc.soundings[i + 1] / 1e5, enc.soundings[i] / 1e5]) < R) ds.push(enc.soundings[i + 2] / 10);
+    ds.sort((a, b) => a - b);
+    if (ds.length) { p.depth = { m: ds[ds.length >> 1], soundings: ds.length, within_m: R }; break; }
+  }
+}
 // each charted pier's nearest OSM support, for the record
 const supports = [...gg, ...bb].map(w => ({ id: w.id, ref: w.tags.ref ?? w.tags.name ?? w.tags['bridge:support'], c: centre(w.pts) }));
 for (const p of piers) {
@@ -79,4 +95,4 @@ writeFileSync(new URL('../src/geo/data/bridge-piers.json', import.meta.url), JSO
   source: 'NOAA ENC PYLONS (public domain), via scripts/fetch-charts.mjs; OpenStreetMap contributors (ODbL), api.openstreetmap.org: the Golden Gate Bridge\'s tower bases (bridge:support=pylon). Each charted pier\'s nearest OSM bridge support is noted (osm), with the distance between their centres.',
   made: 'scripts/make-bridge-piers.mjs', fetched: new Date().toISOString().slice(0, 10), piers
 }, null, 0) + '\n');
-for (const p of piers) console.log(p.name.padEnd(60), p.src.padEnd(32), p.osm ? `OSM ${p.osm.ref} ${p.osm.offset_m} m` : '');
+for (const p of piers) console.log(p.name.padEnd(60), p.src.padEnd(32), `${p.depth?.m ?? '?'} m (${p.depth?.soundings ?? 0})`.padEnd(12), p.osm ? `OSM ${p.osm.ref} ${p.osm.offset_m} m` : '');

@@ -131,8 +131,14 @@ const inB = (p: Vec, b: WharfPart['box']) => p.x >= b.x0 && p.x <= b.x1 && p.y >
  * Bridge's. Solid, as the Wharf's piers are, and in the same places: onLand, landAlong, the nearest structure for
  * Rule 19, the passage planner. They stand alone in open water, so each has its own box and no group box.
  */
-export const PIERS: WharfPart[] = (bridgePiers as unknown as { piers: { name: string; pts: [number, number][] }[] }).piers
-  .map(a => { const pts = a.pts.map(q => LL(q[0], q[1])); return { name: a.name, kind: 'bridge', pts, box: boxOf(pts, 0) }; });
+export interface Pier extends WharfPart { name: string; top: number; depth: number }
+/**
+ * How high each stands out of the water (m): the Golden Gate's tower bases 13 (OpenStreetMap's height), the south
+ * tower's fender 6, the Bay Bridge's piers 10, the others 6 (estimates from photographs: the chart gives only footprints).
+ */
+const topOf = (n: string) => /tower$/.test(n) ? 13 : /fender/.test(n) ? 6 : /^Bay Bridge/.test(n) ? 10 : 6;
+export const PIERS: Pier[] = (bridgePiers as unknown as { piers: { name: string; pts: [number, number][]; depth?: { m: number } }[] }).piers
+  .map(a => { const pts = a.pts.map(q => LL(q[0], q[1])); return { name: a.name, kind: 'bridge', pts, box: boxOf(pts, 0), top: topOf(a.name), depth: Math.max(2, a.depth?.m ?? 10) }; });
 /** The bridge pier or tower at p, if she's hit one (for the message: what she hit). */
 export const pierAt = (p: Vec): WharfPart | null => { for (const a of PIERS) if (inB(p, a.box) && inPoly(p, a.pts)) return a; return null; };
 export const hitsPier = (p: Vec): boolean => pierAt(p) !== null;

@@ -38,14 +38,10 @@ export function addWharf(scene: THREE.Scene): THREE.Group {
     if (l.kind === 'breakwater') rock.push(...bar(l.pts, l.width!, -1, ROCK_TOP));
     else docks.push(...bar(l.pts, l.width!, DOCK_TOP - DOCK_T, DOCK_TOP));
   }
-  // the bridges' piers and tower bases, from the outlines that make them solid (geo/shore.ts PIERS): concrete standing out
-  // of the water. Heights: the Golden Gate's tower bases 13 m (OpenStreetMap's height), the south tower's fender 6 m,
-  // the Bay Bridge's piers 10 m and the others 6 m (estimates from photographs: the chart gives only their footprints).
+  // the bridges' piers and tower bases, from the outlines that make them solid (geo/shore.ts PIERS, with their heights):
+  // concrete standing out of the water
   const piers: THREE.BufferGeometry[] = [];
-  for (const P of PIERS) {
-    const n = P.name ?? '', top = /tower$/.test(n) ? 13 : /fender/.test(n) ? 6 : /^Bay Bridge/.test(n) ? 10 : 6;
-    piers.push(slab(P.pts, -2, top));
-  }
+  for (const P of PIERS) piers.push(slab(P.pts, -2, P.top));
   const add = (gs: THREE.BufferGeometry[], color: number) => { if (!gs.length) return; const g = mergeGeometries(gs); g.computeVertexNormals(); group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color }))); gs.forEach(x => x.dispose()); };
   add(deck, 0x9c958a); // weathered concrete and timber decking
   add(piers, 0xb8b2a6); // the bridges' concrete piers
