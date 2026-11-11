@@ -14,9 +14,14 @@
 const { chromium } = require('playwright');
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
 const LL = (lat, lon, z) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT, z];
-// The budget, per view (a desktop laptop's integrated GPU holds 60 fps to about 2,000 draw calls and 2 million
-// triangles in a scene like this one; the JS for a frame, sim included, must leave most of the 16.7 ms to the browser).
-const BUDGET = { calls: 2000, tris: 2.0e6, programs: 80, jsMs: 8 };
+// The budget, per view (ROADMAP, "Performance review"): a laptop's integrated GPU holds 60 fps to about 2,000 draw
+// calls and 2 million triangles in a scene like this; the shader programs are all compiled in the background at the
+// start of a race (scene.ts warmShaders), so their count is only GPU memory. JS: a frame's JS must leave most of the
+// 16.7 ms to the browser and the GPU, about 8 ms on a laptop; here, headless with the software GL sharing the cores,
+// the same JS takes about three times as long (the sim's steps run about 1.8× slower in this page than in Node on the
+// same machine, and a laptop's core is perhaps 1.5–2× this container's), so 24 ms here. The readout behind the ` key
+// (ui/perfMeter.ts) gives the real figure on a real machine.
+const BUDGET = { calls: 2000, tris: 2.0e6, programs: 200, jsMs: 24 };
 // (night views: the free camera, sim coords; the times as night.cjs)
 const VIEWS = [
   { name: 'start_chase', mode: 2 },
@@ -76,6 +81,7 @@ const VIEWS = [
     if (V.cam) await p.evaluate(c => { window.__cam = { pos: c[0], at: c[1] }; }, V.cam);
     if (V.map) await p.keyboard.press('m');
     await p.waitForTimeout(3000);
+    await measure(3); // (a few frames first: the first frames in a new view upload what it hasn't drawn before)
     let cdp = null;
     if (process.env.PERF_PROFILE === V.name) { cdp = await p.context().newCDPSession(p); await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
     const r = await measure(cdp ? 12 : 6);

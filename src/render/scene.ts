@@ -362,6 +362,23 @@ export class SceneView {
     this.fittings.set(this.boatMeshes.map(m => m.grp));
     this.buildCourse(w);
     disposeUnused(oldBoats, this.scene);
+    this.warmShaders();
+  }
+
+  /**
+   * Have the GPU compile the shaders of everything that's hidden now (the city's and the bridge's lights after dark,
+   * the boats' navigation lights, rain, the fog bank) in the background, so the frame they first appear in doesn't
+   * stall while it compiles fifty-odd of them (half a second or more when night fell with the city in view). Each is
+   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. Both with
+   * the sun's shadows and without (it stops casting them once it's down, which changes every lit surface's shader).
+   * Programs already compiled are reused, so after the first race this costs only the walk through the scene.
+   */
+  private warmShaders(): void {
+    const hidden: THREE.Object3D[] = [], shadow = this.sun.castShadow;
+    this.scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    try {
+      for (const cast of [shadow, !shadow]) { this.sun.castShadow = cast; void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
+    } finally { this.sun.castShadow = shadow; for (const o of hidden) o.visible = false; }
   }
 
   /** A buoy on the water, leaning and trailing a wake in the current (see update). */
