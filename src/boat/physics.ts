@@ -199,7 +199,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // upwind, flat downwind), then where they actually are (they move at a human pace, and go where their jobs are)
   const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
-  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt) * (twa > 120 ? 0.6 : 1); // off the wind she rolls less
+  // (off the wind the heel is the same balance of moments as upwind: the eased sails' smaller side force is what heels her
+  // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
+  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt);
   rollTo(b, heelT, rel, disp, dt);
   b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.ceh, clrShift(cs.trim));
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
@@ -234,7 +236,12 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
   }
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, b.luff)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
+  // pinching: the sails flog (their windage, and the hull's and rig's no longer paid for by the polar's drive) as far as
+  // they're luffing (trim.ts), and, below the beat angle, as the square of how far below it she is (pinchFlog): nothing
+  // to speak of a degree or two low, so the polar's VMG peak stays at ORC's beat angle, rising to all of it in the no-go
+  // zone, where she stops
+  const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, ap.awa), pinchFlog(twa, beat));
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
   b.v = Math.max(0, b.v + a * dt);
   // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
@@ -448,10 +455,9 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  * solvers looks for each boat at the ideal heel angle"). Here the same search, over the crew's depowering steps
  * (controls.ts targetShape): for each step, her heel where the moments balance with the crew hiking (the wind triangle
  * heeled with her, eqs. 7.2–7.3), and the speed that gives. What pushes her along is the sails' drive less:
- * - the keel's induced drag, growing with the square of the side force and as she heels (ORC eq. 6.37:
- *   DI = FH² / (π·½ρV²·Te²)). The effective draft is the sim's own keel model's (slender-wing lift, Newman §5.12, the
- *   water's surface mirroring the keel: Te² = 2·T²), its depth shortened by cos(heel); ORC works it from the hull's
- *   offsets (MHSD), which aren't published for the Folkboat;
+ * - the keel's induced drag, growing with the square of the side force square to her centre plane (ORC eq. 6.37:
+ *   DI = FH² / (π·½ρV²·Te²); balance.ts netDrive), with Te ORC's effective draft along the keel's own span (MHSD, 0.92 ×
+ *   the draft standing in for the deepest reduced draft, which ORC works from the hull's offsets);
  * - the rudder held over against her weather helm (balance.ts rudderDrag): North Sails' Nordic Folkboat guide eases the
  *   traveller in a breeze "to decrease heel and thus rudder pressure", and pulls the backstay "until the rudder feels
  *   light again";
@@ -569,6 +575,29 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
   stepCache.set(key, top);
   return top;
 }
+
+/** How much the sails are flogging (0..1), from their trim: each sail's luffing, by its share of the area (a jib that's
+ * poled out or down isn't flogging; a sail half hoisted flogs as much of it as is up). */
+function sailFlog(b: Boat, plan: SailPlan, awa: number): number {
+  const luff = (t: { flow: string; amount: number } | null | undefined) => t && t.flow === 'luffing' ? t.amount : 0;
+  // (the main against the boom the crew intends: the last depowering steps ease it down the traveller on purpose, and the
+  // speed search prices that ease through the sails' own forces, as trimSails counts the sheet, so it isn't flogging
+  // here; the same for a mainsheet you hold, so taking the sheet where the crew had it changes nothing. Pricing the
+  // flogging in the search too, and judging the main where it is, is for later: ROADMAP, the audit)
+  const main = sailTrim('main', awa, clamp(b.sheets.main - crewEaseBoom(b), SAILS.main.min, SAILS.main.max));
+  return SAILS.main.share * luff(main) * (b.rig?.main ?? 1) + (plan === 'jib' ? SAILS.jib.share * luff(b.trim.jib) * (b.rig?.jib ?? 1) : 0);
+}
+
+/**
+ * Pinching below the polar's beat angle (0..1, as flogAmount): the square of how far below it she is, across to the no-go
+ * angle. The polar has her speed falling as she pinches (polar.ts, a curve set so that VMG peaks at ORC's beat angle,
+ * not measured), and the sails sheeted hard in still draw (trim.ts luffs them only once the apparent wind is inside the
+ * sheets' reach), so on its own that leaves a boat ten degrees too high losing little; a real one has her jib's luff
+ * lifting and the hull's and rig's windage no longer paid for. Any cost here must be flat at the beat angle, or it moves
+ * ORC's optimum (a straight line from the beat cost 10–16 times ORC's curve a degree or two low): a square is the
+ * simplest that is. An estimate until the speed below the beat comes from the sails' own forces (ROADMAP, the audit).
+ */
+export const pinchFlog = (twa: number, beat: number) => twa >= beat ? 0 : twa <= NO_GO ? 1 : ((beat - twa) / (beat - NO_GO)) ** 2;
 
 /** Roll her toward the heel `heelLee` (deg, + to leeward) as a damped oscillator (balance.ts rollStep). */
 function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number): void {

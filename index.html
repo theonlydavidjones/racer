@@ -10,7 +10,7 @@
 </head>
 <body>
 <canvas id="gl" aria-label="3D view of the race course"></canvas>
-<div id="tillerGuide" aria-hidden="true"><div class="tg-hard tg-hl"></div><div class="tg-line"></div><div class="tg-hard tg-hr"></div><div class="tg-cur" id="tgCur"></div>
+<div id="tillerGuide" aria-hidden="true"><div class="tg-hard tg-hl"></div><div class="tg-line"></div><div class="tg-hard tg-hr"></div><div class="tg-cur" id="tgCur"></div><div class="tg-lash" id="tgLash"></div>
   <span class="tg-l">◀ tiller to port · turns to starboard</span><span class="tg-r">tiller to starboard · turns to port ▶</span></div>
 <div id="labels"></div>
 
@@ -44,20 +44,30 @@
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
+  <div class="tp-head"><span class="tp-lab">Sail trim</span><span id="tpWho">Crew trims every line</span></div>
   <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
-    <button class="tp-btn" id="bMainIn" type="button" aria-label="Trim the main in">Trim</button><button class="tp-btn" id="bMainOut" type="button" aria-label="Ease the main">Ease</button>
-    <button class="tp-auto" id="bMainAuto" type="button" hidden title="You have the mainsheet: tap to give it back to the crew">Auto</button></div>
+    <button class="tp-btn two" id="bMainIn" type="button" aria-label="Trim the main in">Trim<small>boom in</small></button><button class="tp-btn two" id="bMainOut" type="button" aria-label="Ease the main">Ease<small>boom out</small></button>
+    <span class="who" id="whoMain" data-line="mainsheet" role="group" aria-label="Who works the mainsheet"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
   <div class="tp-row" id="tpJibRow"><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span>
-    <button class="tp-btn" id="bJibIn" type="button" aria-label="Trim the jib in">Trim</button><button class="tp-btn" id="bJibOut" type="button" aria-label="Ease the jib">Ease</button>
-    <button class="tp-btn tp-back" id="bJibBack" type="button">Back</button>
-    <button class="tp-auto" id="bJibAuto" type="button" hidden title="You have the jib sheet: tap to give it back to the crew">Auto</button></div>
+    <button class="tp-btn two" id="bJibIn" type="button" aria-label="Trim the jib in">Trim<small>sheet in</small></button><button class="tp-btn two" id="bJibOut" type="button" aria-label="Ease the jib">Ease<small>sheet out</small></button>
+    <button class="tp-btn two tp-back" id="bJibBack" type="button"><span class="w">Back</span><small>jib to windward</small></button>
+    <span class="who" id="whoJib" data-line="jibsheet" role="group" aria-label="Who works the jib sheet"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
   <div class="tp-row" id="tpPoleRow"><span class="tp-lab">Pole</span><span class="tp-state" id="tpPole"></span>
     <button class="tp-btn tp-pole" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button></div>
-  <div class="tp-row" id="tpCrewRow"><span class="tp-lab" id="tpCrewLab">Crew</span>
-    <span class="tp-seg" role="group" aria-label="Crew weight across the boat (your choice holds until you change it or tap Auto)"><button class="tp-btn sm" type="button" data-ca="lee" title="Crew to leeward (7)">Lee</button><button class="tp-btn sm" type="button" data-ca="mid" title="Crew in the middle">Mid</button><button class="tp-btn sm" type="button" data-ca="up" title="Crew sitting up to windward">Up</button><button class="tp-btn sm" type="button" data-ca="hike" title="Crew hiking out (8)">Hike</button></span>
-    <span class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Crew weight fore and aft (tap the lit one again to leave fore and aft to the crew)"><button class="tp-btn sm" type="button" data-cf="aft" title="Weight aft, by the helm (0)">Aft</button><button class="tp-btn sm" type="button" data-cf="fwd" title="Weight forward in the cockpit (9)">Fwd</button></span>
-    <button class="tp-auto sm" id="bCrewAuto" type="button" aria-pressed="true" title="On auto: the crew place their own weight">Auto</button></div>
-  <div class="tp-hint tp-crew" id="tpCrew"></div>
+  <!-- the crew's weight: one line while they place themselves (tap it to open); open while you've placed them -->
+  <div class="tp-crewbox" id="tpCrewBox">
+    <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
+      <span class="who" id="whoCrew" data-line="crew" role="group" aria-label="Who works the crew weight"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
+    <div class="tp-crewopen" id="tpCrewOpen" hidden>
+      <div class="tp-wind" id="tpWind">Wind over the port side: port is windward, starboard leeward</div>
+      <div class="tp-seg tp-across" id="tpCrewRow" role="group" aria-label="Where the crew sit across the boat">
+        <button class="tp-btn two" type="button" data-ca="lee"><span class="w">Sit to leeward</span><small data-side="lee">stbd &middot; heels her</small></button><button class="tp-btn two" type="button" data-ca="mid"><span class="w">Middle</span><small>on the centreline</small></button><button class="tp-btn two" type="button" data-ca="up"><span class="w">Sit up</span><small data-side="up">port side deck</small></button><button class="tp-btn two" type="button" data-ca="hike"><span class="w">Hike out</span><small data-side="hike">port rail &middot; holds her up</small></button>
+      </div>
+      <div class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Where the crew sit fore and aft (tap the lit one again to leave it to the crew)">
+        <button class="tp-btn two" type="button" data-cf="fwd"><span class="w">Forward</span><small>bow down &middot; light, flat</small></button><button class="tp-btn two" type="button" data-cf="aft"><span class="w">Aft</span><small>stern down &middot; fast, or chop</small></button>
+      </div>
+    </div>
+  </div>
   <div class="tp-hint" id="tpHint"></div>
   <div class="tp-shape" id="tpShape"></div>
   <div class="tp-balance" id="tpBalance"></div>
@@ -66,29 +76,19 @@
 </div>
 
 <div id="controls">
-  <div class="row1">
-    <button class="chip" id="bView" type="button">View · Cockpit</button>
-    <button class="chip" id="bFast" type="button">Speed 1×</button>
-    <button class="chip" id="bSound" type="button">Sound on</button>
-    <button class="chip" id="bPause" type="button">Pause</button>
-    <button class="chip" id="bCourse" type="button">Course</button>
-    <button class="chip" id="bTrim" type="button" aria-pressed="false">Trim · crew</button>
-    <button class="chip" id="bHail" type="button">Hail</button>
-    <button class="chip on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern">Push off</button>
-    <button class="chip" id="bJib" type="button" hidden>Hoist jib</button>
-    <button class="chip" id="bMain" type="button" hidden>Hoist main</button>
-    <button class="chip" id="bPilot" type="button" hidden title="Tiller pilot: steers for you (cruising only)">Autopilot</button>
-    <button class="chip" id="bExit" type="button" title="Leave and go back to the start page">Exit</button>
-    <button class="chip" id="bLook" type="button" hidden>Look ahead</button>
-    <button class="chip" id="bOrient" type="button" hidden>North up</button>
-    <button class="chip" id="bRecentre" type="button" hidden>Back to boat</button>
+  <!-- sailing the boat: what the helm does (the lashing is on the tiller itself: double-click) -->
+  <div class="row1 ibar" id="helmBar">
+    <button class="ib" id="bHail" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l6 4V4L6 8Z"/><path d="M15 7.5a3.5 3.5 0 0 1 0 5"/></svg><span class="w">Hail</span></button>
+    <button class="ib on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3v14"/><path d="M7 10h10"/><path d="M13 6l4 4-4 4"/></svg><span class="w">Push off</span></button>
+    <button class="ib" id="bJib" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 17 12 3v14Z"/></svg><span class="w">Hoist jib</span></button>
+    <button class="ib" id="bMain" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v14h9Z"/></svg><span class="w">Hoist main</span></button>
+    <button class="ib" id="bPilot" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5.5l2 5.5h-4Z"/></svg><span class="w">Autopilot</span></button>
   </div>
   <div class="row2">
     <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
       <div class="tiller-track"></div><div class="tiller-mid"></div><div class="tiller-handle" id="tillerHandle"></div>
       <span class="tiller-lab" id="tillerLab">Tiller · centred</span>
     </div>
-    <span class="lashgrp"><button class="chip" id="bLashP" type="button" hidden title="Move the lashing: tiller further to port" aria-label="Lashed tiller: further to port">◀</button><button class="chip lash" id="bLash" type="button" aria-pressed="false" title="Lash the tiller where it is (I): hands off, as when heaving to">Lash tiller</button><button class="chip" id="bLashS" type="button" hidden title="Move the lashing: tiller further to starboard" aria-label="Lashed tiller: further to starboard">▶</button></span>
     <div class="pilot" id="pilot" hidden role="group" aria-label="Tiller pilot">
       <span class="pl-lab">Pilot</span>
       <button class="tp-btn" type="button" data-pm="auto" title="Hold a compass course">Auto</button>
@@ -100,21 +100,38 @@
       <button class="tp-btn" type="button" data-pa="tack" title="Auto: turn 100° through the wind · Wind: the same angle on the other tack">Tack</button>
       <button class="tp-btn" type="button" data-pa="off" title="Hand the tiller back to you">Standby</button>
     </div>
-    <span class="keys" id="keysHint"></span>
   </div>
 </div>
+<!-- the app: small and dim, top right -->
+<div class="ibar dim" id="appBar">
+  <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
+  <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
+  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
+  <button class="ib" id="bExit" type="button" title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
+</div>
+<!-- the chart: beside the map -->
+<div class="ibar col" id="mapBar">
+  <button class="ib" id="bCourse" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 17V3"/><path d="M5 4h9l-2 3 2 3H5"/></svg><span class="w">Course</span></button>
+  <button class="ib" id="bOrient" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3l4.5 14L10 14l-4.5 3Z"/></svg><span class="w">North up</span></button>
+  <button class="ib" id="bRecentre" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/><path d="M10 2v4M10 14v4M2 10h4M14 10h4"/></svg><span class="w">To boat</span></button>
+</div>
+<!-- the view: bottom right, with the keys line over it on hover -->
+<div class="ibar" id="viewBar">
+  <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
+  <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
+</div>
+<span class="keys" id="keysHint"></span>
 
 <div class="overlay" id="home">
   <div class="panel wide home">
     <div class="eyebrow">San Francisco Bay</div>
     <h1>Folkboat Racing Sim</h1>
-    <p class="lede">Nordic Folkboats on the real Bay, in the real wind, tide and sea for the day you choose.</p>
     <div class="modes three">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
       <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats and their records</span></button>
     </div>
-    <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button><button type="button" class="linkbtn" data-home="club">Yacht Club: coming</button><span class="savenote" id="saveNote"></span></div>
+    <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button></div>
   </div>
 </div>
 <div class="overlay" id="club" hidden>
@@ -301,10 +318,12 @@
       <div><div class="eyebrow">Settings</div><h2>Settings</h2></div>
       <button class="ghost" id="bKeysClose" type="button">Done</button>
     </div>
-    <div class="field"><span>On screen</span>
-      <div class="seg" data-k="aids"><button type="button" data-v="1">Line, zones &amp; laylines</button><button type="button" data-v="0">Off, sight it yourself</button></div>
-      <div class="seg" data-k="windDial"><button type="button" data-v="0">No wind-angle dial</button><button type="button" data-v="1">Show the wind-angle dial</button></div>
-      <small>Training aids. Real boats have neither: they have the windex and the telltales.</small></div>
+    <div class="field"><span>Training aids</span>
+      <div class="togs">
+        <label class="tog">Show laylines and zones<input type="checkbox" data-t="aids"><span class="tog-sw"></span></label>
+        <label class="tog">Show wind-angle dial<input type="checkbox" data-t="windDial"><span class="tog-sw"></span></label>
+      </div>
+      <small>Real boats have neither: they have the windex and the telltales.</small></div>
     <details class="more"><summary><u>How to sail her ▸</u></summary>
     <div class="help">
       <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
@@ -314,7 +333,7 @@
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
     <div class="field"><span>Keyboard</span>
-    <small>Click Change, then press the key you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
+    <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
     <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
