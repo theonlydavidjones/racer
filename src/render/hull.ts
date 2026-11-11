@@ -20,12 +20,13 @@ export function sheer(u: number): number {
   return u < 0.62 ? 0.568 + 0.40 * Math.pow((0.62 - u) / 0.62, 1.8) : 0.568 + 0.14 * ((u - 0.62) / 0.38) ** 2;
 }
 /**
- * Half-breadth of the deck (m) at the class's measuring stations, 0.5 m apart (CR 2.14), station 1 at the transom.
- * Station 11's beam, 1910 mm, is the class rule's (CR 2.161); the other given stations are from the class lines as
- * read for the audit (stations 1–4 and 12–15; not reproduced in the rules, so unconfirmed); the maximum, 1100 mm (the
- * 2.20 m beam), is at station 8; stations 5–7, 9 and 10 are faired between them (estimates).
+ * Half-breadth of the deck (m) at the class's measuring stations, 0.5 m apart (CR 2.14), station 1 at the transom:
+ * from the class's construction plan (Nordic Folkboat Construction Plan, 1:10, 1947, rev. 2024, folkboat.com; the same
+ * figures as the physics, boat/crewPhys.ts). Station 11's 1910 mm beam is also the class rule's (CR 2.161), and the
+ * numbering agrees with the rules: the frames abreast the mast at stations 10 and 10.5 (CR 2.208), where the forestay
+ * rules put it; the cockpit's after end at station 3 (CR 3.22).
  */
-const HB_MM = [655, 760, 860, 948, 1015, 1062, 1090, 1100, 1088, 1040, 955, 849, 705, 530, 315]; // stations 1..15
+const HB_MM = [655, 760, 860, 948, 1017, 1067, 1094, 1100, 1080, 1028, 955, 849, 705, 530, 315]; // stations 1..15
 /**
  * A fair curve through points (x increasing): a monotone cubic (Fritsch–Carlson), so between two points it never
  * bulges past them, the way a batten bent through a table of offsets lies.
@@ -173,15 +174,17 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
 
 /** Openings in the deck: the cabin trunk and the cockpit well (u range, half-width). */
 /**
- * The cabin trunk starts just aft of the mast, which goes through the foredeck at the sheer's height (the boom's band is
- * 1.00 m above the deck there, CR 6.1.11; a coachroof "extended forward of the mast" is a variation, not the class
- * norm). Its after end and the sizes are estimates. (CR 3.12 puts the cabin's after end within 300 mm forward of
- * station 6; with station 1 at the transom that would be 0.25–0.55 m further aft than drawn, which isn't confirmed.)
+ * The cabin trunk, by the class rules: its top at least 1850 mm long from the main bulkhead to where it meets the
+ * deck forward (CR 3.11), the after end within 300 mm forward of station 6 (CR 3.12): drawn 1.85 m, ending 0.26 m
+ * forward of station 6, which starts it 0.10 m aft of the mast; the mast goes through the foredeck at the sheer (the
+ * boom's band 1.00 m above the deck, CR 6.1.11). The cockpit from the main bulkhead aft to station 3 (CR 3.22), 1.0 m
+ * from the transom, leaving a long after deck; its side decks 250–310 mm wide (CR 3.22). Heights are estimates.
  */
-export const CABIN = { u0: 0.402, u1: 0.6, w: 0.62, h: 0.32 };
-export const COCKPIT = { u0: 0.6, u1: 0.93, w: 0.7, sole: 0.24 };
+const zU = (z: number) => (z + L / 2) / L;
+export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.62, h: 0.32 };
+export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), w: 0.7, sole: 0.24 };
 /** Cockpit half-width: narrows aft with the hull, leaving a side deck. */
-export const cockpitHalf = (u: number) => Math.min(COCKPIT.w, halfBeam(u) - 0.24);
+export const cockpitHalf = (u: number) => Math.min(COCKPIT.w, halfBeam(u) - 0.28); // (a 280 mm side deck)
 const CAMBER = 0.05;
 export const deckY = (u: number, x: number) => sheer(u) + CAMBER * Math.max(0, 1 - (x / Math.max(0.05, halfBeam(u))) ** 2) * halfBeam(u) / 1.1;
 
@@ -291,9 +294,9 @@ export function sheerLine(side: number, inset = 0.01, n = 60): THREE.Vector3[] {
 }
 
 /** A strip standing up from a line of points (toerail, coaming), height h, thickness t. */
-export function rail(pts: THREE.Vector3[], h: number, t: number): THREE.BufferGeometry {
+export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number), t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [];
-  for (const p of pts) { pos.push(p.x - t / 2 * Math.sign(p.x || 1), p.y, p.z, p.x - t / 2 * Math.sign(p.x || 1), p.y + h, p.z, p.x + t / 2 * Math.sign(p.x || 1), p.y + h, p.z, p.x + t / 2 * Math.sign(p.x || 1), p.y, p.z); }
+  for (const [i, p] of pts.entries()) { const h = typeof hh === 'number' ? hh : hh(i); pos.push(p.x - t / 2 * Math.sign(p.x || 1), p.y, p.z, p.x - t / 2 * Math.sign(p.x || 1), p.y + h, p.z, p.x + t / 2 * Math.sign(p.x || 1), p.y + h, p.z, p.x + t / 2 * Math.sign(p.x || 1), p.y, p.z); }
   for (let i = 0; i < pts.length - 1; i++) {
     const a = i * 4, b = a + 4;
     for (let k = 0; k < 3; k++) idx.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1);

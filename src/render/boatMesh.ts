@@ -77,7 +77,8 @@ const JIB_AXIS = HOUNDS.clone().sub(FORESTAY_DECK).normalize();
 /**
  * The jib, hanked on the forestay, in its own frame (origin where the stay meets the deck): from the certificate, luff
  * 5.95 m and LP 2.36 m (the clew's distance square from the luff), area 7.30 m². Its tack is on a short strop 0.10 m up
- * the stay; the clew sits 1.20 m above the water (an estimate). With the car 2.65 m aft of the stay (also an estimate)
+ * the stay; the clew sits 1.20 m above the water (an estimate). With the car 2.65 m aft of the stay (North Sails'
+ * Nordic Folkboat tuning guide, as boat/crewPhys.ts)
  * the sheet pulls about 30° more steeply than the clew's bisector, closing the leech a little; the bisector would
  * want the car about 2.79 m aft. The leech has the small roach that makes up
  * the certificate's area (the class allows a head 0.14 m wide 0.20 m down, CR 9.32).
@@ -188,7 +189,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   for (const s of [1, -1]) {
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= 12; i++) { const u = COCKPIT.u0 + (COCKPIT.u1 - COCKPIT.u0) * i / 12; pts.push(new THREE.Vector3(s * (cockpitHalf(u) + 0.01), deckY(u, cockpitHalf(u)), zc(u))); }
-    grp.add(new THREE.Mesh(rail(pts, 0.13, 0.025), MAT.wood));
+    grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), 0.025), MAT.wood));
     // toerail along the sheer
     grp.add(new THREE.Mesh(rail(sheerLine(s, 0.03), 0.035, 0.03), MAT.wood));
   }
@@ -256,10 +257,16 @@ const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xfffff
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
 const carPos = (side: number, fore: number, ins: number) => {
-  // the middle fore–aft pin 2.65 m aft of the stay; across, where the physics' lead angle puts it (carLead, seen from the tack)
+  // the middle fore–aft pin 2.65 m aft of the stay (North Sails' tuning guide); across, where the physics' lead angle puts it
+  // (carLead, seen from the tack: 12.3° puts the car the guide's 58 cm off the centreline)
   const z = FORESTAY_DECK.z + 2.65 + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (z - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
   return new THREE.Vector3(x, cabinTopY(uAtZ(z)) + 0.06 * (1 - (x / CABIN.w) ** 2) + 0.035, z); // on the cabin top's camber
 };
+/**
+ * The cockpit coaming's height (m) along the boat: at least 200 mm just aft of the cabin, 140 mm at station 4.5 and
+ * 80 mm at station 3 (CR 3.22); drawn a little above each.
+ */
+const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
 const TRAV_Z = 2.35, TRAV_HALF = 0.5, MASTHEAD = new THREE.Vector3(0, MAST_TOP, MAST_Z);
 function line(points: THREE.Vector3[], mat: THREE.Material = LINE_MAT): THREE.Line {
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat); l.frustumCulled = false; return l;
@@ -287,7 +294,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
-    const u = 0.66, zw = -L / 2 + u * L, wx = side * (cockpitHalf(u) + 0.06), wy = deckY(u, cockpitHalf(u)) + 0.13 + 0.07;
+    const u = COCKPIT.u0 + 0.03, zw = -L / 2 + u * L, wx = side * (cockpitHalf(u) + 0.06), wy = deckY(u, cockpitHalf(u)) + COAMING_H(zw) + 0.07; // on the coaming, at its forward end
     const w = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.13, 16), STEEL); w.position.set(wx, wy, zw); grp.add(w);
     winches[tk] = new THREE.Vector3(wx, wy + 0.04, zw);
     // H-shaped car track on the cabin top: two short fore–aft rails and the cross rail
@@ -576,8 +583,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   syncPole(m, plan === 'wing');
   syncLines(m, b);
   for (const r of m.ribbons) syncRibbon(r, b, t);
-  // (the sea's slope from the wind she feels: her apparent wind, which overstates the true wind going upwind)
-  syncNavLights(m.nav, b.aws / 0.5144);
+  syncNavLights(m.nav);
 }
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
