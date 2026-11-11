@@ -47,9 +47,12 @@ export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
   ctx.closePath(); ctx.fill();
 }
 
-export function drawCourse(ctx: CanvasRenderingContext2D, C: Course, aids: boolean, tf: Tf, scale: number, highlight: number): void {
+/** Overlay colours for a light chart (ui/encChart.ts INK.day); left out, the colours for a dark map. */
+export interface OverlayInk { mark?: string; markPass?: string; line?: string; current?: string; lull?: (a: number) => string; lullHatch?: boolean; windTick?: string }
+
+export function drawCourse(ctx: CanvasRenderingContext2D, C: Course, aids: boolean, tf: Tf, scale: number, highlight: number, ink: OverlayInk = {}): void {
   const p1 = tf(C.pin.x, C.pin.y), p2 = tf(C.committee.x, C.committee.y);
-  ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(255,216,74,.75)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = ink.line ?? 'rgba(255,216,74,.75)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); ctx.setLineDash([]);
   const seen = new Set<string>();
   C.marks.forEach((m, i) => {
@@ -57,8 +60,9 @@ export function drawCourse(ctx: CanvasRenderingContext2D, C: Course, aids: boole
     const hi = highlight === i;
     if (m.type === 'round' && aids) { ctx.strokeStyle = hi ? 'rgba(255,216,74,.6)' : 'rgba(255,216,74,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s[0], s[1], Math.max(2, ZONE * scale), 0, 6.29); ctx.stroke(); }
     if (seen.has(key) && !hi) return; seen.add(key);
-    ctx.fillStyle = hi ? '#ffb627' : (m.type === 'pass' ? '#c9b25a' : '#ffc21a');
+    ctx.fillStyle = hi ? '#ffb627' : (m.type === 'pass' ? ink.markPass ?? '#c9b25a' : ink.mark ?? '#ffc21a');
     ctx.beginPath(); ctx.arc(s[0], s[1], hi ? 4 : 3, 0, 6.29); ctx.fill();
+    if (ink.mark) { ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1; ctx.stroke(); }
   });
 }
 
@@ -105,9 +109,9 @@ export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines 
  * Length grows with speed; land and the shore relief come from `at`, the sim's own current field.
  */
 export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x: number; y: number }) => { x: number; y: number },
-  cx: number, cy: number, half: number, spacing: number, pxPerKt: number, onLand: (p: { x: number; y: number }) => boolean): void {
+  cx: number, cy: number, half: number, spacing: number, pxPerKt: number, onLand: (p: { x: number; y: number }) => boolean, ink: OverlayInk = {}): void {
   ctx.save();
-  ctx.strokeStyle = 'rgba(111,208,255,.55)'; ctx.fillStyle = 'rgba(111,208,255,.55)'; ctx.lineWidth = 1.2;
+  ctx.strokeStyle = ink.current ?? 'rgba(111,208,255,.55)'; ctx.fillStyle = ink.current ?? 'rgba(111,208,255,.55)'; ctx.lineWidth = 1.2;
   const x0 = Math.floor((cx - half) / spacing) * spacing, y0 = Math.floor((cy - half) / spacing) * spacing;
   for (let x = x0; x <= cx + half; x += spacing) for (let y = y0; y <= cy + half; y += spacing) {
     const p = { x, y };
@@ -128,7 +132,7 @@ export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p:
  * lighter, as cells a few hundred metres across, with a tick showing which way it's blowing there.
  */
 export function drawWindField(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x: number; y: number }) => { k: number; from: number },
-  cx: number, cy: number, half: number, spacing: number, onLand: (p: { x: number; y: number }) => boolean): void {
+  cx: number, cy: number, half: number, spacing: number, onLand: (p: { x: number; y: number }) => boolean, ink: OverlayInk = {}): void {
   ctx.save();
   const x0 = Math.floor((cx - half) / spacing) * spacing, y0 = Math.floor((cy - half) / spacing) * spacing;
   for (let x = x0; x <= cx + half; x += spacing) for (let y = y0; y <= cy + half; y += spacing) {
@@ -137,19 +141,25 @@ export function drawWindField(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x
     const f = at(p), d = f.k - 1;
     if (Math.abs(d) > 0.04) {
       const a = tf(x, y), b = tf(x + spacing, y + spacing), c = tf(x + spacing, y), e = tf(x, y + spacing);
-      ctx.fillStyle = d > 0 ? `rgba(10,30,60,${Math.min(0.32, d * 0.9)})` : `rgba(200,230,245,${Math.min(0.25, -d * 0.8)})`;
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(e[0], e[1]); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = d > 0 ? `rgba(10,30,60,${Math.min(0.32, d * 0.9)})` : (ink.lull ?? (a => `rgba(200,230,245,${a})`))(Math.min(0.25, -d * 0.8));
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(e[0], e[1]); ctx.closePath();
+      if (d < 0 && ink.lullHatch) { // on a white chart nothing is paler than the water: lighter wind is hatched instead, so it can't read as land
+        ctx.save(); ctx.clip(); ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.beginPath();
+        const xs = [a[0], b[0], c[0], e[0]], ys = [a[1], b[1], c[1], e[1]], x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        for (let t = x0 - (y1 - y0); t < x1; t += 7) { ctx.moveTo(t, y1); ctx.lineTo(t + (y1 - y0), y0); }
+        ctx.stroke(); ctx.restore();
+      } else ctx.fill();
     }
     // which way it blows here (downwind tick)
     const q = tf(p.x, p.y), r = tf(p.x - Math.sin(f.from * Math.PI / 180) * spacing * 0.35, p.y - Math.cos(f.from * Math.PI / 180) * spacing * 0.35);
-    ctx.strokeStyle = 'rgba(232,238,246,.28)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(r[0], r[1]); ctx.stroke();
+    ctx.strokeStyle = ink.windTick ?? 'rgba(232,238,246,.28)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(r[0], r[1]); ctx.stroke();
   }
   ctx.restore();
 }
 
 /** Puffs (dark) and lulls (pale) as soft streaks along the wind, as you'd see them on the water from aloft. */
 export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: number; y: number; r: number; amp: number; age: number; life: number }[],
-  dir: { x: number; y: number }, gustiness: number): void {
+  dir: { x: number; y: number }, gustiness: number, ink: OverlayInk = {}): void {
   ctx.save();
   for (const c of cells) {
     const env = Math.sin(Math.PI * c.age / c.life), a = c.amp * gustiness * env;
@@ -158,7 +168,7 @@ export function drawPuffs(ctx: CanvasRenderingContext2D, tf: Tf, cells: { x: num
     const rx = Math.hypot(e[0] - p[0], e[1] - p[1]), ry = Math.hypot(s[0] - p[0], s[1] - p[1]);
     if (rx < 1.5) continue;
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    const col = a > 0 ? `rgba(8,22,40,${Math.min(0.5, a * 1.6)})` : `rgba(190,225,240,${Math.min(0.35, -a * 1.4)})`;
+    const col = a > 0 ? `rgba(8,22,40,${Math.min(0.5, a * 1.6)})` : (ink.lull ?? (v => `rgba(190,225,240,${v})`))(Math.min(0.35, -a * 1.4));
     g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(Math.atan2(e[1] - p[1], e[0] - p[0])); ctx.scale(rx, ry);
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill(); ctx.restore();

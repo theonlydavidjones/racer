@@ -446,7 +446,8 @@ $('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
 $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
-const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); });
+const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
+  pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
 $('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
