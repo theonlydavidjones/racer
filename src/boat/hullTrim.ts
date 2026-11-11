@@ -59,22 +59,27 @@ export function trimDrag(v: number, t: number): number {
   const wave = TRIM.waveK * smooth((fn - 0.25) / 0.15) * t;
   return (p.friction * ws + p.residuary * wave) / tot;
 }
-/** The trim (m) with the least resistance at speed v, within what weight can do (±15 cm). */
-export function bestTrim(v: number): number {
-  let best = 0, lo = Infinity;
-  for (let t = -0.15; t <= 0.1501; t += 0.005) { const d = trimDrag(v, t); if (d < lo) { lo = d; best = t; } }
-  return best;
+/** The trim (m) with the least resistance at speed v, within what weight can do (±15 cm). (Cached by 0.02 m/s.) */
+const bestCache = new Map<number, { t: number; d: number; n: number }>();
+function best(v: number): { t: number; d: number; n: number } {
+  const key = Math.round(clamp(v, 0.3, 8) * 50), hit = bestCache.get(key); if (hit) return hit;
+  const u = key / 50;
+  let t0 = 0, lo = Infinity;
+  for (let t = -0.15; t <= 0.1501; t += 0.005) { const d = trimDrag(u, t); if (d < lo) { lo = d; t0 = t; } }
+  // the local exponent of resistance with speed (R ∝ vⁿ)
+  const r1 = resistanceParts(u), r2 = resistanceParts(u * 1.02);
+  const n = Math.log((r2.friction + r2.residuary) / (r1.friction + r1.residuary)) / Math.log(1.02);
+  const out = { t: t0, d: lo, n }; bestCache.set(key, out); return out;
 }
+export const bestTrim = (v: number) => best(v).t;
 /**
  * Speed factor from the trim at target speed vt (m/s): the same drive against a resistance changed by trimDrag gives
  * a speed lower by δR/n, where R ∝ vⁿ locally. Relative to the best trim (the polar is the boat sailed well), so it's 1
  * at the best trim and a little less elsewhere.
  */
 export function trimSpeedFactor(vt: number, t: number): number {
-  const v = Math.max(0.5, vt), d = trimDrag(v, t) - trimDrag(v, bestTrim(v));
-  const r1 = resistanceParts(v), r2 = resistanceParts(v * 1.02);
-  const n = Math.log((r2.friction + r2.residuary) / (r1.friction + r1.residuary)) / Math.log(1.02);
-  return 1 / (1 + Math.max(0, d)) ** (1 / Math.max(1.5, n));
+  const v = Math.max(0.5, vt), bt = best(v), d = trimDrag(v, t) - bt.d;
+  return 1 / (1 + Math.max(0, d)) ** (1 / Math.max(1.5, bt.n));
 }
 /** How far forward (m) the centre of lateral resistance moves with trim t (m, + bow down). */
 export const clrShift = (t: number) => (t / TRIM.lwl) * TRIM.keelL ** 2 / (12 * TRIM.keelT);

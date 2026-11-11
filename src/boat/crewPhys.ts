@@ -107,8 +107,8 @@ export interface CrewState {
   side: 'S' | 'P';
   /** Trim (m, + bow down) their weight gives her, and the fore-and-aft moment (kg·m, + forward of the reference). */
   trim: number; trimMoment: number;
-  /** The fore-and-aft place they've chosen (0 aft … 1 forward). */
-  fore01?: number;
+  /** The fore-and-aft place they've chosen (0 aft … 1 forward), and seconds until they think about it again. */
+  fore01?: number; foreT?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
   sailing?: boolean;
 }
@@ -204,7 +204,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const downwind = k.twa > 120;
   // across: the average arm the crew want, as before by the conditions, by their skill
   const breeze = clamp((k.tws - 6) / 2, 0, 1);
-  const maxOf = (i: number) => (i === 0 ? HELM.max : hikeArm(ppl[i], leanCap(ppl[i], c.people[i].fatigue)));
+  const maxes = ppl.map((p, i) => (i === 0 ? HELM.max : hikeArm(p, leanCap(p, c.people[i].fatigue)))), maxOf = (i: number) => maxes[i];
   const maxArm = ppl.reduce((a, p, i) => a + p.w * maxOf(i), 0) / total;
   const minArm = (s.helm.w * HELM.lee + s.crew.reduce((a, p) => a + p.w * LEE_ARM, 0)) / total;
   const sit = (s.helm.w * HELM.sit + s.crew.reduce((a, p) => a + p.w * sitArm(p), 0)) / total;
@@ -215,7 +215,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const pl = c.place;
   if (pl?.across) want = pl.across === 'lee' ? minArm : pl.across === 'mid' ? 0.1 : pl.across === 'up' ? sit : maxArm;
   // fore and aft: the trim with least resistance (hullTrim.ts) for a skilled crew; a novice stays in the middle
-  const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0 }[pl.fore] : chooseFore(c, k, skill);
+  // (they think about it every second or so, not every moment)
+  c.foreT = (c.foreT ?? 0) - dt;
+  if (c.fore01 == null || c.foreT <= 0) { chooseFore(c, k, skill); c.foreT = 1; }
+  const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0 }[pl.fore] : c.fore01!;
   // the bow hand goes to the mast downwind in light air (or for the pole), if they know to
   const atMast = n > 0 && downwind && (k.pole || (k.tws < 10 && skill > 0.5 && foreF > 0.8));
   // targets for each person: jobs first, then the helm, then the free crew share what's left of the wanted moment

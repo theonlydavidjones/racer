@@ -387,7 +387,8 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, twist: number, disp: num
   const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
   const need = heelingMoment(F, twist, bh) - hullRighting(bh, disp) - rmExtra(bh);
   placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set', tack: b.tack, windward: rel >= 0 ? 1 : -1, beat: beatAngle(tws), extraMoment }, dt);
-  return heelWithCrew(F, twist, disp, h => crewMoment(cs, h) + rmExtra(h));
+  const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
+  return heelWithCrew(F, twist, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h));
 }
 /** Roll her toward the heel `heelLee` (deg, + to leeward) as a damped oscillator (balance.ts rollStep). */
 function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number): void {
