@@ -4,7 +4,7 @@ import type { CourseMark } from '../courses/course';
 import { PLACES } from '../sim/places';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
-import { byHand, leeDrift, sailPlan } from '../boat/physics';
+import { byHand, sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
@@ -224,7 +224,7 @@ export class Hud {
     const word = (t: SailTrim | null, off: string) => !t ? [off, 'off'] : t.flow === 'good' ? ['Good', 'good'] : t.flow === 'luffing' ? ['Luffing', 'luffing'] : ['Stalled', 'stalled'];
     const plan = sailPlan(u);
     const [mw, mc] = u.luff ? ['Eased', 'off'] : word(u.trim.main, '');
-    const backed = (u.jibBacked ?? 0) > 0.3, sheetsMine = byHand(u, 'mainsheet') || byHand(u, 'jibsheet');
+    const backed = (u.jibBacked ?? 0) > 0.3;
     const [jw, jc] = backed ? ['Aback', 'backed'] : u.luff ? ['Eased', 'off'] : word(u.trim.jib, plan === 'wing' ? 'Poled out' : 'Down');
     const tm = $('tpMain'), tj = $('tpJib');
     tm.textContent = mw; tm.className = 'tp-state ' + mc;
@@ -242,11 +242,7 @@ export class Hud {
       const advice = u.luff ? '' : hn > 5 ? (up ? overUp : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveller up, ease backstay, fuller sails' : heel > 24 && up ? (crewTrims && dp < 0.95 ? ' · heeling too far: the crew is depowering' : ' · heeling too far: depower') : '';
       if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveller down (Trim coach explains).`, 6000); }
       $('tpBalance').innerHTML = `Heel <b>${heel}°</b> · Helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b><span class="warn">${advice}</span>`; }
-    const bad = [u.trim.jib, u.trim.main].find(t => t && t.flow !== 'good' && t.amount > 0.1);
-    $('tpHint').textContent = backed ? (u.lashed != null ? `Hove to: ${Math.round(u.twa)}° off the wind, ${(u.v / 0.5144).toFixed(1)} kt ahead, ${(leeDrift(u) / 0.5144).toFixed(1)} kt to leeward.` : 'Jib aback: it pushes her bow off. To heave to, ease the main and lash the tiller to leeward.')
-      : u.luff || u.awa > 115 || !bad ? ''
-      : bad.flow === 'luffing' ? (sheetsMine ? 'Windward telltales lifting: trim in, or bear away.' : 'Windward telltales lifting: bear away a little.')
-      : (sheetsMine ? 'Leeward telltales drooping: ease, or head up.' : 'Leeward telltales drooping: head up a little.');
+    // (the line under the sails' state is the trim coach's headline: app.ts coachTick)
   }
 
   private deepT = 0;
