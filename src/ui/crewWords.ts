@@ -31,7 +31,7 @@ let lastRow = '';
  */
 export function showCrewRow(u: Boat): void {
   const c = u.crew, pl = c?.place, mine = !!pl;
-  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : 'mid', autoA = c ? autoAcross(u) : null;
+  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : null, autoA = c ? autoAcross(u) : null;
   // (this runs every frame: touch the page only when something has changed)
   const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}`; if (key === lastRow) return; lastRow = key;
   document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => {
