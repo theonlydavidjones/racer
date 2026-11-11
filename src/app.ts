@@ -173,15 +173,26 @@ function lash(): void {
   pilotOff('Pilot on standby.'); releaseTiller();
   u.lashed = u.tiller; showLash();
   const t = u.tiller, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
-  toast(Math.abs(t) < 0.04 ? 'Tiller lashed amidships. Drag the tiller bar to move the lashing.'
-    : `Tiller lashed ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Drag the tiller bar to move the lashing; take the tiller to undo it.`, 4500);
+  const fast = u.v > 2 / 1.944 && lee && Math.abs(t) > 0.15 && !((u.jibBacked ?? 0) > 0.5);
+  toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack. To heave to, back the jib first and let her slow to a knot or two, then lash.`
+    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. Push it where you want it (◀ ▶ beside Unlash, or hold the tiller and lash again).'
+    : `Tiller lashed ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). ◀ ▶ move the lashing; take the tiller to undo it.`, fast ? 6000 : 4500);
 }
 function unlash(): void { const u = w.user; if (u.lashed == null) return; u.lashed = null; showLash(); toast('Lashing off: you have the tiller.', 2000); }
-function showLash(): void { const on = w.user.lashed != null; $('bLash').textContent = on ? 'Unlash' : 'Lash tiller'; $('bLash').setAttribute('aria-pressed', String(on)); $('tiller').classList.toggle('lashed', on); }
+function showLash(): void {
+  const l = w.user.lashed, on = l != null;
+  const txt = !on ? 'Lash tiller' : `Lashed ${Math.abs(l) < 0.04 ? 'amidships' : `${Math.round(Math.abs(l) * 100)}% ${l > 0 ? 'stbd' : 'port'}`} · unlash`;
+  if ($('bLash').textContent !== txt) $('bLash').textContent = txt;
+  $('bLash').setAttribute('aria-pressed', String(on)); $('tiller').classList.toggle('lashed', on);
+  $('bLashP').hidden = $('bLashS').hidden = !on;
+}
 $('bLash').onclick = lash;
+// move the lashing a notch (a tenth of the way to hard over): ◀ pushes the tiller to port, ▶ to starboard
+$('bLashP').onclick = () => { if (w.user.lashed != null) setTiller(w.user.tiller - 0.1); };
+$('bLashS').onclick = () => { if (w.user.lashed != null) setTiller(w.user.tiller + 0.1); };
 function centreTiller(): void { setTiller(0); }
 function showTiller(): void {
-  const t = w.user.tiller;
+  const t = w.user.tiller; showLash();
   $('tillerHandle').style.left = `${50 + t * 44}%`;
   if (tillerHeld) $('tgCur').style.left = `${50 + t * TILLER_SPAN * 100}%`;
   $('tiller').setAttribute('aria-valuenow', String(Math.round(t * 100)));
@@ -294,7 +305,7 @@ $('bJibBack').onclick = () => {
   toast('Hauling the windward jib sheet: the crew lets the leeward one fly and the jib backs. To heave to, ease the main until it just draws and lash the tiller to leeward.', 5500);
 };
 function openLines(open = $('ctlList').hidden): void {
-  $('ctlList').hidden = !open; $('tpMore').textContent = open ? 'Lines ▾' : 'Lines ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
+  $('ctlList').hidden = !open; $('trimPanel').classList.toggle('lines', !!open); $('tpMore').textContent = open ? 'Lines ▾' : 'Lines ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
 }
 $('tpMore').onclick = () => openLines();
 /* The trim coach: opens beside the trim panel and updates live, so you can work a line and watch what it does. */

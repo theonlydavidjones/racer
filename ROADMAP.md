@@ -10,8 +10,9 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 
 1. ~~Saves kept with your account; save or discard after each sail~~ (done, v53).
 2. **Hands-on boat handling**, in order:
-   a. Easier sail controls: adjusting one line takes only that line off auto; one tap puts it back; bigger targets (4–6 h).
-   b. Heaving to: each jib sheet on its own, the tiller lashed at an angle, hove-to physics checked against real boats (4–6 h).
+   a. ~~Easier sail controls: adjusting one line takes only that line off auto; one tap puts it back; bigger targets~~ (done).
+   b. ~~Heaving to: each jib sheet on its own, the tiller lashed at an angle, hove-to physics checked against real boats~~
+      (done; the real-boat figures are anecdotal, so a GPS track of a Folkboat hove to would tighten the test bands).
    c. Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself (6–10 h).
    d. Real timing and sequencing of adjustments, by crew count and skill; cars rarely moved (4–6 h).

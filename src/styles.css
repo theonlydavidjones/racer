@@ -157,6 +157,7 @@ body.tiller-held #gl{cursor:ew-resize}
 .tiller.held{border-color:var(--accent)}
 .tiller.lashed{border-color:#c9a36a;border-style:dashed}
 .tiller.lashed .tiller-handle{background:#c9a36a}
+.lashgrp{display:flex;gap:4px;flex:0 0 auto}
 .chip.lash[aria-pressed="true"]{background:#c9a36a;color:#13202b;border-color:#c9a36a}
 .tiller:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tiller-track{position:absolute;left:6%;right:6%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:var(--rule)}
@@ -259,11 +260,16 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .tp-shape:empty{display:none}
 .tp-shape b{color:var(--muted);font-weight:600}
 .tp-more{align-self:flex-start;font:700 12px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);background:none;border:0;padding:10px 4px;cursor:pointer}
-.ctl-list{display:flex;flex-direction:column;gap:4px;width:400px;max-height:min(52vh,560px);overflow-y:auto}
+.ctl-list{display:flex;flex-direction:column;gap:4px;width:400px;min-height:0;overflow-y:auto}
+/* with the Lines open the panel stays clear of the clock and the signals above it, scrolls inside, and is opaque */
+#trimPanel.lines{max-height:calc(100vh - 136px - 250px - env(safe-area-inset-bottom,0px));background:rgb(9,22,33);z-index:5}
+#trimPanel.lines .ctl-list{flex:1 1 auto}
+#trimPanel.lines > :not(.ctl-list){flex-shrink:0}
 .ctl-group{font:600 10px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .ctl-row{display:grid;grid-template-columns:112px 1fr 54px auto 52px;align-items:center;gap:6px;padding:2px 4px;border-radius:6px;min-height:36px}
 .ctl-row.mine .ctl-lab{color:var(--accent)}
-.ctl-row.sel{background:rgba(255,182,39,.14);outline:1px solid rgba(255,182,39,.5)}
+/* selected (for the keys) is a neutral outline; yours is amber */
+.ctl-row.sel{background:rgba(255,255,255,.06);outline:1px solid rgba(255,255,255,.35)}
 .ctl-lab{font:600 12px/1.1 var(--f-body);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* the bar is 12 px to look at, with 12 px of grab above and below it */
 .ctl-bar{position:relative;height:12px;border-radius:6px;background:var(--rule);cursor:ew-resize;touch-action:none;background-clip:content-box;border:12px solid transparent;margin:-12px 0;box-sizing:content-box}

@@ -372,6 +372,9 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 
+/** Taking in a slack sheet by hand, full range per second (an arm's length of line a second, no load on it). */
+const SLACK_RATE = 0.6;
+
 /* ---------- who has each line ---------- */
 
 /** Every line you can work, in the order they're shown. */
@@ -464,7 +467,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     else if (b.wHauled && c.jibsheetW > 0.95 && !b.ctlCmd.jibsheetW && b.ctlTarget?.jibsheetW == null) { b.hand.jibsheetW = false; b.wHauled = false; }
   } else b.wHauled = false;
   const wMine = byHand(b, 'jibsheetW');
-  if (wMine) hand('jibsheetW', CONTROL_RATE.jibsheetW * winchFactor(tws, going('jibsheetW') < 0));
+  // (until it comes tight a lazy sheet is just slack, taken in hand over hand in a second or two; only the last of it
+  // needs the winch)
+  const wSlack = jibClew({ ...c, jibsheet: 1 }, b.tack) > jibAngle(c, b.tack) + 3;
+  if (wMine) hand('jibsheetW', wSlack ? SLACK_RATE : CONTROL_RATE.jibsheetW * winchFactor(tws, going('jibsheetW') < 0));
   else move('jibsheetW', 1, CONTROL_RATE.jibsheetW * winchFactor(tws, false)); // the crew leaves the lazy sheet slack
   // you're holding the clew to windward with the windward sheet (backing the jib): the crew lets the leeward one fly
   const backing = wMine && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
