@@ -2,7 +2,7 @@ import type { Boat } from './boat';
 import { IDEAL_HELM, heelFactor, rudderDrag } from './balance';
 import { CAR_FORE_PINS, CAR_IN_PINS, loadedCar, shapeEfficiency, targetShape, type Shape } from './controls';
 import { hullResistance } from './dynamics';
-import { byHand, sailPlan } from './physics';
+import { byHand, leeDrift, sailPlan } from './physics';
 
 /** Whether you're working the shape lines (any of them): otherwise the coach explains the crew's settings. */
 const shapeMine = (b: Boat) => (['backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'traveller', 'car'] as const).some(k => byHand(b, k));
@@ -95,7 +95,7 @@ export function coach(b: Boat): CoachReport {
   const who = (mine: boolean) => (mine ? 'You' : 'The crew');
   items.push({ head: `Conditions: ${R.name}`, text: `${Math.round(tws)} kt over the water, apparent wind ${Math.round(Math.abs(awa))}° ${awa >= 0 ? 'to starboard' : 'to port'}, ${Math.round(b.aws / 0.5144)} kt across the deck. ${R.why}`, ok: true });
 
-  if ((b.jibBacked ?? 0) > 0.3) items.push({ head: 'Jib aback (hove to)', text: `The windward sheet holds the jib's clew ${deg(-b.sheets.jib)} to windward, so the wind presses on its wrong side: it pushes the bow away from the wind and shoves her to leeward. Ease the main until it just draws and lash the tiller to leeward (Lash), and the main and rudder turn her back up as fast as the jib pushes her off: she lies hove to about 45–60° off the wind, creeping forward at a knot or less and slipping to leeward about as fast. Right now: ${deg(b.twa)} off the wind, ${(b.v / 0.5144).toFixed(1)} kt ahead, ${((b.drift ?? 0) / 0.5144).toFixed(1)} kt to leeward. To sail again, let the windward sheet go and trim the leeward one.`, ok: true });
+  if ((b.jibBacked ?? 0) > 0.3) items.push({ head: 'Jib aback (hove to)', text: `The windward sheet holds the jib's clew ${deg(-b.sheets.jib)} to windward, so the wind presses on its wrong side: it pushes the bow away from the wind and shoves her to leeward. Ease the main until it just draws and lash the tiller to leeward (Lash), and the main and rudder turn her back up as fast as the jib pushes her off: she lies hove to about 45–60° off the wind, creeping forward at a knot or less and slipping to leeward about as fast. Right now: ${deg(b.twa)} off the wind, ${(b.v / 0.5144).toFixed(1)} kt ahead, ${(leeDrift(b) / 0.5144).toFixed(1)} kt to leeward. To sail again, let the windward sheet go and trim the leeward one.`, ok: true });
   // sheets: angle of attack
   for (const [name, t, sheet] of [['main', b.trim.main, b.sheets.main], ['jib', b.trim.jib, b.sheets.jib]] as const) {
     if (!t) { items.push({ head: 'Jib', text: plan === 'wing' ? 'Poled out to windward, wing-on-wing: no telltales to read; keep it full and steady.' : 'The jib is down while the crew works the pole.', ok: true }); continue; }

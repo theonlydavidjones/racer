@@ -107,10 +107,14 @@ export interface Boat {
   hand?: Partial<Record<LineKey, boolean>>;
   /** The tiller lashed at this position (−1..1, as `tiller`): it stays there, hands off, until you take it again. */
   lashed?: number | null;
-  /** Sideways speed through the water, m/s, + to leeward: slipping away to leeward when hove to (physics.ts heaveTo). */
-  drift?: number;
-  /** Turn rate, deg/s, + toward the wind, while the forces on her steer her (hove to). */
+  /** Sideways speed through the water, m/s, + to starboard: slipping to leeward when hove to (physics.ts heaveTo). In the boat's own frame, so it doesn't flip when the wind crosses the bow. */
+  sway?: number;
+  /** Turn rate, deg/s, + turning to starboard (clockwise): kept every step, so a turn carries on across a change of model. */
   yawRate?: number;
+  /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
+  wHauled?: boolean;
+  /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
+  hove?: boolean;
   /** How far the jib is backed (aback): 0 drawing normally … 1 clew held well to windward. */
   jibBacked?: number;
   /** Every line on the boat (see controls.ts), and what you're doing on each: +1 raises the value (eases a sheet; tightens the vang, outhaul, backstay…), −1 lowers it. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt } from './helpers/testBoat';
 import { KT, wrap } from '../src/core/math';
-import { allToCrew, byHand, linesByHand, takeLine } from '../src/boat/physics';
+import { allToCrew, byHand, leeDrift, linesByHand, takeLine } from '../src/boat/physics';
 import { jibClew } from '../src/boat/controls';
 import type { Boat } from '../src/boat/boat';
 
@@ -78,6 +78,38 @@ describe('the two jib sheets', () => {
     expect(b.ctl.jibsheetW).toBeCloseTo(trimmed, 5); // the sheet you'd trimmed is now the windward one
     expect(b.jibBacked).toBeGreaterThan(0.5);
   });
+  it('tack holding both sheets with a tack called: she carries through the turn, not stuck head to wind, and lies with the jib aback', () => {
+    const b = testBoat({ heading: 318, kt: 5, windKt: 15 }); sail(b, 15);
+    takeLine(b, 'jibsheet'); takeLine(b, 'jibsheetW');
+    b.turnDir = 1; b.turnTarget = 42; sail(b, 60);
+    expect(b.tack).toBe('P');
+    expect(Math.abs(wrap(b.ww.from - b.h))).toBeGreaterThan(15);
+    expect(b.jibBacked).toBeGreaterThan(0.5);
+  });
+  it('a windward sheet hauled and eased off again goes back to the crew: the next tack is an ordinary one', () => {
+    const b = testBoat({ heading: 318, kt: 5, windKt: 15 }); sail(b, 15);
+    takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0.3; sail(b, 8);
+    b.ctlTarget.jibsheetW = 1; sail(b, 10);
+    expect(byHand(b, 'jibsheetW')).toBe(false);
+    b.turnDir = 1; b.turnTarget = 42; sail(b, 25);
+    expect(b.tack).toBe('P'); expect(b.jibBacked).toBe(0); expect(byHand(b, 'jibsheet')).toBe(false);
+    expect(kt(b)).toBeGreaterThan(3);
+  });
+  it('backing the jib from head to wind pays her off (the way out of irons)', () => {
+    const b = testBoat({ heading: 358, kt: 0, windKt: 12 }) as Boat & { handsOff?: boolean }; b.handsOff = true;
+    takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0; sail(b, 40);
+    expect(Math.abs(wrap(b.ww.from - b.h))).toBeGreaterThan(15); // off the wind's eye, though the crew's hard main holds her up
+    // the textbook way: back the jib and ease the main
+    const c = testBoat({ heading: 358, kt: 0, windKt: 12 }) as Boat & { handsOff?: boolean }; c.handsOff = true;
+    takeLine(c, 'jibsheetW'); takeLine(c, 'mainsheet'); (c.ctlTarget ??= {}).jibsheetW = 0; c.ctlTarget.mainsheet = 0.6; sail(c, 40);
+    expect(Math.abs(wrap(c.ww.from - c.h))).toBeGreaterThan(30);
+  });
+  it('penalty turns count while the jib is aback', () => {
+    const { b } = heaveTo(15);
+    b.penalty = b.penaltyTotal = 360; b.penaltyTurned = 0; b.penaltyDir = 0;
+    b.lashed = null; b.tiller = 1; (b as Boat & { handsOff?: boolean }).handsOff = true; sail(b, 5);
+    expect(Math.abs(b.penaltyTurned)).toBeGreaterThan(0);
+  });
   it('tack with the crew on the jib and it comes across as usual', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 12 }); sail(b, 15);
     b.turnDir = 1; b.turnTarget = 42; sail(b, 25);
@@ -109,7 +141,7 @@ function heaveTo(windKt: number, o: { tack?: 'S' | 'P'; main?: number; lash?: nu
   b.lashed = (o.lash ?? 0.7) * (port ? 1 : -1); // to leeward: port side on starboard tack
   sail(b, 120);
   const x0 = b.x, y0 = b.y; let n = 0, twa = 0, lo = 999, hi = -999, u = 0, d = 0;
-  sail(b, 300, () => { const a = Math.abs(wrap(b.ww.from - b.h)); twa += a; lo = Math.min(lo, a); hi = Math.max(hi, a); u += b.v; d += b.drift ?? 0; n++; });
+  sail(b, 300, () => { const a = Math.abs(wrap(b.ww.from - b.h)); twa += a; lo = Math.min(lo, a); hi = Math.max(hi, a); u += b.v; d += leeDrift(b); n++; });
   const dx = b.x - x0, dy = b.y - y0;
   return { b, twa: twa / n, swing: hi - lo, ahead: u / n / KT, lee: d / n / KT, made: Math.hypot(dx, dy) / 300 / KT,
     track: Math.abs(wrap(Math.atan2(dx, dy) * 180 / Math.PI - b.ww.from)) /* deg off the wind's direction */ };
@@ -149,7 +181,7 @@ describe('heaving to', () => {
     const { b } = heaveTo(15);
     takeLine(b, 'jibsheetW', false); takeLine(b, 'mainsheet', false); b.lashed = null;
     b.turnDir = -1; b.turnTarget = 300; sail(b, 90);
-    expect(b.jibBacked).toBe(0); expect(b.drift ?? 0).toBeLessThan(0.05);
+    expect(b.jibBacked).toBe(0); expect(Math.abs(b.sway ?? 0)).toBeLessThan(0.05);
     expect(kt(b)).toBeGreaterThan(4);
   });
   it('a lashed tiller stays put, hands off', () => {
