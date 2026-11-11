@@ -137,7 +137,9 @@ appendages, waves, wind and puffs, crew and balance, and the AI, with sources). 
 data, ranked by how much it changes what a sailor feels or a race result. Each fix gets a test against its source.
 1. ~~**Feathering cost 10–16× ORC's pinching curve**~~ (done): the sails flogged by the angle below the polar's beat
    angle, on top of the polar's own pinch, so 1–2° low cost 1.6–3.5% of VMG at 20 kt (ORC: 0.1–0.3%), teaching "never
-   feather". Now they flog as far as they luff (trim.ts).
+   feather". Now they flog as far as they luff (trim.ts), and below the beat by the square of the angle below it (flat
+   at the beat, so ORC's optimum stays: 1–2° low costs 0.2–0.6%; ten degrees high still a big loss; she stops in the
+   no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done.
 2. **No tactical wind shifts on most days.** Off observed days the only shifts are two fixed sine waves (120 s ±6°,
    41 s ±2.5°, unsourced) and a 63 s ±8% pulse: about 1° rms change over 30–60 min, against Fort Point's 13–14° on
    10–15 kt westerlies (6-minute record, 492 days, racing hours) and 26–29° on 6–10 kt days. Beats are drag races; a
