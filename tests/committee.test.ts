@@ -86,9 +86,9 @@ describe('a start to leeward (the courses starting east)', () => {
     expect(r.over).toBeLessThanOrEqual(1);
     expect(r.fouls).toBeLessThanOrEqual(8);
   }, 400000);
-  it('a 1 kt flood setting them onto the line: most still start on time, few over early (8 races)', () => {
+  it('a 1 kt flood setting them onto the line: nearly all still start on time, few over early (8 races)', () => {
     const r = leeward('flood', 8);
-    expect(r.onTime).toBeGreaterThan(0.6);
-    expect(r.over / r.boats).toBeLessThan(0.2);
+    expect(r.onTime).toBeGreaterThan(0.85);
+    expect(r.over / r.boats).toBeLessThan(0.1);
   }, 400000);
 });

@@ -13,7 +13,7 @@ describe('generic club Folkboats', () => {
     expect(genericBoat(3)).toEqual(genericBoat(3));
     const fleet = Array.from({ length: 12 }, (_, i) => genericBoat(i + 1));
     expect(new Set(fleet.map(b => b.name)).size).toBe(12);
-    expect(new Set(fleet.map(b => b.sails.number)).size).toBeGreaterThan(9);
+    expect(new Set(fleet.map(b => b.sails.number)).size).toBe(12); // no two generic boats share a number either
     for (const b of fleet) {
       expect(b.skipper).toBe('ai');
       expect(['87', '104', '92', '120', '63', '110']).not.toContain(b.sails.number); // not a club boat's or yours
@@ -34,7 +34,7 @@ describe('generic club Folkboats', () => {
     expect(fillFleet(['stock:1', 'gen:1', 'gen:2', 'gen:5'], 2, MAX_OPPONENTS)).toEqual(['stock:1', 'gen:1']);
     expect(fillFleet(['stock:1', 'stock:2'], 1, MAX_OPPONENTS)).toEqual(['stock:1', 'stock:2']); // never drops a boat you chose
     expect(fillFleet([], 20, MAX_OPPONENTS)).toHaveLength(MAX_OPPONENTS);
-    expect(isGeneric('gen:3') && !isGeneric('stock:3') && !isGeneric('gen:x')).toBe(true);
+    expect(isGeneric('gen:3') && !isGeneric('stock:3') && !isGeneric('gen:x') && !isGeneric('gen:0')).toBe(true);
   });
   it('race beside the club boats and your own, sailed by the AI, with their condition in the physics', () => {
     const mine = { ...DEFAULT_BOAT, id: 'b2', name: 'SECOND', sails: { ...DEFAULT_BOAT.sails, number: String(genericBoat(1).sails.number) } };

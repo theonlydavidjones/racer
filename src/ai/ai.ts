@@ -195,15 +195,18 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const H = { x: w.center.x - N.x * ai.depth + L.x * off, y: w.center.y - N.y * ai.depth + L.y * off }, s = ai.wp ? 1 : -1;
       const reach = Math.min(40, w.lineLen * 0.25);
       const wp = { x: H.x + L.x * reach * s, y: H.y + L.y * reach * s };
-      // turn for the other end of her beat when she gets there, but not across another boat's bows: tacking or
-      // gybing close to another boat she must keep clear (Rule 13), so she carries on a little until there's room
+      // turn for the other end of her beat when she gets there, but not across another boat's bows: after a tack she
+      // must keep clear until close-hauled (Rule 13), and a gybe onto starboard close to a port boat gives her no
+      // time to keep clear (Rule 15). So while the turn would put her on a collision course she carries on along
+      // the line (up to 30 m past her mark) until there's room.
       const past = ((b.x - H.x) * L.x + (b.y - H.y) * L.y) * s;
+      let carryOn = false;
       if (dist(b, wp) < 12 || past > reach - 12) {
         const next = { x: H.x - L.x * reach * s, y: H.y - L.y * reach * s }, hNext = sailable(b, brg(next.x - b.x, next.y - b.y));
-        const crowded = Math.abs(wrap(hNext - b.h)) > 30 && clearanceOn(w, b, hNext) < 10; // the turn would put her on a collision course
-        if ((dist(b, wp) < 12 && !crowded) || past > reach + 30) ai.wp = ai.wp ? 0 : 1;
+        const crowded = Math.abs(wrap(hNext - b.h)) > 30 && clearanceOn(w, b, hNext) < 10;
+        if (!crowded || past > reach + 30) ai.wp = ai.wp ? 0 : 1; else carryOn = true;
       }
-      desired = sailable(b, brg(wp.x - b.x, wp.y - b.y));
+      desired = carryOn ? sailable(b, brg(L.x * s, L.y * s)) : sailable(b, brg(wp.x - b.x, wp.y - b.y));
       // dawdle, but keep enough way on to steer (about 2 kt)
       // (but not when the current has set her down below her spot: then she works back up to it)
       luff = tl > 35 && Math.sin(w.t * 0.25 + b.id * 2) > 0.3 && b.v > 1.0 && w.lineD(b) > -ai.depth - 20;
@@ -332,7 +335,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
       if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') { desired = sailable(b, b.tack === 'P' ? b.h - 20 : b.h + 20); luff = !running; }
-      else if (running) { desired = away; luff = false; } // easing barely slows her on a run: steer clear instead
+      else if (running) { desired = clearestHeading(w, b, b.h); luff = false; } // easing barely slows her on a run: steer round instead
       else { luff = true; desired = away; }
       // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
       // heading that opens the most room, nearest what she wanted
@@ -340,11 +343,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     } else if (r.kc === o && Math.abs(wrap(desired - b.h)) > 8 && dx * dx + dy * dy < 900 && cp.t < 10) {
       // Rule 16.1: a right-of-way boat changing course must give the other boat room to keep clear. If the turn
       // she wants would close on her, she turns only as far as still leaves the other boat that room.
-      const cNow = clearanceOn(w, b, b.h, o);
-      if (clearanceOn(w, b, desired, o) < 5 && cNow >= 5) {
+      // (Room to keep clear: about 8 m between centres, a Folkboat's length plus room to manoeuvre in a seamanlike
+      // way; less than that, she mustn't close it further.)
+      const ROOM = 8, cNow = clearanceOn(w, b, b.h, o), need = Math.min(ROOM, cNow);
+      if (clearanceOn(w, b, desired, o) < need) {
         const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
         let ok = b.h;
-        for (let i = 1; i <= n; i++) { const h = n360(b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < 5) break; ok = h; }
+        for (let i = 1; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
         desired = ok;
       }
       if (cp.t < 2.4 && cp.d < 4.5) { desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; }
