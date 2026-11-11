@@ -84,7 +84,8 @@ export function outlookFor(w: World): Outlook {
     }
     return v;
   };
-  const sea = (p: Vec, t: number) => { const c = current(p, t); return w.sea.at(p, windOnWater(wind(p, t), c), c, q => current(q, t)); };
+  // (the chop as developed as the day's wind will have made it then: World.seaDurationAt)
+  const sea = (p: Vec, t: number) => { const c = current(p, t); return w.sea.at(p, windOnWater(wind(p, t), c), c, q => current(q, t), w.seaDurationAt(t)); };
   const chops = new Map<string, { hs: number; tp: number }>();
   const chop = (p: Vec, t: number) => {
     const k = `${Math.round(p.x / 400)},${Math.round(p.y / 400)},${Math.round(t / 10)}`;

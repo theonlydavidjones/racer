@@ -14,6 +14,9 @@ export interface RulesBoat {
   ocs: boolean; // over early and not yet returned
   started: boolean;
   leg: number; // index of her next mark
+  /** The wind she's sailing in (the true wind over the water where she is: her tack is judged from it). Omitted: the
+   * course's wind (RulesContext.windFrom). */
+  ww?: { from: number };
   /** Her heading RULE16_WINDOW seconds ago (for Rule 16.1). Omit if unknown. */
   headingAgo?: number;
   /** She is sailing above her proper course (for Rules 17 and 23). Omit if unknown. */

@@ -715,7 +715,8 @@ export class SceneView {
       // chase: orbit the boat with the look direction
       const dist = look.chase ?? 24, hv = V(u.h - look.yaw / D2R), height = Math.max(1.2, (9 + look.pitch * 25) * dist / 24);
       camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
-      camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
+      // aimed up the rig rather than at the waterline: she sits lower in the frame, her masthead clear of the dials
+      camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 4.5));
     } else if (viewMode === 3) {
       // the showroom (setting up your boat): a slow circle round her, from a little above the deck
       if (look.spin !== false) this.showroomA += dt * 0.11; // a slow turn (paused from the panel)
