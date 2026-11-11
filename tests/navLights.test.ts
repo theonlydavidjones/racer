@@ -28,3 +28,24 @@ describe('navigation lights', () => {
     expect(overThreshold(2, 500)).toBeGreaterThan(50);
   });
 });
+
+describe('the lights in use (Rules 25 and 30)', async () => {
+  // the lanterns' textures are drawn on canvases: a stand-in 2-D context that draws nothing
+  const noop: unknown = new Proxy(() => noop, { get: (_t, k) => (k === 'data' ? new Uint8ClampedArray(64 * 128 * 4) : noop), apply: () => noop });
+  const g = globalThis as unknown as { document?: unknown };
+  if (!g.document) g.document = { createElement: () => ({ width: 0, height: 0, getContext: () => noop }) };
+  const THREE = await import('three');
+  const { buildNavLights, syncNavLights } = await import('../src/render/navLights');
+  const { NIGHT } = await import('../src/render/night');
+  const build = (kind: 'deck' | 'tricolour') => buildNavLights(new THREE.Group(), { stem: new THREE.Vector3(0, 1, -3.8), stern: new THREE.Vector3(0, 0.6, 3.8), masthead: new THREE.Vector3(0, 10, -1) }, kind, new THREE.MeshPhongMaterial());
+  const shown = (nl: ReturnType<typeof build>) => nl.lamps.filter(l => l.glow.visible).map(l => `${l.role}:${l.arc ? 'arc' : 'round'}`).sort();
+  for (const kind of ['deck', 'tricolour'] as const) it(`${kind}: none in the slip or switched off, the arcs under way, one all-round white at anchor; lanterns only while lit`, () => {
+    const nl = build(kind);
+    NIGHT.uOn.value = 1;
+    syncNavLights(nl, 'off'); expect(shown(nl)).toEqual([]); expect(nl.fittings.underway.visible || nl.fittings.anchor.visible).toBe(false);
+    syncNavLights(nl, 'underway'); expect(shown(nl)).toEqual(['underway:arc', 'underway:arc', 'underway:arc']); expect([nl.fittings.underway.visible, nl.fittings.anchor.visible]).toEqual([true, false]);
+    syncNavLights(nl, 'anchor'); expect(shown(nl)).toEqual(['anchor:round']); expect([nl.fittings.underway.visible, nl.fittings.anchor.visible]).toEqual([false, true]);
+    // by day nothing is lit, and no lantern is drawn
+    NIGHT.uOn.value = 0; syncNavLights(nl, 'underway'); expect(shown(nl)).toEqual([]); expect(nl.fittings.underway.visible).toBe(false);
+  });
+});
