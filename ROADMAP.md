@@ -86,7 +86,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
   sides on both tacks.
-- **Now — push off doesn't get her out of the slip** (bug; 2–3 h): "push off action is still not getting me far
+- **Now — push off doesn't get her out of the slip** (bug; 2–3 h; in progress: Marinas, with a test over every slip): "push off action is still not getting me far
   enough into the fairway of any marina to be able to get out of the slip. also, push off should move me forward if
   I'm at a dock that doesn't require me to be nosed in." Today (geo/marina.ts planPushOff) every berth is treated as
   bow-in: the crew walks her back until her bow is level with the finger's end, swings her and shoves, and she stops
@@ -101,7 +101,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
   and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
-- **Now — the crew, drawn and animated as well as the boat** (accuracy + bug; 10–16 h; moved up from the unranked
+- **Now — the crew, drawn and animated as well as the boat** (accuracy + bug; 10–16 h; in progress: Crew Figures, screenshots to the owner partway; moved up from the unranked
   "crew figures and animation"): owner, "crew movement animations are clumsy, ugly, and distracting… we have so much
   beauty and accuracy in this game and the physics of crew movement are super cool, but the animations are complete
   garbage… we need crew drawings and animations to be commensurate with what we have for the boat." Found: (1) the crew
@@ -113,7 +113,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
   reference/photos), poses for each job (helm on the aft deck or aft rail per the thwart item, hiking with feet under
   the straps, sitting to leeward, at the winch, at the piano, crossing on a tack), and moves that follow the physics.
   Check from both sides on both tacks.
-- **Now — crystal clarity on the crew and trim controls** (polish/clarity; 4–6 h; merged with the trim controls review
+- **Now — crystal clarity on the crew and trim controls** (polish/clarity; 4–6 h; Crew Controls, after the bottom-bar layout; merged with the trim controls review
   below): owner, "I also can't understand the buttons, even after using them for a while. how do I get them to hike on
   the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
   (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
