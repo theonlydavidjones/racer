@@ -1,0 +1,6619 @@
+{
+ "source": "Public race results: Jibeset (www.jibeset.net, GGYC Seaweed Soup) and Regatta Network (www.regattanetwork.com, Sausalito YC Classic Boat Invitational, SFYC Resin Regatta). Fetched by scripts/fetch-folkboat-results.mjs.",
+ "fetched": "2026-11-11",
+ "notes": [
+  "Times are local (Pacific). elapsedS is from the fleet's start to the boat's finish, in seconds.",
+  "Jibeset races: finish and elapsed times for every finisher, the start time, course number and nominal distance (nm).",
+  "Regatta Network races: places and the start time only; finish times appear for one or two boats in a few races and are hand-entered, so they are kept but not used for speed. A start of 00:00:00 there means not entered (null here).",
+  "place is the finishing place among finishers (null for a scoring code). points are as published.",
+  "key is the digits of the sail number, to follow one boat across events (sail numbers are typed differently by each scorer).",
+  "Course numbers are each season's own: the 2025–26 Seaweed Soup sheet isn't the 2026–27 one in src/courses/data (2025–26 course 3 is given as 6.1 nm; 2026–27 course 3 is 3.7 nm), so don't map them onto those course files.",
+  "Distances are the scorer's nominal course lengths, not sailed distances.",
+  "Regatta Network gives every 2023 SYC Classic race the date 2023-06-11 although the event ran June–October; treat those dates as unsure.",
+  "Skippers are as published, tidied to one spelling; a boat can have several skippers over the years."
+ ],
+ "gated": [
+  {
+   "club": "GGYC",
+   "rg": "T00645992",
+   "name": "GGYC Seaweed Soup 2024–25",
+   "url": "https://www.jibeset.net/GGYC000.php?RG=T00645992"
+  },
+  {
+   "club": "GGYC",
+   "rg": "T008769423",
+   "name": "GGYC Seaweed Soup 2023",
+   "url": "https://www.jibeset.net/GGYC000.php?RG=T008769423"
+  },
+  {
+   "club": "GGYC",
+   "rg": "T005493669",
+   "name": "GGYC Seaweed Soup 2022",
+   "url": "https://www.jibeset.net/GGYC000.php?RG=T005493669"
+  },
+  {
+   "club": "GGYC",
+   "rg": "T004296899",
+   "name": "GGYC Seaweed Soup 2021",
+   "url": "https://www.jibeset.net/GGYC000.php?RG=T004296899"
+  },
+  {
+   "club": "GGYC",
+   "rg": "T009157579",
+   "name": "GGYC Seaweed Soup 2019",
+   "url": "https://www.jibeset.net/GGYC000.php?RG=T009157579"
+  }
+ ],
+ "events": [
+  {
+   "source": "jibeset",
+   "id": "GGYC_T008047221",
+   "name": "GGYC Manuel Fagundes Seaweed Soup Regatta 2025–26",
+   "host": "Golden Gate Yacht Club",
+   "url": "https://www.jibeset.net/show.php?RR=GGYC_T008047221&DOC=fh&TYP=html",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "05 - Folkboat",
+     "scoring": "Time on Time 650/(550+PHRF)",
+     "date": "2025-11-01",
+     "start": "12:03:00",
+     "course": "3",
+     "distanceNm": 6.1,
+     "windReported": null,
+     "fleetCount": 8,
+     "started": 5,
+     "finished": 5,
+     "url": "https://www.jibeset.net/show.php?RR=GGYC_T008047221&DOC=r1&TYP=html",
+     "boats": [
+      {
+       "sail": "f113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 1,
+       "finish": "12:49:49",
+       "elapsedS": 2809,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "f125",
+       "key": "125",
+       "boat": "CIRCLE SEA",
+       "skipper": "Kelley Gallese",
+       "club": "ggyc",
+       "points": 2,
+       "finish": "12:51:10",
+       "elapsedS": 2890,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "JOSEPHINE",
+       "skipper": "Tricia D Antin",
+       "club": "bvbc",
+       "points": 3,
+       "finish": "12:53:13",
+       "elapsedS": 3013,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "us-105",
+       "key": "105",
+       "boat": "CICCIOLINA",
+       "skipper": "Paul Dixon",
+       "club": "seqyc",
+       "points": 4,
+       "finish": "12:54:44",
+       "elapsedS": 3104,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "usa108",
+       "key": "108",
+       "boat": "THEA",
+       "skipper": "Anderson/Horsch Schafer/S",
+       "club": "ggyc",
+       "points": 5,
+       "finish": "12:55:22",
+       "elapsedS": 3142,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "SHANTY",
+       "skipper": "Alan Wilk",
+       "club": null,
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "FAITH",
+       "skipper": "Erin Slichter",
+       "club": "bvbc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "RøDHæTTE",
+       "skipper": "Laurence Chambers",
+       "club": "cpyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 7.3,
+       "minKt": 6.3,
+       "maxKt": 8.5,
+       "meanGustKt": 10.2,
+       "fromDeg": 249,
+       "samples": 8
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     },
+     "spread": {
+      "finishers": 5,
+      "winnerElapsed": 2809,
+      "winnerSpeedKt": 7.82,
+      "gapPct": [
+       0,
+       2.9,
+       7.3,
+       10.5,
+       11.9
+      ],
+      "gapSecPerNm": [
+       0,
+       13,
+       33,
+       48,
+       55
+      ]
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "05 - Folkboat",
+     "scoring": "Time on Time 650/(550+PHRF)",
+     "date": "2025-12-06",
+     "start": "12:06:00",
+     "course": null,
+     "distanceNm": null,
+     "windReported": null,
+     "fleetCount": 8,
+     "started": 6,
+     "finished": 5,
+     "url": "https://www.jibeset.net/show.php?RR=GGYC_T008047221&DOC=r2&TYP=html",
+     "boats": [
+      {
+       "sail": "f113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 1,
+       "finish": "13:25:01",
+       "elapsedS": 4741,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "FAITH",
+       "skipper": "Erin Slichter",
+       "club": "bvbc",
+       "points": 2,
+       "finish": "13:25:53",
+       "elapsedS": 4793,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "f125",
+       "key": "125",
+       "boat": "CIRCLE SEA",
+       "skipper": "Kelley Gallese",
+       "club": "ggyc",
+       "points": 3,
+       "finish": "13:26:07",
+       "elapsedS": 4807,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "us-105",
+       "key": "105",
+       "boat": "CICCIOLINA",
+       "skipper": "Paul Dixon",
+       "club": "seqyc",
+       "points": 4,
+       "finish": "13:26:39",
+       "elapsedS": 4839,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "JOSEPHINE",
+       "skipper": "Tricia D Antin",
+       "club": "bvbc",
+       "points": 5,
+       "finish": "13:29:22",
+       "elapsedS": 5002,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "usa108",
+       "key": "108",
+       "boat": "THEA",
+       "skipper": "Anderson/Horsch Schafer/S",
+       "club": "ggyc",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNF"
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "SHANTY",
+       "skipper": "Alan Wilk",
+       "club": null,
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "RøDHæTTE",
+       "skipper": "Laurence Chambers",
+       "club": "cpyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.1,
+       "minKt": 9.3,
+       "maxKt": 13,
+       "meanGustKt": 13.7,
+       "fromDeg": 349,
+       "samples": 14
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     },
+     "spread": {
+      "finishers": 5,
+      "winnerElapsed": 4741,
+      "winnerSpeedKt": null,
+      "gapPct": [
+       0,
+       1.1,
+       1.4,
+       2.1,
+       5.5
+      ],
+      "gapSecPerNm": null
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "05 - Folkboat",
+     "scoring": "Time on Time 650/(550+PHRF)",
+     "date": "2026-01-03",
+     "start": "12:00:00",
+     "course": "1",
+     "distanceNm": 1,
+     "windReported": null,
+     "fleetCount": 8,
+     "started": 8,
+     "finished": 8,
+     "url": "https://www.jibeset.net/show.php?RR=GGYC_T008047221&DOC=r3&TYP=html",
+     "boats": [
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "SHANTY",
+       "skipper": "Alan Wilk",
+       "club": null,
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "us-105",
+       "key": "105",
+       "boat": "CICCIOLINA",
+       "skipper": "Paul Dixon",
+       "club": "seqyc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "usa108",
+       "key": "108",
+       "boat": "THEA",
+       "skipper": "Anderson/Horsch Schafer/S",
+       "club": "ggyc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "f113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "FAITH",
+       "skipper": "Erin Slichter",
+       "club": "bvbc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "JOSEPHINE",
+       "skipper": "Tricia D Antin",
+       "club": "bvbc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "RøDHæTTE",
+       "skipper": "Laurence Chambers",
+       "club": "cpyc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      },
+      {
+       "sail": "f125",
+       "key": "125",
+       "boat": "CIRCLE SEA",
+       "skipper": "Kelley Gallese",
+       "club": "ggyc",
+       "points": null,
+       "finish": null,
+       "elapsedS": null,
+       "code": "ABN"
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 9.6,
+       "minKt": 6.5,
+       "maxKt": 13.3,
+       "meanGustKt": 18.2,
+       "fromDeg": 179,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "05 - Folkboat",
+     "scoring": "Time on Time 650/(550+PHRF)",
+     "date": "2026-02-07",
+     "start": "12:03:00",
+     "course": "13",
+     "distanceNm": 8.9,
+     "windReported": null,
+     "fleetCount": 8,
+     "started": 6,
+     "finished": 5,
+     "url": "https://www.jibeset.net/show.php?RR=GGYC_T008047221&DOC=r4&TYP=html",
+     "boats": [
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "SHANTY",
+       "skipper": "Alan Wilk",
+       "club": null,
+       "points": 1,
+       "finish": "13:42:23",
+       "elapsedS": 5963,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "JOSEPHINE",
+       "skipper": "Tricia D Antin",
+       "club": "bvbc",
+       "points": 2,
+       "finish": "13:51:20",
+       "elapsedS": 6500,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "f113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 3,
+       "finish": "13:52:47",
+       "elapsedS": 6587,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "FAITH",
+       "skipper": "Erin Slichter",
+       "club": "bvbc",
+       "points": 4,
+       "finish": "13:54:47",
+       "elapsedS": 6707,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "f125",
+       "key": "125",
+       "boat": "CIRCLE SEA",
+       "skipper": "Kelley Gallese",
+       "club": "ggyc",
+       "points": 5,
+       "finish": "14:02:06",
+       "elapsedS": 7146,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "usa108",
+       "key": "108",
+       "boat": "THEA",
+       "skipper": "Anderson/Horsch Schafer/S",
+       "club": "ggyc",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNF"
+      },
+      {
+       "sail": "us-105",
+       "key": "105",
+       "boat": "CICCIOLINA",
+       "skipper": "Paul Dixon",
+       "club": "seqyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "RøDHæTTE",
+       "skipper": "Laurence Chambers",
+       "club": "cpyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 5.2,
+       "minKt": 1.5,
+       "maxKt": 12.5,
+       "meanGustKt": 7.7,
+       "fromDeg": 326,
+       "samples": 17
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     },
+     "spread": {
+      "finishers": 5,
+      "winnerElapsed": 5963,
+      "winnerSpeedKt": 5.37,
+      "gapPct": [
+       0,
+       9,
+       10.5,
+       12.5,
+       19.8
+      ],
+      "gapSecPerNm": [
+       0,
+       60,
+       70,
+       84,
+       133
+      ]
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "05 - Folkboat",
+     "scoring": "Time on Time 650/(550+PHRF)",
+     "date": "2026-03-07",
+     "start": "12:03:00",
+     "course": "12",
+     "distanceNm": 3.4,
+     "windReported": null,
+     "fleetCount": 8,
+     "started": 6,
+     "finished": 6,
+     "url": "https://www.jibeset.net/show.php?RR=GGYC_T008047221&DOC=r5&TYP=html",
+     "boats": [
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "FAITH",
+       "skipper": "Erin Slichter",
+       "club": "bvbc",
+       "points": 1,
+       "finish": "12:49:27",
+       "elapsedS": 2787,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "usa108",
+       "key": "108",
+       "boat": "THEA",
+       "skipper": "Anderson/Horsch Schafer/S",
+       "club": "ggyc",
+       "points": 2,
+       "finish": "12:50:17",
+       "elapsedS": 2837,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "f113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 3,
+       "finish": "12:50:47",
+       "elapsedS": 2867,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "JOSEPHINE",
+       "skipper": "Tricia D Antin",
+       "club": "bvbc",
+       "points": 4,
+       "finish": "12:52:10",
+       "elapsedS": 2950,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "f125",
+       "key": "125",
+       "boat": "CIRCLE SEA",
+       "skipper": "Kelley Gallese",
+       "club": "ggyc",
+       "points": 5,
+       "finish": "12:53:11",
+       "elapsedS": 3011,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "SHANTY",
+       "skipper": "Alan Wilk",
+       "club": null,
+       "points": 6,
+       "finish": "12:56:17",
+       "elapsedS": 3197,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "us-105",
+       "key": "105",
+       "boat": "CICCIOLINA",
+       "skipper": "Paul Dixon",
+       "club": "seqyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "RøDHæTTE",
+       "skipper": "Laurence Chambers",
+       "club": "cpyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.5,
+       "minKt": 7,
+       "maxKt": 10.5,
+       "meanGustKt": 10.6,
+       "fromDeg": 353,
+       "samples": 8
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     },
+     "spread": {
+      "finishers": 6,
+      "winnerElapsed": 2787,
+      "winnerSpeedKt": 4.39,
+      "gapPct": [
+       0,
+       1.8,
+       2.9,
+       5.8,
+       8,
+       14.7
+      ],
+      "gapSecPerNm": [
+       0,
+       15,
+       24,
+       48,
+       66,
+       121
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "source": "jibeset",
+   "id": "GGYC_T00227699",
+   "name": "GGYC Manuel Fagundes Seaweed Soup Regatta 2026–27",
+   "host": "Golden Gate Yacht Club",
+   "url": "https://www.jibeset.net/show.php?RR=GGYC_T00227699&DOC=fh&TYP=html",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "06 - Folkboat",
+     "scoring": "Time on Time 550/(650+PHRF)",
+     "date": "2026-11-07",
+     "start": "13:35:00",
+     "course": null,
+     "distanceNm": null,
+     "windReported": null,
+     "fleetCount": 8,
+     "started": 5,
+     "finished": 5,
+     "url": "https://www.jibeset.net/show.php?RR=GGYC_T00227699&DOC=r1&TYP=html",
+     "boats": [
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "JOSEPHINE",
+       "skipper": "Tricia Dantin",
+       "club": "bvbc",
+       "points": 1,
+       "finish": "14:26:22",
+       "elapsedS": 3082,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CIRCLE SEA",
+       "skipper": "Kelley Gallese",
+       "club": "ggyc",
+       "points": 2,
+       "finish": "14:26:42",
+       "elapsedS": 3102,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "FAITH",
+       "skipper": "Erin Slichter",
+       "club": "bvbc",
+       "points": 3,
+       "finish": "14:27:00",
+       "elapsedS": 3120,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "us-105",
+       "key": "105",
+       "boat": "CICCIOLINA",
+       "skipper": "Paul Dixon",
+       "club": "ccsc",
+       "points": 4,
+       "finish": "14:27:17",
+       "elapsedS": 3137,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "RøDHæTTE",
+       "skipper": "Laurence Chambers",
+       "club": "cpyc",
+       "points": 5,
+       "finish": "14:29:49",
+       "elapsedS": 3289,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "THEA",
+       "skipper": "Gordon Anderson",
+       "club": "ggyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "usa111",
+       "key": "111",
+       "boat": "FREJA",
+       "skipper": "Tom Reed",
+       "club": "stfyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      },
+      {
+       "sail": "124",
+       "key": "124",
+       "boat": "SIF",
+       "skipper": "Mason Smith",
+       "club": "ggyc",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC"
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 7.4,
+       "minKt": 6.3,
+       "maxKt": 9.3,
+       "meanGustKt": 10.9,
+       "fromDeg": 255,
+       "samples": 9
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     },
+     "spread": {
+      "finishers": 5,
+      "winnerElapsed": 3082,
+      "winnerSpeedKt": null,
+      "gapPct": [
+       0,
+       0.6,
+       1.2,
+       1.8,
+       6.7
+      ],
+      "gapSecPerNm": null
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "17960",
+   "name": "SYC 2019 Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr)",
+   "host": "SYC 2019 Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr) Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=17960&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2019-06-08",
+     "start": "11:25:00",
+     "distanceNm": 3.2,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=17960&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "us 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "GYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "SSS",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2019-06-08",
+     "start": "12:20:00",
+     "distanceNm": 3.2,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=17960&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "us 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "GYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia YC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA 123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "SSS",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2019-06-08",
+     "start": "13:16:00",
+     "distanceNm": 3.2,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=17960&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "us 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "GYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia YC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "SSS",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "RET",
+       "place": null
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DSQ",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2019-08-03",
+     "start": "11:31:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=17960&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "us 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": "12:22:33",
+       "elapsedS": 3093,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "GYC",
+       "points": 3,
+       "finish": "12:24:31",
+       "elapsedS": 3211,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "SSS",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2019-08-03",
+     "start": "12:40:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=17960&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "us 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": "13:31:42",
+       "elapsedS": 3102,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "GYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": "13:33:42",
+       "elapsedS": 3222,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "SSS",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 6,
+     "fleet": "Folkboat",
+     "date": "2019-08-03",
+     "start": "13:41:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=17960&race_num=6&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "us 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": "13:32:42",
+       "elapsedS": -498,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "GYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": "14:34:54",
+       "elapsedS": 3234,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "SSS",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia YC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "18590",
+   "name": "2019 Resin Regatta",
+   "host": "2019 Resin Regatta The San Francisco Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=18590&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2019-04-13",
+     "start": "12:19:00",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=18590&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "ASC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNF",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2019-04-13",
+     "start": "13:22:00",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=18590&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "ASC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2019-04-13",
+     "start": "14:45:00",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=18590&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "ASC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2019-04-13",
+     "start": "12:15:00",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=18590&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "ASC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2019-04-13",
+     "start": "13:22:00",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=18590&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Polruan",
+       "skipper": "James Vernon",
+       "club": "ASC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "123",
+       "key": "123",
+       "boat": "Roedhatte",
+       "skipper": "Laurence Chambers",
+       "club": "Coyote Point YC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "67",
+       "key": "67",
+       "boat": "Stella",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": false,
+      "currentPredicted": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "22071",
+   "name": "2021 Resin Invitational Regatta",
+   "host": "2021 Resin Invitational Regatta The San Francisco Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=22071&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2021-04-17",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22071&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "none",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNF",
+       "place": null
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2021-04-17",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22071&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "none",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2021-04-17",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22071&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "none",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2021-04-17",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22071&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "none",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2021-04-17",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22071&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "none",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "22583",
+   "name": "2021 SYC Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr)",
+   "host": "2021 SYC Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr) Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=22583&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2021-06-12",
+     "start": "11:39:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22583&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "106",
+       "key": "106",
+       "boat": "Windansea",
+       "skipper": "David Wilson",
+       "club": "RYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "Bay View Boat Club",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "SFBFA",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 8
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 9
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11,
+       "minKt": 7.8,
+       "maxKt": 12.8,
+       "meanGustKt": 15.6,
+       "fromDeg": 259,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2021-06-12",
+     "start": "12:48:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22583&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "106",
+       "key": "106",
+       "boat": "Windansea",
+       "skipper": "David Wilson",
+       "club": "RYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "Bay View Boat Club",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "SFBFA",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 8
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 9
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.1,
+       "minKt": 9.8,
+       "maxKt": 12.3,
+       "meanGustKt": 16.6,
+       "fromDeg": 252,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2021-06-12",
+     "start": "13:58:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22583&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "106",
+       "key": "106",
+       "boat": "Windansea",
+       "skipper": "David Wilson",
+       "club": "RYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "SFBFA",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "Bay View Boat Club",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 8
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 9
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.4,
+       "minKt": 9.8,
+       "maxKt": 13.8,
+       "meanGustKt": 17.9,
+       "fromDeg": 252,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2021-06-12",
+     "start": "12:05:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22583&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": "12:50:21",
+       "elapsedS": 2721,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "SFBFA",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "Bay View Boat Club",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "106",
+       "key": "106",
+       "boat": "Windansea",
+       "skipper": "David Wilson",
+       "club": "RYC",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.2,
+       "minKt": 9.8,
+       "maxKt": 12.8,
+       "meanGustKt": 16,
+       "fromDeg": 258,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2021-06-12",
+     "start": "13:10:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22583&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": "13:57:20",
+       "elapsedS": 2840,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": "14:10:38",
+       "elapsedS": 3638,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNF",
+       "place": null
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "SFBFA",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNS",
+       "place": null
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "Bay View Boat Club",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "106",
+       "key": "106",
+       "boat": "Windansea",
+       "skipper": "David Wilson",
+       "club": "RYC",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.4,
+       "minKt": 9.8,
+       "maxKt": 13.8,
+       "meanGustKt": 17.1,
+       "fromDeg": 253,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 6,
+     "fleet": "Folkboat",
+     "date": "2021-06-12",
+     "start": "14:23:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=22583&race_num=6&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 1,
+       "finish": "15:13:38",
+       "elapsedS": 3038,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "SFBFA",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 7,
+       "finish": "15:22:22",
+       "elapsedS": 3562,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "USA-107",
+       "key": "107",
+       "boat": "Nordic Star",
+       "skipper": "Richard Keldsen",
+       "club": "StFYC",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "Bay View Boat Club",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "106",
+       "key": "106",
+       "boat": "Windansea",
+       "skipper": "David Wilson",
+       "club": "RYC",
+       "points": 11,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.1,
+       "minKt": 9.8,
+       "maxKt": 12.8,
+       "meanGustKt": 17.7,
+       "fromDeg": 244,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "24685",
+   "name": "2022 SYC Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr)",
+   "host": "2022 SYC Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr) Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=24685&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2022-06-11",
+     "start": "11:15:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=24685&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "Self",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 9.5,
+       "minKt": 6.5,
+       "maxKt": 13,
+       "meanGustKt": 16.6,
+       "fromDeg": 297,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2022-06-11",
+     "start": "12:15:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=24685&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "Self",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 15.7,
+       "minKt": 13,
+       "maxKt": 19,
+       "meanGustKt": 21.7,
+       "fromDeg": 300,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2022-06-11",
+     "start": "13:15:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=24685&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "ACSC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "124",
+       "key": "124",
+       "boat": "Sif",
+       "skipper": "George Cathey",
+       "club": "Self",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA-108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "bvbc",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC/SCYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 14.3,
+       "minKt": 11.8,
+       "maxKt": 16.5,
+       "meanGustKt": 20.8,
+       "fromDeg": 311,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "26519",
+   "name": "2023 SYC Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr)",
+   "host": "2023 SYC Classic Boat Invitational Regatta (Bear/Bird/Folkboat/SFBIOD/Knarr) Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=26519&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "11:37:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": "12:25:21",
+       "elapsedS": 2901,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 7,
+       "finish": "12:31:19",
+       "elapsedS": 3259,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.6,
+       "minKt": 4,
+       "maxKt": 10.8,
+       "meanGustKt": 15,
+       "fromDeg": 232,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "12:58:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": "13:42:37",
+       "elapsedS": 2677,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 7,
+       "finish": "13:46:00",
+       "elapsedS": 2880,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 9.2,
+       "minKt": 7,
+       "maxKt": 12.8,
+       "meanGustKt": 15.8,
+       "fromDeg": 237,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "14:01:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": "14:47:21",
+       "elapsedS": 2781,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 7,
+       "finish": "14:52:11",
+       "elapsedS": 3071,
+       "code": null,
+       "place": 7
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 7.7,
+       "minKt": 5.5,
+       "maxKt": 11.8,
+       "meanGustKt": 15.6,
+       "fromDeg": 234,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "11:35:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.8,
+       "minKt": 4,
+       "maxKt": 10.8,
+       "meanGustKt": 15,
+       "fromDeg": 231,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "12:31:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.8,
+       "minKt": 7,
+       "maxKt": 11.8,
+       "meanGustKt": 15.5,
+       "fromDeg": 233,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 6,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "13:22:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=6&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 9,
+       "minKt": 6.5,
+       "maxKt": 12.8,
+       "meanGustKt": 15.4,
+       "fromDeg": 238,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 7,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "11:35:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=7&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.8,
+       "minKt": 4,
+       "maxKt": 10.8,
+       "meanGustKt": 15,
+       "fromDeg": 231,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 8,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "12:35:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=8&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.8,
+       "minKt": 7,
+       "maxKt": 11.8,
+       "meanGustKt": 15.5,
+       "fromDeg": 233,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 9,
+     "fleet": "Folkboat",
+     "date": "2023-06-11",
+     "start": "13:34:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=26519&race_num=9&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "56",
+       "key": "56",
+       "boat": "Shanty",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC, SCYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "Usa123",
+       "key": "123",
+       "boat": "Rodhaette",
+       "skipper": "Laurence Chambers",
+       "club": "Cpyc",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 8,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.5,
+       "minKt": 5.8,
+       "maxKt": 12.8,
+       "meanGustKt": 15.5,
+       "fromDeg": 242,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "28252",
+   "name": "2024 SYC Spring Classic Boat Invitational",
+   "host": "2024 SYC Spring Classic Boat Invitational Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=28252&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2024-06-15",
+     "start": "11:15:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=28252&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "FGSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA123",
+       "key": "123",
+       "boat": "Rodhatte",
+       "skipper": "Laurence Chambers",
+       "club": "CPYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.7,
+       "minKt": 5.8,
+       "maxKt": 10.5,
+       "meanGustKt": 13.1,
+       "fromDeg": 226,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2024-06-15",
+     "start": "12:35:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=28252&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "FGSC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA123",
+       "key": "123",
+       "boat": "Rodhatte",
+       "skipper": "Laurence Chambers",
+       "club": "CPYC",
+       "points": 7,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 7
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11,
+       "minKt": 9,
+       "maxKt": 12.5,
+       "meanGustKt": 16.2,
+       "fromDeg": 224,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2024-06-15",
+     "start": "13:50:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=28252&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "FGSC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "USA123",
+       "key": "123",
+       "boat": "Rodhatte",
+       "skipper": "Laurence Chambers",
+       "club": "CPYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNS",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 13.7,
+       "minKt": 12.5,
+       "maxKt": 15.3,
+       "meanGustKt": 19.5,
+       "fromDeg": 230,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2024-06-15",
+     "start": "11:12:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=28252&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "FGSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA123",
+       "key": "123",
+       "boat": "Rodhatte",
+       "skipper": "Laurence Chambers",
+       "club": "CPYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.7,
+       "minKt": 5.8,
+       "maxKt": 10.5,
+       "meanGustKt": 13.1,
+       "fromDeg": 226,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2024-06-15",
+     "start": "12:12:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=28252&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "FGSC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 6
+      },
+      {
+       "sail": "USA123",
+       "key": "123",
+       "boat": "Rodhatte",
+       "skipper": "Laurence Chambers",
+       "club": "CPYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 11.2,
+       "minKt": 10,
+       "maxKt": 12.5,
+       "meanGustKt": 15.9,
+       "fromDeg": 226,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 6,
+     "fleet": "Folkboat",
+     "date": "2024-06-15",
+     "start": "13:12:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=28252&race_num=6&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "James Vernon",
+       "club": "FGSC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA 111",
+       "key": "111",
+       "boat": "Freja",
+       "skipper": "Tom Reed",
+       "club": "StFYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA 116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Chris Herrmann",
+       "club": "SFYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      },
+      {
+       "sail": "USA123",
+       "key": "123",
+       "boat": "Rodhatte",
+       "skipper": "Laurence Chambers",
+       "club": "CPYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      },
+      {
+       "sail": "125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 9,
+       "finish": null,
+       "elapsedS": null,
+       "code": "RET",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 12.1,
+       "minKt": 9,
+       "maxKt": 14,
+       "meanGustKt": 17.9,
+       "fromDeg": 227,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "29909",
+   "name": "2025 SYC Spring Classic Boat Invitational",
+   "host": "2025 SYC Spring Classic Boat Invitational Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=29909&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 1,
+     "fleet": "Folkboat",
+     "date": "2025-06-07",
+     "start": "12:12:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=29909&race_num=1&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8,
+       "minKt": 5.5,
+       "maxKt": 11.3,
+       "meanGustKt": 14.3,
+       "fromDeg": 247,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 2,
+     "fleet": "Folkboat",
+     "date": "2025-06-07",
+     "start": "13:47:00",
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=29909&race_num=2&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 8.9,
+       "minKt": 6.3,
+       "maxKt": 11.5,
+       "meanGustKt": 15.8,
+       "fromDeg": 246,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 3,
+     "fleet": "Folkboat",
+     "date": "2025-06-07",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=29909&race_num=3&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2025-06-07",
+     "start": null,
+     "distanceNm": 4,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=29909&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2025-06-07",
+     "start": null,
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=29909&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "RET",
+       "place": null
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    },
+    {
+     "raceNo": 6,
+     "fleet": "Folkboat",
+     "date": "2025-06-07",
+     "start": null,
+     "distanceNm": 1,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=29909&race_num=6&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Tom Haverstock",
+       "club": "GGYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "116",
+       "key": "116",
+       "boat": "Sabrina",
+       "skipper": "Chandler Grenier",
+       "club": "sfbfa",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "105",
+       "key": "105",
+       "boat": "Cicciolina",
+       "skipper": "Paul Dixon",
+       "club": "Sequoia",
+       "points": 6,
+       "finish": null,
+       "elapsedS": null,
+       "code": "DNC",
+       "place": null
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "currentPredicted": true
+     }
+    }
+   ]
+  },
+  {
+   "source": "regattanetwork",
+   "id": "31389",
+   "name": "2026 Spring Classic Boat Invitational",
+   "host": "2026 Spring Classic Boat Invitational Sausalito Yacht Club",
+   "url": "https://www.regattanetwork.com/clubmgmt/applet_regatta_results.php?regatta_id=31389&limit_fleet=Folkboat",
+   "races": [
+    {
+     "raceNo": 4,
+     "fleet": "Folkboat",
+     "date": "2026-06-06",
+     "start": "12:59:43",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=31389&race_num=4&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Anderson/Horsch Schafer/Strumph",
+       "club": "StFYC/GGYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Thomas Haverstock",
+       "club": "GGYC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "Josephine",
+       "skipper": "Tricia D’antin",
+       "club": "BVBC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 13.3,
+       "minKt": 11.8,
+       "maxKt": 14.8,
+       "meanGustKt": 20,
+       "fromDeg": 245,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 5,
+     "fleet": "Folkboat",
+     "date": "2026-06-06",
+     "start": "13:25:32",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=31389&race_num=5&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "USA 108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Anderson/Horsch Schafer/Strumph",
+       "club": "StFYC/GGYC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "Josephine",
+       "skipper": "Tricia D’antin",
+       "club": "BVBC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Thomas Haverstock",
+       "club": "GGYC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 14,
+       "minKt": 11.8,
+       "maxKt": 16.8,
+       "meanGustKt": 21,
+       "fromDeg": 247,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    },
+    {
+     "raceNo": 6,
+     "fleet": "Folkboat",
+     "date": "2026-06-06",
+     "start": "14:45:11",
+     "distanceNm": null,
+     "url": "https://www.regattanetwork.com/clubmgmt/applet_race_scores.php?regatta_id=31389&race_num=6&fleet=Folkboat",
+     "boats": [
+      {
+       "sail": "USA 108",
+       "key": "108",
+       "boat": "Thea",
+       "skipper": "Anderson/Horsch Schafer/Strumph",
+       "club": "StFYC/GGYC",
+       "points": 1,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 1
+      },
+      {
+       "sail": "US 113",
+       "key": "113",
+       "boat": "POLPERRO",
+       "skipper": "Peter Jeal",
+       "club": "BVBC",
+       "points": 2,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 2
+      },
+      {
+       "sail": "USA125",
+       "key": "125",
+       "boat": "CircleSea",
+       "skipper": "Thomas Haverstock",
+       "club": "GGYC",
+       "points": 3,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 3
+      },
+      {
+       "sail": "US 121",
+       "key": "121",
+       "boat": "Faith",
+       "skipper": "Mark Slichter",
+       "club": "BVBC",
+       "points": 4,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 4
+      },
+      {
+       "sail": "122",
+       "key": "122",
+       "boat": "Josephine",
+       "skipper": "Tricia D’antin",
+       "club": "BVBC",
+       "points": 5,
+       "finish": null,
+       "elapsedS": null,
+       "code": null,
+       "place": 5
+      }
+     ],
+     "realDay": {
+      "windObserved": true,
+      "windWindow": "10:00–17:54",
+      "fortPoint": {
+       "meanKt": 12.3,
+       "minKt": 10.3,
+       "maxKt": 14.5,
+       "meanGustKt": 19.6,
+       "fromDeg": 242,
+       "samples": 11
+      },
+      "currentPredicted": true,
+      "raceInsideWindow": true
+     }
+    }
+   ]
+  }
+ ],
+ "calibration": {
+  "computed": "2026-11-11",
+  "coverage": {
+   "events": 11,
+   "races": 55,
+   "timedRaces": 5,
+   "placesOnlyRaces": 50,
+   "raceDays": [
+    "2019-04-13",
+    "2019-06-08",
+    "2019-08-03",
+    "2021-04-17",
+    "2021-06-12",
+    "2022-06-11",
+    "2023-06-11",
+    "2024-06-15",
+    "2025-06-07",
+    "2025-11-01",
+    "2025-12-06",
+    "2026-01-03",
+    "2026-02-07",
+    "2026-03-07",
+    "2026-06-06",
+    "2026-11-07"
+   ],
+   "raceDaysWithObservedWind": [
+    "2021-04-17",
+    "2021-06-12",
+    "2022-06-11",
+    "2023-06-11",
+    "2024-06-15",
+    "2025-06-07",
+    "2025-11-01",
+    "2025-12-06",
+    "2026-01-03",
+    "2026-02-07",
+    "2026-03-07",
+    "2026-06-06",
+    "2026-11-07"
+   ],
+   "racesWithStartTime": 46,
+   "racesInsideWindWindow": 35,
+   "withCourseNumber": 4,
+   "gatedEvents": 5
+  },
+  "spread": {
+   "races": 5,
+   "note": "Elapsed times % behind the race winner. Seaweed Soup races (GGYC), 5–8 Folkboats, courses of 3–7 nm.",
+   "lastFinisherPct": {
+    "median": 11.9,
+    "p25": 6.7,
+    "p75": 14.7,
+    "min": 5.5,
+    "max": 19.8
+   },
+   "medianBoatPct": {
+    "median": 5.8,
+    "min": 1.5,
+    "max": 11.5
+   },
+   "byRelativePlace": [
+    {
+     "label": "first quarter after the winner",
+     "n": 5,
+     "medianPct": 1.8
+    },
+    {
+     "label": "second quarter",
+     "n": 5,
+     "medianPct": 2.9
+    },
+    {
+     "label": "third quarter",
+     "n": 5,
+     "medianPct": 5.8
+    },
+    {
+     "label": "last quarter",
+     "n": 6,
+     "medianPct": 10
+    }
+   ],
+   "lastFinisherSecPerNm": {
+    "median": 121
+   },
+   "winnerSpeedKt": {
+    "median": 5.37,
+    "min": 4.39,
+    "max": 7.82
+   }
+  },
+  "consistency": {
+   "note": "Kendall's tau between two races' finishing orders over the boats that finished both: 1 = same order, 0 = no relation. Relative place: 0 = won, 1 = last finisher. Boats and skippers with 4+ finishes.",
+   "tau": {
+    "sameDay": {
+     "pairs": 113,
+     "meanTau": 0.43,
+     "sdTau": 0.42
+    },
+    "sameEventOtherDay": {
+     "pairs": 12,
+     "meanTau": 0.38,
+     "sdTau": 0.56
+    },
+    "otherEvents": {
+     "pairs": 804,
+     "meanTau": 0.42,
+     "sdTau": 0.48
+    }
+   },
+   "varianceExplainedByBoat": 0.45,
+   "varianceExplainedBySkipper": 0.47,
+   "boats": [
+    {
+     "key": "111",
+     "name": "Freja (111)",
+     "races": 40,
+     "wins": 29,
+     "meanRelPlace": 0.08,
+     "sdRelPlace": 0.15,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "113",
+     "name": "POLPERRO (113)",
+     "races": 36,
+     "wins": 13,
+     "meanRelPlace": 0.28,
+     "sdRelPlace": 0.28,
+     "timedRaces": 4,
+     "meanGapPct": 3.3
+    },
+    {
+     "key": "121",
+     "name": "FAITH (121)",
+     "races": 33,
+     "wins": 5,
+     "meanRelPlace": 0.45,
+     "sdRelPlace": 0.3,
+     "timedRaces": 4,
+     "meanGapPct": 3.7
+    },
+    {
+     "key": "108",
+     "name": "THEA (108)",
+     "races": 36,
+     "wins": 2,
+     "meanRelPlace": 0.49,
+     "sdRelPlace": 0.29,
+     "timedRaces": 2,
+     "meanGapPct": 6.8
+    },
+    {
+     "key": "107",
+     "name": "Nordic Star (107)",
+     "races": 9,
+     "wins": 0,
+     "meanRelPlace": 0.49,
+     "sdRelPlace": 0.23,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "122",
+     "name": "JOSEPHINE (122)",
+     "races": 8,
+     "wins": 1,
+     "meanRelPlace": 0.61,
+     "sdRelPlace": 0.37,
+     "timedRaces": 5,
+     "meanGapPct": 5.5
+    },
+    {
+     "key": "116",
+     "name": "Polruan (116)",
+     "races": 39,
+     "wins": 1,
+     "meanRelPlace": 0.62,
+     "sdRelPlace": 0.27,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "56",
+     "name": "SHANTY (56)",
+     "races": 14,
+     "wins": 1,
+     "meanRelPlace": 0.73,
+     "sdRelPlace": 0.32,
+     "timedRaces": 2,
+     "meanGapPct": 7.4
+    },
+    {
+     "key": "125",
+     "name": "CIRCLE SEA (125)",
+     "races": 41,
+     "wins": 1,
+     "meanRelPlace": 0.74,
+     "sdRelPlace": 0.29,
+     "timedRaces": 5,
+     "meanGapPct": 6.6
+    },
+    {
+     "key": "105",
+     "name": "CICCIOLINA (105)",
+     "races": 10,
+     "wins": 0,
+     "meanRelPlace": 0.78,
+     "sdRelPlace": 0.17,
+     "timedRaces": 3,
+     "meanGapPct": 4.8
+    },
+    {
+     "key": "123",
+     "name": "RøDHæTTE (123)",
+     "races": 12,
+     "wins": 0,
+     "meanRelPlace": 0.78,
+     "sdRelPlace": 0.19,
+     "timedRaces": 1,
+     "meanGapPct": 6.7
+    },
+    {
+     "key": "67",
+     "name": "Stella (67)",
+     "races": 7,
+     "wins": 0,
+     "meanRelPlace": 0.9,
+     "sdRelPlace": 0.15,
+     "timedRaces": 0,
+     "meanGapPct": null
+    }
+   ],
+   "skippers": [
+    {
+     "key": "tomreed",
+     "name": "Tom Reed",
+     "races": 40,
+     "wins": 29,
+     "meanRelPlace": 0.08,
+     "sdRelPlace": 0.15,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "peterjeal",
+     "name": "Peter Jeal",
+     "races": 36,
+     "wins": 13,
+     "meanRelPlace": 0.28,
+     "sdRelPlace": 0.28,
+     "timedRaces": 4,
+     "meanGapPct": 3.3
+    },
+    {
+     "key": "erinslichter",
+     "name": "Erin Slichter",
+     "races": 4,
+     "wins": 1,
+     "meanRelPlace": 0.38,
+     "sdRelPlace": 0.32,
+     "timedRaces": 4,
+     "meanGapPct": 3.7
+    },
+    {
+     "key": "jamesvernon",
+     "name": "James Vernon",
+     "races": 31,
+     "wins": 3,
+     "meanRelPlace": 0.45,
+     "sdRelPlace": 0.28,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "richardkeldsen",
+     "name": "Richard Keldsen",
+     "races": 9,
+     "wins": 0,
+     "meanRelPlace": 0.49,
+     "sdRelPlace": 0.23,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "chrisherrmann",
+     "name": "Chris Herrmann",
+     "races": 31,
+     "wins": 1,
+     "meanRelPlace": 0.51,
+     "sdRelPlace": 0.28,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "kelleygallese",
+     "name": "Kelley Gallese",
+     "races": 5,
+     "wins": 0,
+     "meanRelPlace": 0.56,
+     "sdRelPlace": 0.33,
+     "timedRaces": 5,
+     "meanGapPct": 6.6
+    },
+    {
+     "key": "triciadantin",
+     "name": "Tricia D Antin",
+     "races": 8,
+     "wins": 1,
+     "meanRelPlace": 0.61,
+     "sdRelPlace": 0.37,
+     "timedRaces": 5,
+     "meanGapPct": 5.5
+    },
+    {
+     "key": "chandlergrenier",
+     "name": "Chandler Grenier",
+     "races": 28,
+     "wins": 1,
+     "meanRelPlace": 0.65,
+     "sdRelPlace": 0.28,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "markslichter",
+     "name": "Mark Slichter",
+     "races": 21,
+     "wins": 1,
+     "meanRelPlace": 0.71,
+     "sdRelPlace": 0.29,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "tomhaverstock",
+     "name": "Tom Haverstock",
+     "races": 33,
+     "wins": 1,
+     "meanRelPlace": 0.77,
+     "sdRelPlace": 0.29,
+     "timedRaces": 0,
+     "meanGapPct": null
+    },
+    {
+     "key": "laurencechambers",
+     "name": "Laurence Chambers",
+     "races": 12,
+     "wins": 0,
+     "meanRelPlace": 0.78,
+     "sdRelPlace": 0.19,
+     "timedRaces": 1,
+     "meanGapPct": 6.7
+    },
+    {
+     "key": "pauldixon",
+     "name": "Paul Dixon",
+     "races": 17,
+     "wins": 0,
+     "meanRelPlace": 0.83,
+     "sdRelPlace": 0.17,
+     "timedRaces": 3,
+     "meanGapPct": 4.8
+    }
+   ]
+  },
+  "wind": {
+   "orderByWind": [
+    {
+     "wind": "under 8 kt",
+     "races": 4,
+     "meanTauWithUsualOrder": 0.35,
+     "sdTau": 0.31
+    },
+    {
+     "wind": "8–14 kt",
+     "races": 24,
+     "meanTauWithUsualOrder": 0.55,
+     "sdTau": 0.31
+    },
+    {
+     "wind": "14 kt and over",
+     "races": 3,
+     "meanTauWithUsualOrder": 0.6,
+     "sdTau": 0.2
+    }
+   ],
+   "note": "Fort Point (NOAA 9414290) mean wind over the race (start to the winner's finish where timed, else the first hour). Fort Point reads the Gate; the race areas are usually a little lighter. orderByWind: Kendall's tau between each race's order and the fleet's usual order (all races with observed wind). races: the timed races, last finisher's gap against wind; winner speed is over the nominal course distance and includes the current, so it is not boat speed.",
+   "races": [
+    {
+     "date": "2025-11-01",
+     "raceNo": 1,
+     "windKt": 7.3,
+     "lastPct": 11.9,
+     "medianPct": 8.9,
+     "winnerSpeedKt": 7.82
+    },
+    {
+     "date": "2025-12-06",
+     "raceNo": 2,
+     "windKt": 11.1,
+     "lastPct": 5.5,
+     "medianPct": 1.8,
+     "winnerSpeedKt": null
+    },
+    {
+     "date": "2026-02-07",
+     "raceNo": 4,
+     "windKt": 5.2,
+     "lastPct": 19.8,
+     "medianPct": 11.5,
+     "winnerSpeedKt": 5.37
+    },
+    {
+     "date": "2026-03-07",
+     "raceNo": 5,
+     "windKt": 8.5,
+     "lastPct": 14.7,
+     "medianPct": 5.8,
+     "winnerSpeedKt": 4.39
+    },
+    {
+     "date": "2026-11-07",
+     "raceNo": 1,
+     "windKt": 7.4,
+     "lastPct": 6.7,
+     "medianPct": 1.5,
+     "winnerSpeedKt": null
+    }
+   ],
+   "lastPctVsWind": {
+    "slopePctPerKt": -2.03,
+    "interceptPct": 27.7,
+    "r": -0.74
+   },
+   "winnerSpeedVsWind": {
+    "slopeKtPerKt": -0.13,
+    "interceptKt": 6.78,
+    "r": -0.12
+   }
+  },
+  "gaps": {
+   "note": "Mean % behind each race's winner, over the timed races each boat finished (3+). The top boat's own figure is above 0 because it doesn't win every race.",
+   "top": {
+    "name": "POLPERRO (113)",
+    "meanGapPct": 3.3
+   },
+   "median": {
+    "name": "CICCIOLINA (105)",
+    "meanGapPct": 4.8
+   },
+   "back": {
+    "name": "CIRCLE SEA (125)",
+    "meanGapPct": 6.6
+   },
+   "topToMedianPct": 1.5,
+   "topToBackPct": 3.3,
+   "topByPlace": {
+    "name": "Freja (111)",
+    "races": 40,
+    "wins": 29,
+    "meanRelPlace": 0.08,
+    "note": "The fleet's top boat by place over all races (Regatta Network included); it sailed none of the timed races."
+   }
+  }
+ }
+}
