@@ -165,6 +165,16 @@ describe('a backed jib never makes her faster', () => {
 });
 
 describe('the crew works around the lines you hold', () => {
+  it('taking the jib sheet (or the jib car) upwind in 12 kt leaves the crew\'s main settings where they were', () => {
+    for (const k of ['jibsheet', 'car'] as const) {
+      const b = testBoat({ heading: 318, kt: 5, windKt: 12 });
+      sail(b, 30); const was = { traveller: b.ctl.traveller, vang: b.ctl.vang, mainsheet: b.ctl.mainsheet };
+      takeLine(b, k); sail(b, 20);
+      expect(b.ctl.traveller).toBeCloseTo(was.traveller, 1);
+      expect(b.ctl.vang).toBeCloseTo(was.vang, 1);
+      expect(b.ctl.mainsheet).toBeCloseTo(was.mainsheet, 1);
+    }
+  });
   it('traveller held hard down in a breeze: the crew sets the vang for it, keeping the main near its best shape', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 18 });
     sail(b, 30); const vang = b.ctl.vang; takeLine(b, 'traveller'); (b.ctlTarget ??= {}).traveller = 1; sail(b, 30);

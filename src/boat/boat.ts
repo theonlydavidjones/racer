@@ -126,7 +126,7 @@ export interface Boat {
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
   crewPlan?: CrewSettings | null; crewPlanT?: number;
-  /** Which lines you held when the crew last planned (they re-plan from scratch when it changes). */
+  /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
   depower?: number;

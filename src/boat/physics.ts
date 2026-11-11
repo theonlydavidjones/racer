@@ -267,7 +267,12 @@ export const HOVE = {
  */
 const driveCal = new Map<number, number>();
 export function driveCalibration(tws: number, twa: number): number {
-  const w = clamp(Math.round(tws), 2, 40), a = Math.round(clamp(Math.max(twa, beatAngle(w)), 30, 175) / 5) * 5, key = w * 1000 + a;
+  // (between whole knots, a straight line, so the drive doesn't step as the wind changes)
+  const t = clamp(tws, 2, 40), w0 = Math.floor(t), f = t - w0;
+  return f < 1e-6 ? calAt(w0, twa) : calAt(w0, twa) * (1 - f) + calAt(Math.min(40, w0 + 1), twa) * f;
+}
+function calAt(w: number, twa: number): number {
+  const a = Math.round(clamp(Math.max(twa, beatAngle(w)), 30, 175) / 5) * 5, key = w * 1000 + a;
   const hit = driveCal.get(key); if (hit != null) return hit;
   const vt = polar(w, a, 'jib'), ap = apparent(0, w, n360(-a), vt), awaR = ap.awa * D2R;
   const sm = optimalSheet('main', ap.awa), sj = optimalSheet('jib', ap.awa);
@@ -480,9 +485,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
-  // (when a line changes hands the crew thinks again from scratch, not from its old plan)
+  // (when a line changes hands the crew thinks again at once, starting from what it has set: its other lines stay put
+  // unless the change calls for moving them)
   const mineNow = b.isUser ? linesByHand(b).join() : '';
-  if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; b.crewPlan = null; }
+  if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; }
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> = {};
