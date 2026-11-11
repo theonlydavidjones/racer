@@ -94,6 +94,13 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   night (windows, the Salesforce Tower's crown, Coit Tower floodlit). The sun and sky are already real for the race day
   and time, so the lights come on at real dusk. Sources: Caltrans and OSM for the bridge's geometry; the Bay Lights' own
   published specifications for its LEDs and patterns.
+- **Lights on the boats at night** (owner, November 2026: "make them beautiful"; 4–6 h): the real navigation lights for a
+  sailing vessel under 20 m (Inland/International Rules 25): red and green sidelights over 112.5° each, the white
+  sternlight over 135°, or the masthead tricolour as an option under sail; the steaming light when motoring and the
+  all-round white anchor light at anchor or on a mooring. Their sectors exact, so you can read another boat's heading
+  and right of way from her lights, as the rules intend (and the IRPCAS teaching uses it). Beautiful as well as right:
+  soft glow and bloom, their reflections trembling on the water, warm cabin light through the ports, the compass lit,
+  a red cockpit light, and the moored and anchored boats' lights round the harbors.
 - **Crew figures and animation:** natural bodies and positions, moving as the physics moves them and as they work the lines.
 - ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
