@@ -42,6 +42,8 @@ import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, 
 const S: Settings = loadSettings();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
 S.raceLength ??= 'medium';
+// a new player's first race: the committee chooses the course for the day, as at a real club race (saves keep theirs)
+try { if (!localStorage.getItem('fbsim-settings-v2')) S.course = RC_COURSE; } catch { /* storage unavailable */ }
 S.windKind ??= 'auto';
 
 const view = new SceneView($<HTMLCanvasElement>('gl'));
@@ -808,7 +810,7 @@ function drawTideGraph(): void {
     const kmax = Math.max(10, Math.ceil(Math.max(...kts) / 5) * 5), yk = (v: number) => bot - v / kmax * (bot - top);
     ctx.strokeStyle = '#7fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); kts.forEach((v, i) => (i ? ctx.lineTo(x(i), yk(v)) : ctx.moveTo(x(i), yk(v)))); ctx.stroke();
     ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = '#7fe0a8'; ctx.textAlign = 'right';
-    ctx.fillText(`WIND ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
+    ctx.fillText(`WIND · top ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
     const b = w.weather.at(w.gunUtc), b2 = w.weather.at(w.gunUtc + 90), k = windTerrain(p, b.from);
     const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * k)} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * k)} kt` : 'steady';
     rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${w.windKind === 'light' ? 'all over' : Math.round(b.from) + '°'}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
@@ -824,7 +826,7 @@ function drawTideGraph(): void {
   }
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
-  for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
+  for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
   ctx.fillStyle = '#ffb627'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc), 10);
   const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
@@ -1201,8 +1203,9 @@ function adjustUi(): void {
   if (S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
   const names: Record<string, string> = { windKt: 'wind speed', windDir: 'wind direction', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
-  $('adjSum').textContent = real.length ? `Adjusted: ${real.map(k => names[k]).join(', ')}.` : 'All real.';
   if (S.windKind !== 'auto') real.unshift('windKind');
+  names.windKind = `the kind of wind (${WIND_KIND_LABEL[S.windKind as WindKind]?.toLowerCase() ?? S.windKind})`;
+  $('adjSum').textContent = real.length ? `Adjusted: ${real.map(k => names[k]).join(', ')}.` : 'All real.';
   $('condState').textContent = real.length ? 'adjusted' : 'real'; $('condState').classList.toggle('adj', real.length > 0);
 }
 for (const [k, a] of Object.entries(ADJ)) {
