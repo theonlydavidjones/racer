@@ -8,7 +8,7 @@ import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committ
 import { PLACES } from './sim/places';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
-import { addLog, type LogEntry } from './boat/logbook';
+import { addLog, loadLog, type LogEntry, type RaceSetup } from './boat/logbook';
 import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
@@ -955,6 +955,13 @@ function outing(b: BoatSpec, isUser: boolean): Omit<LogEntry, 'kind' | 'title'> 
     wind: `${compass(w.windModel.base)} ${Math.round(w.wind.kt)} kt`
   };
 }
+/** The settings a race was sailed in, kept with your entry so you can sail it again (Run a past race). */
+const REPLAY_KEYS = ['tideTime', 'opponents', 'raceLength', 'windKind', 'windKt', 'windDir', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'bias', 'raceFrom', 'crew', 'sea'] as const;
+function raceSetup(): RaceSetup {
+  const s: Record<string, unknown> = { tideDate: w.raceDate };
+  for (const k of REPLAY_KEYS) if (S[k] !== undefined) s[k] = structuredClone(S[k]);
+  return { seed: w.seed, course: w.C.id, s };
+}
 /** The race, into the logbook of every boat of yours in it: her place (or why she has none) and her time. */
 function logRace(rows: Boat[]): void {
   if (w.logged || S.mode === 'drill') return; w.logged = true;
@@ -962,7 +969,7 @@ function logRace(rows: Boat[]): void {
   rows.forEach((b, i) => {
     const spec = b.isUser ? S.boat : b.spec && S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
     const dsq = b.scoring === 'UFD' || b.scoring === 'BFD';
-    out.push({ ...outing(spec, b.isUser), kind: 'race', title, of: rows.length,
+    out.push({ ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
       ...(dsq ? { code: 'DSQ' } : b.finished ? { place: i + 1, elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) });
   });
   stage(out);
@@ -977,7 +984,7 @@ function logOuting(): void {
   } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
     // you left the race before finishing: retired
     w.logged = true;
-    stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'RET', of: w.boats.length }]);
+    stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'RET', of: w.boats.length, setup: raceSetup() }]);
   }
 }
 /** The sail just ended, waiting for you to say whether it goes in the logbook. */
@@ -1137,10 +1144,7 @@ document.addEventListener('click', e => {
   if (where === 'home') { openHome(); return; }
   $('home').hidden = true; $('raceChoose').hidden = true; $('setup').hidden = true; $('condDlg').hidden = true;
   if (where === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceChoose').hidden = false; }
-  else if (where === 'create' || where === 'createPast') {
-    if (S.mode !== 'race') S.mode = 'race'; saveSettings(S); newGame(); openSetup();
-    if (where === 'createPast') setTimeout(() => $<HTMLInputElement>('tideDate').focus(), 0);
-  }
+  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; saveSettings(S); newGame(); openSetup(); }
   else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); newGame(); openSetup(); }
   else if (where === 'fleet') { fleetFrom = 'home'; fleet.openList(); }
   else if (where === 'club') $('club').hidden = false;
@@ -1148,7 +1152,36 @@ document.addEventListener('click', e => {
 $('bExit').onclick = () => openHome();
 $('bExit2').onclick = () => openHome();
 $('bKeys0').onclick = () => keysView.open();
-$('bPast').onclick = () => { const n = $('pastNote'); n.hidden = !n.hidden; $('bPast').setAttribute('aria-expanded', String(!n.hidden)); };
+$('bPast').onclick = () => { const n = $('pastNote'); n.hidden = !n.hidden; $('bPast').setAttribute('aria-expanded', String(!n.hidden)); if (!n.hidden) pastRaces(); };
+/* Run a past race: a race you've sailed, sailed again. With its saved setup it's the same race (the same seed, course,
+   fleet, crew, start time and conditions settings); an older entry gives its course, day and start time. The day's
+   weather is the sim's record of that day now, so a day raced on the forecast is sailed again in what was observed. */
+let pastList: LogEntry[] = [];
+const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id === e.setup!.course) ? e.setup.course
+  : COURSES.slice().sort((a, b) => b.title.length - a.title.length).find(c => e.title.startsWith(c.title))?.id ?? null;
+function pastRaces(): void {
+  pastList = loadLog().filter(e => e.kind === 'race' && e.skipper === 'you').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${ordinal(e.place)} of ${e.of}` : '';
+  $('pastRows').innerHTML = pastList.length ? pastList.map((e, i) => {
+    const boat = S.boats.find(b => b.id === e.boatId), ok = !!courseOfEntry(e);
+    const day = new Date(e.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return `<div class="pastrow"><div><b>${esc(e.title)}</b><small>${day}, ${e.time} · ${esc(e.wind)} · ${esc(boat?.name || 'a boat since deleted')} · ${result(e)}${e.setup ? '' : ' · fleet and settings as they are now'}</small></div>`
+      + `<button type="button" class="ghost sm" data-past="${i}"${ok ? '' : ' disabled title="That course is no longer in the sim"'}>Sail it again</button></div>`;
+  }).join('') : '<p class="lede">No races in your logbook yet. Race one, save it, and it appears here to sail again.</p>';
+}
+$('pastRows').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-past]'); if (!b || b.disabled) return;
+  const en = pastList[Number(b.dataset.past)], course = en && courseOfEntry(en); if (!en || !course) return;
+  if (en.setup) Object.assign(S, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  S.course = course; S.mode = 'race';
+  const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; }
+  if (!S.boat.slip) S.raceFrom = 'water';
+  { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
+  saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
+  $('raceChoose').hidden = true;
+  beginRace(en.setup?.seed);
+});
 
 /* The conditions adjuster: each control is 'real' until moved; Real puts it back. */
 const ADJ = {

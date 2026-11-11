@@ -540,3 +540,10 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .gobtns .cta{flex:1 1 100%}
 #keysView .help{margin-top:8px}
 @media (max-width:860px){.setgrid{grid-template-columns:1fr}.modes.three{grid-template-columns:1fr}}
+.pastrows{display:flex;flex-direction:column;max-height:50vh;overflow-y:auto}
+.pastrow{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--rule)}
+.pastrow:first-child{border-top:0}
+.pastrow>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pastrow b{font:600 14px/1.3 var(--f-inst);letter-spacing:.02em}
+.pastrow small{color:var(--muted);font-size:12px}
+.pastrow .ghost{flex:none}

@@ -123,13 +123,10 @@
     <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
     <h1>Race</h1>
     <div class="modes">
-      <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, in that day's real conditions</span></button>
-      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>A real race sailed again: its fleet, course and day</span></button>
+      <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
+      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>Sail one of your races again: the same course, fleet, day and start</span></button>
     </div>
-    <div class="pastnote" id="pastNote" hidden>
-      <p>Past races with their real fleets and results aren't in the sim yet. Until they are, create a race on any date since January 2021 and you sail in that day's observed wind, tide and swell.</p>
-      <div class="btnrow"><button type="button" class="cta" data-home="createPast">Create a race on a past date</button></div>
-    </div>
+    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="pastRows"></div></div>
   </div>
 </div>
 
