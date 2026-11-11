@@ -105,10 +105,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       f.root.visible = true; return;
     }
     if (pose === 'car') {
-      // kneeling on the side deck beside the cabin, reaching in to the car on its track
-      const px = side * Math.min(halfBeam(u) - 0.18, Math.max(CABIN.w + 0.12, Math.abs(x)));
-      f.root.position.set(px, deckY(u, Math.abs(px)) + 0.02, z); f.root.rotation.set(0, side * Math.PI / 2, 0);
-      seat(f, { lean: -0.45, kneel: true, arms: [1.3, 1.1], elbows: 0.5 });
+      // kneeling on the side deck beside the cabin, facing forward along it (shins along the deck), reaching to the car
+      const px = side * Math.min(halfBeam(u) - 0.22, Math.max(CABIN.w + 0.12, Math.abs(x)));
+      f.root.position.set(px, deckY(u, Math.abs(px)) + 0.02, z); f.root.rotation.set(0, 0, 0);
+      seat(f, { lean: -0.55, kneel: true, arms: [1.5, 1.2], elbows: 0.5 });
       f.root.visible = true; return;
     }
     // in the cockpit (crossing, to leeward, at a winch, at the lines on the cabin's after end) or up on the side deck
@@ -143,7 +143,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const h = cr.helm, hy = deckY(huu, cockpitHalf(huu)) - COCKPIT.sole * 0.45 + 0.02;
   h.root.position.set(hx, hy, hzz); h.root.rotation.set(0, helmAway ? 0 : hside * 0.55, 0);
   if (helmAway) seat(h, { lean: -0.3, kneel: true, arms: [1.5, 1.3], elbows: 0.5 });
-  else seat(h, { lean: 0.05 + 0.4 * (hp?.lean ?? 0), thigh: 1.35, knee: 1.4, arms: [-0.6, 0.6], elbows: 0.4 }); // aft arm back to the tiller
+  // the inboard arm back to the tiller, the other forward (the figure faces −z: its left arm is to port)
+  else seat(h, { lean: 0.05 + 0.4 * (hp?.lean ?? 0), thigh: 1.35, knee: 1.4, arms: hside > 0 ? [-0.6, 0.6] : [0.6, -0.6], elbows: 0.4 });
   h.root.visible = !hideHelm;
 }
 

@@ -267,8 +267,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     } else if (!helmBusy) helmArm = clamp((want * total - (fixedM - W[0] * helmArm)) / W[0], HELM.lee, HELM.max);
     if (!helmBusy) tgt[0] = { arm: helmArm, z: Z.helm, pose: 'helm' };
     // the free crew, front to back in the cockpit, sharing the moment (each within their own reach)
+    // (where you've put them: each of them there, not just their average)
+    const placed = pl?.across ? { lee: LEE_ARM, mid: 0.1, up: NaN, hike: Infinity }[pl.across] : null;
     free.forEach((i, j) => {
-      const arm = clamp(crewArm, lo, maxOf(i));
+      const arm = placed == null ? clamp(crewArm, lo, maxOf(i)) : clamp(Number.isNaN(placed) ? sitArm(ppl[i]) : placed, lo, maxOf(i));
       const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (free.length - 1 - j) * Z.gap;
       tgt[i] = { arm, z: za + (zf - za) * foreF, pose: arm < -0.05 ? 'lee' : arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit' };
     });
@@ -299,7 +301,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
     const arm = a.x * w;
     a.lean = i === 0 ? clamp((arm - HELM.sit) / (HELM.max - HELM.sit), 0, 1) : clamp((arm - sitArm(p)) / Math.max(0.05, hikeArm(p) - sitArm(p)), 0, 1);
-    a.pose = Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5 ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : t.pose === 'hike' && a.lean < 0.05 ? 'sit' : t.pose;
+    // (sitting, hiking or to leeward: by where they actually are, so the figure matches the weight)
+    const free = t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
+    const settled: Pose = free ? (arm < -0.05 ? 'lee' : a.lean > 0.05 ? 'hike' : 'sit') : t.pose;
+    a.pose = Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5 ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
     a.fatigue = clamp(a.fatigue + dt * (e * e / ENDURE(p) - (1 - e) * a.fatigue / RECOVER), 0, 1);
