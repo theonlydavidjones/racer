@@ -2,6 +2,8 @@ import './three-setup';
 import * as THREE from 'three';
 import type { Boat } from '../boat/boat';
 import { D2R } from '../core/math';
+import { NIGHT } from './night';
+import { L as HULL_L, hullHalfAt } from './hull';
 
 /**
  * Wakes, bow waves and spray, sized by boat speed. Each boat leaves a trail: a turbulent strip of foam behind the
@@ -9,11 +11,22 @@ import { D2R } from '../core/math';
  * either side of her track (the angle is the same for every boat at any speed: it's a property of deep-water
  * waves). A bow wave curls off the stem, bigger as she approaches hull speed, and in a chop she throws spray when
  * her bow comes down into a wave.
+ *
+ * All of it is water, lit by the scene like the sea itself: the foam white by day and dim at night, the bow wave a
+ * raised ridge of sea-coloured water with broken white only at its crest, the spray droplets catching the light (and
+ * after dark only her own: the bicolour's green and red on the bow).
  */
+const G = 9.81, MAXDROPS = 60;
+/** The sea's colour (scene.ts, the water's material), for the bow wave's unbroken water. */
+const SEA = new THREE.Color(0x3b6d84), FOAM = new THREE.Color(0xf2f5f6);
+/** The bicolour's colours as they fall on spray (navLights.ts). */
+const GREEN = new THREE.Color(0.1, 1.0, 0.6), RED = new THREE.Color(1.0, 0.12, 0.1);
+/** The bow wave's ridge: samples along each arm, and across it. */
+const NS = 10, NT = 5;
 
 const KELVIN = Math.tan(19.47 * D2R);
 
-interface Trail { pts: { x: number; y: number; v: number; t: number }[]; acc: number; mesh: THREE.Mesh; bow: THREE.Mesh; spray: THREE.Points; drops: { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number }[]; lastPitch: number }
+interface Trail { pts: { x: number; y: number; v: number; t: number }[]; acc: number; mesh: THREE.Mesh; bow: THREE.Mesh; spray: THREE.InstancedMesh; drops: { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; r: number }[]; lastPitch: number }
 
 let foamTex: THREE.CanvasTexture | null = null;
 function foam(): THREE.CanvasTexture {
@@ -48,14 +61,25 @@ export class Wakes {
       const idx: number[] = [];
       for (let s = 0; s < 3; s++) for (let i = 0; i < N - 1; i++) { const a = (s * N + i) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
       geo.setIndex(idx);
-      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: foam(), vertexColors: true, transparent: true, depthWrite: false }));
+      geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nv * 3).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3)); // lying on the water
+      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: foam(), vertexColors: true, transparent: true, depthWrite: false }));
       mesh.frustumCulled = false; mesh.renderOrder = 2; this.scene.add(mesh);
-      // bow wave: a curl of foam either side of the stem
-      const bg = new THREE.PlaneGeometry(2.6, 1.6); bg.rotateX(-Math.PI / 2);
-      const bow = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ map: bowTex(), transparent: true, depthWrite: false })); bow.renderOrder = 2; this.scene.add(bow);
-      const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(60 * 3), 3));
-      const spray = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, transparent: true, opacity: 0.8, depthWrite: false }));
-      spray.frustumCulled = false; this.scene.add(spray);
+      // the bow wave: a ridge of water along each side from the stem (rebuilt each frame on the sea; see update)
+      const bg = new THREE.BufferGeometry(), nb = 2 * (NS + 1) * NT, bi: number[] = [];
+      bg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nb * 3), 3));
+      bg.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nb * 3), 3));
+      bg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nb * 4), 4));
+      for (let side = 0; side < 2; side++) for (let i = 0; i < NS; i++) for (let j = 0; j < NT - 1; j++) {
+        const a = (side * (NS + 1) + i) * NT + j, b = a + 1, c = a + NT, d = c + 1; bi.push(a, c, b, b, c, d);
+      }
+      bg.setIndex(bi);
+      const bow = new THREE.Mesh(bg, new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, specular: 0x8a8a80, shininess: 140 }));
+      bow.frustumCulled = false; bow.renderOrder = 2; this.scene.add(bow);
+      // spray: droplets, lit by the scene; after dark each also takes the colour of her own light that falls on it
+      const spray = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), sprayMaterial(), MAXDROPS);
+      spray.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      spray.geometry.setAttribute('aGlow', new THREE.InstancedBufferAttribute(new Float32Array(MAXDROPS * 3), 3).setUsage(THREE.DynamicDrawUsage));
+      spray.count = 0; spray.frustumCulled = false; this.scene.add(spray);
       return { pts: [], acc: 0, mesh, bow, spray, drops: [], lastPitch: 0 };
     });
   }
@@ -92,39 +116,87 @@ export class Wakes {
         }
       }
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.attributes.uv.needsUpdate = true;
-      // bow wave
-      const bx = b.x + u.x * (HALF - 0.6 * sc), by = b.y + u.y * (HALF - 0.6 * sc), sz = Math.min(1.3, b.v / 2.6);
-      tr.bow.visible = b.v > 0.6;
-      tr.bow.position.set(bx, sea(bx, by) + 0.06, -by); tr.bow.rotation.y = -b.h * D2R; tr.bow.scale.set((0.5 + 0.6 * sz) * sc, 1, (0.5 + 0.7 * sz) * sc);
-      (tr.bow.material as THREE.MeshBasicMaterial).opacity = Math.min(0.85, sz * 0.9);
-      // spray: when the bow drops into a wave at speed, in a chop
+      // the bow wave: the water banks up against the stem, by Bernoulli as much as V²/2g where it's stopped dead, and
+      // peels off either side as a ridge along her entrance, falling away aft. Taken as 0.6 of the stagnation head at
+      // the stem (the stem's sharp entry turns the flow aside rather than stopping it), its crest breaking white from
+      // about Fn 0.3 (speed-length ratio 1.0) and more as she nears hull speed (Fn 0.4), and in a chop.
+      const lwl = 2 * HALF * 0.785, fn = b.v / Math.sqrt(G * lwl), hs = b.sea?.hsW ?? 0;
+      const h0 = Math.min(0.4, 0.6 * b.v * b.v / (2 * G)) * sc, armLen = (0.6 + 2.4 * Math.min(1, fn / 0.4)) * sc;
+      const brk = Math.min(1, Math.max(0, (fn - 0.3) / 0.12) + 0.6 * Math.min(1, hs / 0.8));
+      // (along her own waterline from the stem, standing a little off it, and peeling away from it aft; a ship's
+      // entrance taken as a 24° wedge)
+      const stemFwd = HALF - 1.02 * sc, spread = Math.tan(24 * D2R);
+      const crestOff = (along: number, f: number) => (sc === 1 ? wlHalf(along) : 0.04 * sc + spread * along) + (0.05 + 0.35 * f * f) * sc;
+      const BP = tr.bow.geometry.attributes.position.array as Float32Array, BC = tr.bow.geometry.attributes.color.array as Float32Array;
+      tr.bow.visible = b.v > 0.4;
+      if (tr.bow.visible) {
+        const px = u.y, py = -u.x; // to starboard
+        for (let side = 0; side < 2; side++) for (let i = 0; i <= NS; i++) {
+          const f = i / NS, along = armLen * f, lat = (side ? 1 : -1) * crestOff(along, f), wid = (0.12 + 0.3 * f) * sc;
+          const hgt = h0 * Math.pow(1 - f, 1.3) * Math.min(1, f * 8 + 0.35);
+          for (let j = 0; j < NT; j++) {
+            const t = j / (NT - 1) * 2 - 1, lt = lat + (side ? 1 : -1) * t * wid; // across the ridge, from its inner foot out
+            const x = b.x + u.x * (stemFwd - along) + px * lt, y = b.y + u.y * (stemFwd - along) + py * lt, o = (side * (NS + 1) + i) * NT + j;
+            const prof = Math.cos(t * Math.PI / 2) ** 2;
+            BP[o * 3] = x; BP[o * 3 + 1] = sea(x, y) + 0.02 + hgt * prof; BP[o * 3 + 2] = -y;
+            // sea-coloured water, white where the crest breaks; it fades into the sea at its feet and its far end
+            const wh = brk * Math.pow(1 - f, 0.6) * Math.max(0, 1 - Math.abs(t) * 2.2), c = SEA.clone().lerp(FOAM, Math.min(1, wh));
+            BC[o * 4] = c.r; BC[o * 4 + 1] = c.g; BC[o * 4 + 2] = c.b; BC[o * 4 + 3] = Math.min(1, h0 / 0.05) * prof * Math.min(1, (1 - f) * 4) * (0.55 + 0.45 * wh);
+          }
+        }
+        tr.bow.geometry.attributes.position.needsUpdate = true; tr.bow.geometry.attributes.color.needsUpdate = true; tr.bow.geometry.computeVertexNormals();
+        const BN = tr.bow.geometry.attributes.normal.array as Float32Array; // (both arms' faces looking up, out of the sea)
+        for (let i = 0; i < BN.length; i += 3) if (BN[i + 1] < 0) { BN[i] = -BN[i]; BN[i + 1] = -BN[i + 1]; BN[i + 2] = -BN[i + 2]; }
+      }
+      // spray: when the bow drops into a wave at speed, in a chop; more, higher and further the faster she goes and
+      // the steeper the sea
+      const bx = b.x + u.x * stemFwd, by = b.y + u.y * stemFwd;
       const dp = (pitch[k] ?? 0) - tr.lastPitch; tr.lastPitch = pitch[k] ?? 0;
-      if (sc === 1 && b.v > 2 && dp < -0.004 && (b.sea?.hsW ?? 0) > 0.25 && tr.drops.length < 60) {
-        const n2 = Math.min(60 - tr.drops.length, Math.round(-dp * 1500 * (b.sea?.hsW ?? 0)));
+      if (sc === 1 && b.v > 2 && dp < -0.004 && hs > 0.25 && tr.drops.length < MAXDROPS) {
+        const n2 = Math.min(MAXDROPS - tr.drops.length, Math.round(-dp * 1500 * hs)), up = Math.min(1.6, 0.4 + 0.25 * b.v + 0.6 * hs);
         const lee = (b.rel >= 0 ? -1 : 1), sx = { x: u.y * lee, y: -u.x * lee };
-        for (let i = 0; i < n2; i++) tr.drops.push({ x: bx, y: by, z: 0.6, vx: sx.x * (1 + Math.random() * 2) + u.x * b.v * 0.6, vy: sx.y * (1 + Math.random() * 2) + u.y * b.v * 0.6, vz: 1.5 + Math.random() * 2.5, life: 0.7 + Math.random() * 0.6 });
+        for (let i = 0; i < n2; i++) {
+          const sd = Math.random() < 0.75 ? lee : -lee; // most of it to leeward, where the bow lands
+          tr.drops.push({ x: bx, y: by, z: 0.3, vx: sx.x * sd * lee * (1 + Math.random() * 2) + u.x * b.v * 0.6, vy: sx.y * sd * lee * (1 + Math.random() * 2) + u.y * b.v * 0.6, vz: up * (1.2 + Math.random() * 2), life: 0.6 + Math.random() * 0.6, r: 0.004 + 0.012 * Math.random() ** 2 }); // clumps of drops up to about 3 cm
+        }
       }
-      const SP = tr.spray.geometry.attributes.position.array as Float32Array;
       tr.drops = tr.drops.filter(d => (d.life -= dt) > 0);
-      for (let i = 0; i < 60; i++) {
-        const d = tr.drops[i];
-        if (d) { d.vz -= 9.8 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt; SP[i * 3] = d.x; SP[i * 3 + 1] = Math.max(sea(d.x, d.y), d.z); SP[i * 3 + 2] = -d.y; }
-        else { SP[i * 3] = 0; SP[i * 3 + 1] = -100; SP[i * 3 + 2] = 0; }
-      }
-      tr.spray.geometry.attributes.position.needsUpdate = true;
+      // the bicolour on the stemhead: lit after dark (navLights.ts), unless she carries the tricolour at the masthead
+      const lamp = (b as Boat).paint?.navLights !== 'tricolour' ? NIGHT.uOn.value * NIGHT.uNight.value : 0;
+      const GL = tr.spray.geometry.attributes.aGlow.array as Float32Array, lx = b.x + u.x * HALF, ly = b.y + u.y * HALF, lz = 0.95;
+      tr.spray.count = tr.drops.length;
+      tr.drops.forEach((d, i) => {
+        d.vz -= G * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+        const sp = Math.hypot(d.vx, d.vy, d.vz) || 1;
+        // a drop drawn out a little along its flight (the eye's blur of a fast drop)
+        Q.setFromUnitVectors(UP, V3.set(d.vx / sp, d.vz / sp, -d.vy / sp));
+        M.compose(V3.set(d.x, Math.max(sea(d.x, d.y), d.z), -d.y), Q, SC.set(d.r, d.r * (1 + 0.15 * sp), d.r));
+        tr.spray.setMatrixAt(i, M);
+        const side = (d.x - b.x) * u.y - (d.y - b.y) * u.x, dist = Math.hypot(d.x - lx, d.y - ly, d.z - lz), e = lamp * 0.9 / (1 + (dist / 0.6) ** 2), c = side >= 0 ? GREEN : RED;
+        GL[i * 3] = c.r * e; GL[i * 3 + 1] = c.g * e; GL[i * 3 + 2] = c.b * e;
+      });
+      tr.spray.instanceMatrix.needsUpdate = true; tr.spray.geometry.attributes.aGlow.needsUpdate = true;
     });
   }
 }
 
-let bowT: THREE.CanvasTexture | null = null;
-function bowTex(): THREE.CanvasTexture {
-  if (bowT) return bowT;
-  const c = document.createElement('canvas'); c.width = 128; c.height = 80; const g = c.getContext('2d')!;
-  // two curls of foam peeling back from the stem (at the top of the picture)
-  for (let i = 0; i < 500; i++) {
-    const t = Math.random(), side = Math.random() < 0.5 ? -1 : 1, x = 64 + side * (6 + t * 52), y = 6 + t * 66 + (Math.random() - 0.5) * 8 * t;
-    g.fillStyle = `rgba(255,255,255,${((1 - t) * 0.8).toFixed(2)})`; g.beginPath(); g.arc(x, y, 1 + Math.random() * 2.2, 0, Math.PI * 2); g.fill();
-  }
-  bowT = new THREE.CanvasTexture(c);
-  return bowT;
+/** A Folkboat's waterline half-breadth (m) `along` m aft of where her stem meets the water (hull.ts). */
+const WL_STEP = 0.1, WL = Array.from({ length: 41 }, (_, i) => hullHalfAt(1.02 / HULL_L + i * WL_STEP / HULL_L, 0));
+const wlHalf = (along: number) => { const q = Math.min(WL.length - 1.001, Math.max(0, along / WL_STEP)), i = Math.floor(q); return WL[i] + (WL[i + 1] - WL[i]) * (q - i); };
+const Q = new THREE.Quaternion(), M = new THREE.Matrix4(), V3 = new THREE.Vector3(), SC = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Spray's material: clear water droplets, lit by the scene (a bright glint of the sun by day, dim at night), each
+ * also glowing with the colour of her own light that falls on it (aGlow, per drop).
+ */
+let sprayMat: THREE.MeshPhongMaterial | null = null;
+function sprayMaterial(): THREE.MeshPhongMaterial {
+  if (sprayMat) return sprayMat;
+  const m = new THREE.MeshPhongMaterial({ color: 0xd6e2e8, specular: 0xffffff, shininess: 120, transparent: true, opacity: 0.55, depthWrite: false });
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = 'attribute vec3 aGlow;\nvarying vec3 vGlow;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;');
+    sh.fragmentShader = 'varying vec3 vGlow;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vGlow;');
+  };
+  m.customProgramCacheKey = () => 'spray';
+  return (sprayMat = m);
 }
