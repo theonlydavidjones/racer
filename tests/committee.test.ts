@@ -60,16 +60,35 @@ describe('the race committee\'s choice', () => {
 });
 
 describe('a start to leeward (the courses starting east)', () => {
-  it('the AI boats come in on a run and most start within a few seconds of the gun (16 races; a regression guard)', () => {
-    // (leeward starts are the AI's weak spot: about 60% of the boats that didn't foul in the pre-start get away within
-    // 20 s. Measured over many races, since one race turns on who meets whom)
+  // A start to leeward: the boats hold upwind of the line and come in on a run. Easing the sails barely slows a boat
+  // on a run, so the AI burns time on a reach along the line and bears away when it's time, on starboard gybe when
+  // it can (src/ai/ai.ts). Measured over many races, since one race turns on who meets whom. Before that, about 60% of
+  // the boats that didn't foul got away within 20 s and a dozen of 48 fouled; now nearly all of them do, and a flood
+  // setting them onto the line no longer sends half the fleet over early.
+  const leeward = (current: string, seeds: number) => {
     const f = COURSES.find(c => c.id === 'ss41')!;
-    let onTime = 0, n = 0;
-    for (let seed = 1; seed <= 16; seed++) {
-      const w = new World(f, settings({ windKt: 12, current: 'slack', fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'] }), seed), fouled = new Set<number>();
-      while (w.t < 40) { w.step(DT); for (const b of w.boats) if (b.penalty > 0 && w.t < 0) fouled.add(b.id); }
+    let onTime = 0, n = 0, fouls = 0, over = 0;
+    for (let seed = 1; seed <= seeds; seed++) {
+      const w = new World(f, settings({ windKt: 12, current, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'] }), seed), fouled = new Set<number>();
+      while (w.t < 40) {
+        w.step(DT);
+        for (const b of w.boats) if (b.penalty > 0 && w.t < 0) fouled.add(b.id);
+        if (Math.abs(w.t) < DT / 2) over += w.boats.slice(1).filter(b => b.ocs).length;
+      }
+      fouls += [...fouled].filter(id => id > 0).length;
       w.startTimes.slice(1).forEach((t, i) => { if (fouled.has(i + 1)) return; n++; if (t != null && t < 20) onTime++; });
     }
-    expect(onTime / n).toBeGreaterThan(0.55);
+    return { onTime: onTime / n, fouls, over, boats: seeds * 3 };
+  };
+  it('slack: the AI boats come in on a run and nearly all start within a few seconds of the gun, few foul, none early (16 races)', () => {
+    const r = leeward('slack', 16);
+    expect(r.onTime).toBeGreaterThan(0.9);
+    expect(r.over).toBeLessThanOrEqual(1);
+    expect(r.fouls).toBeLessThanOrEqual(8);
+  }, 400000);
+  it('a 1 kt flood setting them onto the line: nearly all still start on time, few over early (8 races)', () => {
+    const r = leeward('flood', 8);
+    expect(r.onTime).toBeGreaterThan(0.85);
+    expect(r.over / r.boats).toBeLessThan(0.1);
   }, 400000);
 });

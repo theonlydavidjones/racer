@@ -54,7 +54,7 @@ Then, unranked: ~~start screens~~ (done: Race → create a race or run a past ra
 and hearings (8–12 h); validation against real fleets (4–6 h); rig tuning (5–8 h); seasons and awards (6–10 h); the Bay
 in depth (~~done~~, published); crew figures and animation (10–16 h); ~~NOAA charts on the map~~ (done); the Bay to Berkeley, Alameda
 and Richmond (10–16 h); ~~Gashouse Cove, South Beach and Corinthian marinas~~ (done); Sam's (3–5 h); accounts for other
-players (3–6 h); AI leeward starts and generic AI boats (3–5 h); real slip numbers and nicer moored boats (4–6 h); real
+players (3–6 h); ~~AI leeward starts and generic AI boats~~ (done); real slip numbers and nicer moored boats (4–6 h); real
 past races (8–12 h); accuracy fixes: the GGYC/StFYC line, the Cityfront shore from OSM, Rule 20 at the islands (6–10 h);
 phone layout (on hold, 8–12 h).
 
