@@ -49,7 +49,10 @@ export const HANDLING = {
 /** Wave-making (residuary) resistance as a fraction of displacement weight, by Froude number. */
 const RESIDUARY: [number, number][] = [
   [0, 0], [0.15, 0.0003], [0.2, 0.0008], [0.25, 0.0018], [0.3, 0.004], [0.35, 0.0085],
-  [0.4, 0.019], [0.45, 0.038], [0.5, 0.062], [0.6, 0.11]
+  [0.4, 0.019], [0.45, 0.038], [0.5, 0.062], [0.6, 0.11],
+  // past Fn 0.6 the polar never goes (a displacement hull can't climb its own bow wave), but the force model (heaving
+  // to) can be pushed there, so the wall keeps rising: the same slope as 0.5–0.6, extrapolated
+  [0.7, 0.16], [0.8, 0.21], [1.0, 0.31]
 ];
 
 function residuaryFraction(fn: number): number {

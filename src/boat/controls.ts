@@ -223,15 +223,17 @@ export function depowerLimits(depower: number, awa: number): { min: Partial<Reco
   };
 }
 
-export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number): CrewSettings {
+export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> = {}): CrewSettings {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa);
-  const lo = (k: keyof CrewSettings) => lim.min[k] ?? (k === 'traveller' ? -1 : 0), hi = (_k: keyof CrewSettings) => 1;
+  // lines you hold are fixed where you have them: the crew sets the rest around them
+  const lo = (k: keyof CrewSettings) => fixed[k] ?? lim.min[k] ?? (k === 'traveller' ? -1 : 0), hi = (k: keyof CrewSettings) => fixed[k] ?? 1;
   // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle
   const carIn = clamp(Math.floor((jibAng - 1 - 8) / 1.25), 0, CAR_IN_PINS - 1);
   const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, carFore: 3, carIn, ...from };
   const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const;
   for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
-  const carMin = Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft); x.carFore = Math.max(x.carFore, carMin);
+  const carMin = fixed.carFore ?? Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft), carMax = fixed.carFore ?? CAR_FORE_PINS - 1;
+  x.carFore = clamp(x.carFore, carMin, carMax); if (fixed.carIn != null) x.carIn = fixed.carIn;
   const score = (v: CrewSettings) => {
     const c: Controls = { mainsheet: mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
       backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
@@ -246,7 +248,7 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
       const v = { ...x, [k]: clamp(x[k] + d, lo(k), hi(k)) }, sc = score(v);
       if (sc > best) { best = sc; Object.assign(x, v); }
     }
-    for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, carMin, CAR_FORE_PINS - 1) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
+    for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, carMin, carMax) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
   }
   return x;
 }

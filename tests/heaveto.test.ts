@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt } from './helpers/testBoat';
 import { KT, wrap } from '../src/core/math';
 import { allToCrew, byHand, leeDrift, linesByHand, takeLine } from '../src/boat/physics';
-import { jibClew } from '../src/boat/controls';
+import { jibClew, shapeEfficiency, targetShape } from '../src/boat/controls';
+import { polar } from '../src/boat/polar';
 import type { Boat } from '../src/boat/boat';
 
 /* ---------- 2a: one line at a time ---------- */
@@ -28,11 +29,12 @@ describe('taking one line off the crew', () => {
   });
   it('one tap gives it back: the crew trims it again', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 12 });
-    sail(b, 20); const best = b.ctl.mainsheet;
+    sail(b, 20); const best = b.sheets.main;
     b.ctlCmd.mainsheet = 1; sail(b, 3); b.ctlCmd = {};
-    expect(b.ctl.mainsheet).toBeGreaterThan(best + 0.2);
+    expect(b.sheets.main).toBeGreaterThan(best + 10);
     takeLine(b, 'mainsheet', false); sail(b, 15);
-    expect(b.ctl.mainsheet).toBeCloseTo(best, 1);
+    expect(b.sheets.main).toBeCloseTo(best, 0); // (with the traveller and sheet it likes: there's more than one way to the same boom angle)
+    expect(b.shape.eff).toBeGreaterThan(0.99);
     expect(linesByHand(b)).toEqual([]);
   });
   it('all back to the crew at once, including lines from the old "trim all" setting', () => {
@@ -84,7 +86,7 @@ describe('the two jib sheets', () => {
     b.turnDir = 1; b.turnTarget = 42; sail(b, 60);
     expect(b.tack).toBe('P');
     expect(Math.abs(wrap(b.ww.from - b.h))).toBeGreaterThan(15);
-    expect(b.jibBacked).toBeGreaterThan(0.5);
+    expect(b.hove).toBe(true); expect(b.sheets.jib).toBeLessThan(-1);
   });
   it('a windward sheet hauled and eased off again goes back to the crew: the next tack is an ordinary one', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 15 }); sail(b, 15);
@@ -146,6 +148,33 @@ function heaveTo(windKt: number, o: { tack?: 'S' | 'P'; main?: number; lash?: nu
   return { b, twa: twa / n, swing: hi - lo, ahead: u / n / KT, lee: d / n / KT, made: Math.hypot(dx, dy) / 300 / KT,
     track: Math.abs(wrap(Math.atan2(dx, dy) * 180 / Math.PI - b.ww.from)) /* deg off the wind's direction */ };
 }
+
+describe('a backed jib never makes her faster', () => {
+  const cl = (x: number) => Math.max(-1, Math.min(1, x));
+  for (const W of [8, 12, 18, 25, 35]) it(`${W} kt, close-hauled to a run: never past the polar, always slower than she was`, () => {
+    for (const twa of [50, 70, 90, 110, 130, 150]) {
+      const b = testBoat({ heading: 360 - twa, kt: 5, windKt: W }) as Boat & { handsOff?: boolean }; b.handsOff = true;
+      const hold = () => { b.tiller = -cl(wrap(360 - twa - b.h) * 0.08); };
+      sail(b, 40, hold); const before = kt(b);
+      takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0;
+      let top = 0; sail(b, 90, () => { hold(); top = Math.max(top, kt(b)); });
+      expect(top).toBeLessThan(Math.max(before, polar(W, twa, 'jib') / KT) + 0.15);
+      expect(kt(b)).toBeLessThan(before + 0.2); // (in a gale the polar-model boat is held back by heel, which the backed jib eases)
+    }
+  });
+});
+
+describe('the crew works around the lines you hold', () => {
+  it('traveller held hard down in a breeze: the crew sets the vang for it, keeping the main near its best shape', () => {
+    const b = testBoat({ heading: 318, kt: 5, windKt: 18 });
+    sail(b, 30); const vang = b.ctl.vang; takeLine(b, 'traveller'); (b.ctlTarget ??= {}).traveller = 1; sail(b, 30);
+    expect(b.ctl.traveller).toBeCloseTo(1, 2);
+    // the boom's already down to leeward on the traveller, so the crew eases the vang it had hard on (it doesn't
+    // undo its depowering: she's still overpowered in 18 kt)
+    expect(b.ctl.vang).toBeLessThan(vang - 0.15);
+    expect(shapeEfficiency(b.shape.main, targetShape('main', 18, b.awa, b.depower))).toBeGreaterThan(0.965);
+  });
+});
 
 describe('heaving to', () => {
   for (const W of [8, 12, 16, 20, 25]) it(`lies hove to in ${W} kt: bow 35–65° off, creeping ahead, slipping to leeward`, () => {
