@@ -82,17 +82,12 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   the first press; say so in the tiller hint. Owner: "one issue with double-click in browser is that it surfaces the
   browser menu. need to solve somehow." Over the 3D view only: no context menu, no double-click text selection, no
   double-tap zoom; menus and text selection still work on the panels. Test in Chrome, Safari and Firefox on a trackpad.
-- **Now — she sailed through the Golden Gate Bridge's north tower** (bug; 2–3 h; in progress: Charts): owner, "I just watched her sail
-  right through the north tower of the GGB. Let's make sure those obstacles are known." The bridges are drawn
-  (render/landscape.ts, render/bayBridge.ts) but aren't solid: geo/shore.ts knows the land, the marinas and the Wharf's
-  piers, not the towers. Make every structure standing in the water solid: both Golden Gate towers with their piers and
-  the south tower's fender, the Bay Bridge's piers and towers (their positions are still approximate, from the
-  overpass-api note under the Bay Bridge), and anything else drawn in the water. Solid for collisions, for the AI's and the
-  tiller pilot's look-ahead (landAlong) and the navigator's routes, on the chart, and as obstructions under Rule 19/20
-  (obstruction.ts). A test that sails a boat at each one. And their lee: owner, "there should also be a lee on the lee
-  side of the tower bases, no?" A bluff body leaves a wind shadow downwind (like the ships' and the committee boat's,
-  already in), and in the current a wake of slack water and eddies on its downstream side, shifting with flood and ebb;
-  size both from sourced bluff-body wake lengths, not by eye.
+- **Done — she sailed through the Golden Gate Bridge's north tower** (bug): every bridge pier and tower base standing in
+  the water is solid (NOAA's chart and OpenStreetMap; geo/shore.ts PIERS): collisions, the look-ahead, the navigator's
+  routes, Rules 19 and 20; the Golden Gate and the Bay Bridge's West Span re-laid on them. Each casts a wind shadow
+  downwind and a current wake downstream that turns with the tide (environment/pierWakes.ts). Tests: bridges.test.ts,
+  pierWakes.test.ts. Still open: the wake's constants for long rectangular piers (C_D by side ratio, the recirculation
+  length) and the bed friction c_f want primary sources (NACA TN 3038, Norberg 1993, Parnaudeau 2008 were out of reach).
 - **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
@@ -188,6 +183,13 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min). And the Hail icon (owner, "the hail button icon is the same as the
   sound icon. let's fix that too."): a distinct icon, a hand cupped to the mouth or a sailor calling, never a speaker or
   megaphone (that reads as Sound).
+- **Next — the flags: bring back the original motion, and strike the ensign in a blow** (polish + feature; 1–2 h; for
+  Boat Detail): owner, "I know we dialed down the flag flapping but the new flag physics are ugly and stiff. let's bring
+  back the original physics, and add an option to strike the ensign in high wind. not urgent. put the 'strike ensign'
+  button with the bottom-right controls, and only during cruise mode when winds are high." Restore the flag motion from
+  before it was toned down (render/boatMesh.ts flags; the earlier version is in git history). Add "Strike ensign" to
+  the bottom-right cluster (#viewBar), shown only in a cruise when the wind is high (threshold to propose, about 20 kt):
+  it lowers the ensign and its staff, and a second press hoists it again.
 - **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
@@ -237,12 +239,16 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done. And
    the crew's deliberate ease of the main on the last depowering steps (up to 7°, half luffing) flogs at no cost, in the
    speed search and on the water alike: price it in the search, then judge the main where it is.
-2. **No tactical wind shifts on most days.** Off observed days the only shifts are two fixed sine waves (120 s ±6°,
+2. ~~**No tactical wind shifts on most days.**~~ (done: environment/shifts.ts, fitted to FTPC1's record by kind of day and
+   strength, counted from when the course is laid, carried down the course; later: the lateral coherence (the sides of
+   the course) from two stations' records rather than assumed; the HUD's lift/header readout and the rules' wind (Overlap,
+   Rule 18's beat) still use the course-centre wind, not the boat's; shifts quicker than ~12 min aren't resolved by
+   6-minute samples) Off observed days the only shifts are two fixed sine waves (120 s ±6°,
    41 s ±2.5°, unsourced) and a 63 s ±8% pulse: about 1° rms change over 30–60 min, against Fort Point's 13–14° on
    10–15 kt westerlies (6-minute record, 492 days, racing hours) and 26–29° on 6–10 kt days. Beats are drag races; a
    fixed period can be timed. Fix: a seeded, broadband shift process fitted to FTPC1's structure function by kind of day
    and strength.
-3. **Shifts hit every boat at once.** Carried down the course with the wind (Taylor's frozen turbulence), the boat 300 m
+3. ~~**Shifts hit every boat at once.**~~ (done, but on a past day the record's shifts are still course-wide) Carried down the course with the wind (Taylor's frozen turbulence), the boat 300 m
    to windward gets a header about a minute before the one to leeward, and one side of the course gets a lift first.
    And on observed days the station's own 6-minute turbulence (about 5–6° of it) becomes a course-wide shift: smooth
    the record and hand the residue to the local turbulence (4).
@@ -273,7 +279,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    heave, so no hobby-horsing in the Bay's 2–3 s chop (her pitch period), no rolling on a reach, no surfing, and the
    telltales don't answer the pitching. The drawn hull rolls on the waves the physics doesn't have, so heel, sails and
    flags don't answer the same motion. Needs the wave field shared by the physics and render/waves.ts (render's owners).
-6. **The swell's yaw is wrong in kind** (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
+6. ~~**The swell's yaw is wrong in kind**~~ (done: a slender hull's Froude–Krylov moment) (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
    Froude–Krylov yaw goes as k²), and peaks abeam not on the quarter: up to 16° heading swings and 3% speed lost in a
    2 m 13 s swell outside the Gate, where it should be next to nothing.
 7. **No leeway** (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
@@ -291,8 +297,8 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
    42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own
    hove-to model).
-11. **The chop** (waves 3–6): it follows the wind at the boat, so a puff or a neighbour's lee changes her sea (it is set
-   by the wind over kilometres of fetch); it's fully grown at once (CEM: 3.4 h to fetch-limited on the Berkeley Circle
+11. **The chop** (waves 3–6): ~~it follows the wind at the boat, so a puff or a neighbour's lee changes her sea~~ (done:
+   the wind over the water); ~~it's fully grown at once~~ (done) (CEM: 3.4 h to fetch-limited on the Berkeley Circle
    in 18 kt, so 2.5× too big an hour into the breeze); ORC's polar already has a seaway drag in it (eq. 3.2, D_raw), so
    the chop is partly counted twice and "flat water" isn't flat (est. 1–3% upwind); and its added drag falls off too
    little toward the beam, so footing hardly pays.
@@ -476,7 +482,7 @@ The principle: everything you see on the water comes from the same wind, current
 ### Sea state in the physics — done (see README, Sea state)
 
 Done: wind chop from the wind over the water and the fetch on the real coastline (JONSWAP growth); swell from the SF Bar buoy record by month, dying away inside the Gate; wind against tide from wave–current physics; added resistance (footing pays in chop), wave yaw; flat-water or real, and a small/typical/big swell day. Later:
-- **Duration:** the chop takes time to build when the breeze fills in (today it's as if the wind had been blowing for hours).
+- ~~**Duration:** the chop takes time to build when the breeze fills in~~ (done: CEM's duration-limited growth, run up through the day's own wind from the calm morning; a set strength has been blowing for hours). Later: a sea that lingers as the wind drops.
 - **Pitching in the physics** (today it's visual): hobby-horsing in a short chop, and steering harder through it.
 - **Archived buoy data for a past race day** (with real past races), and the ocean wind sea through the Gate as its own component.
 - **Shoaling** over Harding Rock, Point Blunt and the bar.

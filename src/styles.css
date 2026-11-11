@@ -719,3 +719,6 @@ body.lashed .tg-lash{display:block}
 button.kkeys{background:none;border:1px solid transparent;border-radius:6px;padding:2px 4px;cursor:pointer;color:inherit;margin-left:auto}
 button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .krow.listening button.kkeys{border-color:var(--accent)}
+/* each bar's two ends, named under it (eased … on, leeward … windward) */
+.ctl-ends{grid-column:2;min-width:0;display:flex;justify-content:space-between;gap:3px;padding:0 8px;font:600 9.5px/1 var(--f-inst);letter-spacing:0;color:var(--muted);margin-top:-2px;white-space:nowrap}
+.ctl-row{grid-template-columns:96px minmax(0,1fr) 54px auto auto}

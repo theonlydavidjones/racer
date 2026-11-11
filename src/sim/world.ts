@@ -8,7 +8,8 @@ import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } f
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
-import { Puffs, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
+import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
+import { ShiftField, shiftStats } from '../environment/shifts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
@@ -21,6 +22,7 @@ import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
+import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
 import { harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
@@ -176,7 +178,7 @@ export class World {
   running = false;
   paused = false;
   speed = 1;
-  wind: Wind;
+  wind: Wind = { from: 0, kt: 0 };
   avgFrom: number; // ~1 min running mean of the wind direction, for lift/header calls
   boats: Boat[] = [];
   pairs: Record<string, PairRecord> = {};
@@ -263,6 +265,7 @@ export class World {
     { // the sea: the day's swell (or the adjuster's), and its chop × the adjuster's
       const sw = this.weather.swell(settings.swellDay ?? 1);
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs } : sw, settings.chop ?? 1);
+      this.sea.duration = this.seaDurationAt(this.clockUtc);
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -280,7 +283,12 @@ export class World {
       this.fieldArea = { c, half: half + 600 };
     }
     this.updateBreeze();
-    this.wind = windAt(this.windModel, this.t);
+    // the wind's shifts: on a past day, the record's own; otherwise a field with Fort Point's statistics for this kind of
+    // day and strength, carried down the course with the wind (environment/shifts.ts; its own random numbers, so the
+    // rest of the race draws what it did)
+    this.windModel.shifted = true;
+    if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
+    this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
@@ -404,10 +412,23 @@ export class World {
   nextMark(b: Boat): CourseMark | null { return this.freeSail ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
+  /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec): Vec {
-    if (!this.tide) return currentAt(p, this.cvec);
-    return this.tide.atShore(p);
+    return withPierWakes(p, this.streamAt(p), this.pierFlows(), this.t);
   }
+  private streamAt(p: Vec): Vec { return this.tide ? this.tide.atShore(p) : currentAt(p, this.cvec); }
+  /**
+   * The stream meeting each pier, refreshed every half minute (the tide turns over hours): the open water's (the
+   * stations' current there, or the preset), not eased by the shore relief, which would read the pier itself as shore.
+   */
+  private flowsT = NaN; private flows: Vec[] = [];
+  private pierFlows(): Vec[] {
+    if (!(Math.abs(this.t - this.flowsT) < 30) || (!this.tide && this.flowsC !== this.cvec)) {
+      this.flowsT = this.t; this.flowsC = this.cvec; this.flows = WAKE_PIERS.map(w => this.tide ? this.tide.at(w.c) : this.cvec);
+    }
+    return this.flows;
+  }
+  private flowsC: Vec | null = null;
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
@@ -416,7 +437,19 @@ export class World {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
     const f = this.fieldAt(p);
-    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift), kt: this.wind.kt * f.k * q.k * sh.k };
+    // (the shifts here against the course's centre: the boat to windward has the header first)
+    const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
+    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn), kt: this.wind.kt * f.k * q.k * sh.k * sk };
+  }
+  /** The wind's shifts (environment/shifts.ts), off on a past day (the record has its own). */
+  shifts: ShiftField | null = null;
+  /** The shift at the course's centre now, which the course-wide wind carries. */
+  private shiftRef = { turn: 0, k: 1 };
+  /** The course-wide wind now: the day's mean, with the shift at the course's centre. */
+  private courseWind(): void {
+    const w = windAt(this.windModel, this.t);
+    if (this.shifts) { this.shiftRef = this.shifts.at(this.fieldArea.c); w.from = n360(w.from + this.shiftRef.turn); w.kt *= this.shiftRef.k; }
+    this.wind = w;
   }
 
   /* ---------- the wind across the course (environment/weather.ts), cached on a grid ---------- */
@@ -490,6 +523,7 @@ export class World {
       addShipWake(sum, from, kt, v, SHIP_AIR[v.kind], ty.len, ty.beam, p);
     }
     if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
+    addPierWakes(sum, from, p);
     const r = sum.result(from);
     return { k: r.k * lee, shift: r.shift };
   }
@@ -497,8 +531,36 @@ export class World {
   /** The sea at any point, for the wind and current there. */
   seaHere(p: Vec): SeaHere {
     const c = this.currentAt(p);
-    return this.sea.at(p, windOnWater(this.windHere(p), c), c, q => this.currentAt(q));
+    return this.sea.at(p, windOnWater(this.seaWind(p), c), c, q => this.currentAt(q));
   }
+  /**
+   * The wind the sea is made by at p: the wind over the water around it (the day's field, the land's lee), not the
+   * puff passing or the sails a few lengths upwind. The chop is grown by the wind over kilometres of fetch over an
+   * hour or more (sea.ts), so a 30-second puff, a lull or another boat's dirty air doesn't change the sea she's in.
+   * `lee`: the land's lee here, if it's known (a boat's, refreshed twice a second).
+   */
+  seaWind(p: Vec, lee?: number): Wind {
+    // (the day's mean wind, not its shifts and pulses of a minute or two: the fetch is looked up by direction)
+    const f = this.fieldAt(p), m = this.windModel;
+    return { from: n360(m.base + f.turn), kt: m.kt * f.k * (lee ?? landLee(p, m.base)) };
+  }
+  /**
+   * How long the wind has been making the sea at time tMin (minutes since epoch, UTC; sea.ts SeaField.duration). When
+   * the wind follows the clock: grown from flat 8 hours before she sets out (the Bay's mornings are mostly calm) through
+   * the day's own wind, 10 minutes at a time (before a past day's record starts at 10:00, the records' wind for that kind
+   * of day); worked out once for each 10 minutes and kept, so the boats and the outlook see the same sea whenever they
+   * ask. A set strength has been blowing for hours: fully grown for its fetch.
+   */
+  seaDurationAt(tMin: number): number {
+    if (!this.seaBreeze) return Infinity;
+    const t0 = this.gunUtc - this.startAt / 60 - 8 * 60, U = (t: number) => (this.weather.covers(t) ? this.weather.at(t) : breezeAt(t, this.windDay, this.windKind)).kt * KT;
+    const nodes = this.seaNodes ??= [{ d: 0, u: 0 }], i = Math.max(0, Math.floor((tMin - t0) / 10));
+    if (nodes.length <= i) { const g = new SeaField(null); g.duration = nodes[nodes.length - 1].d; g.restore(nodes[nodes.length - 1].u); while (nodes.length <= i) { g.develop(U(t0 + (nodes.length - 1) * 10 + 5), 600); nodes.push({ d: g.duration, u: g.reckonedIn }); } }
+    const g = new SeaField(null), n = nodes[i]; g.duration = n.d; g.restore(n.u);
+    g.develop(U(t0 + i * 10 + 5), Math.max(0, (tMin - t0 - i * 10) * 60));
+    return g.duration;
+  }
+  private seaNodes?: { d: number; u: number }[];
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
@@ -521,7 +583,7 @@ export class World {
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
     f.setTime(now);
-    this.cvec = this.currentAt(this.C.center);
+    this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
 
@@ -532,15 +594,20 @@ export class World {
     this.steps++;
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
-    this.wind = windAt(this.windModel, this.t);
+    this.shifts?.step(dt, this.windModel.kt * KT, this.wind.from); // (the air, and its shifts, move on downwind)
+    this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
-    for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur); }
+    for (const b of this.boats) {
+      b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur);
+      b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
+    }
     this.vessels = this.traffic.vessels(this.trafficT);
+    if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     if (this.steps % 30 === 1) for (const b of this.boats) {
-      b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));
+      b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q));
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
@@ -942,7 +1009,7 @@ export class World {
     const h = twa != null ? n360(this.wind.from + twa) : u.h;
     u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.luff = false;
     u.cur = this.currentAt(u); u.ww = windOnWater(this.windHere(u, u), u.cur);
-    if (this.steps % 30 === 0) u.sea = this.sea.at(u, u.ww, u.cur, q => this.currentAt(q));
+    if (this.steps % 30 === 0) u.sea = this.sea.at(u, windOnWater(this.seaWind(u, u.leeK), u.cur), u.cur, q => this.currentAt(q));
     this.steps++;
     moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
     u.h = h; // held there

@@ -375,17 +375,18 @@ function buildBridge(scene: THREE.Scene, groundAt: (x: number, y: number) => num
   const ORANGE = new THREE.MeshPhongMaterial({ color: 0xc0362c, specular: 0x331a10, shininess: 12 });
   const DARK = new THREE.MeshPhongMaterial({ color: 0x8e2a22, shininess: 6 }); // recesses and shade
   const CONCRETE = new THREE.MeshLambertMaterial({ color: 0xb8b2a6 });
-  const centre = LL(37.81972, -122.47861), bearing = 356.5; // axis from the YRA tower positions and Fort Point → Lime Point (356–357°)
+  // the towers where they stand: OpenStreetMap's tower bases (ways 1329971884 and 1330832681, the same outlines that make
+  // them solid in geo/shore.ts PIERS): the midpoint between them, the line through them (354.7°), 1,285 m apart
+  const centre = LL(37.819765, -122.47855), bearing = 354.73;
   const g = new THREE.Group();
   const b = bearing * Math.PI / 180, ax = Math.sin(b), ay = Math.cos(b);
   g.position.set(centre.x, 0, -centre.y); g.rotation.y = Math.atan2(ax, -ay); // local z runs along the bridge (south → north), x across, y up
   scene.add(g);
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material = ORANGE) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
-  const HALF_SPAN = 640, SIDE = 343, LEG_X = 14.5, TOP = 227, SADDLE = 224, MID_CABLE = 81;
+  const HALF_SPAN = 642.3, SIDE = 343, LEG_X = 14.5, TOP = 227, SADDLE = 224, MID_CABLE = 81;
   const deckY = (z: number) => 67 - 6 * Math.min(1, (z / HALF_SPAN) ** 2) - (Math.abs(z) > HALF_SPAN ? 4 * Math.min(1.6, (Math.abs(z) - HALF_SPAN) / SIDE) : 0);
   for (const tz of [-HALF_SPAN, HALF_SPAN]) {
-    // the pier and its fender at the waterline
-    box(64, 12, 34, 0, 4, tz, CONCRETE);
+    // (the pier, and the south tower's fender, are drawn from their outlines with the other bridge piers: render/wharf.ts)
     // two legs, stepping in as they rise
     const steps: [number, number, number, number][] = [[0, 82, 11, 17], [82, 128, 10, 15], [128, 172, 9, 13], [172, TOP, 8, 11]];
     for (const sx of [-1, 1]) for (const [y0, y1, wx, dz] of steps) box(wx, y1 - y0, dz, sx * LEG_X, (y0 + y1) / 2, tz);
