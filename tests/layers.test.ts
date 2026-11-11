@@ -56,3 +56,16 @@ describe('fog: real visibility only', () => {
     expect(f({ x: 7500, y: 0 })).toBeNaN(); expect(f({ x: 0, y: -4000 })).toBeNaN();
   });
 });
+
+describe('the map\'s key', () => {
+  it('names every line the chart draws, from the same pens the map uses', async () => {
+    const { ENC, AREA_NAME, areaPen } = await import('../src/ui/encChart');
+    const { CHART_ORDER } = await import('../src/ui/legend');
+    const drawn = new Set(ENC.areas.map(a => a.k).filter(k => areaPen(k, INK.day, 0.25, 'chart')));
+    drawn.add('lane'); // (the lanes' direction arrows)
+    for (const k of drawn) { expect(AREA_NAME[k], k).toBeTruthy(); expect(CHART_ORDER, k).toContain(k); }
+    // the line west of Fort Point (122°29.07'W) is where three of them meet: the precautionary area, the caution areas
+    // (the VTS and the TSS) and a security zone (33 CFR 165.1183): each is in the key
+    for (const k of ['precaution', 'caution', 'restricted']) expect(drawn.has(k), k).toBe(true);
+  });
+});
