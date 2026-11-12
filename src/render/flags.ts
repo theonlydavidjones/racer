@@ -137,3 +137,50 @@ export class SignalMast {
     });
   }
 }
+
+/** Every signal on the RRS 2025–2028 Race Signals page that the committee doesn't fly in the sim, for the flag index. */
+export type IndexSignal = Flag | 'H' | 'V' | 'S' | 'C' | 'L' | 'M' | 'Y' | 'sub1' | 'orange' | 'blue';
+const extra = new Map<IndexSignal, HTMLCanvasElement>();
+/**
+ * A signal as drawn on the Race Signals page of the RRS 2025–2028 (World Sailing, July 2025 reissue: the page's own
+ * pictures, read by the researcher, 12 Nov 2026), in the International Code's colours. AP is the answering pennant
+ * (tapered, five red and white bands) and the First Substitute a triangle (blue, a yellow wedge at the hoist); the
+ * others are square. The sim's own flags come from flagCanvas.
+ */
+export function signalCanvas(f: IndexSignal): HTMLCanvasElement {
+  let c = extra.get(f);
+  if (c) return c;
+  const BLUE = '#1d3f8f', RED = '#c8202b', YEL = '#f5c400', BLK = '#111', WHT = '#fff';
+  c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!, fill = (col: string, x = 0, y = 0, w = W, h = H) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const outline = (pts: [number, number][]) => { g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 2; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.stroke(); };
+  const saltire = (col: string) => { g.strokeStyle = col; g.lineWidth = 16; g.beginPath(); g.moveTo(0, 0); g.lineTo(W, H); g.moveTo(W, 0); g.lineTo(0, H); g.stroke(); };
+  switch (f) {
+    case 'AP': { // the answering pennant: tapered, red and white in five bands from the hoist
+      const pts: [number, number][] = [[0, 4], [W, H * 0.32], [W, H * 0.68], [0, H - 4]];
+      g.save(); g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.clip();
+      for (let i = 0; i < 5; i++) fill(i % 2 ? WHT : RED, i * W / 5, 0, W / 5 + 1, H);
+      g.restore(); outline(pts); extra.set(f, c); return c;
+    }
+    case 'sub1': { // the First Substitute: a triangle, blue, with a yellow wedge against the hoist
+      const pts: [number, number][] = [[0, 2], [W, H / 2], [0, H - 2]];
+      g.save(); g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.clip();
+      fill(BLUE); g.fillStyle = YEL; g.beginPath(); g.moveTo(12, 18); g.lineTo(W * 0.62, H / 2); g.lineTo(12, H - 18); g.closePath(); g.fill();
+      g.restore(); outline(pts); extra.set(f, c); return c;
+    }
+    case 'H': fill(WHT, 0, 0, W / 2, H); fill(RED, W / 2, 0, W / 2, H); break; // white at the hoist, red at the fly
+    case 'V': fill(WHT); saltire(RED); break; // white, a red saltire
+    case 'S': fill(WHT); fill(BLUE, W / 3, H / 3, W / 3, H / 3); break; // white, a blue square in the middle
+    case 'C': for (let i = 0; i < 5; i++) fill([BLUE, WHT, RED, WHT, BLUE][i], 0, i * H / 5, W, H / 5 + 1); break; // blue, white, red, white, blue
+    case 'L': fill(YEL); fill(BLK, W / 2, 0, W / 2, H / 2); fill(BLK, 0, H / 2, W / 2, H / 2); break; // yellow and black quarters
+    case 'M': fill(BLUE); saltire(WHT); break; // blue, a white saltire
+    case 'Y': { fill(YEL); g.save(); g.beginPath(); g.rect(0, 0, W, H); g.clip(); g.strokeStyle = RED; g.lineWidth = 11; // yellow and red diagonal stripes
+      for (let x = -H; x < W + H; x += 30) { g.beginPath(); g.moveTo(x, H); g.lineTo(x + H, 0); g.stroke(); } g.restore(); break; }
+    case 'orange': fill('#ff6a00'); break;
+    case 'blue': fill(BLUE); break;
+    default: return flagCanvas(f);
+  }
+  outline([[1, 1], [W - 1, 1], [W - 1, H - 1], [1, H - 1]]);
+  extra.set(f, c);
+  return c;
+}

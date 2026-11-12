@@ -1,4 +1,5 @@
 import chart from '../geo/data/enc-chart.json';
+import marinPiers from '../geo/data/marin-piers.json';
 import { LL } from '../geo/geo';
 
 /**
@@ -8,8 +9,16 @@ import { LL } from '../geo/geo';
  * moved onto the charted coast and brought down to the water, and the hills rise from there.
  *
  * The chart's land comes in pieces cut at the chart cells' edges; edges with land on both sides are seams, not coast,
- * and are left out.
+ * and are left out. Piers on piles that the chart draws as land (the Moore Road Pier at Fort Baker:
+ * scripts/make-marin-piers.mjs) are water here, and drawn as piers (render/terrain.ts).
  */
+/** The piers the chart draws as land (OpenStreetMap's outlines, in the sim's metres). */
+export const CHART_PIERS: { name: string; pts: { x: number; y: number }[] }[] = (marinPiers as unknown as { piers: { name: string; pts: [number, number][] }[] }).piers
+  .map(p => ({ name: p.name, pts: p.pts.map(q => LL(q[0], q[1])) }));
+const inRing = (x: number, y: number, r: { x: number; y: number }[]) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if ((r[i].y > y) !== (r[j].y > y) && x < (r[j].x - r[i].x) * (y - r[i].y) / (r[j].y - r[i].y) + r[i].x) c = !c; return c; };
+const segD = (x: number, y: number, a: { x: number; y: number }, b: { x: number; y: number }) => { const vx = b.x - a.x, vy = b.y - a.y, t = Math.max(0, Math.min(1, ((x - a.x) * vx + (y - a.y) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(x - a.x - vx * t, y - a.y - vy * t); };
+/** On (or within `m` metres of) one of those piers. */
+const onPier = (x: number, y: number, m: number) => CHART_PIERS.some(P => inRing(x, y, P.pts) || P.pts.some((a, i) => segD(x, y, a, P.pts[(i + 1) % P.pts.length]) < m));
 export interface Coast {
   inside(x: number, y: number): boolean; nearest(x: number, y: number, max: number): { x: number; y: number; d: number } | null;
   /** the charted rocks and islets too small for the 50 m mesh (under ROCK m across), drawn as rocks of their own */
@@ -49,6 +58,7 @@ export function chartCoast(): Coast {
   }
   const inside = (x: number, y: number): boolean => {
     const b = Math.floor((y - y0) / B); if (b < 0 || b >= nb) return false;
+    if (onPier(x, y, 4)) return false; // (a pier on piles: water under it)
     let c = false;
     for (const e of bands[b]) {
       const ax = ex[e * 4], ay = ex[e * 4 + 1], bx = ex[e * 4 + 2], by = ex[e * 4 + 3];
@@ -63,6 +73,7 @@ export function chartCoast(): Coast {
     if (L < 0.01) continue;
     const mx = (ax + bx) / 2, my = (ay + by) / 2, nx = -(by - ay) / L * 1.5, ny = (bx - ax) / L * 1.5;
     if (inside(mx + nx, my + ny) === inside(mx - nx, my - ny)) continue; // a seam between two pieces of the chart's land
+    if (onPier(mx, my, 6)) continue; // (the outline of a pier the chart draws as land)
     for (let i = Math.floor(Math.min(ax, bx) / C); i <= Math.floor(Math.max(ax, bx) / C); i++)
       for (let j = Math.floor(Math.min(ay, by) / C); j <= Math.floor(Math.max(ay, by) / C); j++) {
         const k = key(i, j), l = cells.get(k); if (l) l.push(e); else cells.set(k, [e]);

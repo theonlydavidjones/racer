@@ -9,7 +9,7 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
+import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, skillOf, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedFactor, trimSpeedFactor } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -529,7 +529,9 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
 /** The fastest depowering step for her own crew as they are (how many, how heavy, how tired), in this wind. */
 function herFastestStep(b: Boat, twa: number, tws: number, plan: SailPlan, disp: number): StepPick {
   const cs = b.crew, spec = cs?.spec ?? DEFAULT_CREW, twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
-  return fastestStep(twsR, twaR, plan, disp, crewMass(spec), hikingMoment(spec, cs?.people.map(p => p.fatigue)), crewBestHeel(twaR, twsR, crewSkill(cs)), sittingMoment(spec));
+  // (each where they are: the deck's narrower aft, physics review)
+  const edges = cs?.people.map(p => crewEdgeAt(p.z)) ?? [];
+  return fastestStep(twsR, twaR, plan, disp, crewMass(spec), hikingMoment(spec, cs?.people.map(p => p.fatigue), edges), crewBestHeel(twaR, twsR, crewSkill(cs)), sittingMoment(spec, edges));
 }
 /**
  * What her sails push (N, drive less the keel's drag: netDrive) with these shapes at heel `heel` and depowering step
@@ -672,6 +674,19 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
     const hit = stern(b), pier = pierNear(hit, 6);
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
     bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
+  }
+  // set sideways onto something (the wind on her bare rig across her, at a dock, or her leeway): her side at the beam, amidships
+  // and at the quarters, half her beam (1.1 m) out on the side she's going; she stops against it, as against a fender
+  // (only while she's going more sideways than ahead: under way, what she meets she meets bow first, above)
+  // (her sideways motion over the ground: her slip through the water and the current's set across her)
+  const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y;
+  if (!b.pushing && Math.abs(side) > 0.005 && Math.abs(side) > 0.5 * Math.abs(ahead)) {
+    const sgn = Math.sign(side), hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
+    if (hit) {
+      const pier = pierNear(hit, 6);
+      b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
+      bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
+    }
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)

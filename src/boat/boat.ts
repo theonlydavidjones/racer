@@ -21,6 +21,8 @@ export interface AiState {
   width: number; // how far off the rhumb line before tacking back, m
   aware: boolean; // accounts for current on the approach
   clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
+  below?: boolean;
   /** Expensive start-timing predictions, refreshed 10 times a second. */
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
@@ -104,6 +106,7 @@ export interface Boat {
   penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
   started: boolean;
   ocs: boolean;
+  returning?: boolean; // Rule 21.1: after her start signal, not started, sailing back toward the pre-start side to start; kept by the World
   leg: number; // index of the next mark
   finished: boolean;
   /** retired from the race (RRS A5.1 RET): no longer racing, as if finished, but scored RET */
