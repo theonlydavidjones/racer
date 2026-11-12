@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RIG } from '../src/render/boatMesh';
 import { sailArea, sailEdges } from '../src/render/sails';
-import { CABIN, COCKPIT, L, halfBeam, sheer, uAtZ } from '../src/render/hull';
+import { CABIN, COCKPIT, L, deckY, halfBeam, sheer, uAtZ } from '../src/render/hull';
 import { carLead } from '../src/boat/controls';
 
 /** The drawn boat against the class rules (NFIA CR 2025–2028) and FRIDA's ORC certificate (EST F51, 2026). */
@@ -11,6 +11,10 @@ describe('the drawn rig and hull', () => {
     expect(RIG.FORESTAY_DECK.z + L / 2).toBeCloseTo(0.80, 3);
     expect(RIG.HOUNDS.y - RIG.DECK_AT_MAST).toBeCloseTo(6.50, 3); // IG
     expect(RIG.BOOM_TOP - RIG.DECK_AT_MAST).toBeCloseTo(1.00, 3); // BAS
+  });
+  it('puts the lower band\'s upper edge (the Lower Mast Point) 1000 ± 10 mm above the deck, along the mast\'s after side (CR 6.1.11)', () => {
+    const aft = RIG.MAST_Z + 0.133 / 2, deck = deckY(uAtZ(aft), 0);
+    expect(Math.abs(RIG.BOOM_TOP - deck - 1.0)).toBeLessThan(0.01);
   });
   it('gives the sails the certificate\'s areas: main 18.51 m², jib 7.30 m² (ORC feed, Area_Main and Area_Jib)', () => {
     expect(sailArea(RIG.MAIN_DEF)).toBeGreaterThan(18.51 * 0.98);
