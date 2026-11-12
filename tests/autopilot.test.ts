@@ -38,12 +38,13 @@ describe('the tiller pilot', () => {
     run(w, 10);
     engage(u, w.pilot, 'wind'); w.pilot.awa = 30; // wind 30° on the starboard bow... and she's on port tack: she'll come up to it
     w.pilot.awa = u.arel > 0 ? 30 : -30;
-    run(w, 60);
-    expect(Math.abs(u.arel - w.pilot.awa)).toBeLessThan(6);
+    // (the wind gusts and swings a few degrees second to second: the pilot's error is taken over its last 10 s)
+    const held = (secs: number) => { let e = 0; for (let i = 0; i < secs; i++) { run(w, 1); e += u.arel - w.pilot.awa; } return Math.abs(e / secs); };
+    run(w, 50); expect(held(10)).toBeLessThan(6);
     const before = u.tack;
-    tack(u, w.pilot); run(w, 40);
+    tack(u, w.pilot); run(w, 30);
     expect(u.tack).not.toBe(before);
-    expect(Math.abs(u.arel - w.pilot.awa)).toBeLessThan(8);
+    expect(held(10)).toBeLessThan(8);
   });
 
   it('the buttons turn the set course, and Standby leaves the tiller to you', () => {
