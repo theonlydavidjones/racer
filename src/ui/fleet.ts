@@ -45,6 +45,13 @@ export class Fleet {
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
     for (const el of [this.list, this.page]) el.addEventListener('click', e => this.click(e));
+    // (her crew's seats, on her page: picked from the members; none leaves the seat empty, the forward hand moving up)
+    this.page.addEventListener('change', e => {
+      const t = e.target as HTMLSelectElement, b = this.cur; if (!b || t.dataset.f !== 'seat') return;
+      const ids = [...(b.crewIds ?? [])], i = Number(t.dataset.v);
+      if (t.value) ids[i] = t.value; else ids.splice(i, 1);
+      b.crewIds = ids.filter(Boolean).slice(0, 2); this.hooks.changed(); this.hooks.membersChanged(); this.drawBoat();
+    });
     // (a member's page: their name, build, skill and ratings)
     this.list.addEventListener('change', e => {
       const t = e.target as HTMLInputElement, m = this.member(); if (!m || !t.dataset.m) return;
@@ -73,6 +80,8 @@ export class Fleet {
     this.list.hidden = true;
     this.drawBoat(); this.page.hidden = false; this.hooks.showroom(b);
   }
+  /** Straight to the members (from the race setup's crew line). */
+  openMembers(): void { this.tab = 'members'; this.memberId = null; this.openList(); }
   close(): void { this.list.hidden = true; this.page.hidden = true; this.hooks.showroom(null); }
 
   private click(e: Event): void {
@@ -157,6 +166,16 @@ export class Fleet {
   }
   private thumbJob = 0;
 
+  /**
+   * Her crew, by seat (the Yacht Club, phase 3): the middle crew (the main) and the forward hand (the jib, the cabin top,
+   * the pole), each picked from the club's members who crew, or none. A boat races with one or two (one rarely).
+   */
+  private crewRows(b: BoatSpec): string {
+    const ms = this.hooks.members().filter(m => m.id !== YOU && m.roles.includes('crew')), ids = b.crewIds ?? [];
+    const pick = (i: number) => `<select data-f="seat" data-v="${i}">${i === 1 || ids.length > 1 ? '<option value="">None</option>' : ''}${ms.map(m => `<option value="${esc(m.id)}"${ids[i] === m.id ? ' selected' : ''}${ids.includes(m.id) && ids[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
+    return `<tr><td>Middle crew</td><td>${pick(0)}</td></tr><tr><td>Forward hand</td><td>${pick(1)}</td></tr>`;
+  }
+
   /* ---------- her page ---------- */
   private drawBoat(): void {
     const b = this.cur!, log = logFor(b.id), rec = record(log), races = log.filter(e => e.kind === 'race');
@@ -165,7 +184,7 @@ export class Fleet {
     const colour = (list: [string, string][], c: string) => list.find(x => x[1] === c)?.[0] ?? '';
     const p = b.perf, ages = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
     this.page.innerHTML = `
-      <div class="bphead"><button type="button" class="linkbtn" data-f="toList">‹ Fleet</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
+      <div class="bphead"><button type="button" class="linkbtn" data-f="toList">‹ Yacht Club</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
       <div class="garage">
         <div class="gbtns"><button type="button" class="cta" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
         ${this.confirmDelete ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')} and her record? <button type="button" class="ghost danger" data-f="delYes">Delete</button><button type="button" class="ghost" data-f="delNo">Keep her</button></div>` : ''}
@@ -176,6 +195,7 @@ export class Fleet {
         ${row('Country', esc(countryName(b.sails.country) || '—'))}
         ${row('Yacht club', esc(clubName(b.club) || 'None'))}
         ${row('Skipper', skipperName(b))}
+        ${this.crewRows(b)}
         ${row('Home marina', esc(marinaName(b.marina) || 'None'))}
         ${row('Slip', slip ? `${slip.label.replace(/^Slip /, '')} (${dockName(slip.dock)}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
       </table></section>

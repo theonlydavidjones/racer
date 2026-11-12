@@ -29,8 +29,8 @@ import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
-import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
-import { ensureMembers, loadMembers, pullCrew, pushCrew, saveMembers, type Member } from './club/members';
+import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
+import { YOU, ensureMembers, loadMembers, pullCrew, pushCrew, saveMembers, type Member } from './club/members';
 import { SailBand } from './ui/sailBand';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
@@ -983,7 +983,7 @@ function courseCard(): void {
   $('setupBack').textContent = cruise ? '‹ Start page' : '‹ Race'; $('setupBack').dataset.home = cruise ? 'home' : 'race';
   $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
   { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
-    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Just you'}, ${Math.round(kg / LB)} lb aboard`; }
+    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Just you'}, ${Math.round(kg / 0.4536)} lb aboard`; }
   adjustUi();
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
@@ -1093,29 +1093,27 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
-/* Crew: how many, and each person's height, weight (shown in feet and inches, and pounds) and skill. */
-/** Skill levels to choose from (boat/crewPhys.ts: 0 novice … 1 expert). */
-const SKILLS: [number, string][] = [[0.25, 'Novice'], [0.6, 'Club racer'], [0.9, 'Expert']];
-const LB = 0.4536, IN = 0.0254;
-const fmtHeight = (m: number) => { const t = Math.round(m / IN); return `${Math.floor(t / 12)}'${t % 12}"`; };
-const parseHeight = (s: string): number | null => {
-  const ft = s.match(/^\s*(\d)\s*['’ ]\s*(\d{1,2})?\s*("|”)?\s*$/), cm = s.match(/^\s*(\d{3})\s*cm\s*$/i), inches = s.match(/^\s*(\d{2})\s*(in|")?\s*$/);
-  if (ft) return (Number(ft[1]) * 12 + Number(ft[2] ?? 0)) * IN; if (cm) return Number(cm[1]) / 100; if (inches) return Number(inches[1]) * IN; return null;
-};
+/**
+ * Your crew in the race setup (the Yacht Club, phase 3; the owner: the race setup "isn't where crew are configured",
+ * but you may swap people in and out there): you at the helm, then a pick for each seat from the club's members (the
+ * middle crew: the main; the forward hand: the jib, the cabin top, the pole), the seats swapped, and the members
+ * themselves set up in the Yacht Club. The count (Just you, You + 1, You + 2) sets how many seats.
+ */
 function crewRows(): void {
-  const c = S.crew ??= { ...DEFAULT_SETTINGS.crew }, rows = $('crewRows');
-  const people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, c.n).map((p, i) => ({ who: `Crew ${i + 1}`, p }))];
-  const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
-  rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}`).join('');
-  rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {
-    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); crewToClub(); newGame();
-  });
-  rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
-    const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
-    if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
-    else { const lb = Number(inp.value); if (lb > 70 && lb < 400) p.w = lb * LB; inp.value = String(Math.round(p.w / LB)); }
-    crewToClub(); newGame(); courseCard();
-  });
+  const rows = $('crewRows'), boat = S.boats.find(b => b.id === S.boatId) ?? S.boat, seats = boat.crewIds ?? [];
+  const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+  // (anyone who crews, and isn't on another seat of hers; someone on another of your boats can still be brought aboard)
+  const crewers = MEMBERS.filter(m => m.id !== YOU && m.roles.includes('crew'));
+  const seatName = (i: number) => (seats.length === 1 ? 'Crew' : i === 0 ? 'Middle: main' : 'Forward: jib, pole');
+  const pick = (i: number) => `<label>${seatName(i)} <select data-seat="${i}">${crewers.map(m => `<option value="${esc(m.id)}"${seats[i] === m.id ? ' selected' : ''}${seats.includes(m.id) && seats[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select></label>`;
+  const you = MEMBERS.find(m => m.id === YOU);
+  rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${seats.map((_, i) => pick(i)).join('')}`
+    + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
+    + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
+  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); newGame(); courseCard(); crewRows(); };
+  rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => { const ids = [...(boat.crewIds ?? [])]; ids[Number(sel.dataset.seat)] = sel.value; boat.crewIds = ids; changed(); });
+  rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
+  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openMembers(); });
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {

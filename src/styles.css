@@ -630,6 +630,11 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 details summary u{color:var(--accent);text-decoration:none;font-weight:700;margin-left:4px}
 .sibody{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--rule);border-radius:8px}
 .crewbox .crewrows{margin-top:6px}
+/* your crew in the race setup (app.ts crewRows): you, then a pick for each seat; set up in the Yacht Club */
+.crewline{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.crewline .crewyou{color:var(--text)}
+.crewline select{background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit}
+.crewline .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0}
 .boatsum .ghost.sm{white-space:nowrap}
 .step .coursecard{padding:8px 10px;gap:4px}
 .step .coursecard .rcpick{margin-bottom:4px}
