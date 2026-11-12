@@ -504,10 +504,14 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    error (the depth itself, 0.145/0.141, is still unsourced: no camber figure for a Folkboat, or ORC's flat against
    camber, was found). ORC's least flat is 0.42 since 2023 (VPP Documentation 2023, §5: "reduced to 0.42 from 0.62"),
    as the sim's flatOf has it.
-10. **In irons** (hull 3): at rest she turns 4°/s the way the tiller points and sails off; a real boat gathers sternway
-   and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
-   42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own
-   hove-to model).
+10. **In irons** (hull 3): ~~at rest she turns 4°/s the way the tiller points and sails off~~ (done, branch in-irons:
+   with her sails up she gathers sternway, the rudder works backwards by its flow, and the 4°/s at a crawl is sculling,
+   only as RRS 42.3(d) and World Sailing's interpretations allow: from above close-hauled to either tack's close-hauled
+   course, not back against itself, not against a backed jib; backing the jib keeps her sternway). ~~No yaw inertia~~
+   (done, branch yaw-inertia: her turn answers the helm with the hove-to model's own time constant, 0.6 s at 4.7 kt,
+   2.8 s at 1 kt). Open, unsourced either way: sternway in a breeze (2.2 m/s in 22 kt, 2.7 in 28, on the ahead
+   resistance curve going astern: a transom-first hull may drag more); held amidships head to wind she never sheers
+   off; in 6 kt held head to wind she makes a little headway as she rolls from side to side (the roll's sweep).
 11. **The chop** (waves 3–6): ~~it follows the wind at the boat, so a puff or a neighbour's lee changes her sea~~ (done:
    the wind over the water); ~~it's fully grown at once~~ (done) (CEM: 3.4 h to fetch-limited on the Berkeley Circle
    in 18 kt, so 2.5× too big an hour into the breeze); ORC's polar already has a seaway drag in it (eq. 3.2, D_raw), so
@@ -706,6 +710,19 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
+
+## Training tools (owner, 12 November; not ranked yet: the owner will rank them)
+
+Owner: "As part of the training tools suite, let's build a sort of midair wind indicator, like an arrow or series of
+arrows floating in the air showing where the wind is. Ideally we could also build a second view showing how the wind is
+traveling over the hull and sails to help players learn about sail shape and laminar flow."
+
+- **A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
+  wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
+  the rig (already in the physics) can be seen.
+- **A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+  jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
+  model. True to the physics, and labelled where it's illustrative.
 
 ## Next up
 

@@ -11,7 +11,7 @@
  * power by propeller momentum (actuator-disc) theory, the textbook starting point (e.g. Carlton, Marine Propellers and
  * Propulsion, ch. 8): an ideal disc of area A absorbing power P at rest gives T = (2ρA)^(1/3)·P^(2/3); a real prop gets a
  * fraction of that, its figure of merit (FIGURE_OF_MERIT, an estimate). Moving through the water at v the thrust falls
- * roughly in a straight line to nothing at the prop's pitch speed (where each turn advances the boat one pitch: no slip,
+ * (approximated as a straight line: an estimate of the shape, the usual first approximation) to nothing at the prop's pitch speed (where each turn advances the boat one pitch: no slip,
  * no thrust), pitch × prop rpm. Reverse is weaker than ahead (the blades work backwards: REVERSE, an estimate). The rated
  * power is the crank's; the gearbox takes perhaps 5–10% of it, inside the figure of merit's uncertainty.
  * For the 3.5 that's about 400 N at rest (90 lbf), falling to nothing at about 7.6 m/s (15 kt).
@@ -37,7 +37,8 @@ export const REVERSE = 0.5;
  * 4 cm thick by 35 cm deep (Cd about 0.1 on its frontal area, 0.014 m²) and the prop's disc (0.028 m², Cd about 0.3
  * stopped). Tilted up: nothing. */
 export const LEG_CDA = 0.010;
-/** Tick-over's share of full power: (1,150 / 5,500 rpm)³. */
+/** Tick-over's share of full power: (1,150 / 5,500 rpm)³ (an estimate: a small four-stroke's usual idle, and a fixed prop's
+ * power going as its rpm cubed). */
 export const IDLE = (1150 / 5500) ** 3;
 
 /** Her motor's state (on her, while she has one on the bracket). */

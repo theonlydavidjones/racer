@@ -722,8 +722,8 @@ export class World {
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
     for (const b of this.boats) {
-      if (b.docked) { this.dockStep(b, dt); continue; }
-      if (b.handled) { this.handStep(b, dt); continue; }
+      if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
+      if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
