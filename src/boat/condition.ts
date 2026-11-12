@@ -2,6 +2,7 @@ import { SAIL_WEAR, type SailRig, type SailWear } from './controls';
 import type { BoatSpec } from './spec';
 import { HULL } from './dynamics';
 import { dCfAt, fouling, type Fouling } from './fouling';
+import { OUTBOARDS } from './motor';
 
 /**
  * Your boat's condition, in physical terms: what each setting in the Boat panel does to her.
@@ -40,7 +41,8 @@ export interface Condition {
 const G = 9.81;
 /** A wooden rig's extra weight aloft (kg) and how far above the bilge correctors it sits (m). */
 const WOOD_RIG = { kg: 9, dz: 5.3 };
-const OUTBOARD_KG = 13;
+/** Her outboard's weight (kg): boat/motor.ts OUTBOARDS, by her motor (the 3.5's unless she says). */
+const outboardKg = (s: BoatSpec) => OUTBOARDS[s.perf.outboardHp ?? 3.5].kg;
 /**
  * How much a mast bends, relative to aluminium (all alike) and to the average wooden mast, which the aluminium mast
  * was designed to match: in the class bend test (16 kg hung 4.8 m from the top), wooden masts measure about
@@ -55,9 +57,9 @@ const STATION = { transom: 3.45, locker: 2.3 };
 export function condition(s: BoatSpec, month = 9): Condition {
   const f = fouling(s.perf.cleanedWeeks, month), finish = s.perf.finish;
   const ob = s.perf.outboard;
-  const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : OUTBOARD_KG);
+  const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : outboardKg(s));
   // gear sits about amidships (no moment); the outboard aft
-  const extraMoment = ob === 'bracket' ? -OUTBOARD_KG * STATION.transom : ob === 'stowed' ? -OUTBOARD_KG * STATION.locker : 0;
+  const extraMoment = ob === 'bracket' ? -outboardKg(s) * STATION.transom : ob === 'stowed' ? -outboardKg(s) * STATION.locker : 0;
   const wood = s.perf.mast === 'wood';
   return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
@@ -65,7 +67,7 @@ export function condition(s: BoatSpec, month = 9): Condition {
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
-      + (ob === 'bracket' ? -OUTBOARD_KG * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
+      + (ob === 'bracket' ? -outboardKg(s) * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
   };
 }
 

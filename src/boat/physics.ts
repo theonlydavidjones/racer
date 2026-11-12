@@ -5,6 +5,7 @@ import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
+import { motorForce } from './motor';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
@@ -114,7 +115,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // jib aback: the polar no longer says how she sails, so the forces on her do (heaving to)
   // (it takes the clew a degree to windward to start, and none at all to stop, so she doesn't flicker between the two)
   const canHeave = b.isUser && !b.docked && !b.pushing && sailPlan(b) === 'jib' && (b.rig?.jib ?? 1) > 0.5; // (in irons, drifting astern, backing the jib is the way out)
-  b.hove = canHeave && ((b.jibBacked ?? 0) > 0.2 || (!!b.hove && (b.jibBacked ?? 0) > 0));
+  b.hove = canHeave && !(b.motor?.running && b.motor.down && b.motor.gear !== 'N') && ((b.jibBacked ?? 0) > 0.2 || (!!b.hove && (b.jibBacked ?? 0) > 0));
   if (b.hove) { heaveTo(b, dt, t, emit, groundToast); return; }
   const ww = b.ww;
   // turn rate falls off at low speed: a Folkboat needs water flowing over the rudder
@@ -274,13 +275,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // zone, where she stops (the flogging cloth only as much as is hoisted; struck, the bare rig's windage at any angle
   // forward of the beam)
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
   // (on a bare rig: with her sails struck, as at the dock. With them up, in irons, she'd drift astern too, but the AI's
   // sailing doesn't yet reckon with sternway, so there she stops, as before: ROADMAP, for Deep Physics and the AI)
-  const v1 = b.v + a * dt, bareRig = hm + hj < 0.5;
+  // (the motor in reverse drives her astern whatever sail she has up)
+  const v1 = b.v + a * dt, bareRig = hm + hj < 0.5 || motorForce(b) < 0;
   if (v1 >= 0 || !bareRig) b.v = Math.max(0, v1); else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
   // (headway and sternway are one motion through the water: netted, so the drag on each doesn't push the other)
   if (b.v > 0 && (b.astern ?? 0) > 0) { const n = b.v - b.astern!; if (n >= 0) { b.v = n; b.astern = 0; } else { b.v = 0; b.astern = -n; } }

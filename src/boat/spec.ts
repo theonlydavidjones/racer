@@ -50,6 +50,8 @@ export interface BoatSpec {
     mast: SparMaterial; boom: SparMaterial;
     mastStiffness: 'soft' | 'average' | 'stiff'; // a wooden mast's own character (aluminium masts are all alike)
     outboard: 'none' | 'stowed' | 'bracket'; // left ashore, stowed below, or on its transom bracket (lifted)
+    /** which outboard (boat/motor.ts): 2.5, 3.5 (the usual) or 6 hp */
+    outboardHp?: 2.5 | 3.5 | 6;
     gearKg: number; // gear and stores beyond the racing minimum
   };
 }

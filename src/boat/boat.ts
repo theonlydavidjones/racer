@@ -73,6 +73,8 @@ export interface Boat {
   lightsOff?: boolean;
   /** Sternway, m/s: pushed off astern, she coasts back, slowing, and steers backwards. */
   astern?: number;
+  /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
+  motor?: import('./motor').MotorState;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
