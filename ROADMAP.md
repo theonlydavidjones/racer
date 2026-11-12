@@ -40,6 +40,12 @@ What's planned, roughly in order. Done work is described in the README.
    forward of it mid-route, so the figure sits and stands at the old spot for a second or more (20 kt tack: crew 1 at
    2.245 while the physics has her at 1.65). A naive fix upsets other moves, so it's its own piece of work. Done when
    tests/crewfig.test.ts samples every figure at 0.05, not only the helm, and passes.
+   Parked for the owner to choose (Crew Figures, 12 November; minor by the visual round): in a tack in 12–16 kt the two
+   crew's hips pass within 0.21–0.23 m mid-cockpit for 1–1.3 s (8 and 20 kt are clean). The forward hand's deck seat
+   (1.65, just aft of the jib winch) and the aft hand's climb-out point to pass the thwart (1.85) are only 0.2 m apart,
+   both physical limits. Options: (1) a sit-and-swing over the thwart inside the cockpit (sit on it, legs over, step
+   down onto the after shelf), properly staged; or (2) the main hand tacks the mainsheet from aft of the thwart, at the
+   after shelf, so he never passes forward along the deck (a change to the tack role's station: physics and a pose).
 3. ~~Crystal clarity on the crew and trim controls~~ (done, live in v134: the band with the main halyard renamed, the jib
    halyard, the Auto-trim and Pole tabs, the windex and the Hail tab, v120–v129; the chase-view layout, v129; every RRS
    2025–2028 race signal in the flag index and one-line messages with the log, v132; line colours in the boat editor and
