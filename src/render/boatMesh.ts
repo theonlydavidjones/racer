@@ -220,10 +220,18 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     woodTop.push(new THREE.BoxGeometry(2 * hw + 0.08, 0.03, 0.05).toNonIndexed().translate(0, sill - 0.015, z1 + 0.005));
   }
+  // the grab rails: along most of the cabin top, from abreast the jib cars' forward ends to near its after end, bent to
+  // the roof's curve (it slants down forward), about halfway between the hatch's runner and the roof's edge (Josephine:
+  // the owner's photo from the mast). Each a varnished rail on its feet, the hand-holds between them.
   for (const s of [1, -1]) {
-    // (about halfway between the hatch's runner and the roof's edge, as on Josephine: the owner's photo from the mast)
-    const gu = HANDRAIL_U, gx = s * HANDRAIL_X;
-    woodTop.push(new THREE.BoxGeometry(0.04, 0.05, 1.2).toNonIndexed().translate(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)));
+    const z0 = HANDRAIL_Z0, z1 = -L / 2 + CABIN.u1 * L - 0.08, N = 24, x = s * HANDRAIL_X;
+    const top = (z: number) => cabinTopAt(uAtZ(z), x);
+    for (let i = 0; i < N; i++) {
+      const za = z0 + (z1 - z0) * i / N, zb = z0 + (z1 - z0) * (i + 1) / N, ya = top(za) + 0.045, yb = top(zb) + 0.045;
+      const seg = new THREE.BoxGeometry(0.032, 0.025, Math.hypot(zb - za, yb - ya) + 0.002).toNonIndexed();
+      seg.rotateX(-Math.atan2(yb - ya, zb - za)); seg.translate(x, (ya + yb) / 2, (za + zb) / 2); woodTop.push(seg);
+    }
+    for (let k = 0; k <= 4; k++) { const z = z0 + 0.02 + (z1 - z0 - 0.04) * k / 4; woodTop.push(new THREE.BoxGeometry(0.032, 0.04, 0.05).toNonIndexed().translate(x, top(z) + 0.02, z)); } // its feet
   }
   for (const g of woodTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
   grp.add(new THREE.Mesh(mergeGeometries(woodTop, false)!, MAT.wood));
@@ -368,6 +376,8 @@ const CABIN_Z0 = -L / 2 + CABIN.u0 * L, CABIN_Z1 = -L / 2 + CABIN.u1 * L;
 const TRACK = { bar: 0.127, leg: 0.178 };
 /** The cabin-top grab rails: their middle station, and how far out (m), halfway between the hatch's runner and the roof's edge there. */
 const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.hw + 0.045 + cabinHalf(HANDRAIL_U) - CABIN_LEAN) / 2;
+/** Where the grab rails begin forward: level with the jib car tracks' forward ends (the owner). */
+const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 /** The jib winch's height, base to the top of its drum's cap. */
@@ -525,9 +535,9 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // its dual-ended control line: from the blocks on the quarters, forward along the inside of the hull to a cam
   // cleat at each end of the thwart, where the thwart meets the hull
   for (const side of [1, -1]) {
-    const x = side * (tw - 0.02), foot = new THREE.Vector3(side * 0.3, sheer(1) - 0.05, 3.62);
+    const x = side * (tw - 0.02), foot = new THREE.Vector3(side * 0.3, sheer(1) - 0.12, 3.5); // (under the after deck: it runs below it, out of sight, and comes up at the thwart's end)
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.06), CAM_GREEN); cl.position.set(x, ty + 0.017, TRAV_Z); grp.add(cl); // green cam cleats, as on Josephine
-    grp.add(line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay'));
+    grp.add(line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.12, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty - 0.06, TRAV_Z + 0.04), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay'));
     grp.add(line([new THREE.Vector3(x, ty + 0.03, TRAV_Z - 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.06)], 'backstay')); // the tail
   }
   // vang: a tackle from the boom down to the foot of the mast
@@ -551,7 +561,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     // tracks lying flat on the roof, inboard and outboard of the car's run, with their pin holes; across them a bar, pinned
     // to both at the car's fore–aft hole, carrying the car, which slides along it to its athwartships hole (syncBoatMesh
     // moves the bar with the car)
-    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1), zm = (a.z + b2.z) / 2, len = TRACK.leg;
+    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1), zm = HANDRAIL_Z0 + TRACK.leg / 2, len = TRACK.leg; // (its forward end level with the grab rail's)
     const legX = [(a.x + b2.x) / 2 - side * (TRACK.bar / 2 - 0.008), (a.x + b2.x) / 2 + side * (TRACK.bar / 2 - 0.008)];
     for (const x of legX) {
       const u = uAtZ(zm), y = cabinTopAt(u, x), slope = (cabinTopAt(u, x + 0.01) - cabinTopAt(u, x - 0.01)) / 0.02;

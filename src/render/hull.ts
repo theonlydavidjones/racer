@@ -555,7 +555,10 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   out.push(strip(span(shelfFwd, zA, 6).map(u => [V(-sh(u), seat, zAt(u)), V(sh(u), seat, zAt(u))]))); // the after shelf's top
   panel.push(face(shelfFwd, [...hullSide(us, 1, true), ...hullSide(us, -1, false)])); void wsh; // its front, a solid panel out to the hull each side
   const w1 = benchOut(u1), ya = deckY(u1, 0);
-  lining.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
+  // the after wall, over the shelf: its top follows the deck's camber, which falls away outboard (a flat top at the
+  // centreline's height stood up through the deck at its corners)
+  { const N = 8; for (let i = 0; i < N; i++) { const xa = -w1 + 2 * w1 * i / N, xb = -w1 + 2 * w1 * (i + 1) / N;
+    lining.push(quad(V(xa, seat, zA), V(xb, seat, zA), V(xb, deckY(u1, Math.abs(xb)) - 0.004, zA), V(xa, deckY(u1, Math.abs(xa)) - 0.004, zA))); } void ya; }
   return { teak: out, lining, panel };
 }
 
