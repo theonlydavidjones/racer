@@ -139,6 +139,19 @@ export function buildCourse(f: CourseFile, opt: CourseOptions): Course {
   return prepCourse(C);
 }
 
+/**
+ * Which legs are beats, reaches and runs, in the wind from `from` (the course's own at the gun; mid-race, after a change of
+ * conditions, the new wind's: whether two boats are on a beat to windward, for rule 18.1(a), is a matter of the wind they're
+ * in, not the wind the course was laid for).
+ */
+export function classifyLegs(C: Course, from: number): void {
+  C.marks.forEach(m => {
+    const off = Math.abs(wrap(from - brg(m.p.x - m.prev.x, m.p.y - m.prev.y)));
+    m.beat = off < 55;
+    m.leg = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
+  });
+}
+
 /** Derived geometry: line frame, which legs are beats, pass-side and rounding vectors. */
 function prepCourse(C: Course): Course {
   const center = { x: (C.committee.x + C.pin.x) / 2, y: (C.committee.y + C.pin.y) / 2 };
@@ -150,9 +163,6 @@ function prepCourse(C: Course): Course {
   C.marks.forEach((m, i) => {
     const prev = i === 0 ? center : C.marks[i - 1].p, next = i === n - 1 ? center : C.marks[i + 1].p;
     m.prev = prev; m.next = next;
-    const off = Math.abs(wrap(C.base - brg(m.p.x - prev.x, m.p.y - prev.y)));
-    m.beat = off < 55;
-    m.leg = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
     if (m.type === 'pass') {
       const d = unit(sub(next, prev)); m.dir = d;
       m.sv = m.side === 's' ? { x: -d.y, y: d.x } : { x: d.y, y: -d.x };
@@ -162,6 +172,7 @@ function prepCourse(C: Course): Course {
       else m.r = unit({ x: -s.x, y: -s.y });
     }
   });
+  classifyLegs(C, C.base);
   const last = C.marks[n - 1].p;
   C.finishSign = dot(sub(last, center), N) < 0 ? 1 : -1;
   return C;
