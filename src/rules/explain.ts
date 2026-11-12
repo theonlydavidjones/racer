@@ -142,7 +142,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
     case '23':
       if (e.kind === 'blanket') {
-        const not = e.part === '23.1' ? 'had finished or retired, so you weren\'t racing any more,' : 'were above your proper course';
+        const not = e.part === '23.1' ? 'had finished or retired, so you weren\'t racing any more,' : 'had left your proper course (sailing above it, or bearing away well below it)';
         const them = e.part === '23.1' ? 'still racing' : 'on another leg, taking a penalty or returning to start';
         what = you ? `You ${not} and your sails sat on the wind of ${o}, who was ${them}, for several seconds. Taking a boat's wind interferes with her as much as getting in her way.`
           : `${o} ${e.part === '23.1' ? 'had finished or retired and' : 'left their proper course and'} took your wind for several seconds while you were ${e.part === '23.1' ? 'still racing' : 'on another leg, taking a penalty or returning to start'}.`;
