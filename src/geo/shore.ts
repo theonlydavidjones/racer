@@ -123,6 +123,8 @@ const inLimePoint = (p: Vec): boolean | null => p.x >= LP.x0 && p.x <= LP.x1 && 
 export const onGround = (p: Vec): boolean =>
   inBasin(p) ? hitsHarbor(p) : hitsHarbor(p) || (p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : (inLimePoint(p) ?? inTerrain(p)) || inCityfront(p));
 /** The box OpenStreetMap's Lime Point coastline governs (render/terrain.ts fits the hills to it there). */
+/** Lime Point's land outline (the coast, closed inland through the box's north-west corner). */
+export const limePointLand = (): Vec[] => LP.land;
 export const limePointBox = (): { x0: number; x1: number; y0: number; y1: number } => ({ x0: LP.x0, x1: LP.x1, y0: LP.y0, y1: LP.y1 });
 
 /**

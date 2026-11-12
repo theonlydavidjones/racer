@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
-import { limePointBox, onGround } from '../geo/shore';
+import { limePointBox, limePointLand, onGround } from '../geo/shore';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -98,6 +98,20 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue;
       H[k] = onGround(p) ? Math.max(H[k], 2.5) : -30;
     }
+    // the shore's own vertices kept low: a 50 m triangle from a hilltop vertex down to a water one would otherwise run
+    // out over the water as a fin (the bluffs rise from the next row in)
+    const shore: number[] = [];
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+      if (H[k] <= 0 || p.x < b.x0 - dx || p.x > b.x1 + dx || p.y < b.y0 + dy || p.y > b.y1 - dy) continue;
+      if ([-1, 1, -nx, nx, -nx - 1, -nx + 1, nx - 1, nx + 1].some(o => H[k + o] <= 0)) shore.push(k);
+    }
+    for (const k of shore) H[k] = 2.5;
+    // and the point's own outline as low rock under the hills, for what's finer than the 50 m mesh: the spit the Lime
+    // Point light stands on, the neck behind the north tower's base
+    const sh = new THREE.Shape(); limePointLand().forEach((q, i) => i ? sh.lineTo(q.x, q.y) : sh.moveTo(q.x, q.y));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 4.2, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -2, 0); // (top at 2.2 m, under the terrain's 2.5 m shore)
+    scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x8b7f6d }))); // (the palette's rock)
   }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
