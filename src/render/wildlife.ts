@@ -201,7 +201,7 @@ function seaLionGeo(sitting: boolean, bull: boolean, swimming = false): THREE.Bu
   });
   // the hind flippers: two broad lobes at the tail, turned forward under the body
   const tail = st[st.length - 1];
-  const hind = [-1, 1].map(sx => { const g = plate([[0, 0], [sx * 0.2, -0.05], [sx * 0.28, 0.18], [sx * 0.08, 0.12]].map(([x, z]) => [x * k, z * k] as [number, number]), 0.02, flip, 0.02); g.translate(sx * 0.04, 0, tail.z - 0.12 * k); return g; });
+  const hind = [-1, 1].map(sx => { const g = plate([[0, 0], [sx * 0.2, -0.05], [sx * 0.28, 0.18], [sx * 0.08, 0.12]].map(([x, z]) => [x * k, z * k] as [number, number]), tail.y - 0.08 * k, flip, 0.02); g.translate(sx * 0.04, 0, tail.z - 0.12 * k); return g; }); // (at the tail, wherever the body carries it)
   return merge([body, ...ears, ...eyes, ...fore, ...hind]);
 }
 /** The coats: females and young tawny brown, some dry and pale, some wet and dark; bulls dark brown. */
@@ -577,7 +577,9 @@ export class Wildlife {
     if (sp > 0.05) {
       const h = Math.atan2(b.v.x, b.v.z), hp = Math.atan2(vPrev.x, vPrev.z), om = dt > 0 ? (((h - hp + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) / dt : 0;
       const bank = typeof wing === 'number' ? Math.atan(sp * om / 9.81) : 0;
-      b.bank += (Math.max(-0.8, Math.min(0.8, bank)) - b.bank) * Math.min(1, dt * 4);
+      // (a pelican in a line holds its place with small corrections, flying straight: it hardly banks)
+      const most = b.kind === 'pelican' ? 0.15 : 0.8;
+      b.bank += (Math.max(-most, Math.min(most, bank)) - b.bank) * Math.min(1, dt * 4);
       b.g.rotation.set(0, h + Math.PI, 0, 'YXZ');
       b.g.rotation.x = wing === 'dive' ? -1.3 : Math.atan2(b.v.y, sp) * 0.5; // nose down in a plunge, a little with the climb
       b.g.rotation.z = b.bank; // + rolls the right wing up: a left turn
