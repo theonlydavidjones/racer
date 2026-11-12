@@ -217,13 +217,13 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // leeway: the polar's angles are the angles of her course through the water (ORC's VPP solves for the leeway), so her
   // speed is the polar's at her heading's angle plus the leeway she makes there: the side force across the water against
   // the keel's lift at the polar's speed, F = ½ρ·πT²·v²·λ (slender-wing lift, Newman §5.12, as HOVE and rollStep take it):
-  // about 4–5° close-hauled, nothing downwind. Steering to the beat angle means steering that much higher.
-  // (the polar's speed at her course's angle, the leeway that makes, again: twice is enough)
+  // 3–6° close-hauled (6 to 20 kt), nothing downwind. Steering to the beat angle means steering that much higher.
   const Fside = F * Math.cos((b.heelMag ?? 0) * D2R), lwAt = (v: number) => twa < 150 ? clamp(Fside / (0.5 * 1025 * Math.PI * orc.boat.draft ** 2 * Math.max(0.8, v) ** 2) / D2R, 0, 12) : 0;
-  // (her steady leeway, over a few seconds: what a helmsman allows for, and the polar's frame; the instant slip is b.sway)
-  const lwNow = lwAt(polar(ww.kt, Math.min(180, twa + lwAt(polar(ww.kt, twa, plan))), plan));
+  // (her steady leeway, over a few seconds: what a helmsman allows for, and the polar's frame; the instant slip is b.sway.
+  // The polar's speed at her course's angle, by the leeway she had: settled over the seconds, it needs no iterating)
+  const vAt = polar(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), plan), lwNow = lwAt(vAt);
   b.leeway = b.leeway == null ? lwNow : b.leeway + (lwNow - b.leeway) * Math.min(1, dt / 3);
-  const vPolar = polar(ww.kt, Math.min(180, twa + b.leeway), plan);
+  const vPolar = vAt;
   let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * heelWettedFactor(vPolar, b.heelMag!, crewBestHeel(Math.min(180, twa + b.leeway), ww.kt)) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
@@ -900,8 +900,9 @@ export function sailWind(from: number, windKt: number, h: number, v: number, swa
   return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
 }
 
-/** Her slip to leeward on the tack she's on (deg; her course is that much further off the wind than her heading). */
-const leeSlip = (b: Boat) => b.v > 0.3 ? Math.atan2(b.tack === 'S' ? -(b.sway ?? 0) : (b.sway ?? 0), b.v) / D2R : 0;
+/** Her slip to leeward on the tack she's on (deg; her course is that much further off the wind than her heading). Just
+ * round from a tack, still sliding toward the old leeward side, none. */
+const leeSlip = (b: Boat) => b.v > 0.3 ? Math.max(0, Math.atan2(b.tack === 'S' ? -(b.sway ?? 0) : (b.sway ?? 0), b.v) / D2R) : 0;
 
 /**
  * The frame the sails are trimmed and their forces read in (ORC's: the wind across her course through the water, her
