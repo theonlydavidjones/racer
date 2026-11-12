@@ -270,7 +270,8 @@ function courseSection(o: Outlook, legs: LegPlan[]): BriefSection {
   return { id: 'legs', title: 'The course: which way on each leg', lede: 'Each leg is sailed on paper three ways, at the Folkboat\'s polar speeds in the wind and current the day brings along the way: going left first and tacking (or gybing) on the layline, going right first, and staying near the middle. Left and right are looking upwind, as sailors say it; the direction in brackets says where on the water that is. The best plan is drawn on the map. Each is then tested against the forecast being off, to say how sure the call is. The times are for a perfect sail (about 8 s lost in each tack or gybe): upwind, a race typically takes about a tenth longer, and more on the first beat and round the first mark, where the fleet is bunched.', items };
 }
 
-/** The other boats: what you know about them. */
+/** The other boats: what you'd hear about them at the club (the owner, 12 November: gossip, not their attributes, which
+ * you discover by racing; with Seasons it can draw on what you've seen each do). */
 function fleetSection(w: World): BriefSection {
   const items: BriefItem[] = [];
   const opp = w.boats.filter(b => !b.isUser);
@@ -289,7 +290,7 @@ function fleetSection(w: World): BriefSection {
     }
     return `${b.name} (${b.no}): ${bits.join('; ')}.`;
   };
-  if (opp.length) items.push({ head: `${opp.length} boat${opp.length === 1 ? '' : 's'}`, src: 'model', text: opp.map(describe).join(' ') + ' (What the fleet knows of each other from racing together; the habits are how the AI skippers here sail.)' });
+  if (opp.length) items.push({ head: `${opp.length} boat${opp.length === 1 ? '' : 's'}`, src: 'model', text: opp.map(describe).join(' ') + ' (Club gossip: what you\'d hear about each of them at the bar. How good each skipper really is, you find out by racing her.)' });
   const u = w.user;
   if (u.spec) {
     const p = u.spec.perf, notes: string[] = [];

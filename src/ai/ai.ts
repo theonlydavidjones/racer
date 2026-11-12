@@ -434,7 +434,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
           const u = V(w.C.base), sv = { x: u.y, y: -u.x };
           const lat = (b.x - P.x) * sv.x + (b.y - P.y) * sv.y;
           const width = ai.width * Math.min(1, Math.hypot(d.x, d.y) / 500) + 25;
-          if (headed && w.rng() < dt * ai.kn.headerTackRate) doTack = true; // tack on headers
+          if (headed && w.rng() < 1 - Math.exp(-dt * ai.kn.headerTackRate)) doTack = true; // tack on headers (a hazard rate: right however often she thinks)
           else if ((ai.dirtyT ?? 0) > ai.kn.dirtyAirS && w.t - b.lastTackT > 15) doTack = true; // stuck in another boat's dirty air: tack for clear air
           // don't sail too far off the rhumb line (by where this tack takes her, her close-hauled course: not her heading,
           // which swings across the course's axis as she tacks)
