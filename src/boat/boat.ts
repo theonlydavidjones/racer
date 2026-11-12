@@ -6,6 +6,7 @@ import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
 import type { Controls, CrewSettings, Shape } from './controls';
+import type { PuffCall } from './crewEyes';
 
 /** A line you can work: every control, plus the lazy jib car's pins. */
 export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
@@ -200,6 +201,10 @@ export interface Boat {
   companionway?: { doors: 'in' | 'out'; hatch: 'closed' | 'open'; t?: number };
   /** Out cruising, not racing: the crew sit for comfort (crewPhys.ts standInHatch). */
   cruising?: boolean;
+  /** The crew's calls of the puffs and lulls coming (crewEyes.ts crewLook, once a second): what they believe, soonest first. */
+  calls?: PuffCall[];
+  /** Puffs someone aboard has seen, and when (for the call's delay). */
+  seenPuffs?: Map<number, { t0: number; who: number }>;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;

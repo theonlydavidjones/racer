@@ -36,6 +36,7 @@ import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
+import { crewLook } from '../boat/crewEyes';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
@@ -714,6 +715,8 @@ export class World {
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
+    // every crew looks round for the puffs and lulls coming, once a second (boat/crewEyes.ts): their calls, on b.calls
+    if (this.steps % 60 === 13) for (const b of this.boats) if (!b.docked) crewLook(b, this.puffs, this.t);
     for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
