@@ -9,7 +9,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, windowLids } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
@@ -216,7 +216,18 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const cg = cockpitGeometry(), flat = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.map(g => (g.index ? g.toNonIndexed() : g)), false)!;
   grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), cockpitTeak)); // the sole, benches and shelf (one mesh)
   grp.add(new THREE.Mesh(flat(cg.lining), COCKPIT_LINING)); // the hull's inside round the footwell, under the side decks, and the after wall: smooth moulding
-  grp.add(new THREE.Mesh(flat(cg.panel), MAT.wood)); // the lazarettes' fronts and ends, varnished panels
+  grp.add(new THREE.Mesh(flat(cg.panel), LOCKER)); // the lazarettes: varnished lockers, fronts, ends and lids
+  // each lazarette's lid: the seam where it lifts, its two hinges along the outboard edge, and a finger-hole at the front
+  { const seams: THREE.BufferGeometry[] = [], hinges: THREE.BufferGeometry[] = [], g = 0.007;
+    for (const l of lazaretteLids()) {
+      const xa = Math.min(l.x0, l.x1), xb = Math.max(l.x0, l.x1), y = l.y + 0.0015, fx = l.x0 + Math.sign(l.x1 - l.x0) * 0.035;
+      for (const z of [l.z0, l.z1]) seams.push(new THREE.BoxGeometry(xb - xa, 0.002, g).translate((xa + xb) / 2, y, z));
+      for (const x of [xa, xb]) seams.push(new THREE.BoxGeometry(g, 0.002, l.z1 - l.z0).translate(x, y, (l.z0 + l.z1) / 2));
+      seams.push(new THREE.BoxGeometry(0.025, 0.002, 0.06).translate(fx, y, (l.z0 + l.z1) / 2)); // the finger-hole
+      for (const f of [0.22, 0.78]) hinges.push(new THREE.BoxGeometry(0.03, 0.006, 0.06).translate(l.x1 - Math.sign(l.x1) * 0.012, l.y + 0.003, l.z0 + (l.z1 - l.z0) * f));
+    }
+    grp.add(new THREE.Mesh(mergeGeometries(seams.map(q => q.toNonIndexed()), false)!, BLACK));
+    grp.add(new THREE.Mesh(mergeGeometries(hinges.map(q => q.toNonIndexed()), false)!, CHROME)); }
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
@@ -314,6 +325,8 @@ interface Lines {
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
+/** The lazarettes' varnished panels (seen from either side: the lockers are built of single surfaces). */
+const LOCKER = new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40, side: THREE.DoubleSide });
 /** Polished chrome (the winches): bright, mirror-like, taking the sky. */
 const CHROME = reflect(new THREE.MeshPhongMaterial({ color: 0xb4bac2, specular: 0xffffff, shininess: 160 }), 0.6);
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */

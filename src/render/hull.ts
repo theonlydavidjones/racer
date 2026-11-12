@@ -421,8 +421,8 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
     // thick, its edge standing a little proud of the front
     const lid = 0.025;
     panel.push(strip(bench.map(u => [V(s * sh(u), sole, zAt(u)), V(s * sh(u), seat - lid, zAt(u))]))); // the locker's front
-    out.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat - lid, zAt(u)), V(s * (sh(u) - 0.012), seat, zAt(u))]))); // the lid's edge
-    out.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the lid
+    panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat - lid, zAt(u)), V(s * (sh(u) - 0.012), seat, zAt(u))]))); // the lid's edge
+    panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the lid: a solid varnished panel
     for (const segs of [bench, shelf]) lining.push(strip(segs.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
     // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
     const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
@@ -438,6 +438,15 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   const w1 = benchOut(u1), ya = deckY(u1, 0);
   lining.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
   return { teak: out, lining, panel };
+}
+
+/**
+ * Each lazarette's lid, where it lifts (for its seam, hinges and finger-hole): x from its front edge out to near the
+ * coaming, z along the locker, at the seat's height; starboard positive.
+ */
+export function lazaretteLids(): { x0: number; x1: number; z0: number; z1: number; y: number }[] {
+  const ua = COCKPIT.u0, ub = zU(COCKPIT_FIT.benchAft), um = (ua + ub) / 2, x0 = Math.min(COCKPIT_FIT.soleHalf, hullInnerHalf(um, COCKPIT.sole) - 0.03) + 0.025, x1 = cockpitHalf(um) - 0.03;
+  return [1, -1].map(s => ({ x0: s * x0, x1: s * x1, z0: zAt(ua) + 0.06, z1: COCKPIT_FIT.benchAft - 0.05, y: COCKPIT_FIT.seat }));
 }
 
 /** The thwart: a beam across the cockpit between the coamings, its top flat and its underside curved (boat's frame). */
