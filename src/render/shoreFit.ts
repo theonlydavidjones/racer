@@ -10,16 +10,28 @@ import { LL } from '../geo/geo';
  * The chart's land comes in pieces cut at the chart cells' edges; edges with land on both sides are seams, not coast,
  * and are left out.
  */
-export interface Coast { inside(x: number, y: number): boolean; nearest(x: number, y: number, max: number): { x: number; y: number; d: number } | null }
+export interface Coast {
+  inside(x: number, y: number): boolean; nearest(x: number, y: number, max: number): { x: number; y: number; d: number } | null;
+  /** the charted rocks and islets too small for the 50 m mesh (under ROCK m across), drawn as rocks of their own */
+  rocks: { x: number; y: number }[][];
+}
+/** A piece of the chart's land smaller than this across (m) is a rock: the mesh leaves it out. */
+export const ROCK = 60;
 
 let built: Coast | null = null;
 export function chartCoast(): Coast {
   if (built) return built;
-  const rings: Float64Array[] = [];
-  for (const poly of (chart as unknown as { land: number[][][] }).land) for (const r of poly) {
-    const a = new Float64Array(r.length); let lon = 0, lat = 0;
-    for (let i = 0; i < r.length; i += 2) { lon += r[i]; lat += r[i + 1]; const p = LL(lat / 1e5, lon / 1e5); a[i] = p.x; a[i + 1] = p.y; }
-    rings.push(a);
+  const rings: Float64Array[] = [], rocks: { x: number; y: number }[][] = [];
+  for (const poly of (chart as unknown as { land: number[][][] }).land) {
+    const rs = poly.map(r => {
+      const a = new Float64Array(r.length); let lon = 0, lat = 0;
+      for (let i = 0; i < r.length; i += 2) { lon += r[i]; lat += r[i + 1]; const p = LL(lat / 1e5, lon / 1e5); a[i] = p.x; a[i + 1] = p.y; }
+      return a;
+    });
+    const o = rs[0]; let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < o.length; i += 2) { x0 = Math.min(x0, o[i]); x1 = Math.max(x1, o[i]); y0 = Math.min(y0, o[i + 1]); y1 = Math.max(y1, o[i + 1]); }
+    if (Math.max(x1 - x0, y1 - y0) < ROCK) { rocks.push(Array.from({ length: o.length / 2 }, (_, i) => ({ x: o[i * 2], y: o[i * 2 + 1] }))); continue; }
+    rings.push(...rs);
   }
   // every edge, filed by the 50 m bands of y it spans (for the inside test) …
   let y0 = Infinity, y1 = -Infinity;
@@ -69,5 +81,5 @@ export function chartCoast(): Coast {
     }
     return best;
   };
-  return built = { inside, nearest };
+  return built = { inside, nearest, rocks };
 }

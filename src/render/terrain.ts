@@ -5,6 +5,7 @@ import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
 import { limePointBox, limePointLand, onGround } from '../geo/shore';
 import { chartCoast } from './shoreFit';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -192,6 +193,13 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       moves.push([k, q ? q.x - p.x : 0, q ? q.y - p.y : 0, land]);
     }
     for (const [k, mx, my, land] of moves) { sx[k] = mx; sy[k] = my; if (land) H[k] = 2; else wet[k] = 1; }
+    // the chart's rocks and islets too small for the mesh, each in its charted outline, a couple of metres out of the water
+    const rk: THREE.BufferGeometry[] = [];
+    for (const r of coast.rocks) {
+      const sh = new THREE.Shape(); r.forEach((q, i) => i ? sh.lineTo(q.x, q.y) : sh.moveTo(q.x, q.y));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -2, 0); rk.push(g);
+    }
+    if (rk.length) scene.add(new THREE.Mesh(mergeGeometries(rk), new THREE.MeshLambertMaterial({ color: 0x6f675c }))); // (dark wet rock)
   }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
