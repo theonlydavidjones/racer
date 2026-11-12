@@ -79,14 +79,15 @@ const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
 const STEM_SLOPE = -1.06 / BOW;
 /**
  * The underwater profile forward, below the stem, as one fair batten (a monotone cubic through the points): the stem's
- * rake rounding gently, just under the water, into a long, nearly straight raked forefoot that runs down to the keel's
- * bottom about 4.6 m aft of the stemhead at 1.1 m draft, and the bottom on, nearly level, to the heel at 1.2 m. Read off
- * Josephine hauled out (the owner's photos from port and from the starboard bow: about 0.3 m deep 2 m aft of the
- * stemhead, 0.6 m at 3 m; measured against her mast and transom). The canoe body, the hull's bottom above the keel,
+ * rake rounding gently, just under the water, into a long raked forefoot, steepening a little as it runs down to the
+ * keel's bottom about 3.9 m aft of the stemhead at 1.1 m draft, and the bottom on, nearly level, to the heel at 1.2 m.
+ * Read off Josephine hauled out (the owner's photos from port, from the starboard bow and from the starboard quarter:
+ * about 0.3 m deep 2 m aft of the stemhead, 0.6 m at 3 m, the keel's forward corner about under the cabin's window;
+ * the class lines plan puts the corner a little further forward, at 3.1–3.3 m). The canoe body, the hull's bottom above the keel,
  * leaves it about a third of the way down and rounds into its depth amidships, 0.62 m (the plan's main section at St. 8).
  */
 const U_HEEL = (HEEL.z + L / 2) / L, U_STEM = 0.125;
-const KEEL_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.46], [0.4, -0.68], [0.5, -0.9], [0.56, -1.04], [0.6, -1.1], [0.64, -1.13], [U_HEEL, -1.2]]);
+const KEEL_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.46], [0.39, -0.68], [0.45, -0.88], [0.5, -1.04], [0.54, -1.1], [0.58, -1.12], [U_HEEL, -1.2]]);
 const CANOE_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.44], [0.4, -0.56], [0.5, -0.61], [0.56, -0.62], [0.62, -0.62]]);
 export function canoe(u: number): number {
   // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then the
