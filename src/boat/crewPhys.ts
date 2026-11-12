@@ -1,7 +1,8 @@
 import { D2R, clamp } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import { HULL } from './dynamics';
-import { bestTrim, trimDrag, trimFromMoment } from './hullTrim';
+import { heelFactor } from './balance';
+import { bestTrim, heelWettedFactor, trimDrag, trimFromMoment, trimSpeedFactor } from './hullTrim';
 import { polar } from './polar';
 
 /**
@@ -173,7 +174,7 @@ export function deckHalf(z: number): number {
  * Sails' Nordic Folkboat tuning guide: the cabin-top lead 2.65 m from the forestay pin, the track centred 58 cm off the
  * centreline: on the cabin top about 0.6 m aft of the mast).
  */
-export const Z = { helm: 2.95, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.6, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
+export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.65, cockpitAft: 2.5, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
 /**
  * Deep downwind with the pole out in light air, the crew go right forward to put her bow down (the owner, who races
  * them: "normally people sit all the way up on the foredeck. usually one crew will sit in front of the forestay with both
@@ -181,11 +182,48 @@ export const Z = { helm: 2.95, cockpitFwd: 1.0, cockpitAft: 2.1, piano: 0.85, ca
  * forward of where the forestay meets the deck (0.8 m aft of the stem), `Z.foredeck` between the mast and the forestay.
  * Whether it pays is the hull's trim (hullTrim.ts bestTrim), as for the bow hand at the mast.
  */
+/**
+ * Where the free crew sit fore and aft (the owner's choice, on the cockpit to the construction plan, render/hull.ts
+ * COCKPIT_FIT): on the side benches (the bulkhead at 1.06 to St. 4¾ at 1.945) or the side deck beside them, and on aft
+ * along the side deck past the thwart beside the after shelf, legs into the footwell or on the shelf: from the cockpit's
+ * forward end (`Z.cockpitFwd`, the hips 1.35, half a shoulder's width clear of the bulkhead; out on the side deck, from
+ * just aft of the jib winch, `Z.deckFwd`) to about 2.5 (`Z.cockpitAft`), short of the helm at 2.95; two of
+ * them a shoulder's width apart (`Z.gap`, 0.5 m). Their hiking arms are by the deck's half-breadth where each one is
+ * (`crewEdge`): narrower aft.
+ */
+/**
+ * Out on the side deck (sitting up to windward, to leeward, hiking: the hips outboard of the coaming), not forward of
+ * `Z.deckFwd`: the jib winch stands on its pedestal on the side deck against the coaming at 1.4 (render/crew.ts winchAt,
+ * Boat Detail's from Josephine's photos), so the forward hand sits out just aft of it, the pedestal's radius and half a
+ * hip's width clear (1.4 + 0.075 + 0.18). On the benches inside the coaming, in the middle, they can go on forward.
+ */
+/** At the coaming: the hips outboard of about this (m), out on the side deck or on the bench leaning back against the
+ * coaming (its inside face 0.71–0.74 between 1.35 and 1.65, render/hull.ts cockpitHalf), where the jib winch on its
+ * pedestal just outboard of it (render/crew.ts winchAt, x about 0.84) would be at their shoulder. Further in, on the
+ * bench or the sole, they're clear of it. (Drawn on the deck from about 0.66: render/crew.ts crewPose. Taking 0.66 here
+ * as well put a crew member leaning on the coaming in a puffy 7 kt back and forth across it, 87 seat moves in ten
+ * minutes against 75.) */
+export const DECK_ARM = 0.5;
+/** Crew member `j`'s place fore and aft among `count` free crew, `f` of the way from the aft end to the forward end
+ * (on a side deck, from just aft of the winch). Two crew at most (settings.ts): a third wouldn't fit along one side
+ * deck aft of the winch (1.65 to 2.5 is 0.85 m, three a shoulder's width apart need 1.0). */
+export const stationZ = (j: number, count: number, f: number, deck: boolean) => {
+  const za = Z.cockpitAft - (count - 1 - j) * Z.gap, zf = Math.min(za, (deck ? Z.deckFwd : Z.cockpitFwd) + j * Z.gap);
+  return za + (zf - za) * f;
+};
+/** Whether crew member `i` (1…) is out on a side deck now. */
+const outOnDeck = (c: CrewState, i: number) => Math.abs(c.people[i]?.x ?? 1) > DECK_ARM;
 /** Half-beam at the sheer where the crew sit (between the cockpit's forward end and its middle), from the plan. */
 export const EDGE = deckHalf(1.3);
+/** The deck's half-breadth where crew member `i` is now (within the cockpit's length: forward of it, as at the mast, the
+ * cockpit's forward end). */
+export const crewEdgeAt = (z: number) => deckHalf(clamp(z, Z.cockpitFwd, Z.cockpitAft));
+const crewEdge = (c: CrewState, i: number) => crewEdgeAt(c.people[i]?.z ?? 1.5);
 /** Where the person moving a jib car kneels: on the side deck beside the cabin, reaching in to the track (58 cm out). */
 export const CAR_ARM = 0.8;
-/** The reference places (m) the polar is sailed from: the crew in the middle of the cockpit, the helm at the tiller. */
+/** The reference places (m) for the hull's trim: where the crew's weight trims her to her lines (trim 0), the helm at the
+ * tiller. Only differences from it count for speed (hullTrim.ts TRIM.reach is reckoned from it), so it isn't moved with
+ * the cockpit's stations: the crew can't all sit there now, but it's the hull's reference, not a seat. */
 const zRef = (i: number, n: number) => (i === 0 ? Z.helm : n === 1 ? 1.5 : i === 1 ? 1.2 : 1.8);
 
 /** Arms (m from the centreline, + to windward) for a person: sitting up on the side deck, hiking flat out (by the deck's
@@ -213,7 +251,7 @@ const ENDURE = (p: Person) => 300 + 210 * skillOf(p), RECOVER = 60;
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
-    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: zRef(i, n), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
+    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
   }));
   const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0 };
   summarise(c, w);
@@ -319,10 +357,11 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // across: the average arm the crew want, as before by the conditions, by their skill
     const breeze = clamp((k.tws - 6) / 2, 0, 1);
     const HELM = helmArms(s.helm, c.people[0].fatigue);
-    const maxes = ppl.map((p, i) => (i === 0 ? HELM.max : hikeArm(p, leanCap(p, c.people[i].fatigue)))), maxOf = (i: number) => maxes[i];
+    const edges = ppl.map((_, i) => crewEdge(c, i)), sitOf = (i: number) => sitArm(ppl[i], edges[i]);
+    const maxes = ppl.map((p, i) => (i === 0 ? HELM.max : hikeArm(p, leanCap(p, c.people[i].fatigue), edges[i]))), maxOf = (i: number) => maxes[i];
     const maxArm = ppl.reduce((a, p, i) => a + p.w * maxOf(i), 0) / total;
-    const minArm = (s.helm.w * HELM.lee + s.crew.reduce((a, p) => a + p.w * leeArm(p), 0)) / total;
-    const sit = (s.helm.w * HELM.sit + s.crew.reduce((a, p) => a + p.w * sitArm(p), 0)) / total;
+    const minArm = (s.helm.w * HELM.lee + s.crew.reduce((a, p, j) => a + p.w * leeArm(p, edges[j + 1]), 0)) / total;
+    const sit = (s.helm.w * HELM.sit + s.crew.reduce((a, p, j) => a + p.w * sitOf(j + 1), 0)) / total;
     const needArm = k.need / (total * 9.81);
     let want = downwind ? clamp(needArm, minArm, maxArm)
       : breeze <= 0 ? clamp(needArm, minArm, maxArm) * smoothSkill(skill) + 0.1 * (1 - smoothSkill(skill)) // light air: a good crew as far to leeward as gives her the light-air heel; a novice in the middle
@@ -370,9 +409,11 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     let helmArm = want < 0 ? HELM.lee : HELM.sit;
     if (pl?.across === 'lee') helmArm = HELM.lee;
     if (!helmBusy) fixedM += W[0] * helmArm;
+    let crewFull = false;
     let crewArm = freeW > 0 ? (want * total - fixedM) / freeW : 0;
     if (!helmBusy && freeW > 0) {
       const crewMax = free.reduce((a, i) => a + W[i] * maxOf(i), 0) / freeW;
+      crewFull = crewArm >= crewMax - 1e-6; // (all the moment there is: each out as far as they go where they sit)
       if (crewArm > crewMax) { // the crew are out as far as they go: the helm leans out too
         const short = (crewArm - crewMax) * freeW;
         const h2 = clamp(helmArm + short / W[0], helmArm, HELM.max); crewArm = crewMax + (short - (h2 - helmArm) * W[0]) / freeW; helmArm = h2;
@@ -383,15 +424,14 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // (where you've put them: each of them there, not just their average)
     const placed = pl?.across ? { lee: -Infinity, mid: 0.1, up: NaN, hike: Infinity }[pl.across] : null;
     free.forEach((i, j) => {
-      const lo = leeArm(ppl[i]);
-      const arm = placed == null ? clamp(crewArm, lo, maxOf(i)) : clamp(Number.isNaN(placed) ? sitArm(ppl[i]) : placed, lo, maxOf(i));
-      const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (free.length - 1 - j) * Z.gap;
-      tgt[i] = { arm, z: za + (zf - za) * foreF, pose: arm < -0.05 ? 'lee' : arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit' };
+      const lo = leeArm(ppl[i], edges[i]);
+      const arm = placed == null ? (crewFull ? maxOf(i) : clamp(crewArm, lo, maxOf(i))) : clamp(Number.isNaN(placed) ? sitOf(i) : placed, lo, maxOf(i));
+      tgt[i] = { arm, z: stationZ(j, free.length, foreF, Math.abs(arm) > DECK_ARM), pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
     });
     // the roll tack: as she luffs up they're out on the windward side (in light air, from sitting to leeward), so she rolls
     // to windward through the wind and comes out heeled on the new tack; they hold there, then everyone out hard
-    if (c.roll?.phase === 'lead') for (const i of free) tgt[i] = { arm: Math.max(c.people[i].x * w, sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
-    if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitArm(ppl[i])), z: c.people[i].z, pose: 'sit' };
+    if (c.roll?.phase === 'lead') for (const i of free) tgt[i] = { arm: Math.max(c.people[i].x * w, sitOf(i)), z: c.people[i].z, pose: 'sit' };
+    if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitOf(i)), z: c.people[i].z, pose: 'sit' };
     if (c.roll?.phase === 'flatten') for (const i of free) tgt[i] = { arm: maxOf(i), z: tgt[i].z, pose: 'hike' };
     if (c.roll?.phase === 'hold' && !helmBusy) tgt[0] = { arm: c.people[0].x * w, z: Z.helm, pose: 'helm' };
     hold(c, tgt, k, tacked, W, maxOf);
@@ -415,10 +455,18 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // across: crossing the cockpit (ducking under the boom) about 1 m/s for a club crew; leaning out or in, about 0.7 m/s
     const crossing = Math.sign(goal.x) !== Math.sign(a.x) && Math.abs(goal.x - a.x) > 0.5;
     const vx = (crossing ? 1.0 : 0.7) * pace(p) * (c.roll?.phase === 'flatten' ? 1.3 : 1);
+    const x0 = a.x, z0 = a.z;
     a.x += clamp(goal.x - a.x, -vx * dt, vx * dt);
     a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
+    // (in the cockpit, round the jib winch on the side deck, not through it: in off the deck before going forward of it,
+    // and aft of it before going out on the deck. Going on forward of the cockpit, to the mast, they climb past it)
+    // (a job's station is its own: the jib winch's haul, the lines; this is for finding a seat)
+    if (i > 0 && !a.job?.station && goal.z > Z.cockpitFwd - 0.05 && z0 > Z.cockpitFwd - 0.05) {
+      if (Math.abs(a.x) > DECK_ARM && a.z < Z.deckFwd && z0 >= Z.deckFwd - 1e-6) a.z = Z.deckFwd;
+      else if (a.z < Z.deckFwd && Math.abs(a.x) > DECK_ARM && Math.abs(x0) <= DECK_ARM) a.x = Math.sign(a.x) * DECK_ARM;
+    }
     const arm = a.x * w;
-    const he = i === 0 ? deckHalf(Z.helm) : EDGE;
+    const he = i === 0 ? deckHalf(Z.helm) : crewEdge(c, i);
     a.lean = clamp((arm - sitArm(p, he)) / Math.max(0.05, hikeArm(p, 1, he) - sitArm(p, he)), 0, 1);
     // (sitting, hiking or to leeward: by where they actually are, so the figure matches the weight)
     const free = t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
@@ -457,7 +505,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     h.since += step;
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
     // again, is the body, not a move)
-    const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i]);
+    const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
     if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
     const worth = dArm > dead || dz > HOLD.fore;
@@ -470,8 +518,28 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     h.arm = Math.min(h.arm, maxOf(i));
     t.arm = h.arm; t.z = h.z;
     if (i === 0) t.pose = 'helm';
-    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i]) + 0.04 ? 'hike' : 'sit';
+    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
   });
+  // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
+  // while the other stays put would otherwise put them in each other's laps)
+  // (and none of them out on a side deck forward of the winch there, held or not; and clear of a crewmate working the
+  // cabin-top lines from that side deck, whose place is fixed by the job)
+  const seated = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
+  const onDeckI = (i: number) => i > 0 && !!tgt[i] && Math.abs(tgt[i].arm) > DECK_ARM;
+  const out = tgt.map((t, i) => onDeckI(i) && seated(t) ? i : -1).filter(i => i > 0);
+  const atJob = tgt.map((t, i) => onDeckI(i) && !seated(t) && t.z > Z.cockpitFwd - 0.5 ? i : -1).filter(i => i > 0);
+  const put = (i: number, z: number) => { tgt[i].z = z; const hi = held[i]; if (hi) hi.z = z; };
+  for (const i of out) if (tgt[i].z < Z.deckFwd) put(i, Z.deckFwd);
+  for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
+  // (in their order along the cockpit, front to back: the one whose place is forward keeps it)
+  for (let q = 1; q < out.length; q++) for (let r = 0; r < q; r++) {
+    const a = tgt[out[r]], b = tgt[out[q]];
+    // (and if there's no room aft for the one behind, the one ahead goes forward, as far as the winch lets them)
+    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) {
+      if (a.z + Z.gap <= Z.cockpitAft) put(out[q], a.z + Z.gap);
+      else { put(out[q], Z.cockpitAft); put(out[r], Math.max(Z.deckFwd, Z.cockpitAft - Z.gap)); }
+    }
+  }
 }
 
 /** How far out a person can lean now, as a fraction of the span from sitting to a full hike (the scale `lean` is on):
@@ -502,7 +570,7 @@ export const LAYOUT_STAY = 60;
  */
 function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 'cockpit' | 'mast' | 'foredeck' {
   const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, sea = k.sea ?? 0;
-  const cockpitZ = (j: number, count: number) => { const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (count - 1 - j) * Z.gap; return za + (zf - za) * foreF; };
+  const cockpitZ = (j: number, count: number) => stationZ(j, count, foreF, outOnDeck(c, j + 1));
   const dragAt = (v: number, zOf: (j: number) => number) => {
     let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
     return trimDrag(v, trimFromMoment(m0 + m), sea);
@@ -564,20 +632,34 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a skilled crew. */
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const n = c.spec.crew.length; if (!n) return 0.5;
-  const best = bestTrim(Math.max(0.5, k.v), k.sea ?? 0), m0 = k.extraMoment ?? 0;
-  // the crew's own moment over their range, against the trim it gives
-  let f = 0.5, err = Infinity;
-  for (let x = 0; x <= 1.0001; x += 0.125) {
-    const t = trimFromMoment(m0 + momentOfCrewFore(c, x));
-    const e = Math.abs(t - best); if (e < err - 1e-9) { err = e; f = x; }
-  }
+  const v = Math.max(0.5, k.v), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
+  // Where along the cockpit is fastest, all told (physics review): the trim's effect on the hull's resistance
+  // (hullTrim.ts trimSpeedFactor) and, sitting out to windward, the deck's half-breadth where they sit, narrower aft
+  // (deckHalf), which is their righting arm. Hiking flat out they can't make that up, so it's heel: the moment lost over
+  // her stiffness (k.rmPerDeg) and its cost in speed (balance.ts heelFactor, hullTrim.ts heelWettedFactor). Sitting up
+  // short of flat out it costs no speed, only more lean for the same moment: where the trim's all but even (upwind
+  // in 8 to 10 kt the whole range is worth under 0.1%) they sit where the deck's wider rather than lean out harder for
+  // nothing (1% a metre of half-breadth, about 0.08% over the range: the crew's preference, an estimate).
+  const cr = c.spec.crew, W = cr.reduce((a, p) => a + p.w, 0);
+  const zOf = (j: number, x: number) => stationZ(j, n, x, outOnDeck(c, j + 1));
+  const out = cr.map((_, j) => c.people[j + 1] ? c.people[j + 1].x * w : 0), windwardOut = out.every((a, j) => a > sitArm(cr[j], deckHalf(c.people[j + 1]?.z ?? 1.5)) - 0.05);
+  const flatOut = windwardOut && cr.every((_, j) => (c.people[j + 1]?.lean ?? 0) > 0.85);
+  const h = Math.abs(k.heel ?? 0), ref = crewBestHeel(k.twa, k.tws, skill), rm = Math.max(50, k.rmPerDeg ?? 250);
+  const edgeNow = cr.reduce((a, p, j) => a + p.w * deckHalf(c.people[j + 1]?.z ?? zOf(j, 0.5)), 0);
+  const score = (x: number) => {
+    let s = trimSpeedFactor(v, trimFromMoment(m0 + momentOfCrewFore(c, x)), sea);
+    if (windwardOut) {
+      const edge = cr.reduce((a, p, j) => a + p.w * deckHalf(zOf(j, x)), 0);
+      if (flatOut) { const h2 = Math.max(0, h - 9.81 * (edge - edgeNow) / rm); s *= heelFactor(h2) / heelFactor(h) * heelWettedFactor(v, h2, ref) / heelWettedFactor(v, h, ref); }
+      else s -= 0.01 * (deckHalf(Z.cockpitFwd) * W - edge) / W;
+    }
+    return s;
+  };
+  let f = 0.5, top = -Infinity;
+  for (let x = 0; x <= 1.0001; x += 0.125) { const sc = score(x); if (sc > top + 1e-9) { top = sc; f = x; } }
   const sk = smoothSkill(skill), want = 0.5 + (f - 0.5) * sk;
-  // (a move along the cockpit for a real gain only, 0.05%: the drag is nearly straight in the trim, so the best place is
-  // an end of the cockpit, and near the crossover it isn't worth the move. An estimate.)
-  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6) {
-    const v = Math.max(0.5, k.v), sea = k.sea ?? 0, dOf = (x: number) => trimDrag(v, trimFromMoment(m0 + momentOfCrewFore(c, x)), sea);
-    if (dOf(c.fore01) - dOf(want) < 0.0005) return c.fore01;
-  }
+  // (a move along the cockpit for a real gain only, 0.05%: near the crossover it isn't worth the move. An estimate.)
+  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && score(want) - score(c.fore01) < 0.0005) return c.fore01;
   c.fore01 = want;
   return c.fore01;
 }
@@ -585,8 +667,7 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
 function momentOfCrewFore(c: CrewState, f: number): number {
   const cr = c.spec.crew, n = cr.length; let m = 0;
   cr.forEach((p, j) => {
-    const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (n - 1 - j) * Z.gap;
-    m += p.w * (zRef(j + 1, n) - (za + (zf - za) * f));
+    m += p.w * (zRef(j + 1, n) - stationZ(j, n, f, outOnDeck(c, j + 1)));
   });
   return m;
 }
@@ -603,7 +684,7 @@ function summarise(c: CrewState, w: number, downwind = false, pole = false, extr
       hike = Math.max(hike, q.lean); fore += clamp((Z.helm - q.z) / (Z.helm - Z.mast), 0, 1); if (q.pose === 'mast' || q.pose === 'bow' || q.pose === 'fore') mast = true;
       // (out as far as they can go now: their own reach, which tires; someone away at a job doesn't count either way)
       const onRail = q.pose === 'sit' || q.pose === 'hike' || q.pose === 'lee' || q.pose === 'cross';
-      if (onRail && (q.pose !== 'hike' || q.lean < reachLean(ppl[i], q.fatigue) - 0.03)) out = false;
+      if (onRail && (q.pose !== 'hike' || q.lean < reachLean(ppl[i], q.fatigue, crewEdge(c, i)) - 0.03)) out = false;
     }
   }
   c.allOut = n ? out : P[0].lean >= reachLean(ppl[0], P[0].fatigue, deckHalf(Z.helm)) - 0.03;
@@ -640,12 +721,13 @@ export function bestFore(twa: number, tws: number, pole: boolean): number {
  * per person, helm first). The polar's crew: the ORC certificates the polar comes from declare 240–300 kg of crew; the
  * sim's standard three (DEFAULT_CREW, 230 kg) at a club crew's reach, fresh.
  */
-export function hikingMoment(s: CrewSpec, fatigue: number[] = []): number {
-  return 9.81 * (s.helm.w * helmArms(s.helm, fatigue[0] ?? 0).max + s.crew.reduce((a, p, i) => a + p.w * hikeArm(p, leanCap(p, fatigue[i + 1] ?? 0)), 0));
+export function hikingMoment(s: CrewSpec, fatigue: number[] = [], edges: number[] = []): number {
+  // (`edges`: the deck's half-breadth where each one is, crewEdgeAt: narrower aft. Without them, the reference place.)
+  return 9.81 * (s.helm.w * helmArms(s.helm, fatigue[0] ?? 0).max + s.crew.reduce((a, p, i) => a + p.w * hikeArm(p, leanCap(p, fatigue[i + 1] ?? 0), edges[i + 1] ?? EDGE), 0));
 }
 export const standardCrewMoment = () => hikingMoment(DEFAULT_CREW);
 /** The righting moment (N·m, upright) of a crew sitting out on the windward deck, not hiking: the least a crew that's
  * sitting up to windward gives her (placeCrew). */
-export function sittingMoment(s: CrewSpec): number {
-  return 9.81 * (s.helm.w * helmArms(s.helm).sit + s.crew.reduce((a, p) => a + p.w * sitArm(p), 0));
+export function sittingMoment(s: CrewSpec, edges: number[] = []): number {
+  return 9.81 * (s.helm.w * helmArms(s.helm).sit + s.crew.reduce((a, p, i) => a + p.w * sitArm(p, edges[i + 1] ?? EDGE), 0));
 }
