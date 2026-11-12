@@ -91,7 +91,7 @@ button{font:inherit;color:inherit}
 .v.off{opacity:.3} .v.off .well{cursor:default}
 .v.winch .cleat{background:#55656e}
 .v.winch .well{border-radius:4px}
-.allcrew.poletab{right:64px;color:var(--text)}
+.allcrew.poletab{right:92px;color:var(--text)}
 .allcrew.poletab.mine{color:var(--accent)}
 .gapl{width:1px;align-self:stretch;margin:22px 4px 14px;background:var(--rule)}
 
@@ -232,7 +232,7 @@ const horiz = (k, side) => {
 };
 
 document.getElementById('band').innerHTML =
-  `<button class="allcrew" type="button" id="allCrew" title="Hand every line back to the crew">Auto</button>
+  `<button class="allcrew" type="button" id="allCrew" title="Hand every line back to the crew">Auto-trim</button>
   <button class="allcrew poletab" type="button" id="poleTab" hidden title="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing and wing). Only on a run. Tap to set it or stow it; the crew takes a few seconds."></button>
   <div class="mid">
     <div class="piano">${jcar('P')}${vert('jibP','P','winch')}<span class="gapl"></span>${vert('downhaul','P','tackle')}${vert('jibCunningham','P')}${vert('cunningham','P','clam')}${vert('outhaul','P')}${vert('vang','P')}
@@ -362,7 +362,7 @@ function draw(){
     <text x="${120 + wx * 76}" y="8" fill="#e9f2f5" font-size="11" font-family="Saira Semi Condensed, sans-serif" text-anchor="${wx > 0 ? 'end' : 'start'}">${wind} kt</text>`;
 }
 function drawPole(){
-  // a tab beside "Auto", only while running (or while the pole is still out or on its way in)
+  // a tab beside "Auto-trim", only while running (or while the pole is still out or on its way in)
   const tab = $('poleTab'), side = tack === 'S' ? 'S' : 'P';
   tab.hidden = !poleOk() && POLE.st === 'down';
   tab.classList.toggle('mine', !POLE.a);
