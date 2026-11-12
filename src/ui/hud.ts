@@ -46,6 +46,7 @@ import { keySig, renderKey, type SimKey } from './legend';
 import { layerOn, type LayerKey } from './layers';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
+import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
 
@@ -409,7 +410,7 @@ export class Hud {
     const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
-      const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
+      const vtU = polar(u.ww.kt, u.twa, sailPlan(u)), target = steadySpeed(vtU, v => seaDrag(u.sea, u.h, v), driveCurveFor(u.ww.kt, u.twa, vtU)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
       const speed = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%`;
       const d = w.dest;
@@ -452,7 +453,7 @@ export class Hud {
       }
       // time to the line on this heading if you sheet in now: accelerating from your current speed, with the current
       const cN = u.cur.x * w.N.x + u.cur.y * w.N.y;
-      const tl = uN > 0.15 ? timeToCover(-d, u.v, polar(u.ww.kt, u.twa, sailPlan(u)), uN, cN) : Infinity;
+      const vtL = polar(u.ww.kt, u.twa, sailPlan(u)), tl = uN > 0.15 ? timeToCover(-d, u.v, vtL, uN, cN, 240, driveCurveFor(u.ww.kt, u.twa, vtL)) : Infinity;
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
       this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0));

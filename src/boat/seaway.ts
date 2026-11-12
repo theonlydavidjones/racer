@@ -1,6 +1,7 @@
 import { D2R, KT, wrap } from '../core/math';
 import type { SeaHere } from '../environment/sea';
-import { HULL, driveFrom, hullResistance } from './dynamics';
+import { HULL, driveFrom, hullResistance, type DriveCurve } from './dynamics';
+import { driveCurveFor } from './driveCurve';
 import { beatAngle as beatAngleCalm, polar } from './polar';
 
 /**
@@ -21,7 +22,7 @@ import { beatAngle as beatAngleCalm, polar } from './polar';
 
 const RHO = 1025, G = 9.81, BEAM = 2.21, LWL = HULL.length;
 /** Added-resistance coefficient (dimensionless): the calibration knob. */
-export const C_AW = 0.045;
+export const C_AW = 0.034; // (0.045 with the old flat ×1.6 drive at rest; 0.034 since the drive's shape comes from the sail model, driveCurve.ts, which upwind gives a slowed boat less push: the same 12%)
 
 /** Added resistance (N) in waves of height H (m) and period T (s) meeting the bow at `enc` deg (0 head-on, 180 from astern), at speed v (m/s). */
 export function addedResistance(H: number, T: number, enc: number, v: number): number {
@@ -45,31 +46,51 @@ export function seaDrag(s: SeaHere, h: number, v: number): number {
 }
 
 /** Steady speed (m/s) when the sails would drive her at `vt` in flat water and the sea adds `drag(v)` newtons. */
-export function steadySpeed(vt: number, drag: (v: number) => number): number {
+export function steadySpeed(vt: number, drag: (v: number) => number, k?: DriveCurve): number {
   if (vt <= 0) return 0;
-  let lo = 0, hi = vt;
-  const rvt = hullResistance(vt); // (drive(v, vt) at every v of the search)
-  for (let i = 0; i < 30; i++) { const v = (lo + hi) / 2; if (driveFrom(rvt, v, vt) > hullResistance(v) + drag(v)) lo = v; else hi = v; }
-  return (lo + hi) / 2;
+  const rvt = hullResistance(vt), f = (v: number) => driveFrom(rvt, v, vt, k) - hullResistance(v) - drag(v);
+  // (the one crossing between rest and vt, by false position with the Illinois step: to 1 ppm of vt in a handful of
+  // looks where bisection took 30; it's asked for every boat in the sea, every step)
+  let a = 0, fa = f(0), c = vt, fc = f(c), side = 0;
+  if (fc >= 0) return vt;
+  if (fa <= 0) return 0;
+  for (let i = 0; i < 40; i++) {
+    const m = (a * fc - c * fa) / (fc - fa), fm = f(m);
+    if (Math.abs(c - a) < 1e-6 * vt || Math.abs(fm) < 1e-7 * rvt) return m;
+    if (fm > 0) { a = m; fa = fm; if (side === 1) fc /= 2; side = 1; } else { c = m; fc = fm; if (side === -1) fa /= 2; side = -1; }
+  }
+  return (a + c) / 2;
 }
 
 /** Target speed (m/s) for wind `kt` at true wind angle `twa`, in chop of height `hs` and period `tp` coming from the wind's direction. */
 export function speedInChop(kt: number, twa: number, hs: number, tp: number): number {
   const vt = polar(kt, twa);
   if (hs < 0.01) return vt;
+  // (the AI asks again with the same numbers several times a step: the last few answers kept, exactly as worked out)
+  for (let i = 0; i < CHOP_MEMO; i++) { const m = chopMemo[i]; if (m.kt === kt && m.twa === twa && m.hs === hs && m.tp === tp) return m.v; }
   const k = awAt(hs, tp, twa);
-  return steadySpeed(vt, v => k * awSpeed(v)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once)
+  const v = steadySpeed(vt, u => k * awSpeed(u), driveCurveFor(kt, twa, vt)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once; slowed by the sea, the sails' drive as the apparent wind then gives it)
+  const m = chopMemo[chopNext]; chopNext = (chopNext + 1) % CHOP_MEMO;
+  m.kt = kt; m.twa = twa; m.hs = hs; m.tp = tp; m.v = v;
+  return v;
 }
+const CHOP_MEMO = 16, chopMemo = Array.from({ length: CHOP_MEMO }, () => ({ kt: NaN, twa: NaN, hs: NaN, tp: NaN, v: 0 }));
+let chopNext = 0;
 
-const beatCache = new Map<string, number>();
+function beatSearch(kt: number, hs: number, tp: number): number {
+  let best = 40, bestV = -1;
+  for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
+  return best;
+}
+const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
 export function beatInChop(kt: number, hs: number, tp: number): number {
-  const key = `${Math.round(kt * 4)}:${Math.round(hs * 50)}:${Math.round(tp * 10)}`;
+  // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)
+  if (!Number.isFinite(kt + hs + tp)) return beatSearch(kt, hs, tp); // (no key for a NaN: worked out, not cached)
+  const key = (Math.round(kt * 4) * 1048576 + Math.round(hs * 50)) * 1048576 + Math.round(tp * 10);
   let a = beatCache.get(key);
   if (a === undefined) {
-    let best = 40, bestV = -1;
-    for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
-    a = best;
+    a = beatSearch(kt, hs, tp);
     if (beatCache.size > 20000) beatCache.clear();
     beatCache.set(key, a);
   }

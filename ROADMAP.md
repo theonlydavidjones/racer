@@ -472,7 +472,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    Nav steer her leeway above the beat. The compass's "tack" marker and its mean close-hauled
    heading allow for it too (ui/hud.ts); the laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
    in and she rounds up and tacks; it was before leeway too).
-8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
+8. ~~**Too much push from rest and through a tack**~~ (done: the drive's shape from the sail model, driveCurve.ts; 1 kt → 90% close-hauled in 6 kt now 50 s; the Delft resistance, below, still to do) (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
    ~~The AI's slow tack on a hail~~ (done, branch ai-hail-tack: a hailed boat that puts her helm down at once had been
@@ -481,11 +481,16 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    blocked by data: the Folkboat's hull form (waterline beam, canoe-body draft, Cp, Cm, LCB, LCF) isn't published in
    any source found, and the DSYHS coefficients only in a secondary source (a 2022–23 ULiège thesis reproducing
    Keuning & Sonnenberg 1999). It needs the class lines plan and offsets (NFIA Plan 1, 1961).
-9. **Sail shape and speed** (sails 2, 6): RIG.fullDepth (unsourced) puts ORC's full power at a light-air shape, so the
-   force model never uses full lift upwind and is 17–28% short on a reach; set at the crew's medium-air shape, the speed
-   search starts depowering at 14 kt, where North Sails' guide does (most of the depowering question below). And speed
-   goes as the square root of drive where the resistance goes as v^3–5.6 near hull speed, so trim mistakes cost
-   1.5–2.8× too much.
+9. **Sail shape and speed** (sails 2, 6): ~~speed went as the square root of drive~~ (done, branch sail-shape: a share of
+   the drive is now worth what it is where it meets the hull's resistance, with the sails' drive changing with her speed:
+   dynamics.ts speedForDrive. The effective exponent runs from about 2 in 6 kt to 4.7 near hull speed in 20 kt, so a 20%
+   loss of drive costs 4–6% of speed in a breeze, not 11%; the step, the crew's depowering search, the coach and the
+   debrief all count it the same way). RIG.fullDepth: kept. ORC's own text (VPP Documentation 2022, §5 and after eq.
+   5.48) makes flat = 1 the maximum lift, and its maximum lift the sail at its fullest ("the inability to increase sail
+   camber in light airs" is why a simple rig has less), so full power at the light-air depth is ORC's reading, not an
+   error (the depth itself, 0.145/0.141, is still unsourced: no camber figure for a Folkboat, or ORC's flat against
+   camber, was found). ORC's least flat is 0.42 since 2023 (VPP Documentation 2023, §5: "reduced to 0.42 from 0.62"),
+   as the sim's flatOf has it.
 10. **In irons** (hull 3): at rest she turns 4°/s the way the tiller points and sails off; a real boat gathers sternway
    and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
    42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own

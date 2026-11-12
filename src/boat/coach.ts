@@ -3,7 +3,8 @@ import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './
 import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
 import { crewMass, crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
-import { hullResistance } from './dynamics';
+import { driveSpeedRatio, hullResistance } from './dynamics';
+import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
 import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -94,6 +95,11 @@ export function situation(b: Boat, ctx: CoachContext = {}): Situation {
 
 /* ---------- what a setting is worth, in the boat's own equations ---------- */
 
+/** What a share K of the drive is worth in speed for her, sailing as she is (dynamics.ts driveSpeedRatio). */
+export function driveSpeed(b: Boat, K: number): number {
+  const twa = Math.min(180, b.twa + (b.leeway ?? 0)), vt = Math.max(0.5, polar(b.ww.kt, twa, sailPlan(b)));
+  return driveSpeedRatio(vt, K, driveCurveFor(b.ww.kt, twa, vt));
+}
 /**
  * How fast she'd go with these settings, relative (the same factors physics.ts multiplies the polar by: the sails'
  * angle of attack and shape as drive, heel past her best, and the drag of the helm the sails demand).
@@ -112,7 +118,9 @@ function speedFactor(b: Boat, c: Controls): number {
   // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
   // as physics.ts trimSails counts it; the deliberate ease is in the sails' power, below)
   const ease = crewMainAngle(b) - optimalSheet('main', b.awaSlow);
-  let f = Math.sqrt(Math.max(0, trimDrive(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max)), tj) * eff));
+  // (shares of the drive multiply; what they're worth in speed is where the drive meets the hull's resistance, as the
+  // boat itself counts it: dynamics.ts speedForDrive)
+  let K = Math.max(0, trimDrive(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max)), tj) * eff), f = 1;
   // heel and helm, with the crew where they are now
   const sf = sailForces(sw.aws, sw.awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
   const cs = b.crew;
@@ -125,10 +133,10 @@ function speedFactor(b: Boat, c: Controls): number {
     // but heel her less and ask less of the keel; against the drive as she is, as physics.ts powerFactor weighs it
     // (exactly as the boat weighs it: physics.ts sailPush, against the push with her lines as they are)
     const pushNow = sailPush(tws, b.twa, plan, b.shape.main, plan === 'jib' ? b.shape.jib : null, b.heelMag ?? 0, b.depower ?? 0);
-    if (pushNow > 1) f *= Math.sqrt(Math.max(0, sailPush(tws, b.twa, plan, ms, js, heel, b.depower ?? 0)) / pushNow);
-    f *= 1 - 0.5 * rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v));
+    if (pushNow > 1) K *= Math.max(0, sailPush(tws, b.twa, plan, ms, js, heel, b.depower ?? 0)) / pushNow;
+    K *= Math.max(0, 1 - rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v)));
   }
-  return f;
+  return f * driveSpeed(b, K);
 }
 
 const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] };
@@ -240,7 +248,7 @@ function helmLessons(b: Boat, s: Situation, lineFixes: number): Lesson[] {
   if (b.hove || b.luff || b.docked) return out;
   // pinching: both sails luffing upwind, with the sheets in
   if (s.up && tm.flow === 'luffing' && tm.amount > 0.15 && (!tj || tj.flow === 'luffing') && b.sheets.main <= optimalSheet('main', s.awa) + 2) {
-    const g = Math.sqrt(1 / Math.max(0.05, trimDrive(tm, tj))) - 1;
+    const g = 1 / Math.max(0.05, driveSpeed(b, trimDrive(tm, tj))) - 1;
     out.push({ id: 'steer:pinching', who: 'helm', head: `Bear away about ${deg(Math.max(3, beatAngle(s.tws) - s.twa + 2))}.`, why: 'You\'re pinching: both sails are luffing, so they\'ve stopped pulling.',
       look: 'the windward jib telltales lifting: steer down until they stream', done: 'sails drawing again', gain: g, kind: 'fix' });
   }
@@ -252,7 +260,7 @@ function helmLessons(b: Boat, s: Situation, lineFixes: number): Lesson[] {
     out.push({ id: 'steer:feather', who: 'helm', head: 'Feather in the puffs: head up a touch as each one hits.',
       why: 'Every depowering line is on. What\'s left is to sail a little higher in the gusts, letting the main lift, so she stays on her feet.',
       look: `the heel (${deg(heel)}) and the tiller pulling (${deg(hn)} of weather helm): feather until both ease`, done: 'she\'s on her feet',
-      gain: Math.max(1 - heelFactor(heel), 0.5 * rudderDrag(Math.min(12, hn), v) / Math.max(1, hullResistance(v))), kind: 'fix' });
+      gain: Math.max(1 - heelFactor(heel), 1 - driveSpeed(b, Math.max(0, 1 - rudderDrag(Math.min(12, hn), v) / Math.max(1, hullResistance(v))))), kind: 'fix' });
   }
   return out;
 }

@@ -209,7 +209,7 @@ describe('The crew', () => {
   it('sailing alone in a breeze she goes slower than with two crew: she heels more, or has to be depowered more', () => {
     const two = beat(20), solo = testBoat({ heading: 360 - beatAngle(20), kt: 4.5, windKt: 20 });
     solo.crew = newCrew({ ...DEFAULT_CREW, crew: [] }, 'S');
-    sail(solo, 30, () => { solo.h = 360 - beatAngle(20); });
+    sail(solo, 30, () => { steer(solo, beatAngle(20)); }); // (her course at the beat angle, as beat() steers: heading by course, leeway included)
     expect(solo.heelMag! > two.heelMag! + 3 || (solo.depower ?? 0) > (two.depower ?? 0) + 0.1).toBe(true);
     expect(solo.v).toBeLessThan(two.v);
   });

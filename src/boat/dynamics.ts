@@ -5,9 +5,9 @@ import orc from './data/nordic-folkboat-orc.json';
  * Folkboat speed and turning dynamics.
  *
  * Speed: m·dv/dt = drive − hull resistance − windage − turning drag.
- * Drive is set so the boat settles exactly at its polar target speed: drive = R(target),
- * plus a boost at low speed (stopped or slow, the apparent wind is broader and nearly as
- * strong as the true wind, so the sails pull harder than at full speed).
+ * Drive is set so the boat settles exactly at its polar target speed: drive = R(target), shaped below and above
+ * that speed by how the sails' drive changes with the apparent wind (a DriveCurve: driveCurve.ts, from the sail model;
+ * close-hauled she has less push slow than at speed, on a run more).
  * Hull resistance uses the certificate's wetted surface (ITTC-57 friction) and a residuary
  * (wave) term that climbs steeply toward hull speed. The constants below are the tuning knobs;
  * tests/boat.test.ts pins the behaviour they produce.
@@ -25,8 +25,6 @@ export const HANDLING = {
   mass: HULL.displacement * 1.08,
   /** Friction form factor for a full-bodied long-keel hull. */
   formFactor: 1.15,
-  /** Extra drive at zero speed, as a fraction of the drive at target speed. */
-  driveBoost: 0.6,
   /** Drag area of hull, mast and rigging, m². */
   windageCdA: 2.0,
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
@@ -94,13 +92,42 @@ export function resistanceParts(v: number): { friction: number; residuary: numbe
   return { friction, residuary: HULL.displacement * G * residuaryFraction(fn) };
 }
 
+/** The sails' drive at speed v as a share of their drive at the target speed (driveCurve.ts driveRatio, for the wind and
+ * angle she's sailing). Without one, the drive is the target's at every speed (eased sails, or nothing better known). */
+export type DriveCurve = (v: number) => number;
 /** Sail drive (N) at speed v when the trimmed target speed is vt. */
-export function drive(v: number, vt: number): number {
+export function drive(v: number, vt: number, k?: DriveCurve): number {
   if (vt <= 0) return 0;
-  return driveFrom(hullResistance(vt), v, vt);
+  return driveFrom(hullResistance(vt), v, vt, k);
 }
 /** drive(v, vt), given hullResistance(vt) (`rvt`): for a search over v at one vt, which needn't look it up each time. */
-export const driveFrom = (rvt: number, v: number, vt: number): number => rvt * (1 + HANDLING.driveBoost * Math.max(0, 1 - v / vt));
+export const driveFrom = (rvt: number, v: number, _vt: number, k?: DriveCurve): number => rvt * (k ? k(v) : 1);
+
+/**
+ * The speed (m/s) she settles at with K times the drive that holds her at vt: a sheet off its mark, a sail half hoisted,
+ * a flatter shape. Where K × her drive (with `k`, how the sails' drive changes with her speed: driveCurve.ts) meets the
+ * hull's resistance. Near hull speed the resistance climbs as v^3 to v^5.6, so a 10% loss of drive there costs 2–3% of
+ * speed, not the 5% that "speed goes as the square root of drive" (resistance as v²) would make it.
+ */
+export function speedForDrive(vt: number, K: number, k?: DriveCurve): number {
+  if (vt <= 0 || K <= 0) return 0;
+  if (Math.abs(K - 1) < 1e-9) return vt;
+  const rvt = hullResistance(vt), f = (v: number) => K * driveFrom(rvt, v, vt, k) - hullResistance(v);
+  // (the one crossing, bracketed between rest and 1.4·vt, found by false position with the Illinois step: to 1 ppm of
+  // vt in 6–10 looks where bisection took 20; it runs every step for every boat)
+  let a = 0, fa = f(0), c = vt * (K > 1 ? 1.4 : 1), fc = f(c), side = 0;
+  if (fc >= 0) return c;
+  for (let i = 0; i < 40; i++) {
+    const m = (a * fc - c * fa) / (fc - fa), fm = f(m);
+    if (Math.abs(c - a) < 1e-6 * vt || Math.abs(fm) < 1e-7 * rvt) return m;
+    if (fm > 0) { a = m; fa = fm; if (side === 1) fc /= 2; side = 1; } else { c = m; fc = fm; if (side === -1) fa /= 2; side = -1; }
+  }
+  return (a + c) / 2;
+}
+/** speedForDrive as a ratio of speeds: what K × the drive is worth at vt (1 at K = 1). */
+export const driveSpeedRatio = (vt: number, K: number, k?: DriveCurve): number => vt > 0.05 ? speedForDrive(vt, K, k) / vt : Math.sqrt(Math.max(0, K));
+/** The effective exponent n of drive against speed at vt (a drive ratio K is worth K^(1/n) in speed, near K = 1). */
+export const driveExponent = (vt: number, k?: DriveCurve): number => vt > 0.05 ? Math.log(0.95) / Math.log(speedForDrive(vt, 0.95, k) / vt) : 2;
 
 /**
  * Air drag (N) against forward motion when the sails aren't drawing: rig windage plus flogging sails.
@@ -124,8 +151,8 @@ export function flogAmount(twa: number, beat: number, noGo: number, luffing: boo
 }
 
 /** Surge acceleration, m/s². */
-export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HULL.displacement): number {
-  return (drive(v, vt) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
+export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HULL.displacement, k?: DriveCurve): number {
+  return (drive(v, vt, k) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
 }
 
 /** Fastest the helm can turn the boat at speed v (m/s), deg/s. Rudder authority comes from water flow. */
@@ -139,12 +166,12 @@ export function maxTurnRate(v: number): number {
  * heading and the direction of progress, `drift` is current along that direction (m/s).
  * Returns Infinity if not reached within `limit` seconds.
  */
-export function timeToCover(dist: number, v0: number, vt: number, along = 1, drift = 0, limit = 240): number {
+export function timeToCover(dist: number, v0: number, vt: number, along = 1, drift = 0, limit = 240, k?: DriveCurve): number {
   if (dist <= 0) return 0;
   const dt = 0.25;
   let v = v0, x = 0;
   for (let t = 0; t < limit; t += dt) {
-    const v1 = Math.max(0, v + surgeAccel(v, vt, 0) * dt);
+    const v1 = Math.max(0, v + surgeAccel(v, vt, 0, HULL.displacement, k) * dt);
     const dx = ((v + v1) / 2 * along + drift) * dt;
     if (x + dx >= dist) return t + dt * (dist - x) / Math.max(1e-6, dx);
     x += dx; v = v1;

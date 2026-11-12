@@ -285,3 +285,21 @@ describe('penalty turns (Rule 44.2)', async () => {
     expect(b.penaltyDir).toBe(-1);
   });
 });
+
+describe("the sails' push at her speed (driveCurve.ts)", () => {
+  it('close-hauled, slow, they push less than at full speed (ORC: 0.7–0.8 at rest); on a run, more', async () => {
+    const { driveRatio } = await import('../src/boat/driveCurve');
+    const { polar, beatAngle } = await import('../src/boat/polar');
+    const at = (w: number, a: number, f: number) => { const vt = polar(w, a, 'jib'); return driveRatio(w, a, f * vt, vt); };
+    expect(at(12, beatAngle(12), 0)).toBeGreaterThan(0.65); expect(at(12, beatAngle(12), 0)).toBeLessThan(0.85);
+    expect(at(12, 170, 0)).toBeGreaterThan(1.8);
+    expect(at(12, 90, 1)).toBeCloseTo(1, 6);
+  });
+  it('whatever was asked before (no two conditions share a cached value)', async () => {
+    const { driveRatio } = await import('../src/boat/driveCurve');
+    const { polar } = await import('../src/boat/polar');
+    const run = () => driveRatio(6, 150, 0, polar(6, 150, 'jib'));
+    const a = run(); driveRatio(7, 50, 0, polar(7, 50, 'jib')); driveRatio(13, 70, 0, polar(13, 70, 'jib'));
+    expect(run()).toBe(a); expect(a).toBeGreaterThan(1.5);
+  });
+});

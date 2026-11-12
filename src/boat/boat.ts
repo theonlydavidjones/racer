@@ -207,8 +207,10 @@ export interface Boat {
   heelRate?: number;
   /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
   seaShare?: number; seaShareT?: number;
-  /** Speed factor from the power she carries against the polar crew's (physics.ts powerFactor), and seconds until it's worked out again. */
+  /** Her push against the polar crew's, a share of the drive (physics.ts powerFactor), and seconds until it's worked out again. */
   powerK?: number; powerT?: number;
+  /** heelFactor at the polar crew's heel in this wind (physics.ts powerFactor): the polar has it in it. */
+  powerRefHeel?: number;
   /** The depowering step (0..1) that's fastest for her crew now (physics.ts powerFactor): what the crew works toward. */
   depowerBest?: number;
   /** The heel the moments balanced at last step (deg), to start the next solve from (balance.ts heelWithCrew). */
