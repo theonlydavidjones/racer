@@ -219,6 +219,8 @@ export class World {
   events: SimEvent[] = [];
   /** When each boat last broke a Part 2 rule, and last touched a mark (Rule 44.1(a)); who last fouled each boat (Rule 43.1(a)). */
   private lastFoul = new Map<number, number>();
+  /** Rule 44.1: each boat's last penalized foul, and against whom (one penalty per incident). */
+  private lastFoulVs = new Map<number, { vs: number; t: number }>();
   private lastTouch = new Map<number, number>();
   private fouledAt = new Map<number, { by: number; t: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
@@ -1069,8 +1071,16 @@ export class World {
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
+      // Rule 44.1: a penalty is for an incident. The same boat fouling the same boat again within SAME_INCIDENT of a
+      // penalized foul, while she still owes or is doing her turns (still entangled, before she's got well clear as
+      // 44.2 asks), is that same incident: no second penalty, no second foul counted
+      const prior = this.lastFoulVs.get(f.id);
+      if (incident.kind !== 'hail' && prior && prior.vs === victim.id && this.t - prior.t < SAME_INCIDENT && f.penalty > 0) {
+        if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} again, in the same incident: the penalty already being taken covers it (Rule 44.1).` });
+        continue;
+      }
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
-      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.lastFoul.set(f.id, this.t);
+      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, this.t); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t }); }
       if (A.isUser || B.isUser) {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }

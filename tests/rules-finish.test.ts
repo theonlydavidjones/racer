@@ -274,3 +274,25 @@ describe('hull contact geometry', () => {
     expect(hullGap(a, b)).toBe(0);
   });
 });
+
+describe('Rule 44.1: one penalty per incident', () => {
+  it('you foul a boat, and touch her again moments later while you owe your turns: the same incident, no second foul', async () => {
+    for (const later of [3, 10]) {
+      const w = race(), [u, A] = w.boats;
+      w.boats[2].x = OPEN.x + 3000; w.boats[3].x = OPEN.x + 4000;
+      sail(w, u, OPEN, 'P'); sail(w, A, OPEN, 'S');
+      // (A on her proper course for her mark, so she isn't above it: rule 23.2 doesn't come into it)
+      const { properTwa } = await import('../src/sim/world'), pt = properTwa(w, A) ?? 90;
+      A.h = A.desired = n360(w.wind.from - pt); A.twa = pt;
+      u.penalty = u.penaltyTotal = 720; // her turns from the first foul, against A
+      const hh = (w as unknown as { hHist: number[][] }).hHist; hh[0] = [u.h]; hh[1] = [A.h]; // (both on these headings a while: nobody turned onto the other)
+      (w as unknown as { lastFoulVs: Map<number, { vs: number; t: number }> }).lastFoulVs.set(u.id, { vs: A.id, t: w.t - later });
+      u.x = OPEN.x; u.y = OPEN.y; A.x = OPEN.x + 0.2; A.y = OPEN.y; // in contact again
+      const fouls = w.fouls;
+      w.step(DT);
+      const incidents = w.drainEvents().filter(e => e.type === 'incident').length;
+      expect(incidents, `${later} s after the first`).toBe(later < 8 ? 0 : 1);
+      expect(w.fouls - fouls).toBe(later < 8 ? 0 : 1);
+    }
+  });
+});
