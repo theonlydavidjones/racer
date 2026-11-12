@@ -21,7 +21,7 @@ import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink, crewPoleCall } from '../ai/ai';
-import { legacyKnobs } from '../ai/skipper';
+import { formFor, hashName, knobsFor, newMind, skipperFor } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
@@ -394,9 +394,12 @@ export class World {
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
       ai: isUser ? null : (() => {
         // (her dice, drawn in this order: the same races come out of the same seeds)
-        const wp = r() < 0.5 ? 0 : 1, f = 0.12 + 0.76 * r(), depth = 55 + r() * 45, aggr = r() * 6, width = 110 + r() * 130, aware = r() < 0.7;
+        const wp = r() < 0.5 ? 0 : 1, f = 0.12 + 0.76 * r(), depth = 55 + r() * 45, aggr = r() * 6, width = 110 + r() * 130; r(); // (the last: the current-awareness die, now her strategy's)
+        // her skipper: the same one every race for a boat of this name (the owner), on her form for the day
+        const who = spec?.name ?? F.name, h = hashName(who);
+        const sk = formFor(skipperFor(who), makeRng((h ^ this.seed) >>> 0)), kn = knobsFor(sk);
         return {
-          mode: 'hold' as const, wp: wp as 0 | 1, f, depth, aggr, width, aware, kn: legacyKnobs(aware), clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
+          mode: 'hold' as const, wp: wp as 0 | 1, f, depth, aggr, width, aware: kn.currentShare >= 0.8, sk, kn, mind: newMind(kn, (h ^ this.seed ^ 0x5c1) >>> 0), clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
         };
       })()
     };

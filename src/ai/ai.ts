@@ -12,6 +12,7 @@ import { HAIL_RESPONSE, cpa } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
 import type { World } from '../sim/world';
+import { judgeLeg, layBiasAt } from './skipper';
 
 /**
  * Her hail "Room to tack" at a boat obstruction (WS Case 11): the boat she hailed, the boat that is the obstruction, and
@@ -123,7 +124,8 @@ export function crabFor(brgT: number, v: number, cur: Vec): number {
 
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
-  const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1;
+  // (an AI helm's close-hauled is her own groove's: a little high or low of the best, ai/skipper.ts)
+  const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1 + (b.ai?.mind?.groove ?? 0);
   if (Math.abs(rel) >= ch) return n360(desired);
   if (b.tack === 'S' && rel < -25) return n360(from + ch);
   if (b.tack === 'P' && rel > 25) return n360(from - ch);
@@ -252,8 +254,10 @@ export function bestApproach(w: World, b: Boat): { h: number; along: number } {
 
 /** One decision step for an AI boat: sets b.desired and b.luff. */
 export function aiThink(w: World, b: Boat, dt: number): void {
-  const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
-  const beat = beatFor(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
+  const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur, mind = ai.mind;
+  // a new leg: her judgements for it (her laylines, her groove), drawn as she sets out on it (ai/skipper.ts)
+  if (mind && mind.leg !== b.leg) judgeLeg(mind, ai.kn, b.leg);
+  const beat = beatFor(b) + (mind?.groove ?? 0), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
   ai.tackNow = false; // (set below while she answers a hail)
   if (b.penalty > 0) {
@@ -321,7 +325,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if ((b.shadowK ?? 1) / (b.leeK ?? 1) < 0.94) desired = sailable(b, goH + (b.tack === 'S' ? -12 : 12));
       // aim to hit the line 1–3 s after the gun at full speed (the bolder the boat, the closer)
       // (later still under the I, Z, U and black flags: being over in the last minute costs more)
-      if (ai.plan.tReach < tl + 3 - ai.aggr * 0.33 + FLAG_CAUTION[w.prepFlag]) {
+      // (as she judges her time to the line: out by her start error, ai/skipper.ts)
+      if (ai.plan.tReach + (mind?.startErr ?? 0) < tl + 3 - ai.aggr * 0.33 + FLAG_CAUTION[w.prepFlag]) {
         // Early: burn time. Where would we be at the gun if we eased the sails now? Coasting plus drift
         // with the current (current-aware boats allow for all of it; the others underestimate it).
         const drift = (c.x * N.x + c.y * N.y) * tl * ai.kn.currentShare, atGun = d + drift + Math.max(0, ai.plan.coast); // coasting away from the line is no safety margin
@@ -407,8 +412,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (w.t - b.lastTackT > 9) {
         const d = sub(P, b), vs = targetFor(b, beat);
         // can we fetch P on tack tk, allowing for current?
+        // (as she judges it by eye: her layline bias turns each tack's track away from the wind, so she sees herself
+        // fetching it later than she will (an overstand) or, biased the other way, sooner; ai/skipper.ts)
+        const eb = mind ? layBiasAt(mind, Math.hypot(d.x, d.y)) : 0;
         const fetch = (tk: 'S' | 'P') => {
-          const uu = V(tk === 'S' ? csS : csP), g = unit({ x: uu.x * vs + c.x, y: uu.y * vs + c.y });
+          const uu = V(tk === 'S' ? csS - eb : csP + eb), g = unit({ x: uu.x * vs + c.x, y: uu.y * vs + c.y });
           if (dot(g, d) <= 0) return false;
           const lat = cross(g, d);
           return tk === 'S' ? lat > 3 : lat < -3;
@@ -449,8 +457,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         const d = sub(P, b), vr = targetFor(b, ra);
         // (the other gybe lays the mark when its track over the ground passes no more than 3° to leeward of it: on
         // starboard downwind she heads up by turning to starboard, so she lays a mark to the right of her track)
+        // (by eye, as upwind: her bias turns each gybe's track toward the wind, so she gybes later than she should)
+        const eb = mind ? layBiasAt(mind, Math.hypot(d.x, d.y)) : 0;
         const lays = (tk: 'S' | 'P') => {
-          const uu = V(tk === 'S' ? rS : rP), g = unit({ x: uu.x * vr + c.x, y: uu.y * vr + c.y });
+          const uu = V(tk === 'S' ? rS + eb : rP - eb), g = unit({ x: uu.x * vr + c.x, y: uu.y * vr + c.y });
           if (dot(g, d) <= 0) return false;
           const sinA = cross(g, d) / Math.max(1, Math.hypot(d.x, d.y));
           return tk === 'S' ? sinA < 0.05 : sinA > -0.05;
