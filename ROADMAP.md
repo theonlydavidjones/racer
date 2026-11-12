@@ -52,6 +52,25 @@ What's planned, roughly in order. Done work is described in the README.
    - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
    Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
    (starboard, jib luff tension), with a physics review.
+   **With the band: the chase-view layout** (owner approved 12 November; handed to Crew Controls with the band). Mock-up
+   https://claude.ai/artifact/S2ZAPSy3CPsptyFWidxh8N (design/chase-layout.html on ui/sail-controls-band-mockup):
+   - the middle ~40% of the screen kept clear for the rig;
+   - the dials in the top corners: a rectangular heading pod in place of the compass tape, and a circular inset chart;
+   - one "where next" card (start line, over early, next mark, finish, or the navigator) in place of the start-line
+     and transit banners;
+   - a flags-only tile that opens a flag index, for learning the flags;
+   - the Coach card bottom left, the Messages card bottom right;
+   - Hail as a tab on the band, only when a hail applies; the old trim panel removed;
+   - the chase camera framing the whole boat above the band by default (zooming past it allowed);
+   - on the band: an AUTO-TRIM tab (was "All"), a POLE OUT / POLE IN tab only on a run, a round windex between the
+     vangs.
+   Possible follow-ons, not queued unless the owner asks: the rest of the RRS race signals in the flag index (AP, N,
+   first substitute, S…), checked by the researcher; one-line on-screen messages with the full text in the log;
+   renaming the "Crew · Auto" button.
+   After the band (owner, 12 November; not urgent; 1–2 h): line colours chosen in the boat editor, one per line (jib
+   sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
+   band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
+   the starting set; saved with the boat.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
@@ -196,15 +215,18 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
   in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
   the shove from her real mass and low-speed drag, not a set distance.
-- **Next — outside the Gate, the sea dial disagrees with the water and the chart** (bug; 2–3 h; owner: "not for now"):
-  sailing on auto just west of the Golden Gate Bridge (37°48.48'N 122°30.23'W), the dial showed "FLOOD 0.4" and
-  "9 FT SWELL"; owner, "water definitely does not show 9 foot swell, and the chart shows that it's an ebb?"
-  (1) Flood or ebb: the dial calls it by the nearest NOAA station's flood direction (ui/hud.ts: the current dotted with
-  that station's flood bearing), while the chart's current layer draws the current field itself; find which is wrong
-  out there (a station inside the Gate with a different flood bearing, an eddy, or the layer's arrows), and make the
-  dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
-  offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
-  outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
+- **Done — outside the Gate, the sea dial disagreed with the water and the chart** (bug): the stations' tide predictions
+  covered only the race's window; past it each held its last value, frozen at different points of their tides, so on a
+  long sail the dial (its nearest station, frozen mid-flood) and the chart's arrows (others, mid-ebb) disagreed. They now
+  roll on (CurrentField.cover; tests/seaDial.test.ts at the owner's spot). The swell: the dial and the water come from
+  the same sea state, and 9 ft is what the model gives there on a big day with an ebb against it (0.77 of the bar
+  buoy's height, steepened by the ebb). A long-period swell (14–18 s, 300–500 m long) is a slope of about 1°: the boat
+  heaves about a metre and the cockpit view rises and falls with her, but the chase camera holds its height, so the
+  horizon stays put. Open: (a) should the chase camera ride the swell? (owner's call); (b) the swell's reach into the
+  Gate (0.77 there, 0.55 at the bridge) is an estimate: no measured ratio found (Hanes & Erikson 2013, ECSS 133, is
+  paywalled; the ESA/BCDC Crissy Field comparison is on a blocked host); (c) Deep Physics: the bar buoy's total height
+  includes its own wind sea (NDBC publishes the swell part, SwH, separately), and the swell's real direction is dropped
+  at the Gate.
 - **Next — heavy weather: how she copes in 30+ kt, and reefing for cruising only** (accuracy + feature; 8–12 h; owner:
   "not for now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner:
   "that boat would have sunk by now… How would an IRL skipper handle this situation? can't Folkboats handle heavy weather
