@@ -172,11 +172,15 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const zc = (u: number) => -L / 2 + u * L;
   // the cabin window: one long, narrow light each side with rounded ends, set in an aluminium frame (as on Josephine;
   // portholes' shape is free, CR 3.19)
-  const winTex = windowTexture();
+  // (one material for both: after dark the cabin's lamps glow warm through the glass, not the frame; navLights.ts
+  // syncNavLights sets how bright, on the boat-lights clock)
+  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    emissive: 0x000000, emissiveMap: windowGlow(), emissiveIntensity: 0 });
+  grp.userData.ports = winMat;
   for (const s of [1, -1]) {
     const geo = sidePatch(uAtZ(-0.05), 0.95, CABIN.h * 0.32, CABIN.h * 0.72, 24, 2);
     if (s < 0) mirrorPatch(geo);
-    grp.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    grp.add(new THREE.Mesh(geo, winMat));
   }
   const topAft = cab.topY(CABIN.u1), zAft = zc(CABIN.u1);
   // companionway, sliding hatch and the compass on the aft end of the cabin (as on Josephine)
@@ -306,7 +310,7 @@ interface Lines {
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
-const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82 });
+const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82, emissive: 0x000000, emissiveIntensity: 0 });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
 const carPos = (side: number, fore: number, ins: number) => {
@@ -484,7 +488,6 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   for (const z of [0.5, 1.2, 1.9, 2.6]) { const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 4, 10), MAT.dark); tie.rotation.x = Math.PI / 2; tie.position.y = z - 1.55; mainFurl.add(tie); } // (along the cylinder's own axis)
   const jibBag = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshLambertMaterial({ color: 0x2c3e66 })); jibBag.scale.set(0.2, 0.12, 0.45);
   jibBag.position.set(-0.05, deckY(uAtZ(-2.9), 0.05) + 0.1, -2.9); jibBag.visible = false; grp.add(jibBag);
-  const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshBasicMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, BOOM_TOP + 0.79 * P, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
@@ -554,7 +557,8 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // tiller, the backstay's bridle and the ensign staff), or the tricolour just above the masthead, under the windex
   const sternY = sheer(1) - 0.07;
   const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z) },
-    b.paint?.navLights ?? 'deck', MAT.glass);
+    b.paint?.navLights ?? 'deck', grp.userData.ports);
+  if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false, nav };
 }
@@ -894,6 +898,17 @@ function mirrorPatch(geo: THREE.BufferGeometry): void {
 }
 let winCache: THREE.CanvasTexture | null = null;
 /** The long cabin light: dark tinted glass with a sky sheen, in a thin aluminium frame with rounded ends. */
+/** Where the window's light comes through: the glass (white, a little brighter low down, nearer the lamp), not its frame. */
+let winGlowCache: THREE.CanvasTexture | null = null;
+function windowGlow(): THREE.CanvasTexture {
+  if (winGlowCache) return winGlowCache;
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64; const c = cv.getContext('2d')!;
+  c.fillStyle = '#000'; c.fillRect(0, 0, 512, 64);
+  const rr = (x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+  const g = c.createLinearGradient(0, 10, 0, 54); g.addColorStop(0, '#9a9a9a'); g.addColorStop(1, '#ffffff');
+  c.fillStyle = g; rr(10, 10, 492, 44, 20); c.fill();
+  return (winGlowCache = new THREE.CanvasTexture(cv));
+}
 function windowTexture(): THREE.CanvasTexture {
   if (winCache) return winCache;
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64; const c = cv.getContext('2d')!;

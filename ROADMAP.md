@@ -1,6 +1,12 @@
 # Build plan
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
+  stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
+  her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
+  (the sails' own side force), but the AI's sailing doesn't reckon with either yet (an AI boat luffing by the committee
+  boat drifts onto it), so with sails up she still stops dead and the keel holds her. Also: heaveTo still clamps
+  sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
 - **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
   neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
