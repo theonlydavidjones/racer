@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { DT, World } from '../src/sim/world';
+import { AI_EVERY, DT, World } from '../src/sim/world';
 import { V, n360, type Vec } from '../src/core/math';
 import { LL } from '../src/geo/geo';
 import { onLand } from '../src/geo/shore';
@@ -142,7 +142,7 @@ describe('in the world', () => {
     expect(w.tackBlocker(M)).toBe(W);
     w.hail(L, M, 'room');
     const t0 = w.t;
-    w.step(DT); w.step(DT);
+    for (let i = 0; i < AI_EVERY + 1; i++) w.step(DT); // (within her next think: the AI thinks 10 times a second)
     expect(w.pairRecord(M, W)?.hail).toMatchObject({ by: M.id, kind: 'room', relayed: true });
     expect(w.pairRecord(L, M)?.hail?.passedOn?.to).toBe(W.id);
     // (each boat's first tack after the hail: free of it, W may well tack back for the mark later)
