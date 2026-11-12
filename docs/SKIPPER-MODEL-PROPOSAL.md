@@ -293,6 +293,40 @@ What it shows:
 So the skipper model has to give the order its consistency and the front its star. It must do that while keeping
 the overall spread about where it is, or tightening it a little.
 
+### Phase 2 on the real days, and what's in the way (12 November, evening)
+
+Phase 2 gives each boat a seeded skipper (by name, the same every race) and a form on the day. Her attributes set the
+knobs. Her mind holds a layline bias by eye, a groove upwind and a start-timing error. The AI's keep-clear fixes in
+#167 are included.
+
+| Measure | Real | Today's AI | Phase 2 |
+|---|---|---|---|
+| Last finisher, % behind (median) | 11.9 | 14.8 | 11.3 |
+| Median boat, % behind | 5.8 | 7.7 | 5.1 |
+| By quarter, % | 1.8 / 2.9 / 5.8 / 10 | 0.7 / 5.1 / 9.5 / 14.8 | 1.7 / 3.9 / 5.8 / 11.3 |
+| Race-to-race tau | 0.42 | 0.09 | about 0 |
+
+**The spread now matches the real fleet's. The order doesn't follow skill yet.** The harness logs every penalty (44 in
+10 races, about one per boat per race), and the noise comes from the AI's own fouls:
+
+- **Fouls between AI boats (33):**
+  - rule 10, port and starboard: 14;
+  - rule 11, windward and leeward: 10;
+  - rule 21.2, keeping clear while doing turns: 5;
+  - rule 13, tacking: 3;
+  - rule 18.2, mark-room: 1.
+  - About a third of them are within 40 m of a mark.
+- **Touches of the Fort Mason mark: 8.** These are repeated, sometimes the same boat twice, minutes apart.
+
+Each penalty costs about a minute, which is more than a skill difference makes in a 50-minute race. The first
+skipper-model attempt made bold skippers' traffic margins tighter, and the best skipper then fouled most (14 penalties
+in 10 races). Nerve now never makes margins tighter than today's.
+
+**Next (phase 3 brought forward):**
+
+- the AI's foul rate: rule 10 and 11 crossings in open water, and the Fort Mason touches;
+- then calibrating the skill mix for tau.
+
 ## 7. Phases and hours
 
 | Phase | What | Hours |
