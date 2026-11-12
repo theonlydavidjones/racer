@@ -9,10 +9,12 @@
  * The record (NOAA CO-OPS, product=currents, the near-surface bin, every 6 minutes) is projected on the station's flood
  * axis and fitted by least squares with the sim's own predictor (src/environment/harmonics.ts), so the constants are in
  * the form and the conventions it predicts with: for each constituent the record can resolve (by the Rayleigh criterion:
- * 55 days separates M2 from S2 and N2, K1 from O1, but not P1 from K1 or K2 from S2), an amplitude and a phase lag; P1 and
- * K2 inferred from K1 and S2 by their equilibrium ratios (0.331 and 0.272, with the same phase lags), as NOAA does for
- * short series. --check fits Raccoon Strait's record (SFB1212, the same survey) the same way and compares the prediction
- * with NOAA's own, from its published constants.
+ * 55 days separates M2 from S2 and N2, K1 from O1, but not P1 from K1 or K2 from S2), an amplitude and a phase lag. P1
+ * and K2 are tied to K1 and S2 inside the fit by their equilibrium ratios (0.331 and 0.272, the same phase lags):
+ * equilibrium inference (Foreman's), not NOAA's practice at the neighbouring station, whose ratios and phase offsets
+ * differ (at Raccoon Strait P1/K1 0.52, K2/S2 0.39), but worth under 0.02 kt here. --check fits Raccoon Strait's record
+ * (SFB1212, the same survey) the same way and compares the prediction with NOAA's own, from its published constants (an
+ * analysis of the same record: it checks the method, not its skill in other years).
  *
  * Output: src/environment/data/fitted-currents.json (stations in sf-currents.json's form; tide.ts adds them to the field).
  */
@@ -47,7 +49,9 @@ async function record(id, bin, from, to) {
 /** Least squares: the constituents' cosine and sine parts and a mean, by the normal equations. */
 function fit(times, v, names) {
   const cols = [() => times.map(() => 1)];
-  for (const n of names) { cols.push(() => predict(0, [[n, 1, 0]], times)); cols.push(() => predict(0, [[n, 1, 90]], times)); }
+  // (a constituent the record can't separate from its neighbour rides with it: P1 with K1, K2 with S2)
+  const TIED = { K1: ['P1', 0.331], S2: ['K2', 0.272] }, tied = (n, G) => TIED[n] ? [[n, 1, G], [TIED[n][0], TIED[n][1], G]] : [[n, 1, G]];
+  for (const n of names) { cols.push(() => predict(0, tied(n, 0), times)); cols.push(() => predict(0, tied(n, 90), times)); }
   const X = cols.map(c => c()), k = X.length, A = Array.from({ length: k }, () => new Float64Array(k)), b = new Float64Array(k);
   for (let i = 0; i < k; i++) { for (let j = 0; j < k; j++) { let s = 0; for (let t = 0; t < v.length; t++) s += X[i][t] * X[j][t]; A[i][j] = s; } let s = 0; for (let t = 0; t < v.length; t++) s += X[i][t] * v[t]; b[i] = s; }
   // Gaussian elimination with partial pivoting
@@ -59,27 +63,22 @@ function fit(times, v, names) {
   const x = new Float64Array(k); for (let r = k - 1; r >= 0; r--) { let s = b[r]; for (let j = r + 1; j < k; j++) s -= A[r][j] * x[j]; x[r] = s / A[r][r]; }
   // a·cos(θ) + c·sin(θ) = A·cos(θ − G): A = hypot(a, c), G = atan2(c, a)
   const hc = names.map((n, i) => { const a = x[1 + 2 * i], c = x[2 + 2 * i]; return [n, Math.hypot(a, c), ((Math.atan2(c, a) * 180 / Math.PI) + 360) % 360]; });
+  for (const [n, [m, r]] of Object.entries(TIED)) { const h = hc.find(q => q[0] === n); if (h) hc.push([m, h[1] * r, h[2]]); }
   return { z0: x[0], hc };
 }
 const NAMES = ['M2', 'S2', 'N2', 'K1', 'O1', 'M4', 'MS4', 'M6', 'MK3', '2MK3', 'MN4'];
 /** Fit a station's record on its flood axis; P1 and K2 inferred. */
 async function fitStation(S) {
   const m = (await get(`/mdapi/prod/webapi/stations/${S.id}.json`)).stations[0];
-  const flood = Math.round(m.deployments?.flood_direction ?? NaN);
+  // the flood axis: given, or NOAA's deployment record's flood direction (the direction the water flows toward on the flood)
+  const dep = Number.isFinite(S.flood) ? null : (await get(`/mdapi/prod/webapi/stations/${S.id}/deployments.json`)), axis = Number.isFinite(S.flood) ? S.flood : +(dep.deployments?.[0]?.flood_direction_degrees ?? dep.flood_direction_degrees);
+  if (!Number.isFinite(axis)) fail(`${S.id}: no flood direction`);
   const rec = await record(S.id, S.bin, S.from, S.to);
-  // the flood axis: NOAA's for the station, else the principal axis of the record
-  let axis = Number.isFinite(S.flood) ? S.flood : NaN;
-  if (!Number.isFinite(axis)) {
-    let sxx = 0, syy = 0, sxy = 0; for (const p of rec) { const e = p.s * Math.sin(p.d * Math.PI / 180), n = p.s * Math.cos(p.d * Math.PI / 180); sxx += e * e; syy += n * n; sxy += e * n; }
-    const th = 0.5 * Math.atan2(2 * sxy, syy - sxx); axis = ((th * 180 / Math.PI) + 360) % 360; // (a bearing; flood is the way the bigger peaks go: set below)
-  }
-  let v = rec.map(p => p.s * Math.cos((p.d - axis) * Math.PI / 180));
-  const times = rec.map(p => p.ms), f = fit(times, v, NAMES);
-  const K1 = f.hc.find(h => h[0] === 'K1'), S2 = f.hc.find(h => h[0] === 'S2');
-  const hc = [...f.hc, ['P1', K1[1] * 0.331, K1[2]], ['K2', S2[1] * 0.272, S2[2]]];
+  const v = rec.map(p => p.s * Math.cos((p.d - axis) * Math.PI / 180));
+  const times = rec.map(p => p.ms), { z0, hc } = fit(times, v, NAMES), f = { z0 };
   const pred = predict(f.z0, hc, times), res = v.map((x, i) => x - pred[i]), rms = Math.sqrt(res.reduce((a, x) => a + x * x, 0) / res.length), sd = Math.sqrt(v.reduce((a, x) => a + x * x, 0) / v.length);
   console.log(`${S.id} ${m.name}: ${rec.length} samples, axis ${Math.round(axis)}°, mean ${f.z0.toFixed(3)} kt; fit explains ${(100 * (1 - (rms / sd) ** 2)).toFixed(0)}% of the variance (residual ${rms.toFixed(2)} kt RMS of ${sd.toFixed(2)})`);
-  return { m, axis, z0: f.z0, hc, flood };
+  return { m, axis, z0: f.z0, hc };
 }
 
 if (process.argv.includes('--check')) {
@@ -95,10 +94,10 @@ if (process.argv.includes('--check')) {
 
 const stations = [];
 for (const S of FIT) {
-  const r = await fitStation({ ...S, flood: 74 }); // (NOAA's flood direction for SFB1219: 74° true, its deployment record)
+  const r = await fitStation(S); // (its flood axis from NOAA's deployment record: SFB1219's is 74° true)
   stations.push({
     id: S.id, kind: 'harmonic', name: r.m.name, note: S.note, lat: +(+r.m.lat).toFixed(5), lon: +(+r.m.lng).toFixed(5), bin: S.bin,
-    flood: 74, ebb: 254, z0: +r.z0.toFixed(3), hc: r.hc.map(([n, A, G]) => [n, +A.toFixed(4), +G.toFixed(2)]), fitted: `${S.from}–${S.to}`
+    flood: Math.round(r.axis), ebb: Math.round((r.axis + 180) % 360), z0: +r.z0.toFixed(3), hc: r.hc.map(([n, A, G]) => [n, +A.toFixed(4), +G.toFixed(2)]), fitted: `${S.from}–${S.to}`
   });
 }
 await writeFile(new URL('../src/environment/data/fitted-currents.json', import.meta.url), JSON.stringify({
@@ -106,3 +105,5 @@ await writeFile(new URL('../src/environment/data/fitted-currents.json', import.m
   fetched: new Date().toISOString().slice(0, 10), stations
 }, null, 1) + '\n');
 console.log('Wrote src/environment/data/fitted-currents.json');
+
+function fail(m) { throw new Error(m); }
