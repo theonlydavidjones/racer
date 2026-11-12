@@ -40,7 +40,12 @@ What's planned, roughly in order. Done work is described in the README.
    forward of it mid-route, so the figure sits and stands at the old spot for a second or more (20 kt tack: crew 1 at
    2.245 while the physics has her at 1.65). A naive fix upsets other moves, so it's its own piece of work. Done when
    tests/crewfig.test.ts samples every figure at 0.05, not only the helm, and passes.
-3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
+3. ~~Crystal clarity on the crew and trim controls~~ (done, live in v134: the band with the main halyard renamed, the jib
+   halyard, the Auto-trim and Pole tabs, the windex and the Hail tab, v120–v129; the chase-view layout, v129; every RRS
+   2025–2028 race signal in the flag index and one-line messages with the log, v132; line colours in the boat editor and
+   the committee's call-off shown clearly, v134). Open questions for the owner: (1) on Josephine, does the crew reach
+   the far side of the piano from windward (the sim leans them in, 0.2 m to windward)? (2) bring back a tiller strip
+   (left out because the cursor is the tiller)? The design as agreed: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
    - **The piano**, "mirroring what really exists on Josephine" (the table under Full sail controls: starboard, inboard
