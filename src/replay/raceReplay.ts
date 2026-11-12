@@ -159,9 +159,11 @@ export class RaceReplay {
     this.clipView?.stop(); this.clipView = null;
     if (down) {
       // a click on (or near) a tick picks that moment
-      const near = D.moments.find(m => Math.abs(this.tx(m.t0, r.width) - (e.clientX - r.left)) < 5 || (t >= m.t0 && t <= m.t1 && m.t1 - m.t0 > 5));
+      const near = D.moments.find(m => Math.abs(this.tx(m.t0, r.width) - (e.clientX - r.left)) < 7 || (t >= m.t0 && t <= m.t1 && m.t1 - m.t0 > 5));
       if (near && e.clientY - r.top < 30) { this.dragging = false; this.pick(near); return; }
       this.setPlaying(false);
+      // scrubbing elsewhere lets go of the picked moment (its caption would no longer match what's shown)
+      if (this.sel) { this.sel = null; this.caption(); this.paintButtons(); }
     }
     this.t = Math.min(this.end(), Math.max(D.frames[0].t, t));
     this.draw();
@@ -237,6 +239,15 @@ export class RaceReplay {
     }
     drawLand(ctx, tf);
     drawCourse(ctx, w.C, true, tf, scale, -1);
+    // the marks, big enough to find on the whole course, and named
+    const named = new Set<string>();
+    ctx.font = '600 12px "Saira Semi Condensed", sans-serif';
+    for (const m of w.C.marks) {
+      const q = tf(m.p.x, m.p.y);
+      ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q[0], q[1], 7, 0, 6.29); ctx.stroke();
+      ctx.fillStyle = '#ffc21a'; ctx.beginPath(); ctx.arc(q[0], q[1], 3, 0, 6.29); ctx.fill();
+      if (!named.has(m.name)) { named.add(m.name); ctx.fillText(m.name, q[0] + 10, q[1] + 4); }
+    }
     const k = F.findIndex(f => f.t > this.t), upto = k < 0 ? F.length : k;
     const line = (i: number, a: number, b: number) => {
       ctx.beginPath(); let on = false;
@@ -244,7 +255,7 @@ export class RaceReplay {
       return on;
     };
     // the others' tracks, so far
-    w.boats.forEach((bt, i) => { if (i === u) return; ctx.strokeStyle = hexA(bt.color, .28); ctx.lineWidth = 1; if (line(i, 0, upto)) ctx.stroke(); });
+    w.boats.forEach((bt, i) => { if (i === u) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
     // yours: all of it faint, so far bright
     ctx.strokeStyle = 'rgba(233,242,245,.18)'; ctx.lineWidth = 1.5; if (line(u, 0, F.length)) ctx.stroke();
     ctx.strokeStyle = 'rgba(233,242,245,.8)'; ctx.lineWidth = 2; if (line(u, 0, upto)) ctx.stroke();
