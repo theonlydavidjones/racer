@@ -146,11 +146,12 @@ export class RaceReplay {
   /** Against the winner: the gap, then each leg with what you lost or gained and where it went. */
   private vsHtml(): string {
     const V = this.D!.vs; if (!V || V.legs.length < 2) return '';
-    const who = V.won ? 'who won' : this.w!.boats.some(b => b.finished) ? 'who came second' : V.total > 0 ? 'who is ahead of you' : 'the boat behind you';
+    const who = V.won ? 'who won' : V.youWon ? (this.w!.boats[V.rival].finished ? 'who came second' : 'the next boat') : V.total > 0 ? 'who is ahead of you' : 'the boat behind you';
     const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
     const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
     const gap = Math.round(Math.abs(V.total)), mmss2 = (x: number) => x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${x % 60} s`;
-    const lede = V.won ? `You finished ${mmss2(gap)} behind ${esc(V.rivalName)}.` : V.total < 0 ? `You were ${mmss2(gap)} ahead of ${esc(V.rivalName)}.` : `You were ${mmss2(gap)} behind ${esc(V.rivalName)} over the legs you've both sailed.`;
+    const ahead = V.total < 0 ? 'ahead of' : 'behind';
+    const lede = V.youDone ? `You finished ${mmss2(gap)} ${ahead} ${esc(V.rivalName)}.` : `Over the legs you've both sailed, you're ${mmss2(gap)} ${ahead} ${esc(V.rivalName)}.`;
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p></li>`).join('');

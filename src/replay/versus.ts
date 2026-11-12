@@ -1,5 +1,5 @@
 import { compassPoint } from '../core/compass';
-import { brg, cross, sub, unit, type Vec } from '../core/math';
+import { V, brg, cross, sub, unit, type Vec } from '../core/math';
 import type { Frame } from './recorder';
 
 /**
@@ -34,16 +34,22 @@ export interface LegVs {
   apartM: number; apartDir: string;
 }
 
-export interface Versus { rival: number; rivalName: string; won: boolean; legs: LegVs[]; total: number }
+/** `won`: she won; `youWon`: you did; `youDone`: you've finished and both of you sailed every leg (the gap is the finish gap). */
+export interface Versus { rival: number; rivalName: string; won: boolean; youWon: boolean; youDone: boolean; legs: LegVs[]; total: number }
 
-/** Over-the-ground metres a boat sailed between two race times, from the track. */
+/**
+ * Metres a boat sailed between two race times, from the track: each second's step over the ground counted only as far
+ * as it went the way her bow pointed. Drift doesn't count as sailing further: set sideways or astern by the current,
+ * or adrift in irons or becalmed, she covers ground without sailing it, and that time belongs to "slower" instead.
+ * (The track has no current in it, so a current along her heading still counts: it's the best the track allows.)
+ */
 function sailed(F: Frame[], id: number, t0: number, t1: number): number {
-  let m = 0, prev: [number, number] | null = null;
+  let m = 0, prev: [number, number, number] | null = null;
   for (const f of F) {
     if (f.t < t0 || f.t > t1) continue;
     const p = f.b[id]; if (!p) continue;
-    if (prev) m += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
-    prev = [p[0], p[1]];
+    if (prev) { const h = V((prev[2] + p[2]) / 2 + (Math.abs(p[2] - prev[2]) > 180 ? 180 : 0)); m += Math.max(0, (p[0] - prev[0]) * h.x + (p[1] - prev[1]) * h.y); }
+    prev = [p[0], p[1], p[2]];
   }
   return m;
 }
@@ -72,11 +78,14 @@ export interface VsInput {
   from: Vec;
 }
 
-/** Who to measure against: the winner; if that's you, the boat second; with nobody finished, the one furthest on. */
+/**
+ * Who to measure against: the winner; if that's you, the boat second; with nobody else finished (you won and the
+ * fleet's still racing, or nobody's in yet), the one furthest on. (By time across the line, as the results list them.)
+ */
 export function rivalOf(I: VsInput): number | null {
   const ok = I.boats.filter(b => !b.dsq);
-  const fin = ok.filter(b => b.finishT != null).sort((a, b) => a.finishT! - b.finishT!);
-  if (fin.length) { const r = fin[0].id === I.you ? fin[1] : fin[0]; return r ? r.id : null; }
+  const fin = ok.filter(b => b.finishT != null && b.id !== I.you).sort((a, b) => a.finishT! - b.finishT!);
+  if (fin.length) return fin[0].id;
   // still racing: most marks reached, then soonest at the last of them
   const on = ok.filter(b => b.id !== I.you).map(b => { const m = (I.marks[b.id] ?? []).filter(x => x != null); return { id: b.id, n: m.length, t: m.length ? m[m.length - 1] : Infinity }; });
   on.sort((a, b) => b.n - a.n || a.t - b.t);
@@ -108,13 +117,14 @@ export function versus(I: VsInput): Versus | null {
   }
   const total = legs.reduce((s, l) => s + l.lost, 0);
   const rb = I.boats.find(b => b.id === r)!;
-  return { rival: r, rivalName: rb.name, won: rb.finishT != null && (I.boats.find(b => b.id === me)!.finishT ?? Infinity) > rb.finishT, legs, total };
+  const mine = I.boats.find(b => b.id === me)!, first = I.boats.filter(b => !b.dsq && b.finishT != null).sort((a, b) => a.finishT! - b.finishT!)[0];
+  return { rival: r, rivalName: rb.name, won: first?.id === r, youWon: first?.id === me, youDone: mine.finishT != null && legs.length === I.legs.length + 1, legs, total };
 }
 
 /** A leg's comparison in a line or two, for the list and the caption. */
 export function legWords(L: LegVs, rival: string): string {
   const s = (x: number) => `${Math.round(Math.abs(x))} s`;
-  const mm = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
+  const mm = (x: number) => { const r = Math.round(x); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
   if (L.kind === 'start') {
     return Math.abs(L.lost) < 1 ? `You both crossed the line about together, ${L.you.toFixed(1)} s after the gun.`
       : `You crossed ${L.you.toFixed(1)} s after the gun, ${rival} ${L.them.toFixed(1)} s: you started ${s(L.lost)} ${L.lost > 0 ? 'behind' : 'ahead of'} her.`;

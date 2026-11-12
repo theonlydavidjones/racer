@@ -5,7 +5,9 @@ import { legWords, rivalOf, versus, type VsInput } from '../src/replay/versus';
 /** Two boats sailing one leg due north (y up), 1000 m from (0,0) to (0,1000), once a second. */
 function race(you: (t: number) => [number, number] | null, them: (t: number) => [number, number] | null, T: number): Frame[] {
   const F: Frame[] = [];
-  for (let t = 0; t <= T; t++) F.push({ t, b: [you(t), them(t)].map(p => p ? [p[0], p[1], 0, 'S', 0] : [0, 0, 0, 'S', 0]) as Frame['b'] });
+  // (each boat heading the way she's going, as a sailing boat's bow does)
+  const hd = (f: (t: number) => [number, number] | null, t: number) => { const a = f(t), b = f(t + 1) ?? a; return a && b && (b[0] !== a[0] || b[1] !== a[1]) ? (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360 : 0; };
+  for (let t = 0; t <= T; t++) F.push({ t, b: [you, them].map(f => { const p = f(t); return p ? [p[0], p[1], hd(f, t), 'S', 0] : [0, 0, 0, 'S', 0]; }) as Frame['b'] });
   return F;
 }
 const input = (F: Frame[], youFin: number, themFin: number, o: Partial<VsInput> = {}): VsInput => ({
@@ -41,6 +43,23 @@ describe('your race against the winner', () => {
     expect(L.apartDir).toBe('W'); expect(L.apartM).toBeGreaterThan(80);
   });
 
+  it('drift isn\'t sailing further: set astern by the current, the time is lost to speed', () => {
+    // both sail straight up the line at 5 m/s; you're set back 100 m stern first (bow still north) for 50 s mid-leg
+    const youP = (t: number): [number, number] => t < 100 ? [0, t * 5] : t < 150 ? [0, 500 - (t - 100) * 2] : [0, Math.min(1000, 400 + (t - 150) * 5)];
+    const F: Frame[] = [];
+    for (let t = 0; t <= 280; t++) F.push({ t, b: [[...youP(t), 0, 'S', 0], [0, Math.min(1000, t * 5), 0, 'S', 0]] as Frame['b'] });
+    const V = versus(input(F, 270, 200))!, L = V.legs[1];
+    // the 100 m set astern isn't sailing; sailing it again is (1100 m, where the ground track's sum would say 1200)
+    expect(L.youM).toBeCloseTo(L.themM + 100, -1);
+    expect(L.fromDist).toBeCloseTo(100 / (1100 / 270), 0); // those 100 m at her own mean speed
+    expect(L.fromSpeed).toBeGreaterThan(L.fromDist); // and the 50 s adrift is lost to speed
+  });
+
+  it('times read as minutes and whole seconds (never 1:60)', () => {
+    const L = { i: 1, name: 'A', kind: 'beat' as const, you: 119.6, them: 59.7, lost: 59.9, fromDist: 0, fromSpeed: 59.9, youM: 500, themM: 500, t0: 0, t1: 120, apartM: 0, apartDir: '' };
+    expect(legWords(L, 'Blue')).toMatch(/You 2:00, Blue 1:00\./);
+  });
+
   it('the start is its own row: who crossed first', () => {
     const F = race(t => [0, Math.max(0, t - 10) * 5], t => [0, t * 5], 220);
     const V = versus(input(F, 210, 200, { startTimes: [10, 0] }))!;
@@ -52,6 +71,8 @@ describe('your race against the winner', () => {
     const base = input(race(() => [0, 0], () => [0, 0], 2), 100, 200);
     const three = (o: Partial<VsInput>) => ({ ...base, boats: [{ id: 0, name: 'You', finishT: 100, dsq: false }, { id: 1, name: 'Blue', finishT: 200, dsq: false }, { id: 2, name: 'Red', finishT: 150, dsq: false }], startTimes: [0, 0, 0], marks: [[], [], []], ...o });
     expect(rivalOf(three({}))).toBe(2); // you won: Red came second
+    // you won and nobody else is in yet: the boat furthest on
+    expect(rivalOf(three({ boats: [{ id: 0, name: 'You', finishT: 100, dsq: false }, { id: 1, name: 'Blue', finishT: null, dsq: false }, { id: 2, name: 'Red', finishT: null, dsq: false }], marks: [[20, 50], [40], [45, 80]] }))).toBe(2);
     expect(rivalOf(three({ boats: [{ id: 0, name: 'You', finishT: 300, dsq: false }, { id: 1, name: 'Blue', finishT: 200, dsq: false }, { id: 2, name: 'Red', finishT: 150, dsq: true }] }))).toBe(1);
     expect(rivalOf(three({ boats: [{ id: 0, name: 'You', finishT: null, dsq: false }, { id: 1, name: 'Blue', finishT: null, dsq: false }, { id: 2, name: 'Red', finishT: null, dsq: false }], marks: [[50], [40, 90], [45, 80]] }))).toBe(2);
   });

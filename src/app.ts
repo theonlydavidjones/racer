@@ -599,8 +599,8 @@ $('bPause').onclick = () => {
 };
 /** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
 function vsInput(log: NonNullable<typeof w.log>): VsInput {
-  const C = w.C, wind = w.gun?.windFrom ?? w.wind.from, last = C.marks[C.marks.length - 1]?.p ?? C.center;
-  // the finish leg's point of sail, as the course sets the others' (courses/course.ts: within 55° of the wind a beat, past 125° a run)
+  const C = w.C, wind = w.committeeFrom, last = C.marks[C.marks.length - 1]?.p ?? C.center;
+  // the finish leg's point of sail, as the course sets the others' (courses/course.ts: within 55° of the committee's wind a beat, past 125° a run)
   const off = Math.abs(wrap(brg(C.center.x - last.x, C.center.y - last.y) - wind)), fin = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
   return {
     frames: w.track, you: w.user.id, startTimes: w.startTimes, marks: log.boatMarks, from: C.center,
