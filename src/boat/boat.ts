@@ -31,6 +31,8 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
+  urgent?: boolean;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
    * wind and slow, a passing change of plan mustn't turn her back. */
   hailTack?: { to: 'S' | 'P'; at: number; with: number } | null;
@@ -74,6 +76,8 @@ export interface Boat {
   lightsOff?: boolean;
   /** Sternway, m/s: pushed off astern, she coasts back, slowing, and steers backwards. */
   astern?: number;
+  /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
+  motor?: import('./motor').MotorState;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
@@ -96,6 +100,8 @@ export interface Boat {
   // helm
   steer: number; // −1..1: turn to port .. starboard (keys, and the AI's helm)
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
+  /** Sculling (rule 42.3(d)): the way she's being sculled round (+ to starboard), held until she's close-hauled (SCULL 2). */
+  scullDir?: number;
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;
@@ -146,6 +152,8 @@ export interface Boat {
   sway?: number;
   /** Turn rate, deg/s, + turning to starboard (clockwise): kept every step, so a turn carries on across a change of model. */
   yawRate?: number;
+  /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
+  turnRate?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */

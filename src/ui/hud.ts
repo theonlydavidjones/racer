@@ -13,6 +13,7 @@ import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '..
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
+import { routeAround } from '../sim/routing';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
@@ -698,8 +699,18 @@ export class Hud {
 
 }
 
+/** The navigator's route to the destination (routeAround: the passage plan's way round the land), re-planned as she
+ * goes: when the destination changes, or she's 100 m from where it was last planned from (at most every 2 s: it's an A*
+ * search on a 50 m grid when the land is in the way). */
+let routeMemo: { dest: CourseMark; from: Vec; at: number; pts: Vec[] } | null = null;
+export function navRoute(u: { x: number; y: number }, dest: CourseMark): Vec[] {
+  const now = performance.now(), here = { x: u.x, y: u.y }, m = routeMemo;
+  if (!m || m.dest !== dest || (dist(m.from, here) > 100 && now - m.at > 2000)) routeMemo = { dest, from: here, at: now, pts: routeAround(here, dest.p) };
+  return routeMemo!.pts;
+}
+
 /**
- * Just sailing, on the map: the buoys around you, and where you're heading. If that's off the map, an arrow at the
+ * Just sailing, on the map: the buoys around you, and where you're heading, by the navigator's route. If that's off the map, an arrow at the
  * edge points to it.
  */
 function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink): void {
@@ -711,9 +722,15 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   }
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
-  ctx.save();
-  ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-  ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+  // the navigator's route there (the passage plan's: round the land, sim/navigator.ts), from where she is now
+  const legs = navRoute(u, dest).map(q => tf(q.x, q.y)); legs[0] = a;
+  const path = () => { ctx.beginPath(); legs.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
+  ctx.save(); ctx.lineJoin = 'round';
+  ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();
+  ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
+  // the turns on the way: small dots
+  for (const q of legs.slice(1, -1)) { ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.line; ctx.beginPath(); ctx.arc(q[0], q[1], 2, 0, 6.29); ctx.fill(); }
+  ctx.restore();
   const shape = (pts: [number, number][]) => {
     ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = I.mark; ctx.fill(); ctx.strokeStyle = I.edge; ctx.lineWidth = 1.2; ctx.stroke();
