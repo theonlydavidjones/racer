@@ -460,7 +460,8 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
     // (in the cockpit, round the jib winch on the side deck, not through it: in off the deck before going forward of it,
     // and aft of it before going out on the deck. Going on forward of the cockpit, to the mast, they climb past it)
-    if (i > 0 && goal.z > Z.cockpitFwd - 0.05 && z0 > Z.cockpitFwd - 0.05) {
+    // (a job's station is its own: the jib winch's haul, the lines; this is for finding a seat)
+    if (i > 0 && !a.job?.station && goal.z > Z.cockpitFwd - 0.05 && z0 > Z.cockpitFwd - 0.05) {
       if (Math.abs(a.x) > DECK_ARM && a.z < Z.deckFwd && z0 >= Z.deckFwd - 1e-6) a.z = Z.deckFwd;
       else if (a.z < Z.deckFwd && Math.abs(a.x) > DECK_ARM && Math.abs(x0) <= DECK_ARM) a.x = Math.sign(a.x) * DECK_ARM;
     }
@@ -533,7 +534,11 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // (in their order along the cockpit, front to back: the one whose place is forward keeps it)
   for (let q = 1; q < out.length; q++) for (let r = 0; r < q; r++) {
     const a = tgt[out[r]], b = tgt[out[q]];
-    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) put(out[q], Math.min(Z.cockpitAft, a.z + Z.gap));
+    // (and if there's no room aft for the one behind, the one ahead goes forward, as far as the winch lets them)
+    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) {
+      if (a.z + Z.gap <= Z.cockpitAft) put(out[q], a.z + Z.gap);
+      else { put(out[q], Z.cockpitAft); put(out[r], Math.max(Z.deckFwd, Z.cockpitAft - Z.gap)); }
+    }
   }
 }
 

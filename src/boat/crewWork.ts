@@ -93,8 +93,10 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
   if (PIANO.has(line)) {
     // the helm, alone, has to leave the tiller's end to reach the cabin top
     if (who === 0) return { arm: 0.3, z: 1.6, pose: 'piano' };
-    // dual-ended lines from the windward side deck (in off the rail); the main Cunningham is on the port side, the downhaul in the middle
-    if (BOTH_SIDES.has(line)) return { arm: 0.7, z: Z.deckFwd, pose: 'piano' }; // (just aft of the winch)
+    // dual-ended lines on the windward side of the cabin top's after end: kneeling at the cockpit's forward end on that
+    // side, inboard of the jib winch and of a crewmate sitting out on the deck there (render/crew.ts draws them kneeling
+    // at COCK0 + 0.55, about 1.6); the main Cunningham is on the port side, the downhaul in the middle
+    if (BOTH_SIDES.has(line)) return { arm: 0.45, z: 1.6, pose: 'piano' };
     if (line === 'cunningham') return { arm: windward < 0 ? 0.7 : -0.4, z: Z.piano, pose: 'piano' };
     return { arm: 0.3, z: Z.piano, pose: 'piano' };
   }
