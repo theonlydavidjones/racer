@@ -78,37 +78,32 @@ const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
 /** The stem's slope (m of height per unit of u): a straight, raked stem from the stemhead down to the forefoot. */
 const STEM_SLOPE = -1.06 / BOW;
 /**
- * The line below the stem, from where it meets the water at (BOW, y0) to (u1, y1): straight, with a short knee at its top
- * where it leaves the stem's steeper rake (the knee's length KNEE in u), so the lines plan's long, straight, raked entry
- * and not a deep round forefoot.
+ * The line below the stem, from where it meets the water at (BOW, y0) to (u1, y1): one long, gentle curve, leaving with
+ * the stem's own rake and flattening steadily until it runs on at slope m1 (a cubic Hermite), as the lines plan draws the
+ * bow (Sunden's lines, redrawn by Theo Rye, and the class's): no knee, no deep round forefoot.
  */
-const KNEE = 0.03;
-function knee(y0: number, y1: number, u: number, u1: number): number {
-  const s = u - BOW, span = u1 - BOW, e = KNEE * (1 - Math.exp(-span / KNEE));
-  const sl = (y1 - y0 - STEM_SLOPE * e) / (span - e); // (the line's slope, so it ends at y1)
-  return y0 + sl * s + (STEM_SLOPE - sl) * KNEE * (1 - Math.exp(-s / KNEE));
+function entry(y0: number, y1: number, u: number, u1: number, m1: number): number {
+  const h = u1 - BOW, t = Math.min(1, Math.max(0, (u - BOW) / h)), t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * h * STEM_SLOPE + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h * m1;
 }
 export function canoe(u: number): number {
   // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then
   // rounding into the hull's bottom without a knuckle
   if (u < BOW) return 0.96 + STEM_SLOPE * u;
-  if (u < 0.45) return knee(-0.1, -0.62, u, 0.45);
+  if (u < 0.45) return entry(-0.1, -0.62, u, 0.45, 0);
   if (u < 0.62) return -0.62; // where the hollow garboards meet the keel amidships (the plan's main section at St. 8)
   return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
 }
 /** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band), where the sternpost rises. */
 const U_HEEL = (HEEL.z + L / 2) / L;
 /** Where the keel's leading edge meets its bottom (fraction of L from the bow). */
-const U_KEEL = 0.405;
+const U_KEEL = 0.43;
 export function keel(u: number): number {
   if (u <= BOW) return canoe(u);
-  // the keel's leading edge: on from the stem in a nearly straight raked line (a short knee where it leaves the stem's
-  // steeper rake) down to the keel's forward corner, about 3.1 m aft of the stemhead at 1.1 m draft (Theo Rye's redrawing
-  // of Sunden's lines, and the class's own lines plan); then the bottom, nearly level, to the heel at 1.2 m. A small round
-  // at the corner.
-  const lead = (v: number) => knee(-0.1, -1.1, v, U_KEEL), bottom = (v: number) => -1.1 - 0.1 * (v - U_KEEL) / (U_HEEL - U_KEEL);
-  const t = Math.min(1, Math.max(0, (u - (U_KEEL - 0.03)) / 0.06)), sm = t * t * (3 - 2 * t);
-  return Math.max(-1.2, (1 - sm) * lead(Math.min(u, U_KEEL + 0.03)) + sm * bottom(u));
+  // the keel's leading edge: on from the stem in one long, gentle curve down to the keel's bottom about 3.3 m aft of the
+  // stemhead at 1.12 m draft (the lines plan), then the bottom, nearly level, to the heel at 1.2 m
+  const slope = -0.08 / (U_HEEL - U_KEEL);
+  return u < U_KEEL ? entry(-0.1, -1.12, u, U_KEEL, slope) : Math.max(-1.2, -1.12 + slope * (u - U_KEEL));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
