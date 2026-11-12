@@ -2,6 +2,7 @@ import { shoreRelief } from './current';
 import { KT, V, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import depthGrid from './data/depth-grid.json';
+import sqTide from './data/sq-tide.json';
 import { landBetween, onGround } from '../geo/shore';
 import { predict, type Constituents } from './harmonics';
 import raw from './data/sf-currents.json';
@@ -87,26 +88,59 @@ export function stationVector(s: TideStation, tMin: number): Vec {
   return { x: u.x * m, y: u.y * m };
 }
 
-/* ---------- the water's depth, and San Rafael Bay ---------- */
+/* ---------- San Rafael Bay: a dead end, filled and emptied by the tide ---------- */
+
+// No current has been measured inside San Rafael Bay, and it has nothing behind it: whatever water crosses a line across
+// it is what fills or empties the bay beyond that line. So its stream is the tide's rise there times the water's area
+// beyond, divided by the line's cross-section (continuity), flowing in on the flood and out on the ebb, across the
+// line. San Pablo Strait's stream outside (the stations') hands over to it across the first kilometre in.
+//  - The tide: Point San Quentin (NOAA 9414873), San Francisco's (9414290) by NOAA's offsets for it (sq-tide.json,
+//    scripts/fetch-tide-height.mjs): its rise and fall come 42–50 minutes after San Francisco's at 0.93–0.99 of the
+//    height; here the means of the two, 46 minutes and 0.96.
+//  - The water: the sim's own shoreline, and NOAA's chart's depths below MLLW (depth-grid.json, make-depth-grid.mjs),
+//    the tide added to them; flats the tide has left dry carry nothing and fill nothing.
+//  - Across a line the stream runs faster over the deeper water: the local speed is the line's mean times
+//    (depth / mean depth)^(2/3), as Manning's friction law gives for water sloping the same way across a channel.
+
+const SQ = sqTide as unknown as { dtHigh: number; dtLow: number; kHigh: number; kLow: number; msl: number; hc: Constituents };
+const SQ_DT = (SQ.dtHigh + SQ.dtLow) / 2 * 60e3, SQ_K = (SQ.kHigh + SQ.kLow) / 2;
+/** The tide's height (m above MLLW) at Point San Quentin at a time (ms UTC), and how fast it rises (m/s). */
+export function sanQuentinTide(ms: number): { h: number; rise: number } {
+  const [a, b, c] = predict(0, SQ.hc, [ms - SQ_DT - 300e3, ms - SQ_DT, ms - SQ_DT + 300e3]);
+  return { h: SQ.msl + SQ_K * b, rise: SQ_K * (c - a) / 600 };
+}
 
 const DG = depthGrid as { south: number; north: number; west: number; east: number; nx: number; ny: number; step: number; data: string };
 const DGRID = (() => { const s = atob(DG.data), g = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) g[i] = s.charCodeAt(i); return g; })();
 const D_MLAT = 111320, D_MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
-/** The water's depth below MLLW (m) at a point, from NOAA's chart on a 100 m grid (0 on land; deep off the map). */
+/** The water's depth below MLLW (m) in San Rafael Bay, from NOAA's chart on a 50 m grid (0 on land or drying flats). */
 export function depthAt(p: Vec): number {
   const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
   const i = Math.floor((lon - DG.west) / (DG.east - DG.west) * DG.nx), j = Math.floor((DG.north - lat) / (DG.north - DG.south) * DG.ny);
-  if (i < 0 || j < 0 || i >= DG.nx || j >= DG.ny) return 30;
+  if (i < 0 || j < 0 || i >= DG.nx || j >= DG.ny) return 0;
   return DGRID[j * DG.nx + i] * DG.step;
 }
-/** San Rafael Bay: west of the line from Point San Quentin to Point San Pedro (its mouth on San Pablo Strait). */
-const SRB = [LL(37.9445, -122.4870), LL(37.9930, -122.4520), LL(38.0200, -122.5000), LL(37.9700, -122.5400)];
-/** How far into San Rafael Bay, 0 at its mouth to 1 a kilometre in: the easing grows in over that, not in a step at the line. */
-const srbInside = (p: Vec): number => {
-  const a = SRB[0], b = SRB[1], ex = b.x - a.x, ey = b.y - a.y, L = Math.hypot(ex, ey);
-  return Math.min(1, Math.abs((p.x - a.x) * ey - (p.y - a.y) * ex) / L / 1000);
-};
+// The bay: inside the line from Point San Quentin toward Point San Pedro (its mouth on San Pablo Strait), to the chart's
+// and the world's north edge (37.985° N; Point San Pedro itself, at 37.993°, lies just beyond it).
+const SR_Q = LL(37.9445, -122.4870), SR_P = LL(37.9930, -122.4520), SR_N = 37.985;
+const SR_M = LL(SR_N, -122.4870 + (SR_N - 37.9445) / (37.9930 - 37.9445) * (-122.4520 + 122.4870));
+const SRB = [SR_Q, SR_M, LL(SR_N, -122.5450), LL(37.9350, -122.5450)];
+const SR_L = Math.hypot(SR_P.x - SR_Q.x, SR_P.y - SR_Q.y), SR_IN = { x: -(SR_P.y - SR_Q.y) / SR_L, y: (SR_P.x - SR_Q.x) / SR_L }; // (into the bay)
+/** How far into San Rafael Bay a point is (m) from its mouth. */
+const srbDepth = (p: Vec): number => (p.x - SR_Q.x) * SR_IN.x + (p.y - SR_Q.y) * SR_IN.y;
 const inSanRafaelBay = (p: Vec): boolean => { let c = false; for (let i = 0, j = SRB.length - 1; i < SRB.length; j = i++) { const a = SRB[i], b = SRB[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+const SR_BIN = 50, SR_CELL = 25, SR_HAND = 1000; // (lines across the bay every 50 m; the water sampled every 25 m; the hand-over)
+/** The bay's water, sampled once: each sample's line (how far in, in 50 m steps) and charted depth. */
+let srWater: { bin: Int32Array; depth: Float64Array; bins: number } | null = null;
+function sanRafaelWater() {
+  if (srWater) return srWater;
+  const xs = SRB.map(q => q.x), ys = SRB.map(q => q.y), bin: number[] = [], depth: number[] = [];
+  for (let y = Math.min(...ys) + SR_CELL / 2; y < Math.max(...ys); y += SR_CELL) for (let x = Math.min(...xs) + SR_CELL / 2; x < Math.max(...xs); x += SR_CELL) {
+    const q = { x, y }; if (!inSanRafaelBay(q) || onGround(q)) continue;
+    bin.push(Math.max(0, Math.floor(srbDepth(q) / SR_BIN))); depth.push(depthAt(q));
+  }
+  return (srWater = { bin: Int32Array.from(bin), depth: Float64Array.from(depth), bins: Math.max(0, ...bin) + 1 });
+}
 
 /** The current field at one moment: station currents blended across the water by inverse-distance weighting. */
 export class CurrentField {
@@ -114,7 +148,8 @@ export class CurrentField {
   private vecs: Vec[] = [];
   private stamp: Int32Array;
   private sx: Float64Array;
-  private depth: Float64Array;
+  /** San Rafael Bay's stream at the field's time (m/s, + in): each line's mean speed and mean depth; the tide's height. */
+  private srEpoch = -1; private srU = new Float64Array(0); private srD = new Float64Array(0); private srH = 0;
   private sy: Float64Array;
   private tMin = 0;
   private epoch = 0;
@@ -127,7 +162,6 @@ export class CurrentField {
   constructor(readonly stations: TideStation[]) {
     this.stamp = new Int32Array(stations.length).fill(-1);
     this.sx = Float64Array.from(stations, s => s.p.x); this.sy = Float64Array.from(stations, s => s.p.y);
-    this.depth = Float64Array.from(stations, s => depthAt(s.p));
     this.vecs = stations.map(() => ({ x: 0, y: 0 }));
     this.soft2 = Float64Array.from(stations, (s, i) => {
       let dn = Infinity;
@@ -189,26 +223,27 @@ export class CurrentField {
       const v = stamp[i] === epoch ? this.vecs[i] : this.stationVec(i);
       wx += v.x * w; wy += v.y * w; ws += w;
     }
-    if (ws <= 0) return { x: 0, y: 0 };
-    const s = inSanRafaelBay(p) ? srbInside(p) : 0, k = s > 0 ? 1 - s * (1 - this.shoalFactor(p, list)) : 1;
-    return { x: k * wx / ws, y: k * wy / ws };
+    const c = ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
+    if (!inSanRafaelBay(p)) return c;
+    const f = Math.min(1, Math.max(0, srbDepth(p) / SR_HAND)), u = this.sanRafael(p);
+    return { x: c.x * (1 - f) + SR_IN.x * u * f, y: c.y * (1 - f) + SR_IN.y * u * f };
   }
-  /**
-   * Over San Rafael Bay's shoals, where no current has been measured: the stations' stream carried to the water's depth
-   * here by USGS's relation for San Pablo Bay (Cheng & Gartner 1984, WRI 84-4339, Part III pp. 20–21 and Fig. III.6: the
-   * RMS current speed rises 2.71 cm/s for each metre of depth below MLLW, r² 0.91, from 1.8 to 21.8 m; the line's
-   * intercept, about 20 cm/s, read off the figure, and its shoal meter, 32 cm/s at 3.4 m, sits on it). The depths are
-   * NOAA's chart's (depth-grid.json); the ratio of the speeds at the two depths, weighted as the stations are, and never
-   * more than 1. The bay is about a metre deep at low water, so its stream is a third to two-thirds of theirs.
-   */
-  private shoalFactor(p: Vec, list: Int32Array): number {
-    const rms = (d: number) => 20 + 2.71 * Math.min(21.8, Math.max(1.8, d)), here = rms(depthAt(p));
-    let num = 0, den = 0;
-    for (let k = 0; k < list.length; k++) {
-      const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i], q = dx * dx + dy * dy + this.soft2[i], w = 1 / (q * Math.sqrt(q));
-      num += w * Math.min(1, here / rms(this.depth[i])); den += w;
+  /** San Rafael Bay's stream at a point inside it (m/s, + into the bay), by continuity (see above). */
+  private sanRafael(p: Vec): number {
+    if (this.srEpoch !== this.epoch) {
+      const W = sanRafaelWater(), n = W.bins, area = new Float64Array(n), sect = new Float64Array(n), wide = new Float64Array(n);
+      const { h, rise } = sanQuentinTide(this.tMin * 60e3), a = SR_CELL * SR_CELL;
+      for (let k = 0; k < W.bin.length; k++) { const d = W.depth[k] + h; if (d > 0.05) { area[W.bin[k]] += a; sect[W.bin[k]] += a / SR_BIN * d; wide[W.bin[k]] += a / SR_BIN; } }
+      this.srU = new Float64Array(n); this.srD = new Float64Array(n); this.srH = h;
+      for (let b = n - 1, beyond = 0; b >= 0; b--) {
+        beyond += area[b] / 2; // (the water beyond the line through the middle of these 50 m)
+        this.srU[b] = sect[b] > 0 ? beyond * rise / sect[b] : 0; this.srD[b] = wide[b] > 0 ? sect[b] / wide[b] : 0;
+        beyond += area[b] / 2;
+      }
+      this.srEpoch = this.epoch;
     }
-    return den > 0 ? num / den : 1;
+    const b = Math.min(this.srU.length - 1, Math.max(0, Math.floor(srbDepth(p) / SR_BIN))), d = depthAt(p) + this.srH;
+    return d > 0.05 && this.srD[b] > 0 ? this.srU[b] * (d / this.srD[b]) ** (2 / 3) : 0;
   }
   /**
    * The current at a point, with the slack water along the Cityfront beach: the shore relief (current.ts) applies
@@ -218,7 +253,9 @@ export class CurrentField {
     let dn = Infinity;
     { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest in sight is always among them)
     dn = Math.sqrt(dn);
-    const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600), c = this.at(p);
+    // (not in San Rafael Bay, whose stream already runs slower over its shallower edges)
+    const bay = inSanRafaelBay(p) ? Math.min(1, Math.max(0, srbDepth(p) / SR_HAND)) : 0;
+    const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
     return { x: c.x * k, y: c.y * k };
   }
 }

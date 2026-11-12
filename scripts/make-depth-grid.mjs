@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * The water's depth across the sim's world, on a 100 m grid, from NOAA's chart (src/geo/data/enc-chart.json, made by
+ * The water's depth over San Rafael Bay, on a 50 m grid, from NOAA's chart (src/geo/data/enc-chart.json, made by
  * fetch-charts.mjs): each depth area (DEPARE) filled at the middle of its band, below MLLW (the chart's sounding
- * datum). For the current's easing over the shallows (environment/tide.ts). No network.
+ * datum). For the bay's cross-sections, which carry its tidal prism (environment/tide.ts). No network.
  *
  *   node scripts/make-depth-grid.mjs
  *
- * Output: src/environment/data/depth-grid.json: depths in 0.2 m steps (0 = land or drying, 255 = 51 m or deeper), rows
- * north to south, base64.
+ * Output: src/environment/data/depth-grid.json: depths in 0.2 m steps (0 = land or drying), rows north to south, base64.
  */
 import { readFile, writeFile } from 'node:fs/promises';
 
 const enc = JSON.parse(await readFile(new URL('../src/geo/data/enc-chart.json', import.meta.url), 'utf8'));
-const B = enc.box, CELL = 100, MLAT = 111320, MLON = 111320 * Math.cos((B.south + B.north) / 2 * Math.PI / 180);
+// the bay, inside the line from Point San Quentin to Point San Pedro, to the chart's (and the world's) north edge
+const B = { south: 37.935, north: enc.box.north, west: -122.545, east: -122.45 }, CELL = 50, MLAT = 111320, MLON = 111320 * Math.cos((B.south + B.north) / 2 * Math.PI / 180);
 const nx = Math.round((B.east - B.west) * MLON / CELL), ny = Math.round((B.north - B.south) * MLAT / CELL);
 const dec = a => { const pts = []; let x = 0, y = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; pts.push([x / 1e5, y / 1e5]); } return pts; };
 // the bands, shoal edge up: each band's deep edge is the next band's shoal edge (the deepest band: its own + 5 m)
