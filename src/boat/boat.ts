@@ -208,6 +208,8 @@ export interface Boat {
   burgee?: string;
   /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */
   ensign?: string; special?: string;
+  /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
+  ensignStruck?: boolean;
   /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */
   paint?: Paint;
   /** How you've set her up (your boat only): looks and condition. */
