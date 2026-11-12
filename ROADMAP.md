@@ -182,6 +182,15 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
+- **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
+  - From Charts, after Lime Point (#64): blocky 50 m terrain cliffs along the Marin shore, Horseshoe Bay included (needs
+    a shore fit for all the ENC land); a small sand-coloured sliver floating southwest of Horseshoe Bay's marina; a
+    possible spike at the west edge of the Lime Point box; the tiller pilot tacks into the cove behind Lime Point on a
+    westerly beat out of the Gate (AI/pilot).
+  - From Crew Figures (#63): the crew's fore-and-aft stations (crewPhys) reach slightly past the real benches; fixing it
+    shifts the trim calibration, so it needs its own reviewed PR.
+  - From Bay East: Richmond YC and Encinal slips, BYC and Encinal racing marks, and the current in embayments without
+    NOAA stations all need sources it can't reach yet (the club sites aren't allowed hosts).
 - **Later — aluminium spars look like white plastic** (polish; 1–2 h): owner, "the aluminum on the masts and booms
   looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
   fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
