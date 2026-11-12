@@ -12,14 +12,14 @@ h1{margin:2px 0 12px;font:600 26px var(--f-inst);letter-spacing:.04em}
 .seg{display:inline-flex;background:var(--btn);border-radius:8px;padding:3px}.seg span{padding:5px 12px;border-radius:6px;color:var(--muted);font-size:13px}.seg span.on{background:var(--btn-hi);color:var(--text)}
 .cta{background:var(--accent);color:#1a1205;border-radius:8px;padding:8px 14px;font:700 13px var(--f-inst);letter-spacing:.08em;text-transform:uppercase}
 .ghost{border:1px solid var(--rule);border-radius:8px;padding:6px 12px;color:var(--text);font-size:13px;background:var(--btn)}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:start}
 .card{background:var(--btn);border:1px solid var(--rule);border-radius:10px;padding:12px}
 .card .nm{font:600 16px var(--f-inst);letter-spacing:.03em}.card .sub{color:var(--muted);font-size:12px;margin:2px 0 8px}
 .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;margin-right:4px;background:#0f2130;border:1px solid var(--rule);color:var(--muted)}
 .tag.yours{color:var(--accent);border-color:rgba(255,182,39,.5)}
-.bars{display:grid;grid-template-columns:96px 1fr 30px;gap:3px 8px;font-size:12px;color:var(--muted);align-items:center}
+.bars{display:grid;grid-template-columns:104px 1fr 26px;gap:3px 8px;font-size:12px;color:var(--muted);align-items:center}
 .bar{height:6px;border-radius:3px;background:#0b1a26;position:relative}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#6fb6d9}
-.hidden{color:var(--muted);font-size:12px;font-style:italic}
+.who{font-size:12px;color:var(--accent);margin:0 0 2px}
 .rec{font-size:12px;color:var(--muted);margin-top:6px} .gossip{font-size:12px;color:var(--text);margin-top:6px;font-style:italic}
 .two{display:grid;grid-template-columns:1.1fr 1fr;gap:20px}
 .sl{display:grid;grid-template-columns:120px 1fr 44px;gap:8px;align-items:center;margin:6px 0;font-size:13px;color:var(--muted)}
@@ -40,24 +40,24 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 8px;b
     <div style="display:flex;gap:10px;align-items:center"><div class="seg"><span class="on">Everyone</span><span>Skippers</span><span>Crew</span><span>Yours</span></div><span class="cta">New member</span></div></div>
   <div class="tabs"><b>Boats</b><b class="on">Members</b><b>Club</b><b class="later">Seasons (later)</b></div>
   <div class="grid">
-    <div class="card"><div class="nm">You</div><div class="sub">Skipper of Josephine · 5'10" · 176 lb</div><span class="tag yours">yours</span><span class="tag">skipper</span>
+    <div class="card"><div class="nm">You</div><div class="sub">Skipper of Josephine · 5'10" · 176 lb</div><div class="who">Your member · Skipper</div>
       <div class="rec">12 races · mean place 3.4 · best 1st</div></div>
-    <div class="card"><div class="nm">Sam Okafor</div><div class="sub">Crew on Josephine · middle: main</div><span class="tag yours">yours</span><span class="tag">crew</span>
+    <div class="card"><div class="nm">Sam Okafor</div><div class="sub">Crew on Josephine · middle: main</div><div class="who">Your member · Crew</div>
       <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:70%"></i></div><span>70</span><span>Eyes</span><div class="bar"><i style="width:55%"></i></div><span>55</span><span>Fitness</span><div class="bar"><i style="width:80%"></i></div><span>80</span><span>Composure</span><div class="bar"><i style="width:45%"></i></div><span>45</span></div></div>
-    <div class="card"><div class="nm">Alex Varga</div><div class="sub">Crew on Josephine · forward: jib, pole</div><span class="tag yours">yours</span><span class="tag">crew</span>
+    <div class="card"><div class="nm">Alex Varga</div><div class="sub">Crew on Josephine · forward: jib, pole</div><div class="who">Your member · Crew</div>
       <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:60%"></i></div><span>60</span><span>Eyes</span><div class="bar"><i style="width:90%"></i></div><span>90</span><span>Fitness</span><div class="bar"><i style="width:65%"></i></div><span>65</span><span>Composure</span><div class="bar"><i style="width:60%"></i></div><span>60</span></div></div>
-    <div class="card"><div class="nm">Maren Holt</div><div class="sub">Skipper of Red · USA 87 · StFYC</div><span class="tag">club</span><span class="tag">skipper</span>
-      <div class="hidden" style="margin-top:8px">Ratings: found out by racing her</div><div class="gossip">"Never misses a start. Watch her at the pin."</div><div class="rec">Against you: 7 races · mean 2.1 · best 1st · 1 OCS</div></div>
-    <div class="card"><div class="nm">Jules Prentice</div><div class="sub">Skipper of Blue · USA 104 · GGYC</div><span class="tag">club</span><span class="tag">skipper</span>
-      <div class="hidden" style="margin-top:8px">Ratings: found out by racing him</div><div class="gossip">"Loves the Cityfront. Overstands the weather mark."</div><div class="rec">Against you: 7 races · mean 4.0 · best 2nd</div></div>
-    <div class="card"><div class="nm">Ines Carvalho</div><div class="sub">Crew on Red · forward hand</div><span class="tag">club</span><span class="tag">crew</span>
+    <div class="card"><div class="nm">Maren Holt</div><div class="sub">Skipper of Red · USA 87 · StFYC</div><div class="who">Club member · Skipper</div>
+      <div class="bars" style="margin-top:8px"><span>Starts</span><div class="bar"><i style="width:92%"></i></div><span>92</span><span>Boat speed</span><div class="bar"><i style="width:78%"></i></div><span>78</span><span>Reading the wind</span><div class="bar"><i style="width:70%"></i></div><span>70</span><span>Tactics</span><div class="bar"><i style="width:74%"></i></div><span>74</span><span>Rules</span><div class="bar"><i style="width:80%"></i></div><span>80</span><span>Consistency</span><div class="bar"><i style="width:85%"></i></div><span>85</span><span>Nerve</span><div class="bar"><i style="width:65%"></i></div><span>65</span></div><div class="gossip">"Never misses a start. Watch her at the pin."</div><div class="rec">Against you: 7 races · mean 2.1 · best 1st · 1 OCS</div></div>
+    <div class="card"><div class="nm">Jules Prentice</div><div class="sub">Skipper of Blue · USA 104 · GGYC</div><div class="who">Club member · Skipper</div>
+      <div class="bars" style="margin-top:8px"><span>Starts</span><div class="bar"><i style="width:55%"></i></div><span>55</span><span>Boat speed</span><div class="bar"><i style="width:70%"></i></div><span>70</span><span>Reading the wind</span><div class="bar"><i style="width:62%"></i></div><span>62</span><span>Tactics</span><div class="bar"><i style="width:40%"></i></div><span>40</span><span>Rules</span><div class="bar"><i style="width:60%"></i></div><span>60</span><span>Consistency</span><div class="bar"><i style="width:50%"></i></div><span>50</span><span>Nerve</span><div class="bar"><i style="width:72%"></i></div><span>72</span></div><div class="gossip">"Loves the Cityfront. Overstands the weather mark."</div><div class="rec">Against you: 7 races · mean 4.0 · best 2nd</div></div>
+    <div class="card"><div class="nm">Ines Carvalho</div><div class="sub">Crew on Red · forward hand</div><div class="who">Club member · Crew</div>
       <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:85%"></i></div><span>85</span><span>Eyes</span><div class="bar"><i style="width:80%"></i></div><span>80</span><span>Fitness</span><div class="bar"><i style="width:75%"></i></div><span>75</span><span>Composure</span><div class="bar"><i style="width:90%"></i></div><span>90</span></div></div>
-    <div class="card"><div class="nm">Tom Reyes</div><div class="sub">Free · sails on any boat</div><span class="tag">club</span><span class="tag">crew</span>
+    <div class="card"><div class="nm">Tom Reyes</div><div class="sub">Free · sails on any boat</div><div class="who">Club member · Skipper &amp; crew</div>
       <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:30%"></i></div><span>30</span><span>Eyes</span><div class="bar"><i style="width:40%"></i></div><span>40</span><span>Fitness</span><div class="bar"><i style="width:85%"></i></div><span>85</span><span>Composure</span><div class="bar"><i style="width:35%"></i></div><span>35</span></div></div>
-    <div class="card"><div class="nm">Rae Lindqvist</div><div class="sub">Skipper of Green · USA 92 · SFYC</div><span class="tag">club</span><span class="tag">skipper</span>
-      <div class="hidden" style="margin-top:8px">Ratings: found out by racing her</div><div class="gossip">"Fast in a breeze, nervous at marks."</div><div class="rec">Against you: 5 races · mean 3.6</div></div>
+    <div class="card"><div class="nm">Rae Lindqvist</div><div class="sub">Skipper of Green · USA 92 · SFYC</div><div class="who">Club member · Skipper</div>
+      <div class="bars" style="margin-top:8px"><span>Starts</span><div class="bar"><i style="width:60%"></i></div><span>60</span><span>Boat speed</span><div class="bar"><i style="width:82%"></i></div><span>82</span><span>Reading the wind</span><div class="bar"><i style="width:58%"></i></div><span>58</span><span>Tactics</span><div class="bar"><i style="width:55%"></i></div><span>55</span><span>Rules</span><div class="bar"><i style="width:65%"></i></div><span>65</span><span>Consistency</span><div class="bar"><i style="width:45%"></i></div><span>45</span><span>Nerve</span><div class="bar"><i style="width:35%"></i></div><span>35</span></div><div class="gossip">"Fast in a breeze, nervous at marks."</div><div class="rec">Against you: 5 races · mean 3.6</div></div>
   </div>
-  <div class="note">Your members are yours to set. The club's are made by the Club tab's sliders; skippers' ratings stay hidden (a switch in Settings shows them).</div>
+  <div class="note">Your members are yours to set; the club's are made by the Club tab's sliders. Everyone's ratings are shown: skippers have reputations that precede them.</div>
 </div>
 
 <!-- 2. A member's card, opened (yours, as crew) -->
@@ -92,10 +92,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 8px;b
   <table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Middle crew</th><th>Forward hand</th><th>Club</th></tr></thead><tbody>
     <tr><td>USA 110</td><td>Josephine</td><td>You</td><td><span class="chip">Sam Okafor ▾</span></td><td><span class="chip">Alex Varga ▾</span></td><td>StFYC</td></tr>
     <tr><td>USA 87</td><td>Red</td><td><span class="chip">Maren Holt ▾</span></td><td><span class="chip">Pat Sørensen ▾</span></td><td><span class="chip">Ines Carvalho ▾</span></td><td>StFYC</td></tr>
-    <tr><td>USA 104</td><td>Blue</td><td><span class="chip">Jules Prentice ▾</span></td><td><span class="chip">Kai Moreno ▾</span></td><td><span class="chip">— none ▾</span></td><td>GGYC</td></tr>
+    <tr><td>USA 104</td><td>Blue</td><td><span class="chip">Jules Prentice ▾</span></td><td><span class="chip">Kai Moreno ▾</span></td><td><span class="chip">— (sails with one crew) ▾</span></td><td>GGYC</td></tr>
     <tr><td>USA 92</td><td>Green</td><td><span class="chip">Rae Lindqvist ▾</span></td><td><span class="chip">Tom Reyes ▾</span></td><td><span class="chip">Dee Achebe ▾</span></td><td>SFYC</td></tr>
   </tbody></table>
-  <div class="note">Each pick is from the roster; someone already aboard another boat for the next race is greyed out. A boat with no one assigned sails as today.</div>
+  <div class="note">Each pick is from the roster; someone already aboard another boat for the next race is greyed out. A boat races with one or two crew (one rarely), never none; a boat with no one assigned sails as today.</div>
 </div>
 
 <!-- 4. Club: the generator -->
