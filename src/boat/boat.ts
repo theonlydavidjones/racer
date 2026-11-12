@@ -28,6 +28,11 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
+   * wind and slow, a passing change of plan mustn't turn her back. */
+  hailTack?: { to: 'S' | 'P'; at: number } | null;
+  /** The turn committed to (turnCommit) is that tack. */
+  commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */

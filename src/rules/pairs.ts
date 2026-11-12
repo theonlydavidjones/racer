@@ -31,45 +31,63 @@ export const HAIL_RESPONSE = 5;
  * degrees the sea knocks a close-hauled boat's bow about, and reached in about a second at the sim's turn rates.)
  */
 export const TACK_BEGUN = 15;
-/** Begun to tack, she's through head to wind within this many seconds, or she didn't really tack. */
+/** ... and is above any course she'd sail close-hauled: no more than this far off the wind (a Folkboat's beat is 40–45°,
+ * polar.ts beatAngle), so a boat footing when hailed gets no credit for merely coming up to close-hauled. */
+const BEGUN_TWA = 30;
+/**
+ * Begun to tack, she's through head to wind within this many seconds, or she didn't really tack. (In the sim a boat
+ * keeps turning at the rudder's least authority, dynamics.ts HANDLING.minTurnRate, so even at 1 m/s she's through in
+ * well under 15 s: a modelling allowance, not a number from the rules.)
+ */
 export const THROUGH_WIND = 15;
 
-/** Has `b` begun to tack since the hail `h` (passed head to wind, or turned TACK_BEGUN° up from her heading at the hail)? */
-export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number, number> }, windFrom: number): boolean {
+/**
+ * Is `b` tacking (in the act of it) since the hail `h`: through head to wind, or turned TACK_BEGUN° up from her heading
+ * at the hail (in the wind she had then) and now pinching above close-hauled (in the wind she has now)?
+ * Not latched: bear away again and she's no longer tacking.
+ */
+export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number, { h: number; wind: number }> }, windFrom: number): boolean {
   if (b.lastTackT >= h.at || b.tacking) return true;
-  const h0 = h.headAt?.[b.id];
-  if (h0 == null) return false;
-  const from = b.ww?.from ?? windFrom, r0 = wrap(from - h0), r = wrap(from - b.h);
-  return Math.sign(r) === Math.sign(r0) && Math.abs(r) <= Math.abs(r0) - TACK_BEGUN;
+  const at = h.headAt?.[b.id];
+  if (!at) return false;
+  // turned up from her heading at the hail, in the wind she had then; and pinching now, in the wind she has now (so a
+  // lift she followed, or coming up from footing to close-hauled, isn't a tack begun)
+  // (her turn by her heading alone, toward the side the wind was on; the wind now unsigned, so a few degrees' shift as
+  // she nears head to wind doesn't throw her back out of it)
+  const now = b.ww?.from ?? windFrom, then = Number.isFinite(at.wind) ? at.wind : now;
+  const up = Math.sign(wrap(then - at.h)) * wrap(b.h - at.h);
+  return up >= TACK_BEGUN && Math.abs(wrap(now - b.h)) <= BEGUN_TWA;
 }
 
 /**
- * Rule 20.2: has someone failed to respond to a hail for room to tack? Updates `respondedAt` and returns the
- * boat in breach: the hailed boat if she neither tacked nor replied "You tack" in time (20.2(c)), or the hailing
- * boat if she didn't tack soon after the hailed boat responded (20.2(d)).
+ * Rule 20.2: has someone failed to respond to a hail for room to tack? Keeps `respondedAt` and `clearAt` up to date and
+ * returns the boat in breach:
+ * - the hailed boat (20.2(c)) if within HAIL_RESPONSE she neither began to tack nor replied "You tack", or began and
+ *   didn't go through the wind within THROUGH_WIND (bearing away again undoes her start). After passing the hail on
+ *   (20.3) her clocks run from when the boat she hailed is through the wind;
+ * - the hailing boat (20.2(d)), on the same terms, from when the hailed boat is through the wind or replied.
  */
 export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: number, windFrom = NaN): { boat: B; role: 'hailed' | 'hailer' } | null {
   const h = rec.hail;
   if (!h || h.kind !== 'room') return null;
   const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
-  if (h.respondedAt == null) {
-    if (h.replyAt != null) h.respondedAt = h.replyAt;
-    else if (begunTack(hailed, h, windFrom)) h.respondedAt = t;
-  }
   if (h.clearAt == null && (h.replyAt != null || hailed.lastTackT >= h.at || hailed.tacking)) h.clearAt = h.replyAt ?? t;
-  if (h.respondedAt == null) {
+  if (h.replyAt != null) h.respondedAt ??= h.replyAt;
+  else if (h.clearAt == null) h.respondedAt = begunTack(hailed, h, windFrom) ? h.respondedAt ?? t : undefined;
+  if (h.clearAt == null) {
     // Rule 20.3: she passed the hail on to a boat to windward of her that stops her tacking. She can't tack until that
-    // boat has responded, so her own "as soon as possible" runs from then; and if that boat never does (her breach),
-    // she was never able to (rule 43.1(a)'s reasoning: compelled by another boat's breach).
+    // boat is through the wind, so her own "as soon as possible" runs from then; and if that boat never responds (her
+    // breach), she was never able to (rule 43.1(a)'s reasoning: compelled by another boat's breach).
     const po = h.passedOn;
-    if (po) return po.failed || po.respondedAt == null ? null : t >= po.respondedAt + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
-    return t >= h.at + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
+    if (po && (po.failed || po.respondedAt == null)) return null;
+    const from = po ? po.respondedAt! : h.at;
+    const late = h.respondedAt == null ? t >= from + HAIL_RESPONSE : t >= Math.max(h.respondedAt, from) + THROUGH_WIND;
+    return late ? { boat: hailed, role: 'hailed' } : null;
   }
-  // she began to tack but never went through the wind: that was no response (even at 1 m/s, with the rudder's least
-  // authority, physics.ts maxTurnRate, she's through in under 10 s)
-  if (h.clearAt == null) return t >= h.respondedAt + THROUGH_WIND ? { boat: hailed, role: 'hailed' } : null;
-  const hailerTacked = begunTack(hailer, h, windFrom);
-  return !hailerTacked && t >= h.clearAt + HAIL_RESPONSE ? { boat: hailer, role: 'hailer' } : null;
+  if (hailer.lastTackT >= h.at || hailer.tacking) return null; // she's tacked
+  h.hailerBegunAt = begunTack(hailer, h, windFrom) ? h.hailerBegunAt ?? t : undefined;
+  const late = h.hailerBegunAt == null ? t >= h.clearAt + HAIL_RESPONSE : t >= Math.max(h.hailerBegunAt, h.clearAt) + THROUGH_WIND;
+  return late ? { boat: hailer, role: 'hailer' } : null;
 }
 
 /** Room for a Folkboat to pass between a boat and a mark or obstruction: her beam and a little, m. */

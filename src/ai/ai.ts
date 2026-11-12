@@ -491,12 +491,17 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (!h.passedOn) w.passOnHail(b, o);
       const po = h.passedOn, waiting = !!po && po.respondedAt == null && !po.failed;
       if (po?.failed) continue; // the boat she hailed never responded: she still can't tack into her
-      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; tackNow = true; }
+      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t }; }
       else holdForHail = true;
     }
     // She hailed and the other boat responded (is through the wind, or replied "You tack"): tack now (Rule 20.2(d)).
-    if (h.by === b.id && h.clearAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; }
+    if (h.by === b.id && h.clearAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t }; }
   }
+  // a tack begun for a hail is finished: past head to wind (where the hail no longer asks it of her) she carries on
+  // until she's close-hauled on the new tack
+  const ht = ai.hailTack;
+  if (ht && ((b.tack === ht.to && !b.tacking) || w.t - ht.at > 30)) ai.hailTack = null;
+  else if (ht && !tackNow && !holdForHail) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired));

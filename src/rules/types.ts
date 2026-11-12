@@ -136,9 +136,11 @@ export interface Hail {
    * rule 20.2(d)'s "as soon as possible" runs from here. (Starting to tack, respondedAt, is her response; the hailing
    * boat turning up under her while she's still swinging through the wind would only put them together.) */
   clearAt?: number;
-  /** Each boat's heading when the hail was made: turned TACK_BEGUN° from it toward the wind, she has begun to tack
-   * (pairs.ts begunTack). Omitted: only passing head to wind counts. */
-  headAt?: Record<number, number>;
+  /** Each boat's heading, and the wind she had, when the hail was made: turned TACK_BEGUN° up from it, she has begun to
+   * tack (pairs.ts begunTack). Omitted: only passing head to wind counts. */
+  headAt?: Record<number, { h: number; wind: number }>;
+  /** When the hailing boat began her tack (pairs.ts hailBreach), while she's in the act of it. */
+  hailerBegunAt?: number;
   /**
    * Rule 20.3: the hailed boat, meaning to respond by tacking, passed the hail on to a boat on the same tack that stops
    * her tacking: that boat's id, when, and (kept up to date by the caller from that pair's record) when that boat

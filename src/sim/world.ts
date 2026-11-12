@@ -1408,7 +1408,7 @@ export class World {
   hail(by: Boat, to: Boat, kind: 'room' | 'starboard', relayed = false): boolean {
     const rec = this.pairs[pairKey(by, to)] ??= newPairRecord();
     if (rec.hail && rec.hail.kind === kind) return false;
-    rec.hail = { by: by.id, at: this.t, kind, headAt: { [by.id]: by.h, [to.id]: to.h }, ...(relayed ? { relayed } : {}) };
+    rec.hail = { by: by.id, at: this.t, kind, headAt: { [by.id]: { h: by.h, wind: by.ww.from }, [to.id]: { h: to.h, wind: to.ww.from } }, ...(relayed ? { relayed } : {}) };
     if (kind === 'starboard' && to.ai) to.ai.duckUntil = this.t + 10;
     // An AI boat that is clear ahead, with room for the hailing boat to tack and pass astern, replies "You tack".
     const reply = kind === 'room' && !!to.ai && youTackPays(by, to);

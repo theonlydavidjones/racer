@@ -143,14 +143,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     let err = wrap(b.desired - b.h);
     const ai = b.ai;
     // a commitment ends when the turn is nearly done or she wants to go somewhere else
-    if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || Math.abs(wrap(b.desired - ai.commitFor)) > 45)) ai.turnCommit = 0;
+    if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
     if (ai && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
       ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
-      ai.commitFor = b.desired;
+      ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
       const long = err + ai.turnCommit * 360;
