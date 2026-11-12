@@ -35,6 +35,11 @@ export interface SailShape {
   time: number; // s, for the flapping
   /** Camber (depth / chord) and where the deepest point is (fraction of the chord from the luff), from the sail controls. */
   depth?: number; draft?: number;
+  /**
+   * The luff carried off its straight line by the spar or stay it's on (the mast's bend, the forestay's sag): offset
+   * (x, z) in the sail's frame times f(t) at height fraction t, fading out across the sail to nothing at the leech.
+   */
+  luff?: { x: number; z: number; f: (t: number) => number };
 }
 
 const tmp = new THREE.Vector3();
@@ -117,6 +122,7 @@ export class Sail {
   /** A point on the sail surface at height fraction t and chord fraction s (0 luff → 1 leech). */
   point(t: number, s: number, sh: SailShape, out = new THREE.Vector3()): THREE.Vector3 {
     const [L, F] = this.edges(t);
+    if (sh.luff) { const k = sh.luff.f(t); L.x += sh.luff.x * k; L.z += sh.luff.z * k; }
     out.copy(L).lerp(F, s);
     // camber: depth and draft position from the controls (or the sail's default), flatter toward the head
     const k = sh.draft ? Math.log(0.5) / Math.log(sh.draft) : 0.8; // sin(π s^k) is deepest where s^k = ½, i.e. at s = draft

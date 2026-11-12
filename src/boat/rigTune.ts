@@ -341,3 +341,21 @@ export function tuneBrief(t: RigTune, lo: number, mean: number, hi: number, jump
 
 /** Heikkilä's tune for a medium day (12 kt), worked out once the forestay's figures above are (for the tests). */
 export const TUNE_HEIKKILA: RigTune = heikkilaFor(12);
+
+/* ---------- the rig as drawn (render/boatMesh.ts) ---------- */
+
+/**
+ * What the eye sees of the tune: the forestay's sag (m, to leeward in the jib's pull: the cable law above) and the
+ * mast's fore-and-aft bend (m): its middle bowed forward (pre-bend from the foot pressed aft, about a millimetre per
+ * millimetre, PREBEND above, and the backstay's bend, about 60 mm full on: the same estimates the main's camber uses,
+ * and the jumpers': tighter curves the lower mast more, about 2 mm a turn for the 0.08% of camber JUMPER gives a turn),
+ * and the backstay's own bend of the topmast above the hounds, on top of the tangent the bow leaves it on (an
+ * estimate: 40 mm at the head full on, more with the jumpers loose, which let the top bend, less with them tight).
+ * `bend`: the mast's bendiness against aluminium.
+ */
+export function rigDrawn(t: RigTune, backstay: number, aws: number, bend = 1): { sag: number; bow: number; topAft: number } {
+  const bs = clamp(backstay, 0, 1);
+  const bow = bend * Math.max(0, 0.97 * Math.max(0, t.footAft) / 1000 + 0.06 * bs + 0.0019 * (t.jumperTurns - TUNE_DEFAULT.jumperTurns));
+  const topAft = bend * 0.04 * bs * (1 + 0.15 * (TUNE_DEFAULT.jumperTurns - t.jumperTurns));
+  return { sag: forestaySag(withBackstay(forestayTension(t), bs), aws), bow, topAft };
+}
