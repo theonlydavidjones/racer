@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { setVisibility } from '../environment/weather';
 import { D2R, V, ZONE } from '../core/math';
 import type { World } from '../sim/world';
 import type { MarkShape } from '../courses/course';
@@ -600,7 +601,7 @@ export class SceneView {
     if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
     // the sky itself overcast (the cloud's grey, darker with the day), and no sun glinting off the water through it
     sm.uniforms.uMurk.value = Math.min(0.92, murk * 1.15); (sm.uniforms.uMurkCol.value as THREE.Color).copy(haze).multiplyScalar(0.92);
-    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3100 : rain === 1 ? 7500 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
+    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, setV = setVisibility({ fog, rain }).m, fogF = Number.isFinite(setV) ? setV : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R; set fog and rain: environment/weather.ts SET_VIS, which the map's visibility reads too)
     // (rain's visibility: V ≈ 11.6·R^−0.63 km for R mm/h, Atlas, "Optical extinction by rainfall", J. Meteor. 10, 486–488,
     // 1953, as quoted in a secondary summary, for a 0.055 threshold contrast: the paper itself couldn't be reached to check
     // it. Taken as the fog's far edge, where the haze is complete: near enough the distance you lose sight of things. Light rain about 2 mm/h,
