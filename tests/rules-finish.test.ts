@@ -265,3 +265,18 @@ describe('in the world', () => {
 });
 
 void WIND;
+
+describe('proper course allows for the current (Rules 17, 23.2)', () => {
+  it('reaching across a strong tide, her proper course is the crab up-tide of the mark, not the bearing of it', async () => {
+    const { properTwa } = await import('../src/sim/world');
+    const w = race(), b = w.boats[1], m = w.C.marks[b.leg];
+    // put her beam-on to the wind, the mark straight ahead of her
+    const wv = V(w.wind.from), side = V(w.wind.from + 90), P = off(m.p, side, -400);
+    Object.assign(b, { x: P.x, y: P.y, h: n360(w.wind.from + 90), v: 2.5, ww: { from: w.wind.from, kt: w.wind.kt } });
+    b.cur = { x: 0, y: 0 };
+    const still = properTwa(w, b);
+    b.cur = { x: -wv.x * 1.2, y: -wv.y * 1.2 }; // 2.3 kt setting her to leeward
+    const tide = properTwa(w, b);
+    expect(tide).toBeLessThan(still - 10); // she must point higher to make good the line
+  });
+});

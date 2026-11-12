@@ -18,7 +18,7 @@ import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNe
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, blanketRule, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
-import { aimPoint, sailable } from '../ai/ai';
+import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink, crewPoleCall } from '../ai/ai';
 import type { SimEvent } from './events';
@@ -1563,10 +1563,15 @@ export const BELOW_PROPER = 20;
 /**
  * True wind angle of a boat's proper course: roughly, the course she'd sail to finish as soon as
  * possible with no other boats around. Straight at her next mark if she can lay it; close-hauled
- * if it's upwind; no deeper than the best downwind angle if it's dead downwind. (It doesn't allow for the current: a
- * boat crabbing across a strong tide sails her proper course some degrees off this.)
+ * if it's upwind; no deeper than the best downwind angle if it's dead downwind. Allowing for the current: across a
+ * strong tide her proper course to the mark is the crab that makes good the straight line, not the bearing of it.
  */
 export function properTwa(w: World, b: Boat): number {
-  const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), twa = Math.abs(wrap(b.ww.from - toMark));
-  return Math.min(Math.max(twa, beatAngle(b.ww.kt)), Math.max(runAngle(b.ww.kt), 150));
+  const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), beat = beatAngle(b.ww.kt);
+  // allowing for the current: the heading that makes good the straight line to the mark, up-tide of it by as much as
+  // the current across her track would set her down (as the AI, the tiller pilot and the planner steer: crabFor), at
+  // the speed she'd make on it
+  const twa0 = Math.abs(wrap(b.ww.from - toMark)), vs = Math.max(b.v, polar(b.ww.kt, Math.max(twa0, beat)) * 0.8);
+  const twa = Math.abs(wrap(b.ww.from - crabFor(toMark, vs, b.cur ?? { x: 0, y: 0 })));
+  return Math.min(Math.max(twa, beat), Math.max(runAngle(b.ww.kt), 150));
 }
