@@ -262,11 +262,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));
     grp.add(new THREE.Mesh(rail(caps, 0.02, 0.04), MAT.wood));
-    // the toerail along the sheer; alongside the cockpit it becomes the hiking rail, a broad varnished plank laid flat along
+    // the toerail along the sheer, unbroken; and alongside the cockpit, just inboard of it, the hiking rail, a broad varnished plank laid flat along
     // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
     // starboard side at the dock)
     const sl = sheerLine(s, 0.03, 160), aft = sheerLine(s, HIKE_RAIL.inset, 160).filter(p => p.z >= HIKE_RAIL.z0 && p.z <= HIKE_RAIL.z1);
-    for (const part of [sl.filter(p => p.z <= HIKE_RAIL.z0 + 0.03), sl.filter(p => p.z >= HIKE_RAIL.z1 - 0.03)]) grp.add(new THREE.Mesh(rail(part, 0.035, 0.03), TEAK_WEATHERED));
+    grp.add(new THREE.Mesh(rail(sl, 0.035, 0.03), TEAK_WEATHERED)); // (the toerail, unbroken stem to transom)
     grp.add(new THREE.Mesh(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t), TEAK_WEATHERED));
     const blocks: THREE.BufferGeometry[] = [];
     for (let z = HIKE_RAIL.z0 + 0.05; z < HIKE_RAIL.z1; z += 0.38) { const u = uAtZ(z), x = s * (halfBeam(u) - HIKE_RAIL.inset); blocks.push(new THREE.BoxGeometry(HIKE_RAIL.w * 0.75, HIKE_RAIL.gap + 0.004, 0.05).translate(x, sheer(u) + HIKE_RAIL.gap / 2, z)); }
@@ -385,7 +385,7 @@ const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 const WINCH_H = 0.123;
 /** Bare teak weathered silver-tan, as Josephine's toerail and hiking rail are (the owner's photos): not varnished. */
 const TEAK_WEATHERED = new THREE.MeshPhongMaterial({ color: 0xb8a284, specular: 0x222222, shininess: 8 });
-const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.045, w: 0.08, t: 0.028, gap: 0.014 };
+const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [], n = pts.length;
