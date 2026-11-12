@@ -10,7 +10,8 @@ const polarSpeed = (w: number, a: number) => polar(w, a, 'jib');
  * sail model's drive (balance.ts sailForces, ORC's coefficients, trimmed and shaped as the crew would for the apparent
  * wind at each speed) at speed v over the same at vt. Slow, the apparent wind is lighter and broader: close-hauled it
  * pushes less than at full speed (ORC's model gives 0.7–0.8 of it at rest), and only from about 120° does it push
- * more. In place of a flat boost (×1.6 at rest at every angle, which the audit found too much push from rest and
+ * more (and in a breeze on a beam reach, where at full speed the crew has her flattened and at a crawl needn't, a little
+ * more). In place of a flat boost (×1.6 at rest at every angle, which the audit found too much push from rest and
  * through a tack). The drive at the polar's speed stays the polar's (dynamics.ts drive): this only shapes it below
  * and above that.
  *
@@ -36,7 +37,7 @@ export function driveRatio(tws: number, twa: number, v: number, vt: number): num
   return at(w, a, q) * (1 - f) + at(w, a, q + 1) * f;
 }
 function at(w: number, a: number, q: number): number {
-  const key = (w * 100 + a) * 100 + q;
+  const key = (w * 64 + a / 5) * 32 + q; // (w ≤ 40, a/5 ≤ 36, q ≤ 30: each in its own field, no two conditions share a key)
   let k = cache.get(key);
   if (k == null) {
     const vt = polarSpeed(w, a), d1 = sailDrive(w, a, vt);
