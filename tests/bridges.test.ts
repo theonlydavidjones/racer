@@ -33,9 +33,13 @@ function across(P: { pts: Vec[] }): Vec {
   return { x: NaN, y: NaN };
 }
 // the piers out in open water, with a clear way through them (a few of the Bay Bridge's stand against Yerba Buena Island's shore)
-// (the south tower is inside its fender; the north tower stands at Lime Point, the chart's land within 15 m of it on the
-// 50 m land cells, so the land, not the tower, is the nearest obstruction on its shore side)
+// (the south tower is inside its fender; a few of the Bay Bridge's piers stand against Yerba Buena Island's shore, where
+// the land, not the pier, is the nearest obstruction)
 const OPEN = PIERS.filter(P => Number.isFinite(across(P).x) && !/south tower$/.test(P.name ?? '') && landDist(centre(P.pts)) > 50);
+// the Golden Gate's north tower stands at the edge of Lime Point (OpenStreetMap's coastline runs round its base): a boat
+// meets it from the Gate, to the south of it
+const NORTH = PIERS.find(p => p.name === 'Golden Gate Bridge, north tower')!;
+const approach = (P: { name?: string; pts: Vec[] }): Vec => P === NORTH ? V(0) : across(P);
 
 describe('the bridges\' towers and piers: solid', () => {
   it('has both Golden Gate towers, the south tower\'s fender and the Bay Bridge\'s piers, from NOAA\'s chart and OpenStreetMap', () => {
@@ -60,11 +64,12 @@ describe('the bridges\' towers and piers: solid', () => {
   });
 
   it('stops a boat sailing straight at each one, with a message saying what she hit', () => {
-    for (const P of OPEN) {
+    expect(OPEN).not.toContain(NORTH);
+    for (const P of [...OPEN, NORTH]) {
       const w = new World(COURSES[0], S(), 7, { freeSail: true }), u = w.user, c = centre(P.pts);
       // on a beam reach, straight at it from 70 m off its edge
       // (from whichever side she can sail at it: not head to wind)
-      let ax = across(P); if (Math.abs(wrap(w.wind.from - brg(ax.x, ax.y))) < 60) ax = { x: -ax.x, y: -ax.y };
+      let ax = approach(P); if (P !== NORTH && Math.abs(wrap(w.wind.from - brg(ax.x, ax.y))) < 60) ax = { x: -ax.x, y: -ax.y };
       const h = brg(ax.x, ax.y), r = Math.max(...P.pts.map(p => dist(p, c)));
       u.x = c.x - ax.x * (r + 70); u.y = c.y - ax.y * (r + 70); u.h = h; u.v = 2.5;
       for (const b of w.boats) if (!b.isUser) { b.x += 5000; } // (the others well away)
@@ -101,19 +106,32 @@ describe('the bridges\' towers and piers: solid', () => {
     }
   });
 
-  it('the owner\'s case: cruising on the tiller pilot through the Gate past the north tower, she goes round it', () => {
-    const north = PIERS.find(p => /north tower/.test(p.name ?? ''))!, c = centre(north.pts);
+  it('the owner\'s case: cruising on the tiller pilot in through the Gate past the north tower, she goes round it', () => {
+    const c = centre(NORTH.pts), ys = NORTH.pts.map(p => p.y);
+    // in through the Gate before the westerly along the Marin side, from 450 m west of the tower to 250 m east of it: the
+    // straight line runs through its base, south of Lime Point's spit and the light
     const w = new World(COURSES[0], S({ windKind: 'west' }), 3, { freeSail: true }), u = w.user;
-    // through the Gate along the Marin side, from inside the bridge out past the tower: the straight line runs through it
-    const ax = across(north); u.x = c.x + ax.x * 300; u.y = c.y + ax.y * 300; u.v = 2.5;
-    const to = { x: c.x - ax.x * 600, y: c.y - ax.y * 600 }; w.setDest(to, 'out past the north tower');
-    expect(landAlong(u, to)).toBeLessThan(Infinity); // (the straight line runs into it)
+    const half = (Math.max(...ys) - Math.min(...ys)) / 2;
+    u.x = c.x - 450; u.y = c.y + 1.2 * half; u.v = 2.5;
+    const to = { x: c.x + 250, y: c.y - 2 * half }; w.setDest(to, 'in past the north tower');
+    expect(onLand(u)).toBe(false); expect(onLand(to)).toBe(false);
+    let through = false; for (let t = 0; t <= 1; t += 0.001) if (pierAt({ x: u.x + (to.x - u.x) * t, y: u.y + (to.y - u.y) * t }) === NORTH) through = true;
+    expect(through).toBe(true); // (the straight line runs into it)
     u.h = brg(to.x - u.x, to.y - u.y);
     engage(u, w.pilot, 'nav');
     let hits = 0;
     for (let i = 0; i < 60 * 900 && w.arrivedT == null; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast' && /Collision|Aground/.test(e.msg)) hits++; }
-    expect(hits).toBe(0);
+    expect(hits).toBe(0); expect(w.arrivedT, "she got there").not.toBeNull();
   }, 120_000);
+
+  it('stands the north tower at the edge of Lime Point, with the light on its spit (OpenStreetMap\'s coastline)', () => {
+    // the Lime Point light, at its Light List position (37°49.5′ N, 122°28.7′ W; OSM's node 1243877573 within 10 m)
+    expect(onLand(LL(37.825447, -122.478321))).toBe(true);
+    // the tower's base: land behind it to the north, open water off it to the south, east and west
+    const c = centre(NORTH.pts);
+    expect(onLand({ x: c.x, y: c.y + 40 })).toBe(true);
+    for (const [dx, dy] of [[0, -40], [0, -150], [-60, 0], [-200, 0]]) expect(onLand({ x: c.x + dx, y: c.y + dy }), `${dx},${dy}`).toBe(false);
+  });
 
   it('leaves the places, the marks and the ships\' routes clear of them', () => {
     for (const pl of PLACES) expect(pierAt(pl.p), pl.id).toBeNull();
