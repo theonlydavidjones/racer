@@ -51,6 +51,8 @@ export interface BoatSpec {
     mast: SparMaterial; boom: SparMaterial;
     mastStiffness: 'soft' | 'average' | 'stiff'; // a wooden mast's own character (aluminium masts are all alike)
     outboard: 'none' | 'stowed' | 'bracket'; // left ashore, stowed below, or on its transom bracket (lifted)
+    /** which outboard (boat/motor.ts): 2.5, 3.5 (the usual) or 6 hp */
+    outboardHp?: 2.5 | 3.5 | 6;
     gearKg: number; // gear and stores beyond the racing minimum
     /** The rig's tune at the dock (rigTune.ts): absent, on the guide's tune for the wind (as the sim always sailed). */
     tune?: RigTune;
@@ -143,6 +145,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
   spec.perf.cleanedWeeks = Math.max(0, Math.min(26, Math.round(Number(spec.perf.cleanedWeeks) || 0)));
   spec.perf.gearKg = Math.max(0, Math.min(400, Number(spec.perf.gearKg) || 0));
   if (spec.perf.tune) spec.perf.tune = fixTune(spec.perf.tune); // (absent: the guide's tune for the wind, rigTune.ts)
+  if (spec.perf.outboardHp != null && ![2.5, 3.5, 6].includes(spec.perf.outboardHp)) delete spec.perf.outboardHp; // (2.5, 3.5 or 6 hp)
   return spec;
 }
 

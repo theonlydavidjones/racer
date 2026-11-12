@@ -5,6 +5,7 @@ import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
+import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
@@ -260,6 +261,7 @@ export class World {
     this.settings = { ...settings };
     this.seed = seed;
     this.rng = makeRng(seed);
+    this.motorRng = makeRng((seed ^ 0x6d6f74) >>> 0); // (her motor's pulls: its own draws, so the race's are as they were)
     // the race day and clock, and the kind of wind the day brings (from the records for the month, or as chosen)
     this.raceDate = settings.tideDate || nextSaturday();
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
@@ -421,6 +423,8 @@ export class World {
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
+      // her outboard, if it's on its transom bracket: tilted up, stopped (boat/motor.ts)
+      ...(isUser && spec?.perf.outboard === 'bracket' ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0 } } : {}),
       ai: isUser ? null : {
         mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
         depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
@@ -767,6 +771,7 @@ export class World {
     this.shipEncounters();
     this.checkPairs();
     if (!this.freeSail) this.signals(prevT);
+    this.motorStep(dt);
     if (this.cruising) this.checkArrival();
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
@@ -1355,6 +1360,77 @@ export class World {
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
+  /** Racing, before she's finished: she retires (RET, RRS A5.1), and she's no longer racing. False if she isn't racing. */
+  retire(why = ''): boolean {
+    const u = this.user;
+    if (this.freeSail || u.finished || u.retired) return false; // (before her preparatory signal too: a boat that retires from a race she's entered)
+    u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
+    this.emit({ type: 'toast', msg: `Retired (RET, RRS A5.1)${why}: she's no longer racing. Keep clear of the boats still racing (RRS 23.1).`, ms: 5000 });
+    return true;
+  }
+  /**
+   * Racing (the definition: from her preparatory signal until she finishes or retires, or a recall, postponement or
+   * abandonment): the motor's not hers to use (RRS 42.1). Before it she may motor out to the line. (42.1 forbids propulsion,
+   * not a running engine: the sim asks at the pull, a simplification.)
+   */
+  get racingNow(): boolean { return this.racing(this.user); }
+
+  /* ---------- her outboard (boat/motor.ts) ---------- */
+  private motorRng: Rng;
+  /** Tilt the outboard down into the water, or up out of it (stopping it first). */
+  motorTilt(): void {
+    const m = this.user.motor; if (!m) return;
+    if (m.down && (m.running || m.pulling)) { m.running = false; m.pulling = undefined; }
+    m.down = !m.down; if (!m.down) { m.gear = 'N'; m.throttle = 0; m.swivel = false; }
+    this.emit({ type: 'toast', msg: m.down ? 'Outboard down: its leg in the water.' : 'Outboard tilted up, clear of the water.', ms: 2000 });
+  }
+  /**
+   * Pull-start it: in neutral (it won't start in gear), tilted down. Racing, it isn't hers to use (RRS 42.1; 42.3(h): not
+   * even to get clear after hitting something): `retireFirst` says she's retiring to do it. A pull takes a second and a half;
+   * the first catches three times in four, a second pull nearly always (a warm motor more readily: as owners know them).
+   */
+  motorStart(retireFirst = false): 'ok' | 'racing' | 'tilt' | 'gear' {
+    const m = this.user.motor; if (!m) return 'ok';
+    if (m.running || m.pulling) return 'ok';
+    if (this.racingNow) { if (!retireFirst) return 'racing'; this.retire(', to use her motor (RRS 42.1)'); }
+    if (!m.down) { this.emit({ type: 'toast', msg: 'Tilt the outboard down first: the prop needs to be in the water.', ms: 2500 }); return 'tilt'; }
+    if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Put it in neutral to start it: it won\'t start in gear.', ms: 2500 }); return 'gear'; }
+    m.pulling = { left: 1.5, catches: this.motorRng() < (m.warm ? 0.95 : 0.75) };
+    this.emit({ type: 'toast', msg: 'Pulling the starter cord…', ms: 1500 });
+    return 'ok';
+  }
+  motorStop(): void { const m = this.user.motor; if (!m) return; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; }
+  /** Into gear: F, N or R (the 2.5 has no reverse: swivel it round instead). Shifting is done at tick-over. */
+  motorGear(g: 'F' | 'N' | 'R'): void {
+    const m = this.user.motor; if (!m) return;
+    if (g === 'R' && !OUTBOARDS[m.hp].reverse) { this.emit({ type: 'toast', msg: 'The 2.5 has no reverse gear: swivel it round on its bracket to push astern.', ms: 3500 }); return; }
+    if (g !== m.gear) m.throttle = Math.min(m.throttle, 0.15);
+    m.gear = g;
+  }
+  motorThrottle(t: number): void { const m = this.user.motor; if (m) m.throttle = clamp(t, 0, 1); }
+  /** The 2.5: turned round on its bracket, its push goes astern (in neutral). */
+  motorSwivel(): void {
+    const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse) return;
+    if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Into neutral first, then swivel it round.', ms: 2500 }); return; }
+    m.swivel = !m.swivel;
+    this.emit({ type: 'toast', msg: m.swivel ? 'Swivelled round: in gear it pushes her astern.' : 'Swivelled back: in gear it pushes her ahead.', ms: 2500 });
+  }
+  /** Made fast in her slip, the motor running: the crew casts off the lines and she's yours to motor out. */
+  castOff(): boolean {
+    const u = this.user, m = u.motor;
+    if (!u.docked || !m?.running) return false;
+    u.docked = undefined; u.v = 0; u.astern = 0;
+    this.emit({ type: 'toast', msg: 'Lines in: she\'s yours. Motor her out (reverse to back out of a slip), then hoist sail and stop the motor.', ms: 5000 });
+    return true;
+  }
+  private motorStep(dt: number): void {
+    const m = this.user.motor; if (!m?.pulling) return;
+    m.pulling.left -= dt;
+    if (m.pulling.left > 0) return;
+    if (m.pulling.catches) { m.pulling = undefined; m.running = true; m.warm = true; this.emit({ type: 'toast', msg: `The ${m.hp} hp's running.`, ms: 2000 }); }
+    else { m.pulling = { left: 1.5, catches: this.motorRng() < 0.95 }; this.emit({ type: 'toast', msg: 'It didn\'t catch: another pull…', ms: 1500 }); }
+  }
+
   /**
    * Send her home: her home slip becomes where she's going, for the navigator's passage plan and the tiller pilot (on, it
    * steers for it; you bring her into the slip yourself). Racing, before she's finished, it retires her first: she's no
@@ -1362,12 +1438,9 @@ export class World {
    * and may use the pilot (RRS 52 binds only a boat racing). False when she has no home slip.
    */
   sendHome(): boolean {
-    const u = this.user, slip = this.homeSlip;
+    const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
-    if (!this.freeSail && !u.finished && !u.retired) {
-      u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
-      this.emit({ type: 'toast', msg: 'Retired (RET, RRS A5.1): she\'s no longer racing. Keep clear of the boats still racing (RRS 23.1).', ms: 5000 });
-    }
+    this.retire();
     this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
     this.arrivedT = null;
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';

@@ -4,6 +4,7 @@ import { fixTune, guideTune, tuneEffect, tuneName } from './rigTune';
 import type { BoatSpec } from './spec';
 import { HULL } from './dynamics';
 import { dCfAt, fouling, type Fouling } from './fouling';
+import { OUTBOARDS } from './motor';
 
 /**
  * Your boat's condition, in physical terms: what each setting in the Boat panel does to her.
@@ -42,7 +43,8 @@ export interface Condition {
 const G = 9.81;
 /** A wooden rig's extra weight aloft (kg) and how far above the bilge correctors it sits (m). */
 const WOOD_RIG = { kg: 9, dz: 5.3 };
-const OUTBOARD_KG = 13;
+/** Her outboard's weight (kg): boat/motor.ts OUTBOARDS, by her motor (the 3.5's unless she says). */
+const outboardKg = (s: BoatSpec) => OUTBOARDS[s.perf.outboardHp ?? 3.5].kg;
 /**
  * How much a mast bends, relative to aluminium (all alike) and to the average wooden mast, which the aluminium mast
  * was designed to match: in the class bend test (16 kg hung 4.8 m from the top), wooden masts measure about
@@ -57,9 +59,9 @@ const STATION = { transom: 3.45, locker: 2.3 };
 export function condition(s: BoatSpec, month = 9): Condition {
   const f = fouling(s.perf.cleanedWeeks, month), finish = s.perf.finish;
   const ob = s.perf.outboard;
-  const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : OUTBOARD_KG);
+  const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : outboardKg(s));
   // gear sits about amidships (no moment); the outboard aft
-  const extraMoment = ob === 'bracket' ? -OUTBOARD_KG * STATION.transom : ob === 'stowed' ? -OUTBOARD_KG * STATION.locker : 0;
+  const extraMoment = ob === 'bracket' ? -outboardKg(s) * STATION.transom : ob === 'stowed' ? -outboardKg(s) * STATION.locker : 0;
   const wood = s.perf.mast === 'wood';
   return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
@@ -67,7 +69,7 @@ export function condition(s: BoatSpec, month = 9): Condition {
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
-      + (ob === 'bracket' ? -OUTBOARD_KG * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
+      + (ob === 'bracket' ? -outboardKg(s) * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
   };
 }
 
@@ -119,7 +121,7 @@ export const PERF_INFO = {
   finish: 'A burnished racing bottom has about 3% less skin friction than antifouling as it was rolled on (Schultz 2002). Worth a fraction of a percent; most in light air.',
   sails: 'Old Dacron sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
   spars: 'The class built the aluminium mast to bend like an average wooden one; wooden masts vary. A soft mast flattens the main and opens its leech by itself in a gust (good in a gusty breeze) but has less power in moderate air; a stiff one keeps its power but heels more in the gusts. A wooden rig is also about 9 kg heavier aloft. The boom makes no measured difference.',
-  outboard: 'About 13 kg. On the transom bracket it\'s weight at the very stern (and against the class rules while racing); stowed below it costs less.',
+  outboard: 'Tohatsu-class four-strokes: 2.5 hp (about 13 kg, no reverse gear: it swivels to push astern), 3.5 hp (about 18 kg) or 6 hp (about 26 kg). On the bracket you can motor (the Motor button); it\'s weight at the very stern, and the class rules don\'t allow racing with it mounted aft (NFIA, 2006, rule 1.11): race setup stows it. Stowed below it costs less.',
   gear: 'Gear and stores, or an old wooden hull\'s soaked planking, over the class minimum of 1930 kg (wooden and fiberglass alike). Slower in light air; a little more stable in a breeze.'
 };
 

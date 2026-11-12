@@ -104,6 +104,7 @@ export class BoatPanel {
         else if (v === 'heikkila') b.perf.tune = heikkilaFor(this.S.windKt || 12); // (his shrouds and jumpers for the wind you've set up)
         else if (v in TUNE_PRESETS) b.perf.tune = { ...TUNE_PRESETS[v as keyof typeof TUNE_PRESETS] };
       }); return;
+      case 'outboardHp': this.set(b => { b.perf.outboardHp = Number(v) as 2.5 | 3.5 | 6; }); return;
       case 'finish': this.set(b => { b.perf.finish = v as BoatSpec['perf']['finish']; }); return;
       case 'lineColor': { const k = t.dataset.line as LineColorKey; this.set(b => { const c = { ...b.lineColors, [k]: v }; if (v === LINE_COLORS[k]) delete c[k]; if (Object.keys(c).length) b.lineColors = c; else delete b.lineColors; }); return; }
       case 'lineColorsReset': this.set(b => { delete b.lineColors; }); return;
@@ -238,7 +239,8 @@ export class BoatPanel {
           ${b.perf.mast === 'wood' ? seg('stiff', [['soft', 'Soft'], ['average', 'Average'], ['stiff', 'Stiff']], b.perf.mastStiffness) : ''}</div>
         <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.boom)}<small>${PERF_INFO.spars}</small></div>
         ${rigTuneFields(b, seg)}
-        <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}<small>${PERF_INFO.outboard}</small></div>
+        <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}
+          ${b.perf.outboard !== 'none' ? seg('outboardHp', [['2.5', '2.5 hp (no reverse)'], ['3.5', '3.5 hp'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5)) : ''}<small>${PERF_INFO.outboard}</small></div>
         <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label><small>${PERF_INFO.gear}</small></div>
         <div class="bpreport" id="bpReport"></div>
       </section>

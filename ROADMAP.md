@@ -353,6 +353,9 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
+  - From Marinas, the motor: the outboard's thrust is off her centreline (about 0.45 m out on the bracket, some 180 N·m at full
+    throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
+    both real lessons at the dock. And sourced figures for the figure of merit (0.55), reverse (0.5) and the leg's drag.
   - From Charts, after Lime Point (#64): blocky 50 m terrain cliffs along the Marin shore, Horseshoe Bay included (needs
     a shore fit for all the ENC land); a small sand-coloured sliver floating southwest of Horseshoe Bay's marina; a
     possible spike at the west edge of the Lime Point box; the tiller pilot tacks into the cove behind Lime Point on a

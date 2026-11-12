@@ -227,6 +227,12 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pilot .tp-btn{padding:7px 8px}
 body.pilot-on #keysHint{display:none}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
+#controls .motorhead{flex-wrap:nowrap;width:max-content;margin-top:6px}
+#controls .motorhead .tp-btn{min-width:0;height:38px}
+.mo-thr{display:flex;align-items:center;gap:6px;font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px}
+.mo-thr input{width:110px}
+#moGears .tp-btn[aria-pressed="true"],#motorHead .tp-btn.on{border-color:var(--accent);color:var(--accent)}
+#bMotor.on{border-color:var(--accent);color:var(--accent)}
 #bHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
 @media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)} }
 /* one line along the bottom: the helm's buttons, then the pilot's control head while it steers (clear of the view buttons) */
@@ -785,6 +791,7 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sb-tillerslot #bPilot.on{border-color:var(--accent);color:var(--accent)}
 .sb-tillerslot #bPilot svg{width:12px;height:12px}
 .sb-tillerslot #pilot{position:absolute;right:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3}
+.sb-tillerslot #motorHead{position:absolute;left:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3;margin:0}
 .sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
