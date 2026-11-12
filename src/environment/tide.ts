@@ -161,7 +161,14 @@ export class CurrentField {
    * 290 m apart; the pairs off Treasure Island and Point Blunt) each still give their own prediction where they are.
    */
   private soft2: Float64Array;
+  /** The span every station is predicted over (minutes since epoch, UTC): the latest of their starts to the earliest of their ends. */
+  from = 0; to = 0;
+  private span(): void {
+    this.from = -Infinity; this.to = Infinity;
+    for (const s of this.stations) if (s.t.length) { this.from = Math.max(this.from, s.t[0]); this.to = Math.min(this.to, s.t[s.t.length - 1]); }
+  }
   constructor(readonly stations: TideStation[]) {
+    this.span();
     this.stamp = new Int32Array(stations.length).fill(-1);
     this.sx = Float64Array.from(stations, s => s.p.x); this.sy = Float64Array.from(stations, s => s.p.y);
     this.vecs = stations.map(() => ({ x: 0, y: 0 }));
@@ -172,6 +179,19 @@ export class CurrentField {
     });
   }
   setTime(tMin: number): void { if (tMin !== this.tMin || this.epoch === 0) { this.tMin = tMin; this.epoch++; } }
+  /**
+   * Keep the stations' predictions running for as long as she sails: each is predicted over a window (stationsFor),
+   * and past its end it would hold its last value, every station frozen at a different point of its own tide (mid-flood
+   * at one, mid-ebb at the next). Whenever less than 8¼ hours are left ahead (the tide's description looks 8 hours ahead
+   * for the turn), or the clock is before the window, the stations are predicted afresh from the same harmonic constants,
+   * from 4 hours back (the conditions graph and the strategist look back) to 14 hours on.
+   */
+  cover(tMin: number): void {
+    if (!this.stations.length || (tMin >= this.from && tMin + 8 * 60 + 15 <= this.to)) return;
+    const fresh = new Map(stationsFor(tMin - 4 * 60, tMin + 14 * 60).map(x => [x.id, x]));
+    for (const st of this.stations) { const n = fresh.get(st.id); if (n) { st.t = n.t; st.v = n.v; } }
+    this.span(); this.epoch++;
+  }
   /** Station i's current (m/s) at the field's time. */
   stationVec(i: number): Vec {
     if (this.stamp[i] !== this.epoch) { this.vecs[i] = stationVector(this.stations[i], this.tMin); this.stamp[i] = this.epoch; }

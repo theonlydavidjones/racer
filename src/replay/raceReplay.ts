@@ -52,6 +52,13 @@ export class RaceReplay {
   private last = 0;
   private clipView: ReplayView | null = null;
   private dragging = false;
+  /**
+   * The moments that get a numbered pin. A long leg can hold dozens of small spells (a few seconds each of a poor
+   * downwind angle, say), and a pin on every one buries the track. So, by judgement: a pin for each finding's worst
+   * moment, every rule incident, the start and penalties, and any other moment that cost 5 s or more (about two boat
+   * lengths on a beat); the smaller ones keep their coloured stretch of track and their bar on the timeline.
+   */
+  private pinned = new Set<Moment>();
   /** The finding each moment belongs to, numbered as in the list (1 = cost you most). */
   private rank = new Map<string, number>();
 
@@ -62,6 +69,9 @@ export class RaceReplay {
   open(w: World, D: RaceReplayData): void {
     this.w = w; this.D = D;
     this.rank = new Map(D.findings.map((f, i) => [f.key, i + 1]));
+    const worst = new Map<string, Moment>();
+    for (const m of D.moments) if (!worst.has(m.key) || m.lost > worst.get(m.key)!.lost) worst.set(m.key, m);
+    this.pinned = new Set(D.moments.filter(m => worst.get(m.key) === m || m.lost >= 5 || ['rule', 'start', 'penalty'].includes(m.key)));
     this.root.innerHTML = `<div class="panel rrPanel" role="dialog" aria-modal="true" aria-labelledby="rrTitle">
   <div class="rrHead"><div><div class="eyebrow">Race replay</div><h2 id="rrTitle">Your race, debriefed</h2></div>
     <button class="ghost" type="button" data-rr="close">Close</button></div>
@@ -269,6 +279,7 @@ export class RaceReplay {
       ctx.lineCap = 'butt';
     }
     for (const m of D.moments) {
+      if (!this.pinned.has(m) && this.sel !== m) continue;
       const p = F[idx(m.t0)]?.b[u]; if (!p) continue;
       const q = P(p), on = this.sel === m, r = on ? 9 : 7;
       ctx.fillStyle = ink(m.key); ctx.strokeStyle = '#0c2534'; ctx.lineWidth = 2;

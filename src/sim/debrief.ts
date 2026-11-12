@@ -153,7 +153,7 @@ export class RaceLog {
       this.done.push({ key: 'start', t0: -20, t1: this.startDelay, x: u.x, y: u.y, lost: late,
         text: `Crossed the line ${this.startDelay.toFixed(1)} s after the gun${g ? `, at ${g.kt.toFixed(1)} kt at the gun` : ''}.` });
     }
-    if (!u.started || u.finished || w.t < 0) return;
+    if (!u.started || u.finished || u.retired || w.t < 0) return;
     const m = w.nextMark(u), leg = m?.leg ?? 'beat', beat = beatAngle(ww.kt);
     // penalties
     if (u.penalty > 0) {

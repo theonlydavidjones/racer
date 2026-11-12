@@ -52,12 +52,37 @@ What's planned, roughly in order. Done work is described in the README.
    - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
    Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
    (starboard, jib luff tension), with a physics review.
+   **With the band: the chase-view layout** (owner approved 12 November; handed to Crew Controls with the band). Mock-up
+   https://claude.ai/artifact/S2ZAPSy3CPsptyFWidxh8N (design/chase-layout.html on ui/sail-controls-band-mockup):
+   - the middle ~40% of the screen kept clear for the rig;
+   - the dials in the top corners: a rectangular heading pod in place of the compass tape, and a circular inset chart;
+   - one "where next" card (start line, over early, next mark, finish, or the navigator) in place of the start-line
+     and transit banners;
+   - a flags-only tile that opens a flag index, for learning the flags;
+   - the Coach card bottom left, the Messages card bottom right;
+   - Hail as a tab on the band, only when a hail applies; the old trim panel removed;
+   - the chase camera framing the whole boat above the band by default (zooming past it allowed);
+   - on the band: an AUTO-TRIM tab (was "All"), a POLE OUT / POLE IN tab only on a run, a round windex between the
+     vangs.
+   Also queued (owner, 12 November: "yes"): the rest of the RRS race signals in the flag index (AP, N, first
+   substitute, S… from the RRS 2025–2028 "Race Signals" page, checked by the researcher; 1–2 h); and one-line
+   on-screen messages with the full text in the log (1–2 h). Not queued: renaming the "Crew · Auto" button.
+   After the band (owner, 12 November; not urgent; 1–2 h): line colours chosen in the boat editor, one per line (jib
+   sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
+   band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
+   the starting set; saved with the boat.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
+   Built on branch rules-finish (PR pending, not yet published): 20.2(e) holds until the hailer has tacked and kept
+   clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
+   20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
+   the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
+   Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
+   away below her proper course to blanket.
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
@@ -196,15 +221,18 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   an alongside or end tie (or any berth where she lies bow out) they push her off forward and out from the dock. Check
   in every marina (West Harbor, Gashouse Cove, South Beach, the Corinthian, Horseshoe Bay), with the boat's coast after
   the shove from her real mass and low-speed drag, not a set distance.
-- **Next — outside the Gate, the sea dial disagrees with the water and the chart** (bug; 2–3 h; owner: "not for now"):
-  sailing on auto just west of the Golden Gate Bridge (37°48.48'N 122°30.23'W), the dial showed "FLOOD 0.4" and
-  "9 FT SWELL"; owner, "water definitely does not show 9 foot swell, and the chart shows that it's an ebb?"
-  (1) Flood or ebb: the dial calls it by the nearest NOAA station's flood direction (ui/hud.ts: the current dotted with
-  that station's flood bearing), while the chart's current layer draws the current field itself; find which is wrong
-  out there (a station inside the Gate with a different flood bearing, an eddy, or the layer's arrows), and make the
-  dial, the chart and the water agree. (2) The swell: check 9 ft against the SF Bar buoy (NDBC 46237, and 46026
-  offshore) for that day and month. If it's right, the water must show it (a 9 ft, long-period swell is plain to see
-  outside the Gate); if not, fix the figure. Either way the dial and the water come from the same sea state.
+- **Done — outside the Gate, the sea dial disagreed with the water and the chart** (bug): the stations' tide predictions
+  covered only the race's window; past it each held its last value, frozen at different points of their tides, so on a
+  long sail the dial (its nearest station, frozen mid-flood) and the chart's arrows (others, mid-ebb) disagreed. They now
+  roll on (CurrentField.cover; tests/seaDial.test.ts at the owner's spot). The swell: the dial and the water come from
+  the same sea state, and 9 ft is what the model gives there on a big day with an ebb against it (0.77 of the bar
+  buoy's height, steepened by the ebb). A long-period swell (14–18 s, 300–500 m long) is a slope of about 1°: the boat
+  heaves about a metre and the cockpit view rises and falls with her, but the chase camera holds its height, so the
+  horizon stays put. Open: (a) should the chase camera ride the swell? (owner's call); (b) the swell's reach into the
+  Gate (0.77 there, 0.55 at the bridge) is an estimate: no measured ratio found (Hanes & Erikson 2013, ECSS 133, is
+  paywalled; the ESA/BCDC Crissy Field comparison is on a blocked host); (c) Deep Physics: the bar buoy's total height
+  includes its own wind sea (NDBC publishes the swell part, SwH, separately), and the swell's real direction is dropped
+  at the Gate.
 - **Next — heavy weather: how she copes in 30+ kt, and reefing for cruising only** (accuracy + feature; 8–12 h; owner:
   "not for now"): at 32 kt close-hauled under full main and jib she lay at 60°+ of heel, 0 kt, cockpit filling. Owner:
   "that boat would have sunk by now… How would an IRL skipper handle this situation? can't Folkboats handle heavy weather
@@ -243,11 +271,11 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
   cruise, and in both modes I would like a 'Send her home' feature (copy TBD) that auto-sets her home slip as the
   destination. In race mode, send her home would essentially be withdrawing from the race, if actioned before race is
-  complete." (1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns (2–3 h).
-  (2) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
-  restart (2–4 h). (3) "Send her home" (wording to be settled), in both modes: sets her home slip as the destination for
+  complete." ~~(1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns~~ (done).
+  ~~(2)~~ (done: Pause → Change the conditions…, at once) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
+  restart (2–4 h). ~~(3) "Send her home"~~ (done: the *Home* button, "Send her back to her home slip") (wording to be settled), in both modes: sets her home slip as the destination for
   the navigator or tiller pilot; before she finishes a race it retires her (scored RET under RRS A5.1 and A11) (1–3 h).
-  (4) After "cast off", change where she starts without ending the cruise (owner, "once I tap 'cast off' in cruise
+  ~~(4)~~ (done: "Move her here" on the chart) After "cast off", change where she starts without ending the cruise (owner, "once I tap 'cast off' in cruise
   mode, I'd like to be able to edit the starting location without having to end the cruise altogether"): pick a new
   start on the chart and she's moved there, the cruise and its log carrying on (1–2 h).
   Layout to the owner first.

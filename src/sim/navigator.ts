@@ -70,7 +70,7 @@ export function passagePlan(w: World): PassagePlan | null {
   const nm = (m: number) => `${(m / 1852).toFixed(1)} nm`;
   items.push({ head: 'The way', src: 'model', text: `${nm(routeLen)} to ${dest.name.replace(/^Off /, 'off ')}${route.length > 2 ? ` round the land (${nm(straight)} as the crow flies)` : ''}. ${now.ok ? `Leaving at ${clockOf(t0)}, about ${mins(now.minutes)} at the Folkboat's polar speeds, arriving ${clockOf(t0 + now.minutes)}.` : 'Leaving now she can\'t get there: becalmed against the tide somewhere on the way.'} ${now.legs.map(l => l.kind).includes('beat') ? `Part of it is a beat: ${now.legs.filter(l => l.kind === 'beat').reduce((a, l) => a + l.tacks, 0)} tacks or so.` : ''}` });
   // the same passage leaving later: the tide and the wind change under it
-  const horizon = (o.stations ? w.tide!.stations[0].t[w.tide!.stations[0].t.length - 1] : t0 + 600) - 10;
+  const horizon = (o.stations ? w.tide!.to : t0 + 600) - 10; // (the end of the span every station is predicted over)
   const rows: string[][] = [];
   let quick = { off: 0, minutes: now.ok ? now.minutes : Infinity };
   for (const off of [0, 30, 60, 90, 120, 180]) {
