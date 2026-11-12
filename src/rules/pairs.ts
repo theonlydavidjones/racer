@@ -232,8 +232,11 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   // (Not when the change comes from the other boat's own action: a "You tack" reply, or a tack into the zone.)
   if (rec.kc != null && r.kc.id !== rec.kc && r.rule !== '20' && r.rule !== '18.3') {
     const newRow = r.kc === A ? B : A, tacked = ctx.t - newRow.lastTackT < JUST_TACKED;
-    if (tacked || (rec.rule === '12' && rec.kc === newRow.id)) {
-      rec.grace = ctx.t + RULE15_GRACE; rec.by = newRow.id; rec.byWhy = tacked ? 'tack' : 'overlap';
+    // (or by her own doing, coming out from under rule 21: her hull back below the line, or her penalty turns done; if the
+    // other boat began returning or taking a penalty, she got right of way by the other boat's actions, so no grace)
+    const out21 = (rec.rule === '21.1' || rec.rule === '21.2') && rec.kc === newRow.id;
+    if (tacked || out21 || (rec.rule === '12' && rec.kc === newRow.id)) {
+      rec.grace = ctx.t + RULE15_GRACE; rec.by = newRow.id; rec.byWhy = tacked ? 'tack' : out21 ? 'rule21' : 'overlap';
     }
   }
   // Rule 17: overlap established to leeward from clear astern within two lengths, on the same tack.
@@ -269,7 +272,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   const done = (b: typeof A) => b.finished || !!b.retired;
   if (done(A) && done(B)) return { verdict: r, incident: null };
   rec.cool = ctx.t + INCIDENT_COOLDOWN;
-  let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null, turned: number | undefined, part: string | undefined;
+  let fouler = r.kc, rule = r.rule, byWhy: PairRecord['byWhy'] = null, turned: number | undefined, part: string | undefined;
   const row = r.kc === A ? B : A, kc = r.kc;
   const obst = rule19(A, B, r.rule, rec, ctx);
   if (notRacing(kc) && !notRacing(row)) {

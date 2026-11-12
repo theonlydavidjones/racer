@@ -581,6 +581,37 @@ export class World {
     return { k: r.k * lee, shift: r.shift };
   }
 
+  /** Rule 21.1: how long (s) each returning boat has been sailing clearly away from the line (to release the latch). */
+  private awayFromLine = new Map<number, number>();
+  /**
+   * Rule 21.1, judged each step. "Sailing towards" the pre-start side is judged from her heading through the water (a
+   * boat headed back but set away by the tide is still returning). Once she is returning it holds (a latch) until her
+   * hull is completely on the pre-start side, or she clearly sails away from the line for RELEASE_AWAY seconds: slowing,
+   * luffing or a small turn on her way back doesn't give her rights back (Perry, on rule 21: she keeps her rights only
+   * until she is sailing back, converging with the line). Under the I flag (rule 30.1) she is returning while closing on
+   * the nearer end of the line to go round it, too. Not after the race is abandoned, and only within RETURN_RANGE of the
+   * line: beyond that the sim can't tell a boat going back to start from one sailing the course without having started.
+   */
+  private returningNow(b: Boat, d: number, was: boolean): boolean {
+    const C = this.C, RETURN_RANGE = 300, RELEASE_AWAY = 2;
+    const hullAbove = d > 0 || this.lineD(stern(b)) > 0;
+    if (this.t <= 0 || this.cancelled || b.started || b.finished || !hullAbove || d > RETURN_RANGE) { this.awayFromLine.delete(b.id); return false; }
+    const u = V(b.h), un = u.x * this.N.x + u.y * this.N.y;
+    if (was) {
+      const away = un > 0.3 && b.v > 0.2 ? (this.awayFromLine.get(b.id) ?? 0) + DT : 0;
+      this.awayFromLine.set(b.id, away);
+      return away < RELEASE_AWAY;
+    }
+    if (b.v <= 0.2) return false;
+    if (un < -0.1) return true;
+    if (b.roundEnd && b.ocs) {
+      // closing on the nearer end of the line, to round it (rule 30.1)
+      const bw = bow(b), e = dist(bw, C.pin) < dist(bw, C.committee) ? C.pin : C.committee, l = dist(bw, e) || 1;
+      return (u.x * (e.x - bw.x) + u.y * (e.y - bw.y)) / l > 0.3;
+    }
+    return false;
+  }
+
   /** The fraction of `to`'s wind speed that `by`'s sails take (her wind shadow alone, environment/shadows.ts). */
   takenBy(by: Boat, to: Boat): number {
     if (by.ww == null || this.freeSail) return 0;
@@ -706,17 +737,14 @@ export class World {
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
     if (gun) this.snapGun();
     for (const b of this.boats) {
+      const wasReturning = !!b.returning;
       b.returning = false;
       if (b.retired) continue; // (no longer racing: no start, finish, recall or rounding for her; her destination is checkArrival's)
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
       // Rule 21.1: after her starting signal, not yet started (over early, round an end under the I flag, or simply on the
-      // course side), with her hull not completely on the pre-start side of the line or its extensions, and making way
-      // back toward it, she is returning to start and keeps clear of boats that aren't
-      if (this.t > 0 && !b.started && !b.finished && (d > 0 || this.lineD(stern(b)) > 0)) {
-        // ("sailing towards": her heading through the water, under way; not the current setting her back)
-        const u = V(b.h);
-        b.returning = b.v > 0.2 && u.x * this.N.x + u.y * this.N.y < -0.1;
-      }
+      // course side), with her hull not completely on the pre-start side of the line or its extensions, and sailing back
+      // toward it to start, she is returning and keeps clear of boats that aren't, until her hull is completely below it
+      b.returning = this.returningNow(b, d, wasReturning);
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
       if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
         b.ocs = true;

@@ -74,10 +74,34 @@ describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
     w.step(DT); w.step(DT);
     expect(w.user.started).toBe(false);
     expect(w.user.returning).toBe(true);
-    place(w, 15, toCourse); w.user.v = 2; w.step(DT); // above it, sailing away
-    expect(w.user.returning).toBe(false);
+    const w2 = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    w2.t = 30; place(w2, 15, toCourse); w2.user.v = 2; w2.user.luff = false; w2.step(DT); w2.step(DT); // above it, sailing away
+    expect(w2.user.returning).toBe(false);
     place(w, -10, toCourse + 180); w.user.v = 2; w.step(DT); // hull completely below the line: done
     expect(w.user.returning).toBe(false);
+  });
+
+  it('Rule 21.1 holds once she is coming back: slowing or luffing on the way gives her no rights back; sailing away for 2 s does', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y), u = w.user;
+    w.t = 30; place(w, 20, toCourse + 180); u.v = 2; u.luff = false;
+    w.step(DT); w.step(DT);
+    expect(u.returning).toBe(true);
+    u.h = toCourse + 95; u.v = 0.1; w.step(DT); // luffed head to wind, nearly stopped, still above the line
+    expect(u.returning).toBe(true);
+    u.h = toCourse; u.v = 2;
+    for (let i = 0; i < 60; i++) { u.h = toCourse; u.v = 2; w.step(DT); } // a second sailing away: still latched
+    expect(u.returning).toBe(true);
+    for (let i = 0; i < 90; i++) { u.h = toCourse; u.v = 2; w.step(DT); } // clearly away for over 2 s: released
+    expect(u.returning).toBe(false);
+  });
+
+  it('Rule 21.1 with the I flag (30.1): sailing along the line to round an end, she is returning', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const u = w.user, toPin = brg(w.C.pin.x - w.center.x, w.C.pin.y - w.center.y);
+    w.t = 30; place(w, 6, toPin); u.v = 2; u.luff = false; u.ocs = true; u.roundEnd = true;
+    w.step(DT); w.step(DT);
+    expect(u.returning).toBe(true);
   });
 
   it('behind the line at the gun → not OCS', () => {
