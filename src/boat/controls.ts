@@ -5,7 +5,8 @@
  * (dual-ended, both sides), the main Cunningham (port) and the downhaul; the mainsheet and traveller are on a
  * wooden thwart across the cockpit, in front of the helmsman, with the backstay's dual-ended control cleated at each end of it, where it meets the hull; the jib sheets run along the side decks to the winches (not self-tailing),
  * through cars on H-shaped tracks on the cabin top (pins, fore–aft and athwartships, one car each side).
- * The halyards are set before the race and left alone.
+ * The main halyard (the sim's `downhaul`) is set at the start and rarely touched; the jib halyard is the jib's luff
+ * control, eased off in light air and taken up as the wind builds (North Sails' guide: guideLimits).
  *
  * Shape: each sail has a depth (camber / chord), a draft position (where the deepest point is, as a fraction
  * of the chord from the luff) and twist (how much the head falls off to leeward relative to the foot, deg).
@@ -179,7 +180,7 @@ export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = 
   const sheetT = smooth((0.28 - c.jibsheet) / 0.28);
   // luff tension, as the main's: the halyard coarse, the Cunningham fine (at their defaults, 0.3 each, the same as the
   // jib Cunningham alone gave before the halyard was a control)
-  const luff = 0.6 * (c.jibHalyard ?? 0.3) + 0.4 * c.jibCunningham;
+  const luff = 0.6 * (c.jibHalyard ?? 0.3) + 0.4 * c.jibCunningham; // (the split mirrors the main's: an estimate)
   return age({
     depth: 0.135 - 0.035 * c.backstay + 0.012 * (0.5 - aft) - 0.01 * luff,
     draft: clamp(0.44 - 0.09 * luff + 0.004 * (tws - 10), 0.28, 0.55),
@@ -241,6 +242,11 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   traveller's ±1 is ±9.5° of boom, ±0.5 m of car under the end of the boom (boomAngle): 15–20 cm is −0.3 to −0.4.)
  * - Vang: "Never use the kickingstrap upwind in less than 18 knots"; above that it's on, to hold the leech when the main
  *   is eased in the gusts.
+ * - Jib halyard: "Never pull the halyard too tight. This will cause the draft of the jib to move too far forward. Pull it
+ *   until the wrinkles in the luff disappear. In light wind the best shape is obtained when leaving small wrinkles in the
+ *   luff." The guide gives no jib Cunningham setting: the halyard is the jib's luff control (as on Josephine). Its
+ *   most: 0.3 (the default, small wrinkles) below 5 kt, 0.6 (just smooth) to 15 kt, then free, as the main's Cunningham
+ *   goes hard above 15 kt. The 0.3 and 0.6 are estimates of where the wrinkles go, not measured.
  * Each line's least and most, upwind (`tws` kt); off the wind, the crew sets them for shape alone. A setting changes
  * over a knot or so either side of the guide's wind, as a crew would.
  */
@@ -255,7 +261,7 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
   return {
     min: { outhaul: lo(Math.max(0, outhaul - 0.05 * (1 - over(12)))), // (above 12 kt "all the way to the mark")
       cunningham: lo(0.9 * over(15)), traveller: lo(-0.4 + 0.35 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
-    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(0.1 + 0.9 * over(18)) }
+    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(0.1 + 0.9 * over(18)) }
   };
 }
 
@@ -265,11 +271,12 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
  * forward again as the mast bends), the vang on hard (so the leech holds when the main is eased), the jib cars aft
  * (twisting off the jib's top), and last the traveller down to leeward. Each line's least setting at that level, on top
  * of the guide's settings for the wind (guideLimits, with `tws`): where the guide says a line stays off (the vang under
- * 18 kt), it stays off.
+ * 18 kt), it stays off. The jib's luff tension steps up on its halyard alone: the jib Cunningham does the same job
+ * (jibShape), and a floor on both would send the forward hand to two lines for the one change.
  */
 export function depowerLimits(depower: number, awa: number, tws?: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>>; carAft: number } {
   const d = Math.abs(awa) < 70 ? depower : 0, st = (a: number, b: number) => smooth((d - a) / (b - a));
-  const steps: Partial<Record<keyof CrewSettings, number>> = { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibCunningham: st(0.25, 0.8), jibHalyard: 0.9 * st(0.3, 0.85), vang: 0.9 * st(0.3, 0.8), traveller: -1 + 1.6 * st(0.6, 1) };
+  const steps: Partial<Record<keyof CrewSettings, number>> = { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibHalyard: 0.9 * st(0.3, 0.85), vang: 0.9 * st(0.3, 0.8), traveller: -1 + 1.6 * st(0.6, 1) };
   const g = tws == null ? { min: {}, max: {} } : guideLimits(tws, awa);
   const min: Partial<Record<keyof CrewSettings, number>> = {}, max: Partial<Record<keyof CrewSettings, number>> = { ...g.max };
   for (const k of Object.keys(steps) as (keyof CrewSettings)[]) {

@@ -181,8 +181,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
-    // main Cunningham (port side) and the downhaul (the middle) wait, and the crew's plan sets the rest around them
-    // main Cunningham (port side) and the downhaul (the middle) get a trip only for a big change (a new wind, not a tweak)
+    // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
+    // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them
     const big = waits.includes(k) && e >= PLACED_TRIP;
     if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
