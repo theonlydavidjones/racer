@@ -146,6 +146,8 @@ export interface Boat {
   sway?: number;
   /** Turn rate, deg/s, + turning to starboard (clockwise): kept every step, so a turn carries on across a change of model. */
   yawRate?: number;
+  /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
+  turnRate?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */

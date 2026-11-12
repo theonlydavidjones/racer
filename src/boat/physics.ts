@@ -132,11 +132,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // helm balance: with weather helm she turns toward the wind unless the rudder holds her (balance.ts)
   const balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * toWind;
   let rate: number, rudder: number; // rudder: fraction of full, in the turn-rate sense (+ turns to starboard)
+  // she answers the helm over a moment, not at once: her yaw inertia against the water's damping (yawLag); a helmsman
+  // (and the AI) eases the helm before the heading he wants, by what she'll still turn once it's amidships
+  const tau = yawLag(b.v + astern), r0 = b.turnRate ?? 0;
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
-      rate = b.turnDir * rateFor(b.turnDir);
-      if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.h = b.turnTarget; b.turnTarget = null; }
+      rate = Math.sign(err) === b.turnDir && Math.abs(err) <= Math.abs(r0) * tau ? 0 : b.turnDir * rateFor(b.turnDir);
+      if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.turnTarget = null; }
     } else {
       // tiller to starboard turns the bow to port; keys add a push of their own
       const helm = clamp(b.steer - b.tiller, -1, 1);
@@ -168,12 +171,13 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       const long = err + ai.turnCommit * 360;
       if (Math.abs(long) > 330) ai.turnCommit = 0; else err = long; // target moved: drop the commitment
     }
-    const lim = rateFor(Math.sign(err));
-    rate = clamp(err * 1.6, -lim, lim);
+    const lead = err - r0 * tau, lim = rateFor(Math.sign(lead)); // (where her heading's going with the helm amidships)
+    rate = clamp(lead * 1.6, -lim, lim);
     rudder = clamp((rate - balRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
   }
   b.helm = clamp(rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller)
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
+  b.turnRate = r0 + (rate - r0) * (1 - Math.exp(-dt / tau)); rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
   const dh = rate * dt;
   b.h = n360(b.h + dh); b.yawRate = rate;
@@ -372,6 +376,24 @@ export const HOVE = {
 };
 
 /**
+ * How long (s) her turn takes to answer the helm at speed u (m/s) through the water: the time constant of a first-order
+ * (Nomoto) yaw response, her yaw inertia over the water's yaw damping, from her own hove-to model (HOVE, heaveTo): the
+ * moment of inertia, with the water's added mass, I = m·(0.25·LOA)²·1.4, against the damping the hull's strips and the
+ * rudder give as she turns, both growing with her speed (the keel's lift ½ρ·A·(πAR/2)·u·L²/12 and the rudder's
+ * ½ρ·u·A_R·slope·flow·arm²). 0.6 s at 4.7 kt, 1.4 s at 2 kt, 2.8 s at 1 kt. (No measured value for a yacht was found;
+ * the speed's floor, 0.25 m/s, keeps it finite at a standstill, where sculling turns her.)
+ */
+let yawK = 0;
+export function yawLag(u: number): number {
+  if (!yawK) {
+    const L = orc.boat.imsL, aL = Math.PI * HOVE.aspect / 2, N = 8, I = HULL.displacement * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
+    const perU = 0.5 * 1025 * (HOVE.latArea * aL * (L * L / 12) * (1 - 1 / (N * N)) + RUDDER.area * RUDDER.slope * HOVE.rudderFlow * RUDDER.arm ** 2);
+    yawK = I / perU;
+  }
+  return yawK / Math.max(0.25, u);
+}
+
+/**
  * The sails' drive in the force model, against the polar. balance.ts's sail coefficients were set for heel and helm,
  * and hullResistance is the calm-water upright hull, so the force model's resistance is complete only at a crawl
  * (where it adds the keel's lift-induced drag and broadside drag itself). Toward the polar speed what it leaves out
@@ -475,7 +497,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const mx = HANDLING.mass * disp / HULL.displacement, my = disp * (1 + HOVE.swayAdded), I = disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
   b.v = Math.max(0, u0 + X / mx * dt);
   b.sway = -toWind * (d0 + Y / my * dt);
-  b.yawRate = toWind * (r0 + M / I * dt) / D;
+  b.yawRate = toWind * (r0 + M / I * dt) / D; b.turnRate = b.yawRate; // (her turn carries on as she lets draw)
   b.helmNeed = undefined; b.weatherHeld = undefined;
   let dh = b.yawRate * dt;
   if (b.v > 0.2) dh += waveYaw(b.sea, b.h, b.v, t, b.id + 1) * dt; // the sea knocks her bow about
