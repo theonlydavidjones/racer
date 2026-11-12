@@ -33,15 +33,33 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
     if (m.q) { const ax = m.q.x - m.p.x, ay = m.q.y - m.p.y, k = clamp(((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay || 1), 0, 1); np = { x: m.p.x + ax * k, y: m.p.y + ay * k }; }
     const d = dist(b, np);
     if (d > 30 || d < 0.5) continue;
-    const rel = wrap(brg(np.x - b.x, np.y - b.y) - desired); // + = mark to starboard of the course
+    const bm = brg(np.x - b.x, np.y - b.y);
     // (room between her side and the mark's: MARK_ROOM, plus the mark's own radius and her half beam)
     const need = Math.asin(Math.min(1, (MARK_ROOM + m.r + HALF_BEAM) / d)) / (Math.PI / 180);
+    // close to it, a turn from her heading to the course she wants mustn't swing her across it on the way: if it lies
+    // inside that turn, she turns only as far as passes it on the side it's on now (then on round once she's past).
+    // At the start, round the committee boat and the pin while she's getting to the line: a mark she's rounding she
+    // means to sail round, close, and the rounding has its own course (aimPoint)
+    const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`;
+    if (d < 20 && !b.started) {
+      const relH = wrap(bm - b.h), turn = wrap(desired - b.h), side = Math.sign(relH || 1);
+      if (Math.sign(relH) === Math.sign(turn) && Math.abs(relH) < Math.abs(turn) + need) {
+        // (and that's the side she passes it on, until she's clear: the rule below would otherwise pick the other)
+        // (and if passing it there would take her above close-hauled, she can't: pinned there, her leeway carries her on
+        // to it. She turns away from it instead, through the wind if need be, the way that doesn't swing her across it)
+        const keepH = n360(bm - side * need);
+        desired = Math.abs(wrap(sailable(b, keepH) - keepH)) > 1 ? n360(bm + 180) : keepH; near = key;
+        if (b.ai) b.ai.passing = { key, side };
+        continue;
+      }
+    }
+    const rel = wrap(bm - desired); // + = mark to starboard of the course
     if (Math.abs(rel) < need && Math.abs(rel) < 90) {
       // pass it on the side it's already on; if that means heading up past close-hauled (sailable would undo it, and she'd
       // sail on into it), pass it on the other side, bearing away. Once she's chosen a side she holds to it until she's
       // clear (her course swinging as she turns would swap them back and forth, and she'd hold on into it)
       const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
-      const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`, prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
+      const prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
       const useKeep = prev ? Math.sign(rel || 1) === prev : Math.abs(wrap(sailable(b, keep) - keep)) < 1;
       desired = useKeep ? keep : other;
       near = key; if (b.ai && !prev) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
@@ -310,9 +328,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       P = { x: w.center.x + L.x * s * (half + 20) + N.x * (out ? -20 : 8), y: w.center.y + L.y * s * (half + 20) + N.y * (out ? -20 : 8) };
     } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
     else if (!b.started) {
-      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on)
-      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
-      P = { x: w.center.x + N.x * 10 + L.x * a, y: w.center.y + N.y * 10 + L.y * a }; void along;
+      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on).
+      // But on the course side of it without having started (come round outside an end, or above an extension of the
+      // line), she isn't started until she has crossed it from the pre-start side (Definitions, Start): back below it
+      // first, a few lengths, then up across it. (Aiming above the line from above, she wandered there for minutes.)
+      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half), d = w.lineD(bow(b));
+      if (d > 0) ai.below = true; else if (d < -10) ai.below = false;
+      const off = ai.below ? -15 : 10;
+      P = { x: w.center.x + N.x * off + L.x * a, y: w.center.y + N.y * off + L.y * a }; void along;
     }
     else {
       P = aimPoint(w, b);

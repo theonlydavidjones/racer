@@ -21,6 +21,8 @@ export interface AiState {
   width: number; // how far off the rhumb line before tacking back, m
   aware: boolean; // accounts for current on the approach
   clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
+  below?: boolean;
   /** Expensive start-timing predictions, refreshed 10 times a second. */
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
