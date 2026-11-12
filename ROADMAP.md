@@ -70,6 +70,9 @@ is now "much better" (owner).
 3. The cockpit to the plan, with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
+5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
+   of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
+   hull's heel, pitch and roll, its light moving with it (1–2 h).
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
