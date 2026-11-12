@@ -452,6 +452,19 @@ function deckFittings(grp: THREE.Group): void {
   grp.add(new THREE.Mesh(mergeGeometries(flat, false)!, STEEL));
 }
 
+/**
+ * A rope block: a sheave (`r` m) between two black cheeks with its shackle, as one mesh; its sheave's centre `dy` m
+ * above (or below, hanging) where it's made fast.
+ */
+function sheaveBlock(r: number, dy: number): THREE.Mesh {
+  const parts = [
+    new THREE.CylinderGeometry(r + 0.008, r + 0.008, 0.012, 14).rotateZ(Math.PI / 2).translate(0.011, dy, 0), // a cheek
+    new THREE.CylinderGeometry(r + 0.008, r + 0.008, 0.012, 14).rotateZ(Math.PI / 2).translate(-0.011, dy, 0), // the other
+    new THREE.BoxGeometry(0.008, Math.abs(dy) - r * 0.6, 0.016).translate(0, dy / 2, 0), // the shackle and strap to its fitting
+  ].map(g => g.toNonIndexed());
+  return new THREE.Mesh(mergeGeometries(parts, false)!, BLACK);
+}
+
 /** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
 const sideMatFor = (g: THREE.Group): THREE.Material => g.userData.sideMat ?? MAT.cream;
 function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
@@ -461,6 +474,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   grp.add(new THREE.Mesh(thwartGeometry()[0], MAT.wood));
   const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.08, 0.02, 0.035), STEEL); track.position.set(0, ty + 0.005, TRAV_Z); grp.add(track);
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
+  // the mainsheet's lower block, on its swivel on the car: a sheave between black cheeks (it turns with the car)
+  travCar.add(sheaveBlock(0.03, 0.06));
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
   // its dual-ended control line: from the blocks on the quarters, forward along the inside of the hull to a cam
@@ -553,6 +568,8 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   sailPics.set(sailMat, { front: sailMat, back: sailBack, stbd: pics.mainStbd, port: pics.mainPort });
   sailPics.set(jibMat, { front: jibMat, back: jibBack, stbd: pics.jibStbd, port: pics.jibPort });
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, MAST_AFT_Z); rig.add(boomPivot);
+  // the mainsheet's upper block, hung from a strap under the boom's end
+  { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, BOOM_END.r); boomPivot.add(ub); }
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
   const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT, sailBack); boomPivot.add(main.mesh);
   const jibPivot = new THREE.Group(); jibPivot.position.copy(FORESTAY_DECK); rig.add(jibPivot);
@@ -846,8 +863,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // traveller car: +1 is to leeward; the mainsheet runs from the boom end down to it
   const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
-  p.setXYZ(0, cx, L2.travCar.position.y + 0.02, TRAV_Z);
-  p.setXYZ(1, Math.sin(a) * BOOM_END.r, BOOM_END.y, MAST_AFT_Z + Math.cos(a) * BOOM_END.r); p.needsUpdate = true;
+  // (from the lower block's sheave on the car up to the upper block's under the boom)
+  p.setXYZ(0, cx, L2.travCar.position.y + 0.06, TRAV_Z);
+  p.setXYZ(1, Math.sin(a) * BOOM_END.r, BOOM_END.y - BOOM_R - 0.075, MAST_AFT_Z + Math.cos(a) * BOOM_END.r); p.needsUpdate = true;
   // backstay: the bridle's apex is pulled down as the backstay goes on
   { const q = L2.backstay.geometry.attributes.position as THREE.BufferAttribute, foot = new THREE.Vector3(0, sheer(1), 3.74);
     const ay = 2.7 - 1.3 * c.backstay, f = (MASTHEAD.y - ay) / (MASTHEAD.y - foot.y), apex = MASTHEAD.clone().lerp(foot, f);
