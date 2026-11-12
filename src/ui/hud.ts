@@ -79,8 +79,6 @@ export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) =>
 export class Hud {
   private acc = 0;
   mapZoom = false;
-  /** Whether the trim panel's Pole row is showing (deep downwind, or the pole is out). */
-  private poleRowShown: boolean | null = null; // (null until the first frame decides)
   /** Label of the key bound to Hail (set by main, which owns the key map). */
   hailKey: () => string = () => 'H';
   private dialC = $<HTMLCanvasElement>('dial');
@@ -181,25 +179,6 @@ export class Hud {
     el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
   }
 
-  /**
-   * The windex, as you'd see it looking up at the masthead: the boat from above, bow up, the arrow pointing into the
-   * apparent wind, and the two reference tabs at the close-hauled angle.
-   */
-  private windex(u: Boat): void {
-    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('windexDial')), cx = W / 2, cy = H / 2 + 1, R = Math.min(W, H) / 2 - 1;
-    ctx.clearRect(0, 0, W, H);
-    // the boat, bow up
-    ctx.fillStyle = 'rgba(160,180,190,.25)'; ctx.beginPath(); ctx.moveTo(cx, cy - R * 0.85); ctx.quadraticCurveTo(cx + R * 0.32, cy - R * 0.1, cx + R * 0.2, cy + R * 0.8); ctx.lineTo(cx - R * 0.2, cy + R * 0.8); ctx.quadraticCurveTo(cx - R * 0.32, cy - R * 0.1, cx, cy - R * 0.85); ctx.fill();
-    // reference tabs, ±28° off the bow
-    ctx.strokeStyle = '#9fb3bf'; ctx.lineWidth = 2;
-    for (const s of [-1, 1]) { const a = (s * 28 - 90) * D2R; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55); ctx.lineTo(cx + Math.cos(a) * R * 0.95, cy + Math.sin(a) * R * 0.95); ctx.stroke(); }
-    // the vane: points into the apparent wind (arel: + from starboard)
-    const a = (u.arel - 90) * D2R, tip = { x: cx + Math.cos(a) * R * 0.95, y: cy + Math.sin(a) * R * 0.95 }, tail = { x: cx - Math.cos(a) * R * 0.6, y: cy - Math.sin(a) * R * 0.6 };
-    ctx.strokeStyle = '#ff5a3c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
-    ctx.fillStyle = '#ff5a3c'; ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(tip.x - Math.cos(a - 0.45) * 6, tip.y - Math.sin(a - 0.45) * 6); ctx.lineTo(tip.x - Math.cos(a + 0.45) * 6, tip.y - Math.sin(a + 0.45) * 6); ctx.fill();
-    ctx.fillRect(tail.x - 2.5, tail.y - 2.5, 5, 5);
-  }
-
   private sigKey = '';
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
@@ -240,19 +219,7 @@ export class Hud {
       u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
-    this.windex(u);
-    const poleTxt = u.pole === 'set' ? (u.poleTack === u.tack ? ' · wing' : '') : u.pole === 'setting' ? ' · poling' : u.pole === 'stowing' ? ' · stowing' : '';
-    { const pos = pointOfSail(u);
-      $('tackLab').textContent = (u.tack === 'S' ? 'Stbd' : 'Port') + (u.penalty > 0 ? ' · turns ' + Math.ceil(u.penalty / 360) : poleTxt || ` · ${pos.short}`);
-      $('tackLab').title = `${u.tack === 'S' ? 'Starboard' : 'Port'} tack, ${pos.long}: ${Math.round(Math.abs(u.twa))}° off the true wind, ${Math.round(Math.abs(u.awa))}° apparent`; }
-    // the pole only on deep points of sail: a poled-out jib fills from about 145° true (polar.ts jibEfficiency), so the
-    // row appears at 140° (time to set it as you bear away) and goes below 135°; while it's out it stays, to take it in
-    const deep = Math.abs(u.twa), wantPole = u.pole !== 'down' || deep >= (this.poleRowShown === true ? 135 : 140);
-    if (wantPole !== this.poleRowShown) { this.poleRowShown = wantPole; $('tpPoleRow').hidden = !wantPole; }
-    const bp = $('bPole');
-    bp.textContent = u.pole === 'down' ? 'Pole out' : u.pole === 'set' ? 'Pole in' : u.pole === 'setting' ? 'Poling…' : 'Stowing…';
-    bp.classList.toggle('on', u.pole === 'set' || u.pole === 'setting');
-    $('tpPole').textContent = u.pole === 'set' ? (u.poleTack === u.tack ? 'Wing' : 'Set') : u.pole === 'down' ? 'Stowed' : '…';
+    // (the windex is in the sail controls band: ui/sailBand.ts; the pole's tab too)
     this.poleHints(w, u);
     this.trimPanel(u);
     // the wind on the water here (the windex has the angle); its direction goes under it
@@ -325,20 +292,20 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: World, u: Boat): void {
-    if (w.t < 0 || u.finished || u.retired) return;
+    if (w.t < 0 || u.finished || u.retired || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
     if (this.deepT > 6 && !this.hinted.deep) {
       this.hinted.deep = true;
-      toast('Running deep: the main is blanketing the jib. Pole it out to windward and go wing-on-wing (Pole / O).', 4500);
+      toast('Running deep: the main is blanketing the jib. Pole it out to windward and go wing-on-wing (the band\'s Pole tab, or O).', 4500);
     }
     const aback = u.pole === 'set' && u.twa < 140;
     this.abackT = aback ? this.abackT + 0.1 : 0;
     if (!aback) this.hinted.aback = false;
     if (this.abackT > 3 && !this.hinted.aback) {
       this.hinted.aback = true;
-      toast('The poled-out jib is aback on this course. Stow the pole (Pole / O).', 4000);
+      toast('The poled-out jib is aback on this course. Stow the pole (the band\'s Pole tab, or O).', 4000);
     }
   }
 

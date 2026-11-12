@@ -1,5 +1,5 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, apparent, asternCoast, crewRig, moveBoat } from '../boat/physics';
+import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
@@ -15,12 +15,12 @@ import { ShiftField, shiftStats } from '../environment/shifts';
 import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
-import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
+import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, blanketRule, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink } from '../ai/ai';
+import { aiThink, crewPoleCall } from '../ai/ai';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
@@ -196,6 +196,8 @@ export class World {
   boats: Boat[] = [];
   pairs: Record<string, PairRecord> = {};
   rec: Frame[] = [];
+  /** Racing: the whole race once a second (the race replay), from just before the gun. */
+  track: Frame[] = [];
   horns: Record<number, boolean> = {};
   startReport: StartReport | null = null;
   fouls = 0;
@@ -319,6 +321,9 @@ export class World {
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
+    // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
+    for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
     if (!this.freeSail) this.log = new RaceLog(this);
     this.committeeFrom = this.C.base;
   }
@@ -381,7 +386,7 @@ export class World {
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
-      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
+      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser && this.settings.manualTrim === 2, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
@@ -579,6 +584,16 @@ export class World {
     return { k: r.k * lee, shift: r.shift };
   }
 
+  /** Is she keeping clear of a boat she's closing on (her right of way the other's), within 12 s and 14 m? */
+  private keepingClear(b: Boat): boolean {
+    for (const o of this.boats) {
+      if (o === b || Math.abs(o.x - b.x) > 60 || Math.abs(o.y - b.y) > 60) continue;
+      const c = cpa(b, o);
+      if (c.t < 12 && c.d < 14 && this.keepsClearOf(b, o)) return true;
+    }
+    return false;
+  }
+
   /** The fraction of `to`'s wind speed that `by`'s sails take (her wind shadow alone, environment/shadows.ts). */
   takenBy(by: Boat, to: Boat): number {
     if (by.ww == null || this.freeSail) return 0;
@@ -672,6 +687,8 @@ export class World {
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
+    // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
+    if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
       if (b.handled) { this.handStep(b, dt); continue; }
@@ -696,6 +713,7 @@ export class World {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
+    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(snapshot(this.t, this.boats));
   }
 
   private checkLines(prevT: number): void {
@@ -861,7 +879,13 @@ export class World {
       const h = this.hHist[i] ??= [];
       if (this.steps % RECORD_EVERY_STEPS === 0) { h.push(b.h); if (h.length > keep) h.shift(); }
       b.headingAgo = h.length ? h[0] : b.h;
-      b.aboveProper = this.t > 0 && b.started && !b.finished && !b.retired && b.twa < properTwa(this, b) - 10;
+      const racing = this.t > 0 && b.started && !b.finished && !b.retired, pt = racing ? properTwa(this, b) : 0;
+      b.aboveProper = racing && b.twa < pt - 10;
+      // (well below it: farther off the wind than her course to the mark, by more than footing for speed or a duck would
+      // take her for long; Rule 23.2 also asks that she bore away onto the other boat's wind: see rules/pairs.ts)
+      // (and not while she is keeping clear of another boat close by: a duck is part of her proper course, in the
+      // Definitions' sense, as the course she'd sail without the boat rule 23 protects)
+      b.belowProper = racing && !b.tacking && b.penalty <= 0 && b.twa > pt + BELOW_PROPER && !this.keepingClear(b);
     });
   }
 
@@ -1459,8 +1483,31 @@ export class World {
     return null;
   }
 
+  /**
+   * The hail you could make now, if any: the reply "You tack" to a boat that's hailed you for room; "Room to tack!" to a
+   * boat to windward when you're close-hauled nearing an obstruction (Rule 20); "Starboard!" to a port-tacker on a
+   * collision course. The band shows a Hail tab only while there is one.
+   */
+  hailOption(): { kind: 'reply' | 'room' | 'starboard'; to: Boat; words: string } | null {
+    const u = this.user, hailer = this.pendingRoomHail(u);
+    if (hailer) {
+      // Rule 20.3: with a boat to windward stopping you tacking, and not clear ahead of the hailing boat, pass the hail on
+      if (this.pairs[pairKey(u, hailer)]?.hail?.passedOn) return null; // (passed on already: tack when they respond)
+      const on = !youTackPays(hailer, u) ? this.canPassOn(u, hailer) : null;
+      return on ? { kind: 'room', to: on, words: 'Room to tack!' } : { kind: 'reply', to: hailer, words: 'You tack' };
+    }
+    const blocker = this.roomBlocker(u);
+    if (blocker) return { kind: 'room', to: blocker, words: 'Room to tack!' };
+    if (u.tack === 'S') {
+      const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
+        .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
+      if (port) return { kind: 'starboard', to: port.o, words: 'Starboard!' };
+    }
+    return null;
+  }
+
   /** You pressed Hail: answer a hail with "You tack", hail for room to tack if you're entitled to,
-   * "Starboard!" at a converging port boat, or explain. */
+   * "Starboard!" at a converging port boat, or explain why not. */
   userHail(): void {
     const u = this.user, hailer = this.pendingRoomHail(u);
     if (hailer) {
@@ -1470,13 +1517,8 @@ export class World {
       if (!youTackPays(hailer, u) && this.passOnHail(u, hailer)) return;
       this.replyYouTack(u, hailer); return;
     }
-    const blocker = this.roomBlocker(u);
-    if (blocker) { this.hail(u, blocker, 'room'); return; }
-    if (u.tack === 'S') {
-      const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
-        .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
-      if (port) { this.hail(u, port.o, 'starboard'); return; }
-    }
+    const h = this.hailOption();
+    if (h) { this.hail(u, h.to, h.kind as 'room' | 'starboard'); return; }
     const why = this.whyNoRoomHail(u);
     if (why) { this.emit({ type: 'toast', ms: 6000, msg: why }); return; }
     this.emit({ type: 'toast', ms: 5000, msg: 'Nothing to hail. "Room to tack!" is for when you\'re close-hauled and will soon have to change course a lot to clear an obstruction (the shore, a pier, an island), with a boat to windward stopping you tacking (Rule 20). "Starboard!" is for a port-tack boat on a collision course with you.' });
@@ -1515,10 +1557,14 @@ export function youTackPays(hailer: Boat, to: Boat): boolean {
   return clearAstern(hailer, to) && hullGap(hailer, to) > LOA * 0.6;
 }
 
+/** Rule 23.2: how far (deg) farther off the wind than her proper course counts as leaving it (the sim's estimate). */
+export const BELOW_PROPER = 20;
+
 /**
  * True wind angle of a boat's proper course: roughly, the course she'd sail to finish as soon as
  * possible with no other boats around. Straight at her next mark if she can lay it; close-hauled
- * if it's upwind; no deeper than the best downwind angle if it's dead downwind.
+ * if it's upwind; no deeper than the best downwind angle if it's dead downwind. (It doesn't allow for the current: a
+ * boat crabbing across a strong tide sails her proper course some degrees off this.)
  */
 export function properTwa(w: World, b: Boat): number {
   const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), twa = Math.abs(wrap(b.ww.from - toMark));

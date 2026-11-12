@@ -722,7 +722,7 @@ export function takeLine(b: Boat, k: LineKey, mine = true): void {
   if (!mine && k !== 'car') { delete b.ctlCmd[k]; if (b.ctlTarget) delete b.ctlTarget[k]; }
 }
 /** Every line back to the crew. */
-export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.hand = {}; b.ctlCmd = {}; b.ctlTarget = {}; }
+export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.hand = {}; b.ctlCmd = {}; b.ctlTarget = {}; b.poleMine = false; }
 
 /**
  * At a tack (or gybe) the jib sheets stay on their own sides. The crew lets the old sheet fly and tails the new one, so
@@ -940,4 +940,31 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
   // (the beat angle is her course's: her heading is above it by her leeway)
   if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatFor(b) - (b.leeway ?? 0), Math.min(twa, 60))) };
   return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
+}
+
+/**
+ * A boat as she's placed on the water, before the first step: on the tack the wind gives her heading, with her crew's
+ * sheets already trimmed for the wind there, as a crew sailing about before a start would have them (not sheeted hard
+ * in on a broad reach, easing out as the sequence begins). `from`/`windKt`: the wind on the water where she is (the
+ * World passes her own, current and puffs included, as the first step will). The sheets are trimmed to the wind the
+ * sails see (sailWind: the gradient at their height), the windex shows the masthead's (apparent); the jib sits where
+ * its sheet and car put the clew (jibClew), as trimSails has it. The traveller, the crew's depowering ease and the
+ * other lines come on the first step, from the crew's plan: a few degrees at most, eased in by the boom's own lag.
+ * (Tests that put a boat somewhere new call it too: she arrives trimmed and upright for her new heading.)
+ */
+export function settleTrim(b: Boat, from: number, windKt: number): void {
+  const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), sw = sailWind(from, windKt, b.h, b.v), c = b.ctl;
+  b.rel = rel; b.twa = Math.abs(rel); b.tack = rel >= 0 ? 'S' : 'P';
+  b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = sw.awa;
+  const side = b.tack === 'S' ? -1 : 1;
+  c.mainsheet = mainsheetFor(optimalSheet('main', sw.awa), c.traveller); c.jibsheet = jibsheetFor(optimalSheet('jib', sw.awa), c, b.tack);
+  b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);
+  const clew = jibClew(c, b.tack); b.sheets.jib = clew < 0 ? clew : clamp(clew, SAILS.jib.min, SAILS.jib.max);
+  b.boom = side * b.sheets.main; b.jib = side * b.sheets.jib;
+  // upright and steady as she's put there: no heel, roll or helm carried over from where she was before (a boat moved
+  // onto the other tack must not keep heeling the old way, with the helm that went with it)
+  b.heel = 0; b.heelRate = 0; b.heelMag = 0; b.heelEqLast = 0; b.helmNeed = 0; b.sway = 0;
+  // and her crew sitting to windward for this tack (World makes them on starboard: a port-tack boat's crew would
+  // otherwise cross the boat in the first seconds; a place you've given them stays)
+  if (b.crew && b.crew.side !== b.tack) { const place = b.crew.place; b.crew = newCrew(b.crew.spec, b.tack); if (place) b.crew.place = place; }
 }

@@ -1,5 +1,6 @@
 // The racing rules finished (RRS 2025–2028): 20.2(e)'s end, 20.3 passing on a hail, a boat as the obstruction
 // (rule 19, WS Case 11; and rule 20), and blanketing as rule 23 interference.
+import { settleTrim } from '../src/boat/physics';
 import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
@@ -9,7 +10,7 @@ import { V, n360, type Vec } from '../src/core/math';
 import { LL } from '../src/geo/geo';
 import { onLand } from '../src/geo/shore';
 import { beatAngle } from '../src/boat/polar';
-import { BLANKET_K, BLANKET_TIME, assessPair, hailBreach, newPairRecord, rightOfWay, type RulesBoat, type RulesContext } from '../src/rules';
+import { BLANKET_K, BLANKET_TIME, CONTACT_GAP, hullGap, assessPair, hailBreach, newPairRecord, rightOfWay, type RulesBoat, type RulesContext } from '../src/rules';
 import { WIND, boat, ctx, moveTo, pair } from './diagram';
 
 describe('Rule 20.2(e): 18.2 stays off until the hailing boat has tacked and avoided the hailed boat', () => {
@@ -127,6 +128,17 @@ describe('Rule 23: interfering by taking a boat\'s wind', () => {
     for (let t = 100; t <= 100 + 2 * BLANKET_TIME; t += 0.5) last = last ?? step(rec, X, Y, t, 0.3);
     expect(last).toBeNull();
   });
+  it('23.2 below her proper course: bearing away onto the wind of a boat on another leg breaks it; sailing low already does not', () => {
+    // X was close-hauled at 315 and bore away to 250 to put her shadow on Y
+    const X = boat('X', { at: [0, 20], heading: 250, headingAgo: 315, leg: 1, belowProper: true }), Y = boat('Y', { at: [0, 0], heading: 180, leg: 2 });
+    let rec = newPairRecord(), last = null;
+    for (let t = 100; t <= 100 + BLANKET_TIME; t += 0.5) { last = step(rec, X, Y, t, 0.3); X.headingAgo = X.h; }
+    expect(last).toMatchObject({ fouler: X, rule: '23', part: '23.2' });
+    // already low when her shadow reached Y (no bear-away onto her): not called
+    rec = newPairRecord(); last = null;
+    for (let t = 100; t <= 100 + 2 * BLANKET_TIME; t += 0.5) last = last ?? step(rec, X, Y, t, 0.3);
+    expect(last).toBeNull();
+  });
   it('on the same leg, racing, blanketing is just tactics', () => {
     const X = boat('X', { at: [0, 20], heading: 315, aboveProper: true }), Y = boat('Y', { at: [0, 0], heading: 315 });
     const rec = newPairRecord();
@@ -150,6 +162,8 @@ type B = World['boats'][number];
 function sail(w: World, b: B, p: Vec, tack: 'S' | 'P', v = 2.4) {
   const beat = beatAngle(w.wind.kt), h = n360(tack === 'S' ? w.wind.from - beat : w.wind.from + beat), u = V(h);
   Object.assign(b, { x: p.x, y: p.y, h, desired: h, v, vx: u.x * v, vy: u.y * v, tack, tacking: false, twa: beat, ww: { from: w.wind.from, kt: w.wind.kt }, lastTackT: -999, turnTarget: null });
+  settleTrim(b, w.wind.from, w.wind.kt); // (her sheets trimmed close-hauled, as a boat sailing there would have them)
+  if (b.ai) { b.ai.turnCommit = 0; b.ai.commitFor = 0; } // (no turn the AI committed to where she was before)
   return h;
 }
 const off = (p: Vec, u: Vec, k: number) => ({ x: p.x + u.x * k, y: p.y + u.y * k });
@@ -194,6 +208,48 @@ describe('in the world', () => {
     expect(w.roomBlocker(u)).toBe(A);
     S.x += V(hS).x * -60; S.y += V(hS).y * -60; // far off: not yet "soon"
     expect(w.roomBlocker(u)).toBeNull();
+  });
+
+  it('an AI boat closing on a starboard boat, with a port boat to windward, hails it "Room to tack" (WS Case 11)', () => {
+    const w = race(), [u, A, W, S] = w.boats, wv = V(w.wind.from);
+    // somewhere 500 m straight downwind of a mark, in open water, on the leg to that mark: a beat
+    const leg = w.C.marks.findIndex(m => m.type === 'round' && !onLand(off(m.p, wv, -500)) && !onLand(off(m.p, wv, -480)));
+    expect(leg).toBeGreaterThanOrEqual(0);
+    const P = off(w.C.marks[leg].p, wv, -500);
+    for (const b of w.boats) b.leg = leg;
+    w.t = 120; // (not in the crush just after the start, when the AI ducks instead)
+    u.x = P.x + 2000;
+    const hP = sail(w, A, P, 'P'); sail(w, W, off(P, wv, 8), 'P');
+    const beat = beatAngle(w.wind.kt), hS = n360(w.wind.from - beat), X = off(P, V(hP), 26);
+    sail(w, S, off(X, V(hS), -26), 'S');
+    expect(w.roomBlocker(A)).toBe(W);
+    let hailed = false;
+    for (let t = 0; t < 8 && !hailed; t += DT) { w.step(DT); hailed = w.pairRecord(A, W)?.hail?.by === A.id; }
+    expect(hailed).toBe(true);
+    // she holds her course while W responds, then tacks (20.2(d)), and nobody touches
+    const t0 = w.t; let minGap = Infinity;
+    for (let t = 0; t < 20; t += DT) { w.step(DT); minGap = Math.min(minGap, hullGap(A, S), hullGap(A, W)); }
+    expect(W.lastTackT).toBeGreaterThan(t0 - 3);
+    expect(A.lastTackT).toBeGreaterThanOrEqual(W.lastTackT);
+    expect(minGap).toBeGreaterThan(CONTACT_GAP);
+  });
+
+  it('if her hail goes unanswered (passed on to a boat that never responds), the AI still ducks the starboard boat in time', () => {
+    for (const gap of [22, 26, 30]) {
+      const w = race(), [u, A, W, S] = w.boats, wv = V(w.wind.from);
+      const leg = w.C.marks.findIndex(m => m.type === 'round' && !onLand(off(m.p, wv, -500)) && !onLand(off(m.p, wv, -480)));
+      const P = off(w.C.marks[leg].p, wv, -500);
+      for (const b of w.boats) b.leg = leg;
+      w.t = 120;
+      const hP = sail(w, A, P, 'P'); sail(w, W, off(P, wv, 8), 'P'); sail(w, u, off(P, wv, 30), 'P'); // you, 22 m to windward of W, do nothing
+      const beat = beatAngle(w.wind.kt), hS = n360(w.wind.from - beat), X = off(P, V(hP), gap);
+      sail(w, S, off(X, V(hS), -gap), 'S');
+      let minGap = Infinity;
+      let relayed = false;
+      for (let t = 0; t < 20; t += DT) { u.h = hP; u.desired = hP; w.step(DT); minGap = Math.min(minGap, hullGap(A, S)); relayed ||= !!w.pairRecord(A, W)?.hail?.passedOn; }
+      expect(relayed, `starting ${gap} m off: W passed the hail on to you`).toBe(true);
+      expect(minGap, `starting ${gap} m off`).toBeGreaterThan(CONTACT_GAP);
+    }
   });
 
   it('a running boat takes a good part of the wind of a boat close downwind of her, and none of one upwind', () => {

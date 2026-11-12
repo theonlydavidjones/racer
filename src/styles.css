@@ -50,9 +50,6 @@ body{
 .val{font:700 23px/1.05 var(--f-inst);font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#e9f1f3;text-align:right}
 .sub{font:600 9px/1.2 var(--f-inst);letter-spacing:.08em;color:#8ea2ac;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
 .pod.clock .val{color:var(--accent)}
-.pod.windex{align-items:center}
-.pod.windex .lab{align-self:stretch}
-#windexDial{width:40px;height:34px;display:block}
 .sub.lift{color:var(--row)} .sub.head{color:var(--giveway)}
 
 #dial{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);left:max(16px,env(safe-area-inset-left,0px));
@@ -467,6 +464,33 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief li p{font-size:14px}
 .debrief .dbTip{color:var(--muted)}
 
+/* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */
+#raceReplay{z-index:30}
+.rrPanel{max-width:1320px}
+.rrHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rrHead .ghost{flex:0 0 auto}
+.rrGrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.rrMain{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rrCanvas{width:100%;height:min(62vh,640px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.rrTime{width:100%;height:50px;display:block;cursor:pointer;touch-action:none}
+.rrBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rrBtn{padding:8px 12px;font-size:13px}
+.rrPlay{min-width:84px}
+.rrSpeed{flex:0 0 auto}
+.rrSpeed button{padding:7px 10px}
+.rrClock{margin-left:auto;font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--muted)}
+.rrCaption{display:flex;gap:10px;align-items:center;min-height:40px;font-size:14px;line-height:1.4}
+.rrCaption .dbLost{font:600 13px/1 var(--f-inst);color:var(--accent);margin-left:4px}
+.rrCaption .ghost{margin-left:auto;flex:0 0 auto}
+.rrNo{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;margin-right:8px;
+  color:#0c2534;font:700 12px/1 var(--f-inst);flex:0 0 auto}
+.rrNo.hollow{background:#0c2534;border:2px solid;box-sizing:border-box}
+.rrList{max-height:calc(62vh + 120px);overflow-y:auto;border-top:0;padding-top:0}
+.rrList li{border:1px solid transparent;border-radius:8px;padding:6px 8px}
+.rrList li.rrPick{cursor:pointer}
+.rrList li.rrPick:hover,.rrList li.rrPick:focus-visible{border-color:var(--rule);background:rgba(150,196,218,.05);outline:0}
+.rrList li.on{border-color:var(--accent)}
+
 /* the race committee's choice of course */
 .coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
 .coursecard .rcpick b{font:600 14px/1.2 var(--f-inst);color:var(--accent)}
@@ -736,19 +760,36 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 
 /* ---------- the sail controls band (ui/sailBand.ts; the owner's design, 12 Nov 2026) ---------- */
 /* a compact console docked at the bottom, as you face forward from the helm: port on the left */
-.sailband{position:fixed;bottom:0;left:max(calc(max(16px,env(safe-area-inset-left,0px)) + 452px + 16px),calc(50% - 300px));width:600px;box-sizing:border-box;
+.sailband{position:fixed;bottom:0;left:max(calc(max(16px,env(safe-area-inset-left,0px)) + 452px + 16px),calc(50% - 330px));width:660px;box-sizing:border-box;
   padding:8px 12px calc(env(safe-area-inset-bottom,0px) + 8px);background:rgba(9,22,33,.86);border:1px solid var(--rule);border-bottom:0;border-radius:12px 12px 0 0;
   display:flex;flex-direction:column;gap:6px;color:var(--text);pointer-events:auto;user-select:none;-webkit-user-select:none;touch-action:none;cursor:default}
 .sailband[hidden]{display:none}
+/* put away: only the windex stays (and a hail tab, when there's a hail to make) */
+.sailband.shut{background:none;border-color:transparent;pointer-events:none}
+.sailband.shut .sb-top > :not(.sb-wx),.sailband.shut .sb-tabs,.sailband.shut .sb-pen{visibility:hidden}
+.sailband.shut .sb-bot{visibility:hidden} /* (kept in the layout: the windex stays where it was, not jumping down) */
+.sailband.shut .sb-hail{pointer-events:auto}
 .sailband.off{opacity:.55}
 .sailband button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 .sailband button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
-.sb-all{position:absolute;right:10px;top:-22px;height:22px;padding:0 9px!important;font:700 10px/22px var(--f-inst)!important;letter-spacing:.08em;
-  background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important}
-.sb-all:hover{color:var(--text)!important}
+.sb-tabs{position:absolute;right:10px;top:-22px;display:flex;gap:4px}
+.sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
+  background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
+.sb-tab[hidden]{display:none}
+button.sb-tab:hover{color:var(--text)!important}
+.sb-pole{color:var(--text)!important}
+.sb-pole.mine{color:var(--accent)!important}
+.sb-pole.dim{opacity:.45}
+.sb-hail{position:absolute;left:10px;top:-22px;background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
+.sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}
+.sb-hail .k{font-size:9.5px;border:1px solid rgba(26,18,5,.5);border-radius:3px;padding:1px 3px}
+.sb-pen{position:absolute;left:50%;top:-22px;transform:translateX(-50%);color:var(--accent)!important;cursor:default}
+/* the windex between the two vangs: looking up at the masthead */
+.sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}
+.sb-wx svg{width:100%;height:100%;display:block}
+.sb-awa{fill:#cfdbe1;font:700 12px var(--f-inst);letter-spacing:1px}
 .sb-top{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
 .sb-div{width:1px;align-self:stretch;background:var(--rule);margin:4px 2px}
-.sb-gap{width:22px;align-self:stretch}
 .sb-slot{width:30px}
 /* a vertical line: name, ▲ (eases), the cleat, the rope below it (how much is on), ▼ (pulls on) */
 .sb-v{display:flex;flex-direction:column;align-items:center;gap:2px;width:32px;border-radius:5px;padding:1px 0}
@@ -801,6 +842,9 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sb-jc.mine .sb-jcar{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-tag{font:700 8px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-height:8px}
 body.showroom .sailband{visibility:hidden}
+/* (the band is added after the overlays, so it would sit on top of an open one and catch its clicks: the incident's
+   "Continue racing" at 1280×800, the pause and results buttons. It stays put away while any overlay is up) */
+body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 .sb-jwant,.sb-jideal{width:9px;height:9px;margin:-1px;border-radius:2px;pointer-events:none;z-index:2;box-sizing:border-box}
 .sb-jwant{border:1.5px dashed var(--accent)}
 .sb-jideal{border:1.5px dashed #fff}
