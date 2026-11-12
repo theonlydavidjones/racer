@@ -4,6 +4,7 @@ import type { World } from '../sim/world';
 import { drawCourse, drawHull, drawLand, fitCanvas, hexA, makeTf } from '../ui/draw2d';
 import type { BoatSnap, Frame } from './recorder';
 import { ReplayView, type ReplayClip } from './replayView';
+import { legWords, type LegVs, type Versus } from './versus';
 
 /**
  * The race replay: your whole race from overhead (wind up), with the debrief on it. Each thing the debrief says cost
@@ -41,9 +42,13 @@ export interface RaceReplayData {
   marks: { name: string; t: number }[];
   /** Rule incidents' close-up clips, by Moment.ref, and a line on what happened for each. */
   clips: { clip: ReplayClip; title: string; what: string }[];
+  /** Your race against the boat that won (or second, if you won), leg by leg; null when there's no one to measure against. */
+  vs?: Versus | null;
 }
 
 const SPEEDS = [10, 30, 60];
+/** The timeline's strip of legs against the winner, px from its top. */
+const STRIP_Y = 50;
 const mmss = (t: number) => `${t < 0 ? '−' : '+'}${Math.floor(Math.abs(t) / 60)}:${String(Math.floor(Math.abs(t) % 60)).padStart(2, '0')}`;
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
@@ -62,6 +67,8 @@ export class RaceReplay {
   private speed = 30;
   private follow = false;
   private sel: Moment | null = null;
+  /** The leg picked in the comparison with the winner. */
+  private selLeg: LegVs | null = null;
   private anim = 0;
   private last = 0;
   private clipView: ReplayView | null = null;
@@ -113,7 +120,7 @@ export class RaceReplay {
     this.tl.onpointerdown = e => { this.dragging = true; this.tl.setPointerCapture(e.pointerId); this.scrub(e, true); };
     this.tl.onpointermove = e => { if (this.dragging) this.scrub(e, false); };
     this.tl.onpointerup = () => { this.dragging = false; };
-    this.follow = false; this.sel = null; this.t = D.frames[0]?.t ?? 0;
+    this.follow = false; this.sel = null; this.selLeg = null; this.t = D.frames[0]?.t ?? 0;
     this.caption();
     this.setPlaying(true);
   }
@@ -132,8 +139,30 @@ export class RaceReplay {
       <p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
     const rules = D.moments.filter(m => m.key === 'rule').map(m => `<li class="rrPick" data-at="${m.t1}" tabindex="0">
       <div class="dbHead"><b>${badge('rule', '!')}${esc(m.text)}</b><span class="dbLost">${mmss(m.t1)}</span></div></li>`).join('');
-    return `<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
+    return `${this.vsHtml()}<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
       <ol>${items}</ol>${rules ? `<div class="eyebrow">Rule incidents</div><ol>${rules}</ol>` : ''}`;
+  }
+
+  /** Against the winner: the gap, then each leg with what you lost or gained and where it went. */
+  private vsHtml(): string {
+    const V = this.D!.vs; if (!V || V.legs.length < 2) return '';
+    const who = V.won ? 'who won' : this.w!.boats.some(b => b.finished) ? 'who came second' : 'leading';
+    const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
+    const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
+    const gap = Math.round(Math.abs(V.total)), mmss2 = (x: number) => x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${x % 60} s`;
+    const lede = V.won ? `You finished ${mmss2(gap)} behind ${esc(V.rivalName)}.` : V.total < 0 ? `You were ${mmss2(gap)} ahead of ${esc(V.rivalName)}.` : `You were ${mmss2(gap)} behind ${esc(V.rivalName)} over the legs you've both sailed.`;
+    const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
+      <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i || 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
+      <p>${esc(legWords(L, V.rivalName))}</p></li>`).join('');
+    return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg to sail it side by side.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
+  }
+
+  /** Jump to a leg of the comparison: follow you from its start, the rival in view. */
+  private pickLeg(L: LegVs): void {
+    this.clipView?.stop(); this.clipView = null;
+    this.sel = null; this.selLeg = L; this.follow = true;
+    this.t = Math.max(this.D!.frames[0].t, L.t0 - 5);
+    this.caption(); this.paintButtons(); this.setPlaying(true);
   }
 
   private click(e: MouseEvent): void {
@@ -148,6 +177,7 @@ export class RaceReplay {
     if (sp) { this.speed = +sp; this.paintButtons(); return; }
     const li = el.closest<HTMLElement>('li.rrPick');
     if (li) {
+      if (li.dataset.leg != null) { const L = D.vs?.legs.find(x => x.i === +li.dataset.leg!); if (L) this.pickLeg(L); return; }
       if (li.dataset.at) { const m = D.moments.find(x => x.key === 'rule' && x.t1 === +li.dataset.at!); if (m) this.pick(m); return; }
       // a finding: its worst moment
       const ms = D.moments.filter(m => m.key === li.dataset.key).sort((a, b) => b.lost - a.lost);
@@ -158,7 +188,7 @@ export class RaceReplay {
   /** Jump to a moment: close in on you, from a little before it, and play it. */
   pick(m: Moment): void {
     this.clipView?.stop(); this.clipView = null;
-    this.sel = m; this.follow = true;
+    this.sel = m; this.selLeg = null; this.follow = true;
     this.t = Math.max(this.D!.frames[0].t, m.t0 - 10);
     this.caption(); this.paintButtons(); this.setPlaying(true);
   }
@@ -185,9 +215,12 @@ export class RaceReplay {
       // a click on (or near) a tick picks that moment
       const near = D.moments.find(m => Math.abs(this.tx(m.t0, r.width) - (e.clientX - r.left)) < 7 || (t >= m.t0 && t <= m.t1 && m.t1 - m.t0 > 5));
       if (near && e.clientY - r.top < 30) { this.dragging = false; this.pick(near); return; }
+      // the strip of legs along the bottom: that leg against the winner
+      const leg = e.clientY - r.top > STRIP_Y - 2 ? D.vs?.legs.find(L => L.i > 0 && t >= L.t0 && t <= L.t1) : undefined;
+      if (leg) { this.dragging = false; this.pickLeg(leg); return; }
       this.setPlaying(false);
       // scrubbing elsewhere lets go of the picked moment (its caption would no longer match what's shown)
-      if (this.sel) { this.sel = null; this.caption(); this.paintButtons(); }
+      if (this.sel || this.selLeg) { this.sel = null; this.selLeg = null; this.caption(); this.paintButtons(); }
     }
     this.t = Math.min(this.end(), Math.max(D.frames[0].t, t));
     this.draw();
@@ -214,11 +247,17 @@ export class RaceReplay {
     const v = q('[data-rr="view"]'); if (v) v.textContent = this.follow ? 'Whole course' : 'Follow you';
     this.root.querySelectorAll<HTMLElement>('[data-sp]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.sp! === this.speed)));
     this.root.querySelectorAll<HTMLElement>('li[data-key]').forEach(li => li.classList.toggle('on', this.sel?.key === li.dataset.key));
+    this.root.querySelectorAll<HTMLElement>('li[data-leg]').forEach(li => li.classList.toggle('on', this.selLeg?.i === +li.dataset.leg!));
   }
 
   private caption(): void {
     const el = this.root.querySelector<HTMLElement>('.rrCaption'); if (!el) return;
-    const m = this.sel;
+    const m = this.sel, L = this.selLeg, V = this.D!.vs;
+    if (L && V) {
+      const sgn = Math.abs(L.lost) < 0.5 ? '±0 s' : `${L.lost > 0 ? '−' : '+'}${Math.round(Math.abs(L.lost))} s`;
+      el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i || 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> ${esc(legWords(L, V.rivalName))}</span>`;
+      return;
+    }
     if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is coloured where it cost you time.</span>'; return; }
     const n = m.key === 'rule' ? '!' : this.rank.get(m.key) ?? '·', c = m.ref != null ? this.D!.clips[m.ref] : null;
     el.innerHTML = `${badge(m.key, n)}<span><b>${m.key === 'start' ? 'The start' : mmss(m.key === 'rule' ? m.t1 : m.t0)}</b> ${esc(c ? `${c.title}. ${c.what}` : m.text)}${m.lost >= 1 ? ` <span class="dbLost">about −${Math.round(m.lost)} s</span>` : ''}</span>${c ? '<button class="ghost rrBtn" type="button" data-rr="clip">Close-up</button>' : ''}`;
@@ -278,8 +317,14 @@ export class RaceReplay {
       for (let f = a; f < b; f++) { const p = F[f].b[i]; if (!p) continue; const q = P(p); on ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); on = true; }
       return on;
     };
-    // the others' tracks, so far
-    w.boats.forEach((bt, i) => { if (i === u) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
+    // the others' tracks, so far; the boat you're measured against brighter, all of hers faint ahead
+    const rv = D.vs?.rival ?? -1;
+    w.boats.forEach((bt, i) => { if (i === u || i === rv) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
+    if (rv >= 0) {
+      const c = w.boats[rv].color;
+      ctx.strokeStyle = hexA(c, .2); ctx.lineWidth = 1.5; if (line(rv, 0, F.length)) ctx.stroke();
+      ctx.setLineDash([2, 3]); ctx.strokeStyle = hexA(c, .9); ctx.lineWidth = 2.5; if (line(rv, 0, upto)) ctx.stroke(); ctx.setLineDash([]);
+    }
     // yours: all of it faint, so far bright
     ctx.strokeStyle = 'rgba(233,242,245,.18)'; ctx.lineWidth = 1.5; if (line(u, 0, F.length)) ctx.stroke();
     ctx.strokeStyle = 'rgba(233,242,245,.8)'; ctx.lineWidth = 2; if (line(u, 0, upto)) ctx.stroke();
@@ -308,8 +353,21 @@ export class RaceReplay {
     const hs = Math.max(scale, 1.6);
     w.boats.forEach((bt, i) => {
       const p = now[i]; if (!p) return;
-      drawHull(ctx, P(p), p[2] - W, p[4], hs, i === u ? bt.color : hexA(bt.color, .7), i === u ? `You · ${p[3]}` : this.follow ? bt.name : null);
+      const lab = i === u ? `You · ${p[3]}` : i === rv ? `${bt.name}${D.vs!.won ? ' (won)' : ''}` : this.follow ? bt.name : null;
+      drawHull(ctx, P(p), p[2] - W, p[4], i === rv ? hs * 1.15 : hs, i === u || i === rv ? bt.color : hexA(bt.color, .7), lab);
     });
+    // close in, with her out of sight: an arrow at the edge toward her, and how far
+    if (rv >= 0 && this.follow && now[rv]) {
+      const q = P(now[rv]), mx = 28, inside = q[0] > mx && q[0] < wpx - mx && q[1] > mx && q[1] < hpx - mx;
+      if (!inside) {
+        const c0 = [wpx / 2, hpx / 2], dx = q[0] - c0[0], dy = q[1] - c0[1], k2 = Math.min((wpx / 2 - mx) / Math.abs(dx || 1e-6), (hpx / 2 - mx) / Math.abs(dy || 1e-6));
+        const ex = c0[0] + dx * k2, ey = c0[1] + dy * k2, an = Math.atan2(dy, dx), d = Math.hypot(now[rv][0] - me[0], now[rv][1] - me[1]);
+        ctx.fillStyle = w.boats[rv].color; ctx.beginPath(); ctx.moveTo(ex + Math.cos(an) * 10, ey + Math.sin(an) * 10);
+        ctx.lineTo(ex + Math.cos(an + 2.5) * 9, ey + Math.sin(an + 2.5) * 9); ctx.lineTo(ex + Math.cos(an - 2.5) * 9, ey + Math.sin(an - 2.5) * 9); ctx.fill();
+        ctx.font = '600 12px "Saira Semi Condensed", sans-serif'; const txt = `${w.boats[rv].name} ${d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1852).toFixed(1)} nm`}`, tw = ctx.measureText(txt).width;
+        ctx.fillText(txt, Math.min(wpx - tw - 6, Math.max(6, ex - Math.cos(an) * 16 - tw / 2)), Math.min(hpx - 6, Math.max(14, ey - Math.sin(an) * 16 + 4)));
+      }
+    }
     // the picked moment, while it's on: a ring round you
     if (this.sel && this.t >= this.sel.t0 && this.t <= this.sel.t1 + 2) {
       const q = P(me); ctx.strokeStyle = ink(this.sel.key); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(16, 10 * hs), 0, 6.29); ctx.stroke();
@@ -358,6 +416,18 @@ export class RaceReplay {
         ctx.restore();
       } else { ctx.fillStyle = hexA(ink(m.key), this.sel === m ? 1 : .8); ctx.fillRect(a, base - 2 - h, b - a, h); }
       if (this.sel === m) { ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 1.5; ctx.strokeRect(a - 1, base - 3 - h, b - a + 2, h + 2); }
+    }
+    // against the winner: your legs along the bottom, each with what you lost (vermilion) or gained (sky) on her
+    if (D.vs) for (const L of D.vs.legs) {
+      if (L.i === 0) continue;
+      const a = X(L.t0) + 1, b = X(L.t1) - 1, on = this.selLeg === L, lost = L.lost > 0.5, won = L.lost < -0.5;
+      ctx.fillStyle = lost ? hexA(OI.verm, on ? .9 : .55) : won ? hexA(OI.sky, on ? .9 : .55) : 'rgba(150,196,218,.25)';
+      ctx.fillRect(a, STRIP_Y, Math.max(2, b - a), 13);
+      if (on) { ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 1.5; ctx.strokeRect(a - 1, STRIP_Y - 1, b - a + 2, 15); }
+      const txt = Math.abs(L.lost) < 0.5 ? '±0' : `${L.lost > 0 ? '−' : '+'}${Math.round(Math.abs(L.lost))} s`;
+      ctx.font = '700 11px "Saira Semi Condensed", sans-serif'; ctx.textBaseline = 'middle';
+      if (ctx.measureText(txt).width < b - a - 4) { ctx.fillStyle = '#0c2534'; ctx.fillText(txt, a + 3, STRIP_Y + 7); }
+      ctx.textBaseline = 'alphabetic';
     }
     // the playhead
     const x = X(this.t); ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, 2); ctx.lineTo(x, hpx - 2); ctx.stroke();

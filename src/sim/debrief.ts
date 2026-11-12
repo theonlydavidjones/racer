@@ -65,6 +65,8 @@ export class RaceLog {
   private inPen = false;
   marks: MarkLog[] = [];
   private arrivals: number[] = []; // boats that have reached each mark (for places)
+  /** When each boat reached each mark (race time, s), by boat id: for the race replay's comparison with the winner. */
+  boatMarks: number[][] = [];
   /** The moments of your race the debrief points at, in the order they ended (see moments()). */
   private done: Moment[] = [];
   private open = new Map<string, Spell>();
@@ -77,6 +79,7 @@ export class RaceLog {
   /** Any boat reaching a mark (for the places), and yours (how wide you went round). */
   onAdvance(w: World, b: Boat, idx: number): void {
     this.arrivals[idx]++;
+    (this.boatMarks[b.id] ??= [])[idx] = w.t;
     if (!b.isUser) return;
     const m = w.C.marks[idx], L = this.marks[idx];
     L.place = this.arrivals[idx]; L.t = w.t;

@@ -13,11 +13,12 @@ import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
+import { versus, type VsInput } from './replay/versus';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
 import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
-import { D2R, V } from './core/math';
+import { D2R, V, brg, wrap } from './core/math';
 import { EXONERATION, RULES, explain, type Incident } from './rules';
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
@@ -596,12 +597,24 @@ $('bPause').onclick = () => {
   const d = $('pauseDebrief'), html = w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
   $('pauseWatch').hidden = !html || w.track.length < 2;
 };
+/** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
+function vsInput(log: NonNullable<typeof w.log>): VsInput {
+  const C = w.C, wind = w.gun?.windFrom ?? w.wind.from, last = C.marks[C.marks.length - 1]?.p ?? C.center;
+  // the finish leg's point of sail, as the course sets the others' (courses/course.ts: within 55° of the wind a beat, past 125° a run)
+  const off = Math.abs(wrap(brg(C.center.x - last.x, C.center.y - last.y) - wind)), fin = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
+  return {
+    frames: w.track, you: w.user.id, startTimes: w.startTimes, marks: log.boatMarks, from: C.center,
+    boats: w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD' })),
+    legs: [...C.marks.map(m => ({ name: m.name, to: m.p, kind: m.leg })), { name: 'the finish', to: C.center, kind: fin as 'beat' | 'reach' | 'run' }]
+  };
+}
 /** The race replay: your race from just before the gun, with the debrief on its track and timeline. */
 function watchRace(): void {
   const log = w.log; if (!log || w.track.length < 2) return;
   raceReplay.open(w, {
     frames: w.track, moments: log.moments(w), findings: log.findings(w), wind: w.gun?.windFrom ?? w.wind.from,
-    marks: log.places().filter(p => p.t != null).map(p => ({ name: p.name, t: p.t! })), clips: incidentClips
+    marks: log.places().filter(p => p.t != null).map(p => ({ name: p.name, t: p.t! })), clips: incidentClips,
+    vs: versus(vsInput(log))
   });
 }
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;

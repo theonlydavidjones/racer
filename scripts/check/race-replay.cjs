@@ -1,7 +1,8 @@
 const { chromium } = require('playwright');
 /**
  * The race replay in the dev server (npm run dev -- --port 5199): sails a whole race with boat 0 on the AI skipper, then
- * opens "Watch your race so far" and screenshots the whole course, a picked finding and the next moment.
+ * opens "Watch your race so far" and screenshots the whole course, the leg lost most against the winner (close in and
+ * whole), a picked finding and the next moment.
  *   node scripts/check/race-replay.cjs <out-dir>
  */
 const out = process.argv[2];
@@ -27,7 +28,16 @@ const out = process.argv[2];
   await page.evaluate(() => { document.getElementById('bWatch2')?.click(); });
   await page.waitForTimeout(3000);
   await page.screenshot({ path: out + '/rr-whole.png' });
-  await page.click('#raceReplay li.rrPick'); await page.waitForTimeout(2500);
+  // against the winner: pick the leg you lost most on
+  const leg = await page.evaluate(() => { const ls = [...document.querySelectorAll('#raceReplay li.rrLeg')]; if (!ls.length) return null;
+    const worst = ls.slice(1).sort((a, b) => parseFloat(b.querySelector('.dbLost').textContent.replace('−', '')) - parseFloat(a.querySelector('.dbLost').textContent.replace('−', '')))[0] ?? ls[0];
+    worst.scrollIntoView(); worst.click(); return worst.textContent.replace(/\s+/g, ' ').trim(); });
+  console.log('leg vs winner:', leg);
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: out + '/rr-leg.png' });
+  await page.click('[data-rr="view"]'); await page.waitForTimeout(800);
+  await page.screenshot({ path: out + '/rr-leg-whole.png' });
+  await page.click('#raceReplay li[data-key]'); await page.waitForTimeout(2500);
   await page.screenshot({ path: out + '/rr-pick.png' });
   await page.click('[data-rr="next"]'); await page.waitForTimeout(2500);
   await page.screenshot({ path: out + '/rr-next.png' });
