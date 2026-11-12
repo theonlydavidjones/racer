@@ -1005,12 +1005,28 @@ export function apparent(from: number, windKt: number, h: number, v: number, swa
  * VT(10 m)·ln(z/z0)/ln(10/z0) with z0 = 0.005 m (eq. 7.1): 4.3 m up, 89% of it. And heeled, the mast plane leans
  * away from the wind across the boat: only that component is reduced, by cos φ (eqs. 7.2–7.3). `heelDeg` signed, either way.
  */
-const GRADIENT = Math.log(CE_ABOVE_WL / 0.005) / Math.log(10 / 0.005);
+/** The true wind at `z` m over the water as a share of the 10 m wind: the log profile, z0 = 0.005 m (eq. 7.1). */
+export const gradientAt = (z: number) => Math.log(Math.max(z, 0.05) / 0.005) / Math.log(10 / 0.005);
+const GRADIENT = gradientAt(CE_ABOVE_WL);
 export function sailWind(from: number, windKt: number, h: number, v: number, sway = 0, heelDeg = 0): { aws: number; arel: number; awa: number } {
-  const vt = windKt * KT * GRADIENT, rel = wrap(from - h) * D2R, c = Math.cos(heelDeg * D2R);
+  return windAtZ(from, windKt, h, v, GRADIENT, sway, heelDeg);
+}
+/** The apparent wind where the true wind is `g` of the 10 m wind (sailWind's working, at any height). */
+function windAtZ(from: number, windKt: number, h: number, v: number, g: number, sway = 0, heelDeg = 0): { aws: number; arel: number; awa: number } {
+  const vt = windKt * KT * g, rel = wrap(from - h) * D2R, c = Math.cos(heelDeg * D2R);
   const along = vt * Math.cos(rel) + v, across = vt * Math.sin(rel) * c + sway; // (+: air coming from ahead / from starboard)
   const arel = Math.atan2(across, along) / D2R;
   return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
+}
+/**
+ * The wind she feels at `z` m above the water (the midair wind indicator, render/windLadder.ts): the true wind there
+ * (kt, from the log profile), and the apparent wind there, worked exactly as the sails' (sailWind: her speed through
+ * the water, her sideways slip and the rig's sway at that height, the heel), so the arrows, sails, telltales and windex all agree.
+ * `from`: the bearing each comes from (deg).
+ */
+export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; aw: { kt: number; from: number; awa: number } } {
+  const ww = b.ww, g = gradientAt(z), ap = windAtZ(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), g, (b.sway ?? 0) + rigSway(b) * z / CE_ABOVE_WL, b.heel ?? 0); // (the rig's roll moves it faster higher up)
+  return { tw: { kt: ww.kt * g, from: ww.from }, aw: { kt: ap.aws / KT, from: n360(b.h + ap.arel), awa: ap.awa } };
 }
 
 /** Her slip to leeward on the tack she's on (deg; her course is that much further off the wind than her heading). Just

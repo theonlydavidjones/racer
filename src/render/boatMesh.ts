@@ -54,6 +54,8 @@ const DECK_AT_MAST = sheer(uAtZ(MAST_Z));
 const BAS = 1.0, P = 8.75, E = 3.38, IG = 6.5;
 /** The boom's top (the main's tack and foot), and the masthead. */
 const BOOM_TOP = DECK_AT_MAST + BAS, MAST_TOP = BOOM_TOP + P + 0.28, BOOM_R = 0.045;
+/** The masthead, above the waterline (m): the wind indicator's top rung. */
+export const MASTHEAD_Y = MAST_TOP;
 const FORESTAY_DECK = V3(0, sheer(uAtZ(-L / 2 + 0.80)), -L / 2 + 0.80);
 /** Where the forestay meets the mast's front (the hounds), and the shrouds its sides. */
 const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
