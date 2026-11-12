@@ -23,7 +23,7 @@
           "name": { "type": "string" },
           "lat": { "type": "number" }, "lon": { "type": "number" },
           "from": { "const": "lineCenter" }, "bearing": { "type": "number" }, "distance": { "type": "number" },
-          "shape": { "enum": ["cylinder", "sphere", "column", "lighted", "island"], "description": "island: the mark is land (rounding it, boats keep clear of its shore)." },
+          "shape": { "enum": ["cylinder", "sphere", "column", "lighted", "island", "beacon"], "description": "island: the mark is land (rounding it, boats keep clear of its shore). beacon: a light on a pile." },
           "look": { "type": "string", "description": "Colours top to bottom for column/lighted marks: R, G, Y, e.g. RGR." }
         }
       }

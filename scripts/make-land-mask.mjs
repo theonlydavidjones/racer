@@ -45,8 +45,8 @@ for (let j = 0; j < ny; j++) {
   runs.push(n); rows.push(runs);
 }
 await writeFile(new URL('../src/environment/data/land-mask.json', import.meta.url), JSON.stringify({
-  source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx, ny,
-  note: 'land mask, ~100 m cells; rows north to south; run lengths alternating water, land, water, ... starting with water', rows
+  source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx, ny, samples: [w, h], block: 2,
+  note: 'land mask, ~100 m cells, each 2 × 2 of the terrain samples (taken at grid nodes: lon = west + i (east − west) / (samples − 1)); rows north to south; run lengths alternating water, land, water, ... starting with water', rows
 }) + '\n');
 console.log(`land-mask.json ${nx}×${ny}, ${(100 * land / (nx * ny)).toFixed(0)}% land`);
 
@@ -59,7 +59,7 @@ for (let y = 0; y < h; y++) {
 }
 await writeFile(new URL('../src/geo/data/shore-mask.json', import.meta.url), JSON.stringify({
   source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx: w, ny: h,
-  note: 'land (above 0.5 m) in 50 m cells; rows north to south; run lengths alternating water, land, ... starting with water', rows: rows50
+  note: 'land in 50 m cells, each centred on its terrain sample (a grid node: lon = west + i (east − west) / (nx − 1)); rows north to south; run lengths alternating water, land, ... starting with water', rows: rows50
 }) + '\n');
 console.log(`shore-mask.json ${w}×${h}`);
 
@@ -76,8 +76,8 @@ console.log(`shore-mask.json ${w}×${h}`);
     out[j * hx + i] = Math.min(255, Math.round(m / 4));
   }
   await writeFile(new URL('../src/environment/data/heights.json', import.meta.url), JSON.stringify({
-    source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx: hx, ny: hy, step: 4,
-    note: 'highest ground in each ~200 m cell, in units of `step` metres; rows north to south; base64 bytes', data: Buffer.from(out).toString('base64')
+    source: 'src/render/data/terrain.png (' + meta.source + ')', south: meta.south, north: meta.north, west: meta.west, east: meta.east, nx: hx, ny: hy, step: 4, samples: [w, h], block: k,
+    note: 'highest ground in each ~200 m cell (4 × 4 terrain samples, taken at grid nodes), in units of `step` metres; rows north to south; base64 bytes', data: Buffer.from(out).toString('base64')
   }) + '\n');
   console.log(`heights.json ${hx}×${hy}`);
 }

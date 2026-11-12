@@ -55,6 +55,34 @@ const HARBORS = {
     // the way in: between the south breakwater's west end and the Coast Guard station's breakwater, looking west to the bridge
     exits: [[37.8324, -122.4764]]
   },
+  berkeley: {
+    name: 'Berkeley Marina', bbox: [-122.3235, 37.8615, -122.3100, 37.8705],
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
+    basin: { marina: 'Berkeley Marina' }, letter: 'named',
+    // the breakwaters (OSM 23617828, 23617829; NOAA's chart has the same two lines) and the three ways in: south of
+    // Berkeley Breakwater Light 1 (the deepest, the one the guides use), the middle gap between Lights 2 and 3, and north
+    // of North Breakwater Light 4 (ENC US5OAKFI)
+    breakwaterIds: ['23617828', '23617829'],
+    beaconsExtra: [{ at: [37.86523, -122.31906], colour: 'green' }, { at: [37.86700, -122.32012], colour: 'red' }, { at: [37.86718, -122.32134], colour: 'green' }, { at: [37.86831, -122.32047], colour: 'red' }],
+    exits: [[37.86470, -122.31930], [37.86709, -122.32073], [37.86870, -122.32010]]
+  },
+  'richmond-yc': {
+    name: 'Richmond Yacht Club, Brickyard Cove', bbox: [-122.3880, 37.9060, -122.3790, 37.9125],
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
+    basin: { marina: 'Richmond Yacht Club' }, letter: 'north-south',
+    // the harbor's two breakwater arms aren't in OSM: NOAA's chart (ENC US5OAKGH, SLCONS) has them, ending at Brickyard
+    // Cove Harbor Lights 1 (green, F G, 2.4 m) and 2 (red, F R) either side of the way in, which faces south-east
+    breakwatersExtra: [[[37.90851, -122.38494], [37.90835, -122.38494], [37.90711, -122.38288]], [[37.90727, -122.38191], [37.90690, -122.38265]]],
+    beaconsExtra: [{ at: [37.90712, -122.38287], colour: 'green' }, { at: [37.90690, -122.38264], colour: 'red' }],
+    exits: [[37.90695, -122.38282]]
+  },
+  encinal: {
+    name: 'Encinal Yacht Club, Alameda', bbox: [-122.2655, 37.7810, -122.2605, 37.7845],
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
+    basin: { marina: 'Encinal Yacht Club' }, letter: 'north-south',
+    // no breakwater: the club's docks open straight onto the Oakland Estuary, across the basin's north-east side
+    exits: [[37.78320, -122.26195]]
+  },
   corinthian: {
     name: 'Corinthian Yacht Club', bbox: [-122.4600, 37.8700, -122.4535, 37.8740],
     basin: { pts: [ // the coastline round the club's point and the Main Street decks (OSM way 157393812), the entrance, the breakwater (OSM way 125807786)
@@ -97,10 +125,11 @@ async function make(id, H) {
   const BP = basin.map(xy), inBasin = p => inPoly(p, BP);
   const near = (p, d) => inBasin(p) || BP.some((a, i) => segDist(p, a, BP[(i + 1) % BP.length]) < d);
   const skip = new Set(H.skipIds ?? []), bwIds = new Set(H.breakwaterIds ?? []);
-  const breakwaters = ways.filter(w => (w.tags.man_made === 'breakwater' || bwIds.has(w.id)) && pts(w).some(q => near(xy(q), 40)))
+  const breakwaters = ways.filter(w => bwIds.has(w.id) || (w.tags.man_made === 'breakwater' && pts(w).some(q => near(xy(q), 40))))
     .map(w => { const sw = H.seawalls?.[w.id]; if (!sw) return { area: w.tags.area === 'yes', pts: pts(w) };
       const line = pts(w).slice(sw.from ?? 0), a = faceToArea(line, sw.side === 'right' ? 1 : -1, sw.width), n = line.length;
-      return { area: true, pts: a, seawall: { top: sw.top, rail: a.slice(n, 2 * n) } }; }); // (the railing along its outer edge)
+      return { area: true, pts: a, seawall: { top: sw.top, rail: a.slice(n, 2 * n) } }; }) // (the railing along its outer edge)
+    .concat((H.breakwatersExtra ?? []).map(pts => ({ area: false, pts }))); // (charted on NOAA's ENC, not mapped in OSM)
   /** A wall charted as a line along its harbor face: the area of rock from that line out to one side (right or left of the way's direction), `w` m wide. */
   function faceToArea(line, side, w) {
     const q = line.map(xy), out = [];
@@ -153,7 +182,7 @@ async function make(id, H) {
 
   // each walkway's dock letter: its real name, or the sim's own (north to south), or as set above
   const letterOf = new Map();
-  if (H.letter === 'named') for (const w of walkways) { const m = /^Dock ([A-Z])$/.exec(w.name); if (m) letterOf.set(w, m[1]); }
+  if (H.letter === 'named') for (const w of walkways) { const m = /^(?:Dock ([A-Z])|([A-Z])-Dock)$/.exec(w.name); if (m) letterOf.set(w, m[1] ?? m[2]); } // ("Dock A" at South Beach, "B-Dock" at Berkeley)
   else if (H.letter !== 'north-south') for (const w of walkways) if (H.letter[w.id]) letterOf.set(w, H.letter[w.id]);
   // (north to south: lettered below, once it's known which walkways have slips; the rest are gangways and headwalks)
 
@@ -182,7 +211,7 @@ async function make(id, H) {
   }
   // numbered along each dock from its shore (west) end
   const out = [];
-  for (const [w, letter] of [...letterOf].sort((a, b) => a[1].localeCompare(b[1]))) {
+  if (!H.noSlips) for (const [w, letter] of [...letterOf].sort((a, b) => a[1].localeCompare(b[1]))) {
     const q = w.pts.map(xy); let a = q[0], b = q.at(-1); if (b.x < a.x) [a, b] = [b, a];
     const d = { x: b.x - a.x, y: b.y - a.y }, along = s => (s.c.x - a.x) * d.x + (s.c.y - a.y) * d.y;
     slips.filter(s => s.dock === w).sort((s, t) => along(s) - along(t))
