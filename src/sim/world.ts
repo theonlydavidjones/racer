@@ -444,14 +444,14 @@ export class World {
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
    */
-  windHere(p: Vec, self?: Boat): Wind {
+  windHere(p: Vec, self?: Boat, gusts = true): Wind {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
     const f = this.fieldAt(p);
     // (the shifts here against the course's centre: the boat to windward has the header first)
     const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
     // and the gusts, the turbulence of the seconds-to-a-minute, sized for the wind here (environment/gusts.ts)
-    const kt = this.wind.kt * f.k * q.k * sh.k * sk, U = kt * KT, g = this.gusts.at(p), sg = sigmaU(U);
+    const kt = this.wind.kt * f.k * q.k * sh.k * sk, U = kt * KT, g = gusts ? this.gusts.at(p) : { u: 0, v: 0 }, sg = sigmaU(U);
     const gu = Math.max(-0.9 * U, g.u * sg), gt = Math.atan2(g.v * GUSTS.vOverU * sg, Math.max(0.3, U + gu)) / D2R;
     return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn + gt), kt: (U + gu) / KT };
   }
@@ -999,7 +999,8 @@ export class World {
     const slip = slipById(d.slip);
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip) { u.v = SHOVE; return true; }
-    const wind = this.windHere(u, u), plan = pushOffPlan(slip, wind.from, wind.kt);
+    // (the crew judge the breeze, not the gust passing: environment/gusts.ts)
+    const wind = this.windHere(u, u, false), plan = pushOffPlan(slip, wind.from, wind.kt);
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };
     // the finger she lay against: the nearest one, and which side of her it's on (a crew member walks her out along it)
     if (plan.kind !== 'off' && (u.crew?.spec.crew.length ?? 0) > 0) {
@@ -1061,7 +1062,7 @@ export class World {
         b.h = n360(H.h0 + H.yaw);
         const p = b.pushing; if (p) { p.moved += step; if (p.jump === 0 && p.moved >= p.clear) p.jump = 1e-3; } // (aboard at the finger's end)
       } else if (P.kind === 'swing') {
-        const start = { x: H.from.x - u.x * back, y: H.from.y - u.y * back }, ww = this.windHere(b, b);
+        const start = { x: H.from.x - u.x * back, y: H.from.y - u.y * back }, ww = this.windHere(b, b, false); // (the breeze, as the crew judge it)
         if (Math.abs(H.a) < Math.abs(P.turn)) {
           // the bow held at the finger's end, the stern swinging out across the fairway: as fast as the wind on her side
           // swings her against the water's resistance (if it's helping), or the crew walks the bow round
