@@ -37,7 +37,7 @@ describe('the lights in use (Rules 25 and 30)', async () => {
   const THREE = await import('three');
   const { buildNavLights, syncNavLights } = await import('../src/render/navLights');
   const { NIGHT } = await import('../src/render/night');
-  const build = (kind: 'deck' | 'tricolour') => buildNavLights(new THREE.Group(), { stem: new THREE.Vector3(0, 1, -3.8), stern: new THREE.Vector3(0, 0.6, 3.8), masthead: new THREE.Vector3(0, 10, -1) }, kind, new THREE.MeshPhongMaterial());
+  const build = (kind: 'deck' | 'tricolour') => buildNavLights(new THREE.Group(), { stem: new THREE.Vector3(0, 1, -3.8), stern: new THREE.Vector3(0, 0.6, 3.8), masthead: new THREE.Vector3(0, 10, -1) }, kind);
   const shown = (nl: ReturnType<typeof build>) => nl.lamps.filter(l => l.glow.visible).map(l => `${l.role}:${l.arc ? 'arc' : 'round'}`).sort();
   it('shows them by day in restricted visibility (Rule 20(c))', async () => {
     const { setRestrictedVisibility } = await import('../src/render/navLights');
