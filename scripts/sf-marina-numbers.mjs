@@ -99,7 +99,10 @@ export function sfNumbers(harbor, slips) {
     renames[s.id] = { moved: near.id };
   }
   // an end tie (worked out where the harbor's loaded, geo/marina.ts: '<dock> end <k>'): its dock's new name
-  for (const D of docks) for (const L of D.sim) for (let k = 1; k <= 6; k++) renames[`${L} end ${k}`] = `${D.name} end ${k}`;
+  // (not where the old letter is a dock's name now, as West Harbor's E, F and G are: 'G end 1' is the real Dock G's end tie
+  // today, not the old G's, and it mustn't be sent elsewhere)
+  const names = new Set(docks.map(D => D.name));
+  for (const D of docks) for (const L of D.sim) if (!names.has(L)) for (let k = 1; k <= 6; k++) renames[`${L} end ${k}`] = `${D.name} end ${k}`;
   const left = slips.filter(s => !(s.id in renames)); if (left.length) throw new Error(`${harbor}: slips on docks not in SF_DOCKS: ${[...new Set(left.map(s => s.dock))]}`);
   return { slips: out.sort((a, b) => Number(a.id) - Number(b.id)), renames };
 }
