@@ -54,7 +54,11 @@ const at = (g: THREE.BufferGeometry, x: number, y: number, z: number, sx = 1, sy
 /** A body of revolution (y up) from a profile of (radius, y), flattened front to back by `flat`. */
 const lathe = (pts: [number, number][], flat: number, seg = 14) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg); g.scale(1, 1, flat); return g; };
 
+/** (Design only, proposals/crew-art-1: a dev page can put in another body builder, e.g. render/crewArt.ts's.) */
+export const bodyOverride: { fn?: (p: Person, jacket: number, seed: number) => Body } = {};
+
 export function buildBody(p: Person, jacket: number, seed: number): Body {
+  if (bodyOverride.fn) return bodyOverride.fn(p, jacket, seed);
   const s = p.h / 1.75, girth = Math.max(0.85, Math.min(1.35, Math.sqrt(p.w / (p.h * p.h) / 24))), g = girth;
   const tone = Math.floor(hash(seed, 1) * SKINS.length), skin = SKINS[tone];
   const hair = pick(tone >= 6 ? HAIR_DARK : HAIR_FAIR, seed, 2), pfd = pick(PFDS, seed, 3), bib = pick(BIBS, seed, 4), hat = pick(HATS, seed, 5);
