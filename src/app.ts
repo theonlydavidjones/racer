@@ -64,6 +64,8 @@ const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
 let drillShown = false;
 
 let w!: World;
+/** An older race sailed again that was saved with a pinned 'Wind from' (before Turn the wind): its direction, for that race only. */
+let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
 const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0, spin: true };
@@ -101,7 +103,9 @@ const KIND_NOTE: Record<WindKind, string> = {
 function newGame(seed = randomSeed()): void {
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
-  const WS = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
+  const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
+  // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
+  const WS = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
@@ -1039,6 +1043,7 @@ function crewRows(): void {
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
+  replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (S.mode === 'drill') { S.mode = 'race'; newGame(); }
   courseView.close(); navView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
@@ -1131,6 +1136,7 @@ const REPLAY_KEYS = ['tideTime', 'opponents', 'raceLength', 'windKind', 'windKt'
 function raceSetup(): RaceSetup {
   const s: Record<string, unknown> = { tideDate: w.raceDate };
   for (const k of REPLAY_KEYS) if (S[k] !== undefined) s[k] = structuredClone(S[k]);
+  if (replayPin != null) s.windDir = replayPin; // (sailed again, then saved: it keeps its pinned direction)
   return { seed: w.seed, course: w.C.id, s };
 }
 /** The race, into the logbook of every boat of yours in it: her place (or why she has none) and her time. */
@@ -1353,7 +1359,10 @@ function pastRaces(): void {
 $('pastRows').addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-past]'); if (!b || b.disabled) return;
   const en = pastList[Number(b.dataset.past)], course = en && courseOfEntry(en); if (!en || !course) return;
-  if (en.setup) Object.assign(S, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
+  // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
+  if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; }
   if (!S.boat.slip) S.raceFrom = 'water';
@@ -1385,9 +1394,9 @@ function adjustUi(): void {
   if (S.windKind !== 'auto') real.unshift('windKind');
   names.windKind = `the kind of wind (${WIND_KIND_LABEL[S.windKind as WindKind]?.toLowerCase() ?? S.windKind})`;
   // the turn, and where it leaves the wind
-  if (S.windTurn) names.windTurn = `the wind ${turnWords(S.windTurn)}, from ${degAndPoint(w.wind.from)}`;
+  if (S.windTurn) names.windTurn = `the wind ${turnWords(S.windTurn)}, from ${degAndPoint(w.windModel.base)}`; // (as the course is laid, and the setup card says)
   // (light and variable blows from all over: nothing to turn)
-  $('windTurnRow').hidden = w.windKind === 'light';
+  $('windTurnRow').hidden = S.windKind === 'light';
   $('adjSum').textContent = real.length ? `Adjusted: ${real.map(k => names[k]).join(', ')}.` : 'All real.';
   $('condState').textContent = real.length ? 'adjusted' : 'real'; $('condState').classList.toggle('adj', real.length > 0);
 }
