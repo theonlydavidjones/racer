@@ -122,10 +122,13 @@ export function crabFor(brgT: number, v: number, cur: Vec): number {
   return n360(brgT - Math.asin(k) / (Math.PI / 180));
 }
 
+/** Her groove upwind (deg, + low, − high), once she's racing (ai/skipper.ts). */
+const grooveOf = (b: Boat): number => b.ai?.mind && b.started && !b.finished ? b.ai.mind.groove : 0;
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
-  // (an AI helm's close-hauled is her own groove's: a little high or low of the best, ai/skipper.ts)
-  const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1 + (b.ai?.mind?.groove ?? 0);
+  // (an AI helm's close-hauled, racing, is her own groove's: a little high or low of the best, ai/skipper.ts. Not
+  // before the start, where she's reaching about and manoeuvring, not settling into a beat)
+  const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1 + grooveOf(b);
   if (Math.abs(rel) >= ch) return n360(desired);
   if (b.tack === 'S' && rel < -25) return n360(from + ch);
   if (b.tack === 'P' && rel > 25) return n360(from - ch);
@@ -257,7 +260,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur, mind = ai.mind;
   // a new leg: her judgements for it (her laylines, her groove), drawn as she sets out on it (ai/skipper.ts)
   if (mind && mind.leg !== b.leg) judgeLeg(mind, ai.kn, b.leg);
-  const beat = beatFor(b) + (mind?.groove ?? 0), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
+  const beat = beatFor(b) + grooveOf(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
   ai.tackNow = false; // (set below while she answers a hail)
   if (b.penalty > 0) {

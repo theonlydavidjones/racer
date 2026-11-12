@@ -6,6 +6,7 @@ import { beatAngle, runAngle } from '../src/boat/polar';
 import { crabFor } from '../src/ai/ai';
 import { V, n360, wrap } from '../src/core/math';
 import type { CourseFile } from '../src/courses/course';
+import { neutralSkippers } from './helpers/skippers';
 
 /** The AI fleet sailing the training course (windward–return, 620 m legs), the user's boat left at the line. */
 function race(kt: number, current = 'slack', seed = 77) {
@@ -75,7 +76,8 @@ describe('the AI sails the boat as a sailor does', () => {
     expect(quick).toBeLessThanOrEqual(10); // (5 as it stands, the five boats over the race)
   }, 180000);
   it("close-hauled she steers her leeway above the beat angle, so her course through the water is the polar's beat", () => {
-    const w = race(12), beat = beatAngle(12);
+    // (neutral skippers: each skipper's own groove sails her a few degrees high or low of the polar's beat, ai/skipper.ts)
+    const w = neutralSkippers(race(12)), beat = beatAngle(12);
     let s = 0, n = 0;
     while (w.t < 600) {
       w.step(DT);
