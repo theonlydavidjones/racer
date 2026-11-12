@@ -146,7 +146,7 @@ export class RaceReplay {
   /** Against the winner: the gap, then each leg with what you lost or gained and where it went. */
   private vsHtml(): string {
     const V = this.D!.vs; if (!V || V.legs.length < 2) return '';
-    const who = V.won ? 'who won' : this.w!.boats.some(b => b.finished) ? 'who came second' : 'leading';
+    const who = V.won ? 'who won' : this.w!.boats.some(b => b.finished) ? 'who came second' : V.total > 0 ? 'who is ahead of you' : 'the boat behind you';
     const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
     const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
     const gap = Math.round(Math.abs(V.total)), mmss2 = (x: number) => x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${x % 60} s`;
@@ -216,7 +216,7 @@ export class RaceReplay {
       const near = D.moments.find(m => Math.abs(this.tx(m.t0, r.width) - (e.clientX - r.left)) < 7 || (t >= m.t0 && t <= m.t1 && m.t1 - m.t0 > 5));
       if (near && e.clientY - r.top < 30) { this.dragging = false; this.pick(near); return; }
       // the strip of legs along the bottom: that leg against the winner
-      const leg = e.clientY - r.top > STRIP_Y - 2 ? D.vs?.legs.find(L => L.i > 0 && t >= L.t0 && t <= L.t1) : undefined;
+      const leg = e.clientY - r.top > STRIP_Y - 2 ? D.vs?.legs.find(L => L.i > 0 ? t >= L.t0 && t <= L.t1 : t <= Math.max(L.you, 3)) : undefined;
       if (leg) { this.dragging = false; this.pickLeg(leg); return; }
       this.setPlaying(false);
       // scrubbing elsewhere lets go of the picked moment (its caption would no longer match what's shown)
@@ -353,8 +353,10 @@ export class RaceReplay {
     const hs = Math.max(scale, 1.6);
     w.boats.forEach((bt, i) => {
       const p = now[i]; if (!p) return;
-      const lab = i === u ? `You · ${p[3]}` : i === rv ? `${bt.name}${D.vs!.won ? ' (won)' : ''}` : this.follow ? bt.name : null;
+      const lab = i === u ? `You · ${p[3]}` : i === rv ? null : this.follow ? bt.name : null;
       drawHull(ctx, P(p), p[2] - W, p[4], i === rv ? hs * 1.15 : hs, i === u || i === rv ? bt.color : hexA(bt.color, .7), lab);
+      // her name below her hull (yours is above yours), so the two don't crowd when you're close
+      if (i === rv) { const q = P(p); ctx.fillStyle = bt.color; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillText(`${bt.name}${D.vs!.won ? ' (won)' : ''}`, q[0] + 12, q[1] + 20); }
     });
     // close in, with her out of sight: an arrow at the edge toward her, and how far
     if (rv >= 0 && this.follow && now[rv]) {
@@ -419,8 +421,8 @@ export class RaceReplay {
     }
     // against the winner: your legs along the bottom, each with what you lost (vermilion) or gained (sky) on her
     if (D.vs) for (const L of D.vs.legs) {
-      if (L.i === 0) continue;
-      const a = X(L.t0) + 1, b = X(L.t1) - 1, on = this.selLeg === L, lost = L.lost > 0.5, won = L.lost < -0.5;
+      // (the start: from the gun to your crossing, so the strip adds up to the whole gap)
+      const a = X(L.i === 0 ? Math.min(0, L.you) : L.t0) + 1, b = X(L.i === 0 ? Math.max(L.you, 3) : L.t1) - 1, on = this.selLeg === L, lost = L.lost > 0.5, won = L.lost < -0.5;
       ctx.fillStyle = lost ? hexA(OI.verm, on ? .9 : .55) : won ? hexA(OI.sky, on ? .9 : .55) : 'rgba(150,196,218,.25)';
       ctx.fillRect(a, STRIP_Y, Math.max(2, b - a), 13);
       if (on) { ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 1.5; ctx.strokeRect(a - 1, STRIP_Y - 1, b - a + 2, 15); }

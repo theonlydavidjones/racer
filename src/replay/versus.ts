@@ -117,7 +117,7 @@ export function legWords(L: LegVs, rival: string): string {
   const mm = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
   if (L.kind === 'start') {
     return Math.abs(L.lost) < 1 ? `You both crossed the line about together, ${L.you.toFixed(1)} s after the gun.`
-      : `You crossed ${L.you.toFixed(1)} s after the gun, ${rival} ${L.them.toFixed(1)} s: ${s(L.lost)} ${L.lost > 0 ? 'behind' : 'ahead'} from the start.`;
+      : `You crossed ${L.you.toFixed(1)} s after the gun, ${rival} ${L.them.toFixed(1)} s: you started ${s(L.lost)} ${L.lost > 0 ? 'behind' : 'ahead of'} her.`;
   }
   const parts: string[] = [`You ${mm(L.you)}, ${rival} ${mm(L.them)}.`];
   const dm = L.youM - L.themM;
