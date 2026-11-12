@@ -28,11 +28,12 @@ export function logMessage(msg: string): void {
   onLog();
 }
 
-let toastT = 0;
-/** Show a message for a while (longer for longer messages), and keep it in the log. */
-export function toast(msg: string, ms = 2500): void {
-  const el = $('toast'); el.textContent = msg; el.classList.add('show');
-  const hold = Math.max(ms * 1.6, 2500 + msg.length * 45);
-  clearTimeout(toastT); toastT = window.setTimeout(() => el.classList.remove('show'), hold);
+/**
+ * Tell the player something: it goes into the log, and so becomes the Messages card's newest line, lit for a moment (the
+ * chase-view layout, 12 Nov: no box floating over the view). `ms`: how long it matters, for callers; the flash is 2 s.
+ */
+export function toast(msg: string, _ms = 2500): void {
   logMessage(msg);
+  const li = $('msgRecent').firstElementChild as HTMLElement | null;
+  if (li) { li.classList.remove('flash'); void li.offsetWidth; li.classList.add('flash'); }
 }
