@@ -13,12 +13,12 @@ export type LineUiKey = CtlKey | 'carFore' | 'carIn';
 /** The lines' names in running text ("the main halyard"). */
 export const LINE_NAME: Record<LineKey, string> = {
   mainsheet: 'mainsheet', traveller: 'traveller', backstay: 'backstay', vang: 'vang', outhaul: 'outhaul',
-  cunningham: 'Cunningham', downhaul: 'main halyard', jibCunningham: 'jib Cunningham', jibsheet: 'jib sheet', jibsheetW: 'windward jib sheet', car: 'jib cars'
+  cunningham: 'Cunningham', downhaul: 'main halyard', jibCunningham: 'jib Cunningham', jibHalyard: 'jib halyard', jibsheet: 'jib sheet', jibsheetW: 'windward jib sheet', car: 'jib cars'
 };
 /** Their names as labels ("Main halyard"). */
 export const LINE_LABEL: Record<LineUiKey, string> = {
   mainsheet: 'Mainsheet', traveller: 'Traveller', backstay: 'Backstay', vang: 'Vang', outhaul: 'Outhaul', cunningham: 'Cunningham',
-  downhaul: 'Main halyard', jibCunningham: 'Jib Cunningham', jibsheet: 'Jib sheet', jibsheetW: 'Windward sheet', carFore: 'Car fore–aft', carIn: 'Car in–out'
+  downhaul: 'Main halyard', jibCunningham: 'Jib Cunningham', jibHalyard: 'Jib halyard', jibsheet: 'Jib sheet', jibsheetW: 'Windward sheet', carFore: 'Car fore–aft', carIn: 'Car in–out'
 };
 
 /** What each line does, in a sentence (standard trim practice: controls.ts). */
@@ -31,6 +31,7 @@ export const LINE_WHAT: Record<LineUiKey, string> = {
   cunningham: 'On as the wind builds and blows the draft aft.',
   downhaul: 'The main halyard on its tackle: pulled tight at the start for the wind range and rarely touched after; the Cunningham fine-tunes it.',
   jibCunningham: 'On as the wind builds.',
+  jibHalyard: 'The jib\'s coarse luff tension, on the starboard side: set for the wind range, a little more as it builds; the jib Cunningham fine-tunes it.',
   jibsheet: 'The working sheet, on the leeward winch.',
   jibsheetW: 'The lazy sheet, on the windward winch: haul it with the other eased and the jib backs (heaving to).',
   carFore: 'The lazy car, set ready for the next tack; after it:',
@@ -50,6 +51,7 @@ export const LINE_ENDS: Record<LineUiKey, [string, string, string, string]> = {
   cunningham: ['off', 'the luff slack, the draft further aft', 'on', 'the luff tight, the draft pulled forward'],
   downhaul: ['eased', 'the luff slack, the draft further aft', 'tight', 'the luff tight, the draft forward'],
   jibCunningham: ['off', 'the jib\'s draft further aft', 'on', 'the jib\'s draft held forward'],
+  jibHalyard: ['eased', 'the jib\'s luff soft, its draft further aft', 'tight', 'the luff tight, the jib\'s draft forward'],
   jibsheet: ['eased', 'the clew out, the jib twisted open: speed and reaching', 'in', 'the clew in and down: pointing'],
   jibsheetW: ['slack', 'as normal, the jib to leeward', 'hauled', 'the jib backed to windward'],
   carFore: ['forward', 'the leech closed, a fuller foot: power', 'aft', 'the leech open, a flatter foot: depower'],
