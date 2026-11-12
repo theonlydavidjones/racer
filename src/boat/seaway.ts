@@ -87,10 +87,12 @@ const beatCache = new Map<number, number>();
 export function beatInChop(kt: number, hs: number, tp: number): number {
   // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)
   if (!Number.isFinite(kt + hs + tp)) return beatSearch(kt, hs, tp); // (no key for a NaN: worked out, not cached)
-  const key = (Math.round(kt * 4) * 1048576 + Math.round(hs * 50)) * 1048576 + Math.round(tp * 10);
+  const k4 = Math.round(kt * 4), h50 = Math.round(hs * 50), t10 = Math.round(tp * 10), key = (k4 * 1048576 + h50) * 1048576 + t10;
   let a = beatCache.get(key);
   if (a === undefined) {
-    a = beatSearch(kt, hs, tp);
+    // (worked out from the rounded values the key holds, not the first caller's exact ones: otherwise the angle cached
+    // for everyone after depends on which boat, in which World, asked first, and the same seed sails a different race)
+    a = beatSearch(k4 / 4, h50 / 50, t10 / 10);
     if (beatCache.size > 20000) beatCache.clear();
     beatCache.set(key, a);
   }
