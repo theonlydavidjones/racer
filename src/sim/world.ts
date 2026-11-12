@@ -9,7 +9,7 @@ import { buildCourse, type Course, type CourseFile, type CourseMark } from '../c
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
-import { dayWeather, type DayWeather } from '../environment/weather';
+import { dayWeather, turnWeather, type DayWeather } from '../environment/weather';
 import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
 import { ShiftField, shiftStats } from '../environment/shifts';
 import { GUSTS, GustField, sigmaU } from '../environment/gusts';
@@ -248,12 +248,12 @@ export class World {
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
     this.windDay = settings.windDay ?? 1;
     // the real day (observed, or the forecast), or a day from the records, or the kind you chose
-    this.weather = dayWeather(this.raceDate, settings.windKind ?? 'auto', this.windDay);
+    this.weather = turnWeather(dayWeather(this.raceDate, settings.windKind ?? 'auto', this.windDay), settings.windTurn ?? 0);
     this.windKind = this.weather.kind;
     const atGun = this.weather.at(this.gunUtc);
     // a westerly at a set strength (not a real day) blows from the course's own westerly (as it runs over the race area)
-    if (settings.windKt !== 0 && this.windKind === 'west' && !this.realWind) { atGun.from = file.windBase; atGun.steady = 1; atGun.gust = 1.5; }
-    if (settings.windDir != null) atGun.from = settings.windDir; // the conditions adjuster: the wind from here
+    if (settings.windKt !== 0 && this.windKind === 'west' && !this.realWind) { atGun.from = n360(file.windBase + (settings.windTurn ?? 0)); atGun.steady = 1; atGun.gust = 1.5; }
+    if (settings.windDir != null) atGun.from = settings.windDir; // (an older replay's pinned direction)
     // the course for the day's wind: a laid course is set to it; fixed marks stay put, and its legs are whatever the wind makes them
     this.C = buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: atGun.from });
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
@@ -602,7 +602,7 @@ export class World {
   /** The real tide at the course: refresh the field, and the summary used by the HUD, maps and messages. */
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
-    f.setTime(now);
+    f.cover(now); f.setTime(now); // (the predictions roll on past the race's window: a long sail)
     this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }

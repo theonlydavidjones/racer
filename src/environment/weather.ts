@@ -358,3 +358,15 @@ export function idw(points: { p: Vec; m: number }[]): (q: Vec) => number {
     return nearest > CELL_REACH * CELL_REACH ? NaN : sv / sw;
   };
 }
+
+/**
+ * The day's wind turned by `deg` (+ clockwise, a veer; − a back), the owner's "Turn the wind": the same kind of day
+ * (its veer through the afternoon, its gusts and shifts, from the records), blowing a few degrees round from its usual
+ * direction. Everything that reads the day's wind (the sim, the outlook, the committee's course) sees it turned.
+ * (On a forecast day the wind's pattern across the course stays the forecast grid's own: its lees and the slot aren't
+ * rotated with the turn. On a records, chosen or observed day the land's effect follows the turned direction.)
+ */
+export function turnWeather(wx: DayWeather, deg = 0): DayWeather {
+  if (!deg) return wx;
+  return { ...wx, at: t => { const b = wx.at(t); return { ...b, from: n360(b.from + deg) }; } };
+}

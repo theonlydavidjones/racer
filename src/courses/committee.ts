@@ -3,7 +3,7 @@ import { beatAngle, polar, runAngle } from '../boat/polar';
 import { CURRENTS, currentAt, currentVector } from '../environment/current';
 import { CurrentField, nextSaturday, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { WIND_KIND_LABEL, type WindDay, type WindKind } from '../environment/wind';
-import { dayWeather } from '../environment/weather';
+import { dayWeather, turnWeather } from '../environment/weather';
 import type { Settings } from '../settings';
 import { buildCourse, type CourseFile } from './course';
 
@@ -45,9 +45,9 @@ export interface RaceDay {
 export function raceDay(S: Settings, windBase = 275): RaceDay {
   const date = S.tideDate || nextSaturday(), gunUtc = sfLocalToUtcMin(date, S.tideTime || '12:00');
   const sea = S.windKt === 0, day = (S.windDay ?? 1) as WindDay;
-  const wx = dayWeather(date, S.windKind ?? 'auto', day), real = wx.source === 'observed' || wx.source === 'forecast';
+  const wx = turnWeather(dayWeather(date, S.windKind ?? 'auto', day), S.windTurn ?? 0), real = wx.source === 'observed' || wx.source === 'forecast';
   const g = wx.at(gunUtc), kind = wx.kind;
-  if (!sea && kind === 'west' && !real) g.from = windBase; // as the World does
+  if (!sea && kind === 'west' && !real) g.from = (windBase + (S.windTurn ?? 0) + 360) % 360; // as the World does
   if (S.windDir != null) g.from = S.windDir;
   const wind = (p: Vec, min: number) => {
     const b0 = sea ? wx.at(gunUtc + min) : { kt: S.windKt, from: g.from }, b = S.windDir != null ? { ...b0, from: S.windDir } : b0, f = wx.field(p, gunUtc + min, b.from); // the wind across the course

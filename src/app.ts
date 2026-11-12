@@ -30,7 +30,7 @@ import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys
 import { autoAcross, setWho, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { PerfMeter } from './ui/perfMeter';
-import { compassPoint, degAndPoint } from './core/compass';
+import { compassPoint, degAndPoint, turnWords } from './core/compass';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
@@ -65,6 +65,8 @@ const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
 let drillShown = false;
 
 let w!: World;
+/** An older race sailed again that was saved with a pinned 'Wind from' (before Turn the wind): its direction, for that race only. */
+let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
 const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0, spin: true };
@@ -103,7 +105,9 @@ const KIND_NOTE: Record<WindKind, string> = {
 function newGame(seed = randomSeed()): void {
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
-  const WS = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
+  const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
+  // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
+  const WS = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
@@ -989,7 +993,7 @@ function drawTideGraph(): void {
     ctx.fillText(`WIND · top ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
     const b = w.weather.at(w.gunUtc), b2 = w.weather.at(w.gunUtc + 90), k = windTerrain(p, b.from);
     const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * k)} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * k)} kt` : 'steady';
-    rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (your direction, over the ${WIND_KIND_LABEL[w.windKind].toLowerCase()}'s ${compassPoint(b.from)})` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from)}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
+    rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (an older setting)` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (S.windTurn ? ` (${turnWords(S.windTurn)} from the usual ${compassPoint(b.from - S.windTurn)})` : '')}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
   } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]);
   if (!w.tide) rows.push(['Current', CURRENTS[S.current]?.label ?? S.current]);
   rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
@@ -1057,6 +1061,7 @@ function crewRows(): void {
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
+  replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (S.mode === 'drill') { S.mode = 'race'; newGame(); }
   courseView.close(); navView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
@@ -1119,7 +1124,7 @@ $('courseMode').addEventListener('click', e => {
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
 $('bCondClose').onclick = $('bCondDone').onclick = () => { $('condDlg').hidden = true; };
 $('bCondReal').onclick = () => {
-  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
+  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
   saveSettings(S); paintSeg(); newGame(); courseCard(); tideBox();
 };
 
@@ -1145,10 +1150,11 @@ function outing(b: BoatSpec, isUser: boolean): Omit<LogEntry, 'kind' | 'title'> 
   };
 }
 /** The settings a race was sailed in, kept with your entry so you can sail it again (Run a past race). */
-const REPLAY_KEYS = ['tideTime', 'opponents', 'raceLength', 'windKind', 'windKt', 'windDir', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'bias', 'raceFrom', 'crew', 'sea'] as const;
+const REPLAY_KEYS = ['tideTime', 'opponents', 'raceLength', 'windKind', 'windKt', 'windDir', 'windTurn', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'bias', 'raceFrom', 'crew', 'sea'] as const;
 function raceSetup(): RaceSetup {
   const s: Record<string, unknown> = { tideDate: w.raceDate };
   for (const k of REPLAY_KEYS) if (S[k] !== undefined) s[k] = structuredClone(S[k]);
+  if (replayPin != null) s.windDir = replayPin; // (sailed again, then saved: it keeps its pinned direction)
   return { seed: w.seed, course: w.C.id, s };
 }
 /** The race, into the logbook of every boat of yours in it: her place (or why she has none) and her time. */
@@ -1371,7 +1377,10 @@ function pastRaces(): void {
 $('pastRows').addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-past]'); if (!b || b.disabled) return;
   const en = pastList[Number(b.dataset.past)], course = en && courseOfEntry(en); if (!en || !course) return;
-  if (en.setup) Object.assign(S, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
+  // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
+  if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; }
   if (!S.boat.slip) S.raceFrom = 'water';
@@ -1384,7 +1393,8 @@ $('pastRows').addEventListener('click', e => {
 /* The conditions adjuster: each control is 'real' until moved; Real puts it back. */
 const ADJ = {
   windKt: { el: 'adjWindKt', get: () => S.windKt || null, set: (v: number | null) => { S.windKt = v ?? 0; }, show: (v: number) => `${v} kt`, def: () => Math.round(w.wind.kt) },
-  windDir: { el: 'adjWindDir', get: () => S.windDir ?? null, set: (v: number | null) => { S.windDir = v; }, show: (v: number) => degAndPoint(v), def: () => Math.round(w.wind.from / 5) * 5 % 360 },
+  // Turn the wind: the kind of day's own direction, turned up to 30° either way (+ clockwise: a veer)
+  windTurn: { el: 'adjWindTurn', get: () => S.windTurn || null, set: (v: number | null) => { S.windTurn = v ?? 0; }, show: (v: number) => turnWords(v), def: () => 0 },
   chop: { el: 'adjChop', get: () => (S.chop ?? 1) === 1 ? null : S.chop!, set: (v: number | null) => { S.chop = v ?? 1; }, show: (v: number) => v === 0 ? 'glassy' : `× ${v.toFixed(1)}`, def: () => 1 },
   swellHs: { el: 'adjSwell', get: () => S.swellHs ?? null, set: (v: number | null) => { S.swellHs = v; }, show: (v: number) => `${(v / 0.3048).toFixed(0)} ft`, def: () => +(w.sea.swell?.hs ?? 1).toFixed(1) }
 } as const;
@@ -1393,16 +1403,18 @@ function adjustUi(): void {
   for (const [k, a] of Object.entries(ADJ)) {
     const cur = a.get(), inp = $<HTMLInputElement>(a.el), btn = document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!;
     btn.setAttribute('aria-pressed', String(cur == null)); inp.classList.toggle('dim', cur == null);
-    if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
+    if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = k === 'windTurn' ? 'as usual' : 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
   }
   if (S.current !== 'real') real.push('current');
   if (S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
-  const names: Record<string, string> = { windKt: 'wind speed', windDir: 'wind direction', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
+  const names: Record<string, string> = { windKt: 'wind speed', windTurn: 'wind turned', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');
   names.windKind = `the kind of wind (${WIND_KIND_LABEL[S.windKind as WindKind]?.toLowerCase() ?? S.windKind})`;
-  // a direction you've set wins over the kind: say so, in degrees and the compass point
-  if (S.windDir != null) names.windDir = `wind from ${degAndPoint(S.windDir)}${S.windKind !== 'auto' ? ` (overrides ${WIND_KIND_LABEL[S.windKind as WindKind]?.toLowerCase() ?? S.windKind})` : ''}`;
+  // the turn, and where it leaves the wind
+  if (S.windTurn) names.windTurn = `the wind ${turnWords(S.windTurn)}, from ${degAndPoint(w.windModel.base)}`; // (as the course is laid, and the setup card says)
+  // (light and variable blows from all over: nothing to turn)
+  $('windTurnRow').hidden = S.windKind === 'light';
   $('adjSum').textContent = real.length ? `Adjusted: ${real.map(k => names[k]).join(', ')}.` : 'All real.';
   $('condState').textContent = real.length ? 'adjusted' : 'real'; $('condState').classList.toggle('adj', real.length > 0);
 }
