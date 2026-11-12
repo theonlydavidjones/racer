@@ -120,14 +120,17 @@ const WATER_FRAGMENT = `
   // own quantile for that fraction (fitted from its distribution: T = 0.5665 − 0.1835·x − 0.0227·x², x = log10 W),
   // so the area that shows white is the area the law says is white
   float Wc = clamp(vWhite, 0.0, 0.2), lx = log(max(Wc, 1e-4)) / log(10.0), thr = 0.5665 - 0.1835 * lx - 0.0227 * lx * lx;
-  vec2 cp = adv / 2.6 + vec2(0.0, uTime * 0.25);
-  float cf = 0.65 * vnoise(cp) + 0.35 * vnoise(cp * 2.3 + vec2(7.1, 3.3)) + 0.06 * (clamp(crest, -1.0, 1.5) - 0.2);
-  float caps = Wc > 1e-4 ? smoothstep(thr, thr + 0.025, cf) : 0.0;
+  // (each patch drawn out downwind, as the foam trails behind a breaking crest: 3.5 m along the wind, 1.5 m across;
+  // finer noise makes its ragged edge)
+  vec2 wdc = normalize(uPuffV + vec2(1e-5, 0.0)), cp = vec2(dot(adv, wdc) / 3.5, dot(adv, vec2(-wdc.y, wdc.x)) / 1.5) + vec2(uTime * 0.3, 0.0);
+  float cf = 0.65 * vnoise(cp) + 0.35 * vnoise(cp * 2.3 + vec2(7.1, 3.3)) + 0.07 * (vnoise(cp * 7.0 + 2.0) - 0.5);
+  // (brightest on the crests, where they break; the crests don't change the area, which the law sets)
+  float caps = Wc > 1e-4 ? smoothstep(thr - 0.01, thr + 0.05, cf) * (0.65 + 0.35 * smoothstep(0.3, 0.7, vnoise(cp * 4.3 + 11.0))) * (0.7 + 0.3 * smoothstep(0.0, 1.0, crest)) : 0.0; // (ragged, broken up inside: churned water, not paint)
   // ... and from Beaufort 7 (28–33 kt), white foam from the breaking waves blown in streaks along the wind (WMO's
   // Beaufort scale), more as it blows harder
-  vec2 wd = normalize(uPuffV + vec2(1e-5, 0.0)), wq = vec2(dot(vWaveP, wd) / 9.0, dot(vWaveP, vec2(-wd.y, wd.x)) / 0.7);
-  float streak = smoothstep(13.0, 17.0, uMeanKt * 0.5144) * smoothstep(0.7, 0.9, vnoise(wq + vec2(uTime * 0.05, 0.0))) * 0.45;
-  float foam = max(caps * (0.75 + 0.25 * fine.g), streak) * (1.0 - smoothstep(600.0, 2500.0, camDF));
+  vec2 wd = normalize(uPuffV + vec2(1e-5, 0.0)), wq = vec2(dot(vWaveP, wd) / 7.0, dot(vWaveP, vec2(-wd.y, wd.x)) / 0.3);
+  float streak = smoothstep(13.0, 17.0, uMeanKt * 0.5144) * smoothstep(0.78, 0.92, vnoise(wq + vec2(uTime * 0.05, 0.0))) * smoothstep(0.3, 0.6, vnoise(wq * vec2(0.4, 1.0) + 4.0)) * 0.3;
+  float foam = max(caps * (0.75 + 0.25 * fine.g), streak) * (1.0 - smoothstep(1200.0, 4000.0, camDF));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), clamp(foam, 0.0, 0.85));
   // the sky reflected in the water, strongest at a glancing angle (toward the horizon)
   // (Schlick's Fresnel for water: 2% straight down, nearly all at a glancing angle; the wave slopes facing away
