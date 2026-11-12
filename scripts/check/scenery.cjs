@@ -37,6 +37,12 @@ const VIEWS = {
   alameda: [LL(37.7800, -122.3600, 5), LL(37.7750, -122.3000, 40)], // Alameda Point and the Estuary's mouth from the south of the Bay Bridge
   richmond: [LL(37.8950, -122.4250, 5), LL(37.9250, -122.3900, 60)], // Point Richmond and the Long Wharf from Southampton Shoal
   sanpablo: [LL(37.9200, -122.4350, 5), LL(37.9620, -122.4330, 30)], // Red Rock, the Richmond–San Rafael Bridge and the Brothers from the south
+  rsr: [LL(37.9250, -122.4520, 5), LL(37.9350, -122.4460, 50)], // the Richmond–San Rafael Bridge's west channel span, from the south
+  rsr_side: [LL(37.9150, -122.4300, 300), LL(37.9350, -122.4400, 30)], // the whole bridge's roller coaster, from above Red Rock's south
+  brothers_close: [LL(37.9600, -122.4300, 6), LL(37.9632, -122.4336, 12)], // East Brother Light Station
+  cranes: [LL(37.8040, -122.3300, 8), LL(37.8090, -122.3240, 40)], // the Port of Oakland's cranes from the Outer Harbor channel
+  bpier: [LL(37.8560, -122.3400, 8), LL(37.8600, -122.3250, 2)], // the Berkeley Pier and its ruined outer part
+  longwharf: [LL(37.9150, -122.4180, 8), LL(37.9240, -122.4080, 5)], // Chevron's Long Wharf at Richmond
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);

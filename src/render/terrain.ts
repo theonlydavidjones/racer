@@ -18,7 +18,8 @@ import { inBasin } from '../geo/marina';
 export interface Terrain {
   /** Height of the land (m) at a point in course coordinates; ≤ 0 over water. */
   heightAt(x: number, y: number): number;
-  mesh: THREE.Mesh;
+  /** The land, in tiles. */
+  mesh: THREE.Group;
   /** Warm points where the city is, lit at dusk. */
   lights: THREE.Points;
   /** Recolour for the season (month 1–12). */
@@ -124,7 +125,24 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.setIndex(idx); geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  // drawn in tiles of 64 × 64 cells (3.2 km), sharing the one set of vertices, so the land behind the camera and off the
+  // sides of the view isn't drawn (the land reaches from the Gate to Oakland and Richmond: about 600,000 triangles)
+  const mesh = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ vertexColors: true }), T = 64;
+  for (let tj = 0; tj < ny - 1; tj += T) for (let ti = 0; ti < nx - 1; ti += T) {
+    const ix: number[] = [], box = new THREE.Box3(), v = new THREE.Vector3();
+    for (let j = tj; j < Math.min(ny - 1, tj + T); j++) for (let i = ti; i < Math.min(nx - 1, ti + T); i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+      if (H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) continue;
+      ix.push(a, c, b, b, c, d);
+      for (const k of [a, d]) box.expandByPoint(v.set(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]));
+    }
+    if (!ix.length) continue;
+    const g = new THREE.BufferGeometry();
+    for (const n of ['position', 'color', 'normal']) g.setAttribute(n, geo.attributes[n]);
+    g.setIndex(ix); g.boundingBox = box; g.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+    const m = new THREE.Mesh(g, mat); m.matrixAutoUpdate = false; mesh.add(m);
+  }
+  geo.setIndex(null);
   scene.add(mesh);
   const nrm = geo.attributes.normal as THREE.BufferAttribute;
 

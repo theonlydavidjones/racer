@@ -7,6 +7,7 @@ import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
 import { segPt } from '../core/math';
 import { buildBayBridge, BAY_APPROACH } from './bayBridge';
+import { buildEastBay } from './eastBay';
 import { clocks, crownDisplayMaterial, floodlit, glints, litWindows, nightOnly, type Glint } from './night';
 
 /** A small seeded random generator, so the city is the same every time. */
@@ -46,6 +47,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   }
 
   const glows: Glint[] = buildBayBridge(grp, (x, y) => terrain.heightAt(x, y)); // first: the city's buildings keep clear of its approach
+  glows.push(...buildEastBay(grp)); // the Richmond–San Rafael Bridge, the Brothers, the Berkeley Pier, the Port of Oakland's cranes
 
   /* ---------- the city ---------- */
   // one instanced box per building, on a 36 m grid, by neighbourhood: the Marina's low pastel houses, Pacific
@@ -55,6 +57,13 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const rand = rng(7), STEP = 36;
     type Hood = { p: number; h: [number, number]; tall?: [number, number, number]; w: [number, number] };
     const hood = (lat: number, lon: number): Hood | null => {
+      // the East Bay: downtown Oakland's towers round City Center and Lake Merritt (the tallest, the Ordway and 1111
+      // Broadway, about 125 m), Emeryville's towers by the Bay Bridge's toll plaza, downtown Berkeley's few, and low
+      // houses, flats and warehouses everywhere else from Alameda to Richmond
+      if (lat > 37.797 && lat < 37.812 && lon > -122.279 && lon < -122.259) return { p: 0.5, h: [14, 45], tall: [0.16, 60, 125], w: [24, 40] }; // downtown Oakland
+      if (lat > 37.829 && lat < 37.846 && lon > -122.298 && lon < -122.284) return { p: 0.4, h: [10, 28], tall: [0.08, 40, 90], w: [20, 36] }; // Emeryville
+      if (lat > 37.864 && lat < 37.876 && lon > -122.275 && lon < -122.262) return { p: 0.45, h: [10, 26], tall: [0.06, 35, 55], w: [18, 30] }; // downtown Berkeley
+      if (lon > -122.345 || (lat > 37.89 && lon > -122.437)) return { p: 0.22, h: [6, 11], w: [12, 22] }; // Alameda, Oakland, Berkeley, Albany, Richmond
       if (lat > 37.788 && lat < 37.7975 && lon > -122.406 && lon < -122.392) return { p: 0.55, h: [25, 70], tall: [0.3, 80, 150], w: [26, 42] }; // Financial District (its tallest towers are drawn below)
       if (lat > 37.776 && lat < 37.7915 && lon > -122.410 && lon < -122.386) return { p: 0.45, h: [14, 40], tall: [0.14, 50, 140], w: [24, 40] }; // SoMa, Rincon Hill
       if (lat > 37.7985 && lat < 37.8055 && lon > -122.4475 && lon < -122.4305) return { p: 0.75, h: [9, 13], w: [14, 22] }; // the Marina
@@ -72,7 +81,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const glass = ['#b7c1c6', '#c9cdc9', '#9fa9ae', '#d8d6cf', '#aab3b4'].map(h => new THREE.Color(h));
     const m0 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const dLat = STEP / 111320, dLon = STEP / (111320 * Math.cos(37.8 * Math.PI / 180));
-    for (let lat = 37.746; lat < 37.93; lat += dLat) for (let lon = -122.515; lon < -122.36; lon += dLon) {
+    for (let lat = 37.746; lat < 37.975; lat += dLat) for (let lon = -122.515; lon < -122.215; lon += dLon) {
       const la = lat + (rand() - 0.5) * dLat * 0.5, lo = lon + (rand() - 0.5) * dLon * 0.5, H = hood(la, lo), r = rand();
       if (!H || r > H.p) continue;
       const p = LL(la, lo), g = terrain.heightAt(p.x, p.y);
@@ -95,9 +104,14 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     }
     const cityMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
     litWindows(cityMat, { kind: 'auto', glow: 1.1 }); // homes and offices, by height (night.ts: the DOE lighting schedules)
-    const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cityMat, mats.length);
-    mats.forEach((b, i) => { city.setMatrixAt(i, b.m); city.setColorAt(i, b.c); });
-    grp.add(city);
+    // in tiles 2 km on a side, each its own instanced mesh, so the city behind the camera isn't drawn
+    const box = new THREE.BoxGeometry(1, 1, 1), tiles = new Map<number, typeof mats>(), at = new THREE.Vector3();
+    for (const b of mats) { at.setFromMatrixPosition(b.m); const key = Math.floor(at.x / 2000) * 1000 + Math.floor(at.z / 2000); (tiles.get(key) ?? tiles.set(key, []).get(key)!).push(b); }
+    for (const list of tiles.values()) {
+      const city = new THREE.InstancedMesh(box, cityMat, list.length);
+      list.forEach((b, i) => { city.setMatrixAt(i, b.m); city.setColorAt(i, b.c); });
+      city.computeBoundingSphere(); grp.add(city);
+    }
   }
 
   /* ---------- landmarks ---------- */
