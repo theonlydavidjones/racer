@@ -971,3 +971,10 @@ body.showroom #crewPop{visibility:hidden}
 #msgRecent li{display:block!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 #msgRecent li:nth-child(n+3){display:none!important}
 #msgRecent li.cut::after{content:' ▸';color:var(--accent)}
+/* the flag index, the Race Signals page: "over" signals stacked, the sounds, the rule in plain words under the meaning */
+.fi-pic{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.fi-pic canvas{width:54px;height:auto;display:block}
+.fi-snd{font:700 11px/1 var(--f-inst);letter-spacing:.06em;color:var(--muted);margin-left:6px;white-space:nowrap}
+.fi-more{color:var(--muted);font-size:11.5px;margin-top:3px}
+.fi-race{background:var(--row)!important}
+.fi-intro{color:var(--muted);font-size:11.5px;margin:0 0 4px}
