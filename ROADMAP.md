@@ -33,8 +33,25 @@ What's planned, roughly in order. Done work is described in the README.
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
    (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
    a 20 kt hiking tack (around z 2.55, x 0.6; on main too): fix the crossing path, then sample every 2 cm along each
-   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h).
-3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
+   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h). (Fixed in its own PR, Crew Figures.)
+   Next follow-up (Crew Figures, 12 November; 2–3 h): the crew's legs graze 3–8 cm into the coaming while moving along
+   the side deck (climbing out, passing the thwart, sitting down on the deck), mostly on the route planner from #110.
+   One cause found: in render/crew.ts route(), a goal aft of the thwart isn't updated when the physics target moves
+   forward of it mid-route, so the figure sits and stands at the old spot for a second or more (20 kt tack: crew 1 at
+   2.245 while the physics has her at 1.65). A naive fix upsets other moves, so it's its own piece of work. Done when
+   tests/crewfig.test.ts samples every figure at 0.05, not only the helm, and passes.
+   Parked for the owner to choose (Crew Figures, 12 November; minor by the visual round): in a tack in 12–16 kt the two
+   crew's hips pass within 0.21–0.23 m mid-cockpit for 1–1.3 s (8 and 20 kt are clean). The forward hand's deck seat
+   (1.65, just aft of the jib winch) and the aft hand's climb-out point to pass the thwart (1.85) are only 0.2 m apart,
+   both physical limits. Options: (1) a sit-and-swing over the thwart inside the cockpit (sit on it, legs over, step
+   down onto the after shelf), properly staged; or (2) the main hand tacks the mainsheet from aft of the thwart, at the
+   after shelf, so he never passes forward along the deck (a change to the tack role's station: physics and a pose).
+3. ~~Crystal clarity on the crew and trim controls~~ (done, live in v134: the band with the main halyard renamed, the jib
+   halyard, the Auto-trim and Pole tabs, the windex and the Hail tab, v120–v129; the chase-view layout, v129; every RRS
+   2025–2028 race signal in the flag index and one-line messages with the log, v132; line colours in the boat editor and
+   the committee's call-off shown clearly, v134). Open questions for the owner: (1) on Josephine, does the crew reach
+   the far side of the piano from windward (the sim leans them in, 0.2 m to windward)? (2) bring back a tiller strip
+   (left out because the cursor is the tiller)? The design as agreed: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
    - **The piano**, "mirroring what really exists on Josephine" (the table under Full sail controls: starboard, inboard
@@ -460,6 +477,12 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
 8. ~~**Too much push from rest and through a tack**~~ (done: the drive's shape from the sail model, driveCurve.ts; 1 kt → 90% close-hauled in 6 kt now 50 s; the Delft resistance, below, still to do) (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
+   ~~The AI's slow tack on a hail~~ (done, branch ai-hail-tack: a hailed boat that puts her helm down at once had been
+   called in breach for not reaching head to wind in 5 s, and then fell back onto her old tack; starting to tack is now
+   her response under 20.2(c), and a slow AI boat tacks through rather than gybing round). The Delft resistance is
+   blocked by data: the Folkboat's hull form (waterline beam, canoe-body draft, Cp, Cm, LCB, LCF) isn't published in
+   any source found, and the DSYHS coefficients only in a secondary source (a 2022–23 ULiège thesis reproducing
+   Keuning & Sonnenberg 1999). It needs the class lines plan and offsets (NFIA Plan 1, 1961).
 9. **Sail shape and speed** (sails 2, 6): ~~speed went as the square root of drive~~ (done, branch sail-shape: a share of
    the drive is now worth what it is where it meets the hull's resistance, with the sails' drive changing with her speed:
    dynamics.ts speedForDrive. The effective exponent runs from about 2 in 6 kt to 4.7 near hull speed in 20 kt, so a 20%
@@ -648,7 +671,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and Ballena Bay (no marina outline in OSM). ~~The Estuary's other harbors as water to sail into: Oakland YC, Marina
   Village, Fortmann, Grand Marina, Alameda Marina (Island YC)~~ (done, no berths). Polish: the narrow basins (Marina
   Village's) are only partly cut out of the 50 m terrain, so from the air a few docks seem to stand on land. Polish: the land's 50 m cells make a
-  stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
+  stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.1886 W since San Leandro Bay was added,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
   sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: a dead end, so by continuity: Point
@@ -657,12 +680,16 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
   water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
   as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
-  behind it); San
-  Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong;
-  the same continuity would serve (Alameda's tide, NOAA 9414750), but the world, its terrain and the chart extracts
-  stop at 122.213 W, through the middle of the bay, so the water it fills (east to Arrowhead Marsh) isn't in the sim
-  yet: it needs the world taken a kilometre or two further east first (SFEI's San Leandro Bay model, the other lead,
-  sits behind a browser check that a fetch can't pass); BYC's and Encinal YC's own racing marks aren't published where we could
+  behind it); ~~San
+  Leandro Bay's current~~ (done, bay-east-8: the world taken 2 km further east, to 122.1886 W, and the bay filled
+  by continuity like San Rafael Bay, San Leandro Channel's tide, NOAA 9414724, less the Tidal Canal's measured flow,
+  NOAA's SFB1216 fitted depth-averaged over its section by Manning; the chart's drying flats now wetted through their
+  own bands (DRVAL1 to DRVAL2: they had sat near high water, in San Rafael Bay too); the canal carries much of the
+  fill, the San Leandro Channel the rest, never against the slope (about 0.5 kt peak at its mouth); left out: the
+  bay's water south of the world's edge (toward Oakland Airport) and its marsh, so the fill is a little short, and the
+  canal's jet into the bay, handed over to the bay's own stream within 500 m of the canal's mouth; over the flats the
+  stream is held to a long wave's speed in its depth, √(gD), where continuity through a nearly dry line would drive a
+  bore); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

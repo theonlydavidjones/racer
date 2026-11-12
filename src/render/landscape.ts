@@ -8,6 +8,7 @@ import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
 import { segPt } from '../core/math';
 import { buildBayBridge, BAY_APPROACH } from './bayBridge';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildEastBay } from './eastBay';
 import { clocks, crownDisplayMaterial, floodlit, glints, litWindows, nightOnly, type Glint } from './night';
 
@@ -85,7 +86,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const glass = ['#b7c1c6', '#c9cdc9', '#9fa9ae', '#d8d6cf', '#aab3b4'].map(h => new THREE.Color(h));
     const m0 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const dLat = STEP / 111320, dLon = STEP / (111320 * Math.cos(37.8 * Math.PI / 180));
-    for (let lat = 37.746; lat < 37.975; lat += dLat) for (let lon = -122.515; lon < -122.215; lon += dLon) {
+    for (let lat = 37.746; lat < 37.975; lat += dLat) for (let lon = -122.515; lon < -122.189; lon += dLon) {
       const la = lat + (rand() - 0.5) * dLat * 0.5, lo = lon + (rand() - 0.5) * dLon * 0.5, H = hood(la, lo), r = rand();
       if (!H || r > H.p) continue;
       const p = LL(la, lo), g = terrain.heightAt(p.x, p.y);
@@ -329,9 +330,26 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       m.compose(P3(p.x, p.y, g + h * 0.55), q, new THREE.Vector3(w / 2, h / 2, w / 2 * (0.8 + r() * 0.4)));
       mats.push(m.clone()); cols.push(greens[Math.floor(r() * greens.length)].clone().offsetHSL(0, 0, (r() - 0.5) * 0.05));
     }
-    const trees = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), mats.length);
-    mats.forEach((mm, i) => { trees.setMatrixAt(i, mm); trees.setColorAt(i, cols[i]); });
-    grp.add(trees);
+    // in tiles 1 km on a side, so the woods behind the camera and off the sides aren't drawn, each as round canopies
+    // near by and as simpler ones beyond 2.5 km, where a canopy is a few pixels across (20 faces near, 8 far)
+    const treeMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+    const nearG = new THREE.IcosahedronGeometry(1, 0), farG = new THREE.OctahedronGeometry(1, 0), at = new THREE.Vector3();
+    const tiles = new Map<number, number[]>();
+    mats.forEach((mm, i) => { at.setFromMatrixPosition(mm); const key = Math.floor(at.x / 1000) * 1000 + Math.floor(at.z / 1000); (tiles.get(key) ?? tiles.set(key, []).get(key)!).push(i); });
+    for (const list of tiles.values()) {
+      const lod = new THREE.LOD();
+      for (const [geo, far] of [[nearG, 0], [farG, 2500]] as const) {
+        const t = new THREE.InstancedMesh(geo, treeMat, list.length);
+        list.forEach((k, i) => { t.setMatrixAt(i, mats[k]); t.setColorAt(i, cols[k]); });
+        t.computeBoundingSphere(); lod.addLevel(t, far);
+      }
+      // (the LOD's distance is to its own position: put it in the tile's middle, the canopies' matrices relative to it)
+      const c = (lod.levels[0].object as THREE.InstancedMesh).boundingSphere!.center.clone();
+      lod.position.copy(c);
+      for (const lv of lod.levels) { const t = lv.object as THREE.InstancedMesh, mm = new THREE.Matrix4(), sh = new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z);
+        for (let i = 0; i < t.count; i++) { t.getMatrixAt(i, mm); t.setMatrixAt(i, mm.premultiply(sh)); } t.instanceMatrix.needsUpdate = true; t.computeBoundingSphere(); }
+      grp.add(lod);
+    }
   }
   // lighthouses: Point Bonita (out at the entrance), Lime Point (the Marin foot of the bridge), Mile Rock (off Lands End)
   place(group(block(7, 9, 5, WHITE), new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 10, 8), WHITE).translateY(5), new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 2, 8), RED).translateY(11)), 37.815614, -122.529578);
@@ -526,4 +544,22 @@ function buildBridge(scene: THREE.Scene, groundAt: (x: number, y: number) => num
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lamps, 3));
   const lp = new THREE.Points(lg, new THREE.PointsMaterial({ color: 0xffc56a, size: 2.2, sizeAttenuation: false, fog: false })); lp.visible = false; g.add(lp); bridgeLights.push(lp);
   g.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  // the hundreds of beams, struts and panels in one mesh a colour: drawn as a few draw calls, not one each
+  mergeByMaterial(g, [ORANGE, DARK]);
+}
+
+/** Bake a group's meshes of each of `mats` into one mesh per material (their own transforms baked in). */
+function mergeByMaterial(g: THREE.Group, mats: THREE.Material[]): void {
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  for (const mat of mats) {
+    const parts: THREE.Mesh[] = [];
+    g.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && m.material === mat && m.visible) parts.push(m); });
+    if (parts.length < 2) continue;
+    const geos = parts.map(m => { const gg = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone(); gg.deleteAttribute('uv'); return gg.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)); });
+    const merged = mergeGeometries(geos); geos.forEach(x => x.dispose());
+    if (!merged) continue;
+    for (const m of parts) { m.parent!.remove(m); m.geometry.dispose(); }
+    const one = new THREE.Mesh(merged, mat); one.castShadow = false; one.receiveShadow = false; g.add(one);
+  }
 }

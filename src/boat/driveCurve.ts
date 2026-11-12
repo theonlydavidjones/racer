@@ -37,6 +37,21 @@ export function driveRatio(tws: number, twa: number, v: number, vt: number): num
   const w = Math.round(clamp(tws, 2, 40)), a = Math.round(clamp(twa, 30, 180) / 5) * 5, x = clamp(v / vt * 20, 0, 29.999), q = Math.floor(x), f = x - q;
   return at(w, a, q) * (1 - f) + at(w, a, q + 1) * f;
 }
+/**
+ * driveRatio as a curve for one wind, angle and polar speed: the rounding and the row worked out once, so each look is
+ * a multiply and two reads of the table (the AI's predictions step a speed along it hundreds of times).
+ */
+export function driveCurveFor(tws: number, twa: number, vt: number): (v: number) => number {
+  if (vt <= 0.05) return () => 1;
+  const w = Math.round(clamp(tws, 2, 40)), a = Math.round(clamp(twa, 30, 180) / 5) * 5, row = (w * 64 + a / 5) * 32, s = 20 / vt;
+  return (v: number) => {
+    const x = clamp(v * s, 0, 29.999), q = Math.floor(x), f = x - q;
+    let k0 = cache[row + q], k1 = cache[row + q + 1];
+    if (k0 === 0) k0 = at(w, a, q);
+    if (k1 === 0) k1 = at(w, a, q + 1);
+    return k0 * (1 - f) + k1 * f;
+  };
+}
 function at(w: number, a: number, q: number): number {
   const key = (w * 64 + a / 5) * 32 + q; // (w ≤ 40, a/5 ≤ 36, q ≤ 30: each in its own field, no two conditions share a key)
   let k = cache[key];

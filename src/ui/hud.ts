@@ -13,8 +13,8 @@ import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '..
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
-import { flagCanvas, pennantCanvas } from '../render/flags';
-import { FLAG_NAME } from '../sim/signals';
+import { pennantCanvas, signalCanvas } from '../render/flags';
+import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
 import { transitOffset } from '../sim/transits';
 import { targetShape, type Shape } from '../boat/controls';
@@ -46,7 +46,7 @@ import { keySig, renderKey, type SimKey } from './legend';
 import { layerOn, type LayerKey } from './layers';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
-import { driveRatio } from '../boat/driveCurve';
+import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
 
@@ -178,9 +178,13 @@ export class Hud {
       this.sigKey = key;
       if (!$('flagIndex').hidden) this.flagIndex(w); // (open: what's flying changes under you)
       const box = $('sigFlags'); box.innerHTML = '';
-      for (const f of w.flags) { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(flagCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; box.appendChild(c); }
+      const flagPic = (f: Flag) => { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(signalCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; return c; };
+      // a flag flown over A (AP over A, N over A) is one hoist, one above the other, as it's flown
+      const over = w.flags.includes('A') ? w.flags.filter(f => f !== 'A') : [];
+      if (over.length) { const col = document.createElement('span'); col.className = 'sig-over'; col.title = `${over.map(f => FLAG_NAME[f]).join(', ')} over A`; col.append(...over.map(flagPic), flagPic('A')); box.appendChild(col); }
+      else for (const f of w.flags) box.appendChild(flagPic(f));
       if (!w.flags.length) box.textContent = 'none';
-      if (w.courseSignal) { // the course number, in numeral pennants, top to bottom
+      if (w.courseSignal && !w.cancelled) { // (once racing's called off, there's no course to sail) // the course number, in numeral pennants, top to bottom
         const col = document.createElement('span'); col.className = 'pennants'; col.title = `Course ${w.courseSignal.no}`;
         for (const d of String(w.courseSignal.no)) { const c = document.createElement('canvas'); c.width = 56; c.height = 28; c.getContext('2d')!.drawImage(pennantCanvas(d), 0, 0, 56, 28); col.appendChild(c); }
         // (flags and pennants only on the tile, the owner: the index says what they mean)
@@ -204,7 +208,7 @@ export class Hud {
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
-    $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Cruising' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
+    $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Cruising' : w.cancelled ? (w.cancelled.up[0] === 'N' ? 'Abandoned' : 'Postponed') : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
       u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
@@ -341,14 +345,17 @@ export class Hud {
           ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
           : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
-      } else if (hail.passedOn && hail.respondedAt == null) {
+      } else if (hail.passedOn && hail.clearAt == null) {
         const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
         $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
         el.className = 'row';
-      } else if (hail.respondedAt != null) {
-        const left = Math.max(0, hail.respondedAt + HAIL_RESPONSE - w.t);
+      } else if (hail.clearAt != null) {
+        const left = Math.max(0, hail.clearAt + HAIL_RESPONSE - w.t);
         $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
         el.className = u.lastTackT >= hail.at ? 'row' : 'kc alarm';
+      } else if (hail.respondedAt != null) {
+        $('situMsg').textContent = `${o.name} is tacking to give you room. Tack as soon as she's through the wind.`;
+        el.className = 'kc';
       } else {
         $('situMsg').textContent = `You hailed "Room to tack!" ${o.name} must tack or reply "You tack".`;
         el.className = 'row';
@@ -362,6 +369,8 @@ export class Hud {
   }
 
   private cardKey = '';
+  /** The signal flags drawn into the card's sketch (as data URLs, made once). */
+  private flagUrl: Partial<Record<'N' | 'AP' | 'A', string>> = {};
   /** The "where next" card's header, number and sketch (only rewritten when they change). */
   private card(cls: string, head: string, num: string, unit: string, svg: string): void {
     const key = cls + head + num + unit + svg; if (key === this.cardKey) return; this.cardKey = key;
@@ -401,7 +410,7 @@ export class Hud {
     const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
-      const vtU = polar(u.ww.kt, u.twa, sailPlan(u)), target = steadySpeed(vtU, v => seaDrag(u.sea, u.h, v), v => driveRatio(u.ww.kt, u.twa, v, vtU)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
+      const vtU = polar(u.ww.kt, u.twa, sailPlan(u)), target = steadySpeed(vtU, v => seaDrag(u.sea, u.h, v), driveCurveFor(u.ww.kt, u.twa, vtU)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
       const speed = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%`;
       const d = w.dest;
@@ -420,6 +429,14 @@ export class Hud {
       el.textContent = speed + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
       return;
     }
+    // the committee has called racing off (AP or N over A, signals.ts cancelSignal): that's what's next, whatever the leg
+    if (w.cancelled) {
+      const ab = w.cancelled.up[0] === 'N', img = (f: 'N' | 'AP' | 'A') => (this.flagUrl[f] ??= signalCanvas(f).toDataURL());
+      this.card('ocs', ab ? 'Racing abandoned' : 'Racing postponed', ab ? 'N' : 'AP', 'over A',
+        `<image href="${img(ab ? 'N' : 'AP')}" x="60" y="1" width="31" height="21" preserveAspectRatio="none"/><image href="${img('A')}" x="60" y="24" width="31" height="21" preserveAspectRatio="none"/>`);
+      el.innerHTML = 'No more racing today · sail home'; // (the wind that called it off is in the message)
+      return;
+    }
     if (w.t < 0 || u.ocs || !u.started) {
       const d = w.lineD(bow(u)), uN = Math.sin(u.h * D2R) * w.N.x + Math.cos(u.h * D2R) * w.N.y;
       // the end closer to the wind on the water is favored
@@ -436,7 +453,7 @@ export class Hud {
       }
       // time to the line on this heading if you sheet in now: accelerating from your current speed, with the current
       const cN = u.cur.x * w.N.x + u.cur.y * w.N.y;
-      const vtL = polar(u.ww.kt, u.twa, sailPlan(u)), tl = uN > 0.15 ? timeToCover(-d, u.v, vtL, uN, cN, 240, v => driveRatio(u.ww.kt, u.twa, v, vtL)) : Infinity;
+      const vtL = polar(u.ww.kt, u.twa, sailPlan(u)), tl = uN > 0.15 ? timeToCover(-d, u.v, vtL, uN, cN, 240, driveCurveFor(u.ww.kt, u.twa, vtL)) : Infinity;
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
       this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0));

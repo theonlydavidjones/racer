@@ -21,7 +21,8 @@ import { WHARF, onLand } from '../src/geo/shore';
 import { inBasin } from '../src/geo/marina';
 import { beatAngle } from '../src/boat/polar';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from '../src/sim/obstruction';
-import { rightOfWay, newPairRecord } from '../src/rules';
+import { begunTack } from '../src/rules/pairs';
+import { rightOfWay, newPairRecord, hailBreach, assessPair } from '../src/rules';
 import { boat, WIND } from './diagram';
 
 const SS2 = ss2 as unknown as CourseFile, SS41 = ss41 as unknown as CourseFile;
@@ -184,7 +185,7 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
       }
     }
     expect(tried).toBeGreaterThan(0);
-  });
+  }, 30_000); // (three short races round the Wharf's piers: ~5 s alone, more under a parallel suite's load)
 
   it('Alcatraz as the mark (course 41): she may not hail a boat that is fetching it (20.1, last sentence), but may one that is not', () => {
     const { w, u, red } = race(SS41);
@@ -230,4 +231,128 @@ describe('Rule 20.2(e): while a hail for room to tack is under way, rule 18.2 do
     rec.hail = { by: blue.id, at: 49, kind: 'room' };
     expect(rightOfWay(red, blue, ctx, rec).rule).not.toBe('18.2(a)');
   });
+});
+
+describe('Rule 20.2(c): the hailed boat responds by starting to tack, however slow she is', () => {
+  //   "the hailed boat shall respond either by tacking as soon as possible, or by immediately replying 'You tack'"
+  // A boat slowed in dirty air turns slowly (her rudder needs water over it): the response is putting the helm down, not
+  // getting through head to wind within the 5 s allowed (rules/pairs.ts TACK_BEGUN).
+  it('turned up 15° from her heading at the hail, she has responded; drifting a few degrees in the sea, she has not', () => {
+    const hailed = { id: 1, h: 315, lastTackT: -999, tacking: false, ww: { from: 0 } } as Parameters<typeof begunTack>[0];
+    const h = { at: 50, headAt: { 1: { h: 315, wind: 0 } } };
+    expect(begunTack(hailed, h, 0)).toBe(false);
+    hailed.h = 322; expect(begunTack(hailed, h, 0)).toBe(false); // 7° up: the sea knocks her about this much
+    hailed.h = 331; expect(begunTack(hailed, h, 0)).toBe(true);
+    hailed.h = 300; expect(begunTack(hailed, h, 0)).toBe(false); // bearing away is no tack
+    expect(begunTack({ ...hailed, h: 331 }, { at: 50 }, 0)).toBe(false); // heading at the hail unknown: only head to wind counts
+  });
+  it('her response starts the clock on nothing: the hailing boat\'s 5 s (20.2(d)) run from when she is through the wind', () => {
+    const mk = (id: number, h: number) => ({ id, h, x: 0, y: 0, vx: 0, vy: 0, tack: 'S' as const, tacking: false, lastTackT: -999, penalty: 0, ocs: false, started: true, leg: 0, ww: { from: 0 } });
+    const L = mk(0, 315), M = mk(1, 315), rec = newPairRecord();
+    rec.hail = { by: L.id, at: 50, kind: 'room', headAt: { 0: { h: 315, wind: 0 }, 1: { h: 315, wind: 0 } } };
+    M.h = 335; expect(hailBreach(rec, L, M, 52, 0)).toBeNull();
+    expect(rec.hail.respondedAt).toBe(52); expect(rec.hail.clearAt).toBeUndefined();
+    expect(hailBreach(rec, L, M, 58, 0)).toBeNull(); // L waits for her: M still swinging through the wind
+    M.lastTackT = 59; M.tacking = true; M.tack = 'P' as never;
+    expect(hailBreach(rec, L, M, 59, 0)).toBeNull(); expect(rec.hail.clearAt).toBe(59);
+    expect(hailBreach(rec, L, M, 64.5, 0)).toMatchObject({ boat: L, role: 'hailer' });
+  });
+  it('begun but never through the wind is no response', () => {
+    const mk = (id: number, h: number) => ({ id, h, x: 0, y: 0, vx: 0, vy: 0, tack: 'S' as const, tacking: false, lastTackT: -999, penalty: 0, ocs: false, started: true, leg: 0, ww: { from: 0 } });
+    const L = mk(0, 315), M = mk(1, 335), rec = newPairRecord();
+    rec.hail = { by: L.id, at: 50, kind: 'room', headAt: { 0: { h: 315, wind: 0 }, 1: { h: 315, wind: 0 } } };
+    expect(hailBreach(rec, L, M, 51, 0)).toBeNull();
+    expect(hailBreach(rec, L, M, 66.5, 0)).toMatchObject({ boat: M, role: 'hailed' });
+  });
+  const mk = (id: number, h: number) => ({ id, h, x: 0, y: 0, vx: 0, vy: 0, tack: 'S' as 'S' | 'P', tacking: false, lastTackT: -999, penalty: 0, ocs: false, started: true, leg: 0, ww: { from: 0 } });
+  const hail = (o: Partial<NonNullable<ReturnType<typeof newPairRecord>['hail']>> = {}) => {
+    const rec = newPairRecord(); rec.hail = { by: 0, at: 50, kind: 'room', headAt: { 0: { h: 315, wind: 0 }, 1: { h: 315, wind: 0 } }, ...o }; return rec;
+  };
+  it('the hailing boat may not luff 15° and hold it: she too must go through the wind (20.2(d))', () => {
+    const L = mk(0, 315), M = mk(1, 315), rec = hail({ replyAt: 51 });
+    expect(hailBreach(rec, L, M, 52, 0)).toBeNull();
+    L.h = 335; expect(hailBreach(rec, L, M, 54, 0)).toBeNull(); // she luffs within the 5 s
+    expect(hailBreach(rec, L, M, 68, 0)).toBeNull();
+    expect(hailBreach(rec, L, M, 69.5, 0)).toMatchObject({ boat: L, role: 'hailer' }); // and holds it, never tacking
+  });
+  it('a shift that frees her mid-luff does not undo her start', () => {
+    const L = mk(0, 315), M = mk(1, 333), rec = hail();
+    expect(hailBreach(rec, L, M, 52, 0)).toBeNull(); // begun (TWA 27)
+    M.h = 339; M.ww.from = 14; // still turning up, but a 14° veer puts her TWA at 35
+    expect(hailBreach(rec, L, M, 57, 14)).toBeNull();
+    expect(rec.hail!.respondedAt).toBe(52);
+  });
+  it('a late hailing boat is still judged after the hail is half a minute old', () => {
+    const L = mk(0, 315), M = mk(1, 315), rec = hail();
+    rec.hail!.respondedAt = 52; rec.hail!.clearAt = 65; // a slow hailed boat, through the wind at 65
+    M.lastTackT = 65; M.tacking = true;
+    L.h = 337; // the hailing boat luffs at 69.5 and holds it
+    expect(hailBreach(rec, L, M, 69.5, 0)).toBeNull();
+    // (through assessPair, which also retires stale hails: 30 s after the hail itself would have dropped it at 80)
+    M.x = 40; const cx = (t: number) => ({ t, windFrom: 0, marks: [] });
+    for (let t = 70; t <= 84; t += 0.5) expect(assessPair(rec, L, M, cx(t), { swerve: false }).incident).toBeNull();
+    expect(rec.hail).not.toBeNull();
+    expect(assessPair(rec, L, M, cx(84.6), { swerve: false }).incident).toMatchObject({ kind: 'hail', fouler: L, hailRole: 'hailer' });
+  });
+  it('the hailed boat that luffs and bears away again has not responded', () => {
+    const L = mk(0, 315), M = mk(1, 335), rec = hail();
+    expect(hailBreach(rec, L, M, 51, 0)).toBeNull();
+    M.h = 312; expect(hailBreach(rec, L, M, 52, 0)).toBeNull();
+    expect(rec.hail!.respondedAt).toBeUndefined();
+    expect(hailBreach(rec, L, M, 55.5, 0)).toMatchObject({ boat: M, role: 'hailed' });
+  });
+  it('a lift after the hail, or coming up from footing to close-hauled, is not beginning to tack', () => {
+    const M = mk(1, 330); M.ww.from = 15; // the wind lifted her 15° and she followed it
+    expect(begunTack(M, { at: 50, headAt: { 1: { h: 315, wind: 0 } } }, 0)).toBe(false);
+    const F = mk(1, 318); // footing at 60° when hailed, now close-hauled at 42°
+    expect(begunTack(F, { at: 50, headAt: { 1: { h: 300, wind: 0 } } }, 0)).toBe(false);
+  });
+  it('20.3: luffing first and then passing the hail on, she waits for the boat to windward without breach', () => {
+    const L = mk(0, 315), M = mk(1, 333), rec = hail();
+    expect(hailBreach(rec, L, M, 51, 0)).toBeNull(); // she's begun
+    rec.hail!.passedOn = { to: 2, at: 51.5 }; // then sees W to windward and passes it on
+    expect(hailBreach(rec, L, M, 70, 0)).toBeNull(); // W not through yet: M can't tack
+    rec.hail!.passedOn.respondedAt = 71;
+    expect(hailBreach(rec, L, M, 85, 0)).toBeNull();
+    expect(hailBreach(rec, L, M, 86.5, 0)).toMatchObject({ boat: M, role: 'hailed' }); // 15 s from W through, still not
+  });
+  for (const [name, seed] of [PLACES[0], PLACES[3]] as const) for (const v0 of [0.9, 2.4]) {
+    it(`two AI boats off ${name}, the hailed one at ${v0} m/s: both tack and stay tacked`, () => {
+      const w = new World(SS2, settings({ fleet: 2 }), 4);
+      w.t = 30; for (const b of w.boats) { b.started = true; b.ocs = false; b.leg = 0; }
+      w.step(DT);
+      const [u, red, blue] = w.boats, p = pinnedSpot(w, seed, 'S')!, wv = V(w.wind.from);
+      u.x += 3000;
+      sail(w, red, p, 'S'); sail(w, blue, { x: p.x + wv.x * 9, y: p.y + wv.y * 9 }, 'S'); blue.v = v0;
+      w.pairs = {};
+      w.hail(red, blue, 'room');
+      const at = w.t;
+      for (let i = 0; i < 60 * 20; i++) w.step(DT);
+      for (const b of [red, blue]) {
+        expect(b.lastTackT, `${b.name} tacked`).toBeGreaterThan(at);
+        expect(b.tack, `${b.name} on port`).toBe('P');
+      }
+    });
+  }
+  for (const v0 of [0.9, 1.4, 1.9]) {
+    it(`an AI boat sailing ${v0} m/s, hailed off Alcatraz, tacks through the wind and is not in breach`, () => {
+      const { w, u, red } = race();
+      const p = pinnedSpot(w, PLACES[0][1], 'S')!, wv = V(w.wind.from);
+      sail(w, u, p, 'S'); sail(w, red, { x: p.x + wv.x * 9, y: p.y + wv.y * 9 }, 'S'); red.v = v0;
+      w.pairs = {};
+      w.userHail();
+      const at = w.t;
+      let responded = NaN, redFoul = false;
+      for (let i = 0; i < 60 * 9; i++) {
+        w.step(DT);
+        const h = w.pairRecord(u, red)?.hail;
+        if (isNaN(responded) && h?.respondedAt != null) responded = h.respondedAt - at;
+        for (const e of w.drainEvents()) if (e.type === 'incident' && e.incident.fouler === red) redFoul = true;
+      }
+      expect(responded, 'she put her helm down within the 5 s').toBeLessThan(5);
+      expect(red.tack, 'through the wind onto port, not gybed round').toBe('P');
+      expect(red.lastTackT).toBeGreaterThan(at);
+      expect(redFoul).toBe(false);
+    });
+  }
 });

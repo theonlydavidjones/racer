@@ -464,7 +464,10 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   const ext = tip.clone().addScaledVector(d.normalize(), Math.max(0.2, reach));
   const sheet = V(s * 0.12, 0.95, THWART.z + 0.15).lerp(chest, 0.35);
   const hands: [THREE.Vector3, THREE.Vector3] = s > 0 ? [ext, sheet] : [sheet, ext];
-  return { hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0, feet: [foot(0), foot(1)], hands, look: JIB_LUFF.clone() };
+  // (sat out on the side deck, the knees up over the coaming's top as the legs come in over it, not let down level with
+  // it: a helm sat out in a breeze had the top of the shin through it)
+  const kneeUp = hx > chz(fz) - 0.05 ? V(-s * 0.5, 1, -0.2) : undefined;
+  return { hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0, feet: [foot(0), foot(1)], hands, look: JIB_LUFF.clone(), knee: kneeUp };
 }
 
 /** The helm crossing in a tack or gybe: crouched across the after deck under the boom, the extension kept in hand
@@ -668,8 +671,10 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   c.look.lerp(want.look, a);
   // (the knees turn to where the pose points them over a tenth of a second, and back to forward the same way; but at
   // once as a foot steps down inside the coaming, so that knee drops in with it rather than dragging across the top;
-  // and slowly, a third of a second, sitting down on the side deck with the hips held up clear of the coaming)
-  const kw = c.kneeW ?? (c.knee ? 1 : 0), tk = want.kneeSlow ? 0.3 : !want.knee && c.feet.some(p => Math.abs(p.x) < chz(p.z) + 0.03) ? 1e-3 : 0.1;
+  // and slowly, a third of a second, sitting down on the side deck with the hips held up clear of the coaming; and
+  // turning to the new way over a fifth when both feet are out on the deck already, as she sets off along it turning to
+  // face along it (the knee swung out at more than 5 m/s); stepping up out of the cockpit, over the coaming, as before)
+  const kw = c.kneeW ?? (c.knee ? 1 : 0), tk = want.kneeSlow ? 0.3 : !want.knee && c.feet.some(p => Math.abs(p.x) < chz(p.z) + 0.03) ? 1e-3 : want.knee && c.feet.every(p => Math.abs(p.x) > chz(p.z)) ? 0.2 : 0.1;
   c.kneeW = kw + Math.max(-dt / tk, Math.min(dt / tk, (want.knee ? 1 : 0) - kw));
   if (want.knee) c.knee = want.knee.clone(); else if (c.kneeW <= 0) c.knee = undefined;
   return c;
@@ -741,7 +746,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const seated = (q: typeof a) => !!q && (q.pose === 'sit' || q.pose === 'lee' || q.pose === 'hike' || q.pose === 'cross');
     if (seated(a) && seated(o) && (Math.sign(o!.x) === Math.sign(a!.x) || a!.pose === 'cross' || o!.pose === 'cross') && inC(zs[i]) && inC(zs[j]) && Math.abs(zs[i] - zs[j]) < SEP) {
       const fore = Math.min(zs[i], zs[j]), lo = Math.min(fore, ZMAX - SEP);
-      if (zs[i] >= zs[j]) { zs[j] = lo; zs[i] = lo + SEP; } else { zs[i] = lo; zs[j] = lo + SEP; }
+      // (in their order along the cockpit, front to back, as the physics keeps them (crewPhys.ts stationZ): not by where
+      // each is this moment. One still crossing can be a little forward of the other for a second, and the one sat
+      // forward was put aft past the thwart, then left there when the other moved on)
+      zs[j] = lo; zs[i] = lo + SEP;
     }
   }
   // (two of them in the middle sit side by side on the sole)

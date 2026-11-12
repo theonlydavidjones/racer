@@ -4,7 +4,7 @@ import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, s
 import { crewMass, crewMoment, displacement } from './crewPhys';
 import { condition } from './condition';
 import { driveSpeedRatio, hullResistance } from './dynamics';
-import { driveRatio } from './driveCurve';
+import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
 import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -98,7 +98,7 @@ export function situation(b: Boat, ctx: CoachContext = {}): Situation {
 /** What a share K of the drive is worth in speed for her, sailing as she is (dynamics.ts driveSpeedRatio). */
 export function driveSpeed(b: Boat, K: number): number {
   const twa = Math.min(180, b.twa + (b.leeway ?? 0)), vt = Math.max(0.5, polar(b.ww.kt, twa, sailPlan(b)));
-  return driveSpeedRatio(vt, K, u => driveRatio(b.ww.kt, twa, u, vt));
+  return driveSpeedRatio(vt, K, driveCurveFor(b.ww.kt, twa, vt));
 }
 /**
  * How fast she'd go with these settings, relative (the same factors physics.ts multiplies the polar by: the sails'

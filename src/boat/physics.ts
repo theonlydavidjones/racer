@@ -4,7 +4,7 @@ import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
-import { driveRatio } from './driveCurve';
+import { driveCurveFor } from './driveCurve';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
@@ -144,14 +144,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     let err = wrap(b.desired - b.h);
     const ai = b.ai;
     // a commitment ends when the turn is nearly done or she wants to go somewhere else
-    if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || Math.abs(wrap(b.desired - ai.commitFor)) > 45)) ai.turnCommit = 0;
+    if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
     if (ai && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < SLOW_TACK ? -Math.sign(err) : Math.sign(err);
-      ai.commitFor = b.desired;
+      ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
       const long = err + ai.turnCommit * 360;
@@ -247,7 +247,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     K *= full > 0 ? up / full : 0;
   }
   const crs = Math.min(180, twa + (b.leeway ?? 0)), vB = target;
-  target = speedForDrive(vB, K, u => driveRatio(ww.kt, crs, u, vB));
+  target = speedForDrive(vB, K, driveCurveFor(ww.kt, crs, vB));
   if (b.luff) target *= luffDriveFactor(twa); // (luffing: HANDLING's calibrated slowing, on the speed)
   // under bare poles she still drifts off downwind on the windage of her hull and rig (about a tenth of the wind)
   if (partUp) target = Math.max(target, 0.1 * ww.kt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)));
@@ -274,7 +274,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // zone, where she stops (the flogging cloth only as much as is hoisted; struck, the bare rig's windage at any angle
   // forward of the beam)
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp, b.luff || hm < 1 || hj < 1 ? undefined : u => driveRatio(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), u, target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
@@ -589,7 +589,7 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
   if (stepCache.size > 20000) stepCache.clear();
   const vP = Math.max(0.3, polar(tws, twa, plan)), jibOn = plan === 'jib';
   // (speed from push where the push meets the hull's resistance: near K = 1 a share K of the drive is worth K^(1/n) in speed)
-  const n = driveExponent(vP, u => driveRatio(tws, twa, u, vP));
+  const n = driveExponent(vP, driveCurveFor(tws, twa, vP));
   const wind = (heel: number) => sailWind(0, tws, -twa, vP, 0, heel), awa = wind(0).awa;
   // the sails as the crew sets them at each step (controls.ts crewShapes)
   const jibAng = optimalSheet('jib', awa);
@@ -783,6 +783,8 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
  * comes in on a winch, slower as the breeze builds. Then work out each sail's angle of attack and shape.
  */
 type Ctl = Exclude<keyof Controls, 'car'>;
+// (the lines the crew works, as constants: trimSails runs every step for every boat)
+const CREW_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const, CREW_LINES_T = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const, FIXABLE_LINES = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
 function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   if (!b.crewReady) b.awaSlow = awa; // (set up before she sails: for the wind she has)
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
@@ -835,7 +837,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
     if (b.isUser) {
-      for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) if (byHand(b, k)) fixed[k] = c[k];
+      for (const k of FIXABLE_LINES) if (byHand(b, k)) fixed[k] = c[k];
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
     if (b.isUser && byHand(b, 'mainsheet')) fixed.mainsheet = c.mainsheet;
@@ -857,7 +859,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const want: Partial<Record<Ctl, number>> = {};
   // (a line is moved only if it's worth the trip: a skilled crew sees smaller gains, ~0.1% of drive; a novice ~0.4%)
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
-  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
+  for (const k of CREW_LINES_T) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
   if (!byHand(b, 'mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!byHand(b, 'jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
@@ -870,7 +872,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (b.carPlan) { c.car.S = { ...b.carPlan }; c.car.P = { ...b.carPlan }; }
   }
   on = crewJobs(b, want, dt);
-  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
+  for (const k of CREW_LINES) {
     if (byHand(b, k)) hand(k); else move(k, want[k]!);
   }
   // the main: traveller and mainsheet together, for the boom angle and the leech tension (whichever the crew has)
