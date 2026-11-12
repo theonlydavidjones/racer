@@ -273,6 +273,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     for (const m of w.touchableMarks(b)) { const d = dist(m.p, b); if (d < MARK_CLEAR && d < nd + 10) { nd = d; near = m.p; } } // and away from the marks
     ai.clearing = !!near && b.penalty >= b.penaltyTotal - 1; // not started turning yet
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
+    // Once she's turning she must still keep clear of every boat (Rule 21.2): with one closing on her, she breaks off
+    // the turns and sails away from it, and carries on turning once it's past. (Spinning on regardless, she fouled the
+    // boats that came by: about a fifth of the AI's fouls.)
+    if (!ai.clearing) for (const o of w.boats) {
+      if (o === b || o.finished || dist(o, b) > 30) continue;
+      const c = cpa(b, o);
+      if (c.t < 6 && c.d < 9) { b.desired = sailable(b, brg(b.x - o.x, b.y - o.y)); break; }
+    }
     b.luff = false; return;
   }
   ai.clearing = false;
