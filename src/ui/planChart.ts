@@ -8,7 +8,7 @@ import { chartPoint } from './chart';
 import { brg, dist, wrap, type Vec } from '../core/math';
 import type { SetupPicks } from './setupChart';
 import type { World } from '../sim/world';
-import { passageNow } from '../sim/navigator';
+import { passageNow, whyNot } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
 import { mins } from '../sim/brief';
 
@@ -179,7 +179,7 @@ export class PlanChart {
         const turns = [pn.tacks.length ? `${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : '', pn.gybes.length ? `${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ');
         way += pn.ok
           ? `<p><b>Sailing it:</b> about ${(pn.sailedM / 1852).toFixed(1)} nm over the ground${turns ? `, ${turns}` : ''}; ${mins(pn.minutes)}, leaving ${clockOf(pn.leave)} and arriving about <b>${clockOf(pn.eta!)}</b> (the Folkboat's polar speeds in the forecast wind and NOAA's current).</p>`
-          : `<p class="warn">Leaving at ${clockOf(pn.leave)} she can't get there: becalmed against the tide on the way. Try another time in the setup.</p>`;
+          : `<p class="warn">Leaving at ${clockOf(pn.leave)} she can't get there: ${whyNot(pn.why)}.</p>`;
       }
     }
     $('planInfo').innerHTML = `<p><b>Start:</b> ${name(from)}</p><p><b>Destination:</b> ${name(to)}</p>${way}${this.msg ? `<p class="warn">${this.msg}</p>` : ''}`;

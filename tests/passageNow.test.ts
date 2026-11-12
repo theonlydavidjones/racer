@@ -41,3 +41,49 @@ describe('the passage she would sail leaving now', () => {
     expect(Math.abs(real.minutes - slack.minutes)).toBeGreaterThan(0.5);
   });
 });
+
+import { sailLeg } from '../src/sim/routing';
+import { beatAngle } from '../src/boat/polar';
+import { LL } from '../src/geo/geo';
+import { KT, V, brg, wrap } from '../src/core/math';
+import { onLand } from '../src/geo/shore';
+import type { Outlook } from '../src/sim/outlook';
+
+/** A plain day for sailLeg: one wind and one current everywhere, flat water. */
+const plain = (kt: number, from: number, cur: { kt: number; to: number }): Outlook => {
+  const c = V(cur.to), cv = { x: c.x * cur.kt * KT, y: c.y * cur.kt * KT };
+  return { t0: 0, stations: null, wind: () => ({ kt, from, gust: 1 }), current: () => cv, windOnWater: () => ({ kt, from }),
+    sea: () => { throw new Error('not used'); }, chop: () => ({ hs: 0, tp: 2 }), breeze: () => ({ kt, from, gust: 1 }) } as unknown as Outlook;
+};
+
+describe('sailLeg (the review of the course estimate)', () => {
+  it("doesn't hold a fetch she can't lay: a cross-tide setting her to leeward makes a reach a beat, tacked on the layline", () => {
+    // 8 kt from 000; the mark 1500 m on 310° (a close reach on paper); a knot of current setting 220°, to leeward
+    const a = LL(37.8350, -122.4000), u = V(310), b = { x: a.x + u.x * 1500, y: a.y + u.y * 1500 };
+    expect(onLand(a) || onLand(b)).toBe(false);
+    const r = sailLeg(plain(8, 0, { kt: 1, to: 220 }), a, b, 0, 'middle');
+    expect(r.ok).toBe(true); expect(r.turns.length).toBeGreaterThan(0); expect(r.turns.every(q => q.kind === 'tack')).toBe(true);
+    // and never closer to the wind, through the water, than she can sail (her polar's beat angle, less a little for the
+    // wind's own bend by the current)
+    const beat = beatAngle(8);
+    for (let i = 1; i < r.path.length; i++) {
+      const d = { x: r.path[i].p.x - r.path[i - 1].p.x, y: r.path[i].p.y - r.path[i - 1].p.y }, dt = (r.path[i].t - r.path[i - 1].t) * 60;
+      if (dt <= 0 || r.turns.some(q => dist(q.p, r.path[i - 1].p) < 1)) continue; // (not across a tack: she's stopped in it, drifting)
+      const cv = V(220), wv = { x: d.x / dt - cv.x * KT, y: d.y / dt - cv.y * KT }; // (through the water)
+      expect(Math.abs(wrap(brg(wv.x, wv.y) - 0)), `step ${i}`).toBeGreaterThan(beat - 8);
+    }
+  });
+
+  it('runs on from where she rounded each turn of the route: the track has no jumps', () => {
+    const pn = passageNow(at({ sailTo: 'raccoon' }))!;
+    expect(pn.route.length).toBeGreaterThan(2);
+    let worst = 0; for (let i = 1; i < pn.track.length; i++) worst = Math.max(worst, dist(pn.track[i - 1].p, pn.track[i].p));
+    expect(worst).toBeLessThan(110); // (a point every 30 s at most: about 3 m/s × 30 s, and the current)
+  });
+
+  it('is worked out again when the conditions change under way (the pause menu: World.applyConditions)', () => {
+    const w = at({}), a = passageNow(w)!;
+    w.applyConditions({ ...w.settings, current: 'slack' });
+    const b = passageNow(w)!; expect(b).not.toBe(a);
+  });
+});

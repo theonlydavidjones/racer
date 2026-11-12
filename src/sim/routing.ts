@@ -31,8 +31,10 @@ export interface SailResult {
   /** Track over the ground, one point every 30 s: position and minute (since epoch UTC). */
   path: { p: Vec; t: number }[];
   tacks: number;
-  /** Where she tacked or gybed (the points on her track where she turned through the wind). */
-  turns: Vec[];
+  /** Where she tacked or gybed (the points on her track where she turned through the wind), and which. */
+  turns: { p: Vec; kind: 'tack' | 'gybe' }[];
+  /** Why she didn't get there: she ran ashore (the plan's lanes took her into the land), or ran out of time (`maxMin`). */
+  why?: 'land' | 'time';
   /** Average true wind along the way (kt), and the average current along the straight course (kt, + helping). */
   meanKt: number; meanCurAlong: number;
   /** How far she went from the straight course (m): the farthest point left (+) or right (−) of it, looking from start to mark. */
@@ -101,7 +103,13 @@ function crabTo(u: Vec, c: Vec, v: number): number {
 export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
-  const turns: Vec[] = [];
+  const turns: SailResult['turns'] = [];
+  let turnedNow = false;
+  /** A tack or a gybe here: where, on the drawn track, and the time it costs (she's stopped in it, drifting). */
+  const turn = (kind: 'tack' | 'gybe', c: Vec) => {
+    tacks++; turns.push({ p: { ...p }, kind }); path.push({ p: { ...p }, t }); turnedNow = true;
+    t += MANOEUVRE_S / 60; p = { x: p.x + c.x * MANOEUVRE_S, y: p.y + c.y * MANOEUVRE_S };
+  };
   const path = [{ p: { ...p }, t }];
   let sumKt = 0, sumCur = 0, n = 0, maxLeft = 0, maxRight = 0, minShore = Infinity;
   const w0 = windFor(o, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, t0, sc), off0 = Math.abs(wrap(brg(legU.x, legU.y) - w0.from));
@@ -112,7 +120,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     const ang = kind === 'run' ? runAngle(w0.kt) : beatAngle(w0.kt), bb = brg(legU.x, legU.y);
     tack = Math.abs(wrap(bb - (w0.from - ang))) <= Math.abs(wrap(bb - (w0.from + ang))) ? 'S' : 'P';
   }
-  let mode: LegKind | null = null;
+  let mode: LegKind | null = null, side = 0; // (side: which side of the wind her heading is on, + starboard)
   const maxSteps = maxMin * 60 / DT;
   while (dist(p, b) > arrive && steps < maxSteps) {
     steps++;
@@ -123,6 +131,10 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     const off = Math.abs(wrap(bb - w.from)), beat = ch.hs < 0.02 ? beatAngle(w.kt) : beatInChop(w.kt, ch.hs, ch.tp), run = runAngle(w.kt);
     // what kind of sailing it is now (with a little hysteresis, so she doesn't flicker between beating and reaching)
     mode = off < beat - (mode === 'beat' ? -4 : 0) ? 'beat' : off > run + (mode === 'run' ? -4 : 0) ? 'run' : 'reach';
+    // a reach she can't hold: crabbing into the current to make the line good over the ground would put her above
+    // close-hauled (a cross-tide setting her to leeward on a fetch), or deeper than her run: then it's a beat (or a run),
+    // tacked (or gybed) on the layline the current makes
+    if (mode === 'reach') { const tc = Math.abs(wrap(crabTo(u, c, sp(off)) - w.from)); if (tc < beat) mode = 'beat'; else if (tc > run) mode = 'run'; }
     let h: number, v: number;
     if (mode === 'reach') {
       v = sp(off); h = crabTo(u, c, v);
@@ -134,26 +146,33 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       // can she lay the mark on this tack (her track over the ground, current and all, reaches it)?
       const lays = (T: 'S' | 'P') => { const g = gnd(T), r = wrap(bb - brg(g.x, g.y)) * (T === 'S' ? sgn : -sgn); return r >= 0 && r < 90; };
       const near = dist(p, b) < 400;
-      const ahead = (T: 'S' | 'P') => { if (near || sd > 300) return false; const g = gnd(T), q = { x: p.x + g.x * 45, y: p.y + g.y * 45 }; return landDist(q) < 50; };
+      // the room ahead on a tack: how close to the land she'd be in a minute and a half (m, up to 600)
+      const room = (T: 'S' | 'P') => { const g = gnd(T); return landDist({ x: p.x + g.x * 90, y: p.y + g.y * 90 }); };
+      const other = tack === 'S' ? 'P' : 'S';
       let flip = false;
       if (lays(tack)) { /* hold on and steer for the mark */ }
-      else if (lays(tack === 'S' ? 'P' : 'S')) flip = true;
-      else if (ahead(tack) && !ahead(tack === 'S' ? 'P' : 'S')) flip = true;
+      else if (lays(other)) flip = true;
+      // closing the shore: tack (or gybe) off it toward the side with more room, as a skipper does before the shallows
+      else if (!near && sd < 400 && room(tack) < 80 && room(other) > room(tack)) flip = true;
       else if (plan === 'middle') {
         const xt = cross(legU, sub(p, a)); // + left of the straight course
         if ((tack === 'S' && xt > lim) || (tack === 'P' && xt < -lim)) flip = true;
       }
-      if (flip) { tack = tack === 'S' ? 'P' : 'S'; tacks++; turns.push({ ...p }); t += MANOEUVRE_S / 60; p = { x: p.x + c.x * MANOEUVRE_S, y: p.y + c.y * MANOEUVRE_S }; }
+      if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c); }
       h = hd(tack); v = vb;
       if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
         const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
         if (mode === 'beat' ? twa >= beat : twa <= run) { h = hm; v = sp(twa); }
       }
     }
+    // her heading across the wind from the last step's however she came to it (a reach turned beat, a beat's last board
+    // laid for the mark): that's a tack or a gybe too, and costs the same
+    // (within 8° of dead downwind she sails a little by the lee rather than gybe: a crossing there isn't counted)
+    { const r = wrap(h - w.from), sd2 = Math.abs(r) < 172 ? Math.sign(r) : 0; if (side && sd2 && sd2 !== side && !turnedNow) turn(Math.abs(r) < 90 ? 'tack' : 'gybe', c); if (sd2) side = sd2; turnedNow = false; }
     const d = V(h);
     p = { x: p.x + (d.x * v + c.x) * DT, y: p.y + (d.y * v + c.y) * DT };
     t += DT / 60;
-    if (onLand(p) && dist(p, b) > 400) return result(false);
+    if (onLand(p) && dist(p, b) > 400) return result(false, 'land');
     const xt = cross(legU, sub(p, a));
     maxLeft = Math.max(maxLeft, xt); maxRight = Math.max(maxRight, -xt);
     minShore = Math.min(minShore, sd);
@@ -161,10 +180,11 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     if (steps % 3 === 0) path.push({ p: { ...p }, t });
   }
   path.push({ p: { ...p }, t });
-  return result(dist(p, b) <= arrive);
+  const there = dist(p, b) <= arrive;
+  return result(there, there ? undefined : 'time');
 
-  function result(ok: boolean): SailResult {
-    return { ok, minutes: t - t0, kind, path, tacks, turns, meanKt: n ? sumKt / n : 0, meanCurAlong: n ? sumCur / n : 0, maxLeft, maxRight, minShore };
+  function result(ok: boolean, why?: 'land' | 'time'): SailResult {
+    return { ok, why, minutes: t - t0, kind, path, tacks, turns, meanKt: n ? sumKt / n : 0, meanCurAlong: n ? sumCur / n : 0, maxLeft, maxRight, minShore };
   }
 }
 
