@@ -5,3 +5,4 @@ export * from './geometry';
 export * from './rightOfWay';
 export * from './pairs';
 export * from './explain';
+export * from './scoring';

@@ -178,7 +178,7 @@ const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100
 const mmss = (s: number) => `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ':' : ''}${String(Math.floor(s / 60) % 60).padStart(Math.floor(s / 3600) ? 2 : 1, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 const dayLabel = (e: LogEntry) => new Date(e.day + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 function raceRow(e: LogEntry): string {
-  const place = e.code === 'unfinished' ? 'Not finished' : e.code && e.code !== 'ZFP' ? e.code : e.place != null ? `${nth(e.place)} of ${e.of}${e.code ? ' (ZFP)' : ''}` : '—';
+  const place = e.code === 'unfinished' ? 'Not finished' : e.code && e.code !== 'ZFP' ? e.code : e.place != null ? `${e.tied ? '=' : ''}${nth(e.place)} of ${e.of}${e.code ? ' (ZFP)' : ''}` : '—';
   return `<tr><td>${dayLabel(e)}</td><td>${esc(e.title)}<small>${esc(e.wind)}</small></td><td>${place}</td><td>${e.elapsed != null ? mmss(e.elapsed) : '—'}</td><td>${e.skipper === 'you' ? 'You' : 'AI'}</td></tr>`;
 }
 function crewRow(e: LogEntry): string {

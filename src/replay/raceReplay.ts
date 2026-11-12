@@ -146,7 +146,7 @@ export class RaceReplay {
   /** Against the winner: the gap, then each leg with what you lost or gained and where it went. */
   private vsHtml(): string {
     const V = this.D!.vs; if (!V || V.legs.length < 2) return '';
-    const who = V.won ? 'who won' : V.youWon ? (this.w!.boats[V.rival].finished ? 'who came second' : 'the next boat') : V.total > 0 ? 'who is ahead of you' : 'the boat behind you';
+    const who = V.tie ? 'who tied with you on points' : V.won ? 'who won' : V.youWon ? (this.w!.boats[V.rival].finished ? 'who came second' : 'the next boat') : V.total > 0 ? 'who is ahead of you' : 'the boat behind you';
     const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
     const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
     const gap = Math.round(Math.abs(V.total)), mmss2 = (x: number) => x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${x % 60} s`;
