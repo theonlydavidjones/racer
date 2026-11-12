@@ -247,8 +247,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
-    for (let i = 0; i <= 64; i++) { // (finely, for the round sweep down from the cabin at its forward end)
-      const u = COCKPIT.u0 + (COCKPIT.u1 - COCKPIT.u0) * (i / 64) ** 1.6, x = cockpitHalf(u) + COAMING_T / 2, y = deckY(u, x);
+    for (let i = 0; i <= 16; i++) {
+      const u = COCKPIT.u0 + (COCKPIT.u1 - COCKPIT.u0) * i / 16, x = cockpitHalf(u) + COAMING_T / 2, y = deckY(u, x);
       pts.push(new THREE.Vector3(s * x, y, zc(u))); caps.push(new THREE.Vector3(s * x, y + COAMING_H(zc(u)), zc(u)));
     }
     grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));

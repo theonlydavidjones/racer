@@ -338,21 +338,7 @@ export const COCKPIT_FIT = {
   thwart: { z: stZ(4.5), half: 0.045, depth: 0.15, depthEnd: 0.10, belowCap: 0.06 },
 };
 /** The coaming's height above the deck along the cockpit (z): CR 3.22's least heights, 200 mm aft of the cabin, 140 at St. 4½, 80 at St. 3, a little over. */
-const COAMING_BASE = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
-/**
- * The coaming's height over the deck. At its forward end it carries the cabin side on: from the cabin's full height at
- * the main bulkhead it sweeps down in a big round curve to the coaming's own height about COAMING_SWEEP aft, rather than
- * stepping straight down (Josephine's profile photo, the owner).
- */
-const COAMING_SWEEP = 0.36;
-export const COAMING_H = (z: number) => {
-  const z0 = -L / 2 + COCKPIT.u0 * L, d = z - z0, base = COAMING_BASE(z);
-  if (d >= COAMING_SWEEP) return base;
-  const top = CABIN.h + CABIN_RISE; // (the cabin side's height at its after end)
-  // (a round shoulder off the cabin's top, easing into the coaming: (1 − x²)^1.5, level at both ends)
-  const x = Math.max(0, d) / COAMING_SWEEP;
-  return base + (top - base) * (1 - x * x) ** 1.5;
-};
+export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
 /** The thwart's top (m over the waterline). */
 /**
  * Where the jib winches stand fore and aft (m aft of amidships): about a third of the way aft along the cockpit, 0.58 m
