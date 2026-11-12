@@ -54,6 +54,8 @@ export interface AiState {
   passing?: { key: string; side: number } | null;
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
+  /** Her next mark upwind of her (within 44° of the wind; let go past 48°): beating for it (ai.ts) */
+  upwind?: boolean;
   /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
   avgFrom?: number;
   /** How long she's been headed (s), by her compass. */

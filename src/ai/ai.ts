@@ -393,7 +393,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // running) course, deciding nothing else until she's there (re-deciding each moment, mid-tack, she'd stall head to
     // wind or wheel round and run off). Dropped once she's round, if it hasn't happened in 20 s (something stopped her),
     // or if she's on another leg or point of sail than the one she decided it for.
-    const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt), upwind = rel < 44 && !b.ocs;
+    // (upwind or not, with some hysteresis as for running below: rounding a leeward mark her aim point, 12 m off it,
+    // can sit right on the 44° line as she comes to it, and deciding afresh each time she thought, she flipped between
+    // close-hauled and the run every half second and sailed into the mark)
+    const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt);
+    const upwind = (ai.upwind = ai.upwind ? rel < 48 : rel < 44) && !b.ocs;
     // the course she'd steer to make good the straight line to it, up-current of it by as much as the current across
     // her track would set her down (a crew that reckons with the current allows for all of it, the others for some)
     const crab = crabFor(bP, targetFor(b, rel) * 0.9, { x: c.x * ai.kn.currentShare, y: c.y * ai.kn.currentShare });
