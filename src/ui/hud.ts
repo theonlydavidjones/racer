@@ -534,9 +534,12 @@ export class Hud {
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
     const lab = W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
-    say(lab, 34, 12, 'left'); // (right of the layers button on the map's corner)
+    // (the inset is a circle: the label and the north arrow go at its top middle, inside the rim, where it's widest
+    // enough for them, clear of the layers button on its upper left)
+    const tw = ctx.measureText(lab).width, lx0 = w / 2 - (tw + 22) / 2, ly0 = 26;
+    say(lab, lx0, ly0, 'left');
     // north, as the map's turned (wind up in a race): a small arrow by the label, so a westerly's map isn't read as north-up
-    { const a = northOnMap(W), nx = 34 + ctx.measureText(lab).width + 16, ny = 9;
+    { const a = northOnMap(W), nx = lx0 + tw + 14, ny = ly0 - 3;
       ctx.save(); ctx.translate(nx, ny); ctx.rotate(a); ctx.lineJoin = 'round';
       ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4, 4); ctx.lineTo(0, 2); ctx.lineTo(-4, 4); ctx.closePath();
       ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = I.text; ctx.fill(); ctx.restore();
