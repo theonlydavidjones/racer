@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { World } from '../src/sim/world';
+import { World, describeTide } from '../src/sim/world';
 import { LL } from '../src/geo/geo';
 import { V, dot, dist, type Vec } from '../src/core/math';
 import { CurrentField, stationSpeed, stationsFor, type TideStation } from '../src/environment/tide';
@@ -28,6 +28,26 @@ describe('the tide on a long sail', () => {
       if (Math.abs(kt) > 0.2) { expect(dialCall(ws.tide.stations, SPOT, c), `${h} h`).toBe(kt > 0 ? 'flood' : 'ebb'); seen.add(kt > 0 ? 'flood' : 'ebb'); }
     }
     expect([...seen].sort()).toEqual(['ebb', 'flood']);
+  });
+
+  it('tells the turn of the tide right all through a long sail (the description looks 8 hours ahead)', () => {
+    const w = new World(COURSES[0], S, 7, { freeSail: true }), ws = w as unknown as { t: number; tide: CurrentField; updateTide(): void };
+    const g0 = w.gunUtc, ref = new CurrentField(stationsFor(g0 - 60, g0 + 30 * 60));
+    const bad: string[] = [];
+    for (let m = 0; m <= 20 * 60; m += 20) {
+      ws.t = m * 60; ws.updateTide(); const now = w.clockUtc; ref.setTime(now);
+      const a = describeTide(ws.tide, w.C.center, now).label, b = describeTide(ref, w.C.center, now).label;
+      if (a !== b) bad.push(`${m} min: ${a} | ${b}`);
+    }
+    expect(bad).toEqual([]);
+  }, 60_000);
+
+  it('runs on smoothly across a fresh prediction, and keeps four hours behind', () => {
+    const t0 = Date.parse('2026-07-11T18:00:00Z') / 60000, f = new CurrentField(stationsFor(t0, t0 + 360));
+    const at = t0 + 600; f.cover(at - 1); f.setTime(at); const before = f.at(SPOT);
+    f.cover(at); f.setTime(at); const same = f.at(SPOT); // (no change at an unchanged time)
+    expect(same.x).toBeCloseTo(before.x, 6); expect(same.y).toBeCloseTo(before.y, 6);
+    expect(f.from).toBeLessThanOrEqual(at - 1 - 4 * 60 + 1); expect(f.to).toBeGreaterThanOrEqual(at + 8 * 60);
   });
 
   it('a field past its window predicts on (CurrentField.cover)', () => {
