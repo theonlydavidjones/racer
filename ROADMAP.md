@@ -643,7 +643,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and Ballena Bay (no marina outline in OSM). ~~The Estuary's other harbors as water to sail into: Oakland YC, Marina
   Village, Fortmann, Grand Marina, Alameda Marina (Island YC)~~ (done, no berths). Polish: the narrow basins (Marina
   Village's) are only partly cut out of the 50 m terrain, so from the air a few docks seem to stand on land. Polish: the land's 50 m cells make a
-  stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
+  stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.1886 W since San Leandro Bay was added,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
   sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: a dead end, so by continuity: Point
@@ -652,12 +652,16 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
   water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
   as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
-  behind it); San
-  Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong;
-  the same continuity would serve (Alameda's tide, NOAA 9414750), but the world, its terrain and the chart extracts
-  stop at 122.213 W, through the middle of the bay, so the water it fills (east to Arrowhead Marsh) isn't in the sim
-  yet: it needs the world taken a kilometre or two further east first (SFEI's San Leandro Bay model, the other lead,
-  sits behind a browser check that a fetch can't pass); BYC's and Encinal YC's own racing marks aren't published where we could
+  behind it); ~~San
+  Leandro Bay's current~~ (done, bay-east-8: the world taken 2 km further east, to 122.1886 W, and the bay filled
+  by continuity like San Rafael Bay, San Leandro Channel's tide, NOAA 9414724, less the Tidal Canal's measured flow,
+  NOAA's SFB1216 fitted depth-averaged over its section by Manning; the chart's drying flats now wetted through their
+  own bands (DRVAL1 to DRVAL2: they had sat near high water, in San Rafael Bay too); the canal carries much of the
+  fill, the San Leandro Channel the rest, never against the slope (about 0.5 kt peak at its mouth); left out: the
+  bay's water south of the world's edge (toward Oakland Airport) and its marsh, so the fill is a little short, and the
+  canal's jet into the bay, handed over to the bay's own stream within 500 m of the canal's mouth; over the flats the
+  stream is held to a long wave's speed in its depth, √(gD), where continuity through a nearly dry line would drive a
+  bore); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
