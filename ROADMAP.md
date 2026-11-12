@@ -24,21 +24,39 @@ What's planned, roughly in order. Done work is described in the README.
 2. Finish the crew figures: the crew's stations onto the real benches. Owner chose option 2: the benches plus the side
    deck alongside them and aft of the thwart beside the after shelf (hips 1.35–2.5 m), where crews really sit; about
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
-   (in progress).
+   (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
+   a 20 kt hiking tack (around z 2.55, x 0.6; on main too): fix the crossing path, then sample every 2 cm along each
+   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h).
 3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
    - **The piano**, "mirroring what really exists on Josephine" (the table under Full sail controls: starboard, inboard
-     to outboard, vang · outhaul · jib Cunningham; port, vang · outhaul · the main Cunningham's clam cleat · jib
-     Cunningham, with the downhaul and the jib halyard tail): trim / ease buttons on each.
+     to outboard, vang · outhaul · jib Cunningham · the jib halyard tail; port, vang · outhaul · the main Cunningham's
+     clam cleat (main Cunningham) · jib Cunningham, with the main halyard's tackle). Mock-up in progress with the UI & Experience session:
+     https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB: trim / ease buttons on each.
    - **The jib**: a sheet on each side, trim / ease.
    - **The main**: the mainsheet, the backstay, and "the traveller specifically I would want to move left and right
      like a real traveler" (a car you drag along a track).
    Laid out as you face forward from the helm (port on the left), each control with its auto pill, its setting, and its
    ends named. Later: the jib cars and the rig ("we can figure that out later"). A clickable mock-up goes to the owner
    before the build. 6–10 h; replaces the trim-panel review.
+   **Design agreed with the owner, 12 November; handed to the Coordinator to build.** Mock-up:
+   https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB (source design/sail-controls-band.html on branch
+   ui/sail-controls-band-mockup). A compact console at the bottom centre:
+   - the piano lines and jib sheets vertical (▼ pulls on);
+   - the jib cars as an H: the crossbar slides fore and aft on two tracks, the car slides across it (controls.ts's 7×5
+     pins). The cars are now in scope, no longer later;
+   - the backstay's ends pulled outboard;
+   - the mainsheet shown as the boom's position, stacked above the traveller car;
+   - one click is one step; rope colours by sail (jib warm, main cool);
+   - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
+   Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
+   (starboard, jib luff tension), with a physics review.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
+   leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
+   crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
@@ -668,8 +686,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 | Piano | Inboard (by the companionway) → outboard |
 |---|---|
-| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats) |
-| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main downhaul and the jib halyard tail (uncleated) |
+| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats), with the jib halyard tail (uncleated) just outboard of the jib Cunningham (owner, 12 November) |
+| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main halyard's tail on its block and tackle, with its own cleat at the tackle's base (there is no main downhaul; owner, 12 November) |
 
 | Control | Sail | Led to | Notes |
 |---|---|---|---|
@@ -677,9 +695,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Outhaul | Main | Piano, both sides, middle | Dual-ended; blue line, its middle crosses behind the companionway from one side to the other |
 | Jib Cunningham | Jib | Piano, both sides, outermost | Dual-ended |
 | Main Cunningham | Main | Port piano only, fixed clam cleat | Its own line through a ring in the luff above the boom. Fine luff tension under way |
-| Main downhaul | Main | Port side, via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Modelled as a gooseneck downhaul (it sails the same as a halyard tensioner) |
-| Main halyard | Main | Not used under way | Hoisted before racing, not touched while racing |
-| Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
+| Main halyard (tackle) | Main | Port side: the halyard's tail on a block and tackle, with its own cleat at the base of the block | Pulled tight at the start of the sail (the last inches of hoist, and luff tension under load); rarely touched after. Coarse luff tension. In the sim it's the control named `downhaul` (controls.ts), which already sails this way: rename it in the UI (owner, 12 November) |
+| Jib halyard | Jib | Starboard piano, outboard of the jib Cunningham, uncleated | Used under way: coarse jib luff tension, beside the jib Cunningham. The owner's crew uses it and the jib Cunningham rarely; top sailors who borrowed Josephine for the Internationals used the jib Cunningham. The sim needs a jib halyard control (owner, 12 November) |
 | Mainsheet | Main | Boom end to the traveller car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
 | Traveller | Main | Wooden thwart across the cockpit | Dual-ended |
 | Backstay | Rig | Each end of the cockpit thwart, where it meets the hull | Dual-ended; the bridle is on the transom |
@@ -695,7 +712,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - **Traveller:** sets the boom's angle to the centreline without changing twist, which sheet tension controls.
 - **Mainsheet:** angle and twist together. Trimming hard closes the leech.
 - **Jib sheet and cars:** sheet tension sets the angle. Car fore–aft sets twist: forward makes a deeper jib with a tighter leech, aft a flatter jib with an open top. Car in–out sets the sheeting angle: inboard points higher in flat water, outboard gives more power and speed in chop or when reaching.
-- **Downhaul vs. Cunningham:** both tension the main's luff. The downhaul (with its tackle) does the heavy lifting; the Cunningham fine-tunes it.
+- **Halyard tackle vs. Cunningham:** both tension the main's luff. The main halyard's tackle does the heavy lifting; the Cunningham fine-tunes it. On the jib, the halyard and the jib Cunningham share the job the same way.
 - **Winches:** the jib sheet needs a winch to trim in a breeze, so trimming takes time and effort, while easing is quick.
 
 ### How it should play
@@ -709,7 +726,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 - Mainsheet purchase: 4:1.
 - Jib car pin positions: 7 fore–aft and 5 across, 25 mm apart.
-- Downhaul: drawn as a gooseneck downhaul, cleat position approximate.
+- Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
 

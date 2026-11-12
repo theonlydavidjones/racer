@@ -3,3 +3,5 @@ const POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'S
 export const compassPoint = (deg: number): string => POINTS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 /** "355° (N)": the degrees and the point together. */
 export const degAndPoint = (deg: number): string => `${String(Math.round(((deg % 360) + 360) % 360)).padStart(3, '0')}° (${compassPoint(deg)})`;
+/** A turn of the wind in sailors' words: + clockwise is a veer, − anticlockwise a back ("veered 20° (clockwise)"). */
+export const turnWords = (deg: number): string => !deg ? 'as usual' : `${deg > 0 ? 'veered' : 'backed'} ${Math.abs(deg)}° (${deg > 0 ? 'clockwise' : 'anticlockwise'})`;
