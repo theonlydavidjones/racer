@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { crewPoleCall } from '../src/ai/ai';
-import { optimalSheet } from '../src/boat/trim';
+import { settleTrim } from '../src/boat/physics';
+import { n360 } from '../src/core/math';
 import { allToCrew } from '../src/boat/physics';
 import { World } from '../src/sim/world';
 import { DEFAULT_SETTINGS } from '../src/settings';
@@ -43,12 +44,24 @@ describe('The crew calls the whisker pole', () => {
 });
 
 describe('Boats start trimmed for their heading (UI session, 12 Nov 2026)', () => {
-  it('on a broad reach the main is out from the first frame, not sheeted in and easing as the sequence starts', () => {
-    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS }, 1);
-    for (const b of w.boats) {
-      const want = Math.min(optimalSheet('main', b.awa), 80 + 9.5 * b.ctl.traveller); // (as far as the sheet lets it out: controls.ts boomAngle)
-      expect(Math.abs(b.sheets.main - want)).toBeLessThan(3); // (the boom where the crew would have it, within the sheet's limits)
-      expect(Math.sign(b.boom) || -1).toBe(b.tack === 'S' ? -1 : 1); // (to leeward)
+  // the first step must find her sheets where it would put them: nothing visibly eases or trims as the sequence starts
+  const firstStep = (w: World) => {
+    const before = w.boats.map(b => ({ m: b.sheets.main, j: b.sheets.jib, tack: b.tack }));
+    w.step();
+    return w.boats.map((b, i) => ({ id: b.id, dm: Math.abs(b.sheets.main - before[i].m), dj: Math.abs(b.sheets.jib - before[i].j), tack: before[i].tack === b.tack, trav: b.ctl.traveller }));
+  };
+  it('a race fleet: the main and jib barely move on the first step, and no phantom tack', () => {
+    for (const r of firstStep(new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, current: 'real' }, 1))) {
+      expect(r.tack).toBe(true);
+      expect(r.dm).toBeLessThan(2 + 9.5 * Math.abs(r.trav)); // (less the traveller the crew's plan sets on the first step)
+      expect(r.dj).toBeLessThan(2);
     }
+  });
+  it('cruising on a reach in a breeze and a strong tide: trimmed to her own wind, not the course wind', () => {
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, mode: 'sail', windKt: 16, current: 'real' }, 3, { freeSail: true });
+    const u = w.user; u.h = n360(u.ww.from + 90); settleTrim(u, u.ww.from, u.ww.kt);
+    const lee = u.tack === 'S' ? 'P' : 'S', ins0 = u.ctl.car[lee].ins; const [r] = firstStep(w);
+    // (less what the crew's plan does on the first step: the traveller, and the leeward car's lead, 1.25° a pin: controls.ts carLead)
+    expect(r.dm).toBeLessThan(2 + 9.5 * Math.abs(r.trav)); expect(r.dj).toBeLessThan(2 + 1.25 * Math.abs(u.ctl.car[lee].ins - ins0));
   });
 });
