@@ -176,7 +176,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
   }, 120000);
   it('the wind straight out of her slip: she\'s already head to wind, so she\'s walked out and held for the main, not turned across it', () => {
     let n = 0;
-    for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 7 === 0)) {
+    for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 4 === 0)) {
       const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
@@ -272,6 +272,6 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     expect(slipById(wh.label)?.id).toBe(wh.id);
     expect(fixSpec({ ...DEFAULT_BOAT, slip: wh.label, marina: undefined })).toMatchObject({ marina: 'west-harbor', slip: wh.id });
     expect(fixSpec({ ...DEFAULT_BOAT, slip: 'south-beach:C12' })).toMatchObject({ marina: 'south-beach', slip: 'south-beach:C12' });
-    expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian', 'horseshoe-bay', 'berkeley', 'richmond-yc', 'encinal']);
+    expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian', 'horseshoe-bay', 'berkeley', 'richmond-yc', 'encinal', 'oakland-yc', 'marina-village', 'fortmann', 'grand-marina', 'alameda-marina']);
   });
 });

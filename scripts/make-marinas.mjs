@@ -57,14 +57,28 @@ const HARBORS = {
   },
   berkeley: {
     name: 'Berkeley Marina', bbox: [-122.3235, 37.8615, -122.3100, 37.8705],
-    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
-    basin: { marina: 'Berkeley Marina' }, letter: 'named',
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no slips of its own, only the guest dock's berths)
+    // Berkeley Yacht Club's guest dock (OSM way 28239155, floating, 44 m, on the clubhouse's east side): visitors lie alongside
+    alongside: [{ way: '28239155', label: 'BYC guest ' }],
+    // the basin: OSM's marina outline (way 117767451), and the water inside the breakwaters west of it (the fairway, open
+    // to the Bay through the three ways in), bounded by OSM's coastline (ways 153288129, 153288138) round BYC's point and
+    // the north shore, and by the breakwaters between NOAA's charted lights
+    basin: { pts: [
+      [37.86631, -122.31772], [37.86621, -122.31801], [37.86612, -122.31806], [37.86601, -122.31806], [37.86598, -122.31797], [37.86593, -122.31792],
+      [37.86510, -122.31785], [37.86523, -122.31906], [37.86700, -122.32012], [37.86719, -122.32134], [37.86822, -122.32052],
+      [37.86830, -122.31911], [37.86806, -122.31886], [37.86788, -122.31873], [37.86775, -122.31866], [37.86768, -122.31864], [37.86734, -122.31861],
+      [37.86712, -122.31855], [37.86701, -122.31846], [37.86697, -122.31831], [37.86699, -122.31818], [37.86706, -122.31811],
+      [37.86700, -122.31811], [37.86709, -122.31805], [37.86719, -122.31804], [37.86728, -122.31813], [37.86734, -122.31824], [37.86795, -122.31828],
+      [37.86834, -122.31798], [37.86853, -122.31745], [37.86896, -122.31507], [37.86800, -122.31467], [37.86772, -122.31316], [37.86526, -122.31172],
+      [37.86501, -122.31254], [37.86487, -122.31252], [37.86413, -122.31593], [37.86438, -122.31659], [37.86590, -122.31720], [37.86614, -122.31719],
+      [37.86636, -122.31726], [37.86635, -122.31730]] },
+    letter: 'named',
     // the breakwaters (OSM 23617828, 23617829; NOAA's chart has the same two lines) and the three ways in: south of
     // Berkeley Breakwater Light 1 (the deepest, the one the guides use), the middle gap between Lights 2 and 3, and north
     // of North Breakwater Light 4 (ENC US5OAKFI)
     breakwaterIds: ['23617828', '23617829'],
     beaconsExtra: [{ at: [37.86523, -122.31906], colour: 'green' }, { at: [37.86700, -122.32012], colour: 'red' }, { at: [37.86718, -122.32134], colour: 'green' }, { at: [37.86831, -122.32047], colour: 'red' }],
-    exits: [[37.86470, -122.31930], [37.86709, -122.32073], [37.86870, -122.32010]]
+    exits: [[37.86516, -122.31845], [37.86709, -122.32073], [37.86826, -122.31980]] // (south, middle, north: on the basin's edge)
   },
   'richmond-yc': {
     name: 'Richmond Yacht Club, Brickyard Cove', bbox: [-122.3880, 37.9060, -122.3790, 37.9125],
@@ -83,6 +97,14 @@ const HARBORS = {
     // no breakwater: the club's docks open straight onto the Oakland Estuary, across the basin's north-east side
     exits: [[37.78320, -122.26195]]
   },
+  // the Oakland Estuary's other harbors, between Alameda and Oakland (OSM marina outlines; their ways out found from the
+  // chart's water beyond their edges): water to sail into, their docks solid. No berths: their dock letters and slips
+  // aren't published where we could reach
+  'oakland-yc': { name: 'Oakland Yacht Club, Alameda', bbox: [-122.2685, 37.7815, -122.2615, 37.7860], basin: { marina: 'Oakland Yacht Club' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'marina-village': { name: 'Marina Village Yacht Harbor, Alameda', bbox: [-122.2760, 37.7820, -122.2640, 37.7900], basin: { marina: 'Marina Village Yacht Harbor - East Basin' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'fortmann': { name: 'Fortmann Marina, Alameda', bbox: [-122.2590, 37.7765, -122.2540, 37.7820], basin: { marina: 'Fortmann Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'grand-marina': { name: 'Grand Marina, Alameda', bbox: [-122.2575, 37.7765, -122.2500, 37.7815], basin: { marina: 'Grand Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'alameda-marina': { name: 'Alameda Marina (Island Yacht Club)', bbox: [-122.2535, 37.7725, -122.2435, 37.7790], basin: { marina: 'Alameda Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
   corinthian: {
     name: 'Corinthian Yacht Club', bbox: [-122.4600, 37.8700, -122.4535, 37.8740],
     basin: { pts: [ // the coastline round the club's point and the Main Street decks (OSM way 157393812), the entrance, the breakwater (OSM way 125807786)
@@ -216,6 +238,46 @@ async function make(id, H) {
     const d = { x: b.x - a.x, y: b.y - a.y }, along = s => (s.c.x - a.x) * d.x + (s.c.y - a.y) * d.y;
     slips.filter(s => s.dock === w).sort((s, t) => along(s) - along(t))
       .forEach((s, i) => out.push({ id: `${letter}${i + 1}`, dock: letter, at: toLL(s.c), heading: Math.round(s.heading), finger: s.len }));
+  }
+  // berths alongside a dock (a club's guest dock): along each side of it, a Folkboat's length and a bit apart, bow along
+  // the dock, where she lies clear of everything else in the basin
+  for (const { way, label, every = 9 } of H.alongside ?? []) {
+    const w = walkways.find(d => d.id === way) ?? fail(`no dock ${way}`), q = w.pts.map(xy);
+    const others = [...breakwaters, ...docks.filter(d => d !== w), ...fingers], off = 1.2 + 1.1 + 0.3; let k = 0;
+    for (const side of [1, -1]) {
+      let s0 = 0;
+      for (let i = 1; i < q.length; i++) {
+        const a = q[i - 1], b = q[i], L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 1e-6) continue;
+        const u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L }, n = { x: -u.y * side, y: u.x * side };
+        for (let t = 5.5; t <= L - 4.6; t += every) {
+          const c = { x: a.x + u.x * t + n.x * off, y: a.y + u.y * t + n.y * off };
+          const ok = [-3.6, 0, 3.6].every(e => { const p = { x: c.x + u.x * e, y: c.y + u.y * e }; return inBasin(p) && minDist(p, others) > 1.5 && edgeDist(p) > 1.5; });
+          if (ok) out.push({ id: `${label}${++k}`, dock: label, at: toLL(c), heading: Math.round((Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360), finger: 0, kind: 'alongside' });
+        }
+        s0 += L;
+      }
+    }
+  }
+  // the ways out, where they aren't given: the basin's open edges, those with open water (the chart's, the sim's 50 m
+  // land cells) just beyond them; each run of them is one way out, at its middle
+  if (H.exits === 'auto') {
+    const M = JSON.parse(await readFile(new URL('../src/geo/data/shore-mask.json', import.meta.url), 'utf8')), G = new Uint8Array(M.nx * M.ny);
+    M.rows.forEach((runs, j) => { let i = 0, v = 0; for (const n of runs) { if (v) G.fill(1, j * M.nx + i, j * M.nx + i + n); i += n; v ^= 1; } });
+    const landAt = ([la, lo]) => { const i = Math.floor((lo - M.west) / (M.east - M.west) * (M.nx - 1) + 0.5), j = Math.floor((M.north - la) / (M.north - M.south) * (M.ny - 1) + 0.5); return i >= 0 && j >= 0 && i < M.nx && j < M.ny && G[j * M.nx + i] === 1; };
+    const runs = []; let cur = null;
+    for (let i = 0; i < BP.length; i++) {
+      const a = BP[i], b = BP[(i + 1) % BP.length], L = Math.hypot(b.x - a.x, b.y - a.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const n = { x: (b.y - a.y) / L, y: -(b.x - a.x) / L }, side = inBasin({ x: m.x + n.x, y: m.y + n.y }) ? -1 : 1; // (outward)
+      const open = L > 4 && [25, 45].every(d => { const q = { x: m.x + n.x * side * d, y: m.y + n.y * side * d }; return !inBasin(q) && !landAt(toLL(q)) && minDist(q, [...breakwaters, ...docks]) > 3; });
+      if (open) { if (!cur) runs.push(cur = []); cur.push({ a, b, L }); } else cur = null;
+    }
+    if (runs.length > 1 && cur && runs[0] !== cur && BP.length && runs[0][0].a === BP[0]) { runs[0].unshift(...runs.pop()); } // (a run across the outline's start)
+    H.exits = runs.filter(r => r.reduce((t, e) => t + e.L, 0) > 15).map(r => { // the middle of each run, along it
+      const tot = r.reduce((t, e) => t + e.L, 0); let s = tot / 2;
+      for (const e of r) { if (s <= e.L) { const t = s / e.L; return toLL({ x: e.a.x + (e.b.x - e.a.x) * t, y: e.a.y + (e.b.y - e.a.y) * t }); } s -= e.L; }
+      return toLL(r[0].a);
+    });
+    if (!H.exits.length) fail(`${id}: no way out found`);
   }
   // the entrance beacons (lateral marks, from NOAA's chart via OSM seamarks)
   const beacons = [...nodes.values()].filter(n => n.tags['seamark:type'] === 'beacon_lateral' && near(xy([n.lat, n.lon]), 80))

@@ -72,7 +72,8 @@ describe('push off, every berth in every marina (the slow one: npm test, not tes
       // that way doesn't fit from a good many berths, and she's let go pointing down the fairway the other way to be steered round)
       expect(exitward / slips.length, `${H.id}: toward the way out`).toBeGreaterThan(0.6);
       allToward += exitward; all += slips.length;
-      expect(swung / slips.filter(s => s.kind === 'bow-in').length, `${H.id}: swung out`).toBeGreaterThan(0.6); // (the rest shoved off astern: no room to swing her)
+      const bowIn = slips.filter(s => s.kind === 'bow-in').length;
+      if (bowIn) expect(swung / bowIn, `${H.id}: swung out`).toBeGreaterThan(0.6); // (the rest shoved off astern: no room to swing her; a harbor with only berths alongside, Berkeley's guest dock, has none to swing)
       allSwung += swung; allBowIn += slips.filter(s => s.kind === 'bow-in').length;
     }
     expect(allToward / all, 'all the marinas: toward the way out').toBeGreaterThan(0.85);

@@ -1,6 +1,6 @@
 import { hitsHarbor } from '../geo/marina';
 import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
-import { onLand, pierAt } from '../geo/shore';
+import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
@@ -489,6 +489,10 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  * The speed factor is the square root of her push, with her sails as they are, against the polar crew's.
  */
 function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; shape: Shape } | null, twa: number, ww: { from: number; kt: number }, disp: number, dt: number, plan: SailPlan): number {
+  // (the crew set their depowering for the breeze, not for each gust, which they ride out by easing and hiking: the wind
+  // speed they judge it by is hers over the last 20 s or so; her heading they know at once. Her sails against the
+  // polar's crew are weighed in the wind as it is, as the polar and her heel are)
+  b.twsSlow = b.twsSlow == null ? ww.kt : b.twsSlow + (ww.kt - b.twsSlow) * Math.min(1, dt / 20);
   const tws = ww.kt;
   b.powerT = (b.powerT ?? 0) - dt;
   if (b.powerK != null && b.powerT > 0) return b.powerK;
@@ -496,7 +500,7 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
   // (the search, and her sails against it, in the wind rounded to a knot and 2°: cached, and like for like)
   const twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
   const ref = fastestStep(twsR, twaR, plan, STANDARD_DISP, crewMass(DEFAULT_CREW), standardCrewMoment(), crewBestHeel(twaR, twsR), sittingMoment(DEFAULT_CREW));
-  b.depowerBest = herFastestStep(b, twa, tws, plan, disp).d;
+  b.depowerBest = herFastestStep(b, twa, b.twsSlow, plan, disp).d;
   // hers: her sails as they are (no fuller than the full-power shape: fuller gains nothing the polar doesn't have, the
   // shape's own cost is shapeEfficiency's), at the crew's intended sheeting (a sheet set wrong, by you or the crew, is
   // counted once, in the step's trimDrive) and her own heel; her heel's cost to the hull is in the target already
@@ -645,11 +649,11 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
   else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
-    const hit = bow(b), pier = pierAt(hit), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
+    const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
     bump(pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {
-    const hit = stern(b), pier = pierAt(hit);
+    const hit = stern(b), pier = pierNear(hit, 6);
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
     bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }

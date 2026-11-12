@@ -153,6 +153,8 @@ export interface Boat {
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
   trim: { main: SailTrim; jib: SailTrim | null };
   awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)
+  /** The true wind's speed (kt) over the last 20 s or so: the breeze the crew set their depowering for. */
+  twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
   pole: PoleState;

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
-import { onGround } from '../geo/shore';
+import { limePointBox, limePointLand, onGround } from '../geo/shore';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -86,6 +86,25 @@ export function region(lat: number, lon: number, h: number): Region {
   return 'grass';
 }
 
+/** A polygon clipped to a box (Sutherland–Hodgman: the box is convex). */
+function clipToBox(pts: { x: number; y: number }[], x0: number, x1: number, y0: number, y1: number): { x: number; y: number }[] {
+  let out = pts;
+  const edges: [(p: { x: number; y: number }) => boolean, (a: { x: number; y: number }, b: { x: number; y: number }) => { x: number; y: number }][] = [
+    [p => p.x >= x0, (a, b) => ({ x: x0, y: a.y + (b.y - a.y) * (x0 - a.x) / (b.x - a.x) })],
+    [p => p.x <= x1, (a, b) => ({ x: x1, y: a.y + (b.y - a.y) * (x1 - a.x) / (b.x - a.x) })],
+    [p => p.y >= y0, (a, b) => ({ x: a.x + (b.x - a.x) * (y0 - a.y) / (b.y - a.y), y: y0 })],
+    [p => p.y <= y1, (a, b) => ({ x: a.x + (b.x - a.x) * (y1 - a.y) / (b.y - a.y), y: y1 })]
+  ];
+  for (const [inside, cut] of edges) {
+    const inp = out; out = [];
+    for (let i = 0; i < inp.length; i++) {
+      const a = inp[(i + inp.length - 1) % inp.length], b = inp[i];
+      if (inside(b)) { if (!inside(a)) out.push(cut(a, b)); out.push(b); } else if (inside(a)) out.push(cut(a, b));
+    }
+  }
+  return out;
+}
+
 export async function buildTerrain(scene: THREE.Scene, month: number): Promise<Terrain> {
   const H = await loadHeights(), { nx, ny } = M;
   // Angel Island: flood the land out from Mount Livermore's summit (37.8608 N 122.4324 W)
@@ -110,6 +129,33 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     if (!cityShore(lat, lon)) continue;
     const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
     H[k] = onGround(p) ? Math.max(H[k], 2.5) : -30; // (the Wharf's open piers and docks are drawn as structures: render/wharf.ts)
+  }
+  // and Lime Point's to OpenStreetMap's coastline (geo/shore.ts), so the north tower's base and the light stand at its edge
+  {
+    const b = limePointBox();
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+      if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue;
+      H[k] = onGround(p) ? Math.max(H[k], 2.5) : -30;
+    }
+    // the shore's own vertices kept low: a 50 m triangle from a hilltop vertex down to a water one would otherwise run
+    // out over the water as a fin (the bluffs rise from the next row in)
+    const shore: number[] = [];
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+      if (H[k] <= 0 || p.x < b.x0 - dx || p.x > b.x1 + dx || p.y < b.y0 + dy || p.y > b.y1 - dy) continue;
+      if ([-1, 1, -nx, nx, -nx - 1, -nx + 1, nx - 1, nx + 1].some(o => H[k + o] <= 0)) shore.push(k);
+    }
+    for (const k of shore) H[k] = 2.5;
+    // and, for what's finer than the 50 m mesh, the point's own outline as a low rock bench under the hills: the neck
+    // behind the north tower's base and the spit the Lime Point light stands on (only there, clipped to a box round them)
+    const T = LL(37.8275, -122.4800), U = LL(37.8252, -122.4776);
+    const bench = clipToBox(limePointLand(), Math.min(T.x, U.x), Math.max(T.x, U.x), Math.min(T.y, U.y), Math.max(T.y, U.y));
+    if (bench.length > 2) {
+      const sh = new THREE.Shape(); bench.forEach((q, i) => i ? sh.lineTo(q.x, q.y) : sh.moveTo(q.x, q.y));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 3.5, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -2, 0); // (top 1.5 m up)
+      scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x8b7f6d }))); // (the palette's rock)
+    }
   }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {

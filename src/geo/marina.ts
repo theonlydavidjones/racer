@@ -8,6 +8,11 @@ import horseshoeBay from './data/horseshoe-bay.json';
 import berkeley from './data/berkeley.json';
 import richmondYc from './data/richmond-yc.json';
 import encinal from './data/encinal.json';
+import oaklandYc from './data/oakland-yc.json';
+import marinaVillage from './data/marina-village.json';
+import fortmann from './data/fortmann.json';
+import grandMarina from './data/grand-marina.json';
+import alamedaMarina from './data/alameda-marina.json';
 
 /**
  * The marinas your boats can call home, from OpenStreetMap (scripts/make-west-harbor.mjs, scripts/make-marinas.mjs): each
@@ -25,7 +30,7 @@ type LLs = [number, number][];
 interface HarborData {
   name?: string; basin: LLs; breakwaters: { area: boolean; pts: LLs; seawall?: { top: number; rail: LLs } }[]; walkways: LLs[]; fingers: LLs[]; areas: LLs[];
   beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[]; piles?: 'white'; paths?: LLs[];
-  slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number }[];
+  slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number; kind?: 'bow-in' | 'alongside' }[];
 }
 const SOURCES: { id: string; name: string; short: string; data: HarborData }[] = [
   { id: 'west-harbor', name: 'West Harbor, San Francisco Marina', short: 'West Harbor', data: westHarbor as unknown as HarborData },
@@ -33,12 +38,17 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
   { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
-  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart; few fingers
-  // are mapped, so few slips (Berkeley's dock names are OSM's; the others' letters and slips aren't published where we
-  // could reach)
+  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Few fingers
+  // are mapped and the slips aren't published where we could reach, so no slips of their own yet; Berkeley has a berth
+  // alongside Berkeley Yacht Club's guest dock
   { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
-  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData }
+  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
+  { id: 'oakland-yc', name: 'Oakland Yacht Club, Alameda', short: 'Oakland YC', data: oaklandYc as unknown as HarborData },
+  { id: 'marina-village', name: 'Marina Village Yacht Harbor, Alameda', short: 'Marina Village', data: marinaVillage as unknown as HarborData },
+  { id: 'fortmann', name: 'Fortmann Marina, Alameda', short: 'Fortmann Marina', data: fortmann as unknown as HarborData },
+  { id: 'grand-marina', name: 'Grand Marina, Alameda', short: 'Grand Marina', data: grandMarina as unknown as HarborData },
+  { id: 'alameda-marina', name: 'Alameda Marina (Island Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
@@ -168,7 +178,7 @@ export function hitsWall(p: Vec): boolean {
   return false;
 }
 
-const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: 'bow-in' as const })));
+const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: s.kind ?? 'bow-in' as const })));
 
 /** The slips a Folkboat fits in: her length (7.6 m) along it and her beam (2.2 m) across it, clear of every dock. */
 export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
@@ -211,7 +221,7 @@ export const slipById = (id: string | undefined): Slip | null => !id ? null : BY
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
-/** The marinas a boat can call home: those with slips (the East Bay's harbors have none yet: water and docks only). */
+/** The marinas a boat can call home: those with berths (Richmond YC and Encinal YC have none yet: water and docks only). */
 export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.filter(({ data }) => data.slips.length).map(({ id, name, short }) => ({ id, name, short }));
 export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
 /** Where a slip is, for people: "A12, West Harbor". */
@@ -324,6 +334,13 @@ const dirOf = (h: number) => ({ x: Math.sin(h * Math.PI / 180), y: Math.cos(h * 
 const wrap180 = (a: number) => ((a + 540) % 360) - 180;
 /** Pointing within 45 degrees of where the wind's coming from: she can't keep way on there with no sail up. */
 const headUp = (h: number, windFrom: number | undefined) => windFrom != null && Math.abs(wrap180(windFrom - h)) < 45;
+/**
+ * Let go off the wind with only the main up, she doesn't hold her heading to the degree: the wind wanders a few degrees
+ * either way in its gusts (environment/gusts.ts: about ±4 at 14 kt) and the main alone gives her weather helm, so she
+ * rounds up a few degrees more in the seconds it takes to gather way. The clear water ahead she's let go into has to be
+ * there that much nearer the wind than she's pointed, not just dead ahead.
+ */
+const WANDER = 8;
 /** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 14: enough to know there's the 12 m she needs). */
 function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
@@ -429,9 +446,10 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
         if (toWind >= 0 && toWind <= sq + 10) { // (0: already head to wind, the wind straight out of the slip: no swing to speak of, held there for the main)
           turn = sign * toWind;
           // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
-          // wind; less, if that would point her into the docks: with the main up and the shove's way on she bears away from there)
+          // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
+          // and she falls back; and with the room ahead to gather way, allowing for her rounding up a little, WANDER)
           const c0 = about(at(back), s.heading, BOW, turn);
-          const offs = [60, -60, 50, -50, 40, -40, 30, -30].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 8; });
+          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && runAhead(e.c, e.h - Math.sign(o) * WANDER, s) >= 8; });
           if (!offs.length) continue;
           const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
           hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
