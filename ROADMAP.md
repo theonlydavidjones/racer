@@ -49,7 +49,8 @@ What's planned, roughly in order. Done work is described in the README.
 3. ~~Crystal clarity on the crew and trim controls~~ (done, live in v134: the band with the main halyard renamed, the jib
    halyard, the Auto-trim and Pole tabs, the windex and the Hail tab, v120–v129; the chase-view layout, v129; every RRS
    2025–2028 race signal in the flag index and one-line messages with the log, v132; line colours in the boat editor and
-   the committee's call-off shown clearly, v134). Open questions for the owner: (1) on Josephine, does the crew reach
+   the committee's call-off shown clearly, v134). Owner's answers (12 November): the crew leans across from windward, as the sim has it; no tiller strip. The
+   questions were: (1) on Josephine, does the crew reach
    the far side of the piano from windward (the sim leans them in, 0.2 m to windward)? (2) bring back a tiller strip
    (left out because the cursor is the tiller)? The design as agreed: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
@@ -132,6 +133,19 @@ rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Buildi
 showroom's time and conditions, the swinging lantern); Sam's; accounts for other players; real slip numbers and nicer
 moored boats; the sea inside the marinas; the desktop release; the phone layout (on hold). The Bay East work carries on
 as it is.
+
+**Owner's decisions, 12 November (morning)**, via the Coordinator:
+- Blanketing is not a foul: "stealing wind is a significant part of the strategy of tacking". Rules removes it as
+  rule-23 interference (rule 23 protects a boat taking a penalty or on another leg, not one being covered on the same leg).
+- The piano: the crew leans across from windward (confirmed). No tiller strip.
+- Z-flag penalties scored by RRS 44.3(c) (Debrief).
+- Gashouse Cove kept as it was (before 2026).
+- The swell view holds still.
+- The crew passing close mid-cockpit in a 12–16 kt tack: left as it is (parked).
+- Four boat-spec sites allowed, for Marinas to source the moored boats.
+- The lines plan: the researcher to find who holds Plan 1.
+- The speed budget held, with one deeper speed pass.
+- The daily weather refresh now builds from main.
 
 The original ranking, for the record:
 
