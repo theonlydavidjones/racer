@@ -579,6 +579,16 @@ export class World {
     return { k: r.k * lee, shift: r.shift };
   }
 
+  /** Is she keeping clear of a boat she's closing on (her right of way the other's), within 12 s and 14 m? */
+  private keepingClear(b: Boat): boolean {
+    for (const o of this.boats) {
+      if (o === b || Math.abs(o.x - b.x) > 60 || Math.abs(o.y - b.y) > 60) continue;
+      const c = cpa(b, o);
+      if (c.t < 12 && c.d < 14 && this.keepsClearOf(b, o)) return true;
+    }
+    return false;
+  }
+
   /** The fraction of `to`'s wind speed that `by`'s sails take (her wind shadow alone, environment/shadows.ts). */
   takenBy(by: Boat, to: Boat): number {
     if (by.ww == null || this.freeSail) return 0;
@@ -865,7 +875,9 @@ export class World {
       b.aboveProper = racing && b.twa < pt - 10;
       // (well below it: farther off the wind than her course to the mark, by more than footing for speed or a duck would
       // take her for long; Rule 23.2 also asks that she bore away onto the other boat's wind: see rules/pairs.ts)
-      b.belowProper = racing && !b.tacking && b.penalty <= 0 && b.twa > pt + BELOW_PROPER;
+      // (and not while she is keeping clear of another boat close by: a duck is part of her proper course, in the
+      // Definitions' sense, as the course she'd sail without the boat rule 23 protects)
+      b.belowProper = racing && !b.tacking && b.penalty <= 0 && b.twa > pt + BELOW_PROPER && !this.keepingClear(b);
     });
   }
 
@@ -1519,14 +1531,15 @@ export function youTackPays(hailer: Boat, to: Boat): boolean {
   return clearAstern(hailer, to) && hullGap(hailer, to) > LOA * 0.6;
 }
 
+/** Rule 23.2: how far (deg) farther off the wind than her proper course counts as leaving it (the sim's estimate). */
+export const BELOW_PROPER = 20;
+
 /**
  * True wind angle of a boat's proper course: roughly, the course she'd sail to finish as soon as
  * possible with no other boats around. Straight at her next mark if she can lay it; close-hauled
- * if it's upwind; no deeper than the best downwind angle if it's dead downwind.
+ * if it's upwind; no deeper than the best downwind angle if it's dead downwind. (It doesn't allow for the current: a
+ * boat crabbing across a strong tide sails her proper course some degrees off this.)
  */
-/** Rule 23.2: how far (deg) farther off the wind than her proper course counts as leaving it. */
-export const BELOW_PROPER = 20;
-
 export function properTwa(w: World, b: Boat): number {
   const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), twa = Math.abs(wrap(b.ww.from - toMark));
   return Math.min(Math.max(twa, beatAngle(b.ww.kt)), Math.max(runAngle(b.ww.kt), 150));

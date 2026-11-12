@@ -12,17 +12,22 @@ import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
 import type { World } from '../sim/world';
 
-/** Extra seconds of caution at the start under each preparatory flag. */
 /**
  * Her hail "Room to tack" at a boat obstruction (WS Case 11): the boat she hailed, the boat that is the obstruction, and
  * when. While it's being answered she holds close-hauled rather than ducking, so she can tack straight away once the
  * hailed boat responds (Rule 20.2(d)); a duck first leaves her too far off the wind to tack in time.
  */
 const boatHails = new WeakMap<Boat, { o: number; c: number; at: number }>();
-/** How long (s) she keeps her course for a hail at a boat obstruction, if the boat she must keep clear of is still this far off (s). */
-const BOAT_HAIL_HOLD = HAIL_RESPONSE + 4, BOAT_HAIL_MARGIN = 4;
+/**
+ * How long (s) she keeps her course for a hail at a boat obstruction, and how soon (s) before she'd meet the boat she
+ * must keep clear of she gives up waiting and ducks it (rule 10 comes first: no hail excuses her from it). Five seconds
+ * gives a Folkboat at 2–2.5 m/s time to bear away 30° and pass astern without the other boat having to act.
+ */
+const BOAT_HAIL_HOLD = HAIL_RESPONSE + 4, BOAT_HAIL_MARGIN = 5;
 /** She hails at a boat only if they'd meet no sooner than this (s): time for the response and her tack. */
 const BOAT_HAIL_LEAD = 9;
+
+/** Extra seconds of caution at the start under each preparatory flag. */
 
 const FLAG_CAUTION: Record<PrepFlag, number> = { P: 0, I: 1, Z: 2, U: 3, black: 3.5 };
 
@@ -460,7 +465,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // her hail at a boat, still being answered (the hailed boat hasn't tacked or replied yet, or has and she hasn't yet
   // tacked herself): hold close-hauled, keeping the boat she must avoid in view
   const bh = boatHails.get(b), bhRec = bh ? w.boats.find(x => x.id === bh.o) : undefined, bhHail = bhRec ? w.pairRecord(b, bhRec)?.hail : null;
-  const boatHailOn = !!bh && w.t - bh.at < BOAT_HAIL_HOLD && b.lastTackT < bh.at && bhHail?.kind === 'room' && bhHail.by === b.id;
+  const bhC = bh ? w.boats.find(x => x.id === bh.c) : undefined;
+  // (released when time runs short to the meeting, or when a hail passed on beyond the boat she hailed failed: then the
+  // hold ends and her ordinary keep-clear below ducks the other boat)
+  const boatHailOn = !!bh && !!bhC && w.t - bh.at < BOAT_HAIL_HOLD && b.lastTackT < bh.at && bhHail?.kind === 'room' && bhHail.by === b.id
+    && !bhHail.passedOn?.failed && cpa(b, bhC).t > BOAT_HAIL_MARGIN;
   if (bh && !boatHailOn) boatHails.delete(b);
   if (boatHailOn) holdForHail = true;
   // collision avoidance under the rules

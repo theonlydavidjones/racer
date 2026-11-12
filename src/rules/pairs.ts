@@ -321,8 +321,10 @@ function blanketing<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: Rules
     const part = k >= BLANKET_K ? blanketRule(X, Y, ctx) : null;
     if (!part) { delete rec.blanket[X.id]; continue; }
     const bl = rec.blanket[X.id] ??= { since: ctx.t, turned: turnedToward(X, Y), boreAway: boreAwayBy(X, ctx) };
-    // below her proper course, 23.2 bites only if she bore away onto Y's wind (a boat sailing low for her own reasons,
-    // ducking or footing, isn't going out of her way to hinder Y); above it, any blanketing counts
+    // below her proper course, the sim calls 23.2 only if she bore away onto Y's wind. Rule 23.2 itself asks only that
+    // she not be sailing her proper course; this is the sim's guard against its own rough estimate of that course
+    // (world.ts properTwa), so a boat sailing low for her own reasons (footing, a crab for the tide) isn't called.
+    // Above it, any blanketing counts.
     if (part === '23.2' && !X.aboveProper && (bl.boreAway ?? 0) < RULE16_MIN_TURN) continue;
     if (ctx.t - bl.since < BLANKET_TIME) continue;
     rec.blanket = {}; rec.blanketCool = ctx.t + INCIDENT_COOLDOWN;

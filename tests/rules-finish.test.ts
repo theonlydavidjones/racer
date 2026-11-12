@@ -231,6 +231,24 @@ describe('in the world', () => {
     expect(minGap).toBeGreaterThan(CONTACT_GAP);
   });
 
+  it('if her hail goes unanswered (passed on to a boat that never responds), the AI still ducks the starboard boat in time', () => {
+    for (const gap of [22, 26, 30]) {
+      const w = race(), [u, A, W, S] = w.boats, wv = V(w.wind.from);
+      const leg = w.C.marks.findIndex(m => m.type === 'round' && !onLand(off(m.p, wv, -500)) && !onLand(off(m.p, wv, -480)));
+      const P = off(w.C.marks[leg].p, wv, -500);
+      for (const b of w.boats) b.leg = leg;
+      w.t = 120;
+      const hP = sail(w, A, P, 'P'); sail(w, W, off(P, wv, 8), 'P'); sail(w, u, off(P, wv, 30), 'P'); // you, 22 m to windward of W, do nothing
+      const beat = beatAngle(w.wind.kt), hS = n360(w.wind.from - beat), X = off(P, V(hP), gap);
+      sail(w, S, off(X, V(hS), -gap), 'S');
+      let minGap = Infinity;
+      let relayed = false;
+      for (let t = 0; t < 20; t += DT) { u.h = hP; u.desired = hP; w.step(DT); minGap = Math.min(minGap, hullGap(A, S)); relayed ||= !!w.pairRecord(A, W)?.hail?.passedOn; }
+      expect(relayed, `starting ${gap} m off: W passed the hail on to you`).toBe(true);
+      expect(minGap, `starting ${gap} m off`).toBeGreaterThan(CONTACT_GAP);
+    }
+  });
+
   it('a running boat takes a good part of the wind of a boat close downwind of her, and none of one upwind', () => {
     const w = race(), u = w.user, X = w.boats[1], wv = V(w.wind.from);
     sail(w, X, OPEN, 'S'); X.h = n360(w.wind.from + 180 - 10); X.desired = X.h;
