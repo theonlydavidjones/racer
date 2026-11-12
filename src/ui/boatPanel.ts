@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, SAIL_COUNTRIES, TEAK_DECKS, ensignFor, fixSpec, type BoatSpec, type SailAge } from '../boat/spec';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, LINE_COLORS, ROPE_COLORS, SAIL_COUNTRIES, TEAK_DECKS, ensignFor, fixSpec, lineColor, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
 import { BURGEES, CLUBS } from '../render/burgees';
 import { ENSIGNS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
@@ -99,6 +99,8 @@ export class BoatPanel {
       case 'stiff': this.set(b => { b.perf.mastStiffness = v as BoatSpec['perf']['mastStiffness']; }); return;
       case 'outboard': this.set(b => { b.perf.outboard = v as BoatSpec['perf']['outboard']; }); return;
       case 'finish': this.set(b => { b.perf.finish = v as BoatSpec['perf']['finish']; }); return;
+      case 'lineColor': { const k = t.dataset.line as LineColorKey; this.set(b => { const c = { ...b.lineColors, [k]: v }; if (v === LINE_COLORS[k]) delete c[k]; if (Object.keys(c).length) b.lineColors = c; else delete b.lineColors; }); return; }
+      case 'lineColorsReset': this.set(b => { delete b.lineColors; }); return;
     }
   }
   private input(e: Event): void {
@@ -204,6 +206,10 @@ export class BoatPanel {
       <section><h3>Sails</h3>
         <div class="field"><span>Sailcloth</span>${seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)}</div>
       </section>
+      <section><h3>Lines <em>· their colours in the sail controls band</em></h3>
+        ${LINE_ROWS.map(([k, n]) => `<div class="field"><span>${n} · ${name(ROPE_COLORS, lineColor(b, k)) || 'custom'}</span><div class="swatches">${ROPE_COLORS.map(([cn, c]) => `<button type="button" class="sw" style="background:${c}" data-act="lineColor" data-line="${k}" data-v="${c}" aria-pressed="${lineColor(b, k) === c}" title="${cn}" aria-label="${n}: ${cn}"></button>`).join('')}</div></div>`).join('')}
+        <div class="field"><small>As on Josephine's piano, a colour for each line, so you find it by eye. ${b.lineColors ? '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual colours</button>' : 'These are the usual colours: jib lines warm, main lines cool, the backstay white.'}</small></div>
+      </section>
       <section><h3>Condition <em>· changes her speed</em></h3>
         <div class="field"><span>Bottom last cleaned · <b id="bpWeeksV">${weeksLabel(b.perf.cleanedWeeks)}</b></span>
           <input type="range" data-k="weeks" min="0" max="26" step="1" value="${b.perf.cleanedWeeks}"><small>${PERF_INFO.weeks}</small></div>
@@ -222,6 +228,9 @@ export class BoatPanel {
   }
 }
 
+/** The lines in the editor, in the band's order (port to starboard, then the thwart). */
+const LINE_ROWS: [LineColorKey, string][] = [['jibsheet', 'Jib sheets'], ['downhaul', 'Main halyard'], ['jibCunningham', 'Jib Cunningham'], ['cunningham', 'Main Cunningham'],
+  ['outhaul', 'Outhaul'], ['vang', 'Vang'], ['jibHalyard', 'Jib halyard'], ['mainsheet', 'Mainsheet'], ['backstay', 'Backstay']];
 /** The slips, by dock; those other boats of yours have are shown as taken. */
 function slipOptions(b: BoatSpec, boats: BoatSpec[]): string {
   const id = (x: string | undefined) => slipById(x)?.id; // (older saves name West Harbor's slips without the marina)

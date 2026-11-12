@@ -4,6 +4,7 @@ import { byHand, moveLazyCar, takeLine } from '../boat/physics';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
+import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 
 /**
  * The sail controls band (the owner's design, 12 Nov 2026; the UI session's mock-up, design/sail-controls-band.html):
@@ -59,8 +60,11 @@ const chev = (dir: 'u' | 'd' | 'l' | 'r') => {
 };
 /** Short two-line names over the vertical lines. */
 const SHORT: Partial<Record<CtlKey, string>> = { downhaul: 'Main<br>hal.', jibHalyard: 'Jib<br>hal.', jibCunningham: 'Jib<br>Cunn', cunningham: 'Main<br>Cunn', outhaul: 'Out-<br>haul', vang: 'Vang', jibsheet: 'Jib<br>sheet', jibsheetW: 'Jib<br>sheet' };
-/** Each rope's colour, with a laid fleck (the owner: for usability, not Josephine's colours; none port red or starboard green). */
-const ROPE: Partial<Record<CtlKey | 'jib', string>> = { jib: '#ff8a3d', jibCunningham: '#f2c230', jibHalyard: '#c0652a', mainsheet: '#3d8bff', outhaul: '#2ec4d6', vang: '#9b6bff', cunningham: '#ec6aae', downhaul: '#8fa3b8', backstay: '#e8edf0' };
+/** Each rope's colour, with a laid fleck: the boat's own (chosen in the boat editor, boat/spec.ts lineColors), or the
+ * usual ones (the owner: for usability; none port red or starboard green). */
+const ROPE: Partial<Record<CtlKey | 'jib', string>> = { ...LINE_COLORS, jib: LINE_COLORS.jibsheet };
+/** The colour key of a band element's line ('jib' is both jib sheets; the traveller's car rides with the mainsheet). */
+const colorKey = (k: string): LineColorKey | null => (k === 'jib' ? 'jibsheet' : k === 'traveller' ? 'mainsheet' : k in LINE_COLORS ? (k as LineColorKey) : null);
 const CLEAT: Partial<Record<CtlKey, string>> = { cunningham: 'clam', downhaul: 'block', jibsheet: 'winch', jibsheetW: 'winch' };
 
 /** A vertical line: its name, ▲ eases, the cleat, the well with the rope showing how much is on, ▼ pulls on. */
@@ -127,6 +131,8 @@ export class SailBand {
   private holding: CtlKey | null = null;
   private sel: CtlKey | null = null;
   private lastTack: 'S' | 'P' | null = null;
+  /** The boat whose rope colours the band shows (re-coloured when you change boats, or her colours). */
+  private colorsOf: string | null = null;
   /** Whether the pole tab is showing (a deep run, or the pole out): kept between frames for its hysteresis. */
   private poleShown = false;
   /** When to look for a hail to make next (performance.now(), ms). */
@@ -271,6 +277,12 @@ export class SailBand {
     const from = u.carCmd ?? u.ctl.car[side]; takeLine(u, 'car'); moveLazyCar(u, row - from.fore, ins - from.ins); this.host.changed();
   }
 
+  /** Each rope in her own colours (the boat editor's Lines), set again only when they change. */
+  private colours(spec: BoatSpec | undefined): void {
+    const key = JSON.stringify(spec?.lineColors ?? null); if (key === this.colorsOf) return; this.colorsOf = key;
+    this.el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { const k = colorKey(d.dataset.line!); if (k) d.style.setProperty('--rope', lineColor(spec, k)); });
+  }
+
   /** The windex and the tabs on the band's top edge: Hail (when a hail applies), a penalty's turns, the pole, Auto-trim. */
   private tabs(w: ReturnType<BandHost['world']>, u: Boat): void {
     // the windex: the vane into the apparent wind (arel, + from starboard: clockwise looking down)
@@ -309,6 +321,7 @@ export class SailBand {
   update(): void {
     const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
     this.tabs(w, u);
+    this.colours(u.spec);
     if (!this.open) return;
     // a tack ends a jib sheet's run: the sheets change roles (physics.ts carries your targets across), and a sheet still
     // winching after it would back the jib with nothing in the band to stop it

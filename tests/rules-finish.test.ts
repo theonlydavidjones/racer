@@ -180,11 +180,14 @@ describe('in the world', () => {
     w.step(DT); w.step(DT);
     expect(w.pairRecord(M, W)?.hail).toMatchObject({ by: M.id, kind: 'room', relayed: true });
     expect(w.pairRecord(L, M)?.hail?.passedOn?.to).toBe(W.id);
-    for (let t = 0; t < 20; t += DT) w.step(DT);
-    expect(W.lastTackT).toBeGreaterThan(t0);
-    expect(M.lastTackT).toBeGreaterThan(t0);
-    expect(M.lastTackT).toBeGreaterThanOrEqual(W.lastTackT); // M waited for W
-    expect(M.lastTackT - W.lastTackT).toBeLessThan(6); // and then tacked as soon as she could (20.2(c))
+    // (each boat's first tack after the hail: free of it, W may well tack back for the mark later)
+    let wT = NaN, mT = NaN;
+    for (let t = 0; t < 20; t += DT) { w.step(DT); if (isNaN(wT) && W.lastTackT > t0) wT = W.lastTackT; if (isNaN(mT) && M.lastTackT > t0) mT = M.lastTackT; }
+    expect(wT).toBeGreaterThan(t0);
+    expect(mT).toBeGreaterThan(t0);
+    expect(mT).toBeGreaterThanOrEqual(wT); // M waited for W
+    expect(mT - wT).toBeLessThan(6); // and then tacked as soon as she could (20.2(c))
+    expect(M.tack, 'and stayed tacked').toBe('P');
   });
 
   it('20.3: you, hailed with a boat to windward, press Hail and pass it on', () => {

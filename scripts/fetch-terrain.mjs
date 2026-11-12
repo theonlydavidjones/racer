@@ -13,10 +13,10 @@ import { inflateSync, deflateSync } from 'node:zlib';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 // The grid's spacing is the first map's (37.745–37.935 N, 122.61–122.345 W, 467 × 424 cells of about 50 m), kept exactly
-// as it was extended east to Oakland and Alameda and north past Richmond to the Brothers, so every cell of the first map
+// as it was extended east to Oakland and Alameda (and on past San Leandro Bay) and north past Richmond to the Brothers, so every cell of the first map
 // is sampled at the same point as before.
 const DLON = 0.265 / 466, DLAT = 0.19 / 423;
-const BBOX = { south: +(37.745 - 22 * DLAT).toFixed(6), north: +(37.935 + 112 * DLAT).toFixed(6), west: -122.61, east: +(-122.345 + 232 * DLON).toFixed(6) };
+const BBOX = { south: +(37.745 - 22 * DLAT).toFixed(6), north: +(37.935 + 112 * DLAT).toFixed(6), west: -122.61, east: +(-122.345 + 275 * DLON).toFixed(6) };
 const Z = 13, CELL = 50, SCALE = 3.2; // m per grid cell; m per grey level
 const URL0 = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium';
 

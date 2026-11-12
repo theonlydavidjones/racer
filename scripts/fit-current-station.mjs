@@ -21,7 +21,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 const API = 'https://api.tidesandcurrents.noaa.gov', APP = 'folkboat-sim';
-const FIT = [{ id: 'SFB1219', bin: 6, from: '20120715', to: '20120909', note: 'Richardson Bay, mid-bay: the sim\'s fit to NOAA\'s 55-day record (no published constants)' }];
+const FIT = [
+  { id: 'SFB1219', bin: 6, from: '20120715', to: '20120909', note: 'Richardson Bay, mid-bay: the sim\'s fit to NOAA\'s 55-day record (no published constants)' },
+  // the Tidal Canal's flow into San Leandro Bay: the stream averaged over the depth (all nine of the ADCP's bins, 0.67 to
+  // 4.69 m down; the last metre above the bed, slower, unmeasured), on NOAA's own flood axis for the station (178°); not
+  // a point in the current field (NOAA's constants for the near-surface bin are), only the canal's flow (tide.ts)
+  { id: 'SFB1216', bins: [1, 2, 3, 4, 5, 6, 7, 8, 9], flood: 178, from: '20120714', to: '20120909', suffix: '-mean', flowOnly: true, note: 'Alameda Estuary SE End (the Tidal Canal into San Leandro Bay), depth-averaged: the sim\'s fit to NOAA\'s 57-day record, for the canal\'s flow' }
+];
 const CHECK = { id: 'SFB1212', bin: 9, from: '20120522', to: '20120710' };
 
 // the sim's predictor, from its TypeScript (Node strips the types: Node 22.18 or later)
@@ -73,9 +79,18 @@ async function fitStation(S) {
   // the flood axis: given, or NOAA's deployment record's flood direction (the direction the water flows toward on the flood)
   const dep = Number.isFinite(S.flood) ? null : (await get(`/mdapi/prod/webapi/stations/${S.id}/deployments.json`)), axis = Number.isFinite(S.flood) ? S.flood : +(dep.deployments?.[0]?.flood_direction_degrees ?? dep.flood_direction_degrees);
   if (!Number.isFinite(axis)) fail(`${S.id}: no flood direction`);
-  const rec = await record(S.id, S.bin, S.from, S.to);
-  const v = rec.map(p => p.s * Math.cos((p.d - axis) * Math.PI / 180));
-  const times = rec.map(p => p.ms), { z0, hc } = fit(times, v, NAMES), f = { z0 };
+  // (several bins: the stream along the axis at each time, averaged over them, where every bin has it)
+  let times, v;
+  if (S.bins) {
+    const per = await Promise.all(S.bins.map(b => record(S.id, b, S.from, S.to))), at = new Map();
+    per.forEach(r => { for (const p of r) { const a = at.get(p.ms) ?? []; a.push(p.s * Math.cos((p.d - axis) * Math.PI / 180)); at.set(p.ms, a); } });
+    const full = [...at.entries()].filter(([, a]) => a.length === S.bins.length).sort((a, b) => a[0] - b[0]);
+    times = full.map(e => e[0]); v = full.map(e => e[1].reduce((t, x) => t + x, 0) / e[1].length);
+  } else {
+    const rec = await record(S.id, S.bin, S.from, S.to);
+    v = rec.map(p => p.s * Math.cos((p.d - axis) * Math.PI / 180)); times = rec.map(p => p.ms);
+  }
+  const rec = times, { z0, hc } = fit(times, v, NAMES), f = { z0 };
   const pred = predict(f.z0, hc, times), res = v.map((x, i) => x - pred[i]), rms = Math.sqrt(res.reduce((a, x) => a + x * x, 0) / res.length), sd = Math.sqrt(v.reduce((a, x) => a + x * x, 0) / v.length);
   console.log(`${S.id} ${m.name}: ${rec.length} samples, axis ${Math.round(axis)}°, mean ${f.z0.toFixed(3)} kt; fit explains ${(100 * (1 - (rms / sd) ** 2)).toFixed(0)}% of the variance (residual ${rms.toFixed(2)} kt RMS of ${sd.toFixed(2)})`);
   return { m, axis, z0: f.z0, hc };
@@ -96,7 +111,7 @@ const stations = [];
 for (const S of FIT) {
   const r = await fitStation(S); // (its flood axis from NOAA's deployment record: SFB1219's is 74° true)
   stations.push({
-    id: S.id, kind: 'harmonic', name: r.m.name, note: S.note, lat: +(+r.m.lat).toFixed(5), lon: +(+r.m.lng).toFixed(5), bin: S.bin,
+    id: S.id + (S.suffix ?? ''), kind: 'harmonic', ...(S.flowOnly ? { flowOnly: true } : {}), name: r.m.name, note: S.note, lat: +(+r.m.lat).toFixed(5), lon: +(+r.m.lng).toFixed(5), bin: S.bin ?? S.bins,
     flood: Math.round(r.axis), ebb: Math.round((r.axis + 180) % 360), z0: +r.z0.toFixed(3), hc: r.hc.map(([n, A, G]) => [n, +A.toFixed(4), +G.toFixed(2)]), fitted: `${S.from}–${S.to}`
   });
 }

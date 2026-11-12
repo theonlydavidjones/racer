@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { headline } from '../src/ui/feedback';
+import { cancelSignal } from '../src/sim/signals';
 
 // One-line messages on screen, the full text in the log (owner, 12 Nov 2026): ui/feedback.ts headline
 describe('A message\'s one-line headline', () => {
@@ -26,5 +27,9 @@ describe('A message\'s one-line headline', () => {
     const long = 'The committee has signalled a course that runs north from the club along the shore past the Marina and back again to the line';
     expect(h(long).length).toBeLessThanOrEqual(71);
     expect(h(long).endsWith('…')).toBe(true);
+  });
+  it('the committee calling racing off says so first', () => {
+    expect(h(cancelSignal(true, 27).say)).toBe('Racing abandoned, no more racing today');
+    expect(h(cancelSignal(false, 27).say)).toBe('Racing postponed, no more racing today');
   });
 });
