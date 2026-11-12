@@ -1,6 +1,6 @@
 # Build plan
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and slip numbers, and the Corinthian's A dock, are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
@@ -70,6 +70,9 @@ is now "much better" (owner).
 3. The cockpit to the plan, with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
+5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
+   of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
+   hull's heel, pitch and roll, its light moving with it (1–2 h).
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
@@ -87,7 +90,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
-- **Now — cruise ignores the chosen origin** (bug; ~1 h; for Marinas after the reset): owner, "there's a bug in cruise
+- ~~**Now — cruise ignores the chosen origin**~~ (done: 1ace228 in #54, checked in the browser by Marinas; bug; ~1 h): owner, "there's a bug in cruise
   mode where I have an origin selected but it still starts me in the slip." When a cruise origin other than her slip is
   chosen, she must start there (sim/world.ts, the slip and docked start, near line 301). Goes with the push-off fix.
 - **Now — double-click to lash the tiller always lashes it amidships** (bug; <1 h; Crew Controls after the reset, with
@@ -504,10 +507,18 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
-  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); San Rafael Bay and San Leandro Bay have no measurement
-  inside them, so their current is the nearest stations' in sight, very likely too strong for such shallow water (USGS's
-  San Pablo Bay surveys, WRI 84-4339's speed-against-depth relation, and SFEI's San Leandro Bay model are the leads,
-  but pubs.usgs.gov and sfei.org aren't reachable here); BYC's and Encinal YC's own racing marks aren't published where we could
+  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: a dead end, so by continuity: Point
+  San Quentin's tide, NOAA 9414873 from San Francisco's constants by NOAA's offsets, fills and empties the water beyond
+  each line across the bay, NOAA chart depths; peak about 0.1–0.3 kt over the open bay against 1.7 kt at the mouth,
+  handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
+  water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
+  as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
+  behind it); San
+  Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong;
+  the same continuity would serve (Alameda's tide, NOAA 9414750), but the world, its terrain and the chart extracts
+  stop at 122.213 W, through the middle of the bay, so the water it fills (east to Arrowhead Marsh) isn't in the sim
+  yet: it needs the world taken a kilometre or two further east first (SFEI's San Leandro Bay model, the other lead,
+  sits behind a browser check that a fetch can't pass); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

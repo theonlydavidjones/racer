@@ -8,6 +8,7 @@ import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT, fixSpec } from '../src/boat/spec';
+import sbData from '../src/geo/data/south-beach.json';
 import { DT, World, slipLeadTime } from '../src/sim/world';
 
 /** Open water off each harbor's entrance. */
@@ -213,6 +214,20 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     expect(k.signed).toBeGreaterThan(2); expect(Math.sign(k.turned)).toBe(Math.sign(a.turned)); // (a key held, the same as the tiller)
     expect(Math.sign(a.turned)).toBe(-Math.sign(b.turned)); expect(Math.abs(a.turned)).toBeGreaterThan(3); // (let go, with way on, she turns as the tiller says)
   }, 120000);
+  it('South Beach: the harbor\'s own slip numbers (its map, sfport.com): from each dock\'s gate at the shore, odd on the north side, even on the south', () => {
+    const top: Record<string, number> = { A: 84, B: 92, C: 92, D: 104, E: 104, F: 108, G: 92 }; // (the map's highest on each dock)
+    const sb = slipsIn('south-beach');
+    for (const [dock, n] of Object.entries(top)) {
+      const mine = sb.filter(s => s.dock === dock && s.kind === 'bow-in'); // (the end ties, alongside the docks' ends, aren't numbered on the map)
+      // every number on the map, once, as mapped (a few she couldn't be got out of are dropped when the harbor's loaded)
+      const mapped = sbData.slips.filter(s => s.dock === dock).map(s => Number(s.id.slice(1))).sort((a, b) => a - b);
+      expect(mapped).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+      expect(mine.length).toBeGreaterThan(n - 4); expect(mine.every(s => Number(s.id.split(':')[1].slice(1)) <= n)).toBe(true);
+      for (const s of mine) { const k = Number(s.id.split(':')[1].slice(1)), bowSouth = Math.abs(((s.heading - 180 + 540) % 360) - 180) < 30; expect(bowSouth).toBe(k % 2 === 1); } // (odd: on the north side, bow in toward the dock to the south)
+      const at = (k: number) => sbData.slips.find(s => s.id === `${dock}${k}`)!.at, one = at(1), last = at(n - 1);
+      expect(one[1]).toBeLessThan(last[1]); // (1 at the gate, the west end)
+    }
+  });
   it('end ties: berths alongside the free ends of the docks, bow out, which push off forward', () => {
     const ends = SLIPS.filter(s => s.kind === 'alongside');
     expect(ends.length).toBeGreaterThan(10);

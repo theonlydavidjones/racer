@@ -533,7 +533,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       const out = right(c.yaw).multiplyScalar(i ? 1 : -1), shY = BONE.shoulderY * f.scale;
       const sh = _sh.copy(c.hip).addScaledVector(fwd(c.yaw), -Math.sin(c.pitch) * shY).add(_v.set(0, Math.cos(c.pitch) * shY, 0)).addScaledVector(out, BONE.shoulderX * f.scale);
       const seg = _v.copy(want.hands[i]).sub(hd), tq = Math.max(0, Math.min(1, _w.copy(sh).sub(hd).dot(seg) / Math.max(1e-6, seg.lengthSq())));
-      const passes = seg.lengthSq() > 0.0025 && (hd.y - sh.y) * (want.hands[i].y - sh.y) < 0 && _w.copy(hd).addScaledVector(seg, tq).distanceTo(sh) < 0.2; // (only crossing the shoulder's height: a hand already below it goes straight)
+      const passes = seg.lengthSq() > 0.0025 && Math.min(Math.abs(hd.y - sh.y), Math.abs(want.hands[i].y - sh.y)) > 0.05 && (hd.y - sh.y) * (want.hands[i].y - sh.y) < 0 && _w.copy(hd).addScaledVector(seg, tq).distanceTo(sh) < 0.2; // (only crossing the shoulder's height, from well above it to well below or back: one at it goes straight)
       if (passes) { _w.copy(sh).addScaledVector(out, 0.28).setY(Math.min(sh.y, Math.max(hd.y, want.hands[i].y)));
         // (and round it inside the cockpit, not out through the coaming)
         if (inCockpit(Math.abs(c.hip.x), c.hip.z)) { const lim = chz(_w.z) - 0.1; if (Math.abs(_w.x) > lim) _w.x = Math.sign(_w.x) * lim; } }
@@ -541,7 +541,11 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (coming to a step up, the bench's edge or the coaming, it stops and rises to it at a hand's pace: never snapped up onto it)
       if (ground(hd.x, hd.z) + 0.02 > hy + LIMB_SPEED * dt) { hd.x = hx; hd.z = hz; hd.y = Math.max(hy, ground(hx, hz) + 0.02) + LIMB_SPEED * dt; }
       // (rising early to clear an edge it's coming to, at a hand's pace; never inside what's under it)
-      const clear = far ? groundNear(hd.x, hd.z, 0.3) + 0.04 : 0;
+      // (only over something on its way that's higher than both ends, the coaming between the deck and the cockpit: not
+      // whatever's merely near it, which held a hand up beside the coaming on its way down to a locker lid)
+      let clear = 0;
+      if (far) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
+        if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
       hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), ground(hd.x, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step || sw) {
