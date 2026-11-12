@@ -414,6 +414,18 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   const span = (za: number, zb: number, n = 12) => Array.from({ length: n + 1 }, (_, i) => zU(za + (zb - za) * i / n));
   const sh = (u: number) => Math.min(soleHalf, hullInnerHalf(u, sole) - 0.03);
   const zA = zAt(u1), z0 = zAt(u0), out: THREE.BufferGeometry[] = [], lining: THREE.BufferGeometry[] = [], panel: THREE.BufferGeometry[] = [];
+  // a flat panel across the boat at z, its outline (x, y) given round; and the hull's side at station u from the sole up
+  // to the seat (or down), just inside it and never past where the bench reaches, so no panel pokes through the hull
+  const face = (z: number, ring: number[][]) => {
+    const pts = ring.map(([x, y]) => new THREE.Vector2(x, y)).filter((q, i, a) => i === 0 || q.distanceTo(a[i - 1]) > 1e-4), pos: number[] = [];
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(pts, [])) for (const q of [pts[a], pts[b], pts[c]]) pos.push(q.x, q.y, z);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+  };
+  const hullSide = (u: number, s: number, up: boolean) => {
+    const out2: number[][] = [];
+    for (let k = 0; k <= 6; k++) { const y = sole + (seat - sole) * (up ? k : 6 - k) / 6; out2.push([s * Math.max(sh(u), Math.min(benchOut(u), hullInnerHalf(u, y) - 0.03)), y]); }
+    return out2;
+  };
   out.push(strip(span(z0, zA, 16).map(u => [V(-sh(u), sole, zAt(u)), V(sh(u), sole, zAt(u))]))); // the sole
   for (const s of [1, -1]) {
     const bench = span(z0, benchAft), well = span(benchAft, shelfFwd, 4), shelf = span(shelfFwd, zA, 6);
@@ -430,11 +442,11 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
       return pts; };
     for (let k = 0; k < 6; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
     out.push(strip(shelf.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the shelf's top, outboard
-    const ub = zU(benchAft); panel.push(quad(V(s * (sh(ub) - 0.012), sole, benchAft), V(s * benchOut(ub), sole, benchAft), V(s * benchOut(ub), seat, benchAft), V(s * (sh(ub) - 0.012), seat, benchAft))); // the locker's end
+    const ub = zU(benchAft); panel.push(face(benchAft, [[s * (sh(ub) - 0.012), sole], ...hullSide(ub, s, true), [s * (sh(ub) - 0.012), seat]])); // the locker's end, out to the hull
   }
   const us = zU(shelfFwd), wsh = sh(us);
   out.push(strip(span(shelfFwd, zA, 6).map(u => [V(-sh(u), seat, zAt(u)), V(sh(u), seat, zAt(u))]))); // the after shelf's top
-  panel.push(quad(V(-benchOut(us), sole, shelfFwd), V(benchOut(us), sole, shelfFwd), V(benchOut(us), seat, shelfFwd), V(-benchOut(us), seat, shelfFwd))); void wsh; // its front, a solid panel
+  panel.push(face(shelfFwd, [...hullSide(us, 1, true), ...hullSide(us, -1, false)])); void wsh; // its front, a solid panel out to the hull each side
   const w1 = benchOut(u1), ya = deckY(u1, 0);
   lining.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
   return { teak: out, lining, panel };
