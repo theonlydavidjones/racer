@@ -17,7 +17,6 @@
 <header id="hud">
   <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
   <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
-  <div class="pod windex"><span class="lab">Windex</span><canvas id="windexDial" aria-label="Windex: the apparent wind at the masthead"></canvas><span class="sub" id="tackLab">Starboard</span></div>
   <div class="pod"><span class="lab">TWS <i>kt</i></span><span class="val" id="tws">12</span><span class="sub" id="shiftLab">270°</span></div>
   <div class="pod"><span class="lab"><span id="tideLab">Tide</span> <i>kt</i></span><span class="val" id="tideVal">Slack</span><span class="sub" id="seaSub">no waves</span></div>
 </header>
@@ -53,8 +52,6 @@
   <div class="tp-head"><span class="tp-lab">Sail trim</span><span id="tpWho">Crew trims every line</span></div>
   <!-- how each sail is drawing (its lines are in the sail controls band) -->
   <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
-  <div class="tp-row" id="tpPoleRow"><span class="tp-lab">Pole</span><span class="tp-state" id="tpPole"></span>
-    <button class="tp-btn tp-pole" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button></div>
   <!-- the crew's weight: one line while they place themselves (tap it to open); open while you've placed them -->
   <div class="tp-crewbox" id="tpCrewBox">
     <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
@@ -78,7 +75,6 @@
 <div id="controls">
   <!-- sailing the boat: what the helm does (the lashing is on the tiller itself: double-click) -->
   <div class="row1 ibar" id="helmBar">
-    <button class="ib" id="bHail" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 17v-2.5H6.8c-.9 0-1.4-.6-1.4-1.4v-1.6l-1-.4 1-1.8V8.6C5.4 5.6 7.4 3.5 10 3.5"/><path d="M9.2 8.2c1.6.2 2.6 1.3 2.6 2.7s-1 2.5-2.6 2.7"/><path d="M14 8.3a3.5 3.5 0 0 1 0 5.4"/><path d="M16.3 6.4a6.3 6.3 0 0 1 0 9.2"/></svg><span class="w">Hail</span></button>
     <button class="ib on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3v14"/><path d="M7 10h10"/><path d="M13 6l4 4-4 4"/></svg><span class="w">Push off</span></button>
     <button class="ib" id="bJib" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 17 12 3v14Z"/></svg><span class="w">Hoist jib</span></button>
     <button class="ib" id="bMain" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v14h9Z"/></svg><span class="w">Hoist main</span></button>
@@ -334,7 +330,7 @@
       <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
       <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
-      <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
+      <b>Hail</b><span>The Hail tab on the sail controls band (it shows when there's a hail to make) or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
     <div class="field"><span>Keyboard</span>

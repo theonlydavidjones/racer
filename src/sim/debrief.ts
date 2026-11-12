@@ -231,7 +231,8 @@ export class RaceLog {
       const best = runAngle(ww.kt), vmg = (a: number) => polar(ww.kt, a) * -Math.cos(a * D2R), r = vmg(best) > 0 ? vmg(u.twa) / vmg(best) : 1;
       let lost = 0, poleLost = 0;
       if (r < 0.97) { this.down.t += dt; this.down.lost += dt * clamp(1 - r, 0, 0.5); lost += dt * clamp(1 - r, 0, 0.5); }
-      if (u.twa > 156 && u.pole !== 'set') {
+      // (only while the pole is yours: while it's the crew's, setting it and gybing it end-for-end are their time)
+      if (u.twa > 156 && u.pole !== 'set' && u.poleMine) {
         const jib = polar(ww.kt, u.twa, 'jib'), wing = polar(ww.kt, u.twa, 'wing');
         if (wing > jib * 1.02) { this.pole.t += dt; this.pole.lost += dt * (1 - jib / wing); lost += dt * (1 - jib / wing); poleLost = dt * (1 - jib / wing); }
       }

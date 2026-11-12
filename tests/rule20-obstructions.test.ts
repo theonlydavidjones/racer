@@ -8,6 +8,7 @@
 //      ↑ wind                       ░░ the obstruction ░░
 //                                          ↖
 //            Blue (windward, same tack) ↖   ↖ Red, close-hauled, about to hit it: "Room to tack!"
+import { settleTrim } from '../src/boat/physics';
 import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import ss41 from '../src/courses/data/seaweed-soup-2026-course41.json';
@@ -38,6 +39,8 @@ function race(file = SS2) {
 function sail(w: World, b: World['boats'][number], p: Vec, tack: 'S' | 'P') {
   const beat = beatAngle(w.wind.kt), h = n360(tack === 'S' ? w.wind.from - beat : w.wind.from + beat);
   Object.assign(b, { x: p.x, y: p.y, h, desired: h, v: 2.4, tack, tacking: false, twa: beat, ww: { from: w.wind.from, kt: w.wind.kt }, lastTackT: -999, turnTarget: null });
+  settleTrim(b, w.wind.from, w.wind.kt); // (her sheets trimmed close-hauled, as a boat sailing there would have them)
+  if (b.ai) { b.ai.turnCommit = 0; b.ai.commitFor = 0; } // (no turn the AI committed to where she was before)
   return h;
 }
 /**

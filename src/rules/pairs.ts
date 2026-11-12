@@ -150,6 +150,13 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   return after < before - 5 ? Math.abs(turn) : 0;
 }
 
+/** How far (deg) she bore away (turned farther off the wind she's in) over the last RULE16_WINDOW seconds; 0 if she didn't. */
+function boreAwayBy(b: RulesBoat, ctx: RulesContext): number {
+  if (b.headingAgo == null) return 0;
+  const wf = windOf(b, ctx);
+  return Math.max(0, Math.abs(wrap(wf - b.h)) - Math.abs(wrap(wf - b.headingAgo)));
+}
+
 /** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
 function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
   if (b.headingAgo == null || b.tack !== 'S') return false;
@@ -183,16 +190,16 @@ export const notRacing = (b: RulesBoat): boolean => !!b.retired || (!!b.finished
  * Rule 23: could `X` be breaking rule 23 by taking `Y`'s wind? Only between these boats:
  * 23.1, X is not racing (she has finished) and Y is;
  * 23.2, Y is taking a penalty, on another leg, or returning to start under rule 21.1 (the sim's `ocs`), and X is not
- * sailing her proper course (after the starting signal she may sail it whatever it does to Y's wind; the sim's sign of
- * leaving it is sailing above it). Before the start there is no proper course to judge interference by, and the sim
- * only calls 23.2 blanketing it can tell was deliberate, so not then.
+ * sailing her proper course (after the starting signal she may sail it whatever it does to Y's wind): she is above it,
+ * or well below it (and, blanketing() adds, bore away onto Y's wind to get there). Before the start there is no proper
+ * course to judge interference by, and the sim only calls 23.2 blanketing it can tell was deliberate, so not then.
  */
 export function blanketRule<B extends RulesBoat>(X: B, Y: B, ctx: RulesContext): '23.1' | '23.2' | null {
   if (Y.finished || notRacing(Y)) return null;
   if (notRacing(X)) return '23.1';
   if (X.finished) return null; // just over the line, still clearing it, she is racing
 
-  if (ctx.t <= 0 || !X.started || !X.aboveProper) return null;
+  if (ctx.t <= 0 || !X.started || !(X.aboveProper || X.belowProper)) return null;
   const vulnerable = Y.penalty > 0 || Y.ocs || (Y.started && Y.leg !== X.leg);
   return vulnerable ? '23.2' : null;
 }
@@ -358,7 +365,12 @@ function blanketing<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: Rules
   for (const [X, Y, k] of [[A, B, obs.blanket?.byA ?? 0], [B, A, obs.blanket?.byB ?? 0]] as const) {
     const part = k >= BLANKET_K ? blanketRule(X, Y, ctx) : null;
     if (!part) { delete rec.blanket[X.id]; continue; }
-    const bl = rec.blanket[X.id] ??= { since: ctx.t, turned: turnedToward(X, Y) };
+    const bl = rec.blanket[X.id] ??= { since: ctx.t, turned: turnedToward(X, Y), boreAway: boreAwayBy(X, ctx) };
+    // below her proper course, the sim calls 23.2 only if she bore away onto Y's wind. Rule 23.2 itself asks only that
+    // she not be sailing her proper course; this is the sim's guard against its own rough estimate of that course
+    // (world.ts properTwa), so a boat sailing low for her own reasons (footing, a crab for the tide) isn't called.
+    // Above it, any blanketing counts.
+    if (part === '23.2' && !X.aboveProper && (bl.boreAway ?? 0) < RULE16_MIN_TURN) continue;
     if (ctx.t - bl.since < BLANKET_TIME) continue;
     rec.blanket = {}; rec.blanketCool = ctx.t + INCIDENT_COOLDOWN;
     return { kind: 'blanket', fouler: X, rule: '23', byWhy: null, part, turned: bl.turned || undefined, verdict: r };
