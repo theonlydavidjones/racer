@@ -1,5 +1,6 @@
 import { AREA_NAME, INK, areaPen, type ChartPalette, type Detail, type Ink } from './encChart';
 import { PEN } from './draw2d';
+import { CURRENT_RAMP, WIND_RAMP, rampColor } from './flow';
 
 /*
  * The map's key: what each line and symbol on it means, listing only what's on the map now (the sim's overlays that
@@ -27,6 +28,12 @@ const boat = (g: CanvasRenderingContext2D, x: number, y: number, s: number, fill
   if (you) { g.strokeStyle = I.you; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, s * 1.9, 0, 6.29); g.stroke(); }
 };
 
+/** A sample of a flow layer: its colours from calm to strong, with a streak over them. */
+const flowSample = (g: CanvasRenderingContext2D, w: number, h: number, ramp: typeof WIND_RAMP, max: number) => {
+  for (let x = 2; x < w - 2; x++) { const c = rampColor(ramp, (x - 2) / (w - 4) * max); g.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; g.fillRect(x, 1, 1, h - 2); }
+  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 1.3; g.lineCap = 'round'; g.beginPath(); g.moveTo(8, h / 2); g.lineTo(w - 8, h / 2); g.stroke();
+};
+
 const SIM: { key: SimKey; name: string; draw: Draw }[] = [
   { key: 'you', name: 'You', draw: (g, I, w, h) => boat(g, w / 2, h / 2, 4, I.you, I, true) },
   { key: 'boats', name: 'Other boats (in their colours)', draw: (g, I, w, h) => { boat(g, w / 2 - 8, h / 2, 3.4, '#c8302a', I, false); boat(g, w / 2 + 8, h / 2, 3.4, '#f3f1ea', I, false); } },
@@ -37,8 +44,8 @@ const SIM: { key: SimKey; name: string; draw: Draw }[] = [
   { key: 'destline', name: 'The navigator\'s route there', draw: (g, I, w, h) => line(g, w, h, PEN.dest, I.line, I.halo) },
   { key: 'laylines', name: 'Laylines: starboard tack (green), port tack (red)', draw: (g, I, w, h) => { line(g, w / 2 - 1, h, PEN.layline, I.starboard, I.halo); g.save(); g.translate(w / 2 + 1, 0); line(g, w / 2 - 1, h, PEN.layline, I.port, I.halo); g.restore(); } },
   { key: 'ships', name: 'Ship, and where she\'ll be in a minute', draw: (g, I, w, h) => { const y = h / 2; g.lineCap = 'round'; g.strokeStyle = I.shipHalo; g.lineWidth = 6.5; g.beginPath(); g.moveTo(4, y); g.lineTo(16, y); g.stroke(); g.strokeStyle = I.ship; g.lineWidth = 3.5; g.stroke(); g.lineCap = 'butt'; g.globalAlpha = PEN.ahead.alpha; g.lineWidth = PEN.ahead.w; g.setLineDash(PEN.ahead.dash); g.beginPath(); g.moveTo(16, y); g.lineTo(w - 3, y); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; } },
-  { key: 'current', name: 'Current: the way it sets (longer = faster)', draw: (g, I, w, h) => { const y = h / 2, x1 = w - 8; g.strokeStyle = I.halo; g.lineWidth = 3.4; g.beginPath(); g.moveTo(8, y); g.lineTo(x1, y); g.stroke(); g.strokeStyle = I.current; g.fillStyle = I.current; g.lineWidth = 1.2; g.beginPath(); g.moveTo(8, y); g.lineTo(x1, y); g.stroke(); g.beginPath(); g.moveTo(x1, y); g.lineTo(x1 - 4, y - 2.5); g.lineTo(x1 - 4, y + 2.5); g.closePath(); g.fill(); } },
-  { key: 'wind', name: 'Wind across the course: darker more, hatched less', draw: (g, I, w, h) => { g.fillStyle = 'rgba(10,30,60,.25)'; g.fillRect(2, 1, w / 2 - 3, h - 2); g.save(); g.beginPath(); g.rect(w / 2 + 1, 1, w / 2 - 3, h - 2); g.clip(); g.strokeStyle = I.lull(0.5); g.lineWidth = 1; for (let x = w / 2 - h; x < w; x += 5) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + h, 0); g.stroke(); } g.restore(); } },
+  { key: 'current', name: 'Current: its speed in colour (kt: the scale on the chart), streaks the way it sets', draw: (g, _I, w, h) => flowSample(g, w, h, CURRENT_RAMP, 3) },
+  { key: 'wind', name: 'Wind: its speed in colour (kt: the scale on the chart), streaks the way it blows', draw: (g, _I, w, h) => flowSample(g, w, h, WIND_RAMP, 30) },
   { key: 'puffs', name: 'Puffs (dark) and lulls (pale) drifting down the course', draw: (g, _I, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2.5); gr.addColorStop(0, 'rgba(8,22,40,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); } },
   { key: 'sea', name: 'Sea state: more dots, higher waves (m)', draw: (g, I, w, h) => { g.fillStyle = I.seaText; let r = 7; for (let k = 0; k < 18; k++) { r = r * 16807 % 2147483647; const x = 3 + (r % 1000) / 1000 * (w - 6); r = r * 16807 % 2147483647; g.fillRect(x, 2 + (r % 1000) / 1000 * (h - 4), 1.4, 1.4); } } },
   { key: 'fog', name: 'Fog: grey where visibility is low (real readings)', draw: (g, I, w, h) => { g.fillStyle = I.fog(0.45); g.fillRect(2, 1, w - 4, h - 2); } },

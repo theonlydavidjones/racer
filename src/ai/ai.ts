@@ -12,7 +12,7 @@ import { HAIL_RESPONSE, cpa } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
 import { HARBORS } from '../geo/marina';
-import type { World } from '../sim/world';
+import { AI_EVERY, type World } from '../sim/world';
 
 /**
  * Her hail "Room to tack" at a boat obstruction (WS Case 11): the boat she hailed, the boat that is the obstruction, and
@@ -330,7 +330,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
   if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
-  const refresh = (w.steps + b.id) % 6 === 0; // heavy predictions 10× a second
+  const refresh = (w.steps + b.id) % (2 * AI_EVERY) === 0; // heavy predictions 10× a second (every other think outside close quarters, as before the speed pass)
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
   // see the wind she's in, not the course-wide wind); kept from the pre-start on, as crews take readings to learn it
   ai.avgFrom = ai.avgFrom == null ? ww.from : n360(ai.avgFrom + wrap(ww.from - ai.avgFrom) * Math.min(1, dt / 60));
