@@ -483,7 +483,8 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   over the new water, every shore slowing the wind and easing the stream, the East Bay's and Richmond's marks, the
   Richmond–San Rafael Bridge, the Brothers, the Berkeley Pier and Long Wharf (solid), the Port's cranes, the Bay
   Bridge's East Span on its real line, the Berkeley Marina, Richmond YC's Brickyard Cove and Encinal YC as harbors you
-  can sail into, docks and breakwaters solid~~ (done). Next: their slips (only a few fingers are mapped in OSM: Berkeley's
+  can sail into, docks and breakwaters solid, and a berth at BYC's guest dock, inside a basin that takes in the water
+  within the breakwaters~~ (done). Next: their slips (only a few fingers are mapped in OSM: Berkeley's
   B–E are combs, F–O lines; the other harbors' dock letters and slip numbers aren't published where we could reach;
   berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and the Estuary's other harbors (Oakland
   YC, Marina Village, Grand Marina, Alameda Marina with Island YC, Ballena Bay). Polish: the land's 50 m cells make a
