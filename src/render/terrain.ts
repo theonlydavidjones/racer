@@ -4,6 +4,7 @@ import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
 import { limePointBox, limePointLand, onGround } from '../geo/shore';
+import { chartCoast } from './shoreFit';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -157,6 +158,28 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x8b7f6d }))); // (the palette's rock)
     }
   }
+  // the rest of the shore fitted to NOAA's charted coast (render/shoreFit.ts): near the coast, land is where the chart
+  // has land; the land samples along the shore are moved onto the coast and brought down to the water, so the hills rise
+  // from the charted shoreline, not from a staircase of 50 m steps with sheer walls (the Cityfront and Lime Point, fitted
+  // above, are left as they are)
+  const sx = new Float32Array(nx * ny), sy = new Float32Array(nx * ny);
+  {
+    const coast = chartCoast(), b = limePointBox(), cell = Math.hypot(dx, dy) / Math.SQRT2, zone = new Uint8Array(nx * ny);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1);
+      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+      if (cityShore(lat, lon) || (p.x >= b.x0 - dx && p.x <= b.x1 + dx && p.y >= b.y0 + dy && p.y <= b.y1 - dy)) continue;
+      if (!coast.nearest(p.x, p.y, 1.6 * cell)) continue; // (only near the coast)
+      zone[k] = 1; H[k] = coast.inside(p.x, p.y) ? Math.max(H[k], 2.5) : Math.min(H[k], -30);
+    }
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i; if (!zone[k] || H[k] <= 0) continue;
+      if (![-1, 1, -nx, nx, -nx - 1, -nx + 1, nx - 1, nx + 1].some(o => H[k + o] <= 0)) continue;
+      const p = { x: corner.x + i * dx, y: corner.y + j * dy }, q = coast.nearest(p.x, p.y, 0.75 * cell);
+      if (q) { sx[k] = q.x - p.x; sy[k] = q.y - p.y; }
+      H[k] = 2; // (the shore itself; the bluffs rise from the next sample in)
+    }
+  }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i; if (H[k] <= 0) continue;
@@ -165,7 +188,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, h = H[k];
-    pos[k * 3] = corner.x + i * dx; pos[k * 3 + 1] = h > 0 ? h : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy);
+    pos[k * 3] = corner.x + i * dx + sx[k]; pos[k * 3 + 1] = h > 0 ? h : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy + sy[k]);
   }
   const idx: number[] = [];
   for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
