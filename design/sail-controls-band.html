@@ -366,7 +366,9 @@ function drawPole(){
   const tab = $('poleTab'), side = tack === 'S' ? 'S' : 'P';
   tab.hidden = !poleOk() && POLE.st === 'down';
   tab.classList.toggle('mine', !POLE.a);
-  tab.textContent = { down: 'Set pole', setting: 'Setting pole…', set: 'Stow pole', stowing: 'Stowing pole…' }[POLE.st];
+  // "Pole out" sets it, "Pole in" strikes it; while the crew is at it, the tab shows the next word dimmed
+  tab.textContent = { down: 'Pole out', setting: 'Pole in', set: 'Pole in', stowing: 'Pole out' }[POLE.st];
+  tab.style.opacity = POLE.st === 'setting' || POLE.st === 'stowing' ? .45 : 1;
 }
 function frame(now){
   const dt = Math.min(.05, (now - (frame.t || now)) / 1000); frame.t = now;
