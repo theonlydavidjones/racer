@@ -221,7 +221,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     woodTop.push(new THREE.BoxGeometry(2 * hw + 0.08, 0.03, 0.05).toNonIndexed().translate(0, sill - 0.015, z1 + 0.005));
   }
   for (const s of [1, -1]) {
-    const gu = (CABIN.u0 + CABIN.u1) / 2 + 0.03, gx = s * (CABIN.w - 0.2);
+    // (about halfway between the hatch's runner and the roof's edge, as on Josephine: the owner's photo from the mast)
+    const gu = HANDRAIL_U, gx = s * HANDRAIL_X;
     woodTop.push(new THREE.BoxGeometry(0.04, 0.05, 1.2).toNonIndexed().translate(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)));
   }
   for (const g of woodTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
@@ -363,6 +364,10 @@ interface Lines {
  * against the deck's and coaming's known widths: an estimate, within a centimetre.
  */
 const CABIN_Z0 = -L / 2 + CABIN.u0 * L, CABIN_Z1 = -L / 2 + CABIN.u1 * L;
+/** The jib car's H track: the cross-bar's and the tracks' lengths (m: about 5 in and 7 in, the owner, of Josephine). */
+const TRACK = { bar: 0.127, leg: 0.178 };
+/** The cabin-top grab rails: their middle station, and how far out (m), halfway between the hatch's runner and the roof's edge there. */
+const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.hw + 0.045 + cabinHalf(HANDRAIL_U) - CABIN_LEAN) / 2;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 /** The jib winch's height, base to the top of its drum's cap. */
@@ -397,11 +402,13 @@ const carPos = (side: number, fore: number, ins: number) => {
   // the middle fore–aft pin 2.65 m aft of the stay (North Sails' tuning guide); across, where the physics' lead angle puts it
   // (carLead, seen from the tack: 12.3° puts the car the guide's 58 cm off the centreline)
   const z0 = FORESTAY_DECK.z + 2.65 + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), lead = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
+  const lead0 = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(0) * D2R), lead1 = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(CAR_IN_PINS - 1) * D2R);
   // (drawn on the roof: the track's outboard end stays on the cabin top, within its edge; the lead angle the physics
   // uses is the sheet's, not this drawing's)
-  const lead0 = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(0) * D2R), lead1 = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(CAR_IN_PINS - 1) * D2R);
-  const outer = Math.min(lead1, cabinHalf(uAtZ(z0)) - CABIN_LEAN - 0.06), inner = Math.min(lead0, outer - 0.12);
-  const z = z0, x = side * (inner + (outer - inner) * (lead - lead0) / (lead1 - lead0));
+  // (drawn on the roof between the grab rail and the roof's edge, where it sits on Josephine: the cross-bar about 5 in
+  // (127 mm) long, the tracks 7 in (178 mm); the owner. The lead angle the physics uses is the sheet's, not this drawing's)
+  const edge = cabinHalf(uAtZ(z0)) - CABIN_LEAN, mid = (HANDRAIL_X + 0.02 + edge) / 2, span = TRACK.bar - 0.03;
+  const z = z0, x = side * (mid - span / 2 + span * (lead - lead0) / (lead1 - lead0));
   return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.045, z); // on the cabin top's arch, riding its bar
 };
 /**
@@ -544,14 +551,14 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     // tracks lying flat on the roof, inboard and outboard of the car's run, with their pin holes; across them a bar, pinned
     // to both at the car's fore–aft hole, carrying the car, which slides along it to its athwartships hole (syncBoatMesh
     // moves the bar with the car)
-    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1), zm = (a.z + b2.z) / 2, len = Math.abs(b2.z - a.z) + 0.05;
-    const legX = [a.x - side * 0.03, b2.x + side * 0.03];
+    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1), zm = (a.z + b2.z) / 2, len = TRACK.leg;
+    const legX = [(a.x + b2.x) / 2 - side * (TRACK.bar / 2 - 0.008), (a.x + b2.x) / 2 + side * (TRACK.bar / 2 - 0.008)];
     for (const x of legX) {
       const u = uAtZ(zm), y = cabinTopAt(u, x), slope = (cabinTopAt(u, x + 0.01) - cabinTopAt(u, x - 0.01)) / 0.02;
       const m = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.007, len), TRACK_ALU); m.rotation.z = Math.atan(slope); m.position.set(x, y + 0.004, zm); grp.add(m);
     }
     { const yi = cabinTopAt(uAtZ(zm), legX[0]), yo = cabinTopAt(uAtZ(zm), legX[1]), dx = legX[1] - legX[0], dy = yo - yi;
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx, dy) + 0.02, 0.008, 0.014), TRACK_ALU); bar.rotation.z = Math.atan2(dy, dx);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(TRACK.bar, 0.008, 0.014), TRACK_ALU); bar.rotation.z = Math.atan2(dy, dx);
       bar.position.set((legX[0] + legX[1]) / 2, (yi + yo) / 2 + 0.022, zm); grp.add(bar); carBars[tk] = bar; }
     const car = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.035, 0.07), BLACK); grp.add(car); cars[tk] = car; // (the car, low on its track, the sheet's block on it)
     const js = line(Array.from({ length: 5 }, () => new THREE.Vector3()), 'jib'); grp.add(js); jibSheets[tk] = js;
