@@ -6,6 +6,7 @@ import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
 import type { Controls, CrewSettings, Shape } from './controls';
+import type { SkipperKnobs } from '../ai/skipper';
 
 /** A line you can work: every control, plus the lazy jib car's pins. */
 export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
@@ -20,6 +21,8 @@ export interface AiState {
   aggr: number; // seconds of extra margin taken on the approach
   width: number; // how far off the rhumb line before tacking back, m
   aware: boolean; // accounts for current on the approach
+  /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
+  kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
   /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
   below?: boolean;
