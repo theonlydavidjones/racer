@@ -207,9 +207,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
-      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist' || a.job.line === 'doors' || a.job.line === 'hatch';
+      // (the doors and the hatch wait for a sheet: physics.ts crewHatch sends them back to it after, where they left off)
+      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
       const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
-      if (!sheet || committed || onSheet) continue;
+      // (from the doors or the hatch only for a sheet well off, several degrees: a tack's or a big puff's, not a tweak)
+      const atHatch = a.job.line === 'doors' || a.job.line === 'hatch';
+      if (!sheet || committed || onSheet || (atHatch && e < 0.05)) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
     const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);

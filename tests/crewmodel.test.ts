@@ -183,23 +183,27 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     expect(go(one, 4, 60, { cruising: true }).at).toBe(1); // (and in a drifter, there they are)
   }, 60_000);
   it('a tack takes the forward hand off the doors: the jib sheet comes first', () => {
+    let ref = 0;
     const tack = (shut: boolean) => {
       const twa = beatAngle(6), b = testBoat({ heading: 360 - twa, kt: 3, windKt: 6 });
       b.crew = newCrew(crewOf(0.6, { handling: 0.3 }), 'S'); b.cruising = true;
       if (shut) b.companionway = { doors: 'in', hatch: 'closed', doorsT: 0, hatchT: 0 };
-      sail(b, 5, () => { b.h = 360 - twa; });
-      const busy = b.crew!.people.some(p => p.job?.line === 'doors'), js: number[] = [];
+      // (tack once the doors are under way: a fifth of the way out; the other boat at the same moment of her sailing)
+      let at = 30; sail(b, 30, t => { b.h = 360 - twa; if (at === 30 && (shut ? (b.companionway?.doorsT ?? 0) > 0.2 : t >= ref)) at = t; return t >= at; });
+      const cw = b.companionway, busy = b.crew!.people.some(p => p.job?.line === 'doors') || (!!cw && cw.doorsT > 0 && cw.doorsT < 1), js: number[] = [];
       startTack(b); sail(b, 12, () => { js.push(b.ctl.jibsheet); });
-      return { b, busy, js };
+      return { b, busy, js, at };
     };
-    const shut = tack(true), open = tack(false);
-    expect(shut.busy).toBe(true); // (at the doors when the helm put the tiller over)
+    const shut = tack(true); ref = shut.at; const open = tack(false);
+    expect(shut.busy).toBe(true); // (the doors under way when the helm put the tiller over)
     // (the jib sheet worked through the tack as it is with the hatch already open)
     // (the jib sheet worked through the tack as it is with the hatch already open: from a second in, once the tack has
     // called them off the doors; before it, in a drifter, the sheet waited for them)
-    // (within 0.08 of the sheet: the one at the doors stands a little aft of where they'd stand in the hatch, so she trims
-    // and heels a touch differently; an untended sheet, before the fix, was 0.15 and more off, frozen through the tack)
-    shut.js.forEach((v, i) => { if (i > 60) expect(Math.abs(v - open.js[i])).toBeLessThan(0.08); });
+    // (the tack's big haul they leave the doors for at once; after it they go back to the doors, and leave them again for
+    // the jib as she gathers way and it wants easing well out: about half a second behind, caught up within a second or
+    // so. Frozen at the doors, before, it stayed where it was)
+    shut.js.forEach((v, i) => { if (i > 60) expect(Math.abs(v - open.js[i])).toBeLessThan(0.15); });
+    expect(Math.abs(shut.js[shut.js.length - 1] - open.js[open.js.length - 1])).toBeLessThan(0.03);
     sail(shut.b, 40); expect(shut.b.companionway).toEqual({ doors: 'out', hatch: 'open', doorsT: 1, hatchT: 1 }); // (and they open it afterwards)
   }, 30_000);
 });
