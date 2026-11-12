@@ -176,7 +176,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
   }, 120000);
   it('the wind straight out of her slip: she\'s already head to wind, so she\'s walked out and held for the main, not turned across it', () => {
     let n = 0;
-    for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 7 === 0)) {
+    for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 4 === 0)) {
       const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }

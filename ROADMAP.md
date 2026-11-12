@@ -279,7 +279,10 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    to windward gets a header about a minute before the one to leeward, and one side of the course gets a lift first.
    And on observed days the station's own 6-minute turbulence (about 5–6° of it) becomes a course-wide shift: smooth
    the record and hand the residue to the local turbulence (4).
-4. **Almost no gusts, and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
+4. ~~**Almost no gusts**~~ (done: environment/gusts.ts, open-water turbulence from the log law and Charnock's roughness,
+   IEC 61400-1's scales, the puffs keeping the minutes; in a race at 12–18 kt a 5-s gust factor of 1.24–1.28 at a fixed
+   point; light-air gusts in knots; later: more turbulence downwind of land (off the Cityfront), the light-air floor from a
+   sourced convective or stable scaling, the crests' lie turning with the wind) **and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
    not reach the records' 2–5× peaks: those are almost all below 6 kt mean (a third of 6-minute windows at 4–6 kt reach
    2×; none above 12 kt) and the station's off-land turbulence (TI ≈ 0.22). Open water: TI ≈ 0.09–0.12, a 5-s gust over
    the 2-min mean of 1.15–1.27 at 10–15 kt (WMO TD-1555, Harper et al. 2010). The sim's puffs give TI ≈ 0.03 and gust
