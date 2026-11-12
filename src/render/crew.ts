@@ -179,7 +179,8 @@ function deckWalk(s: number, z: number, dir: number, k: number): PoseT {
  */
 function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
   const c = f.cur?.hip; if (!c) return null;
-  if (dt <= 0 || dt > 0.5) { f.route = undefined; return null; } // (a jump, as on a new start: everyone's straight where they're going)
+  if (dt <= 0) return f.route ? deckWalk(f.route.side, f.route.z, f.route.goal < c.z ? -1 : 1, k) : null; // (no time passed: as it was)
+  if (dt > 0.5) { f.route = undefined; return null; } // (a jump, as on a new start: everyone's straight where they're going)
   const inLen = (z: number) => z > COCK0 && z < COCK1 + 0.2;
   const tAft = inLen(want.hip.z) && want.hip.z > THWART.z + 0.05, cAft = inLen(c.z) && c.z > THWART.z + 0.05; // (aft of the thwart's line)
   const r = f.route;
@@ -509,6 +510,8 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
 }
 /** Ease the pose shown toward the pose wanted (a quarter of a second or so). */
 function ease(f: Figure, want: PoseT, dt: number): PoseT {
+  // (no time passed, a frame drawn twice: nothing moves; a jump, a new start: straight there)
+  if (f.cur && dt <= 0) return f.cur;
   if (!f.cur || dt <= 0 || dt > 0.5) {
     f.cur = { ...want, hip: want.hip.clone(), feet: [want.feet[0].clone(), want.feet[1].clone()], hands: [want.hands[0].clone(), want.hands[1].clone()], look: want.look.clone() };
     f.hipV = V(0, 0, 0); f.pitchV = 0; f.swing = [null, null]; return f.cur;
