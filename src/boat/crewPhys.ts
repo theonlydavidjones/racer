@@ -331,12 +331,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.foreT = (c.foreT ?? 0) - Math.max(dt, 0.05); // (this runs 20 times a second)
     if (c.fore01 == null || c.foreT <= 0) { chooseFore(c, k, skill); c.foreT = 1; }
     const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0 }[pl.fore] : c.fore01!;
-    // the bow hand goes forward to the mast downwind when the bow-down trim pays (light air: hullTrim.ts), if they know to
-    // downwind, a good crew goes forward when the hull's trim says it pays (hullTrim.ts: in light air the transom lifts
-    // clear): the bow hand to the mast, or, with the pole out and two crew, both right up on the foredeck. The least drag
-    // of the three at her speed over the last minute, re-thought once a second, but moved only for a real gain and not
-    // within LAYOUT_STAY of the last move, so they don't shuttle along the deck as she speeds up and slows; through a pole
-    // gybe they stay forward
+    // downwind, a good crew goes forward: with the pole out and two crew, both right up on the foredeck as it goes out
+    // (unless there's a breeze: chooseLayout); without it, the bow hand to the mast when the hull's trim says it pays
+    // (hullTrim.ts: in light air the transom lifts clear). Re-thought once a second, moved back only for a real gain and
+    // not within LAYOUT_STAY of the last move, so they don't shuttle along the deck; through a pole gybe they stay forward
     c.layoutT = (c.layoutT ?? 1e9) + Math.max(dt, 0.05);
     // (her speed over about a gust-lull cycle, a minute: the layout is for the wind there is, not each puff)
     c.vAvg = c.vAvg == null ? k.v : c.vAvg + (k.v - c.vAvg) * Math.min(1, Math.max(dt, 0.05) / 60);
@@ -490,16 +488,33 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number): 'cockpit' | 'ma
     let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
     return trimDrag(v, trimFromMoment(m0 + m), sea);
   };
-  const opts: ['cockpit' | 'mast' | 'foredeck', number][] = [['cockpit', drag(j => cockpitZ(j, n))], ['mast', drag(j => j === n - 1 ? Z.mast : cockpitZ(j, n - 1))]];
-  const now = c.layout ?? 'cockpit';
-  if (n >= 2 && (k.pole || now === 'foredeck')) opts.push(['foredeck', drag(j => j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2))]);
-  const cur = opts.find(o => o[0] === now)?.[1] ?? Infinity;
-  const [bestL, bestD] = opts.reduce((a, o) => (o[1] < a[1] ? o : a));
-  // (a real gain: 0.3% for the trip to the foredeck, 0.1% for the short one to the mast and back)
-  const worth = bestL === 'foredeck' || now === 'foredeck' ? 0.003 : 0.001;
-  if (bestL !== now && cur - bestD > worth && (c.layoutT ?? 1e9) >= LAYOUT_STAY) { c.layoutT = 0; c.foredeck = bestL === 'foredeck'; return bestL; }
-  c.foredeck = now === 'foredeck';
-  return now;
+  const now = c.layout ?? 'cockpit', cockpit = drag(j => cockpitZ(j, n));
+  const go = (l: 'cockpit' | 'mast' | 'foredeck') => { if (l !== now) c.layoutT = 0; c.foredeck = l === 'foredeck'; return l; };
+  if (k.pole && n >= 2) {
+    // (judged at her speed in this wind, the polar's (polar.ts, m/s): steady, and right from the moment the pole goes out,
+    // where her speed over the last minute still remembers the slower leg before)
+    const vt = Math.max(0.5, polar(k.tws, Math.min(180, k.twa), 'jib'));
+    const drag = (zOf: (j: number) => number) => {
+      let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
+      return trimDrag(vt, trimFromMoment(m0 + m), sea);
+    };
+    const cockpit = drag(j => cockpitZ(j, n));
+    // the pole out on a run: up on the foredeck is the norm (the owner; the Folk Boat Year Book 2022, p. 44: "crew weight
+    // forward downwind in light to moderate weather to go bow down"), and they go as the pole goes out, not after a
+    // stop at the mast. They stay aft (or come back) only in a breeze, where the bow-down trim plainly costs (hullTrim.ts:
+    // she's near her hull speed and the bow digs in), by more than the 0.3% that's worth the trip: with this hull's
+    // resistance, at about 13 kt of true wind on a run (her polar speed there about 4.4 kt, polar.ts)
+    const fwd = drag(j => j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2));
+    if (now === 'foredeck') return go(fwd - cockpit > 0.003 && (c.layoutT ?? 1e9) >= LAYOUT_STAY ? 'cockpit' : 'foredeck');
+    return go(fwd - cockpit > 0.003 ? 'cockpit' : 'foredeck');
+  }
+  // no pole: the bow hand to the mast when the hull's trim says it pays, for a real gain (0.1%), not within LAYOUT_STAY of
+  // the last move (and off the foredeck at once when the pole's stowed: there's nothing for them up there)
+  const mast = drag(j => j === n - 1 ? Z.mast : cockpitZ(j, n - 1));
+  if (now === 'foredeck') return go(mast < cockpit ? 'mast' : 'cockpit');
+  const cur = now === 'mast' ? mast : cockpit, best = Math.min(mast, cockpit), bestL = mast < cockpit ? 'mast' : 'cockpit';
+  if (bestL !== now && cur - best > 0.001 && (c.layoutT ?? 1e9) >= LAYOUT_STAY) return go(bestL);
+  return go(now);
 }
 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a skilled crew. */
