@@ -93,7 +93,7 @@ changes things the AI already decides, so no new behaviour is invented.
 |---|---|---|
 | **Starting** | `plan.tReach`, the error in judging her time to the line, which is a lasting bias plus noise. `aggr`, her margin. Which end she judges favoured. Her depth and where she sets up. | Time-on-distance error σ about 1.5 s … 6 s. A line-bias judging error of 2° … 8°. |
 | **Boat speed** (the helm) | How well she holds the groove: the error in her steered angle to the wind upwind (pinching and footing) and how much it wanders, and how far her steering lags in waves. Trim stays the crew's (Crew Model). | Upwind VMG lost about 0–1% … 5–8% at 6–12 kt, more in light air (Laser data: 3–8% among elites). |
-| **Strategy** (the wind and the water) | When she sees a shift: its size and how long she waits (now fixed at 4° and 15 s). How far ahead she reads puffs. How much current she allows for (now `aware`, 60% or 100%). The favoured side she believes in from the pre-start (the strategist's plan, with an error). | Shift seen at 3°/8 s … 8°/30 s (Pluijms: 3° vs 11° by feel). Puffs read 400 m … 80 m out. Current allowed 95% … 40%. |
+| **Strategy** (the wind and the water) | When she sees a shift: its size and how long she waits (now fixed at 4° and 15 s). How far ahead she reads puffs. How much current she allows for (now `aware`, 60% or 100%). The favoured side she believes in from the pre-start (the strategist's plan, with an error). | Shift seen at 3°/8 s … 8°/30 s (Pluijms: 3° vs 11° by feel). Far "wind over there" read at 400 m … 100 m. The imminent calls (≈45 m, ≈10 s; the owner) come mainly from the crew. Current allowed 95% … 40%. |
 | **Tactics** (boat on boat) | Laylines judged by eye (below). When she tacks out of dirty air. When she covers or splits. When she ducks or tacks at a crossing. When she hails. | Layline bias 1–2° … 6–8° (overstanding more often), growing with distance. |
 | **Rules knowledge** | Whether she reads an encounter right: who has right of way, mark-room, room to tack. A skipper who reads it wrong keeps clear late or not at all. The safety net (rule 14, contact) stays exact for everyone. Later: whether she knows she fouled. | Encounter read right 99% … 85%. |
 | **Consistency** | Her form on the day: a draw per race for each attribute. Her lapses: per leg, a chance of one real blunder (a shift missed, the wrong side, a bad rounding). | Day-to-day σ 0.05 … 0.2. A lapse in about 2% … 15% of legs. |
@@ -114,10 +114,18 @@ These are the places that change:
 1. **The wind she's in.** She knows her own wind through her compass average (`avgFrom`, already there) and her
    telltales. She sees a shift only when it exceeds her threshold for her hold time. A novice sails a 6° header for
    half a minute.
-2. **The wind ahead.** She sees the puffs and lulls (environment/wind.ts `Puffs`) whose centres fall within her
-   reading range and roughly ahead of her. She sees them with a position error that grows with range, and only on
-   a 1–2 s tick. She uses them to choose which tack, to stay in a puff, or to head for one. Puffs aren't read in
-   fog or at night (they already depend on the light: the dark patches).
+2. **The wind ahead (the owner, 12 November).** Every crew member calls puffs on a Folkboat. The skipper can't
+   watch the water all the time, and she can't see past the sails. Two kinds of reading:
+   - **Imminent calls.** A puff or lull about 50 yards (≈45 m) out, arriving within about 10 s. These come mostly
+     from the crew's calls (Crew Model's `b.calls`), and from her own view, which is open to windward and ahead but
+     blocked to leeward by the main and jib. She uses them to foot in the puff and head up in the lull.
+   - **"Wind over there".** Dark water far off, read for strategy, to steer toward pressure and to choose a tack.
+     Its range and accuracy grow with her strategy attribute (estimates: about 100 m for a novice to 400 m for an
+     expert). Any crew member's far call counts too. The position error grows with range, and it is refreshed only
+     on a 1–2 s tick.
+
+   Puffs aren't read in fog or at night (the dark patches need light). She acts only on what was seen or called,
+   never on the true puff field.
 3. **Laylines by eye.** `fetch()` and `lays()` use her judged layline: the true one (wind and current) turned by
    her bias. The bias is drawn as she comes to the layline, with σ ∝ distance (Dellenbaugh), and is re-judged
    inside about 10 lengths, where an expert gets it nearly right.
