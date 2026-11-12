@@ -33,7 +33,13 @@ What's planned, roughly in order. Done work is described in the README.
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
    (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
    a 20 kt hiking tack (around z 2.55, x 0.6; on main too): fix the crossing path, then sample every 2 cm along each
-   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h).
+   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h). (Fixed in its own PR, Crew Figures.)
+   Next follow-up (Crew Figures, 12 November; 2–3 h): the crew's legs graze 3–8 cm into the coaming while moving along
+   the side deck (climbing out, passing the thwart, sitting down on the deck), mostly on the route planner from #110.
+   One cause found: in render/crew.ts route(), a goal aft of the thwart isn't updated when the physics target moves
+   forward of it mid-route, so the figure sits and stands at the old spot for a second or more (20 kt tack: crew 1 at
+   2.245 while the physics has her at 1.65). A naive fix upsets other moves, so it's its own piece of work. Done when
+   tests/crewfig.test.ts samples every figure at 0.05, not only the helm, and passes.
 3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
