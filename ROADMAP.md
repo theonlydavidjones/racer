@@ -142,9 +142,11 @@ as it is.
 - Gashouse Cove kept as it was (before 2026).
 - The swell view holds still.
 - The crew passing close mid-cockpit in a 12–16 kt tack: left as it is (parked).
-- Four boat-spec sites allowed, for Marinas to source the moored boats.
+- Four boat-spec sites allowed, for Marinas to source the moored boats (begun: their proportions from the J/105's
+  published figures, and the SF Marina's occupancy).
 - The lines plan: the researcher to find who holds Plan 1.
-- The speed budget held, with one deeper speed pass.
+- The speed budget held, with one deeper speed pass (done by v147: hull ends and chop lookups memoised, the current's
+  shore distance off a 10 m lattice, tested against a 0.1% current change).
 - The daily weather refresh now builds from main.
 
 The original ranking, for the record:
@@ -204,7 +206,8 @@ is now "much better" (owner).
 3. ~~The cockpit to the plan~~ (done: benches as lazarettes, footwell, thwart, after shelf, winches on pedestals from Josephine's photos), with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. ~~Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines~~ (done, v128–v134).
-5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
+5. ~~The cabin lantern swings with the boat's motion~~ (done by v147: a damped pendulum on its chain driven by her roll,
+   pitch and heave, its light following) (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
 6. **True-to-life rigging, the owner's most important boat item** (12 November, from the owner's boat review; Rigging,
@@ -354,7 +357,8 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
     shifts the trim calibration, so it needs its own reviewed PR.
   - From Bay East: Richmond YC and Encinal slips, BYC and Encinal racing marks, and the current in embayments without
     NOAA stations all need sources it can't reach yet (the club sites aren't allowed hosts).
-- **Later — aluminium spars look like white plastic** (polish; 1–2 h): owner, "the aluminum on the masts and booms
+- ~~**Later — aluminium spars look like white plastic**~~ (done by v147: clear-anodised extrusion, a satin mid-grey with soft
+  broad highlights, checked against CircleSea's boom in strong sun; polish; 1–2 h): owner, "the aluminum on the masts and booms
   looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
   fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
   a long highlight down the mast. For every aluminium rig (the wooden spars stay wood). Check in daylight and at night.
@@ -648,7 +652,8 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
   pared back. First an audit of every start-state screen for redundancy and friction.
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
-- ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
+- ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife; the wildlife remade from the species by v147, #143: gulls, pelicans, cormorants, seals, porpoises and Pier 39's
+  sea lions). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
 - ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable; the overlit skyline fixed in v79: lit windows follow the DOE reference buildings' lighting schedules, offices 50% at 19:00, 10% by 22:30, 5% on weekend nights, clustered by floor. more far glow on the towers on weekend nights in v80 (owner's call); the homes' peak lit share stays at 0.3) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
   suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
@@ -737,7 +742,8 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). ~~Winter winds~~ (done: westerly, northerly, southerly and light days by their frequency in the records). ~~Real wind for a past race day~~ (done: observed every 6 minutes since 2021) and ~~the forecast~~ (done: NWS, refreshed daily). ~~The wind across the course~~ (done: the NWS grid for forecasts; station-nudged terrain model for past days). Later: the AI sailing to the pressure; a gridded observed analysis (NOAA's URMA) for past days.
 - ~~**Wind shadows**~~ (done: boats' dirty air, ships, the committee boat, the lee of the land). Later: wakes laid down as markers and carried by the wind (so a wake stays where a boat tacked); the AI choosing a clear-air hole on the line; the wind bending round the islands and speeding up on their flanks.
-- ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). ~~Show each item on the replay~~ (done, v127). Later: compare against the boat that won.
+- ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). ~~Show each item on the replay~~ (done, v127). ~~Compare against the boat that won~~ (done by v147: the replay shows your race against the winner's, leg by leg,
+  physics-reviewed).
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
@@ -782,7 +788,8 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
 3. ~~**Landmarks you steer and sight by:**~~ (done, with transits for the start line and laylines) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. ~~**Marks and the committee boat:**~~ (done; no general recall yet) real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
-4a. **The Ferry Building, drawn properly** (owner, November 2026: "a more complete drawing of the ferry building, with
+4a. ~~**The Ferry Building, drawn properly**~~ (done by v147: from OpenStreetMap, the tower's stages to 75 m, the arcade on
+   every long face, gates B–G, the Port of San Francisco sign on the Bay roofline across from the tower) (owner, November 2026: "a more complete drawing of the ferry building, with
    Port of San Francisco sign… Not urgent"; later; accuracy/polish; 4–6 h). Today (render/landscape.ts) it's a
    30 × 200 × 15 m cream box with a 60 m tower, a pyramid roof and four lit 6.7 m clock dials; no sign, arcade or slips.
    True to life (Wikipedia, Ferry Building (San Francisco)): A. Page Brown, Beaux-Arts, opened 1898; the clock tower is
