@@ -181,7 +181,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
     expect(n).toBeGreaterThan(20);
-  }, 60000);
+  }, 120000); // (every fourth berth of all the marinas': about 35 s alone, since Richmond YC's 214 joined)
   it('her flags and windex show the wind while she\'s made fast and while the crew has her', () => {
     const slip = slipsIn('west-harbor')[30], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
