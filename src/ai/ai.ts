@@ -481,6 +481,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   desired = sailable(b, avoidMarks(w, b, desired));
+  // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
+  // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
+  const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
+  if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
   b.desired = desired; b.luff = luff;
   // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;

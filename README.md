@@ -88,6 +88,7 @@ tests/
 - **Build.** Your boat is fiberglass with an aluminium mast and boom; the AI fleet is wooden. Class rules give both the same minimum weight and they race on equal terms, so build changes looks only (`build` in `FLEET`, `src/boat/boat.ts`).
 - **Easing sails to slow down** works upwind and reaching (the sails flog). From a broad reach to a run, eased sails still fill against the shrouds, so it barely slows you: head up first.
 - **Turning.** Turn rate = speed / turning radius (9 m), up to 22°/s, down to 4°/s when nearly stopped. Turning bleeds speed.
+- **Leeway.** The sails' side force sets her bodily to leeward; the keel's lift with way on holds her (a few degrees: about 3° close-hauled in 6 kt, 4° in 12, 6° in 20), and slow, little does (at 1.5 kt close-hauled in 12 kt she sags off at a third of a knot). The polar's angles are her course's through the water, so close-hauled means steering her leeway above the beat angle: the AI and Nav do. (`physics.ts`; ORC's VPP, Newman's Marine Hydrodynamics §5.12.)
 - **Uses of the polar.** AI close-hauled courses, the dial's no-go zone and the laylines use the polar's beat angle (it changes with wind speed) instead of a fixed 42°. The line aid's "time to line" and the AI's start approach assume you sheet in now and accelerate from your current speed, and the AI allows for coasting when it eases sails.
 
 ### The strategist and the navigator

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultControls, jibShape, mainShape, shapeEfficiency, targetShape, winchFactor, boomAngle, mainsheetFor } from '../src/boat/controls';
 import { moveLazyCar } from '../src/boat/physics';
-import { kt, sail, testBoat } from './helpers/testBoat';
+import { courseHeading, kt, sail, testBoat } from './helpers/testBoat';
 
 describe('what each control does to the sails', () => {
   it('outhaul and backstay flatten the main; the backstay flattens the jib too', () => {
@@ -53,7 +53,7 @@ describe('the crew', () => {
   for (const [tws, twa] of [[5, 42], [10, 42], [18, 42], [12, 90], [12, 150]]) {
     it(`sets the sails close to ideal: ${tws} kt, ${twa}° TWA`, () => {
       const b = testBoat({ heading: 360 - twa, kt: 4, windKt: tws });
-      sail(b, 40);
+      sail(b, 40, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
       expect(b.shape.eff).toBeGreaterThan(0.985);
     });
   }

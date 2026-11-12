@@ -78,7 +78,7 @@ describe('the two jib sheets', () => {
     expect(jibClew({ ...c, jibsheetW: 0 }, 'S')).toBeLessThan(-8);
   });
   it('tack holding both sheets and the jib is aback on the new tack (the classic way to heave to)', () => {
-    const b = testBoat({ heading: 318, kt: 5, windKt: 12 }); sail(b, 15);
+    const b = testBoat({ heading: 318, kt: 5, windKt: 12 }); sail(b, 15, () => { b.h = 318 + (b.leeway ?? 0); }); // (close-hauled: her course 42°)
     takeLine(b, 'jibsheet'); takeLine(b, 'jibsheetW');
     const trimmed = b.ctl.jibsheet;
     b.turnDir = 1; b.turnTarget = 42; sail(b, 12, () => { if (b.turnTarget == null) return true; });
@@ -142,7 +142,8 @@ describe('the two jib sheets', () => {
  */
 function heaveTo(windKt: number, o: { tack?: 'S' | 'P'; main?: number; lash?: number } = {}) {
   const port = o.tack === 'P', b = testBoat({ heading: port ? 42 : 318, kt: 4.5, windKt });
-  sail(b, 30);
+  // (close-hauled on a course 42° off the wind: her heading her leeway higher, physics.ts b.leeway)
+  sail(b, 30, () => { b.h = port ? 42 - (b.leeway ?? 0) : 318 + (b.leeway ?? 0); });
   takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0;
   takeLine(b, 'mainsheet'); b.ctlTarget.mainsheet = o.main ?? 0.55;
   sail(b, 20);
@@ -227,7 +228,7 @@ describe('heaving to', () => {
     const { b } = heaveTo(15);
     takeLine(b, 'jibsheetW', false); takeLine(b, 'mainsheet', false); b.lashed = null;
     b.turnDir = -1; b.turnTarget = 300; sail(b, 90);
-    expect(b.jibBacked).toBe(0); expect(Math.abs(b.sway ?? 0)).toBeLessThan(0.05);
+    expect(b.jibBacked).toBe(0); expect(Math.atan2(Math.abs(b.sway ?? 0), b.v) * 180 / Math.PI).toBeLessThan(5); // (her leeway at speed on a close reach, 60° off: a few degrees)
     expect(kt(b)).toBeGreaterThan(4);
   });
   it('a lashed tiller stays put, hands off', () => {

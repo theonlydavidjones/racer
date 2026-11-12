@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import train from '../src/courses/data/training-windward-return.json';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { runAngle } from '../src/boat/polar';
+import { beatAngle, runAngle } from '../src/boat/polar';
 import { crabFor } from '../src/ai/ai';
 import { V, n360, wrap } from '../src/core/math';
 import type { CourseFile } from '../src/courses/course';
@@ -49,6 +49,21 @@ describe('the AI sails the boat as a sailor does', () => {
       }
       expect([...touches]).toEqual([]);
     }
+  }, 120000);
+  it("close-hauled she steers her leeway above the beat angle, so her course through the water is the polar's beat", () => {
+    const w = race(12), beat = beatAngle(12);
+    let s = 0, n = 0;
+    while (w.t < 600) {
+      w.step(DT);
+      if (w.t < 20) continue;
+      for (const b of w.boats) {
+        if (b.isUser || !b.started || b.finished || b.tacking || b.penalty > 0 || b.leg !== 0 || b.v < 2) continue;
+        const course = b.twa + Math.atan2(b.tack === 'S' ? -(b.sway ?? 0) : (b.sway ?? 0), b.v) * 180 / Math.PI;
+        if (Math.abs(course - beat) < 6) { s += course; n++; }
+      }
+    }
+    expect(n).toBeGreaterThan(1000);
+    expect(Math.abs(s / n - beat)).toBeLessThan(1.5);
   }, 120000);
   it('reaching across a current she steers up-current of the mark by just enough to make good the straight line', () => {
     for (const [brg, set, kn] of [[90, 0, 2], [45, 180, 1.5], [200, 290, 1]] as const) {

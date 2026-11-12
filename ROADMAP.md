@@ -4,8 +4,8 @@
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
-  (the sails' own side force), but the AI's sailing doesn't reckon with either yet (an AI boat luffing by the committee
-  boat drifts onto it), so with sails up she still stops dead and the keel holds her. Also: heaveTo still clamps
+  (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
+  yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
   sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
 - **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
@@ -312,9 +312,17 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
 6. ~~**The swell's yaw is wrong in kind**~~ (done: a slender hull's Froude–Krylov moment) (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
    Froude–Krylov yaw goes as k²), and peaks abeam not on the quarter: up to 16° heading swings and 3% speed lost in a
    2 m 13 s swell outside the Gate, where it should be next to nothing.
-7. **No leeway** (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
+7. ~~**No leeway**~~ (done, owner's yes) (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
    angles), but slow she should slip: 0.3–0.7 kt to leeward at 1.5 kt close-hauled in 12 kt, so a boat parked on the
-   line sags onto the one below her and each tack costs 0.2–0.4 boat lengths more. A design change: ask the owner.
+   line sags onto the one below her and each tack costs 0.2–0.4 boat lengths more. Now: the sails' side force against
+   the keel's lift (slender wing, Newman §5.12) and the hull's broadside drag, as a sideways motion; close-hauled 2.9°,
+   4.3° and 6.0° in 6, 12 and 20 kt; slow, 0.36 kt at 1.5 kt in 12 kt. The polar's speed is her course's; the sails
+   are trimmed and their forces read in ORC's frame (the wind across her course, turned from her heading by her steady
+   leeway); she, the AI and Nav steer that much above the beat. Later (ui/hud.ts, not ours): the compass's "tack" marker
+   shows the beat angle as a heading, so it's her leeway too far off the wind (from ± (beatFor − u.leeway)); its mean
+   close-hauled heading collects only within 6° of the beat by heading, which her leeway (6° in 20 kt) reaches. The
+   laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
+   in and she rounds up and tacks; it was before leeway too).
 8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
