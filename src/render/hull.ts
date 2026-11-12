@@ -336,7 +336,15 @@ export const CABIN_LEAN = 0.015;
 export const WINDOW = { uc: zU(-0.05), len: 0.95, h0: CABIN.h * 0.32, h1: CABIN.h * 0.72, hole0: zU(-0.05) - (0.95 / 2 - 0.045) / L, hole1: zU(-0.05) + (0.95 / 2 - 0.045) / L };
 
 /** Height of the cabin sides' top edge at station u. */
-export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + CABIN.h;
+/**
+ * The cabin top's edge rises toward its after end (Josephine's profile, the owner's photo: the roof slants up aft while the
+ * sheer falls), so the cabin side stands CABIN.h above the deck at its front and CABIN_RISE more at the main bulkhead
+ * (an estimate from the photo, within a few centimetres).
+ */
+export const CABIN_RISE = 0.18;
+export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + cabinSideH(u);
+/** The cabin side's height above the deck at station u. */
+export const cabinSideH = (u: number) => CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)));
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
 export const cabinTopAt = (u: number, x: number) => { const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN); return cabinTopY(u) + CABIN.crown * Math.max(0, 1 - (x / w) ** 2); };
 
@@ -654,7 +662,7 @@ export function sidePatch(uc: number, width: number, h0: number, h1: number, nu 
   const pos: number[] = [], uv: number[] = [], idx: number[] = [];
   for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
     const u = uc + (i / nu - 0.5) * width / L, h = h0 + (h1 - h0) * j / nv, w = sideLine(u);
-    const x = w - (u < CABIN.u1 ? CABIN_LEAN * h / CABIN.h : 0) + 0.012; // a hair off the surface
+    const x = w - (u < CABIN.u1 ? CABIN_LEAN * h / cabinSideH(u) : 0) + 0.012; // a hair off the surface
     pos.push(x, deckY(u, w) + h, zAt(u)); uv.push(1 - i / nu, j / nv);
   }
   for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
