@@ -71,7 +71,9 @@ What's planned, roughly in order. Done work is described in the README.
    sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
    band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
    the starting set; saved with the boat.
-4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
+4. ~~Outside the Gate, the sea dial against the chart and the water~~ (done: the tide predictions roll on past the
+   race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
+   with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
@@ -83,15 +85,21 @@ What's planned, roughly in order. Done work is described in the README.
    the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
    Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
    away below her proper course to blanket.
-7. The debrief shown on the replay (3–5 h).
-8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
+7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
+   far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
+   a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
+8. ~~Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home"~~ (done: the start
+   and destination picked on the chart; Change the conditions mid-sail, physics-reviewed; "Move her here" without
+   ending the cruise; Home: back to her slip when cruising, retire and head home when racing). The showroom's own time
+   of day and conditions are done too.
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
    way to set the direction.
    HUD note (Deep Physics, in progress): the inset map shows the boat's own visibility, and is north-up in Just sail,
    with an N arrow.
-9. The flags' original motion back, and "Strike ensign" (1–2 h).
+9. ~~The flags' original motion back, and "Strike ensign"~~ (done: the committee boat's signal flags have their
+   original motion back; the boats' flags keep the measured physics; the strike animates).
 10. P0 phase 4: deck hardware and lines, with the rigging detail (4–8 h).
 Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
 rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Building, aluminium spars, the boat cards, the
@@ -641,7 +649,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). ~~Winter winds~~ (done: westerly, northerly, southerly and light days by their frequency in the records). ~~Real wind for a past race day~~ (done: observed every 6 minutes since 2021) and ~~the forecast~~ (done: NWS, refreshed daily). ~~The wind across the course~~ (done: the NWS grid for forecasts; station-nudged terrain model for past days). Later: the AI sailing to the pressure; a gridded observed analysis (NOAA's URMA) for past days.
 - ~~**Wind shadows**~~ (done: boats' dirty air, ships, the committee boat, the lee of the land). Later: wakes laid down as markers and carried by the wind (so a wake stays where a boat tacked); the AI choosing a clear-air hole on the line; the wind bending round the islands and speeding up on their flanks.
-- ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). Later: show each item on the replay (the header you held, where you overstood), and compare against the boat that won.
+- ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). ~~Show each item on the replay~~ (done, v127). Later: compare against the boat that won.
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
