@@ -55,12 +55,12 @@ const at = (g: THREE.BufferGeometry, x: number, y: number, z: number, sx = 1, sy
 /** A body of revolution (y up) from a profile of (radius, y), flattened front to back by `flat`. */
 const lathe = (pts: [number, number][], flat: number, seg = 14) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg); g.scale(1, 1, flat); return g; };
 
-/** Design examples (dev only, for the owner to choose between): `?crewStyle=anatomy|kit|people|drawn` in the page's URL
+/** Design examples (dev only, for the owner to choose between): `?crewStyle=hidden|figurine|soft|friendly` in the page's URL
  * (render/crewHuman.ts). Today's figures otherwise. The same skeleton and bones whichever, so the animation and the physics
  * are untouched. */
 const STYLE = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('crewStyle') : null;
 export function buildBody(p: Person, jacket: number, seed: number): Body {
-  if (STYLE === 'anatomy' || STYLE === 'kit' || STYLE === 'people' || STYLE === 'drawn') return buildHuman(STYLE, p, jacket, seed);
+  if (STYLE === 'hidden' || STYLE === 'figurine' || STYLE === 'soft' || STYLE === 'friendly') return buildHuman(STYLE, p, jacket, seed);
   return buildClassic(p, jacket, seed);
 }
 function buildClassic(p: Person, jacket: number, seed: number): Body {
