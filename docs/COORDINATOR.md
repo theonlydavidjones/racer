@@ -29,6 +29,7 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 | Rules | session_012Uu5QmJbE8BAU8Bo9CJqzC | Ranked #6: finish the racing rules (20.3, 20.2(e), blanketing for Rule 23, a boat as obstruction). |
 | Debrief | session_012Uu5QjfJMjn9aQ2ePP43Wo | Ranked #7: the debrief shown on the replay. Layout to the owner first. |
 | Rigging | session_012Uu5Qheec6yzUhFvm29AbD | Rig tuning and its physics (rake, shrouds, chocks, backstay, mast bend, forestay sag). Proposal to the owner before the player-facing build. |
+| Crew Art | session_012Uu5Qj44Huy8UKbWdRbcmp | The crew figures' bodies and clothing from scratch (owner rejected four rounds as uncanny); design sheets first, animation out of scope. |
 
 ## Queued for idle sessions (see ROADMAP.md)
 - Crew Controls: original flag motion + "Strike ensign" button (cruise, high wind).
