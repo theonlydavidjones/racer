@@ -295,6 +295,17 @@ export interface Visibility {
 const CELL_REACH = 1800;
 
 /**
+ * The visibility you've set (the conditions adjuster), m: thick fog 450 m, patchy 3 km (fog's own scale); heavy rain
+ * 3.1 km, light 7.5 km (Atlas, J. Meteor. 10, 1953, as quoted: render/scene.ts). The nearer of the two; Infinity if
+ * neither is set (then the real record's, visibilityFor). The scene's haze and the map's words both read it.
+ */
+export const SET_VIS = { fog: [Infinity, 3000, 450], rain: [Infinity, 7500, 3100] } as const;
+export function setVisibility(s: { fog?: 'real' | 0 | 1 | 2; rain?: 0 | 1 | 2 }): { m: number; fogSet: boolean } {
+  const fogSet = s.fog != null && s.fog !== 'real';
+  return { m: Math.min(fogSet ? SET_VIS.fog[s.fog as 0 | 1 | 2] : Infinity, SET_VIS.rain[s.rain ?? 0]), fogSet };
+}
+
+/**
  * The visibility over the race area at a time (minutes since epoch, UTC), from real data only: what NOAA's Pier 17
  * visibility sensor saw (past hours, since 2021); the NWS forecast grid's visibility (from when it's fetched to the
  * next morning); beyond that in the coming week, whether the NWS forecast has fog. `{ none }`, with why, when there's
