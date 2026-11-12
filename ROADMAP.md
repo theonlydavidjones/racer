@@ -279,7 +279,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   mode, I'd like to be able to edit the starting location without having to end the cruise altogether"): pick a new
   start on the chart and she's moved there, the cruise and its log carrying on (1–2 h).
   Layout to the owner first.
-  Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
+  ~~Also in the showroom~~ (done: the showroom's Time of day and Conditions…) (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
@@ -317,6 +317,11 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   before it was toned down (render/boatMesh.ts flags; the earlier version is in git history). Add "Strike ensign" to
   the bottom-right cluster (#viewBar), shown only in a cruise when the wind is high (threshold to propose, about 20 kt):
   it lowers the ensign and its staff, and a second press hoists it again.
+  Built (bay-east-6): the boats' flags now flap as measured flags do (render/flagWave.ts: f·L/U 0.55 and a 0.19 L
+  swing, Chen et al. 2014, J. Fluids Struct. 45; the cloth's angle waves, so it doesn't stretch; hanging below 3 kt),
+  livelier than either old version; the old code (8d45d94's revert) was 3–5× too slow. Follow-up: the committee boat's
+  signal flags keep their restored motion (render/flags.ts, within about 2× of the physics for their 1.8 m fly); to
+  move them onto flagWave.ts, SignalMast.sync needs the wind's speed passed in.
 - ~~**Next — the boat's lights only when in use**~~ (done, #42: none in the slip or when switched off, Rule 25 under way, Rule 30 at anchor, the lanterns drawn only while lit; accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way

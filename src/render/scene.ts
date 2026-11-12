@@ -16,7 +16,8 @@ import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import { updateNight } from './night';
-import { REFLECTIVE } from './boatMesh';
+import { REFLECTIVE, RIG } from './boatMesh';
+import { L as HULL_L } from './hull';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
@@ -175,6 +176,29 @@ export class SceneView {
   private camLocal = new THREE.Vector3();
   private camSide = 1;
   private baseFov = 60;
+  /**
+   * The chase view's frame, in pixels from the top of the 3D view: the bottom of the top dial strip and the top of the
+   * sail controls band (the HUD sets them: setChaseFrame). The masthead goes an eighth of the way down, the hull just above the band.
+   */
+  private chaseFrame = { top: 0, bottom: 0 };
+  setChaseFrame(f: { top: number; bottom: number }): void { this.chaseFrame = { ...f }; }
+  /** The chase camera's distance now (m): the framed one until you zoom. */
+  chaseDist = 24;
+  /** How much the chase camera rides her heave on the swell (0 off, 1 all of it; smoothed): settings.rideSwell. */
+  chaseHeave = 0;
+  private heave1 = 0; private heaveS = 0;
+  /**
+   * The chase camera's framed distance, looking along `dir` (deg) from `ratio` (height over distance) up: the distance at
+   * which the masthead (RIG.MAST_TOP up, at the mast) and the hull nearest the camera (at the water) span from an eighth
+   * of the way down to just above the band. Also the band's line as the tangent of its angle below the view's middle.
+   */
+  private chaseFit(dir: number, ratio: number): { dist: number; near: number; tBot: number } {
+    const H = this.renderer.domElement.clientHeight || 1, f = this.chaseFrame;
+    // (with the band closed the frame's bottom is the window's: she sits above the row of buttons along it, ~8% of the height)
+    const bottom = f.bottom > 0 ? Math.min(f.bottom, 0.92 * H) : 0.82 * H;
+    return fitChase(this.camera.fov, bottom / H, (this.userHeading - dir) * D2R, ratio, this.userHeel);
+  }
+  private userHeading = 0; private userHeel = 0;
   private laylines: THREE.Line[] = [];
   /* Wind on the water: a map of the wind strength around the camera, refreshed several times a second, that
    * the water shader turns into darker, rougher patches in the puffs and paler, smoother ones in the lulls. */
@@ -751,6 +775,9 @@ export class SceneView {
     w.boats.forEach((b, i) => {
       const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
       const mo = boatOnWaves(this.waves, b, b.h, tw, kW, kS); this.pitches[i] = mo.pitch;
+      // her heave, smoothed twice over (about 0.8 s each) for the chase camera to ride: it glides on a swell (90% of a 14 s
+      // one) but hardly stirs on the chop (15% of a 2 s one)
+      if (b.isUser) { const k = Math.min(1, dt / 0.8); this.heave1 += (mo.heave - this.heave1) * k; this.heaveS += (this.heave1 - this.heaveS) * k; }
       this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
@@ -761,6 +788,7 @@ export class SceneView {
     this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
+    this.userHeading = u.h; this.userHeel = u.heel;
     camera.up.set(0, 1, 0);
     const fov = viewMode === 0 ? 72 : this.baseFov;
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -775,11 +803,22 @@ export class SceneView {
       // the eye rides with the hull (heel and waves move it), but the view stays level: the horizon never tilts
       camera.rotation.set(-4 * D2R + look.pitch, -u.h * D2R + look.yaw, 0);
     } else if (viewMode === 1) {
-      // chase: orbit the boat with the look direction
-      const dist = look.chase ?? 24, hv = V(u.h - look.yaw / D2R), height = Math.max(1.2, (9 + look.pitch * 25) * dist / 24);
+      // chase: orbit the boat with the look direction, framed (design/chase-layout.html) with the whole boat between the
+      // top dial strip and the sail controls band: her masthead an eighth of the way down, the nearest of her hull at the
+      // water just above the band. Zoomed in, the hull stays there and the masthead goes off the top.
+      const hv = V(u.h - look.yaw / D2R), ratio = Math.max(0.05, (9 + look.pitch * 25) / 24); // (the camera's height over its distance)
+      const fit = this.chaseFit(u.h - look.yaw / D2R, ratio), dist = look.chase ?? fit.dist;
+      this.chaseDist = dist;
+      this.chaseHeave = (w.settings.rideSwell ?? 1) === 1 ? 1 : 0; // (the owner: heave only, smoothed, with a switch)
+      const height = Math.max(1.2, ratio * dist) + this.chaseHeave * this.heaveS;
       camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
-      // aimed up the rig rather than at the waterline: she sits lower in the frame, her masthead clear of the dials
-      camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 4.5));
+      // aimed down so the hull nearest the camera sits just above the band
+      // (toward the boat across the water: the camera trails her a little as it eases into place)
+      const c = camera.position, bp = P3(u.x, u.y), ex = bp.x - c.x, ez = bp.z - c.z, eh = Math.hypot(ex, ez) || 1;
+      // (aimed at her hull where it is, risen or fallen on the swell with the camera: she stays put in the frame and the
+      // sea and the horizon move past)
+      const horiz = Math.max(1, eh - fit.near), beta = Math.atan(fit.tBot) - Math.atan2(this.chaseHeave * this.heaveS - c.y, horiz);
+      camera.lookAt(c.x + ex / eh * 100, c.y - Math.tan(beta) * 100, c.z + ez / eh * 100);
     } else if (viewMode === 3) {
       // the showroom (setting up your boat): a slow circle round her, from a little above the deck
       if (look.spin !== false) this.showroomA += dt * 0.11; // a slow turn (paused from the panel)
@@ -842,4 +881,24 @@ function markBody(shape: string, look: string): THREE.Group {
   }
   g.traverse(o => { o.castShadow = true; });
   return g;
+}
+
+/**
+ * The chase camera's framed distance (design/chase-layout.html): seen from `rel` (rad, from astern) with the camera
+ * `ratio` × its distance up, the distance at which her masthead (RIG.MAST_TOP up, at the mast) sits an eighth of the way
+ * down (heeled, it stands lower) and the hull nearest the camera (at the water) just above `bandTop` (a fraction of the height down). Also how far
+ * that hull point is toward the camera (m), and the band's line as the tangent of its angle below the view's middle.
+ */
+export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: number, heelDeg = 0): { dist: number; near: number; tBot: number } {
+  const tf = Math.tan(fovDeg * D2R / 2), yTop = 1 / 8, yBot = Math.min(0.98, bandTop - 0.02);
+  const tTop = tf * (1 - 2 * yTop), tBot = tf * (1 - 2 * yBot), span = Math.atan(tTop) - Math.atan(tBot);
+  const along = Math.abs(Math.cos(rel)) * HULL_L / 2 + Math.abs(Math.sin(rel)) * 1.1; // (her half-length, or her half-beam, toward the camera)
+  const mastOff = -Math.cos(rel) * RIG.MAST_Z; // (the mast stands forward of amidships, at −z: further off seen from astern)
+  let lo = 4, hi = 400;
+  for (let k = 0; k < 40; k++) {
+    const d = (lo + hi) / 2, h = Math.max(1.2, ratio * d);
+    const aM = Math.atan2(RIG.MAST_TOP * Math.cos(heelDeg * D2R) - h, d + mastOff), aT = Math.atan2(0 - h, Math.max(0.5, d - along));
+    if (aM - aT > span) lo = d; else hi = d;
+  }
+  return { dist: (lo + hi) / 2, near: along, tBot };
 }

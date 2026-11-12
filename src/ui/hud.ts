@@ -182,7 +182,7 @@ export class Hud {
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
   private signals(w: World): void {
-    const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd);
+    const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd || !!w.cancelled);
     const el = $('sigPanel'); el.hidden = !show; if (!show) return;
     const key = w.flags.join(',') + '|' + (w.courseSignal?.no ?? '');
     if (key !== this.sigKey) {
@@ -199,7 +199,7 @@ export class Hud {
     }
     const next = w.sequence.find(s => s.t > w.t), u = w.user;
     const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-    let txt = next ? `${next.name} in ${mmss(next.t - w.t)}` : w.flags.includes('X') ? 'X: individual recall. Boats over early must return.' : '';
+    let txt = w.cancelled ? (w.cancelled.up[0] === 'N' ? 'N over A: abandoned, no more racing today.' : 'AP over A: postponed, no more racing today.') : next ? `${next.name} in ${mmss(next.t - w.t)}` : w.flags.includes('X') ? 'X: individual recall. Boats over early must return.' : '';
     if (u.roundEnd) txt = 'I flag: go back round an end of the line.';
     else if (u.scoring) txt = u.scoring === 'ZFP' ? 'Z flag: you have a 20% penalty.' : `You're disqualified (${u.scoring}).`;
     else if (u.ocs && w.t >= 0) txt = 'X flag: you\'re over. Return and start.';
