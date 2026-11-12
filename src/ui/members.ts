@@ -1,6 +1,7 @@
 import { ATTRS, attrOf, type Attr } from '../boat/crewPhys';
 import type { BoatSpec } from '../boat/spec';
 import { YOU, type Member } from '../club/members';
+import { SKIPPER_ATTRS, type SkipperAttr } from '../ai/skipper';
 
 /**
  * The Yacht Club's Members tab (docs/YACHT-CLUB.md, phase 2): the roster as cards, and a member's page. Everyone's
@@ -102,6 +103,7 @@ export function applyMemberInput(m: Member, field: string, value: string, attr?:
     case 'w': { const lb = Number(value); if (lb > 70 && lb < 400) { m.w = lb * LB; return true; } return false; }
     case 'skill': m.skill = Number(value); return true;
     case 'attr': if (attr && (ATTRS as readonly string[]).includes(attr)) { (m.attr ??= {})[attr as Attr] = Number(value); return true; } return false;
+    case 'sk': if (attr && (SKIPPER_ATTRS as readonly string[]).includes(attr)) { (m.skipper ??= {})[attr as SkipperAttr] = Number(value); return true; } return false;
     case 'skipper': {
       const has = m.roles.includes('skipper');
       if (checked && !has) m.roles = [...m.roles, 'skipper'];
