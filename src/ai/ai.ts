@@ -621,6 +621,13 @@ export function crewPoleCall(w: World, b: Boat): void {
   if (!!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < Math.max(12, 8 * b.v)
     && (c!.hike ?? 0) < 0.3 && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0) b.polePrepUntil = (c!.clock ?? 0) + 10;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
-  else if (twa > 157) b.poleWant = true;
+  // (and a crew commits: they call it once she's settled deep, a few seconds past 157°, not on every wander of the course;
+  // once it's called they see it through unless she comes up toward a reach (140°), and stow it after a few seconds
+  // above 150°: the set costs them 20–40 s of the jib, the trip forward included, so a false start is dear. Estimates.)
+  const busy = b.poleWant || b.pole !== 'down';
+  b.poleDeepT = twa > 157 ? (b.poleDeepT ?? w.t) : undefined;
+  b.poleHighT = twa < 150 ? (b.poleHighT ?? w.t) : undefined;
+  const high = twa < 140 || (b.poleHighT != null && w.t - b.poleHighT >= 3);
+  if (w.t < 0 || nearMark || jibDown || b.docked || b.penalty > 0 || (busy ? high : twa < 150)) b.poleWant = false;
+  else if (b.poleDeepT != null && w.t - b.poleDeepT >= 4) b.poleWant = true;
 }
