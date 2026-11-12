@@ -17,7 +17,13 @@ describe(`the committee calls racing off over ${CANCEL_KT} kt (the SF Bay Folkbo
     expect(w.flags).toEqual(['AP', 'A']);
     while (w.t < 300) w.step(DT);
     expect(w.boats.some(b => b.finished)).toBe(false);
+    expect(w.boats.some(b => b.started || b.ocs)).toBe(false); // (no start under AP over A: nobody over early, nobody starts)
     expect(w.flags).toEqual(['AP', 'A']);
+  }, 60000);
+  it('not in start practice: learning starts in a blow is what it is for', () => {
+    const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, mode: 'drill', windKind: 'west', windKt: 28, current: 'slack', sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'] } as never, 5);
+    while (w.t < 120) w.step(DT);
+    expect(w.cancelled).toBeNull();
   }, 60000);
   it('in 16 kt: they race', () => {
     const w = race(16);

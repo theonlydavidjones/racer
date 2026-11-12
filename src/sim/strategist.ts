@@ -137,7 +137,7 @@ function windLimitSection(w: World, o: Outlook, finishT: number): BriefSection |
       : `The forecast peaks at ${Math.round(peak.kt)} kt over the course (${clockOf(peak.t)}, ${when}): a few knots under the fleet's ${CANCEL_KT} kt limit.`,
     items: [
       { head: 'The fleet\'s practice', src: 'practice', text: `On the Bay, Folkboat racing is cancelled at about ${CANCEL_KT} kt: at that speed things start breaking on boats, and the fleet doesn't reef. Before the start the committee shows AP over A with two sounds (postponed, no more racing today); once racing, N over A with three sounds (abandoned, no more racing today).` },
-      over ? { head: 'Before you leave the dock', src: 'practice', text: 'Check for the race chair\'s word before casting off. If you go out, set her up for the top of the range (see Trim and tuning), and plan the way home: the ebb against the westerly makes the worst of the sea off the Cityfront and in the Gate.' }
+      over ? { head: 'Before you leave the dock', src: 'practice', text: 'Check for the race chair\'s word before casting off: on a day like this the fleet usually decides at the dock. If you\'re out when it\'s called off, depower and sail home; the ebb against the westerly makes the worst of the sea off the Cityfront and in the Gate.' }
         : { head: 'If it builds', src: 'practice', text: `A puffier or later breeze than forecast can take it over ${CANCEL_KT} kt: if the committee calls it off, come home with the sails depowered (see Trim and tuning).` }
     ]
   };

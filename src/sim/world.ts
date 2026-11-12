@@ -218,6 +218,7 @@ export class World {
   cancelled: { t: number; kt: number; up: Flag[]; say: string } | null = null;
   /** The wind the committee reads over the course, over about two minutes (kt). */
   private cbMean: number | null = null;
+  private cbWin: number[] = [];
   private xUntil = -Infinity;
   /** Every boat at the start signal (null until the gun). */
   gun: { windFrom: number; boats: GunSnap[] } | null = null;
@@ -662,6 +663,7 @@ export class World {
   }
 
   private checkLines(prevT: number): void {
+    if (this.cancelled && this.cancelled.t < 0) return; // (postponed before the gun, AP over A: no start, nobody over early, nobody starts)
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
     if (gun) this.snapGun();
     for (const b of this.boats) {
@@ -864,11 +866,14 @@ export class World {
     // too much wind: from two minutes before the warning signal until the race is over, the committee watches the wind
     // over the course (its middle and the marks: its own boat may sit in a lee) over a couple of minutes, and at the
     // fleet's limit calls racing off for the day
-    if (this.cbMean == null || this.steps % 30 === 0) { // (twice a second is plenty for a two-minute mean)
-      const pts = [this.C.center, ...this.C.marks.map(m => m.p)], kt = pts.reduce((a, p) => a + this.windHere(p).kt, 0) / pts.length, dt = this.cbMean == null ? 0 : 0.5;
-      this.cbMean = this.cbMean == null ? kt : this.cbMean + (kt - this.cbMean) * Math.min(1, dt / 120);
-      if (!this.cancelled && this.t >= this.sequence[0].t - 120 && this.boats.some(b => !b.finished) && this.cbMean >= CANCEL_KT) {
-        const sig = cancelSignal(this.t >= 0, this.cbMean);
+    if (this.steps % 30 === 0) { // (twice a second: a true two-minute mean, the last 240 readings)
+      const pts = [this.C.center, ...this.C.marks.map(m => m.p)], kt = pts.reduce((a, p) => a + this.windHere(p).kt, 0) / pts.length;
+      this.cbWin.push(kt); if (this.cbWin.length > 240) this.cbWin.shift();
+      this.cbMean = this.cbWin.reduce((a, v) => a + v, 0) / this.cbWin.length;
+      // (not in start practice, which is for learning starts in any breeze; not once a boat has finished, when the race
+      // has been sailed; and only on a full two minutes of readings, so no single gust calls it off)
+      if (!this.cancelled && this.settings.mode !== 'drill' && this.cbWin.length >= 240 && this.t >= this.sequence[0].t - 120 && !this.boats.some(b => b.finished) && this.cbMean! >= CANCEL_KT) {
+        const sig = cancelSignal(this.t >= 0, this.cbMean!);
         this.cancelled = { t: this.t, kt: this.cbMean, up: sig.up, say: sig.say };
         for (let i = 0; i < sig.sounds; i++) this.emit({ type: 'horn', dur: 0.8, delayMs: i * 1100 });
         this.emit({ type: 'toast', ms: 9000, msg: sig.say });
