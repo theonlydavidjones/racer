@@ -25,6 +25,9 @@ export interface AiState {
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
+  /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
+   * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
+  tackNow?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */

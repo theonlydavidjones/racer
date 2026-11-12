@@ -217,6 +217,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
   const beat = beatFor(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
+  ai.tackNow = false; // (set below while she answers a hail)
   if (b.penalty > 0) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
@@ -418,7 +419,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (!headedNow) ai.headedT = 0;
   }
   // keep off the shore (and off the line mid-race)
-  let holdForHail = false;
+  let holdForHail = false; let tackNow = false;
   if (blocked(w, b, desired, 45)) {
     // Pinned by a boat to windward that she'd hit if she tacked? Hail for room to tack (Rule 20) as soon as she may
     // (close enough to the obstruction that she'll soon have to change course substantially: rule 20.1(a)), and hold on
@@ -490,13 +491,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (!h.passedOn) w.passOnHail(b, o);
       const po = h.passedOn, waiting = !!po && po.respondedAt == null && !po.failed;
       if (po?.failed) continue; // the boat she hailed never responded: she still can't tack into her
-      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; tackNow = true; }
       else holdForHail = true;
     }
-    // She hailed and the other boat responded (tacked, or replied "You tack"): tack now (Rule 20.2(d)).
-    if (h.by === b.id && h.respondedAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; }
+    // She hailed and the other boat responded (is through the wind, or replied "You tack"): tack now (Rule 20.2(d)).
+    if (h.by === b.id && h.clearAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; }
   }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
+  ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
   // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course

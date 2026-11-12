@@ -132,12 +132,19 @@ export interface Hail {
   replyAt?: number;
   /** When the hailed boat responded (tacked, or replied "You tack"). Rule 20.2(d): the hailing boat must then tack as soon as possible. */
   respondedAt?: number;
+  /** When the hailed boat was through head to wind (or replied "You tack"): clear of her, the hailing boat can tack, and
+   * rule 20.2(d)'s "as soon as possible" runs from here. (Starting to tack, respondedAt, is her response; the hailing
+   * boat turning up under her while she's still swinging through the wind would only put them together.) */
+  clearAt?: number;
+  /** Each boat's heading when the hail was made: turned TACK_BEGUN° from it toward the wind, she has begun to tack
+   * (pairs.ts begunTack). Omitted: only passing head to wind counts. */
+  headAt?: Record<number, number>;
   /**
    * Rule 20.3: the hailed boat, meaning to respond by tacking, passed the hail on to a boat on the same tack that stops
    * her tacking: that boat's id, when, and (kept up to date by the caller from that pair's record) when that boat
    * responded, or that she failed to. Until then the hailed boat can't tack, so she isn't late responding.
    */
-  passedOn?: { to: number; at: number; respondedAt?: number; failed?: boolean };
+  passedOn?: { to: number; at: number; /** when that boat was through head to wind (its hail's clearAt) */ respondedAt?: number; failed?: boolean };
   /** Rule 20.3: this hail is one passed on (she may hail even if it doesn't meet the conditions of rule 20.1). */
   relayed?: boolean;
 }
