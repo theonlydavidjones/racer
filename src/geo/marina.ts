@@ -38,9 +38,9 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
   { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
-  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Few fingers
-  // are mapped and the slips aren't published where we could reach, so no slips of their own yet; Berkeley has a berth
-  // alongside Berkeley Yacht Club's guest dock
+  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
+  // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
+  // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
   { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
   { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
@@ -205,7 +205,7 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
     for (const side of [1, -1]) {
       const n = { x: u.y * side, y: -u.x * side }, c = { x: e.x - u.x * 4.6 + n.x * (WALKWAY_W / 2 + 1.1 + 0.3), y: e.y - u.y * 4.6 + n.y * (WALKWAY_W / 2 + 1.1 + 0.3) };
       const h = (Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360;
-      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
+      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 9) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
       let run = 0; while (run < 12 && hullClear({ x: c.x + u.x * (run + 2), y: c.y + u.y * (run + 2) }, h)) run += 2;
       if (run < 12) continue; // no open water ahead to leave by
       const k = (count.get(near.dock) ?? 0) + 1; count.set(near.dock, k);
@@ -221,7 +221,7 @@ export const slipById = (id: string | undefined): Slip | null => !id ? null : BY
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
-/** The marinas a boat can call home: those with berths (Richmond YC and Encinal YC have none yet: water and docks only). */
+/** The marinas a boat can call home: those with berths (Encinal YC and the Estuary's other harbors have none yet: water and docks only). */
 export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.filter(({ data }) => data.slips.length).map(({ id, name, short }) => ({ id, name, short }));
 export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
 /** Where a slip is, for people: "A12, West Harbor". */
@@ -484,7 +484,7 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
  * Cove's docks, by the seawall and the shore; two by Horseshoe Bay's L dock): with no engine there's no getting out. Kept
  * up to date by tests/pushoff-all.test.ts.
  */
-export const NO_WAY_OUT = ['gashouse-cove:D1', 'gashouse-cove:E1', 'gashouse-cove:F1', 'gashouse-cove:F2', 'gashouse-cove:G1', 'horseshoe-bay:B1', 'horseshoe-bay:B2'];
+export const NO_WAY_OUT = ['gashouse-cove:D1', 'gashouse-cove:E1', 'gashouse-cove:F1', 'gashouse-cove:F2', 'gashouse-cove:G1', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();
