@@ -17,7 +17,7 @@ import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
-import { Sail, Telltale, luffTellStates, leechTellState, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
+import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailShape } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
@@ -968,11 +968,11 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     if (pr) { const want = sgn > 0 ? pr.stbd : pr.port, other = sgn > 0 ? pr.port : pr.stbd; if (pr.front.map !== want) { pr.front.map = want; pr.back.map = other; } }
   }
   if (b.isUser) {
-    const st = b.luff ? { windward: 'lift' as TellState, leeward: 'hang' as TellState } : luffTellStates(plan === 'jib' ? tj : null, b.awa);
+    const tells = boatTells(plan === 'jib' ? tj : null, tm, b.awa, !!b.luff), st = tells.jib;
     const amt = tj?.amount ?? 0, mirJ = m.jib.mesh.scale.x < 0;
     m.jibTells.windward.forEach(tt => tt.update(jibShape, st.windward, amt, mirJ));
     m.jibTells.leeward.forEach(tt => tt.update(jibShape, st.leeward, amt, mirJ));
-    const leech: TellState = leechTellState(tm, b.awa, !!b.luff);
+    const leech = tells.leech;
     m.leechTells.forEach(tt => tt.update(mainShape, leech, tm.amount, m.main.mesh.scale.x < 0));
   }
   syncPole(m, plan === 'wing');

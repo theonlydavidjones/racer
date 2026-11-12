@@ -1,7 +1,6 @@
 import type { Boat } from '../boat/boat';
-import { crewEaseBoom } from '../boat/physics';
 import type { TellState } from '../render/sails';
-import { camberLine, flowField, flowState, gridField, streamline, turnFor, type FlowCut, type FlowSection, type FlowState } from './sailFlow';
+import { camberLine, flowField, flowState, flowWords, gridField, streamline, type FlowCut, type FlowSection, type FlowState } from './sailFlow';
 
 /*
  * The flow view (the owner's training tool #2): a panel beside the 3D view with her sails cut across at three heights,
@@ -19,7 +18,6 @@ function speedCol(s: number): string {
   return `rgb(${a.map((c, i) => Math.round(c + (b[i] - c) * t)).join(',')})`;
 }
 const flowCol = (s: FlowSection) => COL[s.trim.flow === 'good' ? 'attached' : s.trim.flow];
-const pct = (x: number) => `${Math.round(x * 100)}%`;
 const deg = (x: number) => `${Math.round(x)}°`;
 
 /** Point in polygon (even–odd). */
@@ -126,8 +124,8 @@ export class FlowPanel {
       g.stroke();
       // the telltales: on the luff (an eighth of the chord back) windward and leeward; the main's on its leech
       const [tx, ty] = p[3], [ux, uy] = [p[4][0] - p[3][0], p[4][1] - p[3][1]], ul = Math.hypot(ux, uy) || 1;
-      this.tell1(g, X, Y, tx, ty, ux / ul, uy / ul, -1, s.tells.windward, b.tack === 'S' ? COL.stbd : COL.port);
-      this.tell1(g, X, Y, tx, ty, ux / ul, uy / ul, 1, s.tells.leeward, b.tack === 'S' ? COL.port : COL.stbd);
+      if (s.tells.windward) this.tell1(g, X, Y, tx, ty, ux / ul, uy / ul, -1, s.tells.windward, b.tack === 'S' ? COL.stbd : COL.port);
+      if (s.tells.leeward) this.tell1(g, X, Y, tx, ty, ux / ul, uy / ul, 1, s.tells.leeward, b.tack === 'S' ? COL.port : COL.stbd);
       if (s.tells.leech) { const [ex, ey] = p[24], [dx, dy] = [p[24][0] - p[23][0], p[24][1] - p[23][1]], dl = Math.hypot(dx, dy) || 1; this.tell1(g, X, Y, ex, ey, dx / dl, dy / dl, 0, s.tells.leech, '#d0d6dc'); }
     }
     // the apparent wind there
@@ -155,33 +153,7 @@ export class FlowPanel {
     pts.forEach(([px, py], k) => k ? g.lineTo(X(px), Y(py)) : g.moveTo(X(px), Y(py))); g.stroke();
   }
 
-  /** What the flow and the telltales are saying, in words, from the sim's own trim for each sail (the same at every
-   * height, as the 3D telltales show it): how it's drawing and what to do; its twist against the crew's target for the
-   * wind; the slot; and the keel's leeway. */
   private tell(st: FlowState, b: Boat): HTMLElement[] {
-    const out: HTMLElement[] = [], p = (cls: string, html: string) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; out.push(e); };
-    const name = { main: 'Main', jib: 'Jib' } as const, foot = { main: 'the boom', jib: "the jib's foot" } as const;
-    const keel = () => p('fp-keel', `<b>Under water</b> leeway ${st.leeway.toFixed(1)}°: the keel's angle to the water, which makes its lift against the sails' side force. Pinch and it grows.`);
-    if (st.hove) { p('fp-sail', `<b>Hove to</b>: the jib backed on purpose and the main eased, both meant to be stalled or luffing. She lies quiet, forereaching slowly.`); keel(); return out; }
-    if (!st.sails.length) { p('fp-sail', 'No sails drawing.'); return out; }
-    for (const s of st.sails) {
-      const t = s.trim, by = Math.abs(t.err);
-      if (st.running) { p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, the telltales hanging. ${s.sail === 'main' ? 'Ease it till it\'s nearly square across the wind (the boom at the shrouds)' : 'Pole it out to windward, or let it fill on the leeward side'}.`); continue; }
-      const eased = s.sail === 'main' && crewEaseBoom(b) > 1;
-      const what = t.flow === 'good' ? `attached: both telltales streaming`
-        : t.flow === 'luffing' ? (eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveller on purpose to keep her on her feet; the lifting luff is the price`
-          : `<em class="luff">luffing</em> ${pct(t.amount)}: windward telltales lifting. Trim in about ${deg(by)}, or bear away about ${deg(turnFor(b, by))}`)
-        : `<em class="stall">stalled</em> ${pct(t.amount)}: leeward telltales drooping${s.sail === 'main' && t.amount > 0.12 ? ', the leech telltale hiding' : ''}. Ease about ${deg(by)}, or head up`;
-      p('fp-sail', `<b>${name[s.sail]}</b> the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)}): ${what}.`);
-    }
-    // twist, as facts (no verdict: the sim's best twist is the crew's whole-boat choice, which the coach judges): how open
-    // each head is set against its foot, and the wind's own twist up the sail
-    if (!st.running) {
-      const [lo, , hi] = st.cuts, set = st.sails.map(s => `${s.sail} ${deg(s.twist)}`).join(', ');
-      p('fp-twist', `<b>Twist</b> ${set}, the head open from the foot. Up there the wind is ${hi.aws.toFixed(1)} kt at ${deg(hi.awa)}, low down ${lo.aws.toFixed(1)} kt at ${deg(lo.awa)}: the head's wind is stronger and freer. The coach says which line to change.`);
-    }
-    if (st.sails.length === 2 && !st.running) p('fp-slot', `<b>The slot</b>: on real boats the jib bends the air along the main's lee side, and an over-trimmed jib backs the main before it luffs. The sim doesn't model this; the streamlines show the idea.`);
-    keel();
-    return out;
+    return flowWords(st, b).map(([cls, html]) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; return e; });
   }
 }

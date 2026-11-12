@@ -231,6 +231,12 @@ export class Telltale {
 export function leechTellState(trim: SailTrim, awa: number, luffing: boolean): TellState {
   return awa > 115 || luffing ? 'hang' : trim.flow === 'stalled' && trim.amount > 0.12 ? 'curl' : 'stream';
 }
+/** The boat's telltales as she has them: the jib's luff pair (none when it isn't on its sheet) and the main's leech one,
+ * from the sails' trim and the apparent wind (deg off the bow); luffing on purpose, the jib's windward ones lift and the
+ * rest hang. The 3D boat and the flow view both use this, so they can't disagree. */
+export function boatTells(jib: SailTrim | null, main: SailTrim, awa: number, luffing: boolean): { jib: { windward: TellState; leeward: TellState }; leech: TellState } {
+  return { jib: luffing ? { windward: 'lift', leeward: 'hang' } : luffTellStates(jib, awa), leech: leechTellState(main, awa, luffing) };
+}
 /** Telltale behaviour for a luff telltale pair from how the sail is drawing. */
 export function luffTellStates(trim: SailTrim | null, awa: number): { windward: TellState; leeward: TellState } {
   if (!trim || awa > 115) return { windward: 'hang', leeward: 'hang' };

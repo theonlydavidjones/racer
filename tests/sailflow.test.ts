@@ -4,7 +4,8 @@ import { takeLine } from '../src/boat/physics';
 import { CE_ABOVE_WL } from '../src/boat/balance';
 import { SAILS } from '../src/boat/trim';
 import type { Boat } from '../src/boat/boat';
-import { flowState, flowField, gridField, camberLine, streamline, windAt, sectionAt, turnFor } from '../src/ui/sailFlow';
+import { flowState, flowWords, flowField, gridField, camberLine, streamline, windAt, sectionAt, turnFor } from '../src/ui/sailFlow';
+import { crewEaseBoom } from '../src/boat/physics';
 
 /** Sailing on a course (deg, wind from 0) in `windKt`, the crew trimming, held there for a while. */
 function sailing(heading: number, windKt: number, then?: (b: Boat) => void): Boat {
@@ -61,7 +62,39 @@ describe('the flow view: the sim\'s own numbers', () => {
     expect(jib.trim.flow).toBe('luffing'); expect(jib.tells.windward).toBe('lift');
     const hard = flowState(sailing(250, 12, b => { takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = 0; }));
     const main = hard.cuts[1].sections.find(s => s.sail === 'main')!;
-    expect(main.trim.flow).toBe('stalled'); expect(main.tells.leeward).toBe('droop');
+    expect(main.trim.flow).toBe('stalled'); expect(main.tells.leech).toBe(main.trim.amount > 0.12 ? 'curl' : 'stream');
+  });
+});
+
+/** The panel's words for her now, as one string. */
+const words = (b: Boat) => flowWords(flowState(b), b).map(w => w[1]).join(' ');
+
+describe('the flow view: what it says', () => {
+  it('a broad reach the telltales still stream on (about 108° apparent) is not called "working stalled"', () => {
+    const b = sailing(225, 12), st = flowState(b);
+    expect(b.awa).toBeLessThan(115); expect(st.running).toBe(false);
+    expect(words(b)).not.toMatch(/works stalled/);
+  });
+  it('the crew easing the boom down the traveller in a blow: luffing on purpose; you over-easing the sheet: trim in', () => {
+    const blow = sailing(318, 25), m = flowState(blow).sails.find(s => s.sail === 'main')!;
+    if (m.trim.flow === 'luffing') { expect(crewEaseBoom(blow)).toBeGreaterThan(1); expect(words(blow)).toMatch(/on purpose/); }
+    const over = sailing(318, 24, b => { takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = 0.5; });
+    expect(flowState(over).sails.find(s => s.sail === 'main')!.trim.flow).toBe('luffing');
+    expect(words(over)).not.toMatch(/on purpose/); expect(words(over)).toMatch(/Main<\/b>[^]*Trim in/);
+  });
+  it('a jib eased right out: trim in, with no bear away into a reach', () => {
+    const b = sailing(318, 12, b => { takeLine(b, 'jibsheet'); (b.ctlTarget ??= {}).jibsheet = 0.75; });
+    const w = words(b), jib = w.slice(w.indexOf('<b>Jib</b>'), w.indexOf('<b>Main</b>') > w.indexOf('<b>Jib</b>') ? w.indexOf('<b>Main</b>') : undefined);
+    expect(jib).toMatch(/Trim in/); expect(jib).not.toMatch(/bear away/);
+  });
+  it('a jib stalled with its sheet all the way out: head up, not ease', () => {
+    const b = sailing(230, 12), j = flowState(b).sails.find(s => s.sail === 'jib');
+    if (j && j.atMax && j.trim.flow === 'stalled') { const w = words(b); expect(w).toMatch(/all the way out/); expect(w).not.toMatch(/Jib<\/b>[^<]*Ease about/); }
+  });
+  it('the main has no luff telltales (the boat has leech ones), the jib has its luff pair', () => {
+    const st = flowState(sailing(318, 12)), main = st.cuts[1].sections.find(s => s.sail === 'main')!, jib = st.cuts[1].sections.find(s => s.sail === 'jib')!;
+    expect(main.tells.windward).toBeUndefined(); expect(main.tells.leech).toBeDefined();
+    expect(jib.tells.windward).toBeDefined(); expect(jib.tells.leech).toBeUndefined();
   });
 });
 
