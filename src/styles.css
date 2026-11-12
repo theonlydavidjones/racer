@@ -229,6 +229,7 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pilot .tp-btn{padding:7px 8px}
 body.pilot-on #keysHint{display:none}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
+#bHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
 @media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)} }
 /* one line along the bottom: the helm's buttons, then the pilot's control head while it steers (clear of the view buttons) */
 #controls{flex-direction:row;align-items:flex-end;padding-right:calc(max(16px,env(safe-area-inset-right,0px)) + 96px)}
@@ -719,6 +720,11 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 /* each bar's two ends, named under it (eased … on, leeward … windward) */
 .ctl-ends{grid-column:2;min-width:0;display:flex;justify-content:space-between;gap:3px;padding:0 8px;font:600 9.5px/1 var(--f-inst);letter-spacing:0;color:var(--muted);margin-top:-2px;white-space:nowrap}
 .ctl-row{grid-template-columns:96px minmax(0,1fr) 54px auto auto}
+/* cruise setup: the start and the destination, on the chart (ui/setupChart.ts) */
+.setchart{display:block;width:100%;height:300px;margin-top:8px;border:1px solid var(--rule);border-radius:8px;cursor:crosshair;touch-action:none}
+#whereField .pins{margin:8px 0 4px;font:500 13px/1.4 var(--f-body)}
+#whereField .pinbtns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#whereField .pinbtns small{flex:1 1 200px;color:var(--muted)}
 
 /* ---------- the sail controls band (ui/sailBand.ts; the owner's design, 12 Nov 2026) ---------- */
 /* a compact console docked at the bottom, as you face forward from the helm: port on the left */
