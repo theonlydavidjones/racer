@@ -30,6 +30,8 @@ export interface AiState {
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
+  /** Not started yet: her whole hull has been on the pre-start side since the gun (bow and stern below, by a margin), so she may come up and start. */
+  belowSinceGun?: boolean;
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
