@@ -40,6 +40,8 @@ export class WaveSet {
   readonly comps: WaveComp[] = [];
   /** The sea the component heights are set for (the reference the sea map scales from). */
   ref = { hsW: 0, hsS: 0 };
+  /** Set once the heights have been set for this world (scene.ts clears it for a new one). */
+  primed = false;
   private windDir = NaN;
   private swellL = 150;
 
@@ -62,7 +64,8 @@ export class WaveSet {
     const travel = windFrom + 180;
     if (Number.isNaN(this.windDir)) this.windDir = travel;
     this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
-    const ease = Math.min(1, dt * 0.5);
+    // (a new world starts with its sea already running: the first update sets the heights, later ones ease toward them)
+    const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
     // wind sea: heights shaped by the spectrum, scaled so the sum has the right significant height
     const hsW = s.hsW, tp = Math.max(1, s.tpW);
     const raw = WIND_L.map((L, i) => {
