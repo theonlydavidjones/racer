@@ -420,7 +420,12 @@ export class SceneView {
   /** New conditions mid-sail (World.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
   conditionsChanged(w: World): void {
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
-    this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
+    this.ripAngle = -w.windModel.base * D2R; // (the ripples lie across the new wind at once, not swept round to it)
+    this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12, w.t + 600); // (wave time: see sync)
+    // the lee of the land in the puffs' shading, for the new wind's direction
+    const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)},${Math.round(w.windModel.base)}`;
+    if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y, 5000, 50, w.windModel.base); this.terrainKey = key; }
+    this.buildCourse(w); // (the committee boat swung to the new wind)
   }
 
   private buildCourse(w: World): void {
@@ -448,10 +453,10 @@ export class SceneView {
       const rc = new THREE.Group();
       const rh = new THREE.Mesh(new THREE.BoxGeometry(4, 1.6, 12), new THREE.MeshLambertMaterial({ color: 0xf0f0ea })); rh.position.y = 0.5; rc.add(rh);
       const rcab = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 5), new THREE.MeshLambertMaterial({ color: 0xdedcd2 })); rcab.position.set(0, 2.2, 0.5); rc.add(rcab);
-      rc.position.copy(P3(C.committee.x, C.committee.y)); rc.rotation.y = -C.base * D2R; add(rc);
+      rc.position.copy(P3(C.committee.x, C.committee.y)); rc.rotation.y = -w.committeeFrom * D2R; add(rc); // (head to wind at her anchor)
       // the signal mast on her cabin top
       const mast = new SignalMast(5, true, 0.9); mast.group.position.set(0, 3.2, 0.5); rc.add(mast.group);
-      this.signal = { mast, heading: C.base };
+      this.signal = { mast, heading: w.committeeFrom };
     } else if (C.committeeKind === 'shore') {
       // flags on a yardarm on the club's flagpole (the pole itself is part of the landscape)
       const mast = new SignalMast(12, false, 1.3); mast.group.position.copy(P3(C.committee.x, C.committee.y, 2.3)); add(mast.group);

@@ -51,9 +51,10 @@ export class WaveSet {
   }
 
   /** Set the swell's period (fixed for a race: it comes from the buoy record for the day). */
-  setSwellPeriod(tp: number): void {
+  setSwellPeriod(tp: number, t = 0): void {
     this.swellL = G * tp * tp / (2 * Math.PI);
-    this.comps.filter(c => c.swell).forEach((c, i) => { c.k = 2 * Math.PI / (this.swellL * SWELL_F[i]); c.w = Math.sqrt(G * c.k); });
+    // (mid-sail, at time t: each component's phase carried over, so the surface doesn't jump where it is)
+    this.comps.filter(c => c.swell).forEach((c, i) => { const w0 = c.w; c.k = 2 * Math.PI / (this.swellL * SWELL_F[i]); c.w = Math.sqrt(G * c.k); c.phase += (c.w - w0) * t; });
   }
 
   /**
