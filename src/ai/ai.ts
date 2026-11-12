@@ -255,7 +255,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
   const beat = beatFor(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
-  ai.tackNow = false; // (set below while she answers a hail)
+  ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
   if (b.penalty > 0) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
@@ -542,9 +542,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   }
   // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
   let avoiding = false;
-  // (her turn answers the helm over a moment, physics.ts yawLag: a second or two at a start's crawl, in which she
-  // covers this much ground before the turn has built; she starts her moves that much sooner)
-  const lagT = yawLag(b.v + (b.astern ?? 0)), lagM = (b.v + (b.astern ?? 0)) * lagT;
+  // (her turn answers the helm over a moment, physics.ts yawLag, in which she covers the same ground at any speed, the
+  // time growing as the speed falls: v·τ = 1.46 m. She starts her keep-clear moves that much further off; and her Rule
+  // 14 move that much sooner, up to a second and a half more, not seconds at a crawl, where she'd be swerving for a boat
+  // she needn't)
+  const lagT = Math.min(1.5, yawLag(b.v + (b.astern ?? 0))), lagM = (b.v + (b.astern ?? 0)) * yawLag(b.v + (b.astern ?? 0));
+  ai.urgent = false;
   for (const { o, dx, dy, r, cp } of near) {
     // keep clear early: slow, heavy boats need time to respond
     // hailed "Starboard!" by this boat: duck early and generously
@@ -565,6 +568,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
+      if (cp.t < lagT + 1) ai.urgent = true; // (about to touch: before even finishing a tack, physics.ts midTack)
       if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
     }
   }

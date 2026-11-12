@@ -30,6 +30,8 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
+  urgent?: boolean;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
    * wind and slow, a passing change of plan mustn't turn her back. */
   hailTack?: { to: 'S' | 'P'; at: number; with: number } | null;

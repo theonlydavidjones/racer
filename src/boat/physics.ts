@@ -143,7 +143,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
-      rate = Math.sign(err) === b.turnDir && Math.abs(err) <= Math.abs(r0) * tau ? 0 : b.turnDir * rateFor(b.turnDir);
+      rate = Math.sign(err) === b.turnDir && Math.abs(err) <= Math.max(0, r0 * b.turnDir) * tau ? 0 : b.turnDir * rateFor(b.turnDir);
       if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.turnTarget = null; }
     } else {
       // tiller to starboard turns the bow to port; keys add a push of their own
@@ -166,12 +166,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     const ai = b.ai;
     // in the middle of a tack (within 20° of head to wind, committed to going through it) she finishes it to the course
     // she set out for, whatever else comes up meanwhile: with her turn's inertia, a reversal there would leave her
-    // stopped head to wind; once she's through, she answers it (the keep-clear moves among them)
-    const midTack = !!ai && ai.turnCommit !== 0 && Math.abs(wrap(b.ww.from - b.h)) < 20 && Math.sign(wrap(ai.commitFor - b.h)) === ai.turnCommit;
+    // stopped head to wind; once she's through, she answers it (the keep-clear moves among them). But not against a
+    // boat she's about to hit (Rule 14, ai.ts urgent): that comes first. (The commitment is left alone meanwhile: ended
+    // and re-made on a new heading behind her, it would take her the long way round, through the fleet.)
+    const midTack = !!ai && ai.turnCommit !== 0 && !ai.urgent && Math.abs(wrap(b.ww.from - b.h)) < 20 && Math.sign(wrap(ai.commitFor - b.h)) === ai.turnCommit;
     if (midTack) err = wrap(ai!.commitFor - b.h);
     // a commitment ends when the turn is nearly done or she wants to go somewhere else
-    if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
-    if (ai && ai.turnCommit === 0 && Math.abs(err) > 30) {
+    if (ai && !midTack && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
+    if (ai && !midTack && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
@@ -179,11 +181,13 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
-    if (ai && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
+    if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
       const long = err + ai.turnCommit * 360;
       if (Math.abs(long) > 330) ai.turnCommit = 0; else err = long; // target moved: drop the commitment
     }
-    const lead = err - r0 * tau, lim = rateFor(Math.sign(lead)); // (where her heading's going with the helm amidships)
+    // (where her heading's going with the helm amidships; checking a swing is the rudder's work, not sculling's: rule
+    // 42.3(d) allows sculling only to turn toward close-hauled)
+    const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? rateFor(Math.sign(lead)) : flow;
     rate = clamp(lead * 1.6, -lim, lim);
     rudder = clamp((rate - balRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
   }
@@ -192,8 +196,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
   b.helm = clamp(bladeFlip ? -rudder : rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
-  // (penalty turns aren't the rudder's: the crew backs the sails to spin her, at their own rate, PENALTY_TURN_RATE)
-  b.turnRate = b.penalty > 0 && !b.isUser && !b.ai?.clearing ? rate : r0 + (rate - r0) * (1 - Math.exp(-dt / tau)); rate = b.turnRate;
+  // (penalty spins too: the crew's backed sails turn her against the same inertia and damping as the rudder does)
+  b.turnRate = r0 + (rate - r0) * (1 - Math.exp(-dt / tau)); rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
   const dh = rate * dt;
   b.h = n360(b.h + dh); b.yawRate = rate;
@@ -396,8 +400,10 @@ export const HOVE = {
  * (Nomoto) yaw response, her yaw inertia over the water's yaw damping, from her own hove-to model (HOVE, heaveTo): the
  * moment of inertia, with the water's added mass, I = m·(0.25·LOA)²·1.4, against the damping the hull's strips and the
  * rudder give as she turns, both growing with her speed (the keel's lift ½ρ·A·(πAR/2)·u·L²/12 and the rudder's
- * ½ρ·u·A_R·slope·flow·arm²). 0.6 s at 4.7 kt, 1.4 s at 2 kt, 2.8 s at 1 kt. (No measured value for a yacht was found;
- * the speed's floor, 0.25 m/s, keeps it finite at a standstill, where sculling turns her.)
+ * ½ρ·u·A_R·slope·flow·arm²). 0.6 s at 4.7 kt, 1.4 s at 2 kt, 2.8 s at 1 kt. (No measured value for a yacht was found.
+ * The broadside cross-flow drag damps her turn too, which this linear figure leaves out: about 20% quicker at 4.7 kt
+ * turning hard. At a standstill it's all there is: sculled at 4°/s it gives 7–8 s, near the 5.8 s the speed's floor,
+ * 0.25 m/s, gives.)
  */
 let yawK = 0;
 export function yawLag(u: number): number {
