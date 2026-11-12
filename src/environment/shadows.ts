@@ -122,7 +122,7 @@ export function addCommitteeWake(sum: WindSum, from: number, c: Vec, p: Vec): vo
 
 /* ---------- the lee of the land ---------- */
 
-const HM = heights as { south: number; north: number; west: number; east: number; nx: number; ny: number; step: number; data: string };
+const HM = heights as { south: number; north: number; west: number; east: number; nx: number; ny: number; step: number; samples: number[]; block: number; data: string };
 const HGRID = (() => {
   const s = atob(HM.data), g = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) g[i] = s.charCodeAt(i);
@@ -138,7 +138,8 @@ const GATE_X = (-122.474 - LON0) * MLON;
 export function groundHeight(p: Vec): number {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
   if (lat > CITYFRONT.south && lat < CITYFRONT.north && lon > CITYFRONT.west && lon < CITYFRONT.east) return 0;
-  const i = Math.floor((lon - HM.west) / (HM.east - HM.west) * HM.nx), j = Math.floor((HM.north - lat) / (HM.north - HM.south) * HM.ny);
+  // (each cell is 4 × 4 of the terrain's samples, which sit at grid nodes)
+  const i = Math.floor(((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block), j = Math.floor(((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block);
   if (i < 0 || j < 0 || i >= HM.nx || j >= HM.ny) return 0;
   return HGRID[j * HM.nx + i] * HM.step;
 }

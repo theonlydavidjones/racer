@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 const HOST = 'https://charts.noaa.gov/ENCs/';
 // the sim's world (the terrain and land mask, src/geo/data/shore-mask.json)
-const BOX = { south: 37.745, north: 37.935, west: -122.61, east: -122.345 };
+const BOX = { south: 37.735, north: 37.985, west: -122.61, east: -122.215 };
 const CACHE = new URL('../.cache/enc/', import.meta.url).pathname;
 const OUT = new URL('../src/geo/data/enc-chart.json', import.meta.url).pathname;
 mkdirSync(CACHE, { recursive: true });
@@ -60,7 +60,7 @@ for (const sq of gaps) {
   const c = catalog.find(c => c.band === 4 && inside(c.b, (sq.west + sq.east) / 2, (sq.south + sq.north) / 2));
   if (!c) { console.warn('no chart for', sq); continue; }
   fill.push([c.rec, sq]);
-  if (!cells.includes(c.rec)) cells.push({ ...c.rec, onlyIn: [] });
+  if (!cells.some(r => r.name === c.rec.name)) cells.push({ ...c.rec, onlyIn: [] });
   cells.find(r => r.name === c.rec.name).onlyIn.push(sq);
 }
 cells.sort((a, b) => a.name.localeCompare(b.name));

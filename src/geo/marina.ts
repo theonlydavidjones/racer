@@ -5,6 +5,9 @@ import gashouseCove from './data/gashouse-cove.json';
 import southBeach from './data/south-beach.json';
 import corinthian from './data/corinthian.json';
 import horseshoeBay from './data/horseshoe-bay.json';
+import berkeley from './data/berkeley.json';
+import richmondYc from './data/richmond-yc.json';
+import encinal from './data/encinal.json';
 
 /**
  * The marinas your boats can call home, from OpenStreetMap (scripts/make-west-harbor.mjs, scripts/make-marinas.mjs): each
@@ -29,7 +32,13 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'gashouse-cove', name: 'Gashouse Cove, San Francisco Marina East Harbor', short: 'Gashouse Cove', data: gashouseCove as unknown as HarborData },
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
   { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
-  { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData }
+  { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
+  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart; few fingers
+  // are mapped, so few slips (Berkeley's dock names are OSM's; the others' letters and slips aren't published where we
+  // could reach)
+  { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
+  { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
+  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
@@ -202,8 +211,8 @@ export const slipById = (id: string | undefined): Slip | null => !id ? null : BY
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
-/** The marinas your boats can call home. */
-export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.map(({ id, name, short }) => ({ id, name, short }));
+/** The marinas a boat can call home: those with slips (the East Bay's harbors have none yet: water and docks only). */
+export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.filter(({ data }) => data.slips.length).map(({ id, name, short }) => ({ id, name, short }));
 export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
 /** Where a slip is, for people: "A12, West Harbor". */
 export const slipPlace = (s: Slip) => `${s.label}, ${harborOf(s.marina)?.short ?? ''}`;

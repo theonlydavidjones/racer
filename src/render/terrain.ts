@@ -18,7 +18,8 @@ import { inBasin } from '../geo/marina';
 export interface Terrain {
   /** Height of the land (m) at a point in course coordinates; ≤ 0 over water. */
   heightAt(x: number, y: number): number;
-  mesh: THREE.Mesh;
+  /** The land, in tiles. */
+  mesh: THREE.Group;
   /** Warm points where the city is, lit at dusk. */
   lights: THREE.Points;
   /** Recolour for the season (month 1–12). */
@@ -41,7 +42,15 @@ async function loadHeights(): Promise<Float32Array> {
 /** Simple deterministic noise for colour variation. */
 const hash = (i: number, j: number) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
 
-export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock' | 'island';
+export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock' | 'island' | 'port';
+
+/** The Port of Oakland's terminals and the old Naval Air Station at Alameda Point: flat paved fill, no houses. */
+export const onPort = (lat: number, lon: number): boolean => {
+  // how far inside the terminals' outline (deg, about 0.001 = 100 m), less a ragged margin so its edge isn't a ruler line
+  const inside = (s: number, n: number, w: number, e: number) => Math.min(lat - s, n - lat, (lon - w) * 0.79, (e - lon) * 0.79);
+  const d = Math.max(inside(37.793, 37.8195, -122.335, -122.296), inside(37.7695, 37.7955, -122.3295, -122.3)); // the Outer and Middle Harbor terminals and the old Army base; Alameda Point's runways, hangars and piers
+  return d > 0.0018 * hash(Math.round(lat * 2000), Math.round(lon * 2000));
+};
 
 /** Angel Island's cells in the elevation grid (found by flooding the land out from Mount Livermore), once loaded. */
 let ANGEL: Uint8Array | null = null;
@@ -57,11 +66,23 @@ export function region(lat: number, lon: number, h: number): Region {
   if (lat > 37.804 && lat < 37.8155 && lon > -122.3745 && lon < -122.357) return 'woods'; // Yerba Buena Island: wooded, a few Navy houses
   if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return 'city'; // Treasure Island: flat, built over (the old Navy base and the new blocks)
   if (lat > 37.8235 && lat < 37.8295 && lon > -122.4265 && lon < -122.418) return 'rock'; // Alcatraz
+  if (lat > 37.926 && lat < 37.9315 && lon > -122.4335 && lon < -122.4285) return 'rock'; // Red Rock: a steep rock island, scrub on top
+  if (lat > 37.961 && lat < 37.965 && lon > -122.437 && lon < -122.432) return 'rock'; // the Brothers
+  if (lat > 37.892 && lat < 37.903 && lon > -122.375 && lon < -122.349) return 'grass'; // Brooks Island: a regional preserve, no houses
+  if (lon > -122.345) {
+    // the East Bay, from Alameda and Oakland to Berkeley, Richmond and San Pablo: the flatlands built over to the foot of the hills;
+    // the Berkeley and Oakland hills above about 120 m grassland (gold in summer), darker with oak, bay and eucalyptus on
+    // the north-facing slopes and in the canyons (Tilden, Claremont Canyon, Redwood Regional Park: the grass's scrub shading)
+    if (onPort(lat, lon) && h < 20) return 'port';
+    if (h > 120) return 'grass';
+    return h > 70 ? 'suburb' : 'city';
+  }
+  if (lat > 37.885 && lon > -122.445) return h > 45 ? 'grass' : 'city'; // Richmond: Point Richmond, the refinery, the harbor; the Potrero Hills and Point San Pablo's ridge grass
   if (lat > 37.787 && lat < 37.811 && lon > -122.486 && lon < -122.447) return 'woods'; // the Presidio
   if (lat > 37.8013 && lat < 37.8034 && lon > -122.4074 && lon < -122.4043) return 'woods'; // Pioneer Park, round Coit Tower
   if (lat > 37.764 && lat < 37.7745 && lon > -122.511 && lon < -122.454) return 'woods'; // Golden Gate Park
   if (lat < 37.812 && lon > -122.515) return lon > -122.4545 && lat < 37.7755 && h > 150 ? 'grass' : 'city'; // San Francisco (Twin Peaks grassy on top)
-  if (lat > 37.845 && h < 90 && lon > -122.51) return 'suburb'; // Sausalito, Tiburon, Belvedere, Mill Valley
+  if (lat > 37.845 && h < 90 && lon > (lat > 37.88 ? -122.58 : -122.51)) return 'suburb'; // Sausalito, Tiburon, Belvedere, Mill Valley; Corte Madera, Larkspur, San Rafael
   return 'grass';
 }
 
@@ -110,14 +131,31 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.setIndex(idx); geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  // drawn in tiles of 64 × 64 cells (3.2 km), sharing the one set of vertices, so the land behind the camera and off the
+  // sides of the view isn't drawn (the land reaches from the Gate to Oakland and Richmond: about 600,000 triangles)
+  const mesh = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ vertexColors: true }), T = 64;
+  for (let tj = 0; tj < ny - 1; tj += T) for (let ti = 0; ti < nx - 1; ti += T) {
+    const ix: number[] = [], box = new THREE.Box3(), v = new THREE.Vector3();
+    for (let j = tj; j < Math.min(ny - 1, tj + T); j++) for (let i = ti; i < Math.min(nx - 1, ti + T); i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+      if (H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) continue;
+      ix.push(a, c, b, b, c, d);
+      for (const k of [a, d]) box.expandByPoint(v.set(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]));
+    }
+    if (!ix.length) continue;
+    const g = new THREE.BufferGeometry();
+    for (const n of ['position', 'color', 'normal']) g.setAttribute(n, geo.attributes[n]);
+    g.setIndex(ix); g.boundingBox = box; g.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+    const m = new THREE.Mesh(g, mat); m.matrixAutoUpdate = false; mesh.add(m);
+  }
+  geo.setIndex(null);
   scene.add(mesh);
   const nrm = geo.attributes.normal as THREE.BufferAttribute;
 
   const C = (h: string) => new THREE.Color(h);
   const PAL = {
     city: [C('#a9a796'), C('#bdb9a8'), C('#8f8f82'), C('#c6c0ae')], woods: [C('#45603f'), C('#3b5236'), C('#56704a')],
-    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')]
+    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')], paved: [C('#a9a69c'), C('#b4b0a5'), C('#9e9c95')]
   };
   const wood = new Uint8Array(nx * ny);
   const setSeason = (mo: number) => {
@@ -141,6 +179,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       else if (r === 'woods') { tmp.copy(PAL.woods[Math.floor(n * 3) % 3]); wood[k] = 1; }
       else if (r === 'rock') tmp.copy(PAL.stone).lerp(PAL.scrub, n < 0.5 ? 0.7 : 0.1); // Alcatraz: grey rock and concrete, patches of scrub and garden
       else if (r === 'suburb') tmp.copy(PAL.suburb[0]).lerp(PAL.suburb[1], n);
+      else if (r === 'port') tmp.copy(PAL.paved[Math.floor(n * 3) % 3]); // asphalt and concrete yards, container stacks seen from afar
       else {
         // grassland, with scrub on north-facing slopes and in the gullies, chaparral up high on Tamalpais
         tmp.copy(grass);
@@ -148,7 +187,8 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
         if (h > 380) tmp.lerp(PAL.chaparral, 0.6);
         tmp.offsetHSL(0, 0, (n - 0.5) * 0.06);
       }
-      if (h < 5 && r !== 'city') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      const shore = H[k - 1] <= 0 || H[k + 1] <= 0 || H[k - nx] <= 0 || H[k + nx] <= 0 || H[k - 2] <= 0 || H[k + 2] <= 0 || H[k - 2 * nx] <= 0 || H[k + 2 * nx] <= 0; // within 100 m of the water
+      if (h < 5 && shore && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
       else if (slope > 0.55) tmp.lerp(PAL.rock, 0.6); // cliffs
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
     }

@@ -10,9 +10,13 @@
  * No dependencies: a minimal PNG decoder and encoder on Node's zlib.
  */
 import { inflateSync, deflateSync } from 'node:zlib';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
-const BBOX = { south: 37.745, north: 37.935, west: -122.61, east: -122.345 };
+// The grid's spacing is the first map's (37.745–37.935 N, 122.61–122.345 W, 467 × 424 cells of about 50 m), kept exactly
+// as it was extended east to Oakland and Alameda and north past Richmond to the Brothers, so every cell of the first map
+// is sampled at the same point as before.
+const DLON = 0.265 / 466, DLAT = 0.19 / 423;
+const BBOX = { south: +(37.745 - 22 * DLAT).toFixed(6), north: +(37.935 + 112 * DLAT).toFixed(6), west: -122.61, east: +(-122.345 + 232 * DLON).toFixed(6) };
 const Z = 13, CELL = 50, SCALE = 3.2; // m per grid cell; m per grey level
 const URL0 = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium';
 
@@ -71,8 +75,7 @@ function elev(lat, lon) {
   const at = (px, py) => { const t = tiles.get(`${Math.floor(px / 256)},${Math.floor(py / 256)}`); if (!t) return 0; const i = ((py % 256) * 256 + (px % 256)) * t.ch, d = t.data; return d[i] * 256 + d[i + 1] + d[i + 2] / 256 - 32768; };
   return (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v) + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
 }
-const midLat = (BBOX.south + BBOX.north) / 2, mLat = 111320, mLon = 111320 * Math.cos(midLat * Math.PI / 180);
-const nx = Math.round((BBOX.east - BBOX.west) * mLon / CELL) + 1, ny = Math.round((BBOX.north - BBOX.south) * mLat / CELL) + 1;
+const nx = Math.round((BBOX.east - BBOX.west) / DLON) + 1, ny = Math.round((BBOX.north - BBOX.south) / DLAT) + 1;
 const px = new Uint8Array(nx * ny);
 let maxH = 0;
 for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -80,10 +83,68 @@ for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
   const h = elev(lat, lon); maxH = Math.max(maxH, h);
   px[j * nx + i] = h <= 0.5 ? 0 : Math.min(255, 1 + Math.round(h / SCALE)); // row 0 = north
 }
+// The land and water are NOAA's chart's, not the elevation data's: the ENC's land areas (LNDARE, harbour-scale cells at
+// 1:12,000–1:22,000; src/geo/data/enc-chart.json, made by fetch-charts.mjs) decide which 50 m cells are land, tested at
+// each cell's centre. The elevation tiles' sea level is coarse along the flat filled shores (the Port of Oakland, Alameda
+// Point, the Berkeley and Richmond waterfronts, a few metres above the water), they fill breakwaters and basins in, and
+// they miss low islands (Brooks Island, 4 m). An islet smaller than a cell (West Brother) gets the cell at its middle.
+// Heights still come from the elevation data, at least 2.5 m on the chart's land (fill and seawalls). Along the
+// Cityfront nothing changes: the shore there is OpenStreetMap's, fitted in render/terrain.ts and geo/shore.ts.
+const CITYFRONT = { south: 37.7925, north: 37.8135, west: -122.4775, east: -122.4015 }; // (render/terrain.ts cityShore)
+let chartLand = 0, islets = 0;
+try {
+  const enc = JSON.parse(await readFile(new URL('../src/geo/data/enc-chart.json', import.meta.url), 'utf8'));
+  const dec = a => { const pts = []; let x = 0, y = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; pts.push([x / 1e5, y / 1e5]); } return pts; };
+  const isLand = new Uint8Array(nx * ny);
+  // each land area (outer ring and holes, even–odd) filled by scanlines through the cells' centres
+  for (const poly of enc.land) {
+    const rings = poly.map(dec), lats = rings.flat().map(p => p[1]); let cells = 0;
+    const ja = Math.max(0, Math.floor((BBOX.north - Math.max(...lats)) / (BBOX.north - BBOX.south) * (ny - 1))), jb = Math.min(ny - 1, Math.ceil((BBOX.north - Math.min(...lats)) / (BBOX.north - BBOX.south) * (ny - 1)));
+    for (let j = ja; j <= jb; j++) {
+      const lat = BBOX.north - (BBOX.north - BBOX.south) * j / (ny - 1), xs = [];
+      for (const r of rings) for (let k = 0, l = r.length - 1; k < r.length; l = k++) {
+        const [x0, y0] = r[l], [x1, y1] = r[k];
+        if ((y0 > lat) !== (y1 > lat)) xs.push(x0 + (lat - y0) / (y1 - y0) * (x1 - x0));
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const ia = Math.max(0, Math.ceil((xs[k] - BBOX.west) / (BBOX.east - BBOX.west) * (nx - 1))), ib = Math.min(nx - 1, Math.floor((xs[k + 1] - BBOX.west) / (BBOX.east - BBOX.west) * (nx - 1)));
+        for (let i = ia; i <= ib; i++) { isLand[j * nx + i] = 1; cells++; }
+      }
+    }
+    if (!cells) { // too small to hold a cell's centre: the cell at its middle
+      const r = rings[0], la = r.reduce((a, q) => a + q[1], 0) / r.length, lo = r.reduce((a, q) => a + q[0], 0) / r.length;
+      const i = Math.round((lo - BBOX.west) / (BBOX.east - BBOX.west) * (nx - 1)), j = Math.round((BBOX.north - la) / (BBOX.north - BBOX.south) * (ny - 1));
+      if (i >= 0 && j >= 0 && i < nx && j < ny) { isLand[j * nx + i] = 1; islets++; }
+    }
+  }
+  // NOAA cuts its cells along a 0.075° grid, and a land area spanning two cells is two polygons meeting there: a line of
+  // cell centres right on the cut can fall in neither. A water cell on a cut with land either side across it is land.
+  {
+    const onCut = v => { const r = v / 0.075 - Math.round(v / 0.075); return Math.abs(r) * 0.075 < 0.0004; };
+    const fill = [];
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i; if (isLand[k]) continue;
+      const lat = BBOX.north - (BBOX.north - BBOX.south) * j / (ny - 1), lon = BBOX.west + (BBOX.east - BBOX.west) * i / (nx - 1);
+      if ((onCut(lon) && isLand[k - 1] && isLand[k + 1]) || (onCut(lat) && isLand[k - nx] && isLand[k + nx])) fill.push(k);
+    }
+    for (const k of fill) isLand[k] = 1;
+    console.log(`${fill.length} cells on the chart's cell cuts filled`);
+  }
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const lat = BBOX.north - (BBOX.north - BBOX.south) * j / (ny - 1), lon = BBOX.west + (BBOX.east - BBOX.west) * i / (nx - 1);
+    if (lat > CITYFRONT.south && lat < CITYFRONT.north && lon > CITYFRONT.west && lon < CITYFRONT.east) continue;
+    const k = j * nx + i;
+    px[k] = isLand[k] ? Math.max(px[k], 1 + Math.round(2.5 / SCALE)) : 0;
+    chartLand += isLand[k];
+  }
+} catch (e) { console.warn('no chart land (run fetch-charts.mjs first):', e.message); }
+console.log(`${chartLand} cells of land from the chart (${islets} islets smaller than a cell)`);
 await mkdir(new URL('../src/render/data/', import.meta.url), { recursive: true });
 await writeFile(new URL('../src/render/data/terrain.png', import.meta.url), encodePngGrey(nx, ny, px));
 await writeFile(new URL('../src/render/data/terrain.json', import.meta.url), JSON.stringify({
   source: 'AWS open terrain tiles (Terrarium; USGS 3DEP/NED, SRTM), zoom ' + Z, fetched: new Date().toISOString().slice(0, 10),
+  land: 'land and water from NOAA ENC land areas (LNDARE), src/geo/data/enc-chart.json, except along the Cityfront (OpenStreetMap, fitted in the sim)',
   ...BBOX, nx, ny, cell: CELL, scale: SCALE, note: 'grey 0 = water (≤ 0.5 m), else 1 + height / scale; row 0 is the north edge'
 }, null, 1) + '\n');
 console.log(`terrain.png ${nx}×${ny}, highest ${Math.round(maxH)} m`);

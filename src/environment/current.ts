@@ -1,5 +1,5 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { shoreDist, wharfDist, wharfShelter } from '../geo/shore';
+import { anyShoreDist, wharfDist, wharfShelter } from '../geo/shore';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -25,7 +25,7 @@ export function currentVector(c: CurrentPreset): Vec {
  * marina) they count as shore too; off a pier head, where the stream runs past, they don't.
  */
 export const shoreRelief = (p: Vec): number => {
-  const k = clamp(0.25 + 0.75 * shoreDist(p) / 350, 0.25, 1), w = wharfShelter(p);
+  const k = clamp(0.25 + 0.75 * anyShoreDist(p) / 350, 0.25, 1), w = wharfShelter(p);
   return w > 0 ? Math.min(k, 1 - w * (1 - clamp(0.25 + 0.75 * wharfDist(p, 350) / 350, 0.25, 1))) : k;
 };
 
