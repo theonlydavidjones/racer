@@ -44,20 +44,41 @@ import { polar } from './polar';
  * out less. (A dinghy bench is harder than a Folkboat sit-out, so this is on the tiring side.)
  */
 
-/** height (m), weight (kg), skill (0 novice … 1 expert; club-racing crew ≈ 0.6). */
-export interface Person { h: number; w: number; skill?: number }
+/**
+ * What each person aboard is good at, 0 novice … 1 expert (club-racing crew ≈ 0.6). Every one falls back to the
+ * person's `skill`, so a person given only a skill is the same at everything, as before these were split:
+ * - trim: how close to the best they keep the sails and the boat (the heel they sail at, where they put their weight
+ *   in light air and fore and aft, how far a line drifts before they fix it, how closely they follow the depowering);
+ * - react: how quickly they start on a new call (reactTime);
+ * - eyes: how far up the course they see puffs and lulls coming (not used yet);
+ * - handling: the pace of their work and movement: tacks, gybes, crossing the boat, the pole (pace; roll tacks);
+ * - fitness: how far out they hike and how long they last there (leanCap, ENDURE);
+ * - composure: how well they hold up under pressure (not used yet).
+ * Real crews differ in these separately (a fit novice, a sharp-eyed trimmer who tires); no study measures them for
+ * sailing, so the effect of each is an estimate, labelled where it's used.
+ */
+export type Attr = 'trim' | 'react' | 'eyes' | 'handling' | 'fitness' | 'composure';
+export const ATTRS: readonly Attr[] = ['trim', 'react', 'eyes', 'handling', 'fitness', 'composure'];
+/** height (m), weight (kg), skill (0 novice … 1 expert; club-racing crew ≈ 0.6), and optionally each attribute on its own. */
+export interface Person { h: number; w: number; skill?: number; attr?: Partial<Record<Attr, number>> }
 export interface CrewSpec { helm: Person; crew: Person[] } // 0, 1 or 2 crew besides the helm
 export const DEFAULT_SKILL = 0.6;
 export const DEFAULT_CREW: CrewSpec = { helm: { h: 1.78, w: 80 }, crew: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] };
+/** A person's overall skill: their experience (who takes the main, crewWork.ts mainHand), and every attribute's default. */
 export const skillOf = (p: Person) => clamp(p.skill ?? DEFAULT_SKILL, 0, 1);
-/** The crew's skill: the average of the crew (alone: the helm's). */
-const skillCache = new WeakMap<CrewSpec, number>();
-export const crewSkill = (c?: { spec: CrewSpec }) => {
-  if (!c) return DEFAULT_SKILL;
-  let k = skillCache.get(c.spec);
-  if (k == null) { k = c.spec.crew.length ? c.spec.crew.reduce((a, p) => a + skillOf(p), 0) / c.spec.crew.length : skillOf(c.spec.helm); skillCache.set(c.spec, k); }
+/** One of a person's attributes (their skill unless it's set on its own). */
+export const attrOf = (p: Person, a: Attr) => clamp(p.attr?.[a] ?? p.skill ?? DEFAULT_SKILL, 0, 1);
+/** The crew's attribute: the average of the crew (alone: the helm's). Cached per crew (it runs every step). */
+const attrCache = new WeakMap<CrewSpec, Partial<Record<Attr, number>>>();
+export const specAttr = (s: CrewSpec, a: Attr): number => {
+  let m = attrCache.get(s); if (!m) attrCache.set(s, m = {});
+  let k = m[a];
+  if (k == null) k = m[a] = s.crew.length ? s.crew.reduce((acc, p) => acc + attrOf(p, a), 0) / s.crew.length : attrOf(s.helm, a);
   return k;
 };
+export const crewAttr = (c: { spec: CrewSpec } | undefined, a: Attr) => (c ? specAttr(c.spec, a) : DEFAULT_SKILL);
+/** The crew's trim (the attribute most of the crew's judgement follows): crewAttr(c, 'trim'). */
+export const crewSkill = (c?: { spec: CrewSpec }) => crewAttr(c, 'trim');
 
 /** The hull and rig without people (the ORC sailing displacement includes about three crew, ~240 kg). */
 export const HULL_EMPTY = orc.boat.displacementSailing - 240;
@@ -240,13 +261,13 @@ export const helmArms = (p: Person, fatigue = 0) => {
 };
 
 /** How far out a person will lean (0..1) for their skill and how tired they are. */
-const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * skillOf(p)) * (1 - 0.6 * fatigue);
+const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * attrOf(p, 'fitness')) * (1 - 0.6 * fatigue);
 /** Reaction time (s) to a new call: an expert ~0.4 s, a novice ~1.6 s (simple visual reaction is 0.2–0.3 s; choosing what to do takes longer). Estimates. */
-export const reactTime = (p: Person) => 1.6 - 1.2 * skillOf(p);
+export const reactTime = (p: Person) => 1.6 - 1.2 * attrOf(p, 'react');
 /** Pace of a person's work and movement against a club crew (1 at skill 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
-export const pace = (p: Person) => 0.55 + 0.75 * skillOf(p);
+export const pace = (p: Person) => 0.55 + 0.75 * attrOf(p, 'handling');
 /** Hiking endurance (s at a full hike) and recovery time constant (s): Vogiatzis 1995 (above). */
-const ENDURE = (p: Person) => 300 + 210 * skillOf(p), RECOVER = 60;
+const ENDURE = (p: Person) => 300 + 210 * attrOf(p, 'fitness'), RECOVER = 60;
 
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
@@ -326,15 +347,15 @@ interface Held { arm: number; z: number; since: number; off: number }
 export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const s = c.spec, ppl = c.ppl ??= allAboard(s), W = c.W ??= ppl.map(p => p.w), total = c.total ??= W.reduce((a, b) => a + b, 0), n = s.crew.length;
   const w = k.windward;
-  // the crew's skill: the average of the crew (alone: the helm's)
-  const skill = n ? s.crew.reduce((a, p) => a + skillOf(p), 0) / n : skillOf(s.helm);
+  // the crew's judgement of where to be (trim) and their boat handling: the average of the crew (alone: the helm's)
+  const skill = specAttr(s, 'trim'), handling = specAttr(s, 'handling');
   // (the first time: they were set up on the side the wind is on)
   if (!c.sailing) { c.sailing = true; if (w !== c.wind) { for (const a of c.people) a.x = -a.x; c.wind = w; c.side = k.tack; } }
   // a tack or gybe: a skilled crew roll-tacks through the wind
   const tacked = w !== c.wind;
   // a roll tack starts as she luffs up to tack: they go up onto the windward side (in light air, from sitting to leeward)
   // so she rolls to windward through the wind
-  const canRoll = skill >= 0.45 && c.place?.across == null;
+  const canRoll = handling >= 0.45 && c.place?.across == null;
   if (!tacked && k.tackComing && canRoll && !c.roll) c.roll = { phase: 'lead', t: 0 };
   if (tacked) {
     const through = k.twa < 90;
@@ -602,7 +623,7 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
     //   of those that go misjudge it further.
     // (How crews sail, as the owner describes it: the numbers are estimates, not from a source.)
     const r1 = crewDraw(c.spec, 1), r2 = crewDraw(c.spec, 2), r3 = crewDraw(c.spec, 3);
-    const judge = (skillOf(c.spec.helm) + skill) / 2, tier = judge >= 0.8 ? 2 : judge >= 0.45 ? 1 : 0;
+    const judge = (attrOf(c.spec.helm, 'trim') + skill) / 2, tier = judge >= 0.8 ? 2 : judge >= 0.45 ? 1 : 0;
     const err = tier === 2 ? 0 : tier === 1 ? (r3 < 0.35 ? 0.006 + 0.012 * r1 : 0) : (r3 < 0.5 ? 0.02 : 0);
     const theirs = call(cost - err);
     if (theirs !== c.poleFwd) { c.poleFwd = theirs; c.poleFwdT = 0; } else c.poleFwdT = (c.poleFwdT ?? 0) + 1; // (once a second)
