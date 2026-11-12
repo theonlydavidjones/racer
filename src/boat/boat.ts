@@ -121,7 +121,6 @@ export interface Boat {
   markTouch: string | null; // the mark she is touching right now (Rule 31), if any
   headingAgo?: number; // heading RULE16_WINDOW seconds ago (Rule 16.1), kept by the World
   aboveProper?: boolean; // sailing above her proper course (Rule 17), kept by the World
-  belowProper?: boolean; // sailing well below her proper course (Rule 23.2), kept by the World
   cleared?: boolean; // finished and cleared the finishing line and marks: no longer racing (Definitions, Racing), kept by the World
   // environment at the boat
   cur: Vec;

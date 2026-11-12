@@ -14,7 +14,7 @@ import { DEFAULT_CREW } from '../boat/crewPhys';
 import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { cabinInteriorGeometry, cabinInteriorMaterial, windowLids } from './cabinInterior';
+import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, luffTellStates, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
 
@@ -199,6 +199,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const below = cabinInteriorMaterial();
   grp.add(new THREE.Mesh(cabinInteriorGeometry(), below));
   grp.userData.below = below;
+  // its lantern, on its own arm from the shackle so it can swing (syncBoatMesh)
+  const lanternArm = new THREE.Group(); lanternArm.add(new THREE.Mesh(lanternGeometry(), below)); grp.add(lanternArm);
+  grp.userData.lantern = makeLanternSwing(lanternArm);
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
   // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
   // the companionway open (the hatch slid forward, the doors stowed below) or shut (the hatch slid aft, the doors in)
@@ -347,6 +350,8 @@ export interface BoatMesh {
   lines: Lines;
   /** Her navigation lights and the cabin's glow (navLights.ts). */
   nav: NavLights;
+  /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
+  lantern: LanternSwing;
 }
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
@@ -742,7 +747,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp);
-  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, ensign, hideHelm: false, nav, ropes };
+  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, ensign, hideHelm: false, nav, ropes, lantern: grp.userData.lantern };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -755,6 +760,10 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // rudder and tiller follow the helm the sim is using (steady, not estimated from frame-to-frame heading changes,
   // which jitter with the frame rate); eased so it swings like a real tiller
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
+  // the cabin's lantern swings on its chain under her motion, and its light goes with it
+  { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
+    swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
+    u.uLampUp.value.set(0, 1, 0).applyQuaternion(m.lantern.arm.quaternion); }
   const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
   m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading

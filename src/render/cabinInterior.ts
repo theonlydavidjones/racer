@@ -12,9 +12,9 @@ import { CABIN, CABIN_LEAN, COMPANIONWAY, L, WINDOW, cabinHalf, cabinTopAt, cabi
  * The berths run the cabin's length, 1.85 m (CR 3.15: at least 1.80 m).
  *
  * It's one inward-facing shell just inside the hull, deck and cabin trunk, seen only through the companionway and the
- * windows. Its light is one lantern hanging in the middle of the cabin: worked out at each vertex as falling off with
- * the square of the distance and with the angle the surface turns from it, plus the light bounced round the cabin's
- * pale lining (taken as an even share). By day it's lit only by what comes in through the openings, dimly.
+ * windows. Its light is one lantern hanging in the middle of the cabin, swinging on its chain as she moves
+ * (swingLantern): worked out where it hangs now as falling off with the square of the distance and with the angle the
+ * surface turns from it, plus the light bounced round the cabin's pale lining (taken as an even share). By day it's lit only by what comes in through the openings, dimly.
  */
 
 const zAt = (u: number) => -L / 2 + u * L;
@@ -52,11 +52,6 @@ function section(u: number): { x: number; y: number; wood: boolean; win?: boolea
   return pts;
 }
 
-/** The light the lantern gives a point with (unit) normal n: falling off with distance and angle, plus bounce. */
-function lampAt(p: THREE.Vector3, n: THREE.Vector3): number {
-  const l = LANTERN.clone().sub(p), d = l.length(); l.divideScalar(d || 1);
-  return Math.max(0, n.dot(l)) / (1 + (d / 0.7) ** 2) + 0.12;
-}
 /**
  * Daylight inside: what comes in through the openings, each taken as a patch of bright sky facing into the cabin. A
  * surface takes light from an opening by how squarely it faces it, how squarely the opening faces it, and the square of
@@ -91,14 +86,14 @@ function aoAt(p: THREE.Vector3): number {
 
 /** The shell: positions, the lining's or the woodwork's colour, and the lantern's light, per vertex. */
 export function cabinInteriorGeometry(): THREE.BufferGeometry {
-  const pos: number[] = [], col: number[] = [], lamp: number[] = [], day: number[] = [];
+  const pos: number[] = [], col: number[] = [], lamp: number[] = [], day: number[] = [], nrm: number[] = [], lit: number[] = [];
   const centre = new THREE.Vector3();
   const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, ca: THREE.Color, cb: THREE.Color, cc: THREE.Color, open = 1) => {
     // the face's normal, turned to look into the cabin (toward its middle line)
     const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
     centre.set(0, (INTERIOR.sole + cabinTopY(uAt(a.z)) + CABIN.crown) / 2, a.z);
     if (n.dot(centre.clone().sub(a)) < 0) { n.negate(); [b, c] = [c, b]; [cb, cc] = [cc, cb]; }
-    for (const [p, cl] of [[a, ca], [b, cb], [c, cc]] as const) { const ao = aoAt(p); pos.push(p.x, p.y, p.z); col.push(cl.r, cl.g, cl.b); lamp.push(lampAt(p, n) * open * ao); day.push(dayAt(p, n) * ao); }
+    for (const [p, cl] of [[a, ca], [b, cb], [c, cc]] as const) { const ao = aoAt(p); pos.push(p.x, p.y, p.z); col.push(cl.r, cl.g, cl.b); lamp.push(0); nrm.push(n.x, n.y, n.z); lit.push(open * ao); day.push(dayAt(p, n) * ao); }
   };
   // stations from the main bulkhead forward to where the trunk's rounded front begins, and the windows' ends
   const uA = CABIN.u1 - 0.002, uF = CABIN.u0 + 0.06, NS = 16;
@@ -172,22 +167,12 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
   // the floorboards' seams, along the sole (CR 3.40: wooden boards between the berths)
   for (const x of [-0.12, 0.12]) box(x - 0.004, x + 0.004, INTERIOR.sole, INTERIOR.sole + 0.002, zEnd, zMain - 0.01, SEAM);
   // a hanging locker to port by the companionway, from the berth up under the side deck (as on Wilma)
-  { const zl0 = zMain - 0.42, zl1 = zMain - 0.01, xi = -(INTERIOR.berthIn + 0.02), xo = -(Math.min(hullInnerHalf(uAt(zMain - 0.2), 0.3), halfBeam(uAt(zMain - 0.2))) - INSET - 0.01), yt = deckY(uAt(zMain - 0.2), cabinHalf(uAt(zMain - 0.2))) - INSET;
+  { const zl0 = zMain - 0.42, zl1 = zMain - 0.01, xi = -(INTERIOR.berthIn + 0.02), xo = -(Math.min(...[zl0, zl1].map(z => Math.min(hullInnerHalf(uAt(z), INTERIOR.berth), halfBeam(uAt(z))))) - INSET - 0.01) /* (its back as far out as the hull allows at its foot, the narrowest place, so no corner shows through the planking) */, yt = deckY(uAt(zMain - 0.2), cabinHalf(uAt(zMain - 0.2))) - INSET;
     box(xo, xi, INTERIOR.berth, yt, zl0, zl1, WOOD);
     box(xi - 0.004, xi + 0.001, INTERIOR.berth + 0.06, yt - 0.06, zl0 + 0.04, zl1 - 0.04, SEAM); } // its door's outline
   // the mast, stepped on the keel: through the forepeak from the deck down (aluminium, 133 × 110 mm; boatMesh MAST_Z)
   { const mz = -L / 2 + 0.8 + 2.0 + 0.0665, top = deckY(uAt(mz), 0) - INSET;
     box(-0.055, 0.055, INTERIOR.sole, top, mz - 0.0665, mz + 0.0665, SPAR); }
-  // the lantern itself, hanging from the cabin top on a short chain: a small brass lamp, its glass bright when lit
-  { const v = (x: number, y: number, z: number) => new THREE.Vector3(LANTERN.x + x, LANTERN.y + y, LANTERN.z + z), N = 8, r = 0.045, BRASS = new THREE.Color(0xb08a4a), GLOW = new THREE.Color(1, 0.95, 0.85);
-    for (let k = 0; k < N; k++) {
-      const a0 = 2 * Math.PI * k / N, a1 = 2 * Math.PI * (k + 1) / N, c0 = Math.cos(a0) * r, s0 = Math.sin(a0) * r, c1 = Math.cos(a1) * r, s1 = Math.sin(a1) * r;
-      const glass = [v(c0, -0.05, s0), v(c1, -0.05, s1), v(c1, 0.05, s1), v(c0, 0.05, s0)];
-      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); day.push(0.12); /* its glass by day: unlit, only the daylight on it */ } }
-      for (const y of [0.05, -0.05]) { const cap3 = [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]; for (const p of cap3) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.4); day.push(0.35); } }
-    }
-    const top = cabinTopAt(uAt(LANTERN.z), 0) - INSET; // the chain
-    for (const p of [v(-0.004, 0.08, 0), v(0.004, 0.08, 0), new THREE.Vector3(LANTERN.x, top, LANTERN.z)]) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.3); day.push(0.3); } }
   // each window's reveal: the cabin side's thickness round the opening, lining to the outside skin, so no gap shows
   for (const side of [1, -1]) {
     const N = 8, outer = (u: number, h: number) => cabinHalf(u) - CABIN_LEAN * h / CABIN.h, inner = (u: number, h: number) => outer(u, h) - INSET;
@@ -206,7 +191,97 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setAttribute('aLamp', new THREE.Float32BufferAttribute(lamp, 1));
   g.setAttribute('aDay', new THREE.Float32BufferAttribute(day, 1));
+  g.setAttribute('aN', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('aLit', new THREE.Float32BufferAttribute(lit, 1));
   return g;
+}
+
+/** Where the lantern's chain is shackled to the cabin top's underside (on the centreline), and the chain's length to the lamp's middle. */
+export const LANTERN_PIVOT = new THREE.Vector3(LANTERN.x, cabinTopAt(uAt(LANTERN.z), 0) - INSET, LANTERN.z);
+export const LANTERN_DROP = LANTERN_PIVOT.y - LANTERN.y;
+
+/**
+ * The lantern itself, drawn in its own frame (the chain's shackle at the origin, hanging along −y) so it can swing: a
+ * small brass lamp on a short chain, its glass bright when lit. It gives no light to itself from the room (aLit 0); its
+ * glass and brass carry their own brightness (aLamp).
+ */
+export function lanternGeometry(): THREE.BufferGeometry {
+  const pos: number[] = [], col: number[] = [], lamp: number[] = [], day: number[] = [];
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y - LANTERN_DROP, z), N = 8, r = 0.045, BRASS = new THREE.Color(0xb08a4a), GLOW = new THREE.Color(1, 0.95, 0.85);
+  const put = (p: THREE.Vector3, c: THREE.Color, l: number, d: number) => { pos.push(p.x, p.y, p.z); col.push(c.r, c.g, c.b); lamp.push(l); day.push(d); };
+  for (let k = 0; k < N; k++) {
+    const a0 = 2 * Math.PI * k / N, a1 = 2 * Math.PI * (k + 1) / N, c0 = Math.cos(a0) * r, s0 = Math.sin(a0) * r, c1 = Math.cos(a1) * r, s1 = Math.sin(a1) * r;
+    const glass = [v(c0, -0.05, s0), v(c1, -0.05, s1), v(c1, 0.05, s1), v(c0, 0.05, s0)];
+    for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) for (const q of [a, b, c]) put(glass[q], GLOW, 2.5, 0.12); // (its glass by day: unlit, only the daylight on it)
+    for (const y of [0.05, -0.05]) for (const p of [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]) put(p, BRASS, 0.4, 0.35); // the brass top and font
+  }
+  for (const p of [v(-0.004, 0.08, 0), v(0.004, 0.08, 0), new THREE.Vector3(0, 0, 0)]) put(p, BRASS, 0.3, 0.3); // the chain
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('aLamp', new THREE.Float32BufferAttribute(lamp, 1));
+  g.setAttribute('aDay', new THREE.Float32BufferAttribute(day, 1));
+  g.setAttribute('aN', new THREE.Float32BufferAttribute(new Float32Array(pos.length), 3));
+  g.setAttribute('aLit', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3), 1));
+  return g;
+}
+
+/**
+ * The lantern swinging on its chain: a damped pendulum hung from a point that moves with the hull. It's worked out in
+ * a frame that keeps her place but not her turn, where gravity is simply down, so what the hull does to the shackle (heel,
+ * rolling and pitching in the waves, heaving) reaches the lamp only through the chain, as it does in a real boat. (Her
+ * way over the ground is left out, and with it her surging and the sideways pull of a turn: for a Folkboat those are a
+ * few hundredths of g, small beside the seaway's.) The chain is taken as a light rigid link of length ℓ to the lamp's middle (a simple pendulum):
+ *   ẍ = g − 2ζω₀ (ẋ − ẋ_pivot) + T,  with T the chain's pull keeping |x − x_pivot| = ℓ,
+ * which for small swings from a still pivot is θ̈ = −(g/ℓ)·θ − 2ζω₀·θ̇, period 2π√(ℓ/g) ≈ 1.1 s for ℓ ≈ 0.28 m
+ * (e.g. Halliday, Resnick & Walker, Fundamentals of Physics, ch. 15: the simple and the damped pendulum). The damping (the
+ * chain's links rubbing at the shackle, and the still air in the cabin, so it acts on the lamp's motion relative to the
+ * boat, not to the world) is light: ζ ≈ 0.03, a swing dying away to a third in about 6 s. Its period is well under a
+ * Folkboat's roll period in a seaway (about 2.5–4 s), so it mostly stays plumb while she rolls under it: from aboard,
+ * it swings against the cabin by the roll's own angle, a little more and a little late, and hangs off her centreline
+ * by the heel.
+ */
+export interface LanternSwing { arm: THREE.Group; x: THREE.Vector3; v: THREE.Vector3; p: THREE.Vector3; ok: boolean }
+const G = new THREE.Vector3(0, -9.81, 0), ZETA = 0.03, W0 = Math.sqrt(9.81 / LANTERN_DROP);
+const _p1 = new THREE.Vector3(), _r = new THREE.Vector3(), _vp = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _pp = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
+export function makeLanternSwing(arm: THREE.Group): LanternSwing { return { arm, x: new THREE.Vector3(), v: new THREE.Vector3(), p: new THREE.Vector3(), ok: false }; }
+/**
+ * One frame of swinging (dt s of sim time), the hull already turned and heaved (grp).
+ * Turns the arm to the chain's new direction in the boat's frame, and returns the lamp's middle in the boat's frame.
+ */
+export function swingLantern(s: LanternSwing, grp: THREE.Object3D, dt: number, out: THREE.Vector3): THREE.Vector3 {
+  // the shackle as she turns and heaves about her own middle; her way over the ground is left out (steady, it does
+  // nothing to a pendulum, and the sim moves her in steps that would only jerk it)
+  _p1.copy(LANTERN_PIVOT).applyQuaternion(grp.quaternion); _p1.y += grp.position.y;
+  // the first frame, or she's been moved or turned at a stroke (a restart, a new scene): start hanging still, plumb.
+  // (Her own motion carries the shackle a few centimetres a frame at most; a jerk of more would only whip it round.)
+  if (!s.ok || _p1.distanceToSquared(s.p) > 0.25 * 0.25) { s.p.copy(_p1); s.x.copy(_p1).addScaledVector(DOWN, LANTERN_DROP); s.v.set(0, 0, 0); s.ok = true; }
+  if (dt > 0) {
+    const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n; // (small steps: the link's constraint holds without drifting)
+    _vp.subVectors(_p1, s.p).divideScalar(dt);
+    for (let i = 1; i <= n; i++) {
+      // worked relative to the shackle: where the lamp is from it (_d) and how it moves against it (_r). A change in the
+      // shackle's own speed between frames shows here as the lamp lagging behind it (its inertia).
+      _d.subVectors(s.x, _pp.lerpVectors(s.p, _p1, (i - 1) / n)).normalize();
+      _r.subVectors(s.v, _vp);
+      // gravity, and the damping on its motion relative to the cabin; the chain's pull takes out any motion along it
+      _r.addScaledVector(G, h).multiplyScalar(1 - 2 * ZETA * W0 * h);
+      _r.addScaledVector(_d, -_r.dot(_d));
+      // swing round the shackle on the chain's length, the motion turned to run across the chain's new line
+      const sp = _r.length();
+      _d.multiplyScalar(LANTERN_DROP).addScaledVector(_r, h).normalize();
+      _r.addScaledVector(_d, -_r.dot(_d)); const sp2 = _r.length(); if (sp2 > 1e-9) _r.multiplyScalar(sp / sp2);
+      _pp.lerpVectors(s.p, _p1, i / n);
+      s.x.copy(_pp).addScaledVector(_d, LANTERN_DROP); s.v.copy(_vp).add(_r);
+    }
+    s.p.copy(_p1);
+  }
+  // the chain's direction in the boat's own frame
+  _d.subVectors(s.x, s.p).normalize();
+  _q.copy(grp.quaternion); // (the hull's turn in the scene, the frame the swing is worked in)
+  _q.invert(); _d.applyQuaternion(_q);
+  s.arm.position.copy(LANTERN_PIVOT); s.arm.quaternion.setFromUnitVectors(DOWN, _d);
+  return out.copy(LANTERN_PIVOT).addScaledVector(_d, LANTERN_DROP);
 }
 
 /** Depth-only covers over the windows' openings (as over the cockpit): the sea isn't drawn inside her through them. */
@@ -225,17 +300,26 @@ export function windowLids(): THREE.BufferGeometry {
  * The interior's material: its colours lit by the day coming in (uDay) and by the lantern's warm light (uLamp, the
  * lantern's brightness, set each frame by navLights.ts on the boat-lights clock).
  */
-export function cabinInteriorMaterial(): THREE.MeshBasicMaterial & { uniforms: { uDay: { value: number }; uLamp: { value: number } } } {
-  const uniforms = { uDay: { value: 0.3 }, uLamp: { value: 0 } };
+export function cabinInteriorMaterial(): THREE.MeshBasicMaterial & { uniforms: { uDay: { value: number }; uLamp: { value: number }; uLampAt: { value: THREE.Vector3 }; uLampUp: { value: THREE.Vector3 } } } {
+  const uniforms = { uDay: { value: 0.3 }, uLamp: { value: 0 }, uLampAt: { value: LANTERN.clone() }, uLampUp: { value: new THREE.Vector3(0, 1, 0) } };
   const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }) as THREE.MeshBasicMaterial & { uniforms: typeof uniforms };
   m.uniforms = uniforms;
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
-    sh.vertexShader = 'attribute float aLamp;\nattribute float aDay;\nvarying float vLamp;\nvarying float vDay;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLamp = aLamp; vDay = aDay;');
-    sh.fragmentShader = 'uniform float uDay;\nuniform float uLamp;\nvarying float vLamp;\nvarying float vDay;\n' + sh.fragmentShader.replace(
+    sh.vertexShader = 'attribute float aLamp;\nattribute float aDay;\nattribute vec3 aN;\nattribute float aLit;\nvarying float vLamp;\nvarying float vDay;\nvarying vec3 vP;\nvarying vec3 vN;\nvarying float vLit;\n'
+      + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLamp = aLamp; vDay = aDay; vP = position; vN = aN; vLit = aLit;');
+    sh.fragmentShader = 'uniform float uDay;\nuniform float uLamp;\nuniform vec3 uLampAt;\nuniform vec3 uLampUp;\nvarying float vLamp;\nvarying float vDay;\nvarying vec3 vP;\nvarying vec3 vN;\nvarying float vLit;\n' + sh.fragmentShader.replace(
       'vec3 outgoingLight = reflectedLight.indirectDiffuse;',
+      // The lantern's light where it hangs now (it swings, so this is worked out here, not baked): falling off with the
+      // square of the distance and with the angle the surface turns from it, plus the light bounced round the pale lining.
+      // Its brass top hides the glass from straight above and its font from below (each about 0.045 m across 0.05 m from
+      // the glass's middle, so within about 42° of the lamp's own up or down, softened by the glass's height): a dark
+      // patch on the deckhead over it and a dimmer one on the sole, both sliding as it swings.
+      `vec3 toL = uLampAt - vP; float dL = length(toL); toL /= max(dL, 1e-4);
+      float cU = -dot(toL, uLampUp), hide = 1.0 - smoothstep(0.62, 0.82, cU) - 0.35 * smoothstep(0.62, 0.82, -cU);
+      float lampHere = vLamp + vLit * (max(0.0, dot(normalize(vN + 1e-6), toL)) * hide / (1.0 + (dL / 0.7) * (dL / 0.7)) + 0.12);
       // a lamp's warm light (about 2700 K) on the cabin's colours, and the dim day
-      'vec3 outgoingLight = reflectedLight.indirectDiffuse * (uDay * vDay + uLamp * vLamp * vec3(1.5, 1.1, 0.7));');
+      vec3 outgoingLight = reflectedLight.indirectDiffuse * (uDay * vDay + uLamp * lampHere * vec3(1.5, 1.1, 0.7));`);
   };
   m.customProgramCacheKey = () => 'cabinInterior';
   return m;

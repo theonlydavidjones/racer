@@ -16,7 +16,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, blanketRule, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -660,24 +660,6 @@ export class World {
     return false;
   }
 
-  /** Is she keeping clear of a boat she's closing on (her right of way the other's), within 12 s and 14 m? */
-  private keepingClear(b: Boat): boolean {
-    for (const o of this.boats) {
-      if (o === b || Math.abs(o.x - b.x) > 60 || Math.abs(o.y - b.y) > 60) continue;
-      const c = cpa(b, o);
-      if (c.t < 12 && c.d < 14 && this.keepsClearOf(b, o)) return true;
-    }
-    return false;
-  }
-
-  /** The fraction of `to`'s wind speed that `by`'s sails take (her wind shadow alone, environment/shadows.ts). */
-  takenBy(by: Boat, to: Boat): number {
-    if (by.ww == null || this.freeSail) return 0;
-    const sum = new WindSum();
-    addBoatWake(sum, by, to, this.wind.kt * (to.leeK ?? 1));
-    return Math.max(0, 1 - sum.result(this.wind.from).k);
-  }
-
   /** The sea at any point, for the wind and current there. */
   seaHere(p: Vec): SeaHere {
     const c = this.currentAt(p);
@@ -975,11 +957,6 @@ export class World {
       b.headingAgo = h.length ? h[0] : b.h;
       const pt = this.t > 0 && b.started && !b.finished && !b.retired ? properTwa(this, b) : null, racing = pt != null; // (null: undetermined)
       b.aboveProper = racing && b.twa < pt - 10;
-      // (well below it: farther off the wind than her course to the mark, by more than footing for speed or a duck would
-      // take her for long; Rule 23.2 also asks that she bore away onto the other boat's wind: see rules/pairs.ts)
-      // (and not while she is keeping clear of another boat close by: a duck is part of her proper course, in the
-      // Definitions' sense, as the course she'd sail without the boat rule 23 protects)
-      b.belowProper = racing && !b.tacking && b.penalty <= 0 && b.twa > pt + BELOW_PROPER && !this.keepingClear(b);
     });
   }
 
@@ -1003,7 +980,7 @@ export class World {
     if (rec.hail || rec.r202e || rec.mark || rec.r183 || rec.r17 != null || rec.grace > ctx.t || A.forced14 === B.id || B.forced14 === A.id) return false;
     const n = ctx.marks.length, nearZone = (X: Boat) => X.leg < n && markDist(X, ctx.marks[X.leg]) < ZONE * 2.5;
     if (nearZone(A) || nearZone(B) || cpa(A, B).d < 60) return false;
-    rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null; rec.blanket = {};
+    rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null;
     rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT; // (rule 18.3: tacks seen as they happen)
     return true;
   }
@@ -1023,13 +1000,7 @@ export class World {
         if (h2?.kind === 'room' && h2.by === mid.id && h2.at >= po.at) { if (h2.clearAt != null) po.respondedAt = h2.clearAt; }
         else po.failed = true; // that hail lapsed unanswered (a breach was called on it)
       }
-      // Rule 23: how much of each one's wind the other is taking, where rule 23 could forbid it (environment/shadows.ts)
-      let blanket: { byA: number; byB: number } | undefined;
-      if (blanketRule(A, B, ctx) || blanketRule(B, A, ctx)) {
-        const dx = A.x - B.x, dy = A.y - B.y;
-        if (dx * dx + dy * dy < 120 * 120) blanket = { byA: this.takenBy(A, B), byB: this.takenBy(B, A) };
-      }
-      const { incident } = assessPair(rec, A, B, ctx, { swerve: A.forced14 === B.id || B.forced14 === A.id, blanket });
+      const { incident } = assessPair(rec, A, B, ctx, { swerve: A.forced14 === B.id || B.forced14 === A.id });
       const h = rec.hail;
       if (h && h.kind === 'room' && !answered && h.clearAt != null && h.replyAt == null) {
         // the hailed boat is through the wind: now the hailing boat must tack too (Rule 20.2(d))
@@ -1039,15 +1010,12 @@ export class World {
       if (incident) found.push({ A, B, incident });
     }
     // who fouled whom this step, before deciding penalties (Rule 43.1(a) needs the whole picture)
-    // (losing her wind can't compel a boat to break a rule: blanketing isn't a breach that exonerates another)
-    for (const { A, B, incident } of found) if (incident.kind !== 'hail' && incident.kind !== 'blanket') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
+    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
     for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
-      // a boat that has finished isn't racing, so there are no penalty turns for her to take (rule 44.1)
-      if (incident.kind === 'blanket' && notRacing(incident.fouler) && A.ai && B.ai) continue;
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
-      if (incident.kind !== 'hail' && incident.kind !== 'blanket' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
+      if (incident.kind !== 'hail' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
       // Part 2 preamble: the rules of Part 2 still apply between boats that intend to race, are racing or have been racing,
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
@@ -1690,9 +1658,6 @@ export function describeTide(f: CurrentField, p: Vec, now: number): { label: str
 export function youTackPays(hailer: Boat, to: Boat): boolean {
   return clearAstern(hailer, to) && hullGap(hailer, to) > LOA * 0.6;
 }
-
-/** Rule 23.2: how far (deg) farther off the wind than her proper course counts as leaving it (the sim's estimate). */
-export const BELOW_PROPER = 20;
 
 /**
  * True wind angle of a boat's proper course: roughly, the course she'd sail to finish as soon as
