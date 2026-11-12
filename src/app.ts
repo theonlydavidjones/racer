@@ -141,11 +141,14 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   $('rWhat').textContent = ex.what;
   $('rTip').textContent = ex.tip;
   const turns = w.penaltyDeg === 720 ? 'two turns' : 'one turn';
-  $('rPen').textContent = exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
+  // (a boat not racing, finished or retired, that breaks rule 23.1 can't take turns for it: rule 44.1's penalties are for
+  // an incident while racing; she can be protested)
+  const notRacing = inc.part === '23.1';
+  $('rPen').textContent = notRacing ? `No turns: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing, and a turns penalty is only for an incident while racing (Rule 44.1). ${youFault ? `${other.name} may protest you` : `You may protest ${inc.fouler.name}`} instead.` : exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
     ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a gybe (Rule 44.2).`
     : `${other.name} takes a ${turns} penalty.`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
-  pendingPenalty = exonerated ? null : inc.fouler;
+  pendingPenalty = exonerated || notRacing ? null : inc.fouler;
   lastClip = clip;
   $('replay').hidden = false;
   replayView.play(w, clip);
@@ -547,7 +550,7 @@ for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
  * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
 function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
   if (!w.running || w.paused) return;
-  if (!w.freeSail) { toast('No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.', 5000); return; }
+  if (!w.cruising) { toast('No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.', 5000); return; }
   const u = w.user;
   if (u.docked || u.pushing || (u.astern ?? 0) > 0.1 || u.v < 0.5) { toast('Get her sailing first: a tiller pilot needs way on to steer.', 3500); return; }
   unlash();
@@ -560,7 +563,7 @@ let pilotShown = '';
 function pilotTick(dt: number): void {
   const p = w.pilot, on = p.mode !== 'off' && w.running;
   if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) pilotAdjust(w.user, p, d * 20 * dt); }
-  const chip = $('bPilot'), hide = !w.running || !w.freeSail;
+  const chip = $('bPilot'), hide = !w.running || !w.cruising;
   if (chip.hidden !== hide) chip.hidden = hide;
   chip.classList.toggle('on', on);
   const panel = $('pilot'); if (panel.hidden === on) { panel.hidden = !on; document.body.classList.toggle('pilot-on', on); }
@@ -575,6 +578,25 @@ function pilotTick(dt: number): void {
   }
   if (txt !== pilotShown) { $('pilotRead').textContent = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
+}
+/* ---------------- Home: send her back to her home slip (racing, it retires her first) ---------------- */
+function goHome(): void {
+  if (!w.running) return;
+  if (!w.homeSlip) { toast('She has no home slip: give her one in the Fleet.', 3500); return; }
+  if (!w.freeSail && !w.user.finished && !w.user.retired) { w.paused = true; $('homeAsk').hidden = false; ($('bHomeNo') as HTMLButtonElement).focus(); return; }
+  if (w.sendHome()) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); }
+}
+$('bHome').onclick = goHome;
+$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; w.paused = false; if (w.sendHome()) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); } };
+$('bHomeNo').onclick = () => { $('homeAsk').hidden = true; w.paused = false; };
+/** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
+function homeButton(): void {
+  const el = $('bHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
+  const hide = !w.running || S.mode === 'drill' || !!u.docked || !!u.handled || home;
+  if (el.hidden !== hide) el.hidden = hide;
+  el.classList.toggle('dim', !w.homeSlip);
+  const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Fleet first)';
+  if (el.title !== t) el.title = t;
 }
 $('bPilot').onclick = () => { if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); };
 for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pm]')) b.onclick = () => pilotOn(b.dataset.pm as Exclude<PilotMode, 'off'>);
@@ -599,7 +621,7 @@ $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
 // Cruising, the same button (and key) opens the navigator's passage plan instead.
-$('bCourse').onclick = () => (w.freeSail ? navView.toggle(w) : courseView.toggle(w));
+$('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle(w));
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
@@ -650,7 +672,7 @@ function keysHint(): void {
   $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · right-click, double-click or ${k('lashTiller')}: lash it · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} all keys`;
   // each cluster button's name and key, on hover (the word under it is short)
   const tip: [string, string, Action][] = [['bHail', 'Hail: "Room to tack!", "Starboard!", or reply "You tack"', 'hail'], ['bPause', 'Pause', 'pause'],
-    ['bCourse', w?.freeSail ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
+    ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
     ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
@@ -679,7 +701,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
+const anyOverlay = () => !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -687,6 +709,7 @@ addEventListener('keydown', e => {
   if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) && e.key !== 'Escape') return;
   if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
   if (!$('keepAsk').hidden) return; // save or discard first
+  if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
@@ -701,7 +724,7 @@ addEventListener('keydown', e => {
   }
   if (a === 'keys') { keysView.open(); return; }
   if (a === 'log') { if ($('logView').hidden) openLog(); else $('logView').hidden = true; return; }
-  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.freeSail) navView.toggle(w); else courseView.toggle(w); return; }
+  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.cruising) navView.toggle(w); else courseView.toggle(w); return; }
   if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
   if (anyOverlay() || !a) return;
   if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
@@ -1232,7 +1255,7 @@ function frame(now: number): void {
     acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); // (held head to wind on the bow line: push off again to let her go)
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1313,7 +1336,7 @@ const fleet: Fleet = new Fleet(S, {
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
   courseView.close(); navView.close(); w.running = false; w.paused = false;
-  for (const id of ['setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
+  for (const id of ['homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);
   $('home').hidden = false;

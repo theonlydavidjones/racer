@@ -84,6 +84,7 @@
     <button class="ib" id="bMain" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v14h9Z"/></svg><span class="w">Hoist main</span></button>
     <button class="ib" id="bCourse" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 17V3"/><path d="M5 4h9l-2 3 2 3H5"/></svg><span class="w">Course</span></button>
     <button class="ib" id="bPilot" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5.5l2 5.5h-4Z"/></svg><span class="w">Autopilot</span></button>
+    <button class="ib" id="bHome" type="button" hidden title="Send her back to her home slip"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5"/><path d="M5.5 8v8h9V8"/><path d="M8.5 16v-4h3v4"/></svg><span class="w">Home</span></button>
   </div>
   <div class="row2">
     <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
@@ -377,6 +378,13 @@
 <div id="boatPanel" class="boatpanel" hidden></div>
 <div class="overlay" id="fleet" hidden></div>
 <div id="fleetBoat" class="boatpanel" hidden></div>
+<div class="overlay" id="homeAsk" hidden role="dialog" aria-modal="true" aria-labelledby="homeTitle">
+  <div class="panel">
+    <h2 id="homeTitle">Retire and head home?</h2>
+    <p>She'll be scored <b>RET</b>, retired (RRS A5.1), and she's no longer racing: keep clear of the boats still racing (RRS 23.1). Her home slip becomes the destination for the navigator and the tiller pilot.</p>
+    <div class="btnrow"><button class="cta" type="button" id="bHomeYes">Retire and head home</button><button class="ghost" type="button" id="bHomeNo">Keep racing</button></div>
+  </div>
+</div>
 <div class="overlay" id="keepAsk" hidden role="dialog" aria-modal="true" aria-labelledby="keepTitle">
   <div class="panel">
     <h2 id="keepTitle">Keep this sail?</h2>

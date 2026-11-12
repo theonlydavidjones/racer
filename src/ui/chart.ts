@@ -64,8 +64,8 @@ export class Chart {
     this.cx = w.user.x; this.cy = w.user.y;
     this.scale = Math.min(innerWidth, innerHeight) / 6000; // about 3 nm across to begin with
     $('chart').hidden = false;
-    $('chartTitle').textContent = w.freeSail ? 'Chart · pick a destination' : 'Chart';
-    $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
+    $('chartTitle').textContent = w.cruising ? 'Chart · pick a destination' : 'Chart';
+    $('chartSub').textContent = w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
     this.info(); this.palLabel();
     this.draw();
   }
@@ -86,7 +86,7 @@ export class Chart {
   }
 
   private tap(clientX: number, clientY: number): void {
-    const w = this.w; if (!w || !w.freeSail) return;
+    const w = this.w; if (!w || !w.cruising) return;
     const r = this.c.getBoundingClientRect(), sx = clientX - r.left, sy = clientY - r.top, q = this.at(sx, sy);
     // a place near the tap: take it, by name
     let best: { p: Vec; name: string } | null = null, bd = 16;
