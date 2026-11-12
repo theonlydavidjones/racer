@@ -256,9 +256,16 @@ const step = (k, d, amt) => k === 'traveller' ? setCar(carX() + d * amt * 2)
 // where the boom's end sits across the boat, as you see it from the helm: −1 port .. +1 starboard (sin of its angle)
 const boomX = a => lee() * Math.sin(Math.max(-5, a) * Math.PI / 180);
 const mainsheetFor = (angle, trav) => Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - 9.5 * trav) / 80, 1 / 1.5)));
-let hold = null, drag = null;
+let hold = null, drag = null, run = null;
+// a double-click on an arrow lets the line run all the way off, or hauls it all the way on: at the line's own rate
+// (a sheet on a winch still takes the time it takes), until it's there or you touch another control
+document.addEventListener('dblclick', e => {
+  const b = e.target.closest('button[data-d]'); if (!b) return;
+  e.preventDefault(); run = { k: b.dataset.k, d: +b.dataset.d };
+});
 document.addEventListener('pointerdown', e => {
   const b = e.target.closest('button[data-d]');
+  if (b || e.target.closest('[data-bar], .track, .pin')) run = null;
   if (b) { e.preventDefault(); step(b.dataset.k, +b.dataset.d, STEP); hold = { k: b.dataset.k, d: +b.dataset.d, el: b, t0: performance.now() }; b.classList.add('held'); return; }
   const bar = e.target.closest('[data-bar]'); if (bar) { drag = bar; bar.setPointerCapture(e.pointerId); dragTo(e); }
 });
@@ -337,6 +344,12 @@ function frame(now){
   const dt = Math.min(.05, (now - (frame.t || now)) / 1000); frame.t = now;
   // a held arrow starts moving on its own after a short pause, so a single click stays a single step
   if (hold && now - hold.t0 > 300) step(hold.k, hold.d, rate(hold.k, hold.d) * dt);
+  if (run && !hold) {
+    const before = run.k === 'traveller' ? carX() : fillOf(run.k === 'boom' ? 'mainsheet' : run.k);
+    step(run.k, run.d, rate(run.k, run.d) * dt);
+    const after = run.k === 'traveller' ? carX() : fillOf(run.k === 'boom' ? 'mainsheet' : run.k);
+    if (after === before) run = null;   // at the end of its travel
+  }
   for (const k in L) if (L[k].a) L[k].v += (crew(k) - L[k].v) * Math.min(1, dt * 1.5);
   for (const sd of ['P','S']) if (CAR[sd].a) Object.assign(CAR[sd], carCrew());
   document.querySelectorAll('.jcar').forEach(el => {
