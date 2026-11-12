@@ -573,15 +573,18 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // (Josephine's photos: a cluster of blocks at the partner, the lines coming down to them and running aft in a bundle),
   // and on to what it works:
   //  - the vang (dual-ended): to the vang's lower block, its tail;
-  //  - the outhaul (dual-ended): up the mast's after side to the gooseneck, and inside the boom to the clew (inside the
-  //    boom is an estimate: the photos don't show it; CR 6.3.4 allows an aluminium boom a groove for its controls);
+  //  - the outhaul (dual-ended): up the mast's after side to the gooseneck, and inside the boom to the clew, where it's
+  //    made fast (inside the boom and fixed to the clew: the owner, on Josephine; how it gets from the foot block to the
+  //    boom is still an estimate);
   //  - the jib Cunningham (dual-ended): forward along the foredeck, outboard of the forehatch, to a block at the stemhead
   //    and up the stay to the jib's cringle (an estimate: not in the photos, and her foredeck looks clear in the one from
   //    the bow; it may well run below);
   //  - the main Cunningham: up the mast's port side, outside the boom, to a block at the gooseneck and to its cringle
   //    above the main's tack (an estimate: not in the photos);
-  //  - the halyards: out of the mast above the deck (CR 6.2.5), the jib's at its front, the main's at its after side, down
-  //    its sides to the blocks and aft (where they exit is an estimate).
+  //  - the halyards: inside the mast, out of it low down (CR 6.2.5), the jib's at its front, the main's at its after side,
+  //    each to a small block-and-tackle on the mast's side by its foot, the tackle's fall to the foot block and aft to the
+  //    piano (the owner, on Josephine). The tackle's purchase and exact height aren't known: drawn as a 2:1, its moving
+  //    block on the halyard's end about 0.4 m up, its standing part and fall at the foot block (estimates).
   const mastLines: Lines['mastLines'] = [], deckAt = (x: number, z: number) => deckY(uAtZ(z), Math.abs(x));
   // (a line lying on the boat from a to b: straight in plan, following the cabin top, over its forward edge and down its
   // face to the deck; a point every 20 cm, and points at the edge, so it lies on the surface)
@@ -624,10 +627,15 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       const d = (z: number) => new THREE.Vector3(side * 0.36, 0, z);
       fixed(line([fb, ...lay(fb, new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12)), ...lay(new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12), d(-1.38)), ...lay(d(-1.38), d(-2.12)), ...lay(d(-2.12), new THREE.Vector3(side * 0.07, 0, stem.z + 0.06)), stem.clone().setX(side * 0.015)], 'jib', 'jibCunningham'));
       if (side > 0) cringles.push({ l: line([stem.clone(), FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP)], 'jib', 'jibCunningham'), sail: 'jib' }), grp.add(cringles[cringles.length - 1].l);
-    } else { // the halyards: from their exits down the mast's side to the block
-      const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.3, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.15, MAST_AFT_Z - 0.004);
+    } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
+      const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
-      upMast([exit, new THREE.Vector3(side * (MAST_ATH / 2 + 0.006), exit.y - 0.15, MAST_Z), new THREE.Vector3(side * (MAST_ATH / 2 + 0.006), fb.y + 0.12, MAST_Z + 0.02), fb], role, key);
+      const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + (key === 'jibHalyard' ? -0.025 : 0.025), my = fb.y + 0.36;
+      const mb = sheaveBlock(0.014, -0.03); mb.position.set(sx, my + 0.03, mz); mb.rotation.y = Math.PI / 2; grp.add(mb); // the moving block, hanging from the halyard's end
+      upMast([exit, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, down the mast's side to the block
+      // the tackle's two parts: the standing part from the foot block's becket up to the moving block, and back down to the
+      // foot block's sheave (the fall, which goes aft to the piano)
+      upMast([fb.clone().setX(fb.x + side * 0.008), new THREE.Vector3(sx + side * 0.006, my - 0.015, mz), new THREE.Vector3(sx - side * 0.006, my - 0.015, mz), fb.clone()], role, key);
     }
   });
   // the mast's own bands: a black boot where it goes through the deck, and the lower band (CR 6.1.11: its upper edge the
