@@ -218,7 +218,7 @@
     <div class="adjust" id="adjust">
       <div class="adjrow"><span>Wind speed</span><button type="button" class="realbtn" data-real="windKt">Real</button><input type="range" id="adjWindKt" min="2" max="30" step="1"><b id="adjWindKtV"></b></div>
       <div class="adjrow" id="windDaySeg"><span>Records day</span><div class="seg" data-k="windDay"><button type="button" data-v="0">Light</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Windy</button></div></div>
-      <div class="adjrow"><span>Wind from</span><button type="button" class="realbtn" data-real="windDir">Real</button><input type="range" id="adjWindDir" min="0" max="355" step="5"><b id="adjWindDirV"></b></div>
+      <div class="adjrow" id="windTurnRow"><span>Turn the wind</span><button type="button" class="realbtn" data-real="windTurn">Usual</button><input type="range" id="adjWindTurn" min="-30" max="30" step="5" aria-label="Turn the wind: up to 30° either way from its usual direction"><b id="adjWindTurnV"></b></div>
       <div class="adjrow"><span>Current</span><div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div></div>
       <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small>
       <div class="adjrow"><span>Chop</span><button type="button" class="realbtn" data-real="chop">Real</button><input type="range" id="adjChop" min="0" max="3" step="0.1"><b id="adjChopV"></b></div>
