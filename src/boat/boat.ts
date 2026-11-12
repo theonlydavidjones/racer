@@ -95,6 +95,8 @@ export interface Boat {
   // helm
   steer: number; // −1..1: turn to port .. starboard (keys, and the AI's helm)
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
+  /** Sculling (rule 42.3(d)): the way she's being sculled round (+ to starboard), held until she's close-hauled (SCULL 2). */
+  scullDir?: number;
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;
