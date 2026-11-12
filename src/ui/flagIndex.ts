@@ -16,7 +16,7 @@ const PREP_MORE = (p: PrepFlag) => { const t = PREP_MEANING[p].replace(/^[A-Za-z
 const SECTIONS: [string, Row[]][] = [
   // (the class flag isn't on the Race Signals page: rule 26's starting signals)
   ['The start (rule 26)', [
-    { flags: ['class'], name: 'Class flag (F, Folkboats)', sound: '↑ • ↓ •', meaning: 'Warning signal: displayed with one sound five minutes before the starting signal (or as the notice of race or sailing instructions say: the sequence you chose in Setup); removed with one sound, the starting signal.', more: 'Rule 26: times are taken from the visual signals; the absence of a sound signal is disregarded. A minute after it, the preparatory flag below; at one minute, the preparatory flag comes down with one long sound.' }
+    { flags: ['class'], name: 'Class flag (F, Folkboats)', sound: '↑ • ↓ •', meaning: 'Warning signal: up with one sound at the start of the sequence; down with one sound at the start.', more: 'Rule 26: times are taken from the flags, not the sounds.' }
   ]],
   ['Postponement signals', [
     { flags: ['AP'], name: 'AP (answering pennant)', sound: '↑ •• ↓ •', meaning: 'Races not started are postponed. The warning signal will be made 1 minute after removal unless at that time the race is postponed again or abandoned.' },
