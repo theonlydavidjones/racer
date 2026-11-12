@@ -93,6 +93,7 @@ export class SailBand {
   private holdT = 0;
   private holding: CtlKey | null = null;
   private sel: CtlKey | null = null;
+  private lastTack: 'S' | 'P' | null = null;
 
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
@@ -110,6 +111,8 @@ export class SailBand {
     el.addEventListener('pointerdown', e => this.down(e));
     el.addEventListener('pointermove', e => this.move(e));
     for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) el.addEventListener(ev, e => this.up(e as PointerEvent));
+    // (a hold ends however the press ends: let go off the band, or the window loses focus)
+    addEventListener('blur', () => this.up(null));
     el.addEventListener('click', e => this.click(e));
     el.addEventListener('dblclick', e => e.preventDefault());
     // hover titles: both ends of each line and what they do (no explanatory text in the band itself)
@@ -167,6 +170,9 @@ export class SailBand {
     if (act === 'drag') { e.preventDefault(); t.closest<HTMLElement>('[data-act]')!.setPointerCapture(e.pointerId); this.dragTo(k, d, e); return; }
     if (act === 'name') return;
     e.preventDefault();
+    t.closest<HTMLElement>('[data-act]')!.setPointerCapture(e.pointerId); // (the release comes back here, wherever it is)
+    // a press on a line that's running to its end stops it where it is first: the step is from there, not from the end
+    if (this.runKey === k) { const u = this.host.world().user; if (u.ctlTarget) delete u.ctlTarget[k]; this.runKey = null; }
     const dv = this.dirOf(k, act), id = `${d.dataset.line}|${d.dataset.side ?? ''}|${act}`, now = performance.now();
     // a second press soon after the first: the double-click, all the way (the first press has already stepped)
     if (this.last && this.last.key === id && now - this.last.t < DBL_MS) {
@@ -183,7 +189,7 @@ export class SailBand {
     if (!a || !a.hasPointerCapture(e.pointerId)) return;
     const d = a.closest<HTMLElement>('[data-line]')!, k = this.keyOf(d); if (k && k !== 'car') this.dragTo(k, d, e);
   }
-  private up(_e: PointerEvent): void {
+  private up(_e: PointerEvent | null): void {
     clearTimeout(this.holdT);
     if (this.holding) { this.host.hold(this.holding, null); this.holding = null; }
   }
@@ -225,6 +231,10 @@ export class SailBand {
   update(): void {
     if (this.el.hidden) return;
     const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
+    // a tack ends a jib sheet's run: the sheets change roles (physics.ts carries your targets across), and a sheet still
+    // winching after it would back the jib with nothing in the band to stop it
+    if (this.lastTack && u.tack !== this.lastTack && (this.runKey === 'jibsheet' || this.runKey === 'jibsheetW') && u.ctlTarget) { delete u.ctlTarget.jibsheet; delete u.ctlTarget.jibsheetW; this.runKey = null; }
+    this.lastTack = u.tack;
     if (this.runKey && u.ctlTarget?.[this.runKey] == null) this.runKey = null; // (arrived)
     this.el.classList.toggle('off', !w.running);
     this.el.querySelectorAll<HTMLElement>('.sb-v, .sb-h').forEach(d => {
