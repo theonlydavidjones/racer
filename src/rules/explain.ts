@@ -19,7 +19,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '21.1': ['Rule 21.1 · Returning to start', 'After her starting signal, a boat sailing back toward the pre-start side of the starting line (or its extensions) to start keeps clear of boats that are not, until her hull is completely on the pre-start side.'],
   '21.2': ['Rule 21.2 · Taking a penalty', 'A boat taking a penalty keeps clear of boats that are not.'],
   '21.3': ['Rule 21.3 · Backing a sail', 'A boat moving astern, or sideways to windward, through the water by backing a sail keeps clear of one that is not.'],
-  '23': ['Rule 23 · Interfering with another boat', 'If reasonably possible, a boat not racing (for example, one that has finished) shall not interfere with a boat that is racing (23.1). And a boat shall not interfere with a boat taking a penalty, sailing on another leg, or returning to start under rule 21.1, except that after the starting signal she may sail her proper course (23.2).']
+  '23': ['Rule 23 · Interfering with another boat', 'If reasonably possible, a boat not racing (for example, one that has finished or retired) shall not interfere with a boat that is racing (23.1). And a boat shall not interfere with a boat taking a penalty, sailing on another leg, or returning to start under rule 21.1, except that after the starting signal she may sail her proper course (23.2).']
 };
 
 /** Rule 43.1(a): text added when a boat broke a rule only because another boat's breach compelled her to. */
@@ -142,8 +142,8 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
     case '23':
       if (e.part === '23.1') {
-        what = you ? `You had finished, so you were no longer racing, and you got in the way of ${o}, who was.` : `${o} had finished and got in your way while you were still racing.`;
-        tip = you ? 'After you finish, sail well clear of the line and the course: boats still racing come first.' : 'A boat that has finished must not interfere with boats still racing.';
+        what = you ? `You had finished or retired, so you were no longer racing, and you got in the way of ${o}, who was.` : `${o} had finished or retired and got in your way while you were still racing.`;
+        tip = you ? 'After you finish or retire, sail well clear of the line and the course: boats still racing come first.' : 'A boat that has finished or retired must not interfere with boats still racing.';
       } else {
         what = you ? `${o} was on another leg, taking a penalty or returning to start, and you left your proper course${e.turned ? ` (turning ${Math.round(e.turned)}° toward them)` : ''} and got in their way.` : `${o} left their proper course and interfered with you while you were on another leg, taking a penalty or returning to start.`;
         tip = you ? 'You may sail your proper course past a boat on another leg or doing turns, but don\'t go out of your way to block or luff her.' : 'Rule 23 protects a boat in a vulnerable moment from boats that go out of their way to hinder her.';

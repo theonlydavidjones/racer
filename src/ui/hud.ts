@@ -44,7 +44,7 @@ import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, t
 import { keySig, renderKey, type SimKey } from './legend';
 import { layerOn, type LayerKey } from './layers';
 import { drawFog, drawSea, nm } from './mapLayers';
-import { visibilityFor } from '../environment/weather';
+import { setVisibility, visibilityFor } from '../environment/weather';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
 
@@ -67,6 +67,13 @@ export function pointOfSail(u: Boat): { short: string; long: string } {
     : a < 160 ? ['broad reach', 'on a broad reach'] : ['run', 'running'];
   return { short, long };
 }
+
+/** Which way north points on a map turned so that `W` (deg, the wind's direction) is at the top: the angle (rad) to
+ * turn an up-pointing arrow by, clockwise on the canvas (makeTf: a bearing b is drawn at b − W from up). */
+export const northOnMap = (W: number) => -W * Math.PI / 180;
+/** How the inset map is turned (deg at the top): wind up in a race, as racers read a course; north up just sailing, as a
+ * cruising chart is (the owner picked a destination off a wind-up map in a westerly as if it were north-up). */
+export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) => wd.freeSail ? 0 : wd.C.base;
 
 export class Hud {
   private acc = 0;
@@ -129,10 +136,10 @@ export class Hud {
     const low: [number, number][] = [];
     const upwind = u.twa < 80, from = u.ww.from;
     // the other tack (or gybe): where you'd point after turning
-    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * beatFor(u)) : n360(from + wrap(from - h)); // the mirror image across the wind
+    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
     marker(other, '#9fb3bf', upwind ? 'tack' : 'gybe', false);
     // average close-hauled heading on this tack: a slow running mean while you're close-hauled
-    if (upwind && Math.abs(u.twa - beatFor(u)) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
+    if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
     const mean = this.meanHdg[u.tack];
     if (upwind && mean != null) {
       marker(mean, '#e8e8e8', 'avg', false);
@@ -156,7 +163,7 @@ export class Hud {
    */
   private transit(w: World, u: Boat): void {
     const el = $('transit');
-    if (w.freeSail || u.finished || !w.settings.aids) { el.hidden = true; return; }
+    if (w.freeSail || u.finished || u.retired || !w.settings.aids) { el.hidden = true; return; }
     const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
     if (w.t < 0 || !u.started) {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
@@ -229,7 +236,7 @@ export class Hud {
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
     $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Cruising' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+      u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
     this.windex(u);
@@ -317,7 +324,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: World, u: Boat): void {
-    if (w.t < 0 || u.finished) return;
+    if (w.t < 0 || u.finished || u.retired) return;
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
@@ -383,7 +390,7 @@ export class Hud {
   private lineBox(w: World, u: Boat): void {
     const el = $('linebox'), C = w.C;
     if (u.finished) { el.hidden = true; return; }
-    if (w.freeSail) {
+    if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
@@ -452,7 +459,7 @@ export class Hud {
   private map(wd: World, u: Boat): void {
     const [ctx, w, h] = fitCanvas(this.mapC);
     ctx.clearRect(0, 0, w, h);
-    const W = wd.C.base;
+    const W = insetRotation(wd);
     let tf: Tf, scale: number, ctr = { x: u.x, y: u.y };
     if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
     else if (wd.freeSail) { scale = Math.min(w, h) / 2800; tf = makeTf(u.x, u.y, W, scale, w, h); } // just sailing: the water around you, about 1.5 nm across
@@ -471,7 +478,14 @@ export class Hud {
     // the map's own words, each on a halo so it reads over the chart
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
-    say('WIND ↓', 34, 12, 'left'); // (right of the layers button on the map's corner)
+    const lab = W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
+    say(lab, 34, 12, 'left'); // (right of the layers button on the map's corner)
+    // north, as the map's turned (wind up in a race): a small arrow by the label, so a westerly's map isn't read as north-up
+    { const a = northOnMap(W), nx = 34 + ctx.measureText(lab).width + 16, ny = 9;
+      ctx.save(); ctx.translate(nx, ny); ctx.rotate(a); ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4, 4); ctx.lineTo(0, 2); ctx.lineTo(-4, 4); ctx.closePath();
+      ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = I.text; ctx.fill(); ctx.restore();
+      const t = (k: number) => [nx + Math.sin(a) * k, ny - Math.cos(a) * k]; const [lx, ly] = t(13); say('N', lx, ly + 3, 'center'); }
     const fog = this.fogNote(wd, true);
     if (fog) say(fog, 6, h - 6, 'left');
     const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
@@ -553,7 +567,12 @@ export class Hud {
   /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
   fogNote(wd: World, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
+    // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
+    const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
+    const here = (m: number) => short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`;
+    if (set.fogSet) return here(set.m);
     const v = visibilityFor(wd.raceDate, wd.clockUtc);
+    if (Number.isFinite(set.m)) { const real = 'none' in v || v.source === 'outlook' ? Infinity : v.source === 'observed' ? v.points[0].m : v.at(wd.user); if (!(real < set.m)) return here(set.m); }
     if ('none' in v) return short ? (v.noFog ? 'NO FOG FORECAST · NWS' : 'FOG: NO DATA') : `Fog: ${v.none}`;
     if (v.source === 'observed') { const m = v.points[0].m; return short ? `VIS ${nm(m, v.cap).toUpperCase()} AT PIER 17` : `Visibility ${nm(m, v.cap)} at Pier 17: ${v.says}.`; }
     if (v.source === 'outlook') { const w = v.words!(wd.user); return short ? (w ? `${w.toUpperCase()} · NWS` : w === '' ? 'NO FOG HERE · NWS' : 'FOG: OFF THE GRID') : `${w ? w[0].toUpperCase() + w.slice(1) : w === '' ? 'No fog' : 'Nothing'} here: ${v.says}.`; }

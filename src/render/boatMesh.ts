@@ -72,7 +72,8 @@ const MAIN_DEF: SailDef = {
   // the roach square to the straight leech, from the width it adds square to the luff
   roach: t => (MAIN_GIRTH(t) - E * (1 - t)) * MAIN_LEECH / P,
   windows: [{ t0: 0.3 / P, t1: 0.65 / P, s0: 0.18, s1: 0.18 + 1.8 / E }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
-  battens: [{ t: 0.2, len: 1.0 }, { t: 0.41, len: 1.0 }, { t: 0.61, len: 1.0 }, { t: 0.82, len: 0.6 }], battenLines: false
+  battens: [{ t: 0.2, len: 1.0 }, { t: 0.41, len: 1.0 }, { t: 0.61, len: 1.0 }, { t: 0.82, len: 0.6 }], battenLines: false,
+  footOnSpar: true // the foot's bolt-rope in the boom's groove, the clew lashed at its end
 };
 /** The forestay: the jib swings around it, so its luff stays on the stay. */
 const JIB_AXIS = HOUNDS.clone().sub(FORESTAY_DECK).normalize();

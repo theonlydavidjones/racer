@@ -246,12 +246,16 @@ export class SeaField {
     // (the fetch stretched or shortened by the current: the waves spend longer or less under the wind crossing it; a sea
     // still growing is limited by the time the wind has blown, which the current doesn't change)
     const F = this.fetch(p, ww.from), Fd = Number.isFinite(duration) ? durationFetch(U, duration) : Infinity;
-    let w = windSea(U, Math.min(F, Fd));
-    for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = windSea(U, Math.min(F * cg / Math.max(0.3 * cg, cg + Uc), Fd)); }
+    // (the conditions adjuster: the chop × `chop` as the sea a longer fetch would make, F × chop², so its height goes ×
+    // chop and its period with it (JONSWAP's fetch-limited laws, windSea: Hs ∝ F^½, Tp ∝ F^⅓), and never past the fully
+    // developed sea; not its height alone at the same period, which only made it steeper until it broke)
+    const k2 = this.chop * this.chop, grow = (X: number) => windSea(U, X * k2);
+    let w = grow(Math.min(F, Fd));
+    for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = grow(Math.min(F * cg / Math.max(0.3 * cg, cg + Uc), Fd)); }
     // ... then steepened (or eased) by the change in current since the water the waves came through, ~1 km upwind
     const up = currentAt({ x: p.x - to.x * 1000, y: p.y - to.y * 1000 });
     const wc = onCurrent(w.hs, w.tp, Uc - dot(up, to));
-    let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * this.chop; // glassy below ~2 m/s
+    let hsW = wc.H * clamp((U - 1) / 2, 0, 1); // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     // (in a marina, its own walls shelter it below, traced finely: the 50 m terrain grid's shadow can land on the wrong side of a breakwater)
@@ -260,9 +264,13 @@ export class SeaField {
     if (inBasin(p) && !basinRay(p, reach.toward + 180).out) reach.k *= 0.15;
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
     const hsS = Math.min(sc.H, 0.1 * sc.L);
-    // whitecaps: the classic fraction-vs-wind law (Monahan), more where the chop is steep or blocked
+    // whitecaps: the fraction of the water white, W = 3.84e-6·U^3.41 (U at 10 m, m/s: Monahan & O'Muircheartaigh, J. Phys.
+    // Oceanogr. 10, 2094–2099, 1980, the law most models use; quoted, the paper itself not reachable from here): 0.4% in
+    // 15 kt, 1.1% in 20, 2.4% in 25, 4.3% in 30. Doubled where an opposing current blocks the chop and it breaks (a
+    // judgement); and no more than about a tenth (W levels off in a gale: Brumer et al., J. Phys. Oceanogr. 47, 2017, as
+    // summarized). (It was scaled by the chop's steepness too, unsourced, which halved it in a breeze.)
     const steep = hsW / Math.max(1, wc.L);
-    const white = clamp(3.84e-6 * Math.pow(U, 3.41) * clamp(steep / 0.05, 0.5, 3) * (wc.blocked ? 2 : 1), 0, 0.2);
+    const white = clamp(3.84e-6 * Math.pow(U, 3.41) * (wc.blocked ? 2 : 1), 0, 0.1);
     return { hsW, tpW: w.tp, fromW: ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
   }
 }
@@ -273,4 +281,15 @@ export function describeSea(s: SeaHere): string {
   const ft = (m: number) => `${(m / 0.3048).toFixed(m < 0.6 ? 1 : 0)} ft`;
   const chop = s.hsW < 0.05 ? 'glassy' : `${ft(s.hsW)} chop${s.steep > 0.075 ? ', short and steep' : s.hsW > 0.3 && s.steep < 0.05 ? ', long and smooth' : ''}`;
   return s.hsS >= 0.05 ? `${chop} · ${ft(s.hsS)} swell, ${Math.round(s.tpS)} s` : chop;
+}
+
+/**
+ * How foam on the water drifts (m/s, east and north): with the surface water, the current plus the wind's drift of the
+ * top layer, about 3% of the wind (the drift factor oil-spill and search-and-rescue models use: NOAA's GNOME takes 1–4%
+ * windage for floating things). Not with the waves' crests, and nothing like the wind's own speed.
+ */
+export const FOAM_DRIFT = 0.03;
+export function foamDrift(windFrom: number, windKt: number, cur: Vec): Vec {
+  const d = V(windFrom + 180), u = windKt * KT * FOAM_DRIFT;
+  return { x: d.x * u + cur.x, y: d.y * u + cur.y };
 }

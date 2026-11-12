@@ -295,6 +295,17 @@ export interface Visibility {
 const CELL_REACH = 1800;
 
 /**
+ * The visibility you've set (the conditions adjuster), m: thick fog 450 m, patchy 3 km (fog's own scale); heavy rain
+ * 3.1 km, light 7.5 km (Atlas, J. Meteor. 10, 1953, as quoted: render/scene.ts). The nearer of the two; Infinity if
+ * neither is set (then the real record's, visibilityFor). The scene's haze and the map's words both read it.
+ */
+export const SET_VIS = { fog: [Infinity, 3000, 450], rain: [Infinity, 7500, 3100] } as const;
+export function setVisibility(s: { fog?: 'real' | 0 | 1 | 2; rain?: 0 | 1 | 2 }): { m: number; fogSet: boolean } {
+  const fogSet = s.fog != null && s.fog !== 'real';
+  return { m: Math.min(fogSet ? SET_VIS.fog[s.fog as 0 | 1 | 2] : Infinity, SET_VIS.rain[s.rain ?? 0]), fogSet };
+}
+
+/**
  * The visibility over the race area at a time (minutes since epoch, UTC), from real data only: what NOAA's Pier 17
  * visibility sensor saw (past hours, since 2021); the NWS forecast grid's visibility (from when it's fetched to the
  * next morning); beyond that in the coming week, whether the NWS forecast has fog. `{ none }`, with why, when there's
@@ -346,4 +357,16 @@ export function idw(points: { p: Vec; m: number }[]): (q: Vec) => number {
     for (const c of points) { const d2 = (c.p.x - q.x) ** 2 + (c.p.y - q.y) ** 2; nearest = Math.min(nearest, d2); if (d2 < 1) return c.m; const w = 1 / d2; sw += w; sv += w * c.m; }
     return nearest > CELL_REACH * CELL_REACH ? NaN : sv / sw;
   };
+}
+
+/**
+ * The day's wind turned by `deg` (+ clockwise, a veer; − a back), the owner's "Turn the wind": the same kind of day
+ * (its veer through the afternoon, its gusts and shifts, from the records), blowing a few degrees round from its usual
+ * direction. Everything that reads the day's wind (the sim, the outlook, the committee's course) sees it turned.
+ * (On a forecast day the wind's pattern across the course stays the forecast grid's own: its lees and the slot aren't
+ * rotated with the turn. On a records, chosen or observed day the land's effect follows the turned direction.)
+ */
+export function turnWeather(wx: DayWeather, deg = 0): DayWeather {
+  if (!deg) return wx;
+  return { ...wx, at: t => { const b = wx.at(t); return { ...b, from: n360(b.from + deg) }; } };
 }

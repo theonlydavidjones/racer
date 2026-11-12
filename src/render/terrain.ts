@@ -150,50 +150,46 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x8b7f6d }))); // (the palette's rock)
     }
   }
-  // the rest of the shore fitted to NOAA's charted coast (render/shoreFit.ts): near the coast, land is where the chart
-  // has land; the land samples along the shore are moved onto the coast and brought down to the water, so the hills rise
-  // from the charted shoreline, not from a staircase of 50 m steps with sheer walls (the Cityfront and Lime Point, fitted
-  // above, are left as they are)
-  const sx = new Float32Array(nx * ny), sy = new Float32Array(nx * ny), wet = new Uint8Array(nx * ny);
+  // the rest of the shore fitted to NOAA's charted coast (render/shoreFit.ts; within Lime Point's box, OpenStreetMap's):
+  // near the coast, a sample is land where the chart has land; the 50 m cells the coast runs through are redrawn below
+  // at 12.5 m (the shore patches), with the samples either side of the shore moved onto it, so the waterline follows the
+  // charted coast and the hills rise from it (the Cityfront, fitted above, is left as it is)
+  const coast = chartCoast(), lpb = limePointBox(), cell = Math.hypot(dx, dy) / Math.SQRT2;
+  const inLP = (x: number, y: number) => x >= lpb.x0 && x <= lpb.x1 && y >= lpb.y0 && y <= lpb.y1;
+  // Lime Point's coast: its outline's edges, less the box's own sides
+  const lpl = limePointLand(), lpEdges: [number, number, number, number][] = [];
+  for (let k = 0; k < lpl.length; k++) {
+    const a = lpl[k], c = lpl[(k + 1) % lpl.length], on = (v: number, w: number) => Math.abs(v - w) < 0.5;
+    if ((on(a.x, lpb.x0) && on(c.x, lpb.x0)) || (on(a.x, lpb.x1) && on(c.x, lpb.x1)) || (on(a.y, lpb.y0) && on(c.y, lpb.y0)) || (on(a.y, lpb.y1) && on(c.y, lpb.y1))) continue;
+    lpEdges.push([a.x, a.y, c.x, c.y]);
+  }
+  const nearestLP = (x: number, y: number, max: number) => {
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const [ax, ay, bx, by] of lpEdges) {
+      const vx = bx - ax, vy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1)));
+      const qx = ax + vx * t, qy = ay + vy * t, d = Math.hypot(x - qx, y - qy);
+      if (d <= max && (!best || d < best.d)) best = { x: qx, y: qy, d };
+    }
+    return best;
+  };
+  const isLand = (x: number, y: number) => inBasin({ x, y }) ? false : inLP(x, y) ? onGround({ x, y }) : coast.inside(x, y);
+  const nearCoast = (x: number, y: number, max: number) => inLP(x, y) ? nearestLP(x, y, max) : coast.nearest(x, y, max);
+  const latOf = (j: number) => M.north - (M.north - M.south) * j / (ny - 1), lonOf = (i: number) => M.west + (M.east - M.west) * i / (nx - 1);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i, x = corner.x + i * dx, y = corner.y + j * dy;
+    if (cityShore(latOf(j), lonOf(i)) || inLP(x, y)) continue; // (fitted above)
+    if (!coast.nearest(x, y, 4 * cell)) continue; // (only near the coast: the height data's own shore can be 100 m out)
+    H[k] = coast.inside(x, y) ? Math.max(H[k], 2.5) : Math.min(H[k], -30);
+  }
+  // the cells the coast runs through (its nearest point within the cell's circle), outside the Cityfront
+  const shoreCell = new Uint8Array((nx - 1) * (ny - 1));
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    if (cityShore(latOf(j), lonOf(i)) || cityShore(latOf(j + 1), lonOf(i + 1)) || cityShore(latOf(j), lonOf(i + 1)) || cityShore(latOf(j + 1), lonOf(i))) continue;
+    const x = corner.x + (i + 0.5) * dx, y = corner.y + (j + 0.5) * dy;
+    if (nearCoast(x, y, 0.75 * cell)) shoreCell[j * (nx - 1) + i] = 1;
+  }
+  // the chart's rocks and islets too small for the mesh, each in its charted outline, a couple of metres out of the water
   {
-    const coast = chartCoast(), b = limePointBox(), cell = Math.hypot(dx, dy) / Math.SQRT2, zone = new Uint8Array(nx * ny);
-    const inLP = (p: { x: number; y: number }) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1;
-    // Lime Point's coast (OpenStreetMap's, fitted above): its outline's edges, less the box's own sides
-    const lp = limePointLand(), lpEdges: [number, number, number, number][] = [];
-    for (let k = 0; k < lp.length; k++) {
-      const a = lp[k], c = lp[(k + 1) % lp.length], on = (v: number, w: number) => Math.abs(v - w) < 0.5;
-      if ((on(a.x, b.x0) && on(c.x, b.x0)) || (on(a.x, b.x1) && on(c.x, b.x1)) || (on(a.y, b.y0) && on(c.y, b.y0)) || (on(a.y, b.y1) && on(c.y, b.y1))) continue;
-      lpEdges.push([a.x, a.y, c.x, c.y]);
-    }
-    const nearestLP = (x: number, y: number, max: number) => {
-      let best: { x: number; y: number; d: number } | null = null;
-      for (const [ax, ay, bx, by] of lpEdges) {
-        const vx = bx - ax, vy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1)));
-        const qx = ax + vx * t, qy = ay + vy * t, d = Math.hypot(x - qx, y - qy);
-        if (d <= max && (!best || d < best.d)) best = { x: qx, y: qy, d };
-      }
-      return best;
-    };
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-      const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1);
-      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
-      if (cityShore(lat, lon)) continue;
-      if (inLP(p)) { zone[k] = 2; continue; } // (classified above, by OpenStreetMap's coast)
-      if (!coast.nearest(p.x, p.y, 1.6 * cell)) continue; // (only near the coast)
-      zone[k] = 1; H[k] = coast.inside(p.x, p.y) ? Math.max(H[k], 2.5) : Math.min(H[k], -30);
-    }
-    // the samples either side of the shore moved onto it: the land ones 2 m up, the water ones 3 m down, so the
-    // waterline runs along the coast between them (and the bluffs rise from the next sample in)
-    const moves: [number, number, number, boolean][] = [];
-    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
-      const k = j * nx + i; if (!zone[k]) continue;
-      const land = H[k] > 0;
-      if (![-1, 1, -nx, nx, -nx - 1, -nx + 1, nx - 1, nx + 1].some(o => (H[k + o] > 0) !== land)) continue;
-      const p = { x: corner.x + i * dx, y: corner.y + j * dy }, q = zone[k] === 2 ? nearestLP(p.x, p.y, 0.75 * cell) : coast.nearest(p.x, p.y, 0.75 * cell);
-      moves.push([k, q ? q.x - p.x : 0, q ? q.y - p.y : 0, land]);
-    }
-    for (const [k, mx, my, land] of moves) { sx[k] = mx; sy[k] = my; if (land) H[k] = 2; else wet[k] = 1; }
-    // the chart's rocks and islets too small for the mesh, each in its charted outline, a couple of metres out of the water
     const rk: THREE.BufferGeometry[] = [];
     for (const r of coast.rocks) {
       const sh = new THREE.Shape(); r.forEach((q, i) => i ? sh.lineTo(q.x, q.y) : sh.moveTo(q.x, q.y));
@@ -209,12 +205,12 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, h = H[k];
-    pos[k * 3] = corner.x + i * dx + sx[k]; pos[k * 3 + 1] = h > 0 ? h : wet[k] ? -3 : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy + sy[k]);
+    pos[k * 3] = corner.x + i * dx; pos[k * 3 + 1] = h > 0 ? h : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy);
   }
   const idx: number[] = [];
   for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
     const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-    if (H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) continue; // open water: no triangles
+    if ((H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) || shoreCell[j * (nx - 1) + i]) continue; // open water, or a shore patch's
     idx.push(a, c, b, b, c, d);
   }
   const geo = new THREE.BufferGeometry();
@@ -228,7 +224,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     const ix: number[] = [], box = new THREE.Box3(), v = new THREE.Vector3();
     for (let j = tj; j < Math.min(ny - 1, tj + T); j++) for (let i = ti; i < Math.min(nx - 1, ti + T); i++) {
       const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-      if (H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) continue;
+      if ((H[a] <= 0 && H[b] <= 0 && H[c] <= 0 && H[d] <= 0) || shoreCell[j * (nx - 1) + i]) continue;
       ix.push(a, c, b, b, c, d);
       for (const k of [a, d]) box.expandByPoint(v.set(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]));
     }
@@ -241,6 +237,86 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   geo.setIndex(null);
   scene.add(mesh);
   const nrm = geo.attributes.normal as THREE.BufferAttribute;
+
+  // the shore patches: each 50 m cell the coast runs through, redrawn at 12.5 m. A patch's samples are land where the
+  // chart has land, their heights from the 50 m surface (no lower than 1.5 m on land, no higher than 3 m under water),
+  // and those either side of the shore are moved onto the coast: the land ones 1.5 m up, the water ones 2 m down, so the
+  // waterline runs along the charted coast. Samples on an edge shared with a cell drawn at 50 m keep that cell's surface,
+  // so the two meet without a crack.
+  const F = 4, fdx = dx / F, fdy = dy / F, FW = (nx - 1) * F + 1, fStep = cell / F;
+  const isShore = (i: number, j: number) => i >= 0 && j >= 0 && i < nx - 1 && j < ny - 1 && shoreCell[j * (nx - 1) + i] === 1;
+  const fIndex = new Map<number, number>(), fPos: number[] = [], fG: number[] = [], fPinned: number[] = [];
+  const disp = (k: number) => pos[k * 3 + 1];
+  const vert = (gi: number, gj: number) => {
+    const key = gj * FW + gi; let v = fIndex.get(key); if (v !== undefined) return v;
+    const i = Math.min(nx - 2, Math.floor(gi / F)), j = Math.min(ny - 2, Math.floor(gj / F)), u = gi / F - i, w = gj / F - j, k = j * nx + i;
+    const h0 = (disp(k) * (1 - u) + disp(k + 1) * u) * (1 - w) + (disp(k + nx) * (1 - u) + disp(k + nx + 1) * u) * w;
+    const cis = gi % F === 0 ? [gi / F - 1, gi / F] : [Math.floor(gi / F)], cjs = gj % F === 0 ? [gj / F - 1, gj / F] : [Math.floor(gj / F)];
+    let pinned = false; for (const a of cis) for (const b of cjs) if (!isShore(a, b)) pinned = true;
+    const x = corner.x + gi * fdx, y = corner.y + gj * fdy;
+    let h = h0;
+    if (!pinned) h = isLand(x, y) ? Math.max(h0, 1.5) : Math.min(h0, -3);
+    v = fPos.length / 3; fPos.push(x, h, -y); fG.push(gi, gj); fPinned.push(pinned ? 1 : 0); fIndex.set(key, v);
+    return v;
+  };
+  const fQuads: number[] = [];
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    if (!shoreCell[j * (nx - 1) + i]) continue;
+    for (let w = 0; w < F; w++) for (let u = 0; u < F; u++) {
+      const gi = i * F + u, gj = j * F + w;
+      fQuads.push(vert(gi, gj), vert(gi + 1, gj), vert(gi, gj + 1), vert(gi + 1, gj + 1), i, j);
+    }
+  }
+  {
+    // the samples either side of the shore, onto the coast
+    const moves: [number, number, number, number][] = [];
+    for (let v = 0; v < fPinned.length; v++) {
+      if (fPinned[v]) continue;
+      const gi = fG[v * 2], gj = fG[v * 2 + 1], land = fPos[v * 3 + 1] > 0;
+      let edge = false;
+      for (let b = -1; b <= 1 && !edge; b++) for (let a = -1; a <= 1; a++) {
+        const o = fIndex.get((gj + b) * FW + gi + a); if (o !== undefined && (fPos[o * 3 + 1] > 0) !== land) { edge = true; break; }
+      }
+      if (!edge) continue;
+      const x = fPos[v * 3], y = -fPos[v * 3 + 2], q = nearCoast(x, y, 1.45 * fStep); // (the coast is within a diagonal of a sample with the other side next to it)
+      moves.push([v, q ? q.x : x, q ? q.y : y, land ? 1.5 : -2]);
+    }
+    for (const [v, x, y, h] of moves) { fPos[v * 3] = x; fPos[v * 3 + 1] = h; fPos[v * 3 + 2] = -y; }
+  }
+  const fGeo = new THREE.BufferGeometry(), fCol = new Float32Array(fPos.length), fP = new Float32Array(fPos), fGi = new Int32Array(fG), fPin = new Uint8Array(fPinned);
+  fGeo.setAttribute('position', new THREE.BufferAttribute(fP, 3));
+  fGeo.setAttribute('color', new THREE.BufferAttribute(fCol, 3));
+  {
+    const all: number[] = [], tiles = new Map<number, number[]>();
+    for (let q = 0; q < fQuads.length; q += 6) {
+      const [a, b, c, d, i, j] = fQuads.slice(q, q + 6);
+      if (fPos[a * 3 + 1] <= 0 && fPos[b * 3 + 1] <= 0 && fPos[c * 3 + 1] <= 0 && fPos[d * 3 + 1] <= 0) continue; // (all water)
+      const key = Math.floor(j / T) * 1000 + Math.floor(i / T), l = tiles.get(key) ?? [];
+      l.push(a, c, b, b, c, d); all.push(a, c, b, b, c, d); tiles.set(key, l);
+    }
+    fGeo.setIndex(all); fGeo.computeVertexNormals();
+    // on the edges a patch shares with the 50 m cells, the 50 m surface's own normals, so the light doesn't step there
+    const fn = fGeo.attributes.normal as THREE.BufferAttribute, n3 = new THREE.Vector3();
+    for (let v = 0; v < fPinned.length; v++) {
+      if (!fPinned[v]) continue;
+      const gi = fG[v * 2], gj = fG[v * 2 + 1], i = Math.min(nx - 2, Math.floor(gi / F)), j = Math.min(ny - 2, Math.floor(gj / F)), u = gi / F - i, w = gj / F - j;
+      n3.set(0, 0, 0);
+      for (const [k, kw] of [[j * nx + i, (1 - u) * (1 - w)], [j * nx + i + 1, u * (1 - w)], [(j + 1) * nx + i, (1 - u) * w], [(j + 1) * nx + i + 1, u * w]] as const)
+        n3.x += nrm.getX(k) * kw, n3.y += nrm.getY(k) * kw, n3.z += nrm.getZ(k) * kw;
+      n3.normalize(); fn.setXYZ(v, n3.x, n3.y, n3.z);
+    }
+    for (const ix of tiles.values()) {
+      const g = new THREE.BufferGeometry(), box = new THREE.Box3(), v3 = new THREE.Vector3();
+      for (const n of ['position', 'color', 'normal']) g.setAttribute(n, fGeo.attributes[n]);
+      for (const k of ix) box.expandByPoint(v3.set(fPos[k * 3], fPos[k * 3 + 1], fPos[k * 3 + 2]));
+      g.setIndex(ix); g.boundingBox = box; g.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+      const m = new THREE.Mesh(g, mat); m.matrixAutoUpdate = false; mesh.add(m);
+    }
+    fGeo.setIndex(null);
+  }
+  const fNrm = fGeo.attributes.normal as THREE.BufferAttribute;
+  // (the build's working lists, let go: the season's colouring keeps this scope alive)
+  fIndex.clear(); fPos.length = 0; fG.length = 0; fPinned.length = 0; fQuads.length = 0;
 
   const C = (h: string) => new THREE.Color(h);
   const PAL = {
@@ -278,11 +354,25 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
         tmp.offsetHSL(0, 0, (n - 0.5) * 0.06);
       }
       const shore = H[k - 1] <= 0 || H[k + 1] <= 0 || H[k - nx] <= 0 || H[k + nx] <= 0 || H[k - 2] <= 0 || H[k + 2] <= 0 || H[k - 2 * nx] <= 0 || H[k + 2 * nx] <= 0; // within 100 m of the water
-      if (h < 5 && shore && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      const patchCorner = isShore(i - 1, j - 1) || isShore(i, j - 1) || isShore(i - 1, j) || isShore(i, j); // (the patches put the sand where the shore is)
+      if (h < 5 && shore && !patchCorner && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
       else if (slope > 0.55) tmp.lerp(PAL.rock, 0.6); // cliffs
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
     }
     (geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+    // the shore patches: blended from the 50 m cell's land samples, sand or rock along the water's edge
+    for (let v = 0; v < fGi.length / 2; v++) {
+      const gi = fGi[v * 2], gj = fGi[v * 2 + 1], i = Math.min(nx - 2, Math.floor(gi / F)), j = Math.min(ny - 2, Math.floor(gj / F)), u = gi / F - i, w = gj / F - j;
+      let r = 0, g = 0, bl = 0, wt = 0;
+      for (const [k, kw] of [[j * nx + i, (1 - u) * (1 - w)], [j * nx + i + 1, u * (1 - w)], [(j + 1) * nx + i, (1 - u) * w], [(j + 1) * nx + i + 1, u * w]] as const) {
+        if (H[k] <= 0 || kw <= 0) continue; r += col[k * 3] * kw; g += col[k * 3 + 1] * kw; bl += col[k * 3 + 2] * kw; wt += kw;
+      }
+      if (wt > 0) tmp.setRGB(r / wt, g / wt, bl / wt); else tmp.copy(PAL.sand);
+      const h = fP[v * 3 + 1], lat = M.north - (M.north - M.south) * gj / F / (ny - 1), lon = M.west + (M.east - M.west) * gi / F / (nx - 1), rg = region(lat, lon, Math.max(h, 1));
+      if (!fPin[v] && h < 5 && rg !== 'city' && rg !== 'port') tmp.copy(1 - fNrm.getY(v) > 0.4 || rg === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      fCol[v * 3] = tmp.r; fCol[v * 3 + 1] = tmp.g; fCol[v * 3 + 2] = tmp.b;
+    }
+    (fGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
   };
   setSeason(month);
 

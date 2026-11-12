@@ -4,7 +4,7 @@ import { BURGEES, CLUBS } from '../render/burgees';
 import { ENSIGNS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
-import { harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
+import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
 
 /**
  * Editing one of your boats (from the Fleet): her particulars (name, number, club, skipper, home marina and slip),
@@ -227,14 +227,14 @@ function slipOptions(b: BoatSpec, boats: BoatSpec[]): string {
   const id = (x: string | undefined) => slipById(x)?.id; // (older saves name West Harbor's slips without the marina)
   const taken = new Map(boats.filter(x => x.id !== b.id && id(x.slip)).map(x => [id(x.slip)!, x.name])), mine = id(b.slip);
   const slips = slipsIn(b.marina), docks = [...new Set(slips.map(s => s.dock))];
-  return '<option value="">No slip</option>' + docks.map(d => `<optgroup label="Dock ${d}">${slips.filter(s => s.dock === d).map(s =>
+  return '<option value="">No slip</option>' + docks.map(d => `<optgroup label="${(n => n[0].toUpperCase() + n.slice(1))(dockName(d))}">${slips.filter(s => s.dock === d).map(s =>
     `<option value="${s.id}"${s.id === mine ? ' selected' : ''}${taken.has(s.id) ? ' disabled' : ''}>${s.label}${taken.has(s.id) ? ` · ${esc(taken.get(s.id)!)}` : ''}</option>`).join('')}</optgroup>`).join('');
 }
 /** What's real about each marina's dock letters and slip numbers (geo/marina.ts). */
 const SLIP_NOTE: Record<string, string> = {
-  'west-harbor': 'The dock letters and slip numbers are this sim\'s (the harbor\'s own aren\'t published).',
-  'gashouse-cove': 'The dock letters and slip numbers are this sim\'s (the harbor\'s own aren\'t published).',
-  'south-beach': 'Docks A to G are the harbor\'s own; the slip numbers are this sim\'s.',
+  'west-harbor': 'The slip numbers are the marina\'s own, and so are Docks E, F and G (its maps); where the maps don\'t show the order along a dock, it\'s this sim\'s guess.',
+  'gashouse-cove': 'The slip numbers are the marina\'s own, each dock\'s range from its map; the order along each dock isn\'t published, so that\'s this sim\'s guess.',
+  'south-beach': 'Docks A to G and the slip numbers are the harbor\'s own (its map).',
   corinthian: 'A dock, along the breakwater, is the club\'s own; B and C, the fingers and the slip numbers are this sim\'s.'
 };
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));

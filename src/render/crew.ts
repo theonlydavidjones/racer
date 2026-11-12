@@ -148,7 +148,9 @@ function onDeck(s: number, z: number, lean: number, k: number): PoseT {
 /** On the cockpit seat, back to the coaming, feet on the sole. */
 function onSeat(s: number, x: number, z: number, k: number): PoseT {
   const c = chz(z), hx = Math.min(c - 0.1, Math.max(benchEdge(z) + 0.12, Math.abs(x) + 0.08));
-  const yaw = s * (Math.PI / 2 - 0.45), r = right(yaw), f = fwd(yaw);
+  // (facing inboard and a little forward; at the bench's forward end, inboard and a little aft, the knees clear of the
+  // bulkhead, and kept clear as they turn to go forward)
+  const yaw = s * (Math.PI / 2 - 0.45 + 0.65 * (1 - smooth01((z - COCK0 - 0.3) / 0.35))), r = right(yaw), f = fwd(yaw);
   const hip = V(s * hx, SEAT_Y + 0.09 * k, z);
   const foot = (j: number) => onGround(V(s * (hx - 0.4 * k), 0, z - 0.12).addScaledVector(r, (j ? 1 : -1) * 0.11 * k));
   const kneeAt = hip.clone().addScaledVector(f, 0.4 * k).add(V(0, 0.1, 0));
@@ -218,7 +220,9 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
   const hip = V(x, groundNear(x, z, 0.08) + 0.42 * k, z);
   const foot = (j: number) => onGround(V(x, 0, z).addScaledVector(f, (j ? 0.06 : -0.06) * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k));
   // hands down to the seat or the coaming for balance
-  const hand = (j: number) => { const h = hip.clone().addScaledVector(f, 0.28 * k).addScaledVector(r, (j ? 1 : -1) * 0.25 * k); return h.setY(Math.max(ground(h.x, h.z), hip.y - 0.3) + 0.05); };
+  const hand = (j: number) => { const h = hip.clone().addScaledVector(f, 0.42 * k).addScaledVector(r, (j ? 1 : -1) * 0.25 * k); // (well ahead, at arm's length: not folded under the shoulder)
+    if (inCockpit(Math.abs(hip.x), hip.z)) { const lim = chz(h.z) - 0.08; if (Math.abs(h.x) > lim) h.x = Math.sign(h.x) * lim; } // (inside the coaming, on the lid or the sole)
+    return h.setY(Math.max(ground(h.x, h.z), hip.y - 0.3) + 0.05); };
   // (the cockpit's under a metre long between the bulkhead and the thwart: crouched, but not so far over that the head
   // meets the cabin's after end)
   return { hip, yaw, pitch: inCockpit(Math.abs(x), z) ? -0.6 : -0.85, roll: 0, feet: [foot(0), foot(1)], hands: [hand(0), hand(1)], look: hip.clone().addScaledVector(f, 2).setY(hip.y + 0.6), step: true };
@@ -352,7 +356,10 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
  * (swapped across behind them as they go). */
 function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.Vector3): PoseT {
   // (facing forward as they shuffle across behind the tiller, so the knees stay over the cockpit's after end)
-  void dir; const p = moving(h, x, z, 0, h.scale), chest = p.hip.clone().add(V(0, 0.35 * h.scale, 0));
+  void dir; const p = moving(h, x, z, 0, h.scale);
+  // (low across the after deck, ducking the boom: barely up off the deck, not stood up into a crouch)
+  p.hip.y = Math.min(p.hip.y, ground(p.hip.x, p.hip.z) + 0.3 * h.scale);
+  const chest = p.hip.clone().add(V(0, 0.35 * h.scale, 0));
   const d = chest.sub(tip), ext = tip.clone().addScaledVector(d.normalize(), Math.max(0.2, Math.min(0.95, d.length() - 0.25)));
   ext.y = Math.min(ext.y, p.hip.y + 0.2 * h.scale); // (low, at the hip, as they pass the stick behind them)
   p.hands[x >= 0 ? 0 : 1] = ext;
@@ -441,9 +448,12 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   let rising = false;
   if (jump > 0.08) {
     let top = 0; for (let q = 0; q <= 6; q++) { _u.copy(c.hip).lerp(want.hip, q / 6); top = Math.max(top, ground(_u.x, _u.z)); }
-    if (top > ground(want.hip.x, want.hip.z) + 0.04 && top > ground(c.hip.x, c.hip.z) - 0.3) {
-      aim.y = Math.max(aim.y, top + 0.3 * f.scale * Math.max(0.6, Math.min(1, jump / 0.25)));
-      rising = c.hip.y < top + 0.2 * f.scale; // (the feet wait while they rise over it, and they go over it slowly)
+    // (or up onto something higher than where they are, from the sole onto a locker lid: up first, then across onto it)
+    const gw = ground(want.hip.x, want.hip.z), gc = ground(c.hip.x, c.hip.z);
+    if ((top > gw + 0.04 && top > gc - 0.3) || gw > gc + 0.15) {
+      const up = gw > gc + 0.15 ? 0.45 : 0.3; // (stepping up onto it: up as high as a shin over it first, the knees with them)
+      aim.y = Math.max(aim.y, top + up * f.scale * Math.max(0.6, Math.min(1, jump / 0.25)));
+      rising = c.hip.y < top + (up - 0.1) * f.scale; // (the feet wait while they rise over it, and they go over it slowly)
       if (rising) { aim.x = c.hip.x + (want.hip.x - c.hip.x) * 0.3; aim.z = c.hip.z + (want.hip.z - c.hip.z) * 0.3; }
     }
   }
@@ -463,7 +473,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       const out = right(c.yaw).multiplyScalar(i ? 1 : -1), shY = BONE.shoulderY * f.scale;
       const sh = _sh.copy(c.hip).addScaledVector(fwd(c.yaw), -Math.sin(c.pitch) * shY).add(_v.set(0, Math.cos(c.pitch) * shY, 0)).addScaledVector(out, BONE.shoulderX * f.scale);
       const seg = _v.copy(want.hands[i]).sub(hd), tq = Math.max(0, Math.min(1, _w.copy(sh).sub(hd).dot(seg) / Math.max(1e-6, seg.lengthSq())));
-      const passes = seg.lengthSq() > 0.0025 && _w.copy(hd).addScaledVector(seg, tq).distanceTo(sh) < 0.2;
+      const passes = seg.lengthSq() > 0.0025 && Math.min(Math.abs(hd.y - sh.y), Math.abs(want.hands[i].y - sh.y)) > 0.05 && (hd.y - sh.y) * (want.hands[i].y - sh.y) < 0 && _w.copy(hd).addScaledVector(seg, tq).distanceTo(sh) < 0.2; // (only crossing the shoulder's height, from well above it to well below or back: one at it goes straight)
       if (passes) { _w.copy(sh).addScaledVector(out, 0.28).setY(Math.min(sh.y, Math.max(hd.y, want.hands[i].y)));
         // (and round it inside the cockpit, not out through the coaming)
         if (inCockpit(Math.abs(c.hip.x), c.hip.z)) { const lim = chz(_w.z) - 0.1; if (Math.abs(_w.x) > lim) _w.x = Math.sign(_w.x) * lim; } }
@@ -471,7 +481,11 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (coming to a step up, the bench's edge or the coaming, it stops and rises to it at a hand's pace: never snapped up onto it)
       if (ground(hd.x, hd.z) + 0.02 > hy + LIMB_SPEED * dt) { hd.x = hx; hd.z = hz; hd.y = Math.max(hy, ground(hx, hz) + 0.02) + LIMB_SPEED * dt; }
       // (rising early to clear an edge it's coming to, at a hand's pace; never inside what's under it)
-      const clear = far ? groundNear(hd.x, hd.z, 0.3) + 0.04 : 0;
+      // (only over something on its way that's higher than both ends, the coaming between the deck and the cockpit: not
+      // whatever's merely near it, which held a hand up beside the coaming on its way down to a locker lid)
+      let clear = 0;
+      if (far) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
+        if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
       hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), ground(hd.x, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step) {

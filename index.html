@@ -34,7 +34,7 @@
     <div class="ch-btns"><span class="lp-wrap"><button class="ghost" type="button" id="bChartLayers" aria-expanded="false">Layers</button><div id="chartLayersPop" class="layerpop" hidden></div></span><button class="ghost" type="button" id="bChartPal" title="The chart's colours: NOAA's paper chart (day) or a dark display (dusk)">Dusk colours</button><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
   </div>
   <canvas id="chartC" aria-label="Chart of the Bay: drag to move, scroll to zoom, tap to pick a destination"></canvas>
-  <div class="ch-info"><div id="chartInfo"></div><button class="cta" type="button" id="bChartGo" hidden>Sail here</button></div>
+  <div class="ch-info"><div id="chartInfo"></div><button class="cta" type="button" id="bChartGo" hidden>Sail here</button><button class="ghost" type="button" id="bChartMove" hidden title="Put her here, stopped: the cruise and its log carry on">Move her here</button></div>
 </div>
 <div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
 <div id="linebox" hidden></div>
@@ -84,6 +84,7 @@
     <button class="ib" id="bMain" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v14h9Z"/></svg><span class="w">Hoist main</span></button>
     <button class="ib" id="bCourse" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 17V3"/><path d="M5 4h9l-2 3 2 3H5"/></svg><span class="w">Course</span></button>
     <button class="ib" id="bPilot" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5.5l2 5.5h-4Z"/></svg><span class="w">Autopilot</span></button>
+    <button class="ib" id="bHome" type="button" hidden title="Send her back to her home slip"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5"/><path d="M5.5 8v8h9V8"/><path d="M8.5 16v-4h3v4"/></svg><span class="w">Home</span></button>
   </div>
   <div class="row2">
     <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
@@ -182,10 +183,11 @@
           <div class="coursecard" id="courseCard"></div></div>
         <div class="field step" id="fleetField"><span>Competitors <b id="oppCount"></b></span>
           <div class="opps" id="oppList"></div></div>
-        <div class="field step" id="fromField"><span>From</span>
-          <select id="sailFromSel" class="pick" aria-label="Start from"></select></div>
-        <div class="field step" id="toField"><span>To</span>
-          <select id="sailToSel" class="pick" aria-label="Sail to"></select></div>
+        <div class="field step" id="whereField"><span>Where</span>
+          <div class="seg" id="setupPinSeg"><button type="button" data-pin="from">Start</button><button type="button" data-pin="to">Destination</button></div>
+          <canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas>
+          <p class="pins" id="setupPins"></p>
+          <div class="pinbtns"><small id="setupChartHint"></small><button type="button" class="ghost sm" id="bPinSlip">Her slip</button><button type="button" class="ghost sm" id="bPinNone">Nowhere in particular</button></div></div>
         <div class="field step" id="crewField"><span>Your boat and crew</span>
           <div class="boatsum"><select id="boatPick" class="pick" aria-label="The boat you'll sail"></select><button type="button" class="ghost sm" id="bBoat">Your boats…</button></div>
           <small id="boatSum"></small>
@@ -218,7 +220,7 @@
     <div class="adjust" id="adjust">
       <div class="adjrow"><span>Wind speed</span><button type="button" class="realbtn" data-real="windKt">Real</button><input type="range" id="adjWindKt" min="2" max="30" step="1"><b id="adjWindKtV"></b></div>
       <div class="adjrow" id="windDaySeg"><span>Records day</span><div class="seg" data-k="windDay"><button type="button" data-v="0">Light</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Windy</button></div></div>
-      <div class="adjrow"><span>Wind from</span><button type="button" class="realbtn" data-real="windDir">Real</button><input type="range" id="adjWindDir" min="0" max="355" step="5"><b id="adjWindDirV"></b></div>
+      <div class="adjrow" id="windTurnRow"><span>Turn the wind</span><button type="button" class="realbtn" data-real="windTurn">Usual</button><input type="range" id="adjWindTurn" min="-30" max="30" step="5" aria-label="Turn the wind: up to 30° either way from its usual direction"><b id="adjWindTurnV"></b></div>
       <div class="adjrow"><span>Current</span><div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div></div>
       <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small>
       <div class="adjrow"><span>Chop</span><button type="button" class="realbtn" data-real="chop">Real</button><input type="range" id="adjChop" min="0" max="3" step="0.1"><b id="adjChopV"></b></div>
@@ -357,6 +359,7 @@
   <div class="panel">
     <h2>Paused</h2>
     <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
+    <div class="btnrow"><button class="ghost" id="bPauseCond" type="button" title="New wind, current and sea, at once: the sail carries on">Change the conditions…</button></div>
     <div id="pauseDebrief" class="debrief" hidden></div>
     <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Back to setup</button><button class="ghost" id="bKeys2" type="button">Settings</button></div>
     <div class="btnrow"><button class="ghost" id="bExit2" type="button">Exit to the start page</button></div>
@@ -377,6 +380,13 @@
 <div id="boatPanel" class="boatpanel" hidden></div>
 <div class="overlay" id="fleet" hidden></div>
 <div id="fleetBoat" class="boatpanel" hidden></div>
+<div class="overlay" id="homeAsk" hidden role="dialog" aria-modal="true" aria-labelledby="homeTitle">
+  <div class="panel">
+    <h2 id="homeTitle">Retire and head home?</h2>
+    <p>She'll be scored <b>RET</b>, retired (RRS A5.1), and she's no longer racing: keep clear of the boats still racing (RRS 23.1). Her home slip becomes the destination for the navigator and the tiller pilot.</p>
+    <div class="btnrow"><button class="cta" type="button" id="bHomeYes">Retire and head home</button><button class="ghost" type="button" id="bHomeNo">Keep racing</button></div>
+  </div>
+</div>
 <div class="overlay" id="keepAsk" hidden role="dialog" aria-modal="true" aria-labelledby="keepTitle">
   <div class="panel">
     <h2 id="keepTitle">Keep this sail?</h2>

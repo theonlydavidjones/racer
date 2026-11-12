@@ -40,6 +40,8 @@ export class WaveSet {
   readonly comps: WaveComp[] = [];
   /** The sea the component heights are set for (the reference the sea map scales from). */
   ref = { hsW: 0, hsS: 0 };
+  /** Set once the heights have been set for this world (scene.ts clears it for a new one). */
+  primed = false;
   private windDir = NaN;
   private swellL = 150;
 
@@ -49,9 +51,10 @@ export class WaveSet {
   }
 
   /** Set the swell's period (fixed for a race: it comes from the buoy record for the day). */
-  setSwellPeriod(tp: number): void {
+  setSwellPeriod(tp: number, t = 0): void {
     this.swellL = G * tp * tp / (2 * Math.PI);
-    this.comps.filter(c => c.swell).forEach((c, i) => { c.k = 2 * Math.PI / (this.swellL * SWELL_F[i]); c.w = Math.sqrt(G * c.k); });
+    // (mid-sail, at time t: each component's phase carried over, so the surface doesn't jump where it is)
+    this.comps.filter(c => c.swell).forEach((c, i) => { const w0 = c.w; c.k = 2 * Math.PI / (this.swellL * SWELL_F[i]); c.w = Math.sqrt(G * c.k); c.phase += (c.w - w0) * t; });
   }
 
   /**
@@ -62,7 +65,8 @@ export class WaveSet {
     const travel = windFrom + 180;
     if (Number.isNaN(this.windDir)) this.windDir = travel;
     this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
-    const ease = Math.min(1, dt * 0.5);
+    // (a new world starts with its sea already running: the first update sets the heights, later ones ease toward them)
+    const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
     // wind sea: heights shaped by the spectrum, scaled so the sum has the right significant height
     const hsW = s.hsW, tp = Math.max(1, s.tpW);
     const raw = WIND_L.map((L, i) => {

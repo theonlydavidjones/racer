@@ -20,6 +20,12 @@ export interface SailDef {
    * sail's plane, at height fraction t (0 at the clew; at t = 1 it's the head's width). None: a straight leech.
    */
   roach?: (t: number) => number;
+  /**
+   * The foot is held along a spar (the main's bolt-rope in the boom's groove, its clew made fast at the boom's end):
+   * camber, luff bubble and flogging all ease in from nothing at the foot over the lowest tenth of the sail, so the foot
+   * and the clew stay on the boom however the sail above it shakes. Off: a loose foot (the jib's clew flogs free).
+   */
+  footOnSpar?: boolean;
 }
 
 export interface SailShape {
@@ -120,6 +126,8 @@ export class Sail {
     if (sh.bubble > 0 && s < 0.45) x -= sh.bubble * this.def.depth * 1.7 * Math.sin(Math.PI * s / 0.45) * (1 - 0.5 * t);
     // flogging: the whole sail shakes
     if (sh.flog > 0) x = x * (1 - sh.flog) + sh.flog * this.def.depth * 0.9 * Math.sin(sh.time * 16 + t * 5 + s * 6) * s;
+    // a foot held on the boom stays there
+    if (this.def.footOnSpar) { const q = Math.min(1, t / 0.1); x *= q * q * (3 - 2 * q); }
     // twist: rotate the section about the luff, the head falling off to leeward
     const th = sh.twist * t * Math.PI / 180, rz = out.z - L.z, rx = x;
     out.x = L.x + rx * Math.cos(th) + rz * Math.sin(th);
