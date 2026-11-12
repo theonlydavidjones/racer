@@ -12,6 +12,7 @@ import { addLog, loadLog, type LogEntry, type RaceSetup } from './boat/logbook';
 import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
+import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
 import { HELD, KeyMap, type Action } from './ui/keys';
@@ -59,6 +60,7 @@ const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));
 const courseView = new CourseView();
 const navView = new NavView();
 const drillView = new ReplayView($<HTMLCanvasElement>('dcanvas'));
+const raceReplay = new RaceReplay($('raceReplay'));
 /** Start practice begins this many seconds before the gun, and the debrief comes this long after it. */
 const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
 let drillShown = false;
@@ -101,6 +103,7 @@ const KIND_NOTE: Record<WindKind, string> = {
 };
 
 function newGame(seed = randomSeed()): void {
+  incidentClips = []; // (a new race: its own rule incidents)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
@@ -128,6 +131,8 @@ function handle(e: SimEvent): void {
 }
 
 let lastClip: ReplayClip | null = null;
+/** This race's rule incidents, for the race replay (by Moment.ref). */
+let incidentClips: { clip: ReplayClip; title: string; what: string }[] = [];
 function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): void {
   setControlsIdle();
   const user = A.isUser ? A : B, other = A.isUser ? B : A, youFault = inc.fouler.isUser;
@@ -151,6 +156,11 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
   pendingPenalty = exonerated ? null : inc.fouler;
   lastClip = clip;
+  if (w.log) {
+    const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
+    w.log.note({ key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length });
+    incidentClips.push({ clip, title, what: ex.what });
+  }
   $('replay').hidden = false;
   replayView.play(w, clip);
 }
@@ -612,7 +622,17 @@ $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'S
 $('bPause').onclick = () => {
   if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false;
   const d = $('pauseDebrief'), html = w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
+  $('pauseWatch').hidden = !html || w.track.length < 2;
 };
+/** The race replay: your race from just before the gun, with the debrief on its track and timeline. */
+function watchRace(): void {
+  const log = w.log; if (!log || w.track.length < 2) return;
+  raceReplay.open(w, {
+    frames: w.track, moments: log.moments(w), findings: log.findings(w), wind: w.gun?.windFrom ?? w.wind.from,
+    marks: log.places().filter(p => p.t != null).map(p => ({ name: p.name, t: p.t! })), clips: incidentClips
+  });
+}
+$('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; w.paused = false; };
 $('bRestart').onclick = () => { $('pause').hidden = true; beginRace(); };
 $('bSettings').onclick = () => { $('pause').hidden = true; openSetup(); };
@@ -683,7 +703,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
+const anyOverlay = () => !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -694,6 +714,7 @@ addEventListener('keydown', e => {
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
+    if (raceReplay.isOpen) { raceReplay.close(); return; }
     if (courseView.isOpen) { courseView.close(); return; }
     if (navView.isOpen) { navView.close(); return; }
     if (chart.isOpen) { chart.close(); return; }
@@ -706,6 +727,7 @@ addEventListener('keydown', e => {
   if (a === 'keys') { keysView.open(); return; }
   if (a === 'log') { if ($('logView').hidden) openLog(); else $('logView').hidden = true; return; }
   if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.freeSail) navView.toggle(w); else courseView.toggle(w); return; }
+  if (raceReplay.isOpen) return; // the replay's own buttons only
   if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
   if (anyOverlay() || !a) return;
   if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
@@ -1205,6 +1227,7 @@ function showResults(): void {
   $('resFouls').textContent = `Fouls you committed: ${w.fouls}. Fouls against you: ${w.fouledBy}.`;
   const db = debriefHtml('Your race, debriefed');
   $('resDebrief').innerHTML = db; $('resDebrief').hidden = !db; $('resStart').hidden = !!db; // the debrief has the start in full
+  $('bWatch').hidden = !w.log || w.track.length < 2;
   $('results').hidden = false;
   w.paused = true;
 }
@@ -1320,6 +1343,7 @@ function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
   courseView.close(); navView.close(); w.running = false; w.paused = false;
   for (const id of ['setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
+  if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);
   $('home').hidden = false;

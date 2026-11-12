@@ -80,4 +80,38 @@ describe('the tactics debrief', () => {
     const start = w.log!.findings(w).find(f => f.key === 'start')!;
     expect(start.detail).toMatch(/at the gun|No clean start/);
   });
+
+  it('the race replay\'s moments: each loss is a moment with its time, place and cost, matching the findings', () => {
+    const { w, u, log, run } = midBeat(), o = w.boats[1], up = V(w.wind.from);
+    Object.assign(o, { x: u.x + 40 * up.x, y: u.y + 40 * up.y });
+    run(5);
+    u.shadowK = 0.7; run(20); u.shadowK = 1; run(10); // a spell in her dirty air
+    u.ww = { ...u.ww, from: 252 }; run(45); u.ww = { ...u.ww, from: 260 }; run(10); // then a header held
+    const ms = log.moments(w);
+    const dirty = ms.find(m => m.key === 'dirty')!, hdr = ms.find(m => m.key === 'shifts')!;
+    expect(dirty.t0).toBeCloseTo(125, 0); expect(dirty.t1).toBeCloseTo(145, 0);
+    expect(dirty.text).toContain(o.name);
+    expect(dirty.lost).toBeCloseTo(log.dirty.lost, 1);
+    expect(hdr.t0).toBeGreaterThan(dirty.t1); expect(hdr.lost).toBeCloseTo(log.header.lost, 1);
+    expect(hdr.text).toMatch(/8° header/);
+    for (let i = 1; i < ms.length; i++) expect(ms[i].t0).toBeGreaterThanOrEqual(ms[i - 1].t0);
+    // asking doesn't end a spell still going: it's there now, and goes on growing
+    u.shadowK = 0.7; run(10);
+    const a = log.moments(w).find(m => m.key === 'dirty' && m.t0 > 150)!; run(10);
+    const b = log.moments(w).find(m => m.key === 'dirty' && m.t0 > 150)!;
+    expect(b.t0).toBe(a.t0); expect(b.lost).toBeGreaterThan(a.lost);
+    // every moment's key is a finding's, or a rule incident
+    const keys = new Set(['start', 'shifts', 'laylines', 'tacks', 'dirty', 'lee', 'downwind', 'heel', 'trim', 'penalty', 'roundings', 'rule']);
+    for (const m of log.moments(w)) expect(keys.has(m.key)).toBe(true);
+  });
+
+  it('a real race records the whole of it once a second for the replay, from just before the gun', () => {
+    const w = new World(TRAIN, settings({ fleet: 2, seq: 1 }), 3);
+    while (w.t < 20) w.step(DT);
+    expect(w.track[0].t).toBeGreaterThanOrEqual(-30); expect(w.track[0].t).toBeLessThan(-28);
+    expect(w.track[1].t - w.track[0].t).toBeCloseTo(1, 5);
+    expect(w.track.at(-1)!.t).toBeGreaterThan(18);
+    expect(w.track[0].b.length).toBe(w.boats.length);
+    expect(new World(TRAIN, settings({ mode: 'sail' }), 1, { freeSail: true }).track).toEqual([]);
+  });
 });
