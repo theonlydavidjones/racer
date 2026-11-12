@@ -1,8 +1,7 @@
 import type { World } from '../sim/world';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES } from '../sim/places';
-import { toLL } from '../geo/geo';
+import { PLACES, latLon } from '../sim/places';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -124,10 +123,4 @@ export class Chart {
   }
 
   draw(): void { if (this.w && this.isOpen) this.hud.drawChart(this.c, this.w, this.cx, this.cy, this.scale, this.pick?.p ?? null); }
-}
-
-/** A spot by its latitude and longitude, as on a chart (degrees and decimal minutes). */
-function latLon(q: Vec): string {
-  const { lat, lon } = toLL(q), dm = (v: number) => `${Math.floor(Math.abs(v))}°${((Math.abs(v) % 1) * 60).toFixed(2)}′`;
-  return `${dm(lat)}N ${dm(lon)}W`;
 }

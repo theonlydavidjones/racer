@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { place as getPlace } from '../src/sim/places';
+import { place as getPlace, spotId } from '../src/sim/places';
 import { LL } from '../src/geo/geo';
 
 /** Cruising, "Move her here" on the chart: a new start without ending the cruise. */
@@ -32,5 +32,16 @@ describe('Move her here (cruising)', () => {
     expect(w.moveHere(getPlace('crissy')!.p, 'Off Crissy Field')).toBe(true);
     expect(u.docked).toBeUndefined(); for (let i = 0; i < 60; i++) w.step(DT);
     expect(Math.hypot(u.x - getPlace('crissy')!.p.x, u.y - getPlace('crissy')!.p.y)).toBeLessThan(5);
+  });
+});
+
+describe('Cruise setup on the chart: a spot picked on the water', () => {
+  it('is a place by its latitude and longitude, to about a metre, and she starts there or sails to it', () => {
+    const p = getPlace('raccoon')!.p, q = { x: p.x + 123.4, y: p.y - 56.7 }, id = spotId(q);
+    expect(id).toMatch(/^at:37\.\d{5},-122\.\d{5}$/);
+    const pl = getPlace(id)!; expect(Math.hypot(pl.p.x - q.x, pl.p.y - q.y)).toBeLessThan(1.5); expect(pl.name).toMatch(/^37°\d+\.\d\d′N 122°\d+\.\d\d′W$/);
+    const w = new World(COURSES[0], { ...S, sailFrom: id, sailTo: spotId({ x: q.x + 2000, y: q.y }) }, 1, { freeSail: true });
+    expect(Math.hypot(w.user.x - q.x, w.user.y - q.y)).toBeLessThan(1.5);
+    expect(w.dest!.name).toMatch(/′W$/); expect(Math.hypot(w.dest!.p.x - q.x - 2000, w.dest!.p.y - q.y)).toBeLessThan(1.5);
   });
 });

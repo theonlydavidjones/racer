@@ -5,7 +5,7 @@ import './styles.css';
 import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
-import { PLACES } from './sim/places';
+import { place } from './sim/places';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { addLog, loadLog, type LogEntry, type RaceSetup } from './boat/logbook';
@@ -43,6 +43,7 @@ import { NavView } from './ui/navView';
 import { onSaveTrouble } from './store/cloud';
 import { layerMenu, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
+import { SetupChart } from './ui/setupChart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
@@ -80,6 +81,7 @@ function setLook(yaw: number, pitch: number): void {
   look.pitch = Math.max(LOOK_PITCH_MIN, Math.min(LOOK_PITCH_MAX, pitch));
 }
 function lookAhead(): void { setLook(0, 0); }
+let setupChart: SetupChart | null = null;
 let pendingPenalty: Boat | null = null;
 
 /** The race committee's choice of course for these conditions (worked out once per set of conditions). */
@@ -638,6 +640,12 @@ $('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
 $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
+/** Cruise setup: the start and the destination, picked on the chart (ui/setupChart.ts); each pick rebuilds the world. */
+setupChart = new SetupChart(hud, {
+  world: () => w,
+  get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); }
+});
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
   pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
@@ -863,15 +871,6 @@ function buildSetupChoices(): void {
   sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
   sel.value = S.course;
   sel.onchange = () => { S.course = lastPick = sel.value; saveSettings(S); newGame(); courseCard(); tideBox(); };
-  // Just sail: where from, and where to
-  const opts = (blank: string | null) => (blank ? `<option value="">${blank}</option>` : '') + (['Spots', 'Marks and buoys'] as const)
-    .map(g => `<optgroup label="${g}">${PLACES.filter(p => p.group === g).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup>`).join('');
-  const from = $('sailFromSel') as HTMLSelectElement, to = $('sailToSel') as HTMLSelectElement;
-  from.innerHTML = '<option value="slip" id="optSlipFrom">Her slip</option>' + opts(null);
-  to.innerHTML = opts('Nowhere in particular').replace('</option>', '</option><option value="slip" id="optSlipTo">Back to her slip</option>');
-  from.value = S.sailFrom ?? 'cityfront'; to.value = S.sailTo ?? '';
-  from.onchange = () => { S.sailFrom = from.value; newGame(); };
-  to.onchange = () => { S.sailTo = to.value; newGame(); };
   $('condDlg').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
 function courseCard(): void {
@@ -908,17 +907,13 @@ function courseCard(): void {
       : '';
   }
   { // her slip, if she has one (Marina)
-    const slip = slipById(S.boat.slip), sl = slip ? slipPlace(slip) : null, f = $<HTMLOptionElement>('optSlipFrom'), t = $<HTMLOptionElement>('optSlipTo');
-    f.textContent = sl ? `Her slip (${sl})` : 'Her slip (give her one in the Fleet)'; f.disabled = !sl;
-    t.textContent = sl ? `Back to her slip (${sl})` : 'Back to her slip (give her one in the Fleet)'; t.disabled = !sl;
-    if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; }
-    // (the menus show where she'll really start and go: the Fleet's "Sail her" sets her start, and a menu showing anything
-    // else would start her in her slip with another place showing, and choosing that place again changes nothing)
-    ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom ?? 'cityfront'; ($('sailToSel') as HTMLSelectElement).value = S.sailTo ?? '';
+    const slip = slipById(S.boat.slip);
+    if (!slip && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; }
   }
   const cruise = S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
-  for (const id of ['fromField', 'toField']) $(id).hidden = !cruise;
+  $('whereField').hidden = !cruise;
+  if (cruise) setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
   $('bDrill').hidden = cruise;
   $('bGo').textContent = cruise ? 'Cast off' : 'Start the sequence';
   $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
@@ -1063,12 +1058,12 @@ function crewRows(): void {
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
   if (S.mode === 'drill') { S.mode = 'race'; newGame(); }
-  courseView.close(); navView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; tideBox(); }
+  courseView.close(); navView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
   saveSettings(S);
   newGame(seed);
-  logMessage(`— ${S.mode === 'sail' ? `Cruise · ${PLACES.find(p => p.id === S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
+  logMessage(`— ${S.mode === 'sail' ? `Cruise · ${place(S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
   w.running = true; w.paused = false;
   word('bFast', 'Speed 1×');
   horn(1.0);
@@ -1173,7 +1168,7 @@ function logOuting(): void {
   if (!w || w.logged || S.mode === 'drill') return;
   if (S.mode === 'sail' && w.freeSail && w.t >= 60) {
     w.logged = true;
-    const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : PLACES.find(p => p.id === S.sailFrom)?.name ?? 'the Bay';
+    const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : place(S.sailFrom)?.name ?? 'the Bay';
     stage([{ ...outing(S.boat, true), kind: 'cruise', title: `From ${from}${w.dest ? ` to ${w.dest.name}` : ''}`, elapsed: Math.round(w.t), nm: w.sailedM / 1852, arrived: w.arrivedT != null }]);
   } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
     // you left the race before finishing: retired

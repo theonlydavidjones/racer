@@ -183,10 +183,11 @@
           <div class="coursecard" id="courseCard"></div></div>
         <div class="field step" id="fleetField"><span>Competitors <b id="oppCount"></b></span>
           <div class="opps" id="oppList"></div></div>
-        <div class="field step" id="fromField"><span>From</span>
-          <select id="sailFromSel" class="pick" aria-label="Start from"></select></div>
-        <div class="field step" id="toField"><span>To</span>
-          <select id="sailToSel" class="pick" aria-label="Sail to"></select></div>
+        <div class="field step" id="whereField"><span>Where</span>
+          <div class="seg" id="setupPinSeg"><button type="button" data-pin="from">Start</button><button type="button" data-pin="to">Destination</button></div>
+          <canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas>
+          <p class="pins" id="setupPins"></p>
+          <div class="pinbtns"><small id="setupChartHint"></small><button type="button" class="ghost sm" id="bPinSlip">Her slip</button><button type="button" class="ghost sm" id="bPinNone">Nowhere in particular</button></div></div>
         <div class="field step" id="crewField"><span>Your boat and crew</span>
           <div class="boatsum"><select id="boatPick" class="pick" aria-label="The boat you'll sail"></select><button type="button" class="ghost sm" id="bBoat">Your boats…</button></div>
           <small id="boatSum"></small>
