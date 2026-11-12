@@ -18,7 +18,7 @@ import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, type Incident } from './rules';
-import { DEFAULT_SETTINGS, MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './settings';
+import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
 import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
@@ -30,6 +30,7 @@ import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys
 import { autoAcross, setWho, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { PerfMeter } from './ui/perfMeter';
+import { compassPoint, degAndPoint } from './core/compass';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
@@ -970,8 +971,8 @@ function drawTideGraph(): void {
     ctx.fillText(`WIND · top ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
     const b = w.weather.at(w.gunUtc), b2 = w.weather.at(w.gunUtc + 90), k = windTerrain(p, b.from);
     const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * k)} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * k)} kt` : 'steady';
-    rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${w.windKind === 'light' ? 'all over' : Math.round(b.from) + '°'}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
-  } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, as you set it`]);
+    rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (your direction, over the ${WIND_KIND_LABEL[w.windKind].toLowerCase()}'s ${compassPoint(b.from)})` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from)}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
+  } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]);
   if (!w.tide) rows.push(['Current', CURRENTS[S.current]?.label ?? S.current]);
   rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
@@ -1008,7 +1009,8 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
   if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewRows(); paintSeg(); newGame(); courseCard(); return; }
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'windKind' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
+  if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
+  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
 /* Crew: how many, and each person's height, weight (shown in feet and inches, and pounds) and skill. */
@@ -1364,7 +1366,7 @@ $('pastRows').addEventListener('click', e => {
 /* The conditions adjuster: each control is 'real' until moved; Real puts it back. */
 const ADJ = {
   windKt: { el: 'adjWindKt', get: () => S.windKt || null, set: (v: number | null) => { S.windKt = v ?? 0; }, show: (v: number) => `${v} kt`, def: () => Math.round(w.wind.kt) },
-  windDir: { el: 'adjWindDir', get: () => S.windDir ?? null, set: (v: number | null) => { S.windDir = v; }, show: (v: number) => `${v}°`, def: () => Math.round(w.wind.from / 5) * 5 % 360 },
+  windDir: { el: 'adjWindDir', get: () => S.windDir ?? null, set: (v: number | null) => { S.windDir = v; }, show: (v: number) => degAndPoint(v), def: () => Math.round(w.wind.from / 5) * 5 % 360 },
   chop: { el: 'adjChop', get: () => (S.chop ?? 1) === 1 ? null : S.chop!, set: (v: number | null) => { S.chop = v ?? 1; }, show: (v: number) => v === 0 ? 'glassy' : `× ${v.toFixed(1)}`, def: () => 1 },
   swellHs: { el: 'adjSwell', get: () => S.swellHs ?? null, set: (v: number | null) => { S.swellHs = v; }, show: (v: number) => `${(v / 0.3048).toFixed(0)} ft`, def: () => +(w.sea.swell?.hs ?? 1).toFixed(1) }
 } as const;
@@ -1381,6 +1383,8 @@ function adjustUi(): void {
   const names: Record<string, string> = { windKt: 'wind speed', windDir: 'wind direction', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');
   names.windKind = `the kind of wind (${WIND_KIND_LABEL[S.windKind as WindKind]?.toLowerCase() ?? S.windKind})`;
+  // a direction you've set wins over the kind: say so, in degrees and the compass point
+  if (S.windDir != null) names.windDir = `wind from ${degAndPoint(S.windDir)}${S.windKind !== 'auto' ? ` (overrides ${WIND_KIND_LABEL[S.windKind as WindKind]?.toLowerCase() ?? S.windKind})` : ''}`;
   $('adjSum').textContent = real.length ? `Adjusted: ${real.map(k => names[k]).join(', ')}.` : 'All real.';
   $('condState').textContent = real.length ? 'adjusted' : 'real'; $('condState').classList.toggle('adj', real.length > 0);
 }
