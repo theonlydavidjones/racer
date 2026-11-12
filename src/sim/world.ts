@@ -259,6 +259,7 @@ export class World {
     this.settings = { ...settings };
     this.seed = seed;
     this.rng = makeRng(seed);
+    this.motorRng = makeRng((seed ^ 0x6d6f74) >>> 0); // (her motor's pulls: its own draws, so the race's are as they were)
     // the race day and clock, and the kind of wind the day brings (from the records for the month, or as chosen)
     this.raceDate = settings.tideDate || nextSaturday();
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
@@ -1328,25 +1329,23 @@ export class World {
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
-  /**
-   * Send her home: her home slip becomes where she's going, for the navigator's passage plan and the tiller pilot (on, it
-   * steers for it; you bring her into the slip yourself). Racing, before she's finished, it retires her first: she's no
-   * longer racing (the definition of Racing; scored RET, RRS A5.1), so she keeps clear of the boats still racing (RRS 23.1)
-   * and may use the pilot (RRS 52 binds only a boat racing). False when she has no home slip.
-   */
   /** Racing, before she's finished: she retires (RET, RRS A5.1), and she's no longer racing. False if she isn't racing. */
   retire(why = ''): boolean {
     const u = this.user;
-    if (this.freeSail || u.finished || u.retired) return false;
+    if (this.freeSail || u.finished || u.retired) return false; // (before her preparatory signal too: a boat that retires from a race she's entered)
     u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
     this.emit({ type: 'toast', msg: `Retired (RET, RRS A5.1)${why}: she's no longer racing. Keep clear of the boats still racing (RRS 23.1).`, ms: 5000 });
     return true;
   }
-  /** Racing, and not yet finished or retired: the motor's not hers to use (RRS 42.1). */
-  get racingNow(): boolean { return !this.freeSail && !this.user.finished && !this.user.retired; }
+  /**
+   * Racing (the definition: from her preparatory signal until she finishes or retires, or a recall, postponement or
+   * abandonment): the motor's not hers to use (RRS 42.1). Before it she may motor out to the line. (42.1 forbids propulsion,
+   * not a running engine: the sim asks at the pull, a simplification.)
+   */
+  get racingNow(): boolean { return this.racing(this.user); }
 
   /* ---------- her outboard (boat/motor.ts) ---------- */
-  private motorRng = makeRng(0x6d6f74);
+  private motorRng: Rng;
   /** Tilt the outboard down into the water, or up out of it (stopping it first). */
   motorTilt(): void {
     const m = this.user.motor; if (!m) return;
@@ -1401,6 +1400,12 @@ export class World {
     else { m.pulling = { left: 1.5, catches: this.motorRng() < 0.95 }; this.emit({ type: 'toast', msg: 'It didn\'t catch: another pull…', ms: 1500 }); }
   }
 
+  /**
+   * Send her home: her home slip becomes where she's going, for the navigator's passage plan and the tiller pilot (on, it
+   * steers for it; you bring her into the slip yourself). Racing, before she's finished, it retires her first: she's no
+   * longer racing (the definition of Racing; scored RET, RRS A5.1), so she keeps clear of the boats still racing (RRS 23.1)
+   * and may use the pilot (RRS 52 binds only a boat racing). False when she has no home slip.
+   */
   sendHome(): boolean {
     const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }

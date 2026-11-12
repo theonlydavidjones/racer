@@ -12,7 +12,8 @@
  * Propulsion, ch. 8): an ideal disc of area A absorbing power P at rest gives T = (2ρA)^(1/3)·P^(2/3); a real prop gets a
  * fraction of that, its figure of merit (FIGURE_OF_MERIT, an estimate). Moving through the water at v the thrust falls
  * roughly in a straight line to nothing at the prop's pitch speed (where each turn advances the boat one pitch: no slip,
- * no thrust), pitch × prop rpm. Reverse is weaker than ahead (the blades work backwards: REVERSE, an estimate).
+ * no thrust), pitch × prop rpm. Reverse is weaker than ahead (the blades work backwards: REVERSE, an estimate). The rated
+ * power is the crank's; the gearbox takes perhaps 5–10% of it, inside the figure of merit's uncertainty.
  * For the 3.5 that's about 400 N at rest (90 lbf), falling to nothing at about 7.6 m/s (15 kt).
  */
 import type { Boat } from './boat';
@@ -33,8 +34,11 @@ export const FIGURE_OF_MERIT = 0.55;
 /** Astern, the share of the thrust ahead (an estimate: the blades' sections work backwards, and the exhaust's in the way). */
 export const REVERSE = 0.5;
 /** The leg and the stopped prop down in the water, not driving: drag area (Cd·A, m²). An estimate: a streamlined strut about
- * 10 cm by 35 cm deep (Cd about 0.1) and the prop's disc (0.028 m², Cd about 0.3 stopped). Tilted up: nothing. */
-export const LEG_CDA = 0.012;
+ * 4 cm thick by 35 cm deep (Cd about 0.1 on its frontal area, 0.014 m²) and the prop's disc (0.028 m², Cd about 0.3
+ * stopped). Tilted up: nothing. */
+export const LEG_CDA = 0.010;
+/** Tick-over's share of full power: (1,150 / 5,500 rpm)³. */
+export const IDLE = (1150 / 5500) ** 3;
 
 /** Her motor's state (on her, while she has one on the bracket). */
 export interface MotorState {
@@ -70,10 +74,11 @@ export function thrust(m: MotorState, vAhead: number): number {
   if (!m.running || !m.down || m.pulling) return 0;
   const o = OUTBOARDS[m.hp], astern = m.gear === 'R' || (m.gear === 'F' && !!m.swivel);
   if (m.gear === 'N') return 0;
-  const t = Math.max(0, Math.min(1, m.throttle)), T0 = staticThrust(o) * Math.pow(t, 2 / 3) * (m.gear === 'R' ? REVERSE : 1);
-  if (T0 <= 0) return 0;
-  const vp = pitchSpeed(o) * Math.cbrt(t) * (m.gear === 'R' ? 0.8 : 1), v = astern ? -vAhead : vAhead; // (speed along the way it pushes)
-  const T = T0 * Math.max(0, 1 - v / vp);
+  // (the throttle from tick-over to full: at tick-over, about 1,150 rpm of 5,500, the power is (1150/5500)³ of full, which
+  // in gear still creeps her along at a knot or so, as you come into a slip; a fixed prop's power goes as its rpm cubed)
+  const t = Math.max(0, Math.min(1, m.throttle)), pw = IDLE + (1 - IDLE) * t, T0 = staticThrust(o) * Math.pow(pw, 2 / 3) * (m.gear === 'R' ? REVERSE : 1);
+  const vp = pitchSpeed(o) * Math.cbrt(pw) * (m.gear === 'R' ? 0.8 : 1), v = astern ? -vAhead : vAhead; // (speed along the way it pushes)
+  const T = T0 * Math.min(1, Math.max(0, 1 - v / vp)); // (pushing against her way, no more than at rest: the engine lugs)
   return astern ? -T : T;
 }
 

@@ -5,7 +5,7 @@ import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
-import { motorForce } from './motor';
+import { motorForce, thrust } from './motor';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
@@ -282,7 +282,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (on a bare rig: with her sails struck, as at the dock. With them up, in irons, she'd drift astern too, but the AI's
   // sailing doesn't yet reckon with sternway, so there she stops, as before: ROADMAP, for Deep Physics and the AI)
   // (the motor in reverse drives her astern whatever sail she has up)
-  const v1 = b.v + a * dt, bareRig = hm + hj < 0.5 || motorForce(b) < 0;
+  const v1 = b.v + a * dt, bareRig = hm + hj < 0.5 || (!!b.motor && thrust(b.motor, b.v - (b.astern ?? 0)) < 0);
   if (v1 >= 0 || !bareRig) b.v = Math.max(0, v1); else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
   // (headway and sternway are one motion through the water: netted, so the drag on each doesn't push the other)
   if (b.v > 0 && (b.astern ?? 0) > 0) { const n = b.v - b.astern!; if (n >= 0) { b.v = n; b.astern = 0; } else { b.v = 0; b.astern = -n; } }

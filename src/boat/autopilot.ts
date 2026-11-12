@@ -1,5 +1,6 @@
 import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
+import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong } from '../geo/shore';
@@ -30,6 +31,8 @@ export type PilotMode = 'off' | 'auto' | 'wind' | 'nav';
 
 export interface Pilot {
   mode: PilotMode;
+  /** Nav under power: on the direct course to the destination (motor.ts), not the sailing navigator's */
+  direct?: boolean;
   /** Auto: the compass course it holds, deg. */
   course: number;
   /** Wind: the apparent wind angle it holds, signed (+ from starboard), deg. */
@@ -144,9 +147,6 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
  * One step of the pilot: it reads the compass and the masthead unit, works out the helm, and the ram moves the tiller
  * toward it. Sets b.tiller (−1 pushed to port … +1 pushed to starboard; pushing it to starboard turns her to port).
  */
-/** The bearing from her to a point (deg true). */
-const brgTo = (b: Vec, q: Vec) => n360(Math.atan2(q.x - b.x, q.y - b.y) * 180 / Math.PI);
-
 export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: number): void {
   if (p.mode === 'off') return;
   if ((b.astern ?? 0) > 0.1) { p.alarm = 'Pilot alarm: she\'s going astern, and a pilot can\'t steer backwards. Pilot on standby: you have the tiller.'; return; }
@@ -161,8 +161,13 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
   else {
     // under power (her motor driving her ahead), she needn't tack: the navigator points her straight at it, unless there's
     // land in the way
-    const motoring = !!b.motor?.running && b.motor.down && b.motor.gear === 'F' && !b.motor.swivel && b.motor.throttle > 0.15;
-    const direct = dest ? brgTo(b, dest) : b.h, u = V(direct), clear = !!dest && landAlong(b, { x: b.x + u.x * 150, y: b.y + u.y * 150 }) === Infinity;
+    const motoring = !!b.motor && thrust(b.motor, b.v) > 40; // (driving her ahead, more than at tick-over)
+    // (the direct line probed ahead to 150 m to take it, 100 m to keep it, so it doesn't flip between the two at the edge of
+    // the probe; and only as far as the destination: her slip's docks behind it don't count)
+    const dd = dest ? Math.hypot(dest.x - b.x, dest.y - b.y) : 0, direct = dest ? n360(brg(dest.x - b.x, dest.y - b.y)) : b.h, u = V(direct);
+    const reach = Math.min(p.direct ? 100 : 150, Math.max(0, dd - 12));
+    const clear = !!dest && landAlong(b, { x: b.x + u.x * reach, y: b.y + u.y * reach }) === Infinity;
+    p.direct = motoring && clear;
     want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
   }
   const err = wrap(want - b.h), rate = wrap(b.h - p.lastH) / Math.max(dt, 1e-6); p.lastH = b.h;

@@ -365,7 +365,7 @@ const band = new SailBand({
 }, document.body);
 // the tiller strip on the band's top edge, the tiller pilot's toggle at its right end and its panel over it (the UI
 // session's placement, 12 Nov: nothing fixed in the middle of the view, the helm's controls where the eye already is)
-band.tillerSlot.append($('tiller'), $('bPilot'), $('pilot'));
+band.tillerSlot.append($('tiller'), $('bPilot'), $('pilot'), $('motorHead')); // (her outboard's control head, above the band on the left)
 function openLines(open = !band.open): void {
   band.show(open); S.band = open ? 1 : 0; saveSettings(S);
   document.body.classList.toggle('band-open', open);

@@ -68,8 +68,11 @@ describe('her outboard, aboard', () => {
     for (let i = 0; i < 60 * 20; i++) w.step(DT);
     expect(u.astern ?? 0).toBeGreaterThan(0.5);
   }, 60000);
-  it('racing, it isn\'t hers to use (RRS 42.1): starting it asks first; told to, she retires, then it\'s hers', () => {
+  it('before her preparatory signal she may motor out to the line; racing, it isn\'t hers to use (RRS 42.1): starting it asks first; told to, she retires, then it\'s hers', () => {
+    const b = withMotor('race'); b.motorTilt();
+    expect(b.racing(b.user)).toBe(false); expect(b.motorStart()).toBe('ok'); expect(b.user.retired).toBeFalsy(); // (not racing yet)
     const w = withMotor('race'), u = w.user;
+    while (!w.racing(u)) w.step(DT); // (her preparatory signal)
     w.motorTilt();
     expect(w.motorStart()).toBe('racing'); expect(u.motor!.pulling).toBeUndefined(); expect(u.retired).toBeFalsy();
     expect(w.motorStart(true)).toBe('ok'); expect(u.retired).toBe(true); expect(u.motor!.pulling).toBeTruthy();
@@ -103,4 +106,19 @@ describe('the tiller pilot under power', () => {
     expect(Math.abs(((u.h - b + 540) % 360) - 180)).toBeLessThan(15); // (pointed at it, dead to windward)
     expect(u.v / KT).toBeGreaterThan(2.5);
   }, 60000);
+});
+
+describe('the outboard, as it\'s used', () => {
+  it('at tick-over in gear she creeps along at a knot or so (coming into a slip)', () => {
+    const v = run({ throttle: 0 }, 90).v / KT; expect(v).toBeGreaterThan(0.6); expect(v).toBeLessThan(2.2);
+  }, 60000);
+  it('the first pull doesn\'t always catch: race to race, about one start in four needs a second', () => {
+    let second = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const boat = { ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, outboard: 'bracket' as const } };
+      const w = new World(COURSES[0], { ...S, boats: [boat], boat, boatId: boat.id } as Settings, seed, { freeSail: true });
+      w.motorTilt(); w.motorStart(); if (!w.user.motor!.pulling!.catches) second++;
+    }
+    expect(second).toBeGreaterThan(3); expect(second).toBeLessThan(20);
+  });
 });

@@ -782,6 +782,7 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sb-tillerslot #bPilot{height:22px;min-width:0;padding:0 8px;border-radius:7px 7px 0 0;flex-direction:row;gap:5px;font:700 10px/1 var(--f-inst)}
 .sb-tillerslot #bPilot svg{width:12px;height:12px}
 .sb-tillerslot #pilot{position:absolute;right:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3}
+.sb-tillerslot #motorHead{position:absolute;left:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3;margin:0}
 .sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
