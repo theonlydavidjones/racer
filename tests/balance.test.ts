@@ -8,6 +8,7 @@ import { netDrive } from '../src/boat/balance';
 import { takeLine } from '../src/boat/physics';
 import { polar } from '../src/boat/polar';
 import { KT } from '../src/core/math';
+import { crewWords } from '../src/ui/crewWords';
 
 /** Beat at `windKt` with the crew's settings, then (optionally) change the controls yourself and settle again. */
 /** Sail her close-hauled; `full`: the crew held at full power (no depowering of their own), so one line's own effect shows. */
@@ -117,6 +118,9 @@ describe('Helm balance (weather helm)', () => {
   });
 });
 
+const EXPERT = { helm: { ...DEFAULT_CREW.helm, skill: 0.9 }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill: 0.9 })) };
+const crewOf = (skill: number, h = 1.75) => ({ helm: { ...DEFAULT_CREW.helm, skill }, crew: [{ h, w: 78, skill }, { h: 1.72, w: 72, skill }] });
+
 describe('The crew', () => {
   it('sit to leeward in light air, to windward in a moderate breeze, and hike only when she needs it', () => {
     // (4 kt: with the ORC certificates' stability the sails alone heel her nearly to the crew's 6° by 5 kt, so there
@@ -127,7 +131,7 @@ describe('The crew', () => {
   });
   it('go right up on the foredeck as the pole goes out on a run (one astride the bow, one between the mast and the forestay), in light and moderate air', () => {
     for (const W of [6, 8, 10]) {
-      const b = testBoat({ heading: 195, kt: 4, windKt: W }); b.poleWant = true;
+      const b = testBoat({ heading: 195, kt: 4, windKt: W }); b.poleWant = true; b.crew = newCrew(EXPERT, 'S');
       let at = -1;
       sail(b, 40, t => { b.h = 195; if (at < 0 && b.crew?.people[2]?.pose === 'bow') at = t; });
       // (straight there as the pole is set, not after a stop at the mast)
@@ -162,6 +166,27 @@ describe('The crew', () => {
       was = fwd;
     });
     expect(moves).toBeLessThanOrEqual(1);
+  });
+  it('follow best practice as well as their skill lets them: an expert crew at once, a club crew a little late or only to the mast, a novice crew mostly not at all', () => {
+    const run = (spec: ReturnType<typeof crewOf>) => {
+      const b = testBoat({ heading: 195, kt: 4, windKt: 8 }); b.poleWant = true; b.crew = newCrew(spec, 'S');
+      let at = -1; sail(b, 90, t => { b.h = 195; if (at < 0 && (b.crew!.layout ?? 'cockpit') !== 'cockpit') at = t; });
+      return { at, layout: b.crew!.layout, why: b.crew!.poleWhy, words: crewWords(b) };
+    };
+    const ex = run(crewOf(0.9));
+    expect(ex.layout).toBe('foredeck'); expect(ex.at).toBeLessThan(15); expect(ex.words).toMatch(/foredeck.*pole out in 8 kt/);
+    // (several club and novice crews: each crew's habits are their own, but the same every time)
+    const club = [1.6, 1.7, 1.8, 1.9, 2.0].map(h => run(crewOf(0.6, h))), nov = [1.6, 1.7, 1.8, 1.9, 2.0].map(h => run(crewOf(0.25, h)));
+    for (const r of club) { expect(r.layout).not.toBe('cockpit'); expect(r.at).toBeGreaterThan(ex.at + 5); }
+    expect(club.some(r => r.layout === 'mast')).toBe(true);
+    expect(nov.filter(r => r.layout === 'cockpit').length).toBeGreaterThanOrEqual(2);
+    for (const r of nov) if (r.layout === 'cockpit') expect(r.words).toMatch(/staying in the cockpit/);
+    expect(run(crewOf(0.6, 1.7))).toEqual(club[1]);
+  });
+  it('say why they stay aft in a breeze with the pole out', () => {
+    const b = testBoat({ heading: 195, kt: 5, windKt: 20 }); b.poleWant = true; b.crew = newCrew(EXPERT, 'S');
+    sail(b, 30, () => { b.h = 195; });
+    expect(crewWords(b)).toMatch(/^Auto: staying aft in 2\d kt to keep the bow up/);
   });
   it('sailing alone in a breeze she goes slower than with two crew: she heels more, or has to be depowered more', () => {
     const two = beat(20), solo = testBoat({ heading: 360 - beatAngle(20), kt: 4.5, windKt: 20 });

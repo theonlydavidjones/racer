@@ -26,7 +26,16 @@ export function crewWords(u: Boat): string {
     const fore = pl.fore == null ? '' : { fwd: 'weight forward', mid: 'weight in the middle', aft: 'weight aft' }[pl.fore];
     where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; tap Crew for auto`;
   } else {
-    where = 'Auto: ' + (c.roll ? (c.roll.phase === 'hold' ? 'roll tack, holding the old high side' : 'roll tack, out hard to flatten her')
+    // (with the pole out on a run: where best practice has them, and how far they've followed it: crewPhys.ts chooseLayout)
+    const pw = c.poleWhy, pole = pw && {
+      fwd: `up on the foredeck, one astride the bow: a run with the pole out in ${kt} kt, bow down pays`,
+      part: `the bow hand at the mast: a run with the pole out in ${kt} kt (a sharper crew would be right up on the foredeck)`,
+      soon: `about to go forward to the foredeck: a run with the pole out in ${kt} kt`,
+      stay: `staying in the cockpit: in ${kt} kt with the pole out a sharper crew would be up on the foredeck`,
+      aft: `staying aft in ${kt} kt to keep the bow up`,
+      late: `still forward: in ${kt} kt they should come aft to keep the bow up`
+    }[pw];
+    where = 'Auto: ' + (pole ? pole : c.roll ? (c.roll.phase === 'hold' ? 'roll tack, holding the old high side' : 'roll tack, out hard to flatten her')
       : c.mode === 'leeward' ? `sitting to leeward on the ${lw} side: ${kt} kt, heeling her ${heel}° so the sails hold their shape`
       : c.mode === 'hike' ? `hiking out on the ${ww} rail: ${kt} kt and she's heeling ${heel}°, their weight holds her up`
       : c.mode === 'windward' ? `sitting up on the ${ww} side: ${kt} kt, their weight to windward`
