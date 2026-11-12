@@ -8,11 +8,11 @@ import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
 
 /** Points along every bone of a figure (the boat's frame): the hips to the knees and feet, the shoulders to the hands, the spine, the head. */
-function bones(f: Figure): { name: string; p: THREE.Vector3 }[] {
+function bones(f: Figure, step = 0.25): { name: string; p: THREE.Vector3 }[] {
   f.root.updateMatrixWorld(true);
   const w = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0));
   const out: { name: string; p: THREE.Vector3 }[] = [];
-  const seg = (name: string, a: THREE.Vector3, b: THREE.Vector3) => { for (let t = 0; t <= 1.0001; t += 0.25) out.push({ name, p: a.clone().lerp(b, t) }); };
+  const seg = (name: string, a: THREE.Vector3, b: THREE.Vector3) => { for (let t = 0; t <= 1.0001; t += step) out.push({ name, p: a.clone().lerp(b, t) }); };
   f.leg.forEach((l, i) => { const hip = w(l.root), knee = w(l.mid), ankle = w(l.mid, -BONE.shin); seg(`thigh${i}`, hip, knee); seg(`shin${i}`, knee, ankle); });
   f.arm.forEach((a, i) => { const sh = w(a.root), el = w(a.mid), wr = w(a.mid, -BONE.fore); seg(`upper${i}`, sh, el); seg(`fore${i}`, el, wr); });
   seg('spine', w(f.root), w(f.head)); out.push({ name: 'head', p: w(f.head, 0.12) });
@@ -22,7 +22,10 @@ function bones(f: Figure): { name: string; p: THREE.Vector3 }[] {
 function through(cr: Crew, label: string, bad: string[]): void {
   for (const [who, f] of [['helm', cr.helm], ...cr.crew.map((f, i) => [`crew${i + 1}`, f] as const)] as const) {
     if (!f.root.visible) continue;
-    for (const { name, p } of bones(f)) {
+    // (the helm every 2 cm or so along each bone: a shin through the coaming, only a few centimetres thick, isn't
+    // stepped over. The crew at a quarter bone for now: at 2 cm their moves along the deck show grazes of 3–8 cm to
+    // be worked through, a follow-up)
+    for (const { name, p } of bones(f, f === cr.helm ? 0.05 : 0.25)) {
       if (Math.abs(p.z) > L / 2 - 0.05 || Math.abs(p.x) > halfBeam(uAtZ(p.z)) - 0.02) continue; // (outboard: hiking out over the side)
       const g = ground(p.x, p.z);
       if (p.y < g - 0.025) bad.push(`${label}: ${who} ${name} ${(g - p.y).toFixed(2)} m into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`);
