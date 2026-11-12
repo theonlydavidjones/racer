@@ -27,7 +27,7 @@ import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
-import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
+import { poleEta, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { SailBand } from './ui/sailBand';
 import { LINE_NAME } from './ui/lines';
@@ -478,7 +478,8 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 function togglePole(): void {
   if (!w.running || w.paused) return;
   const u = w.user; u.poleWant = !u.poleWant; u.poleMine = true; // (yours now, until Auto-trim)
-  toast(u.poleWant ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  const eta = poleEta(u);
+  toast(u.poleWant ? `Crew: setting the whisker pole (about ${Math.round(eta.set)} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${Math.round(eta.stow)} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it

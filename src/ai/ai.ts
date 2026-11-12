@@ -6,6 +6,7 @@ import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK } from '../boat/physics';
+import { attrOf } from '../boat/crewPhys';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
@@ -607,6 +608,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
  */
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
+  // a seasoned forward hand goes up to the mast before the bear-away at a mark when the next leg is a run, so the pole
+  // goes on as soon as she's down (the owner: from the foredeck, "already pre-positioned (which a seasoned crew member
+  // knows to do)", 10 s against 20 from the cockpit). About 15 s out (60 m); not alone, and not where you've put them.
+  const c = b.crew, fwd = c && c.spec.crew.length ? c.spec.crew[c.spec.crew.length - 1] : null;
+  const nextDeep = !!nm && nm.type === 'round' && Math.abs(wrap(b.ww.from - brg(nm.next.x - nm.p.x, nm.next.y - nm.p.y) - 180)) < 30;
+  b.polePrep = !!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < 60 && w.t >= 0 && !b.docked && b.penalty <= 0;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
   if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
   else if (twa > 157) b.poleWant = true;

@@ -117,7 +117,7 @@ function speedFactor(b: Boat, c: Controls): number {
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
   // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
   // as physics.ts trimSails counts it; the deliberate ease is in the sails' power, below)
-  const ease = crewMainAngle(b) - optimalSheet('main', b.awaSlow);
+  const ease = crewMainAngle(b) - optimalSheet('main', b.awaMain ?? b.awaSlow);
   // (shares of the drive multiply; what they're worth in speed is where the drive meets the hull's resistance, as the
   // boat itself counts it: dynamics.ts speedForDrive)
   let K = Math.max(0, trimDrive(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max)), tj) * eff), f = 1;

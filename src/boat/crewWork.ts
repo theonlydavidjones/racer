@@ -116,10 +116,13 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
 
 /** How far off a line has to be (of its full range) before this person goes to fix it: a skilled crew makes finer adjustments. */
 export function startThreshold(line: string, skill: number, to?: number): number {
-  // (the sheets are in hand and the trimmer watches the leech: small changes move the leech, controls.ts mainShape)
-  if (line === 'jibsheet' || line === 'mainsheet') return 0.006;
+  // (the sheets are in hand and the trimmer watches the leech: small changes move the leech, controls.ts mainShape. A club
+  // trimmer's band, 0.006 of the sheet (about 0.3° of boom upwind), the sim's calibration; an expert's half that, a
+  // novice's about twice: their tolerance as their trim, an estimate: no study measures a trimmer's error)
+  const band = Math.pow(2, (0.6 - skill) / 0.3);
+  if (line === 'jibsheet' || line === 'mainsheet') return 0.006 * band;
   // (the traveller is in the main trimmer's other hand on the thwart, played with the sheet: as fine, over its range of 2)
-  if (line === 'traveller') return 0.012;
+  if (line === 'traveller') return 0.012 * band;
   const range = line === 'traveller' ? 2 : 1;
   // a line wanted right on (or off) to its stop is pulled all the way: "backstay bar tight" is one clear action
   if (to != null && (to >= 0.98 || to <= (line === 'traveller' ? -0.98 : 0.02))) return 0.02;
@@ -259,6 +262,18 @@ function carJob(b: Boat, dt: number): void {
 
 
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
+/**
+ * How long (s) before the forward hand (or whoever has the pole) is at the mast to start on it: nothing if they're
+ * there already (at the mast or on the foredeck), else their reaction time and the trip out of the cockpit, along the
+ * side deck and round the shrouds (`forward` s for a club crew, at their pace; alone, the helm also has to leave the
+ * tiller: one-handed pace).
+ */
+export function poleTrip(b: Boat, forward: number): number {
+  const c = b.crew; if (!c) return 0;
+  const n = c.spec.crew.length, who = ownerOf('pole', n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
+  if (!a || a.z <= Z.mast + 0.6) return 0;
+  return reactTime(allAboard(c.spec)[who]) + forward / workPace(b, who);
+}
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;
   const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
