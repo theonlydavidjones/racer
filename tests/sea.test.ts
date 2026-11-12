@@ -172,3 +172,50 @@ describe('the growing sea, more', () => {
     expect(Math.max(...from) - Math.min(...from)).toBeLessThan(2);
   }, 60000);
 });
+
+describe('the sea inside the marinas', () => {
+  it('a 12 s swell\'s length by linear dispersion: 225 m in deep water, 74 m in 4 m', async () => {
+    const { waveLength } = await import('../src/environment/sea');
+    expect(waveLength(12, 1000)).toBeCloseTo(224.8, 0);
+    expect(waveLength(12, 4)).toBeCloseTo(73.8, 0);
+  });
+  it('through a gap (the exact thin-breakwater solution): a wide one passes the wave whole on its axis; a narrow one spreads it evenly, falling as 1/√r', async () => {
+    const { gapKd } = await import('../src/environment/sea');
+    expect(gapKd(3, 1, 0)).toBeGreaterThan(0.9);
+    expect(gapKd(0.1, 2, 0) / gapKd(0.1, 2, 89)).toBeLessThan(1.1); // (a narrow gap radiates alike every way)
+    expect(gapKd(0.5, 40, 0) / gapKd(0.5, 20, 0)).toBeCloseTo(Math.SQRT1_2, 3);
+    expect(gapKd(0.5, 2, 0)).toBeGreaterThan(gapKd(0.2, 2, 0)); // (a wider gap lets more through)
+  });
+  it('Gashouse Cove: the swell spreads evenly from its 37 m entrance, weaker inside than out, with no full-swell strip', async () => {
+    const { harborGaps, harborSwell, swellReach } = await import('../src/environment/sea');
+    const { HARBORS, inBasin } = await import('../src/geo/marina');
+    const [g] = harborGaps(HARBORS.find(h => h.id === 'gashouse-cove')!);
+    expect(g.B).toBeGreaterThan(20); expect(g.B).toBeLessThan(45);
+    const outside = swellReach({ x: g.c.x - g.n.x * 30, y: g.c.y - g.n.y * 30 }).k;
+    for (const back of [15, 40]) {
+      const ks: number[] = [];
+      for (let s = -12; s <= 12; s += 2) { const p = { x: g.c.x + g.n.x * back + g.n.y * s, y: g.c.y + g.n.y * back - g.n.x * s }; if (inBasin(p)) ks.push(harborSwell(p, 12).k); }
+      expect(ks.length).toBeGreaterThan(5);
+      expect(Math.max(...ks) / Math.min(...ks)).toBeLessThan(1.6);
+      expect(Math.max(...ks)).toBeLessThan(0.8 * outside);
+    }
+  });
+  it('the chop\'s fetch by an entrance: no aliasing step from one point to the next, and the same just outside as just inside', async () => {
+    const { harborGaps, SeaField } = await import('../src/environment/sea');
+    const { HARBORS } = await import('../src/geo/marina');
+    const f = new SeaField(null);
+    const [g] = harborGaps(HARBORS.find(h => h.id === 'gashouse-cove')!);
+    // (across Gashouse Cove's entrance, 15 m in, at 315°: it was 0.17 → 0.04 → 0.13 m of chop over 12 m)
+    let prev = -1;
+    for (let s = -12; s <= 12; s += 1.5) {
+      const F = f.fetch({ x: g.c.x + g.n.x * 15 + g.n.y * s, y: g.c.y + g.n.y * 15 - g.n.x * s }, 315);
+      if (prev > 0) expect(Math.abs(F - prev) / prev).toBeLessThan(0.15);
+      prev = F;
+    }
+    // (across each entrance line, 0.75 m either side: it was 194 m inside against 108 m outside at South Beach)
+    for (const id of ['gashouse-cove', 'south-beach', 'corinthian']) for (const gap of harborGaps(HARBORS.find(h => h.id === id)!)) for (const w of [0, 90, 180, 270, 315]) {
+      const a = f.fetch({ x: gap.c.x - gap.n.x * 0.75, y: gap.c.y - gap.n.y * 0.75 }, w), b = f.fetch({ x: gap.c.x + gap.n.x * 0.75, y: gap.c.y + gap.n.y * 0.75 }, w);
+      expect(Math.abs(a - b)).toBeLessThan(0.15 * Math.max(a, b) + 25);
+    }
+  });
+});

@@ -120,6 +120,8 @@ export const harborOf = (id: string | undefined): Harbor | null => HARBORS.find(
 
 /** The harbor whose basin (the water inside its breakwaters) this is in, if any. */
 export const harborAt = (p: Vec): Harbor | null => HARBORS.find(h => inBox(p, h.box) && inPoly(p, h.basin)) ?? null;
+/** The harbor whose breakwaters and shore are near `p` (within the box round all its works), in its basin or not. */
+export const harborNear = (p: Vec): Harbor | null => HARBORS.find(h => inBox(p, h.reach)) ?? null;
 /** In a harbor's basin? */
 export const inBasin = (p: Vec): boolean => harborAt(p) !== null;
 
