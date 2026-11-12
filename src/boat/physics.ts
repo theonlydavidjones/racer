@@ -1019,14 +1019,19 @@ function windAtZ(from: number, windKt: number, h: number, v: number, g: number, 
   return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
 }
 /**
- * The wind she feels at `z` m above the water (the midair wind indicator, render/windLadder.ts): the true wind there
- * (kt, from the log profile), and the apparent wind there, worked exactly as the sails' (sailWind: her speed through
- * the water, her sideways slip and the rig's sway at that height, the heel), so the arrows, sails, telltales and windex all agree.
+ * The wind she feels at `z` m above the water (the midair wind indicator, render/windLadder.ts):
+ * - tw: the true wind there (the wind over the water, as instruments call true: kt, from the log profile);
+ * - air: the apparent wind there as the air actually moves past her, level: true wind less her own motion (her speed
+ *   and slip, and the rig's sway at that height: the roll moves the mast faster higher up). True minus her velocity is
+ *   this, so the indicator's arrows close the wind triangle;
+ * - aw: the apparent wind's speed and angle as the sim measures it for the sails (sailWind in her course's frame, the
+ *   heeled mast's plane), so the label's angle is the one on the HUD and the windex.
  * `from`: the bearing each comes from (deg).
  */
-export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; aw: { kt: number; from: number; awa: number } } {
-  const ww = b.ww, g = gradientAt(z), ap = windAtZ(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), g, (b.sway ?? 0) + rigSway(b) * z / CE_ABOVE_WL, b.heel ?? 0); // (the rig's roll moves it faster higher up)
-  return { tw: { kt: ww.kt * g, from: ww.from }, aw: { kt: ap.aws / KT, from: n360(b.h + ap.arel), awa: ap.awa } };
+export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; air: { kt: number; from: number }; aw: { kt: number; awa: number } } {
+  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0), across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
+  const level = windAtZ(ww.from, ww.kt, h, along, g, across, 0), plane = windAtZ(ww.from, ww.kt, h, along, g, across, b.heel ?? 0);
+  return { tw: { kt: ww.kt * g, from: ww.from }, air: { kt: level.aws / KT, from: n360(h + level.arel) }, aw: { kt: plane.aws / KT, awa: plane.awa } };
 }
 
 /** Her slip to leeward on the tack she's on (deg; her course is that much further off the wind than her heading). Just

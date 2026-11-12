@@ -20,12 +20,13 @@ import { MASTHEAD_Y } from './boatMesh';
 /** The heights (m above the water): her deck, the sails' centre of effort (where the sim works out the sail force), the masthead. */
 export const LADDER_Z = [1, CE_ABOVE_WL, MASTHEAD_Y];
 /** Arrow length per knot of wind (m), and how far to windward of her the ladder stands (m). */
-const PER_KT = 0.42, OFF = 5;
+const PER_KT = 0.42, OFF = 5, MAX_LEN = 8; // (past about 19 kt the arrows stop growing: they'd reach across her)
 
-/** True and apparent wind at height z: speed (kt) and the way the air goes (`to`, a world bearing). */
-export function ladderWind(b: Boat, z: number): { tw: { kt: number; to: number }; aw: { kt: number; to: number; awa: number } } {
+/** True and apparent wind at height z: speed (kt) and the way the air goes (`to`, a world bearing); the apparent
+ * arrow is the air as it moves past her (level), its label the sim's apparent wind for the sails (the HUD's angle). */
+export function ladderWind(b: Boat, z: number): { tw: { kt: number; to: number }; aw: { kt: number; to: number; awa: number; label: number } } {
   const w = windAtHeight(b, z);
-  return { tw: { kt: w.tw.kt, to: (w.tw.from + 180) % 360 }, aw: { kt: w.aw.kt, to: (w.aw.from + 180) % 360, awa: w.aw.awa } };
+  return { tw: { kt: w.tw.kt, to: (w.tw.from + 180) % 360 }, aw: { kt: w.air.kt, to: (w.air.from + 180) % 360, awa: w.aw.awa, label: w.aw.kt } };
 }
 
 function label(): { sprite: THREE.Sprite; set: (t: string, col: string) => void } {
@@ -59,6 +60,7 @@ function lay(g: THREE.Group, at: THREE.Vector3, to: number, len: number): void {
 
 export class WindLadder {
   readonly grp = new THREE.Group();
+  private side: 1 | -1 | 0 = 0;
   private rungs = LADDER_Z.map(() => ({ tw: arrow(0xf4f7fa), aw: arrow(0xffb627), twL: label(), awL: label() }));
   constructor() {
     for (const r of this.rungs) this.grp.add(r.tw, r.aw, r.twL.sprite, r.awL.sprite);
@@ -67,18 +69,20 @@ export class WindLadder {
   update(b: Boat): void {
     const at = new THREE.Vector3(b.x, 0, -b.y);
     // abeam on the side the wind comes over (arel + from starboard), level with the mast: clear of the sails from astern
-    const s = b.arel >= 0 ? 1 : -1, abeam = (b.h + 90 * s) * D2R, fwd = b.h * D2R;
+    // (dead downwind the wind's side flickers as she yaws: the ladder keeps its side till the wind is clearly over the other)
+    if (Math.abs(b.arel) < 170 || this.side === 0) this.side = b.arel >= 0 ? 1 : -1;
+    const s = this.side, abeam = (b.h + 90 * s) * D2R, fwd = b.h * D2R;
     const side = new THREE.Vector3(Math.sin(abeam), 0, -Math.cos(abeam)).multiplyScalar(OFF).add(new THREE.Vector3(Math.sin(fwd), 0, -Math.cos(fwd)).multiplyScalar(1.5));
     this.rungs.forEach((r, i) => {
       const z = LADDER_Z[i], w = ladderWind(b, z), base = at.clone().add(side).setY(z);
-      lay(r.tw, base.clone().add(new THREE.Vector3(0, 0.18, 0)), w.tw.to, w.tw.kt * PER_KT);
-      lay(r.aw, base.clone().add(new THREE.Vector3(0, -0.18, 0)), w.aw.to, w.aw.kt * PER_KT);
+      lay(r.tw, base.clone().add(new THREE.Vector3(0, 0.18, 0)), w.tw.to, Math.min(MAX_LEN, w.tw.kt * PER_KT));
+      lay(r.aw, base.clone().add(new THREE.Vector3(0, -0.18, 0)), w.aw.to, Math.min(MAX_LEN, w.aw.kt * PER_KT));
       // the labels beside the arrows' tails, upwind of them
       const back = (to: number, len: number) => new THREE.Vector3(-Math.sin(to * D2R), 0, Math.cos(to * D2R)).multiplyScalar(len / 2 + 1.1);
-      r.twL.sprite.position.copy(base).add(back(w.tw.to, w.tw.kt * PER_KT)).add(new THREE.Vector3(0, 0.5, 0));
-      r.awL.sprite.position.copy(base).add(back(w.aw.to, w.aw.kt * PER_KT)).add(new THREE.Vector3(0, -0.5, 0));
+      r.twL.sprite.position.copy(base).add(back(w.tw.to, Math.min(MAX_LEN, w.tw.kt * PER_KT))).add(new THREE.Vector3(0, 0.5, 0));
+      r.awL.sprite.position.copy(base).add(back(w.aw.to, Math.min(MAX_LEN, w.aw.kt * PER_KT))).add(new THREE.Vector3(0, -0.5, 0));
       r.twL.set(`True ${w.tw.kt.toFixed(1)} kt`, '#f4f7fa');
-      r.awL.set(`App. ${w.aw.kt.toFixed(1)} kt · ${Math.round(w.aw.awa)}°`, '#ffb627');
+      r.awL.set(`App. ${w.aw.label.toFixed(1)} kt · ${Math.round(w.aw.awa)}°`, '#ffb627');
     });
   }
 }
