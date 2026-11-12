@@ -4,6 +4,11 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { BREAKWATER_W, FINGER_W, HARBORS, SLIPS, WALKWAY_W, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
 import type { Vec } from '../core/math';
 import { P3 } from './coords';
+import { MAX_BEAM, MOORED, powerParts, sailParts, type MooredKind } from './mooredBoats';
+
+/** The share of the slips' boats that are powerboats: an estimate (the harbors' own figures weren't found: one number
+ * to check against the harbors' records). */
+const POWER_SHARE = 0.2;
 
 /**
  * The marinas in 3D (geo/marina.ts: West Harbor, Gashouse Cove, South Beach, the Corinthian): floating wooden docks (main
@@ -79,41 +84,37 @@ function rng(seed: number) { return () => { seed = (seed * 16807) % 2147483647; 
  * of draws): hull, cabin top, mast and the furled main under its cover, the same small cruising boat as render/moored.ts,
  * at each boat's own length.
  */
+/**
+ * The boats in a marina's slips of one kind (sail or power; render/mooredBoats.ts): each part one instanced mesh, every boat
+ * that part scaled to her length; a hull and a sail cover in each boat's own colours.
+ */
 class SlipBoats {
-  private parts: { mesh: THREE.InstancedMesh; at: (len: number) => { o: THREE.Vector3; s: THREE.Vector3 } }[] = [];
+  private parts: { mesh: THREE.InstancedMesh; own?: 'hull' | 'cover' }[] = [];
   private mats: { slip: Slip; len: number }[] = [];
   readonly index = new Map<string, number>();
-  constructor(group: THREE.Group, boats: { slip: Slip; len: number; colour: number }[]) {
+  private beam: number;
+  constructor(group: THREE.Group, kind: MooredKind, boats: { slip: Slip; len: number; colour: number; cover: number }[]) {
+    this.beam = MOORED[kind].beam;
     const n = boats.length; if (!n) return;
-    // each part built for a 1 m boat, then scaled to hers: the hull and cabin in proportion, the mast and cover only in length
-    const shape = new THREE.Shape(), B = 0.17;
-    shape.moveTo(0, -0.5); shape.quadraticCurveTo(B, -0.2, B * 0.85, 0.5); shape.lineTo(-B * 0.85, 0.5); shape.quadraticCurveTo(-B, -0.2, 0, -0.5);
-    const hull = new THREE.ExtrudeGeometry(shape, { depth: 0.11, bevelEnabled: false }); hull.rotateX(Math.PI / 2);
-    const cover = new THREE.CylinderGeometry(0.14, 0.14, 1, 6); cover.rotateX(Math.PI / 2);
-    const one = new THREE.Vector3(1, 1, 1);
-    const spec: [THREE.BufferGeometry, number, (len: number) => { o: THREE.Vector3; s: THREE.Vector3 }][] = [
-      [hull, 0xffffff, len => ({ o: new THREE.Vector3(0, len * 0.11 - 0.05, 0), s: one.clone().multiplyScalar(len) })],
-      [new THREE.BoxGeometry(B * 1.1, 0.06, 0.32), 0xece8de, len => ({ o: new THREE.Vector3(0, len * 0.14, len * 0.02), s: one.clone().multiplyScalar(len) })],
-      [new THREE.CylinderGeometry(0.05, 0.06, 1, 5), 0xc9ced3, len => ({ o: new THREE.Vector3(0, len * 0.78, -len * 0.12), s: new THREE.Vector3(1, len * 1.35, 1) })],
-      [cover, 0x1f4f7a, len => ({ o: new THREE.Vector3(0, len * 0.11 + 0.9, len * 0.08), s: new THREE.Vector3(1, 1, len * 0.36) })] // the main, furled under its cover
-    ];
-    for (const [g, colour, at] of spec) {
-      const mesh = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: colour }), n);
-      group.add(mesh); this.parts.push({ mesh, at });
+    for (const p of kind === 'sail' ? sailParts() : powerParts()) {
+      const mesh = new THREE.InstancedMesh(p.geo, new THREE.MeshLambertMaterial({ color: p.colour }), n);
+      group.add(mesh); this.parts.push({ mesh, own: p.own });
     }
-    boats.forEach((b, i) => { this.mats.push({ slip: b.slip, len: b.len }); this.index.set(b.slip.id, i); this.parts[0].mesh.setColorAt(i, new THREE.Color(b.colour)); this.place(i, true); });
+    boats.forEach((b, i) => {
+      this.mats.push({ slip: b.slip, len: b.len }); this.index.set(b.slip.id, i);
+      for (const p of this.parts) if (p.own) p.mesh.setColorAt(i, new THREE.Color(p.own === 'hull' ? b.colour : b.cover));
+      this.place(i, true);
+    });
     for (const p of this.parts) p.mesh.computeBoundingSphere();
   }
   private m = new THREE.Matrix4(); private q = new THREE.Quaternion(); private up = new THREE.Vector3(0, 1, 0);
+  private s = new THREE.Vector3(); private zero = new THREE.Vector3(0, 0, 0);
   /** Show or hide the boat in this slip (hidden: scaled to nothing). */
   place(i: number, show: boolean): void {
     const { slip, len } = this.mats[i], c = P3(slip.p.x, slip.p.y, 0);
-    this.q.setFromAxisAngle(this.up, -slip.heading * Math.PI / 180); // the boat's bow is toward −z, as the generic boat's
-    for (const p of this.parts) {
-      const { o, s } = p.at(len);
-      this.m.compose(o.applyQuaternion(this.q).add(c), this.q, show ? s : new THREE.Vector3(0, 0, 0));
-      p.mesh.setMatrixAt(i, this.m); p.mesh.instanceMatrix.needsUpdate = true;
-    }
+    this.q.setFromAxisAngle(this.up, -slip.heading * Math.PI / 180); // her bow toward −z, as the parts are built
+    this.m.compose(c, this.q, show ? this.s.set(Math.min(len, MAX_BEAM / this.beam), len, len) : this.zero); // (her beam to fit the slip)
+    for (const p of this.parts) { p.mesh.setMatrixAt(i, this.m); p.mesh.instanceMatrix.needsUpdate = true; }
   }
 }
 
@@ -210,13 +211,17 @@ export class Harbor {
       g.position.copy(P3(bc.p.x, bc.p.y, 0)); this.group.add(g);
     }
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
-    const r = rng(11 + HARBORS.indexOf(H)), boats: { slip: Slip; len: number; colour: number }[] = [];
+    // (hulls mostly white or off-white gelcoat, some dark; the main's cover in the usual canvas colours; the share of powerboats
+    // is an estimate (POWER_SHARE): the harbors' own figures weren't found)
+    const r = rng(11 + HARBORS.indexOf(H)), fleet: Record<MooredKind, { slip: Slip; len: number; colour: number; cover: number }[]> = { sail: [], power: [] };
+    const HULLS = [0xf6f4ee, 0xf6f4ee, 0xf6f4ee, 0xefece2, 0xefece2, 0xe4e0d4, 0x1f3550, 0x2b4a3a, 0x8a2a24], COVERS = [0x1f4f7a, 0x1f4f7a, 0x16314f, 0xb59a6a, 0x6e2a2a, 0x3d5c47];
     for (const s of SLIPS) {
       if (s.marina !== H.id) continue;
-      const keep = r() <= 0.78, len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = [0xf3f1ea, 0xeae7df, 0x1f3550, 0x8a2a24, 0xdedcd3][Math.floor(r() * 5)];
-      if (keep) boats.push({ slip: s, len, colour });
+      const keep = r() <= 0.78, len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = HULLS[Math.floor(r() * HULLS.length)], cover = COVERS[Math.floor(r() * COVERS.length)];
+      const kind: MooredKind = r() < POWER_SHARE ? 'power' : 'sail';
+      if (keep) fleet[kind].push({ slip: s, len, colour: kind === 'power' ? HULLS[Math.floor(r() * 6)] : colour, cover }); // (powerboats in white gelcoat)
     }
-    this.boats.push(new SlipBoats(this.group, boats));
+    for (const k of ['sail', 'power'] as const) this.boats.push(new SlipBoats(this.group, k, fleet[k]));
   }
 
   /** Leave these slips empty (your boats' slips: she's out sailing, or drawn as herself). */
