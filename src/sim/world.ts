@@ -724,7 +724,7 @@ export class World {
     // penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
     for (const b of this.boats) if (!b.isUser) {
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
-      if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.max(1, since)); ai.thought = this.steps; }
+      if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
     }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
@@ -949,7 +949,8 @@ export class World {
     const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
     for (const o of this.boats) if (o !== b && near(o)) return true;
     for (const m of this.C.marks) if (near(m.p)) return true;
-    return near(this.C.pin) || (!!this.committeeHull && near(this.committeeHull.p));
+    const cb = this.committeeHull; // (the committee boat by her whole hull, as avoidMarks steers round it)
+    return near(this.C.pin) || (!!cb && (cb.q ? segPt(b, cb.p, cb.q) : dist(b, cb.p)) < CLOSE_M);
   }
   /** Assess every pair in full every step (for the tests): otherwise pairs far apart are let be (apart()). */
   exactPairs = false;

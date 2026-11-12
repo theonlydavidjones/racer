@@ -1,7 +1,8 @@
-// The step's two approximations (November 2026 performance pass), each against the exact code it stands in for.
+// The step's three approximations (November 2026 performance pass), each against the exact code it stands in for.
 //  1. The distance to the shore off a 10 m lattice (geo/shore.ts anyShoreDistNear), for the current's easing near the
 //     shore (environment/current.ts shoreRelief), every boat every step.
 //  2. Pairs of boats far apart, not converging and with nothing on their record, not assessed in full (World.apart).
+//  3. The AI boats thinking ten times a second, every step in close quarters (World.AI_EVERY, closeQuarters).
 // Kept out of test:fast (it sails eight races of six minutes).
 import { describe, expect, it } from 'vitest';
 import ss10 from '../src/courses/data/seaweed-soup-2026-course10.json';
@@ -24,13 +25,15 @@ function race(i: number, o: { grid: boolean; skip: boolean; curK?: number; seed?
     const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, ...s } as never, seed);
     w.exactPairs = !o.skip; w.exactAI = !!o.exactAI;
     if (o.curK) { const f = w.currentAt.bind(w); w.currentAt = (p, l) => { const v = f(p, l); return { x: v.x * o.curK!, y: v.y * o.curK! }; }; }
-    const sum = w.boats.map(() => 0), incidents: string[] = []; let n = 0;
+    const sum = w.boats.map(() => 0), incidents: string[] = []; let n = 0, fouls = 0;
+    // (each penalty the AI boats are given: penaltyTotal holds only the last one's degrees, and incidents only the user's)
+    const ap = w.assignPenalty.bind(w); w.assignPenalty = b => { if (!b.isUser) fouls++; ap(b); };
     while (w.t < 6 * 60) {
       w.step(DT); if (w.t > 0) { w.boats.forEach((b, k) => { sum[k] += b.v; }); n++; }
       for (const e of w.drainEvents()) if (e.type === 'incident') incidents.push(`${w.t.toFixed(3)} ${e.incident.rule} ${e.incident.fouler.id}`);
     }
     const boats = w.boats.filter(b => !b.isUser).map(b => ({ v: sum[w.boats.indexOf(b)] / n, x: b.x, y: b.y, h: b.h, leg: b.leg, penalties: b.penaltyTotal }));
-    return { boats, incidents };
+    return { boats, incidents, fouls };
   } finally { setShoreGrid(true); }
 }
 const fleetV = (r: ReturnType<typeof race>['boats']) => r.reduce((a, b) => a + b.v, 0) / r.length;
@@ -79,7 +82,7 @@ describe('the AI boats think ten times a second (World.AI_EVERY)', () => {
   it('sails no further from the every-step race than a 0.1% change in the current does, over eight races, with no more fouls', () => {
     const dev: number[] = [], nudge: number[] = [];
     let penE = 0, penD = 0;
-    const pens = (r: ReturnType<typeof race>) => r.boats.reduce((a, b) => a + b.penalties / 720, 0);
+    const pens = (r: ReturnType<typeof race>) => r.fouls;
     for (const [i, seed] of [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const) {
       const exR = race(i, { grid: true, skip: true, seed, exactAI: true }), ex = fleetV(exR.boats), dR = race(i, { grid: true, skip: true, seed });
       dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR);
