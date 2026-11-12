@@ -129,6 +129,7 @@ export class SailBand {
   private lastTack: 'S' | 'P' | null = null;
   /** Whether the pole tab is showing (a deep run, or the pole out): kept between frames for its hysteresis. */
   private poleShown = false;
+  /** When to look for a hail to make next (performance.now(), ms). */
   private hailT = 0;
 
   constructor(private host: BandHost, parent: HTMLElement) {
@@ -239,7 +240,7 @@ export class SailBand {
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
-    if (act === 'hail') { this.host.hail(); this.hailT = 0; return; }
+    if (act === 'hail') { this.host.hail(); this.hailT = 0; return; } // (look again at once: the hail's been made)
     if (act !== 'name' || !d) return;
     const u = this.host.world().user, k = this.keyOf(d) as LineKey | null; if (!k) return;
     // the name: amber (yours) hands it back; grey (the crew's) takes it where it is
@@ -285,8 +286,8 @@ export class SailBand {
     // Hail: only when there's a hail to make (checked a few times a second: it looks round the fleet)
     const hail = this.el.querySelector<HTMLElement>('.sb-hail')!;
     if (!w.running || w.paused) hail.hidden = true;
-    else if (--this.hailT <= 0) {
-      this.hailT = 15;
+    else if (performance.now() >= this.hailT) {
+      this.hailT = performance.now() + 250; // (by the clock, not frames: the same at any frame rate)
       const words = this.host.hailWords();
       hail.hidden = !words;
       if (words) { hail.innerHTML = `Hail · ${words}<span class="k">${this.host.hailKey()}</span>`; hail.title = `Hail "${words}" (${this.host.hailKey()})`; }
