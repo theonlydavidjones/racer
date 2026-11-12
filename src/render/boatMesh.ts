@@ -112,7 +112,9 @@ const MAT = {
   spar: new THREE.MeshLambertMaterial({ color: 0xc7a06a }), // varnished spruce
   // fiberglass boats: off-white non-skid gelcoat deck, anodised aluminium spars
   deckGrp: new THREE.MeshLambertMaterial({ color: 0xb9b5ab, side: THREE.DoubleSide }), // matte non-skid reads darker than the glossy cabin top
-  sparAlu: reflect(new THREE.MeshPhongMaterial({ color: 0xaeb5bc, specular: 0x9aa0a6, shininess: 70 }), 0.22),
+  // clear (silver) anodised aluminium, the usual Folkboat extrusion (as CircleSea's boom, the owner's photo): a satin
+  // mid-grey with soft, broad highlights, not a mirror (it read as white plastic, taking the bright sky)
+  sparAlu: reflect(new THREE.MeshPhongMaterial({ color: 0x8e959b, specular: 0x5c6166, shininess: 28 }), 0.08),
   wire: new THREE.LineBasicMaterial({ color: 0x333333 }),
   wood: reflect(new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40 }), 0.06), // varnished trim
   tiller: new THREE.MeshPhongMaterial({ color: 0xb07a44, specular: 0x664422, shininess: 50 }),
@@ -571,6 +573,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // the mainsheet's upper block, hung from a strap under the boom's end
   { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, BOOM_END.r); boomPivot.add(ub); }
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
+  if (aluBoom) { // the extrusion's black moulded end fitting, at its after end (as CircleSea's)
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R * 1.05, BOOM_R * 1.05, 0.06, 10), MAT.dark); cap.rotation.x = Math.PI / 2; cap.position.set(0, BOOM_TOP - BOOM_R, E + 0.12 - 0.02); boomPivot.add(cap);
+  }
   const main = new Sail(MAIN_DEF, sailMat, WINDOW_MAT, sailBack); boomPivot.add(main.mesh);
   const jibPivot = new THREE.Group(); jibPivot.position.copy(FORESTAY_DECK); rig.add(jibPivot);
   const jib = new Sail(JIB_DEF, jibMat, WINDOW_MAT, jibBack); jibPivot.add(jib.mesh);
