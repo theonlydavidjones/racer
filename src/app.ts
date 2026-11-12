@@ -526,6 +526,21 @@ function sailButtons(): void {
     el.classList.toggle('on', !up && h === 0);
   }
 }
+/**
+ * Strike the ensign: cruising in a blow, a crew takes the ensign down and unships its staff before it flogs itself to
+ * rags; a second press hoists it again. The button shows from 20 kt of true wind (the 20 s mean the crew works by;
+ * well into Beaufort force 5, 17–21 kt, the owner's mark for "high"), stays until the breeze is back under 17 (so a lull
+ * doesn't flick it away), and always while the ensign is down. Racing she flies no ensign at all (world.ts takes her flags down).
+ */
+let ensignShown = false;
+function ensignButton(): void {
+  const u = w.user, tws = u.twsSlow ?? 0, el = $('bEnsign');
+  ensignShown = !!u.ensign && w.running && w.freeSail && (!!u.ensignStruck || tws >= 20 || (ensignShown && tws >= 17));
+  if (el.hidden !== !ensignShown) el.hidden = !ensignShown;
+  word('bEnsign', u.ensignStruck ? 'Hoist ensign' : 'Strike ensign');
+  el.classList.toggle('on', !!u.ensignStruck);
+}
+$('bEnsign').onclick = () => { const u = w.user; u.ensignStruck = !u.ensignStruck; toast(u.ensignStruck ? 'Ensign struck: down and stowed below till the breeze eases.' : 'Ensign hoisted again.', 2500); };
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
@@ -1164,7 +1179,7 @@ function frame(now: number): void {
     acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); // (held head to wind on the bow line: push off again to let her go)
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }

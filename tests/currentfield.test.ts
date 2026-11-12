@@ -40,7 +40,7 @@ describe('San Rafael Bay', () => {
     let prev = peak(37.962, -122.4715), worst = 0;
     for (let lon = -122.472; lon > -122.489; lon -= 0.0005) { const v = peak(37.962, lon); worst = Math.max(worst, Math.abs(v - prev)); prev = v; }
     expect(worst).toBeLessThan(0.1);
-  });
+  }, 60_000); // (a day's peaks at forty points: slow when the whole suite runs at once)
   it('floods into the bay as the tide rises', () => {
     const t0 = sfLocalToUtcMin('2026-11-14', '00:00'), f = new CurrentField(stationsFor(t0, t0 + 1440)), p = LL(37.966, -122.485);
     for (let h = 0; h < 24; h += 1) {
