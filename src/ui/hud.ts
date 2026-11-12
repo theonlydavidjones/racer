@@ -10,7 +10,7 @@ import { byHand, sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
-import type { World } from '../sim/world';
+import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
 import { flagCanvas, pennantCanvas } from '../render/flags';
 import { FLAG_NAME } from '../sim/signals';
@@ -161,7 +161,7 @@ export class Hud {
    */
   private transit(w: World, u: Boat): void {
     const el = $('transit');
-    if (w.freeSail || u.finished || !w.settings.aids) { el.hidden = true; return; }
+    if (w.freeSail || u.finished || u.retired || !w.settings.aids) { el.hidden = true; return; }
     const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
     if (w.t < 0 || !u.started) {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
@@ -215,7 +215,7 @@ export class Hud {
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
     $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Cruising' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+      u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
     // (the windex is in the sail controls band: ui/sailBand.ts; the pole's tab too)
@@ -291,7 +291,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: World, u: Boat): void {
-    if (w.t < 0 || u.finished || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
+    if (w.t < 0 || u.finished || u.retired || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
@@ -333,10 +333,24 @@ export class Hud {
       if (hail.replyAt != null) {
         $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now: they must give you room.`;
         el.className = hail.by === o.id ? 'kc' : 'row';
+      } else if (hail.by === o.id && hail.passedOn) {
+        // Rule 20.3: you passed the hail on to the boat to windward of you
+        const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';
+        const left = po.respondedAt != null ? Math.max(0, po.respondedAt + HAIL_RESPONSE - w.t) : null;
+        $('situMsg').textContent = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
+          : left == null ? `You passed the hail on to ${nm}. Tack as soon as they respond (Rule 20.3).` : `${nm} has responded. Tack now (Rule 20.3): ${left.toFixed(0)} s.`;
+        el.className = left != null ? 'kc alarm' : 'kc';
       } else if (hail.by === o.id) {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
-        $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
+        const passTo = !youTackPays(o, u) ? w.canPassOn(u, o) : null, blocked = !!passTo;
+        $('situMsg').textContent = blocked
+          ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
+          : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
+      } else if (hail.passedOn && hail.respondedAt == null) {
+        const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
+        $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
+        el.className = 'row';
       } else if (hail.respondedAt != null) {
         const left = Math.max(0, hail.respondedAt + HAIL_RESPONSE - w.t);
         $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
@@ -357,7 +371,7 @@ export class Hud {
   private lineBox(w: World, u: Boat): void {
     const el = $('linebox'), C = w.C;
     if (u.finished) { el.hidden = true; return; }
-    if (w.freeSail) {
+    if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;

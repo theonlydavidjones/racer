@@ -65,7 +65,7 @@ export class RaceLog {
       this.gun = { d: w.lineD(u), kt: u.v / 0.5144, favored: k > 0 ? w.C.pinLabel : w.C.committeeLabel, favDeg: deg, frac: (w.lineA(u) + w.lineLen / 2) / w.lineLen };
     }
     if (u.started && this.startDelay == null && w.startTimes[u.id] != null) this.startDelay = w.startTimes[u.id]!;
-    if (!u.started || u.finished || w.t < 0) return;
+    if (!u.started || u.finished || u.retired || w.t < 0) return;
     const m = w.nextMark(u), leg = m?.leg ?? 'beat', beat = beatAngle(ww.kt);
     // penalties
     if (u.penalty > 0) { if (!this.inPen) { this.pen.n++; this.inPen = true; } this.pen.t += dt; return; }

@@ -1,8 +1,7 @@
 import type { World } from '../sim/world';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES } from '../sim/places';
-import { toLL } from '../geo/geo';
+import { PLACES, latLon } from '../sim/places';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -53,6 +52,12 @@ export class Chart {
       this.w.setDest(this.pick.p, this.pick.name);
       this.close();
     };
+    // cruising: a new start, without ending the cruise (she's put there, stopped; the clock and the log carry on)
+    $('bChartMove').onclick = () => {
+      if (!this.w || !this.pick) return;
+      if (!this.w.moveHere(this.pick.p, this.pick.name)) { this.info('She can\'t be put there: pick a spot on open water.'); return; }
+      this.close();
+    };
     addEventListener('resize', () => { if (this.isOpen) this.draw(); });
   }
 
@@ -64,8 +69,8 @@ export class Chart {
     this.cx = w.user.x; this.cy = w.user.y;
     this.scale = Math.min(innerWidth, innerHeight) / 6000; // about 3 nm across to begin with
     $('chart').hidden = false;
-    $('chartTitle').textContent = w.freeSail ? 'Chart · pick a destination' : 'Chart';
-    $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
+    $('chartTitle').textContent = w.cruising ? 'Chart · pick a destination' : 'Chart';
+    $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place: sail there, or move her there. Drag to move, scroll to zoom.' : w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
     this.info(); this.palLabel();
     this.draw();
   }
@@ -86,7 +91,7 @@ export class Chart {
   }
 
   private tap(clientX: number, clientY: number): void {
-    const w = this.w; if (!w || !w.freeSail) return;
+    const w = this.w; if (!w || !w.cruising) return;
     const r = this.c.getBoundingClientRect(), sx = clientX - r.left, sy = clientY - r.top, q = this.at(sx, sy);
     // a place near the tap: take it, by name
     let best: { p: Vec; name: string } | null = null, bd = 16;
@@ -102,9 +107,10 @@ export class Chart {
   /** What the picked spot is from here: how far, which way, and what sort of sail it'll be. */
   private info(note?: string): void {
     const el = $('chartInfo'), go = $('bChartGo') as HTMLButtonElement, w = this.w;
-    go.hidden = !(w?.freeSail && this.pick);
+    go.hidden = !(w?.cruising && this.pick);
+    $('bChartMove').hidden = !(w?.freeSail && this.pick); // (not in a race, even retired: that would be a restart)
     if (!w || !this.pick) {
-      el.innerHTML = note ? `<p>${note}</p>` : w?.freeSail ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Tap the water or a place to choose one.</p>` : '';
+      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Tap the water or a place to choose one.</p>` : '';
       return;
     }
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);
@@ -117,10 +123,4 @@ export class Chart {
   }
 
   draw(): void { if (this.w && this.isOpen) this.hud.drawChart(this.c, this.w, this.cx, this.cy, this.scale, this.pick?.p ?? null); }
-}
-
-/** A spot by its latitude and longitude, as on a chart (degrees and decimal minutes). */
-function latLon(q: Vec): string {
-  const { lat, lon } = toLL(q), dm = (v: number) => `${Math.floor(Math.abs(v))}°${((Math.abs(v) % 1) * 60).toFixed(2)}′`;
-  return `${dm(lat)}N ${dm(lon)}W`;
 }
