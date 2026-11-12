@@ -132,6 +132,9 @@ What's planned, roughly in order. Done work is described in the README.
    view of the map to select start and end. I should be able to select both in the same map and not have to bounce from
    one to another." One large chart, opened from the cruise setup, where you place both the start and the destination
    (and move either), then return to the setup with both set.
+   Also (owner, 12 November; polish; queued, not to interrupt running work; 1–2 h): "the navigator button is at
+   bottom-right atm. it should just be a view in the inset map." The navigator becomes one of the inset map's views
+   (its route and advice there), and its button leaves the bottom-right cluster.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
