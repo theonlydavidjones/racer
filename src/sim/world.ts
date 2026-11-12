@@ -1127,7 +1127,13 @@ export class World {
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'
         ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. She's going astern: steer with the tiller (the bow goes the way you push it), then get sail on her.${hoist}`
-        : `Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on).${hoist}` });
+        : plan.setBack
+          ? plan.h !== slip.heading
+            ? plan.headToWind
+              ? `Pushing off: the wind's onto the dock and nearly ahead, so your crew pushes her bow off as far as there's room. She'll be close to head to wind: get the main up first (U), then the jib, and sail off close-hauled, away from the dock.`
+              : `Pushing off: the wind's blowing her onto the dock, so your crew pushes her bow off toward the wind and shoves her out at an angle. Get the jib up quickly (J), sheeted in, and sail off close-hauled, away from the dock: don't bear away toward it.`
+            : `Pushing off: the wind's blowing her onto the dock and there's no room to angle her out, so she'll be set back on it. In real life you'd warp her along to the dock's end first; here, get sail up the moment she's off, sheeted in.`
+          : `Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on).${hoist}` });
     return true;
   }
 

@@ -221,7 +221,7 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
 SLIPS.push(...END_TIES);
 const BY_ID = new Map(SLIPS.map(s => [s.id, s]));
 /** A slip by its id (a bare label is one of West Harbor's: saves from before the other marinas). */
-export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(currentSlipId(id)) ?? null;
+export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(id.includes(':') ? id : `west-harbor:${id}`) ?? BY_ID.get(currentSlipId(id)) ?? null; // (a slip by its id today first; an old save's by its renaming)
 /**
  * A slip's id as it is now: West Harbor's and Gashouse Cove's slips were the sim's lettered ones (A12) before they took the
  * marina's own numbers (651), and a save from then follows its berth to its number (data/slip-renames.json, written by
@@ -327,9 +327,15 @@ export function berthClear(c: Vec, h: number, except: Slip): boolean {
  *   the water's drag (physics.ts asternCoast), steered stern first.
  * - **Pushing her off an end tie** (`off`): the crew pushes her off the dock (`out`: where her middle's pushed to) and, if
  *   she'd otherwise be left head to wind, her bow off the wind (`h`), her stern quarter against the dock as the pivot.
- * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first).
+ * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first). `setBack`: the wind's
+ *   blowing her back onto the dock (ONTO_DOCK and more across her): her bow's pushed well off, so she goes out at an angle.
  */
-export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number } } | { kind: 'astern'; back: number; coast: number } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean };
+export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number } } | { kind: 'astern'; back: number; coast: number } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
+/**
+ * A breeze this strong (kt) blowing her onto the dock she's lying alongside and she's pushed off at an angle, not
+ * straight out: the same 4 kt as WIND_SWINGS, where the wind on her bare rig starts to have the say over the crew's hands.
+ */
+export const ONTO_DOCK = 4;
 /** Her bow is 3.8 m ahead of her middle. */
 const BOW = 3.8;
 /**
@@ -449,14 +455,23 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
     let side = 1, best = Infinity;
     for (const w of H.walkways) for (let k = 1; k < w.length; k++) { const d = segPt(s.p, w[k - 1], w[k]); if (d < best) { best = d; const m = { x: (w[k - 1].x + w[k].x) / 2 - s.p.x, y: (w[k - 1].y + w[k].y) / 2 - s.p.y }; side = m.x * n.x + m.y * n.y > 0 ? -1 : 1; } }
     const out = { x: s.p.x + n.x * side * 1.5, y: s.p.y + n.y * side * 1.5 };
-    if (!headUp(s.heading, windFrom)) return { kind: 'off', out, h: s.heading };
-    // head to wind: the crew pushes her bow off, away from the dock, about her stern quarter, as far as there's room for (60
-    // degrees off the wind, where a sail would fill, if it fits)
-    for (const a of [60, 50, 40, 30, 20]) {
-      const h = (s.heading + a * side + 360) % 360, p: PushOff = { kind: 'off', out, h };
+    // the wind onto the dock (kt across her, from the open water's side): pushed straight off, the wind on her bare rig would
+    // set her back onto it before she gathered way (physics.ts: about 0.3 m/s sideways in 15 kt); so the crew pushes her bow
+    // well off, about her stern quarter, and the shove carries her out and away at an angle while the jib goes up
+    const onto = windFrom == null ? 0 : windKt * (dirOf(windFrom).x * n.x * side + dirOf(windFrom).y * n.y * side);
+    const setBack = onto >= ONTO_DOCK;
+    if (!headUp(s.heading, windFrom) && !setBack) return { kind: 'off', out, h: s.heading };
+    // head to wind, or the wind setting her onto the dock: the crew pushes her bow off, away from the dock, about her stern
+    // quarter, as far as there's room for (60 degrees, where a sail would fill, if it fits)
+    // (with the wind onto the dock, just far enough to point her close-hauled, about 45 degrees off the wind, sailing away from
+    // the dock: further and she'd be pointing toward the wind, in irons, and fall back onto it; with less room, less)
+    const theta = windFrom == null ? 90 : Math.abs(wrap180(windFrom - s.heading)), aim = Math.min(60, Math.max(10, Math.floor((theta - 45) / 5) * 5)); // (down: at least 45 off)
+    const angles = setBack && !headUp(s.heading, windFrom) ? [60, 50, 40, 30, 20, 10].filter(a => a <= aim) : [60, 50, 40, 30, 20];
+    for (const a of angles) {
+      const h = (s.heading + a * side + 360) % 360, p: PushOff = { kind: 'off', out, h, ...(setBack ? { setBack: true } : {}) };
       if (pushOffPoses(s, p).every(q => berthClear(q.c, q.h, s)) && runAhead(about(out, s.heading, -BOW, a * side).c, h, s) >= 8) return { ...p, ...(headUp(h, windFrom) ? { headToWind: true } : {}) };
     }
-    return { kind: 'off', out, h: s.heading, headToWind: true };
+    return { kind: 'off', out, h: s.heading, ...(headUp(s.heading, windFrom) ? { headToWind: true } : {}), ...(setBack ? { setBack: true } : {}) };
   }
   const at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
   const tip = 0.45 * s.finger; // her middle to the end of her finger

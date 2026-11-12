@@ -342,6 +342,9 @@ document.addEventListener('click', e => {
   if (you) { takeLine(w.user, k); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
   else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
 });
+// the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout)
+function crewPopOpen(open = !!$('crewPop').hidden): void { $('crewPop').hidden = !open; $('bCrew').setAttribute('aria-expanded', String(open)); $('bCrew').classList.toggle('on', open); }
+$('bCrew').onclick = () => crewPopOpen();
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
 /* The sail controls band (ui/sailBand.ts): every line, laid out as you face forward from the helm. */
 const band = new SailBand({
@@ -355,6 +358,9 @@ const band = new SailBand({
   hail: () => doHail(),
   hailKey: () => keymap.label('hail')
 }, document.body);
+// the tiller strip on the band's top edge, the tiller pilot's toggle at its right end and its panel over it (the UI
+// session's placement, 12 Nov: nothing fixed in the middle of the view, the helm's controls where the eye already is)
+band.tillerSlot.append($('tiller'), $('bPilot'), $('pilot'));
 function openLines(open = !band.open): void {
   band.show(open); S.band = open ? 1 : 0; saveSettings(S);
   document.body.classList.toggle('band-open', open);
@@ -416,6 +422,8 @@ function coachTick(dt: number): void {
   // the headline on the water: only when the panel's shut (it says the same), for six seconds of real time, and it
   // follows the coach while it's up (it never contradicts the panel or the trim panel)
   const tip = $('coachTip'), open = !$('coachPanel').hidden;
+  // (the chase-view layout: the Coach card's main line is the headline; it lights for a moment when it's new)
+  if (r.fresh && !w.paused) { const h = $('tpHint'); h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash'); }
   if (r.fresh && !w.paused && !open) { tip.textContent = r.fresh; tip.className = 'on ' + (r.done ? 'done' : r.view.top.kind); coachTipUntil = performance.now() + 6000; }
   else if (tip.classList.contains('on') && !r.done) { if (r.view.top.kind === 'fix') tip.textContent = r.view.top.head; else coachTipUntil = 0; }
   if (open) coachTipUntil = 0;
@@ -433,6 +441,7 @@ function showLines(): void {
   showTrimOwner();
   const k = CTL_UI[ctlSel].key; band.select(k === 'carFore' || k === 'carIn' ? null : k);
   band.update();
+  word('bCrew', w.user.crew?.place ? 'Crew · you' : 'Crew · auto'); $('bCrew').classList.toggle('mine', !!w.user.crew?.place);
 }
 /* Placing the crew yourself (boat/crewPhys.ts): their weight across the boat and fore and aft. Choosing a place takes
  * the crew off auto and they stay there (through tacks, puffs and lulls) until you choose another or tap Auto, as a
@@ -468,6 +477,9 @@ function togglePole(): void {
   toast(u.poleWant ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
+// the Flags tile opens the flag index; × or Esc closes it
+$('sigPanel').addEventListener('click', () => hud.flagIndex(w, !!$('flagIndex').hidden));
+$('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
 function doHail(): void { if (w.running && !w.paused) w.userHail(); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) w.pushOff(); }
@@ -678,6 +690,7 @@ addEventListener('keydown', e => {
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
+    if (!$('flagIndex').hidden) { hud.flagIndex(w, false); return; }
     if (raceReplay.isOpen) { raceReplay.close(); return; }
     if (courseView.isOpen) { courseView.close(); return; }
     if (navView.isOpen) { navView.close(); return; }

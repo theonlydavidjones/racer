@@ -673,6 +673,19 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
     bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }
+  // set sideways onto something (the wind on her bare rig across her, at a dock, or her leeway): her side at the beam, amidships
+  // and at the quarters, half her beam (1.1 m) out on the side she's going; she stops against it, as against a fender
+  // (only while she's going more sideways than ahead: under way, what she meets she meets bow first, above)
+  // (her sideways motion over the ground: her slip through the water and the current's set across her)
+  const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y;
+  if (!b.pushing && Math.abs(side) > 0.005 && Math.abs(side) > 0.5 * Math.abs(ahead)) {
+    const sgn = Math.sign(side), hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
+    if (hit) {
+      const pier = pierNear(hit, 6);
+      b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
+      bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
+    }
+  }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)
   // (in the frame the sails are trimmed in, the wind across her course through the water: step(), apF)
