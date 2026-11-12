@@ -245,7 +245,29 @@ export const SIDE_DECK = 0.30;
 /** The line of the cabin sides and the coamings' outer face: the sheer less the side deck. */
 export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
 export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
-export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: 0.24 };
+export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
+/**
+ * The cockpit's furniture, from the construction plan's profile and cockpit section (1:10; the arrangement is free,
+ * CR 3.21, so these are the plan's): the sole flat at 80 mm under the waterline ("80"), 700 mm wide ("350/350"); side
+ * benches and a shelf across the after end, their tops 300 mm over the sole ("300"); the benches from the main bulkhead
+ * aft to St. 4¾, the after shelf from St. 3 forward to about St. 4.05, and between them a footwell, where the thwart
+ * stands at St. 4½. Stations 500 mm apart, St. 3 at the cockpit's after end. z: m aft
+ * of amidships. The thwart (the traveller's beam; its size isn't drawn) is a deep varnished beam across the cockpit,
+ * its top a little under the coaming caps, its underside curved: about 6 in deep at the middle, tapering to about 4 in
+ * at its ends (the owner, from Josephine).
+ */
+const stZ = (st: number) => L / 2 - 2 * 0.5 - (st - 3) * 0.5;
+export const COCKPIT_FIT = {
+  seat: -0.08 + 0.30, soleHalf: 0.35,
+  benchAft: stZ(4.75), shelfFwd: stZ(4.05),
+  thwart: { z: stZ(4.5), half: 0.045, depth: 0.15, depthEnd: 0.10, belowCap: 0.06 },
+};
+/** The coaming's height above the deck along the cockpit (z): CR 3.22's least heights, 200 mm aft of the cabin, 140 at St. 4½, 80 at St. 3, a little over. */
+export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
+/** The thwart's top (m over the waterline). */
+export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
+/** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
+export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
 /**
  * The companionway in the after end of the cabin, drawn open (as she's sailed): the sliding hatch 550 mm wide and
  * 460 mm long, from the after bulkhead forward (the construction plan's deck plan, "sliding hatch"), slid forward over
@@ -374,35 +396,59 @@ export function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: TH
   const g = new THREE.BufferGeometry().setFromPoints([a, b, c, a, c, d]); g.computeVertexNormals(); return g;
 }
 
-/** Cockpit well: sole, the side walls from the deck edge down to it (following the taper), and the aft wall. */
-export function cockpitGeometry(): THREE.BufferGeometry[] {
-  const { u0, u1, sole } = COCKPIT, N = 16, us = Array.from({ length: N + 1 }, (_, i) => u0 + (u1 - u0) * i / N);
-  const strip = (pts: [THREE.Vector3, THREE.Vector3][], flip: boolean) => {
+/**
+ * The cockpit, to the plan (COCKPIT_FIT): the sole; the side benches (their fronts, tops, ends, and the backs under the
+ * side decks); in the footwell the hull's own inside up to the deck; the after shelf (its front and top) and above it the after
+ * wall up to the deck. Surfaces only: the sole, benches and shelf varnished teak (`teak`), the hull's inside and the
+ * after wall the smooth moulded lining (`lining`).
+ */
+export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE.BufferGeometry[] } {
+  const { u0, u1, sole } = COCKPIT, { seat, soleHalf, benchAft, shelfFwd } = COCKPIT_FIT, V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  const strip = (pts: [THREE.Vector3, THREE.Vector3][]) => {
     const pos: number[] = [], idx: number[] = [];
     for (const [a, b] of pts) pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
-    for (let i = 0; i < pts.length - 1; i++) { const a = i * 2; if (flip) idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    for (let i = 0; i < pts.length - 1; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
   };
-  const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-  // the well's sole narrows aft with the V of her sections, inside the hull; its sides slope up to the deck opening
-  const soleHalf = (u: number) => Math.min(cockpitHalf(u), hullHalfAt(u, sole) - 0.05);
-  const out = [strip(us.map(u => [V(-soleHalf(u), sole, zAt(u)), V(soleHalf(u), sole, zAt(u))]), true)]; // sole
-  for (const s of [1, -1]) out.push(strip(us.map(u => [V(s * soleHalf(u), sole, zAt(u)), V(s * cockpitHalf(u), deckY(u, cockpitHalf(u)), zAt(u))]), s > 0));
-  const w1 = cockpitHalf(u1), ws = soleHalf(u1), ya = deckY(u1, 0);
-  out.push(quad(V(ws, sole, zAt(u1)), V(-ws, sole, zAt(u1)), V(-w1, ya, zAt(u1)), V(w1, ya, zAt(u1)))); // aft wall
-  return out;
+  const span = (za: number, zb: number, n = 12) => Array.from({ length: n + 1 }, (_, i) => zU(za + (zb - za) * i / n));
+  const sh = (u: number) => Math.min(soleHalf, hullInnerHalf(u, sole) - 0.03);
+  const zA = zAt(u1), z0 = zAt(u0), out: THREE.BufferGeometry[] = [], lining: THREE.BufferGeometry[] = [];
+  out.push(strip(span(z0, zA, 16).map(u => [V(-sh(u), sole, zAt(u)), V(sh(u), sole, zAt(u))]))); // the sole
+  for (const s of [1, -1]) {
+    const bench = span(z0, benchAft), well = span(benchAft, shelfFwd, 4), shelf = span(shelfFwd, zA, 6);
+    out.push(strip(bench.map(u => [V(s * sh(u), sole, zAt(u)), V(s * sh(u), seat, zAt(u))]))); // the bench's front
+    out.push(strip(bench.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // its top
+    for (const segs of [bench, shelf]) lining.push(strip(segs.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
+    // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
+    const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
+      for (let k = 0; k <= 5; k++) { const y = sole + (top - sole) * k / 5; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
+      return pts; };
+    for (let k = 0; k < 6; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
+    out.push(strip(shelf.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the shelf's top, outboard
+    const ub = zU(benchAft); out.push(quad(V(s * sh(ub), sole, benchAft), V(s * benchOut(ub), sole, benchAft), V(s * benchOut(ub), seat, benchAft), V(s * sh(ub), seat, benchAft))); // the bench's end
+  }
+  const us = zU(shelfFwd), wsh = sh(us);
+  out.push(strip(span(shelfFwd, zA, 6).map(u => [V(-sh(u), seat, zAt(u)), V(sh(u), seat, zAt(u))]))); // the after shelf's top
+  out.push(quad(V(-benchOut(us), sole, shelfFwd), V(benchOut(us), sole, shelfFwd), V(benchOut(us), seat, shelfFwd), V(-benchOut(us), seat, shelfFwd))); void wsh; // its front
+  const w1 = benchOut(u1), ya = deckY(u1, 0);
+  lining.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
+  return { teak: out, lining };
 }
 
-/** Cockpit seats along each side, following the taper. */
-export function cockpitSeats(): THREE.BufferGeometry[] {
-  const { u0, u1 } = COCKPIT, h = 0.42, d = 0.3, N = 12, out: THREE.BufferGeometry[] = [];
-  for (const s of [1, -1]) {
-    const pos: number[] = [], idx: number[] = [];
-    for (let i = 0; i <= N; i++) { const u = u0 + 0.01 + (u1 - u0 - 0.03) * i / N, w = cockpitHalf(u) - 0.005; pos.push(s * w, h, zAt(u), s * (w - d), h, zAt(u)); }
-    for (let i = 0; i < N; i++) { const a = i * 2; if (s > 0) idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); out.push(g);
+/** The thwart: a beam across the cockpit between the coamings, its top flat and its underside curved (boat's frame). */
+export function thwartGeometry(): THREE.BufferGeometry[] {
+  const { z, half, depth, depthEnd } = COCKPIT_FIT.thwart, top = thwartTop(), w = cockpitHalf(zU(z)) + COAMING_T, N = 16;
+  const bot = (x: number) => top - (depthEnd + (depth - depthEnd) * (1 - (x / w) ** 2));
+  const pos: number[] = [], P = (x: number, y: number, zz: number) => pos.push(x, y, zz);
+  const q = (a: number[], b: number[], c: number[], d: number[]) => { P(a[0], a[1], a[2]); P(b[0], b[1], b[2]); P(c[0], c[1], c[2]); P(a[0], a[1], a[2]); P(c[0], c[1], c[2]); P(d[0], d[1], d[2]); };
+  for (let i = 0; i < N; i++) {
+    const xa = -w + 2 * w * i / N, xb = -w + 2 * w * (i + 1) / N;
+    for (const zz of [z - half, z + half]) q([xa, bot(xa), zz], [xb, bot(xb), zz], [xb, top, zz], [xa, top, zz]); // the faces
+    q([xa, top, z - half], [xb, top, z - half], [xb, top, z + half], [xa, top, z + half]); // the top
+    q([xa, bot(xa), z + half], [xb, bot(xb), z + half], [xb, bot(xb), z - half], [xa, bot(xa), z - half]); // the curved underside
   }
-  return out;
+  for (const x of [-w, w]) q([x, bot(x), z - half], [x, bot(x), z + half], [x, top, z + half], [x, top, z - half]); // the ends
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return [g];
 }
 
 /** The sheer as a line of points (one side), for the toerail and the coaming. */
