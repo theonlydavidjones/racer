@@ -949,6 +949,7 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
  * sails see (sailWind: the gradient at their height), the windex shows the masthead's (apparent); the jib sits where
  * its sheet and car put the clew (jibClew), as trimSails has it. The traveller, the crew's depowering ease and the
  * other lines come on the first step, from the crew's plan: a few degrees at most, eased in by the boom's own lag.
+ * (Tests that put a boat somewhere new call it too: she arrives trimmed and upright for her new heading.)
  */
 export function settleTrim(b: Boat, from: number, windKt: number): void {
   const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), sw = sailWind(from, windKt, b.h, b.v), c = b.ctl;
@@ -959,4 +960,10 @@ export function settleTrim(b: Boat, from: number, windKt: number): void {
   b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);
   const clew = jibClew(c, b.tack); b.sheets.jib = clew < 0 ? clew : clamp(clew, SAILS.jib.min, SAILS.jib.max);
   b.boom = side * b.sheets.main; b.jib = side * b.sheets.jib;
+  // upright and steady as she's put there: no heel, roll or helm carried over from where she was before (a boat moved
+  // onto the other tack must not keep heeling the old way, with the helm that went with it)
+  b.heel = 0; b.heelRate = 0; b.heelMag = 0; b.heelEqLast = 0; b.helmNeed = 0; b.sway = 0;
+  // and her crew sitting to windward for this tack (World makes them on starboard: a port-tack boat's crew would
+  // otherwise cross the boat in the first seconds; a place you've given them stays)
+  if (b.crew && b.crew.side !== b.tack) { const place = b.crew.place; b.crew = newCrew(b.crew.spec, b.tack); if (place) b.crew.place = place; }
 }
