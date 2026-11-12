@@ -207,6 +207,17 @@ is now "much better" (owner).
 5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
+6. **True-to-life rigging, the owner's most important boat item** (12 November, from the owner's boat review; Rigging,
+   after its current PRs; a big job, about 8–14 h): the blocks for the jib and main at the mast and the boom's junction,
+   the Cunninghams, and the lines visible along the traveller, each led as on Josephine (the Full sail controls
+   tables, reference/photos).
+7. From the same review (12 November):
+   - Bugs (Boat Detail; about 1–2 h): a stray second toerail on the starboard side; a half-circle see-through patch at
+     the cabin's front by the mast foot.
+   - Winching (Crew Figures; 1–2 h): the jib winch handle sits under the deck, beneath the winch, which passes through
+     the deck; and the crew winch in short pulls of at most 45°, not full circles.
+   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; the whisker pole stowed
+     farther forward on the bow; cleats amidships.
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
@@ -711,16 +722,16 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
-## Training tools (owner, 12 November; not ranked yet: the owner will rank them)
+## Training tools (owner, 12 November; ranked by the owner: the wind indicator first, then the flow view)
 
 Owner: "As part of the training tools suite, let's build a sort of midair wind indicator, like an arrow or series of
 arrows floating in the air showing where the wind is. Ideally we could also build a second view showing how the wind is
 traveling over the hull and sails to help players learn about sail shape and laminar flow."
 
-- **A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
+- **1. A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
   wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
   the rig (already in the physics) can be seen.
-- **A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+- **2. A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labelled where it's illustrative.
 
