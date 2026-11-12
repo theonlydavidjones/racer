@@ -91,13 +91,8 @@ button{font:inherit;color:inherit}
 .v.off{opacity:.3} .v.off .well{cursor:default}
 .v.winch .cleat{background:#55656e}
 .v.winch .well{border-radius:4px}
-.pole{width:52px;display:flex;flex-direction:column;align-items:center;gap:2px;align-self:flex-end}
-.pole .n{height:20px;display:flex;align-items:flex-end;margin-bottom:3px}
-.pole svg{width:44px;height:44px;cursor:pointer;border-radius:6px;background:var(--well);box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
-.pole .pst{font:600 8.5px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);height:14px;display:flex;align-items:center}
-.pole.no{opacity:.35} .pole.no svg{cursor:default}
-.pole.mine .n{color:var(--accent);cursor:pointer}
-.pole.mine svg{box-shadow:inset 0 1px 2px rgba(0,0,0,.6),0 0 0 1.5px var(--accent)}
+.allcrew.poletab{right:64px;color:var(--text)}
+.allcrew.poletab.mine{color:var(--accent)}
 .gapl{width:1px;align-self:stretch;margin:22px 4px 14px;background:var(--rule)}
 
 /* horizontal: the jib sheets and backstay ends, pulled outboard */
@@ -238,9 +233,10 @@ const horiz = (k, side) => {
 
 document.getElementById('band').innerHTML =
   `<button class="allcrew" type="button" id="allCrew" title="Hand every line back to the crew">All ↺</button>
+  <button class="allcrew poletab" type="button" id="poleTab" hidden title="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing and wing). Only on a run. Tap to set it or stow it; the crew takes a few seconds."></button>
   <div class="mid">
     <div class="piano">${jcar('P')}${vert('jibP','P','winch')}<span class="gapl"></span>${vert('downhaul','P','tackle')}${vert('jibCunningham','P')}${vert('cunningham','P','clam')}${vert('outhaul','P')}${vert('vang','P')}
-      <span class="gapl"></span><div class="pole" id="pole" title="Whisker pole: click it to set it out, click again to stow it. Only on a run (about 140° off the wind and deeper). It goes out to windward, opposite the boom, and holds the jib's clew out there (wing and wing). Setting it takes the crew a few seconds."><button class="n" type="button" data-npole>Pole</button><svg viewBox="0 0 44 44" id="poleSvg" role="button" aria-label="Whisker pole"></svg><span class="pst" id="pst"></span></div><span class="gapl"></span>
+      <span class="gapl"></span>
       ${vert('vang','S')}${vert('outhaul','S')}${vert('jibCunningham','S')}${vert('jibHalyard','S')}<span class="gapl"></span>${vert('jibS','S','winch')}${jcar('S')}</div>
   </div>
   <div class="thwart">${horiz('backstay','P')}
@@ -305,8 +301,7 @@ document.addEventListener('click', e => {
   const n = e.target.closest('button[data-n]'); if (n) L[n.dataset.n].a = 1;
   const t = e.target.closest('#tackSeg button'); if (t) { const x = carX(); tack = t.dataset.t; if (!L.traveller.a) setCar(x); seg('tackSeg','t',tack); }
   const ps = e.target.closest('#posSeg button'); if (ps) { pos = ps.dataset.p; seg('posSeg','p',pos); }
-  const pl = e.target.closest('#poleSvg'); if (pl) poleToggle();
-  const np = e.target.closest('[data-npole]'); if (np) POLE.a = 1;
+  const pl = e.target.closest('#poleTab'); if (pl) poleToggle();
   const wd = e.target.closest('#windSeg button'); if (wd) { wind = +wd.dataset.w; seg('windSeg','w',String(wind)); }
 });
 const seg = (id, a, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[a] === v)));
@@ -367,14 +362,11 @@ function draw(){
     <text x="${120 + wx * 76}" y="8" fill="#e9f2f5" font-size="11" font-family="Saira Semi Condensed, sans-serif" text-anchor="${wx > 0 ? 'end' : 'start'}">${wind} kt</text>`;
 }
 function drawPole(){
-  const el = $('pole'), ww = tack === 'S' ? 1 : -1;   // to windward: right on starboard tack, as seen from the helm
-  const f = POLE.st === 'set' ? 1 : POLE.st === 'setting' ? 1 - POLE.t / 3 : POLE.st === 'stowing' ? POLE.t / 2 : 0;
-  el.classList.toggle('no', POLE.st === 'down' && !poleOk());
-  el.classList.toggle('mine', !POLE.a);
-  // stowed: lying fore and aft on the deck; out: square to the boat from the mast, to windward
-  const ex = 22 + ww * 17 * f, ey = 10 + 28 * (1 - f);
-  $('poleSvg').innerHTML = `<circle cx="22" cy="10" r="3.5" fill="#94abb7"/><line x1="22" y1="10" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#c9d2d6" stroke-width="3" stroke-linecap="round"/>${f === 1 ? `<circle cx="${ex}" cy="${ey}" r="3" fill="none" stroke="#ff8a3d" stroke-width="1.5"/>` : ''}`;
-  $('pst').textContent = { down: poleOk() ? 'Stowed' : 'Run only', setting: 'Setting…', set: 'Out ' + (ww > 0 ? 'S' : 'P'), stowing: 'Stowing…' }[POLE.st];
+  // a tab beside "All ↺", only while running (or while the pole is still out or on its way in)
+  const tab = $('poleTab'), side = tack === 'S' ? 'S' : 'P';
+  tab.hidden = !poleOk() && POLE.st === 'down';
+  tab.classList.toggle('mine', !POLE.a);
+  tab.textContent = { down: 'Set pole', setting: 'Setting pole…', set: 'Stow pole', stowing: 'Stowing pole…' }[POLE.st];
 }
 function frame(now){
   const dt = Math.min(.05, (now - (frame.t || now)) / 1000); frame.t = now;
