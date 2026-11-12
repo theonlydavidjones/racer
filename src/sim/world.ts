@@ -590,21 +590,33 @@ export class World {
     const g = this.field;
     if (!g) return this.fieldAt(p).extra;
     const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
-    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) return this.fieldAt(p).extra;
+    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1 || this.fieldEdge(fx, fy) < 1) return this.fieldAt(p).extra;
     const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n, a = g.extra;
     return (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
+  }
+  /** How far inside the grid's edge (cells) a grid position is. */
+  private fieldEdge(fx: number, fy: number): number { const m = this.field!.n - 1; return Math.min(fx, fy, m - fx, m - fy); }
+  /** The wind across the course from the day's weather itself (outside the grid, and blended into it at its edge). */
+  private fieldExact(p: Vec): { k: number; turn: number; extra: number } {
+    const f = this.weather.field(p, this.clockUtc, this.wind.from);
+    return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) };
   }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
   fieldAt(p: Vec): { k: number; turn: number; extra: number } {
     const g = this.field;
-    if (!g) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
+    if (!g) return this.fieldExact(p);
     const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
-    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
+    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) return this.fieldExact(p);
     const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n;
     const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
     // the day's pattern (smooth over kilometres) from the grid; the shore and the slot exactly, here
-    const extra = bl(g.extra);
-    return { k: windTerrain(p, this.wind.from) * extra, turn: bl(g.turn), extra };
+    let extra = bl(g.extra), turn = bl(g.turn);
+    // across the grid's outermost cell, eased into the weather's own field, which holds outside it: the grid's samples
+    // between its nodes, and those made up to 30 s ago, needn't match it, and a boat (and the map) crossing the edge
+    // would meet a seam in the wind. At the edge itself, the exact field
+    const e = this.fieldEdge(fx, fy);
+    if (e < 1) { const x = this.fieldExact(p), s = e * e * (3 - 2 * e); extra = x.extra + (extra - x.extra) * s; turn = x.turn + wrap(turn - x.turn) * s; }
+    return { k: windTerrain(p, this.wind.from) * extra, turn, extra };
   }
 
   /**

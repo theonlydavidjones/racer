@@ -574,6 +574,15 @@ the guide's line settings and the search decides only the depowering past them. 
 optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
 settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
 heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Open, the rig's height datum (November 2026, the Coordinator: keep the physics on the ORC certificates; settle if the
+IMS rule text becomes reachable): the drawing measures the rig from the deck at the mast, as CR 6.1.11 does (the Lower
+Mast Point 1000 mm above the deck, along the mast's after side); the physics (balance.ts RIG) uses ORC's BAS 1.00 and
+IG 6.50, which ORC measures from the sheer at the mast (VPP Documentation 2026: HBI, "height of sheer at the base of
+I"). The deck's camber there is about 4.5 cm, so a class-legal Folkboat's band would be about 1.045 m above the sheer
+while the certificates say 1.00: one of them is nominal. If the class rule governs, the sails' heights rise 4.5 cm
+(about 0.9% less induced drag, 0.9% more heeling arm). The IMS definition of the mast datum point would settle it
+(orc2.orc.org and osiris.ffvoile.fr were blocked from the sessions).
+
 Open items from the physics review (November 2026): the sails' "full" depth (balance.ts RIG.fullDepth) is unsourced, so
 ORC's full-power lift is never reached above about 10 kt (this partly hides the gap above); ORC's default crew for
 the sailing displacement is about 300–330 kg against the sim's 240 (GM 0.50 rather than 0.52); the sails' own weight
