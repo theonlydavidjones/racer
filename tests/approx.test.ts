@@ -2,7 +2,7 @@
 //  1. The distance to the shore off a 10 m lattice (geo/shore.ts anyShoreDistNear), for the current's easing near the
 //     shore (environment/current.ts shoreRelief), every boat every step.
 //  2. Pairs of boats far apart, not converging and with nothing on their record, not assessed in full (World.apart).
-//  3. The AI boats thinking ten times a second, every step in close quarters (World.AI_EVERY, closeQuarters).
+//  3. The AI boats thinking twenty times a second, every step in close quarters (World.AI_EVERY, closeQuarters).
 // Kept out of test:fast (it sails eight races of six minutes).
 import { describe, expect, it } from 'vitest';
 import ss10 from '../src/courses/data/seaweed-soup-2026-course10.json';
@@ -75,7 +75,7 @@ describe('the shore distance off a 10 m lattice', () => {
   }, 1_800_000);
 });
 
-describe('the AI boats think ten times a second (World.AI_EVERY)', () => {
+describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
   // A helmsman's reaction is a few tenths of a second; her boat answers the helm every step. Thinking every sixth step
   // (staggered across the fleet) against every step: no further from that race than a 0.1% change in the current takes
   // it (as the lattice above), and no more penalties.
@@ -89,8 +89,8 @@ describe('the AI boats think ten times a second (World.AI_EVERY)', () => {
       nudge.push((Math.abs(fleetV(race(i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }).boats) / ex - 1) + Math.abs(fleetV(race(i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }).boats) / ex - 1)) / 2);
     }
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    expect(mean(dev), `ten a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
-    expect(penD, `penalties: every step ${penE}, ten a second ${penD}`).toBeLessThanOrEqual(penE * 1.3 + 2);
+    expect(mean(dev), `twenty a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
+    expect(penD, `penalties: every step ${penE}, twenty a second ${penD}`).toBeLessThanOrEqual(penE * 1.3 + 2);
   }, 1_800_000);
 });
 

@@ -269,7 +269,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   ai.clearing = false;
   if (b.finished || w.cancelled) { b.desired = n360(ww.from + 90); b.luff = true; return; } // (racing called off for the wind: she stops racing too)
   const tl = -w.t; // time to the start signal
-  const refresh = (w.steps + b.id) % AI_EVERY === 0; // heavy predictions 10× a second (each think outside close quarters)
+  const refresh = (w.steps + b.id) % (2 * AI_EVERY) === 0; // heavy predictions 10× a second (every other think outside close quarters, as before the speed pass)
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
   // see the wind she's in, not the course-wide wind); kept from the pre-start on, as crews take readings to learn it
   ai.avgFrom = ai.avgFrom == null ? ww.from : n360(ai.avgFrom + wrap(ww.from - ai.avgFrom) * Math.min(1, dt / 60));

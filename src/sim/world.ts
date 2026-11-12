@@ -152,8 +152,8 @@ const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '
 /** The settings the conditions panel sets: what applyConditions takes mid-sail (windDir, a replay's legacy pin, isn't one: it stays the sail's). */
 export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
 
-/** How often (steps) an AI boat thinks: 6 steps, 10 times a second. */
-export const AI_EVERY = 6;
+/** How often (steps) an AI boat thinks: 3 steps, 20 times a second (and every step in close quarters). */
+export const AI_EVERY = 3;
 /** Close quarters (m): four of her lengths (LOA 7.64 m), a length beyond the zone's three (RRS Definitions, Zone). */
 export const CLOSE_M = 4 * LOA;
 
@@ -719,7 +719,7 @@ export class World {
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
-    // the AI boats think 10 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
+    // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
     // boat answers her helm every step); in close quarters (a boat or a mark within CLOSE_M, about to touch, or taking a
     // penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
     for (const b of this.boats) if (!b.isUser) {
