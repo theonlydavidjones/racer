@@ -154,6 +154,8 @@ export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'cho
 
 /** How often (steps) an AI boat thinks: 6 steps, 10 times a second. */
 export const AI_EVERY = 6;
+/** Close quarters (m): four of her lengths (LOA 7.64 m), a length beyond the zone's three (RRS Definitions, Zone). */
+export const CLOSE_M = 4 * LOA;
 
 export class World {
   readonly C: Course;
@@ -718,8 +720,13 @@ export class World {
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     // the AI boats think 10 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
-    // boat answers her helm every step); their clocks in it run on the time since she last thought
-    for (const b of this.boats) if (!b.isUser) { if (this.exactAI || (this.steps + b.id) % AI_EVERY === 0) aiThink(this, b, this.exactAI ? dt : dt * AI_EVERY); this.keepClearOfShips(b); }
+    // boat answers her helm every step); in close quarters (a boat or a mark within CLOSE_M, about to touch, or taking a
+    // penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
+    for (const b of this.boats) if (!b.isUser) {
+      const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
+      if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.max(1, since)); ai.thought = this.steps; }
+      this.keepClearOfShips(b);
+    }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
     for (const b of this.boats) {
@@ -934,8 +941,16 @@ export class World {
     });
   }
 
-  /** The AI boats think every step (for the tests): otherwise every AI_EVERY steps, staggered. */
+  /** The AI boats think every step (for the tests): otherwise every AI_EVERY steps, staggered, and every step in close quarters. */
   exactAI = false;
+  /** Close quarters for an AI boat: another boat or a mark within CLOSE_M, about to touch (Rule 14), or taking a penalty. */
+  private closeQuarters(b: Boat): boolean {
+    if (b.ai?.urgent || b.penalty > 0) return true;
+    const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
+    for (const o of this.boats) if (o !== b && near(o)) return true;
+    for (const m of this.C.marks) if (near(m.p)) return true;
+    return near(this.C.pin) || (!!this.committeeHull && near(this.committeeHull.p));
+  }
   /** Assess every pair in full every step (for the tests): otherwise pairs far apart are let be (apart()). */
   exactPairs = false;
   /**
