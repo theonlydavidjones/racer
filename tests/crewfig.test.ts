@@ -30,7 +30,7 @@ function through(cr: Crew, label: string, bad: string[]): void {
   }
 }
 
-function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number }, label: string): string[] {
+function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean }, label: string): string[] {
   const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
   const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) };
   b.crew = newCrew(spec, 'S'); if (o.place) b.crew.place = o.place;
@@ -40,6 +40,7 @@ function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; s
   const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = 360 - twa; }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); } };
   frames(3);
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
+  else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
   return bad;
 }
 
@@ -50,6 +51,7 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     ['forward, light air', { kt: 6, place: { across: null, fore: 'fwd' } }], ['aft', { kt: 12, place: { across: null, fore: 'aft' } }],
     ['a tack in light air', { kt: 5, tack: true }], ['a tack in a breeze', { kt: 14, tack: true }], ['a tack hiking', { kt: 20, tack: true }],
     ['downwind, light', { kt: 6, twa: 160 }], ['downwind, breeze', { kt: 16, twa: 165 }], ['a gybe', { kt: 12, twa: 160, tack: true }],
+    ['pole out on a light-air run: up on the foredeck, and the trip there', { kt: 7, twa: 172, pole: true, secs: 40 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
   for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); });
@@ -85,4 +87,37 @@ describe('The crew move like people (render/crew.ts)', () => {
   // second, is a part jumping from place to place)
   for (const [name, o] of [['a tack', { kt: 10, tack: true }], ['a gybe', { kt: 12, twa: 160, tack: true }], ['a puff', { kt: 8, puff: 18 }], ['a lull', { kt: 18, puff: 8 }]] as const)
     it(`${name}: nothing jumps (no limb faster than a person moves)`, () => { const m = motion(o, 15); expect(m.fastest, m.where).toBeLessThan(5.5); });
+});
+
+describe('Everyone sits on something (render/crew.ts)', () => {
+  /** How far each seated person's pelvis is off what they're sitting on (m): the seat, the deck or its edge, the coaming. */
+  function gaps(o: { kt: number; twa?: number; place?: CrewPlace; puffy?: boolean }, secs = 40): { worst: number; where: string } {
+    const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
+    b.crew = newCrew(DEFAULT_CREW, 'S'); if (o.place) b.crew.place = o.place;
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), dt = 1 / 30;
+    sail(b, 20, () => { b.h = 360 - twa; });
+    let worst = 0, where = '';
+    for (let i = 0; i < secs * 30; i++) {
+      sail(b, dt, t => { b.h = 360 - twa; if (o.puffy) b.ww = { ...b.ww, kt: o.kt + 3 * Math.sin((i * dt + t) * 2 * Math.PI / 12) }; });
+      syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, dt, false, undefined, b.heel, b.tacking);
+      if (i < 30) continue;
+      [cr.helm, ...cr.crew].forEach((f, w) => {
+        const p = b.crew!.people[w];
+        // (kneeling in the middle of the cockpit is on a knee, not the pelvis: the clipping checks cover it)
+        if (!['sit', 'hike', 'lee', 'helm'].includes(p.pose) || f.going || f.tack || (w > 0 && Math.abs(p.x) < 0.3)) return;
+        f.root.updateMatrixWorld(true);
+        const hip = f.root.getWorldPosition(new THREE.Vector3()), e = halfBeam(uAtZ(hip.z));
+        // (stepping from one seat to another, over the coaming, the pelvis is up for a moment: settled ones only)
+        const was = (f as Figure & { _was?: THREE.Vector3 })._was; (f as Figure & { _was?: THREE.Vector3 })._was = hip.clone();
+        if (!was || was.distanceTo(hip) > 0.01) return;
+        // (the pelvis sits about 9 cm, scaled, above what's under it; a hiker's is over the deck's edge)
+        const under = ground(Math.sign(hip.x) * Math.min(Math.abs(hip.x), e - 0.01), hip.z) + 0.09 * f.scale;
+        const g = Math.abs(hip.y - under);
+        if (g > worst) { worst = g; where = `${w ? 'crew' + w : 'helm'} ${p.pose} frame ${i} hip (${hip.x.toFixed(2)}, ${hip.y.toFixed(2)}, ${hip.z.toFixed(2)}) seat ${under.toFixed(2)}`; }
+      });
+    }
+    return { worst, where };
+  }
+  for (const [name, o] of [['a breeze', { kt: 12 }], ['hiking', { kt: 20 }], ['hiking in puffs', { kt: 17, puffy: true }], ['light air', { kt: 4 }], ['told to hike', { kt: 12, place: { across: 'hike', fore: null } }]] as const)
+    it(`${name}: no pelvis more than 5 cm off its seat`, () => { const g = gaps(o); expect(g.worst, g.where).toBeLessThan(0.05); });
 });
