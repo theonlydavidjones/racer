@@ -20,6 +20,7 @@
  * matters most.
  */
 import type { Tack } from './boat';
+import { jibTune, mainTune, type TuneEffect } from './rigTune';
 
 export interface Controls {
   mainsheet: number; // 0 two-blocked (hard in) .. 1 fully eased
@@ -122,8 +123,9 @@ export const SAIL_WEAR: Record<'new' | 'mid' | 'old', SailWear> = {
   mid: { depth: 0.01, draft: 0.03, stretchDepth: 0.0004, stretchDraft: 0.0015, headTwist: 0.12, dcd: 0.006, clMul: 1 },
   old: { depth: 0.025, draft: 0.06, stretchDepth: 0.0008, stretchDraft: 0.0035, headTwist: 0.3, dcd: 0.015, clMul: 0.98 }
 };
-/** The rig a sail is set on: its wear, and (the main) how much the mast bends to flatten it under backstay. */
-export interface SailRig { wear: SailWear; bend: number }
+/** The rig a sail is set on: its wear, and (the main) how much the mast bends to flatten it under backstay, and the rig's
+ * tune at the dock (rigTune.ts; absent: on the guide's tune for the wind, which the shapes here were set up as). */
+export interface SailRig { wear: SailWear; bend: number; tune?: TuneEffect }
 /** A new sail on an aluminium mast: the reference the trim settings were tuned on. */
 export const STD_RIG: SailRig = { wear: SAIL_WEAR.new, bend: 1 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -163,7 +165,10 @@ export function mainShape(c: Controls, tws: number, rig: SailRig = STD_RIG, aws 
   // or less pre-bend (flatter or fuller to start with), and bends more or less under the sail's load as the apparent
   // wind's pressure rises, flattening the main and opening the upper leech by itself, at once, in a gust
   const soft = rig.bend - 1, load = Math.min(3, (aws / 14) ** 2);
-  return age({
+  // the rig's tune (rigTune.ts): pre-bend from the mast foot and the jumpers, and the masthead falling off to leeward
+  // with a slacker rig (the forestay's extra sag), against the guide's tune for the wind: none set, nothing changes
+  const tu = rig.tune ? mainTune(rig.tune, tws, c.backstay, aws) : null;
+  return tuned(age({
     // (a hard vang with the sheet in pushes the boom into the gooseneck and bends the lower mast: a little flatter)
     // the backstay bends the mast and flattens the main: more with a mast that bends more (rig.bend)
     // (the outhaul: 0 is 3 cm off the black band, 1 on it, North Sails' light-air and breeze settings (guideLimits); it
@@ -171,21 +176,30 @@ export function mainShape(c: Controls, tws: number, rig: SailRig = STD_RIG, aws 
     depth: 0.145 - 0.015 * c.outhaul - 0.025 * rig.bend * c.backstay - 0.01 * luff - 0.012 * c.vang * sheetT - 0.03 * soft - 0.012 * soft * load,
     draft: clamp(0.5 - 0.1 * luff + 0.004 * (tws - 10) + 0.02 * c.backstay, 0.3, 0.6),
     twist: clamp(19 - 12 * Math.min(1, leech) + 3 * c.backstay + 5 * soft * load, 4, 24) // a bent mast opens the upper leech a little
-  }, rig.wear, aws);
+  }, rig.wear, aws), tu);
+}
+
+/** A shape with the rig tune's changes on top (none: the same shape back, untouched). */
+function tuned(sh: Shape, t: { depth: number; twist?: number; ceAft: number } | null): Shape {
+  if (!t) return sh;
+  const { depth, twist = 0, ceAft } = t;
+  if (!depth && !twist && !ceAft) return sh;
+  return { ...sh, depth: sh.depth + depth, twist: twist ? clamp(sh.twist + twist, 4, 24) : sh.twist, ...(ceAft ? { ceAft: (sh.ceAft ?? 0) + ceAft } : {}) };
 }
 
 /** The jib's shape: the car sets its twist and foot depth, the backstay its luff sag. */
-export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = SAIL_WEAR.new, aws = tws): Shape {
+export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = SAIL_WEAR.new, aws = tws, tune?: TuneEffect): Shape {
   const car = loadedCar(c, tack), aft = car.fore / (CAR_FORE_PINS - 1); // 0 forward .. 1 aft
   const sheetT = smooth((0.28 - c.jibsheet) / 0.28);
   // luff tension, as the main's: the halyard coarse, the Cunningham fine (at their defaults, 0.3 each, the same as the
   // jib Cunningham alone gave before the halyard was a control)
   const luff = 0.6 * (c.jibHalyard ?? 0.3) + 0.4 * c.jibCunningham; // (the split mirrors the main's: an estimate)
-  return age({
+  // (the rig's tune, rigTune.ts: a forestay that sags more than on the guide's tune for the wind puts depth into the jib's front)
+  return tuned(age({
     depth: 0.135 - 0.035 * c.backstay + 0.012 * (0.5 - aft) - 0.01 * luff,
     draft: clamp(0.44 - 0.09 * luff + 0.004 * (tws - 10), 0.28, 0.55),
     twist: clamp(9 + 12 * aft - 6 * sheetT, 3, 24)
-  }, wear, aws);
+  }, wear, aws), tune ? jibTune(tune, tws, c.backstay, aws) : null);
 }
 
 /** The fastest shape for a sail in this wind (kt) and apparent wind angle. */
@@ -217,8 +231,21 @@ export function shapeEfficiency(s: Shape, t: Shape): number {
 
 /** How fast the crew (or you) can work each control, in full range per second. Hauling in a loaded line is slower. */
 export const CONTROL_RATE: Record<Exclude<keyof Controls, 'car'>, number> = {
-  mainsheet: 0.12, traveller: 0.6, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3, jibHalyard: 0.2
+  mainsheet: 0.12, traveller: 0.6 /* (unused: the traveller runs at travellerRate, below) */, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3, jibHalyard: 0.2
 };
+
+/**
+ * The traveller's car (−1 windward … +1 leeward, a range of 2): let go under load it runs to leeward almost at once, the
+ * mainsheet's pull doing the work (with no load, in a drifter, it's pushed across by hand about as fast): about a second
+ * end to end. Hauled to windward by hand it's a little slower: about 1.4 s end to end in light air, where the car carries
+ * almost no load, to about 3 s in a breeze, as the sheet's load grows (the owner, 12 Nov 2026: "IRL releasing it is very rapid; pulling it in is slightly
+ * slower but still quick"). ESTIMATES: a search found no measured times. Only words: dropping the traveller spills
+ * the wind "instantly" (Yachting Monthly, "Easy ways to power up your mainsheet"); ball-bearing cars "adjust and
+ * release under load" (Harken mid-range). North Sails' Nordic Folkboat guide sets two cars joined by ~40 cm wires to the
+ * mainsheet block, 15–20 cm to windward in light air, central in medium, eased to leeward in a breeze; it gives no
+ * speeds. The breeze's slowing follows the winch's (winchFactor), floored at half speed.
+ */
+export const travellerRate = (easing: boolean, tws: number) => (easing ? 2 : 1.4 * clamp(1.25 - tws / 24, 0.5, 1));
 
 /** Winch: hauling the jib sheet in gets slower as the breeze builds (one hand cranks, the other tails). Easing is quick. */
 export const winchFactor = (tws: number, hauling: boolean) => (hauling ? clamp(1.25 - tws / 24, 0.35, 1) : 1.6);
@@ -348,7 +375,7 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
   const c: Controls = { mainsheet: mainsheet ?? mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
     backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
   c.jibsheet = jibsheetFor(jibAng, c, tack);
-  return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws), tj);
+  return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws, rig.tune), tj);
 }
 
 /**

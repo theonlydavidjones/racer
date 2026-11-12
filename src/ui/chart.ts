@@ -21,11 +21,16 @@ export class Chart {
   private pick: { p: Vec; name: string } | null = null;
   private wasPaused = false;
   private c = $<HTMLCanvasElement>('chartC');
+  /** the overlay for the wind's or the current's moving streaks and the readout under the cursor (Hud.chartFx) */
+  private fx = $<HTMLCanvasElement>('chartFx');
+  private cursor: [number, number] | null = null;
+  private raf = 0;
 
   constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
     this.c.addEventListener('pointermove', e => {
+      const r = this.c.getBoundingClientRect(); this.cursor = e.pointerType === 'mouse' ? [e.clientX - r.left, e.clientY - r.top] : null;
       if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 4) drag.moved = true;
@@ -33,6 +38,7 @@ export class Chart {
     });
     this.c.addEventListener('pointerup', e => { if (drag && !drag.moved) this.tap(e.clientX, e.clientY); drag = null; });
     this.c.addEventListener('pointercancel', () => { drag = null; });
+    this.c.addEventListener('pointerleave', () => { this.cursor = null; });
     this.c.addEventListener('wheel', e => {
       e.preventDefault();
       const r = this.c.getBoundingClientRect(), before = this.at(e.clientX - r.left, e.clientY - r.top);
@@ -73,6 +79,16 @@ export class Chart {
     $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place: sail there, or move her there. Drag to move, scroll to zoom.' : w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
     this.info(); this.palLabel();
     this.draw();
+    // the streaks move every frame while the chart's open (the sail is paused: they're the only thing that moves)
+    let last = performance.now();
+    const tick = (t: number) => {
+      if (!this.isOpen || !this.w) { this.raf = 0; return; }
+      const r = this.c.getBoundingClientRect();
+      Object.assign(this.fx.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+      this.hud.chartFx(this.fx, this.w, (t - last) / 1000, this.cursor); last = t;
+      this.raf = requestAnimationFrame(tick);
+    };
+    if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
   private palLabel(): void { $('bChartPal').textContent = (this.w?.settings.chartPal ?? 'day') === 'day' ? 'Dusk colours' : 'Day colours'; }

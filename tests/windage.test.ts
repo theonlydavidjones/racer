@@ -50,11 +50,13 @@ describe('the wind on her with no way on (bare poles)', () => {
     for (let i = 0; i < 60 * 60; i++) { hold(w, w.windHere(u, u).from + 150); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
     expect(u.v).toBeGreaterThan(0.2); expect(u.astern ?? 0).toBe(0); // (blown off downwind on her bare rig, ahead now)
   });
-  it('in irons with her sails up she stops, as before (no sternway: the AI\'s sailing doesn\'t reckon with it yet)', () => {
-    const { w, u } = world(15);
-    u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
-    for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from); w.step(DT); }
-    expect(u.astern ?? 0).toBe(0);
+  it('in irons with her sails up she gathers sternway, faster than on her bare rig (the flogging cloth\'s windage too)', () => {
+    const bare = world(15), up = world(15);
+    up.u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
+    for (let i = 0; i < 60 * 30; i++) for (const { w, u } of [bare, up]) { hold(w, w.windHere(u, u).from); w.step(DT); }
+    expect(up.u.v).toBe(0);
+    expect(up.u.astern ?? 0).toBeGreaterThan(bare.u.astern ?? 0);
+    expect(up.u.astern ?? 0).toBeLessThan(1.5); // (a slow drift back, not a sail astern)
   });
   it('on bare poles the rig\'s windage acts at any angle forward of the beam: stopped 40 degrees off the wind, she\'s pushed astern', () => {
     const { w, u } = world(15);

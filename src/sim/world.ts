@@ -5,6 +5,7 @@ import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
+import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
@@ -21,6 +22,7 @@ import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink, crewPoleCall } from '../ai/ai';
+import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
@@ -29,7 +31,9 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { destMark, place as getPlace } from './places';
 import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
-import { condition } from '../boat/condition';
+import { condition, stepJumpers } from '../boat/condition';
+import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
+import { outlookFor } from './outlook';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
@@ -152,6 +156,11 @@ const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '
 /** The settings the conditions panel sets: what applyConditions takes mid-sail (windDir, a replay's legacy pin, isn't one: it stays the sail's). */
 export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
 
+/** How often (steps) an AI boat thinks: 3 steps, 20 times a second (and every step in close quarters). */
+export const AI_EVERY = 3;
+/** Close quarters (m): four of her lengths (LOA 7.64 m), a length beyond the zone's three (RRS Definitions, Zone). */
+export const CLOSE_M = 4 * LOA;
+
 export class World {
   readonly C: Course;
   settings: Settings;
@@ -258,6 +267,7 @@ export class World {
     this.settings = { ...settings };
     this.seed = seed;
     this.rng = makeRng(seed);
+    this.motorRng = makeRng((seed ^ 0x6d6f74) >>> 0); // (her motor's pulls: its own draws, so the race's are as they were)
     // the race day and clock, and the kind of wind the day brings (from the records for the month, or as chosen)
     this.raceDate = settings.tideDate || nextSaturday();
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
@@ -324,8 +334,35 @@ export class World {
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
+    if (!this.freeSail) this.tuneAtDock();
     if (!this.freeSail) this.log = new RaceLog(this);
     this.committeeFrom = this.C.base;
+  }
+
+  /** The wind the forecast gives for the race (kt): the course-wide breeze over the first hour from the gun (outlook.ts). */
+  forecastKt = 0;
+  /**
+   * Racing, each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
+   * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5). A boat set up in the Boat panel keeps her
+   * own tune. With none, you're set to North Sails' setting for the forecast (rigTune.ts presetFor); the club boats
+   * mostly are too, a few on Heikkilä Sailmaker's tune for the day and a few on the setting next to the right one (a crew
+   * that read the forecast differently). Their own random draw, so the race's other draws (and replays) don't move.
+   */
+  private tuneAtDock(): void {
+    const o = outlookFor(this);
+    let n = 0, sum = 0; for (let m = 0; m <= 60; m += 10) { sum += o.breeze(this.gunUtc + m).kt; n++; }
+    const kt = this.forecastKt = sum / n, right = presetFor(kt);
+    const r = makeRng((this.seed ^ 0x71a3e) >>> 0), order = ['light', 'medium', 'strong'] as const;
+    for (const b of this.boats) {
+      if (b.tune) continue;
+      let t: RigTune = TUNE_PRESETS[right];
+      if (!b.isUser) {
+        const x = r(), i = order.indexOf(right);
+        if (x > 0.85) t = heikkilaFor(kt);
+        else if (x > 0.7) t = TUNE_PRESETS[order[i === 0 ? 1 : i === 2 ? 1 : (r() < 0.5 ? 0 : 2)]];
+      }
+      b.tune = { ...t };
+    }
   }
 
   get user(): Boat { return this.boats[0]; }
@@ -382,6 +419,7 @@ export class World {
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor } } : { paint: F.paint }),
+      ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
@@ -391,10 +429,15 @@ export class World {
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
-      ai: isUser ? null : {
-        mode: 'hold', wp: r() < 0.5 ? 0 : 1, f: 0.12 + 0.76 * r(),
-        depth: 55 + r() * 45, aggr: r() * 6, width: 110 + r() * 130, aware: r() < 0.7, clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
-      }
+      // her outboard, if it's on its transom bracket: tilted up, stopped (boat/motor.ts)
+      ...(isUser && spec?.perf.outboard === 'bracket' ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0 } } : {}),
+      ai: isUser ? null : (() => {
+        // (her dice, drawn in this order: the same races come out of the same seeds)
+        const wp = r() < 0.5 ? 0 : 1, f = 0.12 + 0.76 * r(), depth = 55 + r() * 45, aggr = r() * 6, width = 110 + r() * 130, aware = r() < 0.7;
+        return {
+          mode: 'hold' as const, wp: wp as 0 | 1, f, depth, aggr, width, aware, kn: legacyKnobs(aware), clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
+        };
+      })()
     };
   }
 
@@ -714,12 +757,20 @@ export class World {
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
-    for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
+    // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
+    // boat answers her helm every step); in close quarters (a boat or a mark within CLOSE_M, about to touch, or taking a
+    // penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
+    for (const b of this.boats) if (!b.isUser) {
+      const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
+      if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
+      this.keepClearOfShips(b);
+    }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
+    for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
-      if (b.docked) { this.dockStep(b, dt); continue; }
-      if (b.handled) { this.handStep(b, dt); continue; }
+      if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
+      if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
@@ -736,6 +787,7 @@ export class World {
     this.shipEncounters();
     this.checkPairs();
     if (!this.freeSail) this.signals(prevT);
+    this.motorStep(dt);
     if (this.cruising) this.checkArrival();
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
@@ -929,6 +981,17 @@ export class World {
     });
   }
 
+  /** The AI boats think every step (for the tests): otherwise every AI_EVERY steps, staggered, and every step in close quarters. */
+  exactAI = false;
+  /** Close quarters for an AI boat: another boat or a mark within CLOSE_M, about to touch (Rule 14), or taking a penalty. */
+  private closeQuarters(b: Boat): boolean {
+    if (b.ai?.urgent || b.penalty > 0) return true;
+    const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
+    for (const o of this.boats) if (o !== b && near(o)) return true;
+    for (const m of this.C.marks) if (near(m.p)) return true;
+    const cb = this.committeeHull; // (the committee boat by her whole hull, as avoidMarks steers round it)
+    return near(this.C.pin) || (!!cb && (cb.q ? segPt(b, cb.p, cb.q) : dist(b, cb.p)) < CLOSE_M);
+  }
   /** Assess every pair in full every step (for the tests): otherwise pairs far apart are let be (apart()). */
   exactPairs = false;
   /**
@@ -1324,6 +1387,77 @@ export class World {
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
+  /** Racing, before she's finished: she retires (RET, RRS A5.1), and she's no longer racing. False if she isn't racing. */
+  retire(why = ''): boolean {
+    const u = this.user;
+    if (this.freeSail || u.finished || u.retired) return false; // (before her preparatory signal too: a boat that retires from a race she's entered)
+    u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
+    this.emit({ type: 'toast', msg: `Retired (RET, RRS A5.1)${why}: she's no longer racing. Keep clear of the boats still racing (RRS 23.1).`, ms: 5000 });
+    return true;
+  }
+  /**
+   * Racing (the definition: from her preparatory signal until she finishes or retires, or a recall, postponement or
+   * abandonment): the motor's not hers to use (RRS 42.1). Before it she may motor out to the line. (42.1 forbids propulsion,
+   * not a running engine: the sim asks at the pull, a simplification.)
+   */
+  get racingNow(): boolean { return this.racing(this.user); }
+
+  /* ---------- her outboard (boat/motor.ts) ---------- */
+  private motorRng: Rng;
+  /** Tilt the outboard down into the water, or up out of it (stopping it first). */
+  motorTilt(): void {
+    const m = this.user.motor; if (!m) return;
+    if (m.down && (m.running || m.pulling)) { m.running = false; m.pulling = undefined; }
+    m.down = !m.down; if (!m.down) { m.gear = 'N'; m.throttle = 0; m.swivel = false; }
+    this.emit({ type: 'toast', msg: m.down ? 'Outboard down: its leg in the water.' : 'Outboard tilted up, clear of the water.', ms: 2000 });
+  }
+  /**
+   * Pull-start it: in neutral (it won't start in gear), tilted down. Racing, it isn't hers to use (RRS 42.1; 42.3(h): not
+   * even to get clear after hitting something): `retireFirst` says she's retiring to do it. A pull takes a second and a half;
+   * the first catches three times in four, a second pull nearly always (a warm motor more readily: as owners know them).
+   */
+  motorStart(retireFirst = false): 'ok' | 'racing' | 'tilt' | 'gear' {
+    const m = this.user.motor; if (!m) return 'ok';
+    if (m.running || m.pulling) return 'ok';
+    if (this.racingNow) { if (!retireFirst) return 'racing'; this.retire(', to use her motor (RRS 42.1)'); }
+    if (!m.down) { this.emit({ type: 'toast', msg: 'Tilt the outboard down first: the prop needs to be in the water.', ms: 2500 }); return 'tilt'; }
+    if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Put it in neutral to start it: it won\'t start in gear.', ms: 2500 }); return 'gear'; }
+    m.pulling = { left: 1.5, catches: this.motorRng() < (m.warm ? 0.95 : 0.75) };
+    this.emit({ type: 'toast', msg: 'Pulling the starter cord…', ms: 1500 });
+    return 'ok';
+  }
+  motorStop(): void { const m = this.user.motor; if (!m) return; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; }
+  /** Into gear: F, N or R (the 2.5 has no reverse: swivel it round instead). Shifting is done at tick-over. */
+  motorGear(g: 'F' | 'N' | 'R'): void {
+    const m = this.user.motor; if (!m) return;
+    if (g === 'R' && !OUTBOARDS[m.hp].reverse) { this.emit({ type: 'toast', msg: 'The 2.5 has no reverse gear: swivel it round on its bracket to push astern.', ms: 3500 }); return; }
+    if (g !== m.gear) m.throttle = Math.min(m.throttle, 0.15);
+    m.gear = g;
+  }
+  motorThrottle(t: number): void { const m = this.user.motor; if (m) m.throttle = clamp(t, 0, 1); }
+  /** The 2.5: turned round on its bracket, its push goes astern (in neutral). */
+  motorSwivel(): void {
+    const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse) return;
+    if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Into neutral first, then swivel it round.', ms: 2500 }); return; }
+    m.swivel = !m.swivel;
+    this.emit({ type: 'toast', msg: m.swivel ? 'Swivelled round: in gear it pushes her astern.' : 'Swivelled back: in gear it pushes her ahead.', ms: 2500 });
+  }
+  /** Made fast in her slip, the motor running: the crew casts off the lines and she's yours to motor out. */
+  castOff(): boolean {
+    const u = this.user, m = u.motor;
+    if (!u.docked || !m?.running) return false;
+    u.docked = undefined; u.v = 0; u.astern = 0;
+    this.emit({ type: 'toast', msg: 'Lines in: she\'s yours. Motor her out (reverse to back out of a slip), then hoist sail and stop the motor.', ms: 5000 });
+    return true;
+  }
+  private motorStep(dt: number): void {
+    const m = this.user.motor; if (!m?.pulling) return;
+    m.pulling.left -= dt;
+    if (m.pulling.left > 0) return;
+    if (m.pulling.catches) { m.pulling = undefined; m.running = true; m.warm = true; this.emit({ type: 'toast', msg: `The ${m.hp} hp's running.`, ms: 2000 }); }
+    else { m.pulling = { left: 1.5, catches: this.motorRng() < 0.95 }; this.emit({ type: 'toast', msg: 'It didn\'t catch: another pull…', ms: 1500 }); }
+  }
+
   /**
    * Send her home: her home slip becomes where she's going, for the navigator's passage plan and the tiller pilot (on, it
    * steers for it; you bring her into the slip yourself). Racing, before she's finished, it retires her first: she's no
@@ -1331,12 +1465,9 @@ export class World {
    * and may use the pilot (RRS 52 binds only a boat racing). False when she has no home slip.
    */
   sendHome(): boolean {
-    const u = this.user, slip = this.homeSlip;
+    const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
-    if (!this.freeSail && !u.finished && !u.retired) {
-      u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
-      this.emit({ type: 'toast', msg: 'Retired (RET, RRS A5.1): she\'s no longer racing. Keep clear of the boats still racing (RRS 23.1).', ms: 5000 });
-    }
+    this.retire();
     this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
     this.arrivedT = null;
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
