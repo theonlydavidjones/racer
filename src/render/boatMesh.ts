@@ -748,12 +748,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   }
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; rig.add(pole);
-  // ... and stowed when it isn't: on the foredeck, a little to starboard of the centreline, from abreast the mast
-  // forward, in two deck chocks (the usual place on a small keelboat without lifelines, clear of the jib's tack)
+  // ... and stowed when it isn't: flat on a side deck in two chocks, from near the bow aft
   const stowed = new THREE.Group();
-  // (on a side deck, port or starboard as her owner keeps it, flat, just inboard of the toe rail, alongside the cabin)
+  // (on a side deck, port or starboard as her owner keeps it, flat, just inboard of the toe rail)
   { const side = (b.paint?.poleSide ?? 'port') === 'starboard' ? 1 : -1;
-    const z0 = -1.35, z1 = 0.72, xAt = (z: number) => side * (halfBeam(uAtZ(z)) - 0.11), yAt = (z: number) => deckY(uAtZ(z), Math.abs(xAt(z))) + 0.024;
+    // (2.85 m long: Theis Palm, North Sails' Folkboat talk to the Finnish class, 2023, "Whisker 'Jib' pole is 2,85 m";
+    // stowed well forward, its fore end near the bow, as the owner has it on Josephine)
+    // (just aft of the forestay, 0.22 m in from the side: clear of the forehatch, inboard of the shrouds' chainplates, and
+    // about 8 cm off the cabin's side at its after end)
+    const z0 = -L / 2 + 0.9, z1 = z0 + 2.85, xAt = (z: number) => side * (halfBeam(uAtZ(z)) - 0.22), yAt = (z: number) => deckY(uAtZ(z), Math.abs(xAt(z))) + 0.024;
     const a = new THREE.Vector3(xAt(z0), yAt(z0), z0), c = new THREE.Vector3(xAt(z1), yAt(z1), z1), len = a.distanceTo(c);
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT);
     sp.position.copy(a).lerp(c, 0.5); sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize()); stowed.add(sp);
