@@ -152,6 +152,9 @@ const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '
 /** The settings the conditions panel sets: what applyConditions takes mid-sail (windDir, a replay's legacy pin, isn't one: it stays the sail's). */
 export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
 
+/** How often (steps) an AI boat thinks: 6 steps, 10 times a second. */
+export const AI_EVERY = 6;
+
 export class World {
   readonly C: Course;
   settings: Settings;
@@ -714,7 +717,9 @@ export class World {
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
-    for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
+    // the AI boats think 10 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
+    // boat answers her helm every step); their clocks in it run on the time since she last thought
+    for (const b of this.boats) if (!b.isUser) { if (this.exactAI || (this.steps + b.id) % AI_EVERY === 0) aiThink(this, b, this.exactAI ? dt : dt * AI_EVERY); this.keepClearOfShips(b); }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
     for (const b of this.boats) {
@@ -929,6 +934,8 @@ export class World {
     });
   }
 
+  /** The AI boats think every step (for the tests): otherwise every AI_EVERY steps, staggered. */
+  exactAI = false;
   /** Assess every pair in full every step (for the tests): otherwise pairs far apart are let be (apart()). */
   exactPairs = false;
   /**

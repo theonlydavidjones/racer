@@ -17,12 +17,12 @@ const RACES = [
   [ss2, { tideDate: '2026-11-14', windKind: 'west', windKt: 12, current: 'real', fleet: 5 }, 7]
 ] as const;
 /** Six minutes of a race: each AI boat's mean speed after the gun, and where she is (the user's boat, unsailed, left out). */
-function race(i: number, o: { grid: boolean; skip: boolean; curK?: number; seed?: number }) {
+function race(i: number, o: { grid: boolean; skip: boolean; curK?: number; seed?: number; exactAI?: boolean }) {
   const [c, s, seed0] = RACES[i], seed = o.seed ?? seed0;
   setShoreGrid(o.grid);
   try {
     const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, ...s } as never, seed);
-    w.exactPairs = !o.skip;
+    w.exactPairs = !o.skip; w.exactAI = !!o.exactAI;
     if (o.curK) { const f = w.currentAt.bind(w); w.currentAt = (p, l) => { const v = f(p, l); return { x: v.x * o.curK!, y: v.y * o.curK! }; }; }
     const sum = w.boats.map(() => 0), incidents: string[] = []; let n = 0;
     while (w.t < 6 * 60) {
@@ -69,6 +69,25 @@ describe('the shore distance off a 10 m lattice', () => {
     }
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(mean(dev), `the lattice ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
+  }, 1_800_000);
+});
+
+describe('the AI boats think ten times a second (World.AI_EVERY)', () => {
+  // A helmsman's reaction is a few tenths of a second; her boat answers the helm every step. Thinking every sixth step
+  // (staggered across the fleet) against every step: no further from that race than a 0.1% change in the current takes
+  // it (as the lattice above), and no more penalties.
+  it('sails no further from the every-step race than a 0.1% change in the current does, over eight races, with no more fouls', () => {
+    const dev: number[] = [], nudge: number[] = [];
+    let penE = 0, penD = 0;
+    const pens = (r: ReturnType<typeof race>) => r.boats.reduce((a, b) => a + b.penalties / 720, 0);
+    for (const [i, seed] of [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const) {
+      const exR = race(i, { grid: true, skip: true, seed, exactAI: true }), ex = fleetV(exR.boats), dR = race(i, { grid: true, skip: true, seed });
+      dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR);
+      nudge.push((Math.abs(fleetV(race(i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }).boats) / ex - 1) + Math.abs(fleetV(race(i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }).boats) / ex - 1)) / 2);
+    }
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(mean(dev), `ten a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
+    expect(penD, `penalties: every step ${penE}, ten a second ${penD}`).toBeLessThanOrEqual(penE * 1.3 + 2);
   }, 1_800_000);
 });
 
