@@ -78,14 +78,17 @@ export class FlowField {
   /** samples worked out last time, and how long that took (ms): for the frame-cost check */
   lastSamples = 0; lastMs = 0;
   draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, wd: World, kind: FlowKind, alpha: number, cellPx = 12): void {
+    if (!(w > 0 && h > 0 && scale > 0 && cellPx > 0)) return; // (a map not laid out yet, or hidden)
     const { m, inv } = affine(tf);
     const cs = [inv(0, 0), inv(w, 0), inv(0, h), inv(w, h)], xs = cs.map(p => p.x), ys = cs.map(p => p.y);
     const vx0 = Math.min(...xs), vx1 = Math.max(...xs), vy0 = Math.min(...ys), vy1 = Math.max(...ys);
     const d = cellPx / scale, minute = Math.floor(wd.clockUtc);
     const key = `${kind}|${minute}|${wd.seed}|${wd.wind.from.toFixed(0)}`;
     const inside = this.img && vx0 >= this.x0 && vx1 <= this.x0 + (this.nx - 1) * this.d && vy1 <= this.y1 && vy0 >= this.y1 - (this.ny - 1) * this.d;
+    if (![vx0, vx1, vy0, vy1, d].every(Number.isFinite)) return;
     if (!inside || key !== this.key || Math.abs(Math.log(d / this.d)) > 0.25) this.build(wd, kind, vx0, vx1, vy0, vy1, d, key);
     else this.lastSamples = 0;
+    if (!this.img) return;
     // the image's pixel (i, j) is the sim's (x0 + i·d, y1 − j·d): that onto the screen through tf
     ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = true;
     ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); ctx.transform(this.d, 0, 0, -this.d, this.x0, this.y1);
@@ -96,7 +99,7 @@ export class FlowField {
     const T0 = performance.now();
     const mx = (vx1 - vx0) * 0.25, my = (vy1 - vy0) * 0.25;
     this.x0 = Math.floor((vx0 - mx) / d) * d; this.y1 = Math.ceil((vy1 + my) / d) * d; this.d = d; this.key = key;
-    this.nx = Math.ceil((vx1 + mx - this.x0) / d) + 2; this.ny = Math.ceil((this.y1 - (vy0 - my)) / d) + 2;
+    this.nx = Math.min(1024, Math.ceil((vx1 + mx - this.x0) / d) + 2); this.ny = Math.min(1024, Math.ceil((this.y1 - (vy0 - my)) / d) + 2);
     const img = this.img ?? document.createElement('canvas'); img.width = this.nx; img.height = this.ny; this.img = img;
     const g = img.getContext('2d')!, id = g.createImageData(this.nx, this.ny), R = RAMP[kind], N = this.nx * this.ny;
     if (this.kt.length !== N) { this.kt = new Float32Array(N); this.ux = new Float32Array(N); this.uy = new Float32Array(N); }
@@ -143,7 +146,8 @@ export class Streaks {
   private rnd(): number { this.seed = (this.seed * 16807) % 2147483647; return this.seed / 2147483647; }
   /** Move them on by dt (real seconds), then draw them through tf. */
   draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, field: FlowField, kind: FlowKind, dt: number, lineW = 1.3, color = '255,255,255'): void {
-    const { inv } = affine(tf), step = Math.min(dt, 0.1), px = PX_PER_KT[kind];
+    if (!(w > 0 && h > 0 && scale > 0)) return;
+    const { inv } = affine(tf), step = Math.min(Math.max(dt, 0), 0.1), px = PX_PER_KT[kind];
     // a new view (zoomed, or moved a quarter of the way across): scatter them all over it afresh
     { const c = inv(w / 2, h / 2), v = this.view;
       if (Math.abs(Math.log(scale / (v.scale || 1e-9))) > 0.1 || Math.hypot(c.x - v.x, c.y - v.y) * scale > Math.min(w, h) / 4) { this.age.fill(Infinity); this.view = { x: c.x, y: c.y, scale }; } }
