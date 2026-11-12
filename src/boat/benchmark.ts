@@ -23,7 +23,7 @@ export function benchBoat(heading: number, windKt: number, spec?: BoatSpec, mont
     cur: { x: 0, y: 0 }, ww: { from: 0, kt: windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: false, sheetCmd: { main: 0, jib: 0 }, trimAll: false,
     ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 },
     trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
-    heel: 0, boom: 0, jib: 0, ai: null, ...(spec ? { spec, cond: condition(spec, month) } : {})
+    heel: 0, boom: 0, jib: 0, ai: null, ...(spec ? { spec, cond: condition(spec, month), ...(spec.perf.tune ? { tune: spec.perf.tune } : {}) } : {})
   };
 }
 

@@ -1,5 +1,6 @@
 import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
+import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong } from '../geo/shore';
@@ -30,6 +31,8 @@ export type PilotMode = 'off' | 'auto' | 'wind' | 'nav';
 
 export interface Pilot {
   mode: PilotMode;
+  /** Nav under power: on the direct course to the destination (motor.ts), not the sailing navigator's */
+  direct?: boolean;
   /** Auto: the compass course it holds, deg. */
   course: number;
   /** Wind: the apparent wind angle it holds, signed (+ from starboard), deg. */
@@ -155,7 +158,18 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
   let want: number;
   if (p.mode === 'auto') want = p.course;
   else if (p.mode === 'wind') want = n360(b.h + wrap(seen - p.awa)); // wind too far aft: come up toward it
-  else { want = dest ? navHeading(b, p, dest, t) : b.h; p.navH = want; }
+  else {
+    // under power (her motor driving her ahead), she needn't tack: the navigator points her straight at it, unless there's
+    // land in the way
+    const motoring = !!b.motor && thrust(b.motor, b.v) > 40; // (driving her ahead, more than at tick-over)
+    // (the direct line probed ahead to 150 m to take it, 100 m to keep it, so it doesn't flip between the two at the edge of
+    // the probe; and only as far as the destination: her slip's docks behind it don't count)
+    const dd = dest ? Math.hypot(dest.x - b.x, dest.y - b.y) : 0, direct = dest ? n360(brg(dest.x - b.x, dest.y - b.y)) : b.h, u = V(direct);
+    const reach = Math.min(p.direct ? 100 : 150, Math.max(0, dd - 12));
+    const clear = !!dest && landAlong(b, { x: b.x + u.x * reach, y: b.y + u.y * reach }) === Infinity;
+    p.direct = motoring && clear;
+    want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
+  }
   const err = wrap(want - b.h), rate = wrap(b.h - p.lastH) / Math.max(dt, 1e-6); p.lastH = b.h;
   const mr = Math.max(1, maxTurnRate(b.v));
   // the turn it asks for, and the helm that should give it, plus what AutoTrim has learned she needs to go straight

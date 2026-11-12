@@ -119,7 +119,10 @@ export function formFor(sk: SkipperAttrs, r: Rng): SkipperAttrs {
 const by = (x: number, [e, n]: [number, number]) => n + (e - n) * x;
 /** Her knobs from her attributes: a 0.5 skipper gets the legacy numbers. */
 export function knobsFor(sk: SkipperAttrs): SkipperKnobs {
-  const nerve = 1.3 - 0.6 * sk.nerve; // (more nerve, smaller margins: 0.5 gives today's)
+  // (less nerve, wider margins in traffic, giving away distance. More nerve doesn't yet mean tighter ones than today's:
+  // the AI's keep-clear moves aren't precise enough for that, and the boldest skippers fouled most, two penalties a race.
+  // Sailing closer and getting away with it comes with phase 3, traffic)
+  const nerve = 1 + 0.6 * Math.max(0, 0.5 - sk.nerve);
   return {
     layBiasSd: by(sk.tactics, SKIPPER_KNOBS.layBias), grooveSd: by(sk.speed, SKIPPER_KNOBS.groove), startSd: by(sk.start, SKIPPER_KNOBS.start),
     currentShare: 0.4 + 0.6 * sk.strategy,

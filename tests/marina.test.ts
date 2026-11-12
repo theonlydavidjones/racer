@@ -69,7 +69,7 @@ describe('West Harbor', () => {
     expect(Math.hypot(u.x - x0, u.y - y0)).toBeGreaterThan(4);
     // going astern the tiller still steers her (the bow goes the way the tiller's pushed)
     Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, handled: undefined, v: 0, astern: 0.8 });
-    const h0 = u.h; u.tiller = -0.8; for (let i = 0; i < 120; i++) w.step(DT); u.tiller = 0;
+    const h0 = u.h; u.tiller = -0.8; for (let i = 0; i < 240; i++) w.step(DT); u.tiller = 0; // (4 s: at 0.8 m/s astern she answers the helm over about 2 s, physics.ts yawLag)
     expect(((u.h - h0 + 540) % 360) - 180).toBeLessThan(-3); // tiller to port: bow to port
     // the crew hoists: the jib in about 15 s, the main in about 30 s (slower off the wind)
     w.setSail('jib', true); w.setSail('main', true);

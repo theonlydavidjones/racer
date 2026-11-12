@@ -12,7 +12,8 @@ describe('the AI skipper', () => {
     expect(skipperFor('Polperro')).not.toEqual(skipperFor('Freja'));
     for (const v of Object.values(skipperFor('Thea'))) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1); }
   });
-  it('a mid-fleet skipper (0.5) decides by the legacy numbers', () => {
+  it('a mid-fleet skipper (0.5) or a bolder one decides by the legacy numbers in traffic; a timid one keeps more room', () => {
+    expect(knobsFor(all(1)).keepClearM).toBe(legacyKnobs(true).keepClearM); expect(knobsFor(all(0)).keepClearM).toBeGreaterThan(legacyKnobs(true).keepClearM);
     const k = knobsFor(all(0.5)), L = legacyKnobs(true);
     for (const key of ['headerDeg', 'headerHoldS', 'headerTackRate', 'dirtyAirS', 'keepClearM', 'keepClearS'] as const) expect(k[key]).toBeCloseTo(L[key], 9);
   });

@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type CrewSpec, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -136,7 +136,7 @@ export function workPace(b: Boat, who: number): number {
 }
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
-function reachTime(a: Aboard, st: Station | null, windward: number, p: { skill?: number; h: number; w: number }): number {
+function reachTime(a: Aboard, st: Station | null, windward: number, p: Person): number {
   if (!st) return reactTime(p) * 0.5;
   const dx = Math.abs(st.arm * windward - a.x), dz = Math.abs(st.z - a.z), forward = st.z < Z.cockpitFwd - 0.2;
   return reactTime(p) + (dx + dz) / ((forward ? 0.5 : 0.9) * pace(p));
@@ -173,7 +173,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
     const who = ownerOf(k, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who]; if (!a) continue;
-    const skill = skillOf(ppl[who]), e = err(k);
+    const skill = attrOf(ppl[who], 'trim'), e = err(k);
     if (a.job?.line === k) continue;
     if (PIANO.has(k)) {
       // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
@@ -248,7 +248,7 @@ function carJob(b: Boat, dt: number): void {
   if (!want) return;
   const off = Math.abs(want.fore - lazy.fore) + Math.abs(want.ins - lazy.ins);
   if (off === 0) { b.carOff = 0; if (yours) b.carCmd = null; return; }
-  const skill = skillOf(p);
+  const skill = attrOf(p, 'trim');
   b.carOff = (b.carOff ?? 0) + dt;
   // your call: as soon as they're free. Their own: a change that has lasted, worth a pin (a novice: two), and not while
   // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)

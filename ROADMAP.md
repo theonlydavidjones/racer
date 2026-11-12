@@ -27,8 +27,11 @@ What's planned, roughly in order. Done work is described in the README.
 ## Priorities (owner's ranking, November 2026)
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
-1. P0 phase 2: the interior true to a real Folkboat (Boat Detail, running; 6–10 h).
-2. Finish the crew figures: the crew's stations onto the real benches. Owner chose option 2: the benches plus the side
+1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner moulding with brown cushions,
+   shelves and fiddles, floorboards, knees, a hanging locker, the forepeak opening to the rule, the keel-stepped mast).
+   Next in P0: true-to-life rigging (the owner's top boat item, Rigging, begun with the mainsheet's blocks) and the
+   boat review's bugs, winching and polish (P0 items 6–7).
+2. ~~Finish the crew figures: the crew's stations onto the real benches~~ (done, crew-stations merged). Owner chose option 2: the benches plus the side
    deck alongside them and aft of the thwart beside the after shelf (hips 1.35–2.5 m), where crews really sit; about
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
    (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
@@ -142,9 +145,11 @@ as it is.
 - Gashouse Cove kept as it was (before 2026).
 - The swell view holds still.
 - The crew passing close mid-cockpit in a 12–16 kt tack: left as it is (parked).
-- Four boat-spec sites allowed, for Marinas to source the moored boats.
+- Four boat-spec sites allowed, for Marinas to source the moored boats (begun: their proportions from the J/105's
+  published figures, and the SF Marina's occupancy).
 - The lines plan: the researcher to find who holds Plan 1.
-- The speed budget held, with one deeper speed pass.
+- The speed budget held, with one deeper speed pass (done by v147: hull ends and chop lookups memoised, the current's
+  shore distance off a 10 m lattice, tested against a 0.1% current change).
 - The daily weather refresh now builds from main.
 
 The original ranking, for the record:
@@ -200,13 +205,25 @@ work to do on the deck as well (lines, hatch, fairleads, etc) but that's not urg
 is now "much better" (owner).
 1. ~~The interior reads as real 3D by day~~ (done, v106) (parallax, daylight in through the companionway and lights), and the
    translucent panel over the companionway at night is gone (2–4 h).
-2. The interior true to a real Folkboat, from the construction plan and reference photos (6–10 h).
+2. ~~The interior true to a real Folkboat~~ (done), from the construction plan and reference photos (6–10 h).
 3. ~~The cockpit to the plan~~ (done: benches as lazarettes, footwell, thwart, after shelf, winches on pedestals from Josephine's photos), with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. ~~Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines~~ (done, v128–v134).
-5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
+5. ~~The cabin lantern swings with the boat's motion~~ (done by v147: a damped pendulum on its chain driven by her roll,
+   pitch and heave, its light following) (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
+6. **True-to-life rigging, the owner's most important boat item** (12 November, from the owner's boat review; Rigging,
+   after its current PRs; a big job, about 8–14 h): the blocks for the jib and main at the mast and the boom's junction,
+   the Cunninghams, and the lines visible along the traveller, each led as on Josephine (the Full sail controls
+   tables, reference/photos).
+7. From the same review (12 November):
+   - Bugs (Boat Detail; about 1–2 h): a stray second toerail on the starboard side; a half-circle see-through patch at
+     the cabin's front by the mast foot.
+   - Winching (Crew Figures; 1–2 h): the jib winch handle sits under the deck, beneath the winch, which passes through
+     the deck; and the crew winch in short pulls of at most 45°, not full circles.
+   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; the whisker pole stowed
+     farther forward on the bow; cleats amidships.
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
@@ -313,7 +330,8 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Race Chair with the OA decides, and tells the fleet by text. It's marked proposed; the bylaws say nothing on wind. So
   in racing: no reefing; the committee cancels in a blow, by the fleet's practice (the owner's 23 kt vote; the written
   proposal's 25 kt), signalled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
-  the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (the fleet's
+  the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (built: the committee calls racing off over 23 kt, AP or N over A, the
+  strategist warns ahead, CXL in the logbook) (the fleet's
   practice), and **reefing is held until there's a Folkboat-specific source** (a cruiser's account or a sailmaker). For cruising: the owner expects blue-water
   Folkboats to reef; still unconfirmed. Ann Gash (solo round the world, 1975–77) reportedly used a working jib and a
   trysail in a storm, not a reefed main (a search summary of her memoir, not read); Hasler's Jester was junk-rigged
@@ -335,6 +353,9 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
+  - From Marinas, the motor: the outboard's thrust is off her centreline (about 0.45 m out on the bracket, some 180 N·m at full
+    throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
+    both real lessons at the dock. And sourced figures for the figure of merit (0.55), reverse (0.5) and the leg's drag.
   - From Charts, after Lime Point (#64): blocky 50 m terrain cliffs along the Marin shore, Horseshoe Bay included (needs
     a shore fit for all the ENC land); a small sand-coloured sliver floating southwest of Horseshoe Bay's marina; a
     possible spike at the west edge of the Lime Point box; the tiller pilot tacks into the cove behind Lime Point on a
@@ -343,7 +364,8 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
     shifts the trim calibration, so it needs its own reviewed PR.
   - From Bay East: Richmond YC and Encinal slips, BYC and Encinal racing marks, and the current in embayments without
     NOAA stations all need sources it can't reach yet (the club sites aren't allowed hosts).
-- **Later — aluminium spars look like white plastic** (polish; 1–2 h): owner, "the aluminum on the masts and booms
+- ~~**Later — aluminium spars look like white plastic**~~ (done by v147: clear-anodised extrusion, a satin mid-grey with soft
+  broad highlights, checked against CircleSea's boom in strong sun; polish; 1–2 h): owner, "the aluminum on the masts and booms
   looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
   fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
   a long highlight down the mast. For every aluminium rig (the wooden spars stay wood). Check in daylight and at night.
@@ -501,10 +523,14 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    error (the depth itself, 0.145/0.141, is still unsourced: no camber figure for a Folkboat, or ORC's flat against
    camber, was found). ORC's least flat is 0.42 since 2023 (VPP Documentation 2023, §5: "reduced to 0.42 from 0.62"),
    as the sim's flatOf has it.
-10. **In irons** (hull 3): at rest she turns 4°/s the way the tiller points and sails off; a real boat gathers sternway
-   and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
-   42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own
-   hove-to model).
+10. **In irons** (hull 3): ~~at rest she turns 4°/s the way the tiller points and sails off~~ (done, branch in-irons:
+   with her sails up she gathers sternway, the rudder works backwards by its flow, and the 4°/s at a crawl is sculling,
+   only as RRS 42.3(d) and World Sailing's interpretations allow: from above close-hauled to either tack's close-hauled
+   course, not back against itself, not against a backed jib; backing the jib keeps her sternway). ~~No yaw inertia~~
+   (done, branch yaw-inertia: her turn answers the helm with the hove-to model's own time constant, 0.6 s at 4.7 kt,
+   2.8 s at 1 kt). Open, unsourced either way: sternway in a breeze (2.2 m/s in 22 kt, 2.7 in 28, on the ahead
+   resistance curve going astern: a transom-first hull may drag more); held amidships head to wind she never sheers
+   off; in 6 kt held head to wind she makes a little headway as she rolls from side to side (the roll's sweep).
 11. **The chop** (waves 3–6): ~~it follows the wind at the boat, so a puff or a neighbour's lee changes her sea~~ (done:
    the wind over the water); ~~it's fully grown at once~~ (done) (CEM: 3.4 h to fetch-limited on the Berkeley Circle
    in 18 kt, so 2.5× too big an hour into the breeze); ORC's polar already has a seaway drag in it (eq. 3.2, D_raw), so
@@ -633,7 +659,8 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
   pared back. First an audit of every start-state screen for redundancy and friction.
 - **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
-- ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
+- ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife; the wildlife remade from the species by v147, #143: gulls, pelicans, cormorants, seals, porpoises and Pier 39's
+  sea lions). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
 - ~~**The Bay Bridge and the city at night**~~ (done, v69: the West and East Spans, The Bay Lights' patterns dusk to dawn (their current hours unconfirmed), the skyline lit, reflections; pier positions approximate until overpass-api.de is reachable; the overlit skyline fixed in v79: lit windows follow the DOE reference buildings' lighting schedules, offices 50% at 19:00, 10% by 22:30, 5% on weekend nights, clustered by floor. more far glow on the towers on weekend nights in v80 (owner's call); the homes' peak lit share stays at 0.3) (owner, November 2026; 6–10 h): a high-quality Bay Bridge (the West Span's
   suspension towers, cables and anchorage at Yerba Buena Island, the East Span's single tower), with **The Bay Lights**,
@@ -704,16 +731,41 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
+## Training tools (owner, 12 November; ranked by the owner: the wind indicator first, then the flow view)
+
+Owner: "As part of the training tools suite, let's build a sort of midair wind indicator, like an arrow or series of
+arrows floating in the air showing where the wind is. Ideally we could also build a second view showing how the wind is
+traveling over the hull and sails to help players learn about sail shape and laminar flow."
+
+- **1. A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
+  wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
+  the rig (already in the physics) can be seen.
+- **2. A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+  jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
+  model. True to the physics, and labelled where it's illustrative.
+
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). ~~Winter winds~~ (done: westerly, northerly, southerly and light days by their frequency in the records). ~~Real wind for a past race day~~ (done: observed every 6 minutes since 2021) and ~~the forecast~~ (done: NWS, refreshed daily). ~~The wind across the course~~ (done: the NWS grid for forecasts; station-nudged terrain model for past days). Later: the AI sailing to the pressure; a gridded observed analysis (NOAA's URMA) for past days.
 - ~~**Wind shadows**~~ (done: boats' dirty air, ships, the committee boat, the lee of the land). Later: wakes laid down as markers and carried by the wind (so a wake stays where a boat tacked); the AI choosing a clear-air hole on the line; the wind bending round the islands and speeding up on their flanks.
-- ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). ~~Show each item on the replay~~ (done, v127). Later: compare against the boat that won.
+- ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). ~~Show each item on the replay~~ (done, v127). ~~Compare against the boat that won~~ (done by v147: the replay shows your race against the winner's, leg by leg,
+  physics-reviewed).
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
+  Owner's requests, 12 November (unranked; the owner will rank them):
+  1. Significantly more hull paint colours (Boat Detail).
+  2. Colour options for the sail numbers and the F class letter (Boat Detail).
+  3. The interior and cockpit material, teak or fibreglass (Boat Detail).
+  4. The drawn rigging lines in the colours chosen for the control panel (the Boat page's line colours), so each line
+     wears its control's colour (Rigging, with the rigging rendering).
+  5. A tactical compass on the cabin top, as Josephine's Tacktick-style unit at the mast foot
+     (reference/photos/josephine-cabin-top-forward-port.png): usable in the game, readable from the cockpit camera,
+     showing heading, and used tack to tack to read lifts and headers like the real one (Boat Detail for the unit,
+     UI & Experience for its readout).
+  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (Boat Detail).
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)
@@ -754,7 +806,8 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
 3. ~~**Landmarks you steer and sight by:**~~ (done, with transits for the start line and laylines) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. ~~**Marks and the committee boat:**~~ (done; no general recall yet) real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
-4a. **The Ferry Building, drawn properly** (owner, November 2026: "a more complete drawing of the ferry building, with
+4a. ~~**The Ferry Building, drawn properly**~~ (done by v147: from OpenStreetMap, the tower's stages to 75 m, the arcade on
+   every long face, gates B–G, the Port of San Francisco sign on the Bay roofline across from the tower) (owner, November 2026: "a more complete drawing of the ferry building, with
    Port of San Francisco sign… Not urgent"; later; accuracy/polish; 4–6 h). Today (render/landscape.ts) it's a
    30 × 200 × 15 m cream box with a 60 m tower, a pyramid roof and four lit 6.7 m clock dials; no sign, arcade or slips.
    True to life (Wikipedia, Ferry Building (San Francisco)): A. Page Brown, Beaux-Arts, opened 1898; the clock tower is

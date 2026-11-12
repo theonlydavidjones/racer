@@ -5,7 +5,8 @@ import { beatInChop, speedInChop } from '../boat/seaway';
 import { crewSolve, targetShape, CAR_FORE_PINS } from '../boat/controls';
 import { optimalSheet } from '../boat/trim';
 import { bestFore } from '../boat/crewPhys';
-import { condition } from '../boat/condition';
+import { condition, mainRig } from '../boat/condition';
+import { tuneBrief } from '../boat/rigTune';
 import { ISLAND_ROUNDING_S } from '../courses/committee';
 import { describeSea } from '../environment/sea';
 import { WIND_KIND_LABEL, slotFlow } from '../environment/wind';
@@ -320,7 +321,7 @@ function trimSection(w: World, o: Outlook, legs: LegPlan[], finishT: number): Br
     const flat = beatAngle(tws), chopB = sea.hsW < 0.02 ? flat : beatInChop(tws, sea.hsW, sea.tpW), vb = speedInChop(tws, chopB, sea.hsW, sea.tpW);
     const awx = tws * Math.sin(chopB * D2R), awy = tws * Math.cos(chopB * D2R) + vb / KT, awa = Math.atan2(awx, awy) / D2R, aws = Math.hypot(awx, awy);
     const dep = clamp((tws - 14) / 10, 0, 1); // where the crew starts from, as the boat does (boat/physics.ts)
-    const s = crewSolve(tws, awa, 'S', optimalSheet('main', awa), optimalSheet('jib', awa), undefined, cond?.main, cond?.jib, aws, dep);
+    const s = crewSolve(tws, awa, 'S', optimalSheet('main', awa), optimalSheet('jib', awa), undefined, mainRig({ tune: u.tune, rigMain: u.rigMain, cond: cond ?? undefined }), cond?.jib, aws, dep);
     const tm = targetShape('main', tws, awa, dep);
     const regime = tws < 6 ? 'light' : tws < 13 ? 'medium' : 'heavy';
     const crew = tws < 6 ? 'Crew to leeward and forward, to heel her a few degrees: the sails hold their shape and the wetted area drops.'
@@ -347,7 +348,11 @@ function trimSection(w: World, o: Outlook, legs: LegPlan[], finishT: number): Br
   // downwind, from the crew model
   const mid = o.breeze(gun + span / 2).kt, fore = bestFore(150, mid, true);
   items.push({ head: 'Downwind', src: 'model', text: `Running deep, wing on wing with the whisker pole (a Folkboat races without a spinnaker unless the sailing instructions allow one). Crew weight ${fore > 0.5 ? 'forward, by the mast, so the transom lifts clear and she stops dragging it' : 'back, to keep the bow up in a breeze'}. Vang on to stop the main twisting off; ease the outhaul and backstay for depth.` });
-  items.push({ head: 'Rig tune', src: 'practice', text: 'Before you leave the dock, set the rig for the middle of the day\'s range: the sailmakers\' Folkboat guides take up on the shrouds as the breeze builds (less forestay sag, a flatter jib that points) and ease them in light air (more sag, more power). The sim doesn\'t model rig tune yet.' });
+  { // the rig's tune, set at the dock (boat/rigTune.ts): against the day's range
+    const kts = phases.map(ph => o.breeze((ph.a + ph.b) / 2).kt), lo = Math.min(...kts), hi = Math.max(...kts), mean = kts.reduce((a, b) => a + b, 0) / kts.length;
+    items.push(u.tune ? { head: 'Rig tune', src: 'model', text: tuneBrief(u.tune, Math.min(lo, w.forecastKt), w.forecastKt || mean, Math.max(hi, w.forecastKt), !!u.spec?.perf.jumpersUnderWay) }
+      : { head: 'Rig tune', src: 'practice', text: 'Before you leave the dock, set the rig for the middle of the day\'s range: the sailmakers\' Folkboat guides take up on the shrouds as the breeze builds (less forestay sag, a flatter jib that points) and ease them in light air (more sag, more power).' });
+  }
   return { id: 'trim', title: 'Trim and tuning, by phase', lede: 'From the boat\'s own sail and crew model: the settings below are what makes the fastest sail shapes in that wind here, and what the crew will set if they\'re trimming.', items };
 }
 

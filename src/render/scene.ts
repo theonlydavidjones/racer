@@ -760,7 +760,7 @@ export class SceneView {
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
     }
     const tw = w.t + 600; // wave time: the sim's clock, so the waves pause, speed up and replay with it
-    this.waves.update(this.seaRef, w.windModel.base, dt);
+    this.waves.update(this.seaRef, w.windModel.base, dt, focus); // (turning about where you are: waves.ts)
     this.waves.pack(this.waveA, this.waveB);
     this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(this.waves.ref.hsW, this.waves.ref.hsS); this.waveUni.uWhiteRef.value = this.seaRef.white;
     // the signal flags, and marks leaning and trailing a wake in the current
