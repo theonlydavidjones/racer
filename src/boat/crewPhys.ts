@@ -607,8 +607,8 @@ function crewDraw(spec: CrewSpec, k: number): number {
 export const LAYOUT_STAY = 60;
 /**
  * Who stands in the companionway (the owner's request, 12 Nov 2026): on the steps in the open hatch, out of the boom's
- * way. Cruising, it's the most comfortable spot aboard, so a crew member whose weight isn't wanted on the rail goes
- * there. Racing, beginners and novices are inclined to do it too (it's where people stand when they don't know where
+ * way. Cruising, it's the most comfortable spot aboard, and comfort comes first: someone stands there until she heels
+ * past about 15° (the owner: 12–15°). Racing, beginners and novices are inclined to do it too (it's where people stand when they don't know where
  * to be: a draw by their trim, fixed for the crew, crewDraw); better crews put their weight where it does the most good,
  * the rail or to leeward. Either way they leave when she needs them (heeling past the crew's best by a few degrees, or
  * their weight wanted hiking: the helm calls "weight out") at once, and no one stands there while you've placed the crew, alone,
@@ -628,6 +628,15 @@ function standInHatch(c: CrewState, k: CrewCall, downwind: boolean): void {
   // own sitting arm on the side deck. Coming in and leaving have their own marks, and 20 s between, so they don't pop
   // in and out: their weight's wanted once the crew would be sitting well up to windward)
   const arm = c.crewArmLast;
+  // cruising, comfort first: the owner, "cruising comfort tolerates up to about 12–15° of heel before going to the rail"
+  // (out at 15°, back in under 12°, with the same 20 s between)
+  if (k.cruising) {
+    const heel = Math.abs(k.heel);
+    if (c.stander != null) { if (heel > 15) set(null); return; }
+    if (since < 20 || heel > 12) return;
+    for (let i = n; i >= 1; i--) if (!c.people[i].job?.station) { set(i); return; }
+    return;
+  }
   if (c.stander != null) { if (arm > 0.7 * sitArm(c.spec.crew[c.stander - 1] ?? c.spec.helm) || heelOver > 4) set(null); return; }
   if (since < 20 || heelOver > 2) return;
   for (let i = n; i >= 1; i--) {
