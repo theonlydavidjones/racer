@@ -541,7 +541,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .chip.on{border-color:var(--accent);color:var(--accent)}
 /* keyboard settings open from the pause screen (and the start page): always on top of them */
 #keysView{z-index:60}
-.fthumb{width:100%;aspect-ratio:400/300;object-fit:cover;border-radius:6px;margin-bottom:6px;background:linear-gradient(#9fc6e3,#9fc6e3 55%,#2c6488 55%)}
+.fthumb{width:100%;aspect-ratio:400/300;object-fit:cover;border-radius:6px;margin-bottom:6px;background:linear-gradient(#86bcc0,#d6b3b2 45%,#7d8a9c 45%,#2f4e6a)} /* (until her picture is drawn: the same evening sky and sea) */
 .fslot{display:inline-flex;align-items:center;justify-content:flex-start;width:30px;height:14px;margin-right:8px;vertical-align:-2px;flex:none}
 .fflag{max-height:13px;max-width:30px;width:auto}
 .fcard span{display:flex;align-items:center}
