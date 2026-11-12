@@ -33,7 +33,7 @@ export interface ExplainInput {
   userTack: Tack;
   rule: RuleId;
   kind: IncidentKind;
-  byWhy: 'tack' | 'overlap' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | null;
   markName?: string; // for 18.2(a)
   markOverlapped?: boolean;
   turned?: number; // for 16.1 and 16.2
@@ -65,7 +65,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       tip = you ? 'Before tacking near a boat, make sure you will be close-hauled with clear water. About three boat lengths is a safe rule of thumb.' : 'A boat that is mid-tack has no rights. Hold your course.';
       break;
     case '15':
-      what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
+      what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing your penalty turns)' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing their penalty turns)' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
       tip = you ? 'Right of way you have just acquired is not enforceable straight away. Leave the other boat time and space to get clear.' : 'You were the boat that had to keep clear, but the other boat changed the situation too suddenly for you to respond.';
       break;
     case '16.1':
@@ -129,8 +129,8 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       tip = you ? 'When a boat to leeward near an obstruction (the shore, a pier, an island) hails "Room to tack!", tack right away (or reply "You tack" and give them room). They may not be able to hold their course much longer.' : 'You did the right thing: hail early, clearly, and only when you really need to tack to clear the obstruction.';
       break;
     case '21.1':
-      what = you ? `You were returning to start after being over early, so you had to keep clear of ${o}.` : `${o} was returning after being over early and had to keep clear.`;
-      tip = you ? 'With an ebb, hang back farther before the gun. The current carries you toward the line while you luff.' : 'Boats coming back from over early have no rights until they restart.';
+      what = you ? `After the starting signal you were sailing back toward the pre-start side of the line to start (over early, or not yet below it), so you had to keep clear of ${o}.` : `${o} was sailing back toward the pre-start side of the line to start, and had to keep clear.`;
+      tip = you ? 'With an ebb, hang back farther before the gun. The current carries you toward the line while you luff. Coming back, you have no rights until your whole hull is below the line.' : 'Boats coming back to start have no rights until their whole hull is back on the pre-start side.';
       break;
     case '21.2':
       what = you ? 'You were doing penalty turns, so you had to keep clear of everyone.' : `${o} was doing penalty turns and had to keep clear.`;

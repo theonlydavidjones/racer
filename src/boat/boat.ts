@@ -98,6 +98,7 @@ export interface Boat {
   penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
   started: boolean;
   ocs: boolean;
+  returning?: boolean; // Rule 21.1: after her start signal, not started, sailing back toward the pre-start side to start; kept by the World
   leg: number; // index of the next mark
   finished: boolean;
   /** retired from the race (RRS A5.1 RET): no longer racing, as if finished, but scored RET */
