@@ -27,8 +27,8 @@ function shapeWords(u: Boat): string {
     const main = name === 'main', maxed = (...ks: (keyof typeof c)[]) => ks.every(k => (c[k] as number) >= 0.97);
     if (s.depth > t.depth + 0.012) out.push(maxed(...(main ? ['outhaul', 'backstay'] as const : ['backstay'] as const)) ? 'too full (flattening lines all on)' : `too full (${main ? 'outhaul, backstay' : 'backstay'} on)`);
     else if (s.depth < t.depth - 0.012) out.push(`too flat (ease ${main ? 'outhaul, backstay' : 'backstay'})`);
-    if (s.draft > t.draft + 0.04) out.push(maxed(...(main ? ['cunningham', 'downhaul'] as const : ['jibCunningham', 'jibHalyard'] as const)) ? 'draft aft (the mast bend: Cunningham all on)' : `draft aft (${main ? 'Cunningham, main halyard' : 'jib Cunningham, jib halyard'} on)`);
-    else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib Cunningham'})`);
+    if (s.draft > t.draft + 0.04) out.push(maxed(...(main ? ['cunningham', 'downhaul'] as const : ['jibCunningham', 'jibHalyard'] as const)) ? (main ? 'draft aft (the mast bend: Cunningham all on)' : 'draft aft (jib luff all on)') : `draft aft (${main ? 'Cunningham, main halyard' : 'jib Cunningham, jib halyard'} on)`);
+    else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib halyard, jib Cunningham'})`);
     if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveller up') : 'jib car forward next tack'})`);
     else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : u.ww.kt >= 13 ? 'ease the sheet, traveller down' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
     parts.push(`<b>${main ? 'Main' : 'Jib'}:</b> ${out.length ? out.join(', ') : 'shape good'}`);
