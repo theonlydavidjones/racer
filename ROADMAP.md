@@ -156,8 +156,12 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
    slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
    chart data; the crew-trim model's traveller (boat/controls.ts puts it to leeward in medium air: found in review).
-   Also from review: check the brief's leg times against the sim's own fleet sailing the same legs (an observed day's
-   long beat was planned at 38 min, the AI took 47–71); list a max flood or ebb already under way at the window's edges;
+   Also from review: ~~check the brief's leg times against the sim's own fleet sailing the same legs~~ (done, PR #111:
+   with four AI boats on Seaweed Soup course 2 and the training course, the 38 vs 47–71 gap is gone since the AI's held
+   tacks; runs and reaches match the plan or the fleet is a little faster; beats take 5–20% longer, the plan being a
+   perfect sail at 8 s a tack; the first beat and the leg after the first mark are slowest, from traffic and penalties
+   at the first rounding; the whole race 47 min planned, about 50 sailed; tests/sim-fleet.test.ts holds the brief to
+   the fleet, and the brief will say upwind times are for a perfect sail); list a max flood or ebb already under way at the window's edges;
    the tide predictions stop about 6 h after the gun (tide.ts stationsFor), so later passages see it frozen; and the
    gusts: Fort Point's records show peak gusts of 2–5 × the 6-minute mean on light, puffy days, while the sim's puffs
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
