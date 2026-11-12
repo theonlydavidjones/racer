@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CREW, FUMBLE, STRESS, fumble, newCrew, stressOf, type Attr, type CrewSpec } from '../src/boat/crewPhys';
 import { workPace } from '../src/boat/crewWork';
 import { crewPressure } from '../src/sim/pressure';
-import { testBoat } from './helpers/testBoat';
+import { testBoat, sail, startTack } from './helpers/testBoat';
+import { beatAngle } from '../src/boat/polar';
 import { LOA } from '../src/core/math';
 import type { World } from '../src/sim/world';
 
@@ -22,7 +23,8 @@ describe('pressure, and how much it gets to them', () => {
     expect(crewPressure(w({ t: -5 }), b)).toBeGreaterThan(0.9);
     expect(crewPressure(w({ mark: 2 * LOA }), b)).toBeGreaterThan(0.7); expect(crewPressure(w({ mark: 5 * LOA }), b)).toBe(0);
     expect(crewPressure(w({ other: LOA }), b)).toBeGreaterThan(0.5); expect(crewPressure(w({ other: 4 * LOA }), b)).toBe(0);
-    b.penalty = 720; expect(crewPressure(w({}), b)).toBeGreaterThan(0.7);
+    b.penalty = 720; expect(crewPressure(w({}), b)).toBe(0); // (owed, not yet being turned)
+    b.penaltyDir = 1; expect(crewPressure(w({}), b)).toBeGreaterThan(0.7);
   });
   it('composure holds it off: none gets to a cool head, most of it to a nervous one', () => {
     const p = { h: 1.75, w: 75 };
@@ -57,4 +59,29 @@ describe('fumbles under pressure (seeded, for every boat; off for yours if you l
     const run = () => { const c = newCrew(crewOf({ composure: 0.3 }), 'S'); c.pressure = 1; return Array.from({ length: 30 }, () => fumble(c, c.spec.crew[1], true)); };
     expect(run()).toEqual(run());
   });
+});
+
+describe('fumbles happen where they should (the review: through a real tack)', () => {
+  /** Twelve tacks in 10 kt under full pressure: how many had a riding turn, and the jib's drive lost through them. */
+  function tacks(attr: Partial<Record<Attr, number>>, off = false) {
+    const twa = beatAngle(10), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 10 }); b.crew = newCrew(crewOf(attr), 'S'); b.noFumbles = off;
+    let snags = 0, was = 0;
+    for (let i = 0; i < 12; i++) {
+      sail(b, 20, () => { b.crew!.pressure = 1; const s = b.jibSnagT ?? 0; if (s > 0 && was <= 0) snags++; was = s; });
+      startTack(b);
+    }
+    return snags;
+  }
+  it('a nervous crew under pressure fumbles some tacks; a cool one none; switched off, none', () => {
+    expect(tacks({ composure: 0.2 })).toBeGreaterThan(0);
+    expect(tacks({ composure: 1 })).toBe(0);
+    expect(tacks({ composure: 0.2 }, true)).toBe(0);
+  }, 60_000);
+  it('a riding turn lets the jib out and holds it there for a few seconds, then it comes in', () => {
+    const twa = beatAngle(10), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 10 }); b.crew = newCrew(crewOf({ composure: 0 }), 'S');
+    let seen = false, out = 0;
+    for (let i = 0; i < 20 && !seen; i++) { sail(b, 15, () => { b.crew!.pressure = 1; if ((b.jibSnagT ?? 0) > 0) { seen = true; out = Math.max(out, b.ctl.jibsheet); } }); startTack(b); }
+    expect(seen).toBe(true); expect(out).toBeGreaterThanOrEqual(0.5);
+    sail(b, 25); expect(b.ctl.jibsheet).toBeLessThan(0.3);
+  }, 60_000);
 });

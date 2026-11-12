@@ -53,7 +53,7 @@ import { polar } from './polar';
  * - eyes: how far up the course they see puffs and lulls coming (not used yet);
  * - handling: the pace of their work and movement: tacks, gybes, crossing the boat, the pole (pace; roll tacks);
  * - fitness: how far out they hike and how long they last there (leanCap, ENDURE);
- * - composure: how well they hold up under pressure (not used yet).
+ * - composure: how well they hold up under pressure (stressOf: sim/pressure.ts, and their fumbles).
  * Real crews differ in these separately (a fit novice, a sharp-eyed trimmer who tires); no study measures them for
  * sailing, so the effect of each is an estimate, labelled where it's used.
  */
