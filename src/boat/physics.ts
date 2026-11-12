@@ -11,6 +11,7 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, attrOf, reactTime, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import type { PuffCall } from './crewEyes';
 import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -876,32 +877,54 @@ function calledAwa(b: Boat, awa: number, lag: number): number | null {
     if (c.far) continue;
     const inNow = c.in - age;
     if (inNow <= 0 || inNow > lag + 0.5) continue;
-    const tws = b.ww.kt * KT * c.strength, twa = clamp(Math.abs(b.twa) + c.lift, 0, 180) * D2R, v = b.v;
-    return Math.sign(awa || 1) * Math.atan2(tws * Math.sin(twa), tws * Math.cos(twa) + v) / D2R;
+    return Math.sign(awa || 1) * inPuff(b, c).awa;
   }
   return null;
 }
-/** How much more the sails will push in a puff called to hit in the next two seconds (1: none called, or a lull). */
+/**
+ * The apparent wind she'll have in a called puff or lull, on her present heading and speed: its true wind (the called
+ * strength, turned by its lift) and her own way through the water, as vectors (deg, and the apparent wind's square
+ * against now's). Leeway and current left out: the crew judge it from the water and the boat.
+ */
+function inPuff(b: Boat, c: PuffCall): { awa: number; aws2: number } {
+  const tws = b.ww.kt * KT, v = b.v, twa0 = Math.abs(b.twa) * D2R, twa = clamp(Math.abs(b.twa) + c.lift, 0, 180) * D2R;
+  const ax = tws * c.strength * Math.sin(twa), ay = tws * c.strength * Math.cos(twa) + v;
+  const ax0 = tws * Math.sin(twa0), ay0 = tws * Math.cos(twa0) + v;
+  return { awa: Math.atan2(ax, ay) / D2R, aws2: (ax * ax + ay * ay) / Math.max(1e-6, ax0 * ax0 + ay0 * ay0) };
+}
+/**
+ * How much more the sails will push in a puff called to hit in the next two seconds (1: none called, or a lull): as the
+ * apparent wind's square (Deep Physics' review: her own speed adds to it unchanged, so a 1.2× puff close-hauled in 12 kt
+ * at 5 kt is about 1.32×, not 1.44×). The apparent wind's swing aft in the puff also changes the sails' force
+ * coefficients a little: second order, left out.
+ */
 function calledPuffForce(b: Boat): number {
   const cs = b.calls; if (!cs || !cs.length || Math.abs(b.twa) > 120) return 1;
   const age = b.callsAge ?? 0;
-  for (const c of cs) { const t = c.in - age; if (!c.far && c.kind === 'puff' && t > 0 && t < 2) return c.strength * c.strength; }
+  for (const c of cs) { const t = c.in - age; if (!c.far && c.kind === 'puff' && t > 0 && t < 2) return inPuff(b, c).aws2; }
   return 1;
 }
 /**
- * The main played in a puff: as a gust comes on (the wind on the water above its own last 20 s, b.twsSlow) and heels her
- * past her best, the main trimmer eases the boom to hold her down, and trims it back as it passes (North Sails' Folkboat
+ * The main played in a puff: as a gust comes on (the wind on the water above its own last 20 s, b.twsSlow) and would
+ * heel her past her best, the main trimmer eases the boom to hold her down, and trims it back as it passes (North Sails' Folkboat
  * guide: the kicker "keeps the boom down when easing in the gusts"; the usual coaching order: ease as it hits, hike,
  * trim back as she accelerates). On the wind only. A good trimmer answers within a degree or two of heel, a novice
- * later and less (margin), at their own lag; about 1.5° of boom a degree of heel, up to 10°, in full once the gust is
- * a tenth over the average (estimates). The rest follows from the sail forces: less heel and helm, less drive while
- * it's eased. A steady breeze is the depowering's (depower), not this.
+ * later and less (margin), at their own lag; about 1.5° of boom a degree of heel, up to 10° (estimates). With the last depowering step's ease (crewEaseBoom, up to 7°) the boom can be
+ * out up to 17° past its best: a Folkboat main played in a big puff with the traveller down. The rest follows from the
+ * sail forces: less heel and helm, less drive while it's eased. A steady breeze is the depowering's (depower), not this.
  */
 function puffEase(b: Boat, dt: number): number {
+  // (driven by the gust, not by her heel now, which the ease itself takes off: that loop hunted, several eases and
+  // trims a gust, in Deep Physics' check. The heel the gust would give her: her heel over the last 20 s, as the wind's
+  // square, a sail force's)
+  const h = b.heelMag ?? 0;
+  b.heelSlow = b.heelSlow == null ? h : b.heelSlow + (h - b.heelSlow) * Math.min(1, dt / 20);
   const p = trimmerOf(b, 'mainsheet');
   if (!p || byHand(b, 'mainsheet') || Math.abs(b.awaSlow) > 70 || b.twsSlow == null) { b.puffEase = 0; return 0; }
-  const gust = clamp((b.ww.kt / Math.max(1, b.twsSlow) - 1) / 0.1, 0, 1), trim = attrOf(p, 'trim');
-  const want = gust * clamp(1.5 * ((b.heelMag ?? 0) - crewBestHeel(Math.abs(b.twa), b.ww.kt, trim) - (1.5 + 3 * (1 - trim))), 0, 10);
+  const r = b.ww.kt / Math.max(1, b.twsSlow), trim = attrOf(p, 'trim');
+  if (r <= 1) { b.puffEase = (b.puffEase ?? 0) * (1 - Math.min(1, dt / trimmerLag(b, 'mainsheet'))); return b.puffEase; }
+  const heelIn = Math.max(0, b.heelSlow) * r * r;
+  const want = clamp(1.5 * (heelIn - crewBestHeel(Math.abs(b.twa), b.ww.kt, trim) - (1.5 + 3 * (1 - trim))), 0, 10);
   b.puffEase = (b.puffEase ?? 0) + (want - (b.puffEase ?? 0)) * Math.min(1, dt / trimmerLag(b, 'mainsheet'));
   return b.puffEase;
 }

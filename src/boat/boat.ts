@@ -207,8 +207,8 @@ export interface Boat {
   seenPuffs?: Map<number, { t0: number; who: number }>;
   /** Seconds since the calls were made (physics.ts counts down each call's `in` by it). */
   callsAge?: number;
-  /** The main's ease for a puff (deg: physics.ts puffEase). */
-  puffEase?: number;
+  /** The main's ease for a puff (deg), and her heel over the last 20 s (physics.ts puffEase). */
+  puffEase?: number; heelSlow?: number;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;

@@ -5,6 +5,7 @@ import { CALL_WINDOW, crewLook, sailsHide, spotRange } from '../src/boat/crewEye
 import { Puffs } from '../src/environment/wind';
 import { makeRng } from '../src/core/rng';
 import { KT } from '../src/core/math';
+import { beatAngle } from '../src/boat/polar';
 
 // The crew's eyes and calls (boat/crewEyes.ts): every crew member a lookout (the owner), a call that says lift or
 // header, how much, how long and when (Sailing World, "Puff Talk"), from the sim's own puffs.
@@ -95,4 +96,18 @@ describe('the crew\'s answer to a puff (phase C2)', () => {
     const peak = (trim: number) => { const s = scene(crewOf({ trim, eyes: 0.6 }), 0.3, 260, -70, 17, false); s.run(80); return Math.max(...s.log.map(e => e.heel)); };
     expect(peak(0.95)).toBeLessThan(peak(0.15) - 0.5);
   });
+  it('in a gusty breeze the main is eased once and trimmed back once a gust: it doesn\'t hunt (Deep Physics\' check)', () => {
+    for (const [W, A, P] of [[18, 3, 40], [19, 4, 30], [20, 3, 60]]) {
+      const twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 5, windKt: W }); b.crew = newCrew(crewOf({ trim: 0.9 }), 'S');
+      let prev = 0, dprev = 0, flips = 0, most = 0;
+      sail(b, 60 + 4 * P, t => {
+        b.h = 360 - twa; b.ww = { ...b.ww, kt: W + A * Math.max(0, Math.sin(2 * Math.PI * t / P)) };
+        const e = b.puffEase ?? 0, d = e - prev;
+        if (t > 60 && Math.abs(d) > 1e-4) { if (dprev && Math.sign(d) !== Math.sign(dprev)) flips++; dprev = d; }
+        prev = e; if (t > 60) most = Math.max(most, e);
+      });
+      expect(flips / 4, `${W}±${A} kt every ${P} s`).toBeLessThanOrEqual(2.5); // (an ease and a trim back each gust)
+      expect(most).toBeGreaterThan(2); // (and it does ease)
+    }
+  }, 60_000);
 });
