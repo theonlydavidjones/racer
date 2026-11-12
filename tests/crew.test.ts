@@ -267,7 +267,8 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0); // (then held: her leeway at the mean wind)
     sail(b, 600, t => {
       b.h = h; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
-      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { n[i]++; last[i] = { ...p.goal }; } });
+      // (moves to a seat: a trip to a line at the cabin top and back is the puff being trimmed for, not the flicker)
+      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (!p.job?.station) n[i]++; last[i] = { ...p.goal }; } });
     });
     return n.slice(1);
   }
