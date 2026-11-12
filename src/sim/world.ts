@@ -860,7 +860,11 @@ export class World {
       // the same touch until she's got clearly away from that mark
       const prev = b.markTouch ? marks.find(m => m.name === b.markTouch) : undefined;
       const stillNear = !!prev && solidGap(bw, st, prev) - prev.r - HULL_HALF_BEAM < 1.5;
-      if (touching && b.markTouch !== touching.name) {
+      if (touching && b.markTouch !== touching.name && !this.racing(b)) {
+        // Rule 31 is "while racing": before her preparatory signal or once racing's called off, no penalty
+        b.v *= 0.6;
+        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
+      } else if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
         // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
         const sameIncident = this.t - (this.lastFoul.get(b.id) ?? -Infinity) < SAME_INCIDENT;
@@ -993,7 +997,8 @@ export class World {
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
-      if (incident.exoneratedBy == null) this.lastFoul.set(f.id, this.t);
+      // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
+      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.lastFoul.set(f.id, this.t);
       if (A.isUser || B.isUser) {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
