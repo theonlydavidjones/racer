@@ -167,7 +167,7 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
   // the floorboards' seams, along the sole (CR 3.40: wooden boards between the berths)
   for (const x of [-0.12, 0.12]) box(x - 0.004, x + 0.004, INTERIOR.sole, INTERIOR.sole + 0.002, zEnd, zMain - 0.01, SEAM);
   // a hanging locker to port by the companionway, from the berth up under the side deck (as on Wilma)
-  { const zl0 = zMain - 0.42, zl1 = zMain - 0.01, xi = -(INTERIOR.berthIn + 0.02), xo = -(Math.min(hullInnerHalf(uAt(zMain - 0.2), 0.3), halfBeam(uAt(zMain - 0.2))) - INSET - 0.01), yt = deckY(uAt(zMain - 0.2), cabinHalf(uAt(zMain - 0.2))) - INSET;
+  { const zl0 = zMain - 0.42, zl1 = zMain - 0.01, xi = -(INTERIOR.berthIn + 0.02), xo = -(Math.min(...[zl0, zl1].map(z => Math.min(hullInnerHalf(uAt(z), INTERIOR.berth), halfBeam(uAt(z))))) - INSET - 0.01) /* (its back as far out as the hull allows at its foot, the narrowest place, so no corner shows through the planking) */, yt = deckY(uAt(zMain - 0.2), cabinHalf(uAt(zMain - 0.2))) - INSET;
     box(xo, xi, INTERIOR.berth, yt, zl0, zl1, WOOD);
     box(xi - 0.004, xi + 0.001, INTERIOR.berth + 0.06, yt - 0.06, zl0 + 0.04, zl1 - 0.04, SEAM); } // its door's outline
   // the mast, stepped on the keel: through the forepeak from the deck down (aluminium, 133 × 110 mm; boatMesh MAST_Z)
@@ -230,7 +230,8 @@ export function lanternGeometry(): THREE.BufferGeometry {
  * The lantern swinging on its chain: a damped pendulum hung from a point that moves with the hull. It's worked out in
  * a frame that keeps her place but not her turn, where gravity is simply down, so what the hull does to the shackle (heel,
  * rolling and pitching in the waves, heaving) reaches the lamp only through the chain, as it does in a real boat. (Her
- * surging and turning are left out: for a Folkboat they're a few hundredths of g, small beside the seaway's.) The chain is taken as a light rigid link of length ℓ to the lamp's middle (a simple pendulum):
+ * way over the ground is left out, and with it her surging and the sideways pull of a turn: for a Folkboat those are a
+ * few hundredths of g, small beside the seaway's.) The chain is taken as a light rigid link of length ℓ to the lamp's middle (a simple pendulum):
  *   ẍ = g − 2ζω₀ (ẋ − ẋ_pivot) + T,  with T the chain's pull keeping |x − x_pivot| = ℓ,
  * which for small swings from a still pivot is θ̈ = −(g/ℓ)·θ − 2ζω₀·θ̇, period 2π√(ℓ/g) ≈ 1.1 s for ℓ ≈ 0.28 m
  * (e.g. Halliday, Resnick & Walker, Fundamentals of Physics, ch. 15: the simple and the damped pendulum). The damping (the
@@ -252,8 +253,9 @@ export function swingLantern(s: LanternSwing, grp: THREE.Object3D, dt: number, o
   // the shackle as she turns and heaves about her own middle; her way over the ground is left out (steady, it does
   // nothing to a pendulum, and the sim moves her in steps that would only jerk it)
   _p1.copy(LANTERN_PIVOT).applyQuaternion(grp.quaternion); _p1.y += grp.position.y;
-  // the first frame, or she's been moved (a restart, a new scene): start hanging still, plumb
-  if (!s.ok || _p1.distanceToSquared(s.p) > 9) { s.p.copy(_p1); s.x.copy(_p1).addScaledVector(DOWN, LANTERN_DROP); s.v.set(0, 0, 0); s.ok = true; }
+  // the first frame, or she's been moved or turned at a stroke (a restart, a new scene): start hanging still, plumb.
+  // (Her own motion carries the shackle a few centimetres a frame at most; a jerk of more would only whip it round.)
+  if (!s.ok || _p1.distanceToSquared(s.p) > 0.25 * 0.25) { s.p.copy(_p1); s.x.copy(_p1).addScaledVector(DOWN, LANTERN_DROP); s.v.set(0, 0, 0); s.ok = true; }
   if (dt > 0) {
     const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n; // (small steps: the link's constraint holds without drifting)
     _vp.subVectors(_p1, s.p).divideScalar(dt);
