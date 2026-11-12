@@ -9,8 +9,9 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayWell, companionwaySteps, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { cabinInteriorGeometry, cabinInteriorMaterial, windowLids } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, luffTellStates, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
 
@@ -154,7 +155,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // the sea is never drawn inside the hull: a lid over the cockpit at deck level, in the depth buffer only (drawn after
   // the boat and before the water, which scene.ts draws last of the solid things)
   // (the companionway's openings too: one mesh for both)
-  const lid = new THREE.Mesh(mergeGeometries([cockpitLid().toNonIndexed(), companionwayLid()], false)!, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
+  const lid = new THREE.Mesh(mergeGeometries([cockpitLid().toNonIndexed(), companionwayLid(), windowLids()], false)!, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
   const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
@@ -174,9 +175,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // portholes' shape is free, CR 3.19)
   // (one material for both: after dark the cabin's lamps glow warm through the glass, not the frame; navLights.ts
   // syncNavLights sets how bright, on the boat-lights clock)
-  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-    emissive: 0x000000, emissiveMap: windowGlow(), emissiveIntensity: 0 });
-  grp.userData.ports = winMat;
+  // (clear glass in an aluminium frame, cut through the cabin side: the cabin's inside, lit by its lantern after dark,
+  // is what shows through it)
+  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   for (const s of [1, -1]) {
     const geo = sidePatch(uAtZ(-0.05), 0.95, CABIN.h * 0.32, CABIN.h * 0.72, 24, 2);
     if (s < 0) mirrorPatch(geo);
@@ -187,12 +188,13 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // the companionway open, its hatch slid forward: through the doorway its well and steps, dim varnished wood by day;
   // after dark lit warm by the cabin's lamp below, brightest low down and fading up the well (navLights.ts, the same
   // clock as the ports)
-  const below = new THREE.MeshLambertMaterial({ color: 0x4a3426, side: THREE.DoubleSide, emissive: 0x000000, emissiveMap: lampFall() });
-  grp.add(new THREE.Mesh(companionwayWell(), below));
+  // the cabin's inside (cabinInterior.ts), seen through the companionway and the windows, lit by its one lantern
+  const below = cabinInteriorMaterial();
+  grp.add(new THREE.Mesh(cabinInteriorGeometry(), below));
   grp.userData.below = below;
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
   // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
-  const woodTop = [slidingHatch().toNonIndexed(), ...companionwaySteps().map(g => g.toNonIndexed())];
+  const woodTop = [slidingHatch().toNonIndexed()];
   { // the doorway's frame (a post each side, the sill across its foot) and the hatch's runners along the cabin top
     const { hw, len, sill } = COMPANIONWAY, z1 = zc(CABIN.u1), top = cabinTopAt(CABIN.u1, hw);
     for (const sx of [1, -1]) {
@@ -557,7 +559,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // tiller, the backstay's bridle and the ensign staff), or the tricolour just above the masthead, under the windex
   const sternY = sheer(1) - 0.07;
   const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z) },
-    b.paint?.navLights ?? 'deck', grp.userData.ports);
+    b.paint?.navLights ?? 'deck');
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, hideHelm: false, nav };
@@ -847,15 +849,6 @@ const teakCache = new Map<boolean, THREE.CanvasTexture>();
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
  * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
  */
-/** The cabin lamp's light up the companionway's well: full on the floor at its foot, faint by the top (v up). */
-let lampTex: THREE.CanvasTexture | null = null;
-function lampFall(): THREE.CanvasTexture {
-  if (lampTex) return lampTex;
-  const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d')!, gr = g.createLinearGradient(0, 64, 0, 0);
-  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, '#8c8c8c'); gr.addColorStop(0.6, '#262626'); gr.addColorStop(1, '#080808');
-  g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
-  return (lampTex = new THREE.CanvasTexture(c));
-}
 function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   if (!g.attributes.normal) g.computeVertexNormals();
   const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];
@@ -898,24 +891,13 @@ function mirrorPatch(geo: THREE.BufferGeometry): void {
 }
 let winCache: THREE.CanvasTexture | null = null;
 /** The long cabin light: dark tinted glass with a sky sheen, in a thin aluminium frame with rounded ends. */
-/** Where the window's light comes through: the glass (white, a little brighter low down, nearer the lamp), not its frame. */
-let winGlowCache: THREE.CanvasTexture | null = null;
-function windowGlow(): THREE.CanvasTexture {
-  if (winGlowCache) return winGlowCache;
-  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64; const c = cv.getContext('2d')!;
-  c.fillStyle = '#000'; c.fillRect(0, 0, 512, 64);
-  const rr = (x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
-  const g = c.createLinearGradient(0, 10, 0, 54); g.addColorStop(0, '#9a9a9a'); g.addColorStop(1, '#ffffff');
-  c.fillStyle = g; rr(10, 10, 492, 44, 20); c.fill();
-  return (winGlowCache = new THREE.CanvasTexture(cv));
-}
 function windowTexture(): THREE.CanvasTexture {
   if (winCache) return winCache;
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64; const c = cv.getContext('2d')!;
   const rr = (x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
   c.fillStyle = '#b9bec3'; rr(2, 4, 508, 56, 26); c.fill(); // the frame
   const g = c.createLinearGradient(0, 10, 0, 54); g.addColorStop(0, '#3c4c5a'); g.addColorStop(0.45, '#1c252d'); g.addColorStop(1, '#141a20');
-  c.fillStyle = g; rr(10, 10, 492, 44, 20); c.fill(); // the glass
+  c.save(); rr(10, 10, 492, 44, 20); c.clip(); c.clearRect(0, 0, 512, 64); c.fillStyle = g; c.globalAlpha = 0.5; c.fillRect(0, 0, 512, 64); c.restore(); // the glass: tinted, see-through
   winCache = new THREE.CanvasTexture(cv); winCache.anisotropy = 4; return winCache;
 }
 
