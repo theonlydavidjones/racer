@@ -7,7 +7,7 @@ import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
-import { landAlong, onLand } from '../geo/shore';
+import { landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
@@ -134,7 +134,7 @@ export function sailable(b: Boat, desired: number): number {
  * a few metres wide is in the way even if the water beyond it is clear. */
 function blocked(w: World, b: Boat, h: number, d: number): boolean {
   const u = V(h), q = { x: b.x + u.x * d, y: b.y + u.y * d };
-  if (landAlong(b, q) <= d) return true;
+  if (landAlongNear(b, q) <= d) return true; // (the same answer as landAlong, cheaply when the shore's well off)
   if (w.obstructed(b) && segCross(b, q, w.pin, w.committee)) return true;
   return false;
 }

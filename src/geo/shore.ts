@@ -594,6 +594,24 @@ export function landBetween(a: Vec, b: Vec): boolean {
 /** The distance to the nearest shore anywhere (the Cityfront's exactly, elsewhere the chart's land to about 15 m). */
 export const anyShoreDist = (p: Vec): number => Math.min(shoreDist(p), landDist(p));
 /**
+ * landAlong for a boat's own short look ahead (the AI's "is the shore in the way" on every think, ai.ts blocked): when
+ * the shore is further off than the look by a good margin, and no pier, dock, breakwater or harbour lies within its box,
+ * there's nothing it could meet, and the walk along it is skipped. Otherwise landAlong itself, so the answer is the same
+ * (the margin, 30 m, is twice the terrain's distance error and the lattice's few metres: tests/landAlongNear.test.ts).
+ */
+export function landAlongNear(a: Vec, b: Vec): number {
+  const L = Math.hypot(b.x - a.x, b.y - a.y);
+  if (Number.isFinite(L) && L <= 300 && anyShoreDistNear(a) > L + 30) {
+    const bb: Box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
+    let built = false;
+    for (const G of PIER_GROUPS) if (overlaps(bb, G.box)) { built = true; break; }
+    if (!built) for (const G of GROUPS) if (overlaps(bb, G.box)) { built = true; break; }
+    if (!built) for (const { H } of HARBOR_BASINS) if (overlaps(bb, H.reach)) { built = true; break; }
+    if (!built) return Infinity;
+  }
+  return landAlong(a, b);
+}
+/**
  * The same, read off a 10 m lattice of the exact values, bilinearly: for what asks near the same places again and again
  * (a boat's own current, eased near the shore: environment/current.ts shoreRelief, every boat every step), where the exact one
  * searches the shore's segments each time. (Not for what samples the whole Bay once in a while, as the wind's field
