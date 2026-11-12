@@ -215,7 +215,8 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Race Chair with the OA decides, and tells the fleet by text. It's marked proposed; the bylaws say nothing on wind. So
   in racing: no reefing; the committee cancels in a blow, by the fleet's practice (the owner's 23 kt vote; the written
   proposal's 25 kt), signalled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
-  the forecast. Racing above that isn't part of the Bay fleet's sailing. For cruising: the owner expects blue-water
+  the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (the fleet's
+  practice), and **reefing is held until there's a Folkboat-specific source** (a cruiser's account or a sailmaker). For cruising: the owner expects blue-water
   Folkboats to reef; still unconfirmed. Ann Gash (solo round the world, 1975–77) reportedly used a working jib and a
   trysail in a storm, not a reefed main (a search summary of her memoir, not read); Hasler's Jester was junk-rigged
   (Folk Boat Year Book 2021, p.46). Richard Sherwood (1994, via Wikipedia): she "often carries full sail in 20–25".
