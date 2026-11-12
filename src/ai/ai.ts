@@ -47,6 +47,8 @@ const HALF_BEAM = 1.1;
  * must keep clear is doing so: she holds on rather than ease and head up further. Measured between the centrelines
  * (rules hullGap), so the two half-beams are added. */
 const OPEN_GAP = 3 + 2 * HALF_BEAM;
+/** Once she's acting to keep clear of a boat, she keeps at it at least this long (s) while they're still close. */
+const KEEP_ON = 3;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   let near: string | null = null;
@@ -576,7 +578,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // by side at a few cm a second, the closest approach lies beyond the 12 s she looks ahead, and she'd drift on into
     // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
     const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
-    if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+    // (and once she's begun keeping clear of a boat, she carries on with it while they're still close, for at least
+    // KEEP_ON s: judged afresh each moment, slow convergence held the closest approach at the edge of her 12 s look-ahead,
+    // and she swapped every second between her course and the keep-clear move, committing to neither, and fouled)
+    const engaged = (ai.keepOn?.[o.id] ?? -Infinity) > w.t && cp.d < ai.kn.keepClearM + lagM + 4;
+    if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside || engaged)) {
+      (ai.keepOn ??= {})[o.id] = w.t + KEEP_ON;
       // Already opening, with room between the hulls: she is keeping clear (Definitions, Keep Clear: the other boat can
       // sail her course with no need to act), so she sails on at full speed: on her course if that keeps the room, on
       // her heading if her course would close it again. (Easing and heading up on regardless, a windward boat slowed
