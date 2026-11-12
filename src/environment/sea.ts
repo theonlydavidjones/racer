@@ -1,4 +1,4 @@
-import { D2R, KT, V, brg, clamp, dot, wrap, type Vec } from '../core/math';
+import { D2R, KT, V, brg, clamp, dot, n360, wrap, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import { onLand } from '../geo/shore';
 import { harborAt, hitsWall, inBasin } from '../geo/marina';
@@ -143,9 +143,17 @@ export type SwellDay = 0 | 1 | 2;
 const CLIMATE = climate as { months: { month: number; days: Swell[] }[] };
 /** The swell outside the Gate on a small, typical or big day for the month of `date` (YYYY-MM-DD). */
 export function swellFor(date: string, day: SwellDay): Swell {
-  const m = clamp(+date.slice(5, 7) || 1, 1, 12);
-  return { ...CLIMATE.months[m - 1].days[day] };
+  const m = clamp(+date.slice(5, 7) || 1, 1, 12), d = CLIMATE.months[m - 1].days[day];
+  return { ...d, hs: d.hs * swellShare(d.hs) }; // (the climate is of the total height: the swell's share of it)
 }
+/**
+ * The swell's share of the total significant height NDBC 46237 reports (WVHT, which includes the ocean's own wind sea,
+ * which the sim makes for itself from the wind over the water): SwH/WVHT from the buoy's spectral summary, 1,928
+ * half-hourly records 2 October – 11 November 2026 (scripts/fetch-swell-split.mjs): a median 0.73 below 1.5 m, 0.80 at
+ * 1.5–2.5 m, 0.89 above (big seas are mostly swell). Fitted 0.68 + 0.063·Hs. Only the autumn's: the station keeps no
+ * spectral history, so for winter's storms and summer's wind-driven seas it's an estimate.
+ */
+export const swellShare = (hs: number) => clamp(0.68 + 0.063 * hs, 0.6, 0.92);
 
 const BRIDGE = LL(37.81972, -122.47861), OUTSIDE = LL(37.8125, -122.53);
 /** The channel's direction into the bay from the bridge (toward Alcatraz and Berkeley), deg. */
@@ -153,16 +161,26 @@ const INTO_BAY = 78;
 /**
  * How much of the ocean swell reaches a point (0..1), and which way it's travelling there. Outside the
  * bridge it eases off toward the Gate; inside, it fans out from the bridge (diffraction) and dies away over
- * a few kilometres, and islands and points shadow it. An estimate.
+ * a few kilometres, and islands and points shadow it. Unsourced: the factors (0.55 of it at the bridge, falling over
+ * about 2.8 km inside) are an estimate. No measured ratio inside the Gate to the bar buoy could be found; Hanes & Erikson
+ * (2013, USGS) model the mechanism, but their numbers and the BCDC/ESA 2026 hazard study's weren't reachable from here.
  */
-export function swellReach(p: Vec, shadow = true): { k: number; toward: number } {
-  if (p.x < OUTSIDE.x) return { k: 1, toward: 85 };
+export function swellReach(p: Vec, shadow = true, from = 270): { k: number; toward: number } {
+  // the swell's own direction outside; turned into the channel as it crosses the bar. South-west swell is turned
+  // furthest, "ultra-refracted" round into the strait by the ebb-tidal delta (Hanes & Erikson, Estuarine Coastal Shelf
+  // Sci. 133, 2013, abstract: the Bay "is vulnerable to ultra-refracted ocean waves, particularly southwest incident
+  // swell"; Hanes, Ward & Erikson, Cont. Shelf Res. 31, 2011: more open to long swell "from the south or southwest than
+  // the more common ocean waves coming from the northwest"). So from the south-west round to the strait's axis (258° out
+  // from the bridge) it gets in whole; from north of the axis, past Point Bonita, with height ∝ √cos of its angle off it
+  // (the size of that is a judgement: neither paper's numbers could be reached)
+  const own = n360(from + 180), north = clamp(wrap(from - (INTO_BAY + 180)), 0, 85), dirK = Math.sqrt(Math.cos(north * D2R));
+  if (p.x < OUTSIDE.x) return { k: 1, toward: own };
   const dx = p.x - BRIDGE.x, dy = p.y - BRIDGE.y, d = Math.hypot(dx, dy);
-  if (p.x < BRIDGE.x) { const t = (p.x - OUTSIDE.x) / (BRIDGE.x - OUTSIDE.x); return { k: 1 - 0.45 * t, toward: 80 }; }
-  if (d < 1) return { k: 0.55, toward: INTO_BAY };
+  if (p.x < BRIDGE.x) { const t = (p.x - OUTSIDE.x) / (BRIDGE.x - OUTSIDE.x); return { k: (1 - 0.45 * t) * (1 - t + t * dirK), toward: n360(own + wrap(80 - own) * t) }; }
+  if (d < 1) return { k: 0.55 * dirK, toward: INTO_BAY };
   // right by the bridge the swell is still all around; further in, it spreads out along the channel
-  const toward = brg(dx, dy), off = Math.min(90, Math.abs(wrap(toward - INTO_BAY))) * clamp(d / 1500, 0, 1);
-  let k = 0.55 * Math.exp(-d / 2800) * Math.pow(Math.cos(off * D2R), 1.5);
+  const toward = brg(dx, dy), spread = Math.min(90, Math.abs(wrap(toward - INTO_BAY))) * clamp(d / 1500, 0, 1);
+  let k = 0.55 * dirK * Math.exp(-d / 2800) * Math.pow(Math.cos(spread * D2R), 1.5);
   // shadowed if land lies between the bridge and here
   for (let f = 0.1; f < 0.95 && k > 0 && shadow; f += 0.1) if (landAt({ x: BRIDGE.x + dx * f, y: BRIDGE.y + dy * f })) { k *= 0.15; break; }
   return { k, toward };
@@ -259,7 +277,7 @@ export class SeaField {
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     // (in a marina, its own walls shelter it below, traced finely: the 50 m terrain grid's shadow can land on the wrong side of a breakwater)
-    const s = this.swell, reach = swellReach(p, !inBasin(p));
+    const s = this.swell, reach = swellReach(p, !inBasin(p), s.from);
     // in a marina, the swell is stopped by its walls unless it runs straight in through the entrance (then only what diffracts round them)
     if (inBasin(p) && !basinRay(p, reach.toward + 180).out) reach.k *= 0.15;
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
