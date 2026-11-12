@@ -51,10 +51,10 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
   it('the traveller held up in 18 kt costs a little (under 1%): the coach names the traveller, and nothing bigger', () => {
     // (the crew eases the sheet to hold the boom where it should be, so most of the cost is gone; what's left is the
     // middle crew's finer play of traveller and sheet together, with the helm on the after deck where it's narrower, and
-    // the crew hiking aft along the side deck where it's narrower too: a little less righting moment, about 0.7%.
-    // 18 kt: with the mainsheet's blocks a sixth of the boom in from its end, over the car (controls.ts SHEET_ON_BOOM),
-    // the eased sheet stays steeper, so from about 19.5 kt the vang alone holds the leech and the traveller up costs
-    // next to nothing, which the coach explains instead)
+    // the crew hiking aft along the side deck where it's narrower too: a little less righting moment, about 0.5%.
+    // 18 kt: with the mainsheet's blocks over the car (controls.ts SHEET_ON_BOOM, SHEET_H), from about 18.5 kt the crew
+    // vangs hard and the vang alone holds the leech, so the traveller up costs next to nothing, which the coach
+    // explains instead. Where that falls rests on the vang's share of the leech (mainShape's 0.9, an estimate: ROADMAP))
     const b = boat({ heading: 318, windKt: 18, sea: CHOP }); wrong(b, 'traveller', -1);
     const top = teach(b).top;
     expect(top.kind).toBe('fix');
