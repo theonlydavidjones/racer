@@ -42,12 +42,18 @@ export const PLACES: Place[] = [
   P('m-7', '7 · North Channel R "2"', 37.83332, -122.39644, { shape: 'lighted', look: 'R' }),
   P('m-8', '8 · North Channel R "4"', 37.84704, -122.39647, { shape: 'lighted', look: 'R' }),
 
-  // the East Bay and the north reach (November 2026). Spots: off the harbors and landmarks. Marks: the clubs' and the
-  // YRA's, at the positions in nkiesel's YRA-Marks list (github.com/nkiesel/YRA-Marks, from the official YRA mark list of
-  // 2024-12-23; the same source as the courses), checked against the Richmond YC's 2025 intraclub SIs (Race 2,
-  // Attachment A) where they appear there; the government buoys and lights at NOAA's ENC positions (src/geo/data/
-  // enc-chart.json), which agree with the list within 5 m. The clubs' inflatables are set near their positions (RYC:
-  // "or a temporary set within .25 nm").
+  // the East Bay and the north reach (November 2026). Spots: off the harbors and landmarks. Marks: the YRA's and the
+  // clubs', at the positions in nkiesel's YRA-Marks list (github.com/nkiesel/YRA-Marks, from the official YRA mark list of
+  // 2024-12-23; the same source as the courses). Checked: XOC and FOC against the YRA's own Central Bay list (yra.org,
+  // "CentralBay.pdf" of 6 May 2025: the same to the digit; it lists GOC as off station, so it's left out); BK, KG and the
+  // Richmond Harbor buoys against Richmond YC's 2025 intraclub SIs ("Description of Marks"), within 25 m. RYC A comes
+  // only from the YRA-Marks list ("former Olympic Circle A"): none of the club's 2025 documents has it. The Estuary's
+  // Oakland YC and Island YC balls come only from the YRA-Marks list too: the clubs publish no positions. Berkeley YC's
+  // own racing instructions (berkeleyyc.org's Race Docs) are on filesusr.com, which we couldn't reach; Encinal YC sails
+  // its Midwinters off YRA mark 10 (a temporary buoy, no published position) and its twilight series in the Estuary.
+  // The government buoys and lights are at NOAA's ENC positions (src/geo/data/enc-chart.json), within 5 m of the list
+  // (DOC, the Berkeley Marina channel's light 3, within 100 m of the YRA's 0.1′-rounded figure). The clubs' inflatables
+  // are set near their positions (RYC: "or a temporary set within .25 nm").
   P('berkeley', 'Off the Berkeley Marina', 37.8640, -122.3330),
   P('circle', 'The Berkeley Circle', 37.8700, -122.3600),
   P('emeryville', 'Off Emeryville', 37.8380, -122.3220),
