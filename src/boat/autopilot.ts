@@ -144,6 +144,9 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
  * One step of the pilot: it reads the compass and the masthead unit, works out the helm, and the ram moves the tiller
  * toward it. Sets b.tiller (−1 pushed to port … +1 pushed to starboard; pushing it to starboard turns her to port).
  */
+/** The bearing from her to a point (deg true). */
+const brgTo = (b: Vec, q: Vec) => n360(Math.atan2(q.x - b.x, q.y - b.y) * 180 / Math.PI);
+
 export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: number): void {
   if (p.mode === 'off') return;
   if ((b.astern ?? 0) > 0.1) { p.alarm = 'Pilot alarm: she\'s going astern, and a pilot can\'t steer backwards. Pilot on standby: you have the tiller.'; return; }
@@ -155,7 +158,13 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
   let want: number;
   if (p.mode === 'auto') want = p.course;
   else if (p.mode === 'wind') want = n360(b.h + wrap(seen - p.awa)); // wind too far aft: come up toward it
-  else { want = dest ? navHeading(b, p, dest, t) : b.h; p.navH = want; }
+  else {
+    // under power (her motor driving her ahead), she needn't tack: the navigator points her straight at it, unless there's
+    // land in the way
+    const motoring = !!b.motor?.running && b.motor.down && b.motor.gear === 'F' && !b.motor.swivel && b.motor.throttle > 0.15;
+    const direct = dest ? brgTo(b, dest) : b.h, u = V(direct), clear = !!dest && landAlong(b, { x: b.x + u.x * 150, y: b.y + u.y * 150 }) === Infinity;
+    want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
+  }
   const err = wrap(want - b.h), rate = wrap(b.h - p.lastH) / Math.max(dt, 1e-6); p.lastH = b.h;
   const mr = Math.max(1, maxTurnRate(b.v));
   // the turn it asks for, and the helm that should give it, plus what AutoTrim has learned she needs to go straight

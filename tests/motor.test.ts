@@ -86,3 +86,21 @@ describe('her outboard, aboard', () => {
     expect(Math.hypot(u.x - p0.x, u.y - p0.y)).toBeGreaterThan(5); // (backed out of the slip)
   }, 60000);
 });
+
+import { engage } from '../src/boat/autopilot';
+describe('the tiller pilot under power', () => {
+  it('Nav motors her straight at her destination, upwind too, where sailing she\'d tack', () => {
+    const w = withMotor('sail'), u = w.user;
+    u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false };
+    w.motorTilt(); w.motorStart(); for (let i = 0; i < 60 * 5; i++) w.step(DT);
+    w.motorGear('F'); w.motorThrottle(1); for (let i = 0; i < 60 * 10; i++) w.step(DT);
+    // a destination straight upwind, 1 km off
+    const from = w.windHere(u, u).from * Math.PI / 180, to = { x: u.x + Math.sin(from) * 1000, y: u.y + Math.cos(from) * 1000 };
+    w.setDest(to, 'upwind');
+    engage(u, w.pilot, 'nav');
+    for (let i = 0; i < 60 * 60; i++) w.step(DT);
+    const b = (Math.atan2(to.x - u.x, to.y - u.y) * 180 / Math.PI + 360) % 360;
+    expect(Math.abs(((u.h - b + 540) % 360) - 180)).toBeLessThan(15); // (pointed at it, dead to windward)
+    expect(u.v / KT).toBeGreaterThan(2.5);
+  }, 60000);
+});

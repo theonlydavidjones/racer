@@ -6,6 +6,7 @@ import { CURRENTS } from './environment/current';
 import { COURSES, courseFile } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
 import { place } from './sim/places';
+import { OUTBOARDS } from './boat/motor';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { addLog, loadLog, type LogEntry, type RaceSetup } from './boat/logbook';
@@ -528,6 +529,39 @@ function pilotTick(dt: number): void {
   if (txt !== pilotShown) { $('pilotRead').textContent = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
 }
+/* ---------------- her outboard (boat/motor.ts): the Motor button and its control head ---------------- */
+let motorOpen = false;
+function motorUi(): void {
+  const m = w.user.motor, on = !!m && w.running && S.mode !== 'drill';
+  const btn = $('bMotor'); if (btn.hidden !== !on) btn.hidden = !on;
+  const head = $('motorHead'), show = on && motorOpen; if (head.hidden !== !show) head.hidden = !show;
+  btn.classList.toggle('on', !!m?.running);
+  if (!m || !show) return;
+  $('bMoTilt').textContent = m.down ? 'Tilt up' : 'Tilt down'; $('bMoStart').textContent = m.running || m.pulling ? 'Stop' : 'Start';
+  $('motorLab').textContent = `Motor ${m.hp} hp`;
+  for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.setAttribute('aria-pressed', String(b.dataset.mg === m.gear));
+  const hasR = OUTBOARDS[m.hp].reverse; $('bMoR').hidden = !hasR; $('bMoSwivel').hidden = hasR; $('bMoSwivel').classList.toggle('on', !!m.swivel);
+  const thr = $('moThrottle') as HTMLInputElement; if (document.activeElement !== thr) thr.value = String(Math.round(m.throttle * 100));
+  $('bMoCastOff').hidden = !(w.user.docked && m.running);
+  const read = !m.down ? 'Tilted up' : m.pulling ? 'Pulling the cord…' : !m.running ? 'Down · stopped' : m.gear === 'N' ? 'Running · neutral' : `Running · ${m.gear === 'R' || m.swivel ? 'astern' : 'ahead'} ${Math.round(m.throttle * 100)}%`;
+  if ($('motorRead').textContent !== read) $('motorRead').textContent = read;
+}
+$('bMotor').onclick = () => { motorOpen = !motorOpen; motorUi(); };
+function motorStartUi(): void {
+  const m = w.user.motor; if (!m) return;
+  if (m.running || m.pulling) { w.motorStop(); return; }
+  if (w.motorStart() === 'racing') { w.paused = true; $('motorAsk').hidden = false; ($('bMotorNo') as HTMLButtonElement).focus(); }
+}
+for (const b of $('motorHead').querySelectorAll<HTMLButtonElement>('[data-mo]')) b.onclick = () => {
+  const k = b.dataset.mo;
+  if (k === 'tilt') w.motorTilt(); else if (k === 'start') motorStartUi(); else if (k === 'swivel') w.motorSwivel(); else if (k === 'castoff') w.castOff();
+  motorUi();
+};
+for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.onclick = () => { w.motorGear(b.dataset.mg as 'F' | 'N' | 'R'); motorUi(); };
+$('moThrottle').addEventListener('input', () => w.motorThrottle(Number(($('moThrottle') as HTMLInputElement).value) / 100));
+$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; w.paused = false; w.motorStart(true); word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); motorUi(); };
+$('bMotorNo').onclick = () => { $('motorAsk').hidden = true; w.paused = false; };
+
 /* ---------------- Home: send her back to her home slip (racing, it retires her first) ---------------- */
 function goHome(): void {
   if (!w.running) return;
@@ -697,7 +731,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -705,6 +739,7 @@ addEventListener('keydown', e => {
   if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) && e.key !== 'Escape') return;
   if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
   if (!$('keepAsk').hidden) return; // save or discard first
+  if (!$('motorAsk').hidden) { if (e.key === 'Escape') $('bMotorNo').click(); return; }
   if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
@@ -902,6 +937,12 @@ function courseCard(): void {
   { // her slip, if she has one (Marina)
     const slip = slipById(S.boat.slip);
     if (!slip && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; }
+  }
+  // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
+  // clarification, March 2006, under class rule 1.11); the bracket can stay
+  if (S.mode !== 'sail' && S.boat.perf.outboard === 'bracket') {
+    S.boat.perf.outboard = 'stowed'; saveSettings(S); newGame();
+    toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
   }
   const cruise = S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
@@ -1293,7 +1334,7 @@ function frame(now: number): void {
     acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1375,7 +1416,7 @@ const fleet: Fleet = new Fleet(S, {
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
   courseView.close(); navView.close(); w.running = false; w.paused = false;
-  for (const id of ['homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
+  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);

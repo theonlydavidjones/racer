@@ -139,6 +139,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
   spec.sails.number = String(spec.sails.number).replace(/\D/g, '').slice(0, 5) || d.sails.number;
   spec.perf.cleanedWeeks = Math.max(0, Math.min(26, Math.round(Number(spec.perf.cleanedWeeks) || 0)));
   spec.perf.gearKg = Math.max(0, Math.min(400, Number(spec.perf.gearKg) || 0));
+  if (spec.perf.outboardHp != null && ![2.5, 3.5, 6].includes(spec.perf.outboardHp)) delete spec.perf.outboardHp; // (2.5, 3.5 or 6 hp)
   return spec;
 }
 
