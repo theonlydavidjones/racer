@@ -3,7 +3,7 @@ import type { Boat } from '../boat/boat';
 /** What the crew are doing, in a line for the trim panel: where the weight is, who's away on a job, how they're holding up. */
 const JOB: Record<string, string> = {
   car: 'forward moving the jib car', pole: 'at the mast with the pole', hoist: 'at the mast on a halyard',
-  vang: 'adjusting the vang', outhaul: 'adjusting the outhaul', cunningham: 'adjusting the Cunningham', downhaul: 'adjusting the downhaul', jibCunningham: 'adjusting the jib Cunningham',
+  vang: 'adjusting the vang', outhaul: 'adjusting the outhaul', cunningham: 'adjusting the Cunningham', downhaul: 'tensioning the main halyard', jibCunningham: 'adjusting the jib Cunningham',
   backstay: 'adjusting the backstay', traveller: 'playing the traveller', jibsheet: 'trimming the jib', mainsheet: 'trimming the main'
 };
 /** The windward and leeward sides on this tack (the wind comes over the windward side), in words. */

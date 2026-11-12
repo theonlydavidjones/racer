@@ -150,6 +150,11 @@ export interface Boat {
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
+  /**
+   * (Yours, for the sail controls band) where the crew would set every line if they had them all: their plan without your
+   * lines fixed (the same as crewPlan when you hold none), and the sheets for the angles they'd trim to. Display only.
+   */
+  crewIdeal?: CrewSettings & { mainsheet: number; jibsheet: number } | null;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
   depower?: number;
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease

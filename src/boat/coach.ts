@@ -216,7 +216,7 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
       why: more ? `It flattens the bottom of the main: in ${tws} kt that's power she can't use.` : 'It deepens the bottom of the main, for power.',
       look: 'the foot of the main: the depth just above the boom', done: more ? 'foot flat' : 'foot full' };
     case 'cunningham': case 'downhaul': {
-      const name = k === 'cunningham' ? 'Cunningham' : 'downhaul', Name = name[0].toUpperCase() + name.slice(1);
+      const name = k === 'cunningham' ? 'Cunningham' : 'main halyard', Name = name[0].toUpperCase() + name.slice(1); // (Josephine's 'downhaul' is the main halyard on its tackle)
       return { ...base,
         head: more ? `${Name} on, ${amount(d)}.` : `Ease the ${name}, ${easeAmount(d)}.`,
         why: more ? 'The breeze has blown the main\'s draft aft: luff tension pulls it forward again.' : 'The draft is too far forward: the front is round and the leech flat. Easing it lets the draft move back toward the middle, for power.',
@@ -290,7 +290,7 @@ function hoveLessons(b: Boat, s: Situation): Lesson[] {
 /* ---------- the crew's line ---------- */
 
 const NAME: Record<LineKey, string> = { mainsheet: 'mainsheet', jibsheet: 'jib sheet', jibsheetW: 'windward jib sheet', traveller: 'traveller', backstay: 'backstay', vang: 'vang',
-  outhaul: 'outhaul', cunningham: 'Cunningham', downhaul: 'downhaul', jibCunningham: 'jib Cunningham', car: 'jib car' };
+  outhaul: 'outhaul', cunningham: 'Cunningham', downhaul: 'main halyard', jibCunningham: 'jib Cunningham', car: 'jib car' };
 const listWords = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 
 function crewLine(b: Boat, s: Situation): string {
