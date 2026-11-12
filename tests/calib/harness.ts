@@ -7,6 +7,7 @@ import { chooseCourse } from '../../src/courses/committee';
 import { COURSES } from '../../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../../src/settings';
 import { DT, World } from '../../src/sim/world';
+import { markDist } from '../../src/core/math';
 import type { RaceResult } from '../../src/ai/fleetStats';
 
 /** Node's file functions, typed here: the project doesn't take Node's type definitions (as perf.test.ts does). */
@@ -37,9 +38,21 @@ export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceRes
   const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', windKind: 'auto', windKt: 0, current: 'real', tideDate: day.date, tideTime: day.start, raceLength: lengthFor(day.winnerS), opponents: FLEET, fleet: FLEET.length };
   const pick = chooseCourse(COURSES, S);
   if (!pick) throw new Error('no course');
-  const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number; abandoned: boolean; boats: unknown[] })[] = [];
+  const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number; abandoned: boolean; boats: unknown[]; incidents: unknown[] })[] = [];
   for (const seed of seeds) {
     const w = new World(pick.est.file, S, seed);
+    const incidents: unknown[] = [];
+    // (your boat, with nobody sailing her, out of the way: a real fleet has no boat lying idle at the line)
+    { const u = w.boats[0]; u.x += 1e5; u.y += 1e5; u.v = 0; u.vx = 0; u.vy = 0; }
+    // (a foul between two AI boats is penalized without an event: logged here, with the boat nearest her and the rule
+    // between them as the rules see it a moment after)
+    const assign = w.assignPenalty.bind(w);
+    w.assignPenalty = (f) => {
+      const o = w.boats.filter(x => x !== f).sort((p, q) => Math.hypot(p.x - f.x, p.y - f.y) - Math.hypot(q.x - f.x, q.y - f.y))[0];
+      const m = w.nextMark(f), rec = w.pairRecord(f, o);
+      incidents.push({ t: Math.round(w.t), foul: f.name, other: o.name, d: Math.round(Math.hypot(o.x - f.x, o.y - f.y) * 10) / 10, rule: rec?.rule ?? null, markM: m ? Math.round(markDist(f, m)) : null, twa: Math.round(f.twa), otherTwa: Math.round(o.twa), tacks: f.tack + o.tack });
+      assign(f);
+    };
     const limit = Math.max(2 * day.winnerS, 3 * pick.est.minutes * 60); // (the real time limits are about this)
     let ktSum = 0, n = 0;
     // (what decided it, boat by boat: penalties taken, and whether she was over at the gun)
@@ -47,8 +60,20 @@ export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceRes
     while (w.t < limit && !w.cancelled && !w.boats.slice(1).every(b => b.finished)) {
       w.step(DT);
       if (w.t > 0 && (w.steps % 60) === 0) { ktSum += w.wind.kt; n++; }
+      // (the rule incidents, as the World reports them: what the fouls are)
+      for (const e of w.events) if (e.type === 'incident') {
+        const m = w.nextMark(e.incident.fouler);
+        incidents.push({ t: Math.round(w.t), rule: e.incident.rule, part: e.incident.part, kind: e.incident.kind, fouler: e.incident.fouler.name, other: (e.incident.fouler === e.a ? e.b : e.a).name, markM: m ? Math.round(markDist(e.incident.fouler, m)) : null, penalized: !e.incident.exoneratedBy && !e.incident.notRacing });
+      }
+      for (const e of w.events) if (e.type === 'toast' && /touched|penalty/i.test(e.msg)) incidents.push({ t: Math.round(w.t), toast: e.msg });
+      w.events.length = 0;
       for (const b of w.boats) {
-        if (b.penalty > 0 && !(was.get(b.id)! > 0)) pens.set(b.id, (pens.get(b.id) ?? 0) + 1);
+        if (b.penalty > 0 && !(was.get(b.id)! > 0)) {
+          pens.set(b.id, (pens.get(b.id) ?? 0) + 1);
+          // (what for: a rule incident or a mark touch is reported above at the same moment; otherwise, mid-race, crossing
+          // the start/finish line, an obstruction under the Seaweed Soup addendum (B1.1, world.ts))
+          incidents.push({ t: Math.round(w.t), pen: b.name, leg: b.leg, lineM: Math.round(Math.abs(w.lineD(b))), obstructed: w.obstructed(b) });
+        }
         was.set(b.id, b.penalty);
         if (b.ocs) ocs.add(b.id);
       }
@@ -58,6 +83,7 @@ export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceRes
       label: `${day.date} seed ${seed}`, course: pick.est.no, seed, windKt: day.windKt, meanKt: Math.round(ktSum / Math.max(1, n) * 10) / 10,
       finishers: fleet.filter(b => b.finished && b.finishT != null).map(b => ({ key: b.name, elapsedS: b.finishT! })),
       dnf: fleet.filter(b => !b.finished).length,
+      incidents,
       boats: fleet.map(b => ({ key: b.name, startS: w.startTimes[b.id], penalties: pens.get(b.id) ?? 0, ocs: ocs.has(b.id), sk: b.ai?.sk })),
       // (abandoned by the committee, N over A, for too much wind or too little: no result, as in a real series)
       abandoned: !!w.cancelled
