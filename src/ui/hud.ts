@@ -344,14 +344,17 @@ export class Hud {
           ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
           : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
-      } else if (hail.passedOn && hail.respondedAt == null) {
+      } else if (hail.passedOn && hail.clearAt == null) {
         const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
         $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
         el.className = 'row';
-      } else if (hail.respondedAt != null) {
-        const left = Math.max(0, hail.respondedAt + HAIL_RESPONSE - w.t);
+      } else if (hail.clearAt != null) {
+        const left = Math.max(0, hail.clearAt + HAIL_RESPONSE - w.t);
         $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
         el.className = u.lastTackT >= hail.at ? 'row' : 'kc alarm';
+      } else if (hail.respondedAt != null) {
+        $('situMsg').textContent = `${o.name} is tacking to give you room. Tack as soon as she's through the wind.`;
+        el.className = 'kc';
       } else {
         $('situMsg').textContent = `You hailed "Room to tack!" ${o.name} must tack or reply "You tack".`;
         el.className = 'row';

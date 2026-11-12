@@ -941,12 +941,12 @@ export class World {
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
-      const answered = rec.hail?.respondedAt != null;
+      const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
       const po = rec.hail?.kind === 'room' ? rec.hail.passedOn : undefined;
       if (po && po.respondedAt == null && !po.failed) {
         const mid = rec.hail!.by === A.id ? B : A, h2 = this.pairs[`${Math.min(mid.id, po.to)}-${Math.max(mid.id, po.to)}`]?.hail;
-        if (h2?.kind === 'room' && h2.by === mid.id && h2.at >= po.at) { if (h2.respondedAt != null) po.respondedAt = h2.respondedAt; }
+        if (h2?.kind === 'room' && h2.by === mid.id && h2.at >= po.at) { if (h2.clearAt != null) po.respondedAt = h2.clearAt; }
         else po.failed = true; // that hail lapsed unanswered (a breach was called on it)
       }
       // Rule 23: how much of each one's wind the other is taking, where rule 23 could forbid it (environment/shadows.ts)
@@ -957,8 +957,8 @@ export class World {
       }
       const { incident } = assessPair(rec, A, B, ctx, { swerve: A.forced14 === B.id || B.forced14 === A.id, blanket });
       const h = rec.hail;
-      if (h && h.kind === 'room' && !answered && h.respondedAt != null && h.replyAt == null) {
-        // the hailed boat tacked: now the hailing boat must tack too (Rule 20.2(d))
+      if (h && h.kind === 'room' && !answered && h.clearAt != null && h.replyAt == null) {
+        // the hailed boat is through the wind: now the hailing boat must tack too (Rule 20.2(d))
         const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
         if (hailer.isUser) this.emit({ type: 'toast', ms: 3500, msg: `${hailed.name} is tacking to give you room. Tack now (Rule 20.2(d)).` });
       }
@@ -1484,7 +1484,7 @@ export class World {
   hail(by: Boat, to: Boat, kind: 'room' | 'starboard', relayed = false): boolean {
     const rec = this.pairs[pairKey(by, to)] ??= newPairRecord();
     if (rec.hail && rec.hail.kind === kind) return false;
-    rec.hail = { by: by.id, at: this.t, kind, ...(relayed ? { relayed } : {}) };
+    rec.hail = { by: by.id, at: this.t, kind, headAt: { [by.id]: { h: by.h, wind: by.ww.from }, [to.id]: { h: to.h, wind: to.ww.from } }, ...(relayed ? { relayed } : {}) };
     if (kind === 'starboard' && to.ai) to.ai.duckUntil = this.t + 10;
     // An AI boat that is clear ahead, with room for the hailing boat to tack and pass astern, replies "You tack".
     const reply = kind === 'room' && !!to.ai && youTackPays(by, to);

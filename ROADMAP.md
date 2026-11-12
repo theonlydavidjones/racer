@@ -471,6 +471,12 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
 8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
+   ~~The AI's slow tack on a hail~~ (done, branch ai-hail-tack: a hailed boat that puts her helm down at once had been
+   called in breach for not reaching head to wind in 5 s, and then fell back onto her old tack; starting to tack is now
+   her response under 20.2(c), and a slow AI boat tacks through rather than gybing round). The Delft resistance is
+   blocked by data: the Folkboat's hull form (waterline beam, canoe-body draft, Cp, Cm, LCB, LCF) isn't published in
+   any source found, and the DSYHS coefficients only in a secondary source (a 2022–23 ULiège thesis reproducing
+   Keuning & Sonnenberg 1999). It needs the class lines plan and offsets (NFIA Plan 1, 1961).
 9. **Sail shape and speed** (sails 2, 6): RIG.fullDepth (unsourced) puts ORC's full power at a light-air shape, so the
    force model never uses full lift upwind and is 17–28% short on a reach; set at the crew's medium-air shape, the speed
    search starts depowering at 14 kt, where North Sails' guide does (most of the depowering question below). And speed

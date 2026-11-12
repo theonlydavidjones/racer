@@ -22,30 +22,73 @@ export const RULE17_RANGE = 2 * LOA;
 /** Rule 20.2: "as soon as possible", modelled as starting to respond within this many seconds. It applies to the
  * hailed boat (tack, or reply "You tack") and then to the hailing boat (tack once the hailed boat has responded). */
 export const HAIL_RESPONSE = 5;
+/**
+ * Rule 20.2(c) and (d) ask each boat to "respond ... by tacking as soon as possible": the response is starting the tack,
+ * not getting through it. A boat slowed in another's dirty air turns slowly (her rudder needs water over it, physics.ts
+ * maxTurnRate): at 1.5 m/s she takes 4–5 s from close-hauled to head to wind, so judging her by when she passes head to
+ * wind would call a breach on a boat that put her helm down at once. Turned this many degrees toward the wind from her
+ * heading at the hail, she has begun to tack. (A modelling threshold, not a number from the rules: well above the few
+ * degrees the sea knocks a close-hauled boat's bow about, and reached in about a second at the sim's turn rates.)
+ */
+export const TACK_BEGUN = 15;
+/** ... and is above any course she'd sail close-hauled: no more than this far off the wind (a Folkboat's beat is 40–45°,
+ * polar.ts beatAngle), so a boat footing when hailed gets no credit for merely coming up to close-hauled. */
+const BEGUN_TWA = 30;
+/**
+ * Begun to tack, she's through head to wind within this many seconds, or she didn't really tack. (In the sim a boat
+ * keeps turning at the rudder's least authority, dynamics.ts HANDLING.minTurnRate, so even at 1 m/s she's through in
+ * well under 15 s: a modelling allowance, not a number from the rules.)
+ */
+export const THROUGH_WIND = 15;
 
 /**
- * Rule 20.2: has someone failed to respond to a hail for room to tack? Updates `respondedAt` and returns the
- * boat in breach: the hailed boat if she neither tacked nor replied "You tack" in time (20.2(c)), or the hailing
- * boat if she didn't tack soon after the hailed boat responded (20.2(d)).
+ * Is `b` tacking (in the act of it) since the hail `h`: through head to wind, or turned TACK_BEGUN° up from her heading
+ * at the hail (in the wind she had then) and now pinching above close-hauled (in the wind she has now)?
+ * Not latched: bear away again and she's no longer tacking. `started`: she'd begun (the clock is running).
  */
-export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: number): { boat: B; role: 'hailed' | 'hailer' } | null {
+export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number, { h: number; wind: number }> }, windFrom: number, started = false): boolean {
+  if (b.lastTackT >= h.at || b.tacking) return true;
+  const at = h.headAt?.[b.id];
+  if (!at) return false;
+  // turned up from her heading at the hail, in the wind she had then; and pinching now, in the wind she has now (so a
+  // lift she followed, or coming up from footing to close-hauled, isn't a tack begun)
+  // (her turn by her heading alone, toward the side the wind was on; the wind now unsigned, so a few degrees' shift as
+  // she nears head to wind doesn't throw her back out of it)
+  const now = b.ww?.from ?? windFrom, then = Number.isFinite(at.wind) ? at.wind : now;
+  const up = Math.sign(wrap(then - at.h)) * wrap(b.h - at.h);
+  // (once started, she's still at it while she stays turned up: a shift that frees her mid-luff doesn't undo it)
+  return up >= TACK_BEGUN && (started || Math.abs(wrap(now - b.h)) <= BEGUN_TWA);
+}
+
+/**
+ * Rule 20.2: has someone failed to respond to a hail for room to tack? Keeps `respondedAt` and `clearAt` up to date and
+ * returns the boat in breach:
+ * - the hailed boat (20.2(c)) if within HAIL_RESPONSE she neither began to tack nor replied "You tack", or began and
+ *   didn't go through the wind within THROUGH_WIND (bearing away again undoes her start). After passing the hail on
+ *   (20.3) her clocks run from when the boat she hailed is through the wind;
+ * - the hailing boat (20.2(d)), on the same terms, from when the hailed boat is through the wind or replied.
+ */
+export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: number, windFrom = NaN): { boat: B; role: 'hailed' | 'hailer' } | null {
   const h = rec.hail;
   if (!h || h.kind !== 'room') return null;
   const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
-  if (h.respondedAt == null) {
-    if (h.replyAt != null) h.respondedAt = h.replyAt;
-    else if (hailed.lastTackT >= h.at || hailed.tacking) h.respondedAt = t;
-  }
-  if (h.respondedAt == null) {
+  if (h.clearAt == null && (h.replyAt != null || hailed.lastTackT >= h.at || hailed.tacking)) h.clearAt = h.replyAt ?? t;
+  if (h.replyAt != null) h.respondedAt ??= h.replyAt;
+  else if (h.clearAt == null) h.respondedAt = begunTack(hailed, h, windFrom, h.respondedAt != null) ? h.respondedAt ?? t : undefined;
+  if (h.clearAt == null) {
     // Rule 20.3: she passed the hail on to a boat to windward of her that stops her tacking. She can't tack until that
-    // boat has responded, so her own "as soon as possible" runs from then; and if that boat never does (her breach),
-    // she was never able to (rule 43.1(a)'s reasoning: compelled by another boat's breach).
+    // boat is through the wind, so her own "as soon as possible" runs from then; and if that boat never responds (her
+    // breach), she was never able to (rule 43.1(a)'s reasoning: compelled by another boat's breach).
     const po = h.passedOn;
-    if (po) return po.failed || po.respondedAt == null ? null : t >= po.respondedAt + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
-    return t >= h.at + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
+    if (po && (po.failed || po.respondedAt == null)) return null;
+    const from = po ? po.respondedAt! : h.at;
+    const late = h.respondedAt == null ? t >= from + HAIL_RESPONSE : t >= Math.max(h.respondedAt, from) + THROUGH_WIND;
+    return late ? { boat: hailed, role: 'hailed' } : null;
   }
-  const hailerTacked = hailer.lastTackT >= h.at || hailer.tacking;
-  return !hailerTacked && t >= h.respondedAt + HAIL_RESPONSE ? { boat: hailer, role: 'hailer' } : null;
+  if (hailer.lastTackT >= h.at || hailer.tacking) return null; // she's tacked
+  h.hailerBegunAt = begunTack(hailer, h, windFrom, h.hailerBegunAt != null) ? h.hailerBegunAt ?? t : undefined;
+  const late = h.hailerBegunAt == null ? t >= h.clearAt + HAIL_RESPONSE : t >= Math.max(h.hailerBegunAt, h.clearAt) + THROUGH_WIND;
+  return late ? { boat: hailer, role: 'hailer' } : null;
 }
 
 /** Room for a Folkboat to pass between a boat and a mark or obstruction: her beam and a little, m. */
@@ -255,7 +298,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
 
   // Rule 20: not responding to a hail for room to tack is a breach in itself (and so is the hailing
   // boat not tacking once the hailed boat has responded)
-  const breach = hailBreach(rec, A, B, ctx.t);
+  const breach = hailBreach(rec, A, B, ctx.t, ctx.windFrom);
   if (breach) {
     rec.hail = null; rec.cool = ctx.t + INCIDENT_COOLDOWN;
     return { verdict: r, incident: { kind: 'hail', fouler: breach.boat, rule: '20', byWhy: null, hailRole: breach.role, verdict: r } };
@@ -267,7 +310,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     const hailer = hl.by === A.id ? A : B, hailed = hailer === A ? B : A;
     const hailerDone = hailer.lastTackT >= hl.at && !hailer.tacking && ctx.t - hailer.lastTackT > 4;
     if (hl.replyAt != null) { if (ctx.t > hl.replyAt + REPLY_ROOM || hailerDone) rec.hail = null; }
-    else if (ctx.t > hl.at + 30 || (hailerDone && hailed.lastTackT >= hl.at && !hailed.tacking)) rec.hail = null;
+    // (stale half a minute after the last thing that started a clock: the hail, the hailed boat through the wind, or
+    // the boat a 20.3 relay went to through it; every deadline falls within 20 s of one of those)
+    else if (ctx.t > Math.max(hl.at, hl.clearAt ?? -Infinity, hl.passedOn?.respondedAt ?? -Infinity) + 30 || (hailerDone && hailed.lastTackT >= hl.at && !hailed.tacking)) rec.hail = null;
   }
 
   let kind: 'contact' | 'swerve' | null = null;
