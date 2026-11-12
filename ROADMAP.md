@@ -347,7 +347,8 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
   fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
   a long highlight down the mast. For every aluminium rig (the wooden spars stay wood). Check in daylight and at night.
-- **Later — the boat cards' pictures** (polish; 2–3 h): owner, "make the background of these models more true to life
+- ~~**Later — the boat cards' pictures**~~ (done, v144, PR #141: the owner chose the Bay at golden hour, a physical sky
+  with a low sun and rippled water reflecting it, her whole rig in frame, the pictures kept between visits; polish; 2–3 h): owner, "make the background of these models more true to life
   and less ugly af, or just show the model suspended in empty space and slowly rotating? find something beautiful to do
   here." Today (render/thumbs.ts) each boat card (name, flag, sail number) shows her on a flat blue sky over a flat blue
   sea. Options to show the owner as pictures before building: her on the real Bay water and sky at golden hour; or alone
