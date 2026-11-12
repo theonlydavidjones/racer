@@ -9,7 +9,7 @@ import { CABIN, CABIN_LEAN, COMPANIONWAY, L, WINDOW, cabinHalf, cabinTopAt, cabi
  * sloping out to about 360 mm at the sole (scaled from the section); the hull's lining up to the side decks, the cabin
  * sides and the underside of the arched cabin top; the main bulkhead aft (St. 6.6, CR 3.12) with the companionway in
  * it, and forward the cabin's end where the trunk rounds in (the plan draws no forward bulkhead; CR 2.405 allows one).
- * The berths run the cabin's length, 1.85 m (CR 3.15: at least 1.80 m); the companionway's steps go down to the sole.
+ * The berths run the cabin's length, 1.85 m (CR 3.15: at least 1.80 m).
  *
  * It's one inward-facing shell just inside the hull, deck and cabin trunk, seen only through the companionway and the
  * windows. Its light is one lantern hanging in the middle of the cabin: worked out at each vertex as falling off with
@@ -201,14 +201,6 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
       tri(a, b, c, LINING, LINING, LINING); tri(a, c, d, LINING, LINING, LINING);
     }
   }
-  // the companionway's steps, from the sill down to the sole: three treads, each its top and its face
-  { const { hw, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), x = hw - 0.04;
-    for (let k = 1; k <= 3; k++) {
-      const y = INTERIOR.sole + (sill - INTERIOR.sole) * k / 4, zc = z1 - 0.5 * (0.15 + 0.2 * k), z0 = zc - 0.1, zb = zc + 0.1;
-      const v = (xx: number, yy: number, zz: number) => new THREE.Vector3(xx, yy, zz);
-      tri(v(-x, y, z0), v(x, y, z0), v(x, y, zb), WOOD, WOOD, WOOD); tri(v(-x, y, z0), v(x, y, zb), v(-x, y, zb), WOOD, WOOD, WOOD);
-      tri(v(-x, y - 0.03, zb), v(x, y - 0.03, zb), v(x, y, zb), WOOD, WOOD, WOOD); tri(v(-x, y - 0.03, zb), v(x, y, zb), v(-x, y, zb), WOOD, WOOD, WOOD);
-    } }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
