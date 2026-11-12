@@ -173,14 +173,24 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     expect(go(crewOf(0.6, { trim: 0.15 }), 18, 60).at).toBe(-1);
     expect(go(crewOf(0.6), 18, 60, { cruising: true }).at).toBe(-1);
   }, 30_000);
-  it('with one crew, they come out of the hatch as soon as she needs more weight than the helm sitting gives', () => {
-    const one = { helm: { ...DEFAULT_CREW.helm, skill: 0.6 }, crew: [{ ...DEFAULT_CREW.crew[0], skill: 0.6 }] };
+  it('racing with one crew, a novice comes out of the hatch as soon as she needs more weight than the helm sitting gives', () => {
+    const one = { helm: { ...DEFAULT_CREW.helm, skill: 0.6 }, crew: [{ ...DEFAULT_CREW.crew[0], skill: 0.6, attr: { trim: 0.15 } }] };
     for (const W of [10, 12]) {
-      const r = go(one, W, 120, { cruising: true });
+      const r = go(one, W, 120);
       expect(r.at, `${W} kt`).toBe(-1);
       expect(r.b.crew!.people[0].pose).not.toBe('hike'); // (the helm isn't hiking alone for them)
     }
-    expect(go(one, 4, 60, { cruising: true }).at).toBe(1); // (and in a drifter, there they are)
+    expect(go(one, 4, 60).at).toBe(1); // (and in a drifter, there they are)
+  }, 60_000);
+  it('cruising, comfort first: someone stands in the hatch until she heels past about 15° (the owner: 12–15°)', () => {
+    for (const W of [8, 12, 16, 20]) {
+      const twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 4, windKt: W });
+      b.crew = newCrew(crewOf(0.6), 'S'); b.cruising = true;
+      let worst = 0;
+      sail(b, 120, t => { b.h = 360 - twa; if (t > 30 && b.crew!.people.some(p => p.pose === 'companionway' && p.z < Z.companionway + 0.15)) worst = Math.max(worst, Math.abs(b.heel)); });
+      expect(worst, `${W} kt`).toBeLessThan(16.5); // (out by 15°, give or take her settling as they go to the rail)
+    }
+    expect(go(crewOf(0.6), 8, 60, { cruising: true }).at).toBeGreaterThan(0); // (in moderate air, there)
   }, 60_000);
   it('a tack takes the forward hand off the doors: the jib sheet comes first', () => {
     let ref = 0;
