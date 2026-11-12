@@ -2,7 +2,7 @@ import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COCKPIT, COCKPIT_FIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -118,6 +118,9 @@ const keepOnSole = (p: THREE.Vector3) => {
   }
   return p;
 };
+/** The jib winch on side `ws` (hull.ts, Boat Detail's: centred on the coaming at the cockpit's forward end, on a 25 mm pad,
+ * the sheet leading to it 0.07 above its base); `up` higher, as for the handle on top. */
+const winchAt = (ws: number, up = 0) => { const wz = COCK0 + 0.03 * L, c = chz(wz); return V(ws * (c + COAMING_T / 2), deckY(uAtZ(wz), c) + coamH(wz) + 0.025 + 0.07 + up, wz); };
 /** What the crew watch: the jib's luff (its telltales). */
 const JIB_LUFF = V(0, 1.5, -1.6);
 
@@ -229,7 +232,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // (the jib hand forward by the winches, the main hand aft by the thwart, clear of each other)
     const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.1, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
-      const wz = COCK0 + 0.03 * L, ws = -windward, w = V(ws * (chz(wz) + 0.06), deckY(uAtZ(wz), chz(wz)) + coamH(wz) + 0.12, wz);
+      const ws = -windward, w = winchAt(ws);
       const yaw = ws * 0.5, hold = V(px + ws * 0.15, ground(px, zz) + 0.75 * k, zz - 0.3);
       return kneelOne(px, zz, yaw, ws > 0 ? 1 : 0, ws > 0 ? [hold, w] : [w, hold], k, w);
     }
@@ -310,13 +313,13 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   else p = onSole(x, zc, k);
   if (job === 'winch') {
     // cranking the jib sheet in on the winch at the coaming's forward end (on the leeward side), one hand on the handle
-    const wz = COCK0 + 0.03 * L, ws = -windward, w = V(ws * (chz(wz) + 0.06), deckY(uAtZ(wz), chz(wz)) + coamH(wz) + 0.16, wz);
+    const ws = -windward, w = winchAt(ws, 0.04);
     const a = performance.now() / 1000 * 5 + idx; // (about a turn a second)
     p.hands = [w.clone().add(V(Math.cos(a) * 0.16, 0.05, Math.sin(a) * 0.16)), w.clone().add(V(-ws * 0.12, -0.05, 0.25))];
     p.pitch = -0.35; p.look = w;
   } else if (idx === 0 && lean <= 0.15) {
     // the jib trimmer: the sheet in the forward hand, led from the leeward winch
-    const wz = COCK0 + 0.03 * L, w = V(-windward * (chz(wz) + 0.06), deckY(uAtZ(wz), chz(wz)) + coamH(wz) + 0.1, wz);
+    const w = winchAt(-windward);
     const hold = p.hip.clone().add(V(0, 0.26 * k, 0)).addScaledVector(fwd(p.yaw), 0.5 * k).lerp(w, 0.15); // (at arm's length, the elbow easy)
     p.hands[s > 0 ? 0 : 1] = hold;
   }
