@@ -23,7 +23,7 @@ export function crewWords(u: Boat): string {
   let where: string;
   if (pl) {
     const across = pl.across == null ? '' : { lee: `sitting to leeward on the ${lw} side`, mid: 'in the middle', up: `sitting up on the ${ww} side`, hike: `hiking out on the ${ww} rail` }[pl.across];
-    const fore = pl.fore == null ? '' : { fwd: 'weight forward', mid: 'weight in the middle', aft: 'weight aft', deck: 'up on the foredeck' }[pl.fore];
+    const fore = pl.fore == null ? '' : { fwd: 'weight forward', mid: 'weight in the middle', aft: 'weight aft', deck: n >= 2 ? 'up on the foredeck' : 'the crew at the mast' }[pl.fore];
     where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; tap Crew for auto`;
   } else {
     // (with the pole out on a run: where best practice has them, and how far they've followed it: crewPhys.ts chooseLayout)
@@ -31,6 +31,7 @@ export function crewWords(u: Boat): string {
       fwd: `up on the foredeck, one astride the bow: a run with the pole out in ${kt} kt, bow down pays`,
       part: `the bow hand at the mast: a run with the pole out in ${kt} kt (a sharper crew would be right up on the foredeck)`,
       soon: `about to go forward to the foredeck: a run with the pole out in ${kt} kt`,
+      soonMast: `the bow hand about to go forward to the mast: a run with the pole out in ${kt} kt`,
       stay: `staying in the cockpit: in ${kt} kt with the pole out a sharper crew would be up on the foredeck`,
       aft: `staying aft in ${kt} kt to keep the bow up`,
       late: `still forward: in ${kt} kt they should come aft to keep the bow up`,

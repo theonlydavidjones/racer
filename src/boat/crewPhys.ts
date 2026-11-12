@@ -131,7 +131,7 @@ export interface CrewState {
   layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; vAvg?: number; twsAvg?: number; poleWas?: boolean;
   /** With the pole out: whether best practice has them forward, how long it's said so (s), and what they're doing about
    * it, in the status line's terms (ui/crewWords.ts). */
-  poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'stay' | 'aft' | 'late' | 'wrong';
+  poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'soonMast' | 'stay' | 'aft' | 'late' | 'wrong';
   /** (true while both crew are right forward on the foredeck: the helm has the main then, crewWork.ts mainHand) */
   foredeck?: boolean;
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
@@ -542,9 +542,11 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
     const delay = tier === 2 ? 0 : tier === 1 ? 8 + 17 * r2 : 30 + 30 * r2;
     const target = theirs ? fwdAs : 'cockpit';
     const late = (c.poleFwdT ?? 0) < delay;
+    // (about to go: to the mast or the foredeck, whichever they'll go to; misjudging it, they're about to go all the same)
+    const soon = fwdAs === 'mast' ? 'soonMast' : 'soon';
     c.poleWhy = best
-      ? (target === 'cockpit' && now === 'cockpit' ? 'stay' : now === 'foredeck' ? 'fwd' : now === 'mast' ? 'part' : 'soon')
-      : fwdNow ? (theirs ? 'wrong' : 'late') : 'aft';
+      ? (target === 'cockpit' && now === 'cockpit' ? 'stay' : now === 'foredeck' ? 'fwd' : now === 'mast' ? 'part' : soon)
+      : fwdNow ? (theirs ? 'wrong' : 'late') : theirs && target !== 'cockpit' ? soon : 'aft';
     if (target !== now && !late && (settled || target === 'cockpit' && now !== 'cockpit' && (c.layoutT ?? 0) >= 10)) return go(target);
     return go(now);
   }
