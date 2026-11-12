@@ -543,11 +543,22 @@ export function companionwayDoors(): THREE.BufferGeometry[] {
     for (let k = 0; k <= N; k++) { const x = x1 + (x0 - x1) * k / N; ring.push(new THREE.Vector2(x, cabinTopAt(CABIN.u1, x) + 0.045)); }
     const pts = s > 0 ? ring : ring.map(p => new THREE.Vector2(-p.x, p.y)).reverse();
     out.push(new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: t, bevelEnabled: false }).translate(0, 0, z1 - t / 2));
-    // the raised panel: a little proud of the leaf's face, inside its stiles and rails
-    const py0 = sill + 0.08, py1 = cabinTopAt(CABIN.u1, hw) - 0.06, pw = (x1 - x0) - 0.1;
-    out.push(new THREE.BoxGeometry(pw, py1 - py0, 0.008).translate(s * (x0 + x1) / 2, (py0 + py1) / 2, z1 + t / 2 + 0.004));
+    // the panel: set in from the leaf's face, inside its stiles and rails (drawn darker: companionwayDoorPanels)
+    void x1;
   }
   return out;
+}
+
+/** The doors' panels, each set into its leaf inside the stiles and rails, and their hinges and the latch. */
+export function companionwayDoorPanels(): { panels: THREE.BufferGeometry[]; metal: THREE.BufferGeometry[] } {
+  const { hw, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), t = 0.022, x0 = 0.003, x1 = hw - 0.004, panels: THREE.BufferGeometry[] = [], metal: THREE.BufferGeometry[] = [];
+  const py0 = sill + 0.09, py1 = cabinTopAt(CABIN.u1, hw) - 0.05, pw = (x1 - x0) - 0.11;
+  for (const s of [1, -1]) {
+    panels.push(new THREE.BoxGeometry(pw, py1 - py0, 0.004).translate(s * (x0 + x1) / 2, (py0 + py1) / 2, z1 + t / 2 + 0.001));
+    for (const y of [sill + 0.1, py1 - 0.02]) metal.push(new THREE.BoxGeometry(0.03, 0.06, 0.006).translate(s * (x1 - 0.008), y, z1 + t / 2 + 0.003)); // the hinges at the posts
+  }
+  metal.push(new THREE.BoxGeometry(0.05, 0.02, 0.012).translate(0, (sill + py1) / 2 + 0.05, z1 + t / 2 + 0.006)); // the latch across the meeting stiles
+  return { panels, metal };
 }
 
 /** Station u for a z position (m, aft positive). */

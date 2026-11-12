@@ -9,7 +9,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, cockpitSeats, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, windowLids } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
@@ -197,6 +197,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // the companionway open (the hatch slid forward, the doors stowed below) or shut (the hatch slid aft, the doors in)
   const shut = paint.companionway === 'closed';
   const woodTop = [slidingHatch(shut).toNonIndexed(), ...(shut ? companionwayDoors().map(g => (g.index ? g.toNonIndexed() : g)) : [])];
+  if (shut) { // the doors' panels a darker varnish, set in; their hinges and latch bronze
+    const dp = companionwayDoorPanels(), keep = (g: THREE.BufferGeometry) => { const q = g.toNonIndexed(); for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; };
+    grp.add(new THREE.Mesh(mergeGeometries(dp.panels.map(keep), false)!, DOOR_PANEL));
+    grp.add(new THREE.Mesh(mergeGeometries(dp.metal.map(keep), false)!, BRONZE));
+  }
   { // the doorway's frame (a post each side, the sill across its foot) and the hatch's runners along the cabin top
     const { hw, len, sill } = COMPANIONWAY, z1 = zc(CABIN.u1), top = cabinTopAt(CABIN.u1, hw);
     for (const sx of [1, -1]) {
@@ -313,6 +318,8 @@ interface Lines {
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
+/** The companionway doors' panels (a darker varnish, set in) and their bronze hinges and latch. */
+const DOOR_PANEL = new THREE.MeshPhongMaterial({ color: 0x5e3a1e, specular: 0x442211, shininess: 40 }), BRONZE = new THREE.MeshPhongMaterial({ color: 0x9a7a3c, specular: 0xffe0a0, shininess: 80 });
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
 const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82, emissive: 0x000000, emissiveIntensity: 0 });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
