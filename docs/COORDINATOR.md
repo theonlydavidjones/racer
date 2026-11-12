@@ -6,7 +6,7 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 - Test the PR merged with current origin/main: `npx tsc --noEmit -p .` and `npm run test:fast` (full `npm test` only for big physics PRs; the perf test is flaky under load, so rerun it alone).
 - Merge (GitHub MCP merge_pull_request with expectedHeadSha; stacked or conflicting PRs: merge locally and push to main).
 - `npm run build:artifact`, then `node scripts/check/smoke.cjs <dir>`, then publish artifact/folkboat-racing-sim.html to https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m **without passing capabilities** (db + user carry over; `{}` would switch saves off).
-- Live: v141 (12 Nov 2026). Coordinator is now session_012Uu5Qi2mdDP9G1EYJvp2S4.
+- Live: v142 (12 Nov 2026). Coordinator is now session_012Uu5Qi2mdDP9G1EYJvp2S4.
 
 - Only the Coordinator publishes the live artifact, plus the owner's daily real-weather refresh (scheduled task trig_01Jc4kpKT8RFLcqgBnHuBvUC, 04:41 Pacific), which now builds from main and commits its data first. (Before 12 Nov it built an old branch and overwrote the live page.)
 
