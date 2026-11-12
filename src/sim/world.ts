@@ -600,7 +600,7 @@ export class World {
   /** The real tide at the course: refresh the field, and the summary used by the HUD, maps and messages. */
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
-    f.setTime(now);
+    f.cover(now); f.setTime(now); // (the predictions roll on past the race's window: a long sail)
     this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
