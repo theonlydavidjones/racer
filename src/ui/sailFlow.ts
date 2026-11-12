@@ -3,7 +3,7 @@ import type { Boat } from '../boat/boat';
 import { sailFrame } from '../boat/physics';
 import { SAILS, sailTrim, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
-import { luffTellStates, type TellState } from '../render/sails';
+import { leechTellState, luffTellStates, type TellState } from '../render/sails';
 
 /*
  * The flow view's model (the owner's training tool #2): the sails cut across at three heights, each section where the
@@ -85,8 +85,8 @@ export interface FlowSection {
   angle: number; depth: number; draft: number;
   /** The apparent wind there (kt, deg off the bow) and the angle of attack (deg) against the sail's best one. */
   aws: number; awa: number; aoa: number; best: number;
-  /** The sim's trim for this section, and the luff telltales it gives. */
-  trim: SailTrim; tells: { windward: TellState; leeward: TellState };
+  /** The sim's trim for this section, and the telltales it gives (the luff's; the main's leech one too): as the 3D ones. */
+  trim: SailTrim; tells: { windward: TellState; leeward: TellState; leech?: TellState };
   /** True at the centre of effort: these are the sim's own numbers (b.trim), not worked out again. */
   sims: boolean;
 }
@@ -111,7 +111,7 @@ export function flowCuts(b: Boat): FlowCut[] {
       const trim = sims ? simTrim : sailTrim(sail, w.awa, angle);
       sections.push({
         sail, luff: at.luff, chord: at.chord, angle, depth: shape.depth, draft: shape.draft,
-        aws: w.kt, awa: w.awa, aoa: w.awa - angle, best: SAILS[sail].aoa, trim, tells: luffTellStates(trim, w.awa), sims
+        aws: w.kt, awa: w.awa, aoa: w.awa - angle, best: SAILS[sail].aoa, trim, tells: { ...luffTellStates(trim, w.awa), ...(sail === 'main' ? { leech: leechTellState(trim, w.awa, !!b.luff) } : {}) }, sims
       });
     }
     return { name, z, aws: w.kt, awa: w.awa, sections };

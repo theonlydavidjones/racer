@@ -227,6 +227,11 @@ export class Telltale {
 }
 
 /** Telltale behaviour for a luff telltale pair from how the sail is drawing. */
+/** The main's leech telltale: streaming off the leech while the flow leaves it cleanly, curling round behind it to
+ * leeward once the main's stalled past a little (the flow's left the sail before the leech), hanging downwind or luffing. */
+export function leechTellState(trim: SailTrim, awa: number, luffing: boolean): TellState {
+  return awa > 115 || luffing ? 'hang' : trim.flow === 'stalled' && trim.amount > 0.12 ? 'curl' : 'stream';
+}
 export function luffTellStates(trim: SailTrim | null, awa: number): { windward: TellState; leeward: TellState } {
   if (!trim || awa > 115) return { windward: 'hang', leeward: 'hang' };
   if (trim.flow === 'luffing') return { windward: 'lift', leeward: 'stream' };
