@@ -1,6 +1,7 @@
 import type { Boat, LineKey } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
 import { byHand, moveLazyCar, takeLine } from '../boat/physics';
+import { CAR, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
@@ -164,6 +165,11 @@ export class SailBand {
   private helpLast: HTMLElement | null = null;
   private helpLastT = 0;
   private helpShown: string | null = null;
+  /** What the band itself has to say in the Coach card (the jib car under way, a loaded car clicked): over the hover help
+   * until it runs out (performance.now(), ms; Infinity while the crew is at it). */
+  private note: { text: string; until: number } | null = null;
+  /** The jib car you've asked for, while the crew is on it (to say when it's done). */
+  private carAsked: { side: Side; fore: number; ins: number } | null = null;
 
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
@@ -208,7 +214,8 @@ export class SailBand {
   /** The Coach card's help: the control under the mouse; off the band, the one last touched for a quarter of a minute. */
   private showHelp(): void {
     const recent = this.helpLast && performance.now() - this.helpLastT < 15000 ? this.helpLast : null;
-    const h = this.helpOver ?? recent, t = h && !h.hidden ? h.dataset.help ?? null : null;
+    if (this.note && performance.now() > this.note.until) this.note = null;
+    const h = this.helpOver ?? recent, t = this.note?.text ?? (h && !h.hidden ? h.dataset.help ?? null : null);
     if (t !== this.helpShown) { this.helpShown = t; this.host.help(t); }
   }
 
@@ -316,9 +323,29 @@ export class SailBand {
   /** Click a hole: the crossbar to that row, the car to that hole. The lazy car only: the crew moves the loaded one at the tack. */
   private car(side: Side, row: number, col: number): void {
     const u = this.host.world().user, ins = side === 'P' ? CAR_IN_PINS - 1 - col : col; // (inboard toward the band's middle)
-    if (side !== windSide(u)) { this.host.toast('That\'s the loaded car, on the working sheet: the crew moves it at the next tack. Set the lazy one, on the windward side, for after the tack.', 4500); return; }
+    // the leeward car carries the working jib sheet: its pin can't be pulled under that load, so it stays till a tack
+    // takes the load off it (it's then the windward car, and yours to set for the tack after)
+    if (side !== windSide(u)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
     const from = u.carCmd ?? u.ctl.car[side]; takeLine(u, 'car'); moveLazyCar(u, row - from.fore, ins - from.ins); this.host.changed();
+    this.carAsked = u.carCmd ? { side, ...u.carCmd } : null; this.carNote(u);
+  }
+  /** The Coach card's word on the jib car you've asked for: the crew going forward, moving it (and about how long), set. */
+  private carNote(u: Boat): void {
+    const a = this.carAsked; if (!a) return;
+    const name = `${a.side === 'P' ? 'Port' : 'Starboard'} jib car`, at = `pin row ${a.fore + 1}, hole ${a.ins + 1} from inboard`;
+    const car = u.ctl.car[a.side];
+    // done (or a tack loaded it first: then it stays where it was)
+    if (!u.carCmd || a.side !== windSide(u)) {
+      const set = car.fore === a.fore && car.ins === a.ins;
+      this.note = { text: set ? `${name}: set at ${at}. It takes over at the next tack.` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
+      this.carAsked = null; return;
+    }
+    const people = u.crew?.people ?? [], i = people.findIndex(p => p.job?.line === 'car'), j = i >= 0 ? people[i].job! : null;
+    const secs = j ? Math.max(0, j.reach) + Math.max(0, j.work) / Math.max(0.2, workPace(u, i)) : null;
+    const left = secs == null ? '' : ` About ${Math.max(1, Math.round(secs))} s.`;
+    this.note = { text: !j ? `${name} to ${at}: waiting for the crew to be free (moving a car takes a trip forward, about ${CAR.work} s at the car).`
+      : j.reach > 0 ? `${name} to ${at}: the crew is going forward to it.${left}` : `${name} to ${at}: the crew is pulling the pin and sliding it.${left}`, until: Infinity };
   }
 
   /** Where the jumpers are now: her tune, or North's for the wind when she has none (cruising: rigTune.ts guideTune). */
@@ -386,7 +413,8 @@ export class SailBand {
     const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
     this.tabs(w, u);
     this.colours(u.spec);
-    this.showHelp(); // (the windex's words change as she sails, and the last-touched help runs out)
+    this.carNote(u);
+    this.showHelp(); // (the windex's words change as she sails, the jib car's progress, and the last-touched help runs out)
     if (!this.open) return;
     // a tack ends a jib sheet's run: the sheets change roles (physics.ts carries your targets across), and a sheet still
     // winching after it would back the jib with nothing in the band to stop it
@@ -436,7 +464,7 @@ export class SailBand {
       pin(d.querySelector<HTMLElement>('.sb-jwant')!, !loaded && u.carCmd && (u.carCmd.fore !== car.fore || u.carCmd.ins !== car.ins) ? u.carCmd : null);
       pin(d.querySelector<HTMLElement>('.sb-jideal')!, !loaded && carMine && ideal ? { fore: ideal.carFore, ins: ideal.carIn } : null);
       d.classList.toggle('loaded', loaded); d.classList.toggle('mine', carMine && !loaded);
-      d.querySelector<HTMLElement>('.sb-tag')!.textContent = loaded ? 'loaded' : '';
+      d.querySelector<HTMLElement>('.sb-tag')!.textContent = loaded ? 'loaded' : !loaded && u.carCmd ? 'crew…' : '';
     });
   }
 }
