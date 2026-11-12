@@ -38,9 +38,9 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
   { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
-  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Few fingers
-  // are mapped and the slips aren't published where we could reach, so no slips of their own yet; Berkeley has a berth
-  // alongside Berkeley Yacht Club's guest dock
+  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
+  // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
+  // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
   { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
   { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
@@ -205,7 +205,7 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
     for (const side of [1, -1]) {
       const n = { x: u.y * side, y: -u.x * side }, c = { x: e.x - u.x * 4.6 + n.x * (WALKWAY_W / 2 + 1.1 + 0.3), y: e.y - u.y * 4.6 + n.y * (WALKWAY_W / 2 + 1.1 + 0.3) };
       const h = (Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360;
-      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
+      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 9) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
       let run = 0; while (run < 12 && hullClear({ x: c.x + u.x * (run + 2), y: c.y + u.y * (run + 2) }, h)) run += 2;
       if (run < 12) continue; // no open water ahead to leave by
       const k = (count.get(near.dock) ?? 0) + 1; count.set(near.dock, k);
@@ -221,7 +221,7 @@ export const slipById = (id: string | undefined): Slip | null => !id ? null : BY
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
-/** The marinas a boat can call home: those with berths (Richmond YC and Encinal YC have none yet: water and docks only). */
+/** The marinas a boat can call home: those with berths (Encinal YC and the Estuary's other harbors have none yet: water and docks only). */
 export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.filter(({ data }) => data.slips.length).map(({ id, name, short }) => ({ id, name, short }));
 export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
 /** Where a slip is, for people: "A12, West Harbor". */
@@ -334,6 +334,13 @@ const dirOf = (h: number) => ({ x: Math.sin(h * Math.PI / 180), y: Math.cos(h * 
 const wrap180 = (a: number) => ((a + 540) % 360) - 180;
 /** Pointing within 45 degrees of where the wind's coming from: she can't keep way on there with no sail up. */
 const headUp = (h: number, windFrom: number | undefined) => windFrom != null && Math.abs(wrap180(windFrom - h)) < 45;
+/**
+ * Let go off the wind with only the main up, she doesn't hold her heading to the degree: the wind wanders a few degrees
+ * either way in its gusts (environment/gusts.ts: about ±4 at 14 kt) and the main alone gives her weather helm, so she
+ * rounds up a few degrees more in the seconds it takes to gather way. The clear water ahead she's let go into has to be
+ * there that much nearer the wind than she's pointed, not just dead ahead.
+ */
+const WANDER = 8;
 /** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 14: enough to know there's the 12 m she needs). */
 function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
@@ -439,9 +446,10 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
         if (toWind >= 0 && toWind <= sq + 10) { // (0: already head to wind, the wind straight out of the slip: no swing to speak of, held there for the main)
           turn = sign * toWind;
           // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
-          // wind; less, if that would point her into the docks: with the main up and the shove's way on she bears away from there)
+          // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
+          // and she falls back; and with the room ahead to gather way, allowing for her rounding up a little, WANDER)
           const c0 = about(at(back), s.heading, BOW, turn);
-          const offs = [60, -60, 50, -50, 40, -40, 30, -30].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 8; });
+          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && runAhead(e.c, e.h - Math.sign(o) * WANDER, s) >= 8; });
           if (!offs.length) continue;
           const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
           hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
@@ -484,7 +492,7 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
  * Cove's docks, by the seawall and the shore; two by Horseshoe Bay's L dock): with no engine there's no getting out. Kept
  * up to date by tests/pushoff-all.test.ts.
  */
-export const NO_WAY_OUT = ['gashouse-cove:D1', 'gashouse-cove:E1', 'gashouse-cove:F1', 'gashouse-cove:F2', 'gashouse-cove:G1', 'horseshoe-bay:B1', 'horseshoe-bay:B2'];
+export const NO_WAY_OUT = ['gashouse-cove:D1', 'gashouse-cove:E1', 'gashouse-cove:F1', 'gashouse-cove:F2', 'gashouse-cove:G1', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();

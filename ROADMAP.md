@@ -80,7 +80,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
-- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; Boat Detail; the first try, live in v86 (PR #39), was rejected by the owner: an orange cube aft, an orange disc forward on the cabin top, the doorway misunderstood, lines across the hatch; Boat Detail rolls it back and redoes it after the usage reset): water shows through the cockpit sole, and it's
+- ~~**Now — the cockpit sole and companionway**~~ (done, redone by v108: open or closed in the boat editor, panelled doors, hinges and latch; bug + accuracy; 2–4 h; Boat Detail; the first try, live in v86 (PR #39), was rejected by the owner: an orange cube aft, an orange disc forward on the cabin top, the doorway misunderstood, lines across the hatch; Boat Detail rolls it back and redoes it after the usage reset): water shows through the cockpit sole, and it's
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
@@ -127,7 +127,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
   sides on both tacks.
-- **Now — push off doesn't get her out of the slip** (bug; 2–3 h; in progress: Marinas, with a test over every slip): "push off action is still not getting me far
+- ~~**Now — push off doesn't get her out of the slip**~~ (done, by v96; bug; 2–3 h; Marinas, with a test over every slip): "push off action is still not getting me far
   enough into the fairway of any marina to be able to get out of the slip. also, push off should move me forward if
   I'm at a dock that doesn't require me to be nosed in." Today (geo/marina.ts planPushOff) every berth is treated as
   bow-in: the crew walks her back until her bow is level with the finger's end, swings her and shoves, and she stops
@@ -279,7 +279,10 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    to windward gets a header about a minute before the one to leeward, and one side of the course gets a lift first.
    And on observed days the station's own 6-minute turbulence (about 5–6° of it) becomes a course-wide shift: smooth
    the record and hand the residue to the local turbulence (4).
-4. **Almost no gusts, and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
+4. ~~**Almost no gusts**~~ (done: environment/gusts.ts, open-water turbulence from the log law and Charnock's roughness,
+   IEC 61400-1's scales, the puffs keeping the minutes; in a race at 12–18 kt a 5-s gust factor of 1.24–1.28 at a fixed
+   point; light-air gusts in knots; later: more turbulence downwind of land (off the Cityfront), the light-air floor from a
+   sourced convective or stable scaling, the crests' lie turning with the wind) **and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
    not reach the records' 2–5× peaks: those are almost all below 6 kt mean (a third of 6-minute windows at 4–6 kt reach
    2×; none above 12 kt) and the station's off-land turbulence (TI ≈ 0.22). Open water: TI ≈ 0.09–0.12, a 5-s gust over
    the 2-min mean of 1.15–1.27 at 10–15 kt (WMO TD-1555, Harper et al. 2010). The sim's puffs give TI ≈ 0.03 and gust
@@ -500,9 +503,11 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   Village's) are only partly cut out of the 50 m terrain, so from the air a few docks seem to stand on land. Polish: the land's 50 m cells make a
   stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
-  Open questions from review: the current in the embayments with no NOAA station (San Rafael Bay, Richardson Bay, San
-  Leandro Bay) is the nearest stations' in sight, very likely too strong for such shallow water (a depth- or
-  tidal-prism-based easing needs a source); BYC's and Encinal YC's own racing marks aren't published where we could
+  Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
+  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); San Rafael Bay and San Leandro Bay have no measurement
+  inside them, so their current is the nearest stations' in sight, very likely too strong for such shallow water (USGS's
+  San Pablo Bay surveys, WRI 84-4339's speed-against-depth relation, and SFEI's San Leandro Bay model are the leads,
+  but pubs.usgs.gov and sfei.org aren't reachable here); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

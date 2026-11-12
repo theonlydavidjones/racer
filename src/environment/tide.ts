@@ -4,6 +4,7 @@ import { LL } from '../geo/geo';
 import { landBetween, onGround } from '../geo/shore';
 import { predict, type Constituents } from './harmonics';
 import raw from './data/sf-currents.json';
+import fitted from './data/fitted-currents.json';
 
 /**
  * Real tidal currents around the Cityfront race area, predicted offline from NOAA station data
@@ -18,7 +19,9 @@ import raw from './data/sf-currents.json';
 interface HarmonicDef { id: string; /** only a subordinate station's reference (its deeper bin), not in the field */ refOnly?: boolean; kind: 'harmonic'; name: string; lat: number; lon: number; flood: number; ebb: number; z0: number; hc: Constituents }
 interface SubordinateDef { id: string; kind: 'subordinate'; name: string; lat: number; lon: number; flood: number; ebb: number; ref: string; dt: [number, number, number, number]; amp: [number, number] }
 type StationDef = HarmonicDef | SubordinateDef;
-const DEFS = (raw as unknown as { stations: StationDef[] }).stations;
+// NOAA's stations, and those NOAA measured but publishes no constants for, fitted by the sim to NOAA's record
+// (scripts/fit-current-station.mjs: Richardson Bay, the one measurement inside one of the Bay's shallow embayments)
+const DEFS = [...(raw as unknown as { stations: StationDef[] }).stations, ...(fitted as unknown as { stations: StationDef[] }).stations];
 
 /** A station's predicted speed over a time window: points (minutes since epoch UTC, kt + flood), joined by half-cosines. */
 export interface TideStation {

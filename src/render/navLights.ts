@@ -227,6 +227,6 @@ export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): voi
   // through the openings lights the cabin. Its light is what's seen through the windows and the companionway, and,
   // faintly, through the smoked acrylic of the forehatch, forward of the cabin's bulkhead
   const lamp = on ? 0.35 + 0.65 * DARK() : 0;
-  if (nl.below) { nl.below.uniforms.uLamp.value = lamp; nl.below.uniforms.uDay.value = 0.06 + 0.3 * (1 - DARK()); }
+  if (nl.below) { nl.below.uniforms.uLamp.value = lamp; nl.below.uniforms.uDay.value = 2.1 * (1 - DARK()) + 0.03; }
   if (nl.hatch) { nl.hatch.emissive.setRGB(1.0, 0.62, 0.3); nl.hatch.emissiveIntensity = 0.08 * lamp; }
 }

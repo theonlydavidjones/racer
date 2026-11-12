@@ -42,6 +42,9 @@ describe('performance budget: the sim', () => {
     const { us, ref, ratio } = per[Math.floor(per.length / 2)];
     console.log(`full fleet: ${us.toFixed(0)} µs per step (${(1e6 / us).toFixed(0)} steps/s), reference ${ref.toFixed(1)} ms, ratio ${ratio.toFixed(2)}`);
     // the budget: at 4× speed, 60 frames a second, the sim's four steps a frame within about 3 ms on a laptop
-    expect(ratio).toBeLessThan(38); // (27–32 after the review, 35–37 before it; noise about ±10%, more under the suite's load)
+    // (27–32 after the review, 35–37 before it; noise about ±10%, more under the suite's load. Raised from 38 to 40 with
+    // the gusts (environment/gusts.ts, November 2026): the livelier wind costs about 5%, measured, mostly the crew and the
+    // boat answering it, which is what it's for)
+    expect(ratio).toBeLessThan(40);
   }, 120_000);
 });
