@@ -795,6 +795,8 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 #helmBar #pilot{display:grid;grid-template-columns:repeat(6,auto);grid-template-rows:20px 20px;gap:2px;align-content:center;
   height:46px;box-sizing:border-box;padding:2px 4px;width:max-content;flex:0 0 auto}
 #helmBar #pilot[hidden]{display:none}
+/* (Home sends her back under the pilot, so while the pilot steers it isn't needed, and its room keeps the panel clear of the band) */
+body.pilot-on #bHome{display:none}
 #helmBar #pilot .pl-lab{margin:0;align-self:center}
 #helmBar #pilot .tp-btn{height:20px;min-width:0;padding:0 4px;font-size:9.5px;letter-spacing:.03em}
 /* narrower windows (the band reaches further left): while the pilot steers, the helm's buttons go to icons and the panel
