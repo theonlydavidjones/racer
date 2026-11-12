@@ -170,24 +170,33 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); }
-  if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled: Rule 13 ends
+  if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
   crewPole(b, dt, emit);
   const plan = sailPlan(b);
   // the rig rolling: the sails move through the air sideways at the roll rate times their height (rolling to windward,
   // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
   // the wind the sails see: at their height, in the plane of the heeled mast (sailWind), as the crew trims to it
-  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), rigSway(b), b.heel ?? 0); // (going astern, into the wind she sees more of it)
-  trimSails(b, ap.awa, plan, dt);
+  // (going astern, into the wind she sees more of it; slipping to leeward, the wind comes a little more abeam: leeway)
+  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  // (the sails, their trim and their forces, in the wind across her course through the water (sailFrame): the frame the
+  // sail model was calibrated in before she had leeway, when heading and course were one. A calibration choice, not
+  // something ORC's documentation is shown to say: the wind's angle to the hull itself is her leeway less (ap, for the
+  // windage on her hull), and a real windex would read that. Recalibrating the trim constants (trim.ts) in the hull's
+  // frame is on the ROADMAP)
+  stepFrame(b, dt);
+  const fr = sailFrame(b), slip = fr.rot;
+  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0) : ap;
+  trimSails(b, apF.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
-  const sf = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  const sf = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
   // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
   let wornDrive = 1;
   if (cond && (b.shape.main.cd0 || b.shape.main.clMul || b.shape.jib?.cd0 || b.shape.jib?.clMul)) {
     const sound = (sh: Shape): Shape => ({ depth: sh.depth, draft: sh.draft, twist: sh.twist, ceAft: sh.ceAft });
-    const s0 = sailForces(ap.aws, ap.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibOn ? { trim: jibOn.trim, shape: sound(jibOn.shape) } : null, b.luff);
+    const s0 = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibOn ? { trim: jibOn.trim, shape: sound(jibOn.shape) } : null, b.luff);
     const d0 = s0.main.drive + s0.jib.drive, d1 = sf.main.drive + sf.jib.drive;
     if (d0 > 5) wornDrive = clamp(d1 / d0, 0.6, 1.05);
   }
@@ -201,17 +210,26 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
   // (off the wind the heel is the same balance of moments as upwind: the eased sails' smaller side force is what heels her
   // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
-  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, twa, ww.kt, rel, cond?.extraMoment ?? 0, dt);
+  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt);
   rollTo(b, heelT, rel, disp, dt);
   b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.ceh, clrShift(cs.trim));
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
   // heel past her best; the weight aboard (displacement) and where it sits fore and aft (the trim's resistance); in a
   // drifter, the sails' own weight (heeled to leeward, gravity helps hold them in shape)
-  const vPolar = polar(ww.kt, twa, plan);
-  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * heelWettedFactor(vPolar, b.heelMag!, crewBestHeel(twa, ww.kt)) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
+  // leeway: the polar's angles are the angles of her course through the water (ORC's VPP solves for the leeway), so her
+  // speed is the polar's at her heading's angle plus the leeway she makes there: the side force across the water against
+  // the keel's lift at the polar's speed, F = ½ρ·πT²·v²·λ (slender-wing lift, Newman §5.12, as HOVE and rollStep take it):
+  // 3–6° close-hauled (6 to 20 kt), nothing downwind. Steering to the beat angle means steering that much higher.
+  const Fside = F * Math.cos((b.heelMag ?? 0) * D2R), lwAt = (v: number) => twa < 150 ? clamp(Fside / (0.5 * 1025 * Math.PI * orc.boat.draft ** 2 * Math.max(0.8, v) ** 2) / D2R, 0, 12) : 0;
+  // (her steady leeway, over a few seconds: what a helmsman allows for, and the polar's frame; the instant slip is b.sway.
+  // The polar's speed at her course's angle, by the leeway she had: settled over the seconds, it needs no iterating)
+  const vAt = polar(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), plan), lwNow = lwAt(vAt);
+  b.leeway = b.leeway == null ? lwNow : b.leeway + (lwNow - b.leeway) * Math.min(1, dt / 3);
+  const vPolar = vAt;
+  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * heelWettedFactor(vPolar, b.heelMag!, crewBestHeel(Math.min(180, twa + b.leeway), ww.kt)) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
   if (b.luff) target *= luffDriveFactor(twa);
   // Drive scales with trim efficiency; speed with roughly the square root of drive.
-  else target *= Math.sqrt((b.trimDriveK ?? trimDrive(b.trim.main, b.trim.jib)) * b.shape.eff * wornDrive) * powerFactor(b, jibOn, twa, ww, disp, dt, plan); // sheet angles, the sails' shape, worn cloth; flattened more (or less) than the polar's crew needs
+  else target *= Math.sqrt((b.trimDriveK ?? trimDrive(b.trim.main, b.trim.jib)) * b.shape.eff * wornDrive) * powerFactor(b, jibOn, Math.min(180, twa + b.leeway), ww, disp, dt, plan); // (at her course's angle, as the polar: the search's wind triangle is the course's) // sheet angles, the sails' shape, worn cloth; flattened more (or less) than the polar's crew needs
   if (hm < 1 || hj < 1) {
     // part of the sail plan up: speed with roughly the square root of the drive, which goes with the area hoisted
     const je = jibEfficiency(plan, twa), full = SAIL_AREA.main + SAIL_AREA.jib * je, up = SAIL_AREA.main * hm + SAIL_AREA.jib * je * hj;
@@ -231,7 +249,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let sweep = 0;
   const sway = rigSway(b);
   if (Math.abs(sway) > 0.02 && !b.luff) {
-    const ap0 = sailWind(ww.from, ww.kt, b.h, b.v, 0, b.heel ?? 0);
+    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along, fr.across, b.heel ?? 0); // (as sf's, without the roll)
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
@@ -241,7 +259,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // to speak of a degree or two low, so the polar's VMG peak stays at ORC's beat angle, rising to all of it in the no-go
   // zone, where she stops (the flogging cloth only as much as is hoisted; struck, the bare rig's windage at any angle
   // forward of the beam)
-  const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, ap.awa), pinchFlog(twa, beat));
+  const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
@@ -261,20 +279,18 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     bleed = clamp(Math.abs(turn - clamp(b.helmNeed ?? 0, -12, 12)) / Math.max(2, Math.abs(turn)), 0.3, 2);
   }
   b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * bleed * Math.abs(rate) * D2R * dt));
-  // stopped or barely moving, the wind on her side sets her bodily to leeward (leeway): the wind on her topsides and rig
-  // (HOVE.windSide) against her hull and keel broadside to the water (HOVE.crossCd), and with way on the keel's lift (its
-  // slope by the profile's aspect ratio), as heaveTo works it out. Faster than a slow walk the keel's lift holds her and the
-  // polar carries her leeway, so this fades out between 0.5 and 1 m/s and any slip dies away as before
-  // (on a bare rig, as at the dock; with sails up their own side force would set her further, and the AI's sailing doesn't
-  // reckon with leeway yet: ROADMAP, with the sternway)
-  const slow = hm + hj < 0.5 ? clamp((1 - b.v) / 0.5, 0, 1) : 0;
-  if (slow > 0) {
+  // leeway, as a motion: her sails' side force across the water and the wind on her topsides and rig (HOVE.windSide) set
+  // her bodily to leeward; her keel's lift with way on (slender wing: ½ρ·A·(πAR/2)·u·v = ½ρ·πT²·u·v) and her hull and keel
+  // broadside to the water (cross-flow drag, HOVE.crossCd: Hoerner) hold her. At speed the lift does it: a few degrees
+  // (b.leeway, above); slow, little holds her and she sags off to leeward (0.5–0.7 kt at 1.5 kt in 12 kt); stopped, only
+  // the broadside drag does. With her sails struck, the wind on her rig alone (leaving a berth).
+  {
     const awaR = ap.awa * D2R, q = 0.5 * 1.225 * ap.aws * ap.aws, side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
-    const Fy = side * q * HOVE.windSide * Math.sin(awaR) ** 2;
+    const Fy = side * (q * HOVE.windSide * Math.sin(awaR) ** 2 + (b.luff ? 0 : Fside));
     const sw = b.sway ?? 0, aL = Math.PI * HOVE.aspect / 2, Fw = -0.5 * 1025 * HOVE.latArea * (aL * Math.max(0, b.v) * sw + HOVE.crossCd * sw * Math.abs(sw));
-    b.sway = sw + slow * (Fy + Fw) / (disp * (1 + HOVE.swayAdded)) * dt;
-    if (slow < 1) b.sway *= Math.exp(-dt * (1 - slow) / 1.5);
-  } else if (b.sway) { b.sway *= Math.exp(-dt / 1.5); if (Math.abs(b.sway) < 0.005) b.sway = 0; } // (the keel bites again: a second or two)
+    b.sway = sw + (Fy + Fw) / (disp * (1 + HOVE.swayAdded)) * dt;
+    if (Math.abs(b.sway) < 1e-4) b.sway = 0;
+  }
   travel(b, dt, t, emit, groundToast);
   sailVisuals(b, plan, dt);
 }
@@ -376,7 +392,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel); b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P'; if (twa > 176) tk = b.tack;
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); }
-  if (b.tacking && twa >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
+  if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
   crewRig(b, dt, emit); crewPole(b, dt, emit);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
   const u0 = b.v, d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.yawRate ?? 0) * D;
@@ -659,7 +675,9 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)
-  const aw = apparent(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), sw + rigSway(b), b.heel ?? 0);
+  // (in the frame the sails are trimmed in, the wind across her course through the water: step(), apF)
+  const fr = sailFrame(b);
+  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0);
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
@@ -884,10 +902,36 @@ export function sailWind(from: number, windKt: number, h: number, v: number, swa
   return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
 }
 
+/** Her slip to leeward on the tack she's on (deg; her course is that much further off the wind than her heading). Just
+ * round from a tack, still sliding toward the old leeward side, none. */
+const leeSlip = (b: Boat) => b.v > 0.3 ? Math.max(0, Math.atan2(b.tack === 'S' ? -(b.sway ?? 0) : (b.sway ?? 0), b.v) / D2R) : 0;
+
+/**
+ * The frame the sails are trimmed and their forces read in: the wind across her course through the water, the frame the
+ * sail model and its trim constants were calibrated in before she had leeway (a calibration choice: physics.ts step()).
+ * It turns from her heading by the steady leeway she makes at speed (b.leeway); her slip beyond it (stalled, pinching,
+ * slow, or the moment a puff heels her) is the wind drawing forward across her sails, and they luff; short of it (just
+ * tacked, not yet sliding), the wind a little more abeam. Through a tack, as the slip changes sides, the frame turns over
+ * at up to 10° a second (stepFrame) rather than at once. Her velocity through the water in that frame: along it
+ * and across it (+ starboard).
+ */
+/** The frame's turn, worked toward her steady leeway on the side she's slipping, at up to 10° a second (sailFrame). */
+function stepFrame(b: Boat, dt: number): void {
+  const slip = b.v > 0.3 ? Math.atan2(b.sway ?? 0, b.v) / D2R : 0, want = Math.abs(slip) > 0.5 ? Math.sign(slip) * (b.leeway ?? 0) : 0;
+  const r0 = b.sailRot ?? want; b.sailRot = r0 + clamp(want - r0, -10 * dt, 10 * dt);
+}
+
+export function sailFrame(b: Boat): { rot: number; along: number; across: number } {
+  const sw = b.sway ?? 0, slip = b.v > 0.3 ? Math.atan2(sw, b.v) / D2R : 0, lw = b.leeway ?? 0;
+  const rot = b.sailRot ?? (Math.abs(slip) > 0.5 ? Math.sign(slip) * lw : 0), r = rot * D2R;
+  return { rot, along: b.v * Math.cos(r) + sw * Math.sin(r), across: -b.v * Math.sin(r) + sw * Math.cos(r) };
+}
+
 /** Heading a user tack/gybe aims for: the matching course on the other side of the wind. */
 export function tackTarget(b: Boat): { dir: number; target: number } {
   const rel = b.rel, twa = b.twa, from = b.ww.from;
   // upwind: tack to the same angle on the other side, but at least close-hauled; downwind: gybe to the mirror angle
-  if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatFor(b), Math.min(twa, 60))) };
+  // (the beat angle is her course's: her heading is above it by her leeway)
+  if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatFor(b) - (b.leeway ?? 0), Math.min(twa, 60))) };
   return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
 }

@@ -65,6 +65,9 @@ describe('the wind on her with no way on (bare poles)', () => {
     const { w, u } = world(12);
     u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true }; u.v = 3;
     for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from + 90); w.step(DT); }
-    expect(u.v).toBeGreaterThan(2); expect(u.astern ?? 0).toBe(0); expect(Math.abs(u.sway ?? 0)).toBeLessThan(0.02);
+    expect(u.v).toBeGreaterThan(2); expect(u.astern ?? 0).toBe(0);
+    // (her slip is her leeway: a degree or two on a beam reach, as the keel's lift makes it, no more)
+    const slip = Math.atan2(Math.abs(u.sway ?? 0), u.v) * 180 / Math.PI;
+    expect(slip).toBeLessThan(3); expect(Math.abs(slip - (u.leeway ?? 0))).toBeLessThan(0.75);
   });
 });

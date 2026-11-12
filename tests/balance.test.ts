@@ -12,13 +12,15 @@ import { crewWords } from '../src/ui/crewWords';
 
 /** Beat at `windKt` with the crew's settings, then (optionally) change the controls yourself and settle again. */
 /** Sail her close-hauled; `full`: the crew held at full power (no depowering of their own), so one line's own effect shows. */
+// (close-hauled as a sailor steers it: her course at the beat angle, her heading her leeway higher, physics.ts b.leeway)
+const steer = (b: Boat, twa: number) => { b.h = 360 - (twa - (b.leeway ?? 0)); };
 function beat(windKt: number, change?: (c: Controls) => void, full = !!change, secs = 20): Boat {
   const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt });
-  sail(b, secs, () => { b.h = 360 - twa; if (full) b.depower = 0; });
+  sail(b, secs, () => { steer(b, twa); if (full) b.depower = 0; });
   if (change) {
     const base = JSON.parse(JSON.stringify(b.ctl));
     b.manualTrim = true; b.trimAll = true; b.ctl = base; change(b.ctl);
-    sail(b, 12, () => { b.h = 360 - twa; if (full) b.depower = 0; });
+    sail(b, 12, () => { steer(b, twa); if (full) b.depower = 0; });
   }
   return b;
 }
@@ -218,17 +220,18 @@ describe('Sailing a little below the beat angle', () => {
     for (const W of [8, 14, 20]) {
       const beat = beatAngle(W), vmg = (off: number) => {
         const twa = beat - off, b = testBoat({ heading: 360 - twa, kt: polar(W, beat, 'jib') / KT, windKt: W });
-        let s = 0, n = 0; sail(b, 60, t => { b.h = 360 - twa; if (t > 40) { s += b.v; n++; } });
-        return s / n * Math.cos(twa * Math.PI / 180);
+        // (made good to windward: her speed through the water along her course, her heading and her slip)
+        let s = 0, n = 0; sail(b, 60, t => { steer(b, twa); if (t > 40) { s += Math.hypot(b.v, b.sway ?? 0) * Math.cos((360 - b.h + Math.atan2(-(b.sway ?? 0), b.v) * 180 / Math.PI) * Math.PI / 180); n++; } });
+        return s / n;
       };
       const v0 = vmg(0);
       expect(vmg(1) / v0).toBeGreaterThan(0.995);
-      expect(vmg(2) / v0).toBeGreaterThan(0.99);
+      expect(vmg(2) / v0).toBeGreaterThan(0.988); // (about 1%: in a breeze her leeway grows a third of a degree as she slows)
     }
   });
   it('but pinching ten degrees too high is a big loss, and inside the no-go zone she stops', () => {
     const W = 14, beat = beatAngle(W), vb = polar(W, beat, 'jib');
-    const at = (twa: number, secs: number) => { const b = testBoat({ heading: 360 - twa, kt: vb / KT, windKt: W }); sail(b, secs, () => { b.h = 360 - twa; }); return b.v; };
+    const at = (twa: number, secs: number) => { const b = testBoat({ heading: 360 - twa, kt: vb / KT, windKt: W }); sail(b, secs, () => { steer(b, twa); }); return b.v; };
     expect(at(30, 150) * Math.cos(30 * Math.PI / 180) / (vb * Math.cos(beat * Math.PI / 180))).toBeLessThan(0.75);
     expect(at(22, 40)).toBeLessThan(0.1); // (from full speed, in 40 s)
   });
@@ -237,9 +240,9 @@ describe('Sailing a little below the beat angle', () => {
 describe('Who holds the sheet', () => {
   it('taking the mainsheet where the crew had it, in a breeze, changes nothing', () => {
     const W = 26, twa = beatAngle(W), run = (mine: boolean) => {
-      const b = testBoat({ heading: 360 - twa, kt: 5, windKt: W }); sail(b, 40, () => { b.h = 360 - twa; });
+      const b = testBoat({ heading: 360 - twa, kt: 5, windKt: W }); sail(b, 40, () => { steer(b, twa); });
       if (mine) takeLine(b, 'mainsheet');
-      sail(b, 30, () => { b.h = 360 - twa; });
+      sail(b, 30, () => { steer(b, twa); });
       return b.v;
     };
     expect(run(true)).toBeCloseTo(run(false), 2);

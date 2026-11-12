@@ -28,15 +28,20 @@ describe('performance budget: the sim', () => {
     const opponents = ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'];
     const w = new World(ss10 as unknown as CourseFile, { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', windKind: 'west', windKt: 22, current: 'real', opponents, fleet: 7 }, 3);
     expect(w.boats.length).toBe(8);
-    // through the start and five minutes of racing, in one-minute pieces, each timed against the reference just before
-    // it (the load from the rest of the suite comes and goes); the median piece (a GC pause or a busy core in one
-    // piece doesn't count)
+    // through the start and five minutes of racing, a minute at a time, each minute in 10-second pieces timed against
+    // the reference just before each (the load from the rest of the suite, or the machine's, comes and goes). Load only
+    // ever slows a piece down, so each minute counts its fastest piece; then the median minute (a GC pause or a busy
+    // core in one minute doesn't count)
     const per: { us: number; ref: number; ratio: number }[] = [];
     while (w.t < 5 * 60) {
-      const ref = reference(), t0 = performance.now(), end = w.t + 60;
-      let n = 0; while (w.t < end) { w.step(DT); n++; }
-      const us = (performance.now() - t0) * 1000 / n;
-      per.push({ us, ref, ratio: us / ref });
+      let best: { us: number; ref: number; ratio: number } | null = null;
+      for (let k = 0; k < 6; k++) {
+        const ref = reference(), t0 = performance.now(), end = w.t + 10;
+        let n = 0; while (w.t < end) { w.step(DT); n++; }
+        const us = (performance.now() - t0) * 1000 / n;
+        if (!best || us / ref < best.ratio) best = { us, ref, ratio: us / ref };
+      }
+      per.push(best!);
     }
     per.sort((a, b) => a.ratio - b.ratio);
     const { us, ref, ratio } = per[Math.floor(per.length / 2)];
@@ -44,7 +49,8 @@ describe('performance budget: the sim', () => {
     // the budget: at 4× speed, 60 frames a second, the sim's four steps a frame within about 3 ms on a laptop
     // (27–32 after the review, 35–37 before it; noise about ±10%, more under the suite's load. Raised from 38 to 40 with
     // the gusts (environment/gusts.ts, November 2026): the livelier wind costs about 5%, measured, mostly the crew and the
-    // boat answering it, which is what it's for)
+    // boat answering it, which is what it's for). Timed by each minute's fastest piece since leeway (November 2026), which
+    // the machine's load can't push up: 29–34 with leeway and without, on a container with a load average of 1–2)
     expect(ratio).toBeLessThan(40);
   }, 120_000);
 });
