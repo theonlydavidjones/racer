@@ -71,7 +71,7 @@ let w!: World;
 let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0, spin: true };
+const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -271,7 +271,7 @@ gl.addEventListener('wheel', e => {
   if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
   if (viewMode === 2) zoomOverhead(Math.exp(e.deltaY * 0.0015));
   else if (viewMode === 0) setEye(look.aft + e.deltaY * 0.006); // cockpit: move your eye fore and aft
-  else look.chase = Math.max(8, Math.min(90, look.chase * Math.exp(e.deltaY * 0.0015))); // chase: closer or farther
+  else look.chase = Math.max(8, Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(e.deltaY * 0.0015))); // chase: closer or farther (from the framed distance)
 }, { passive: false });
 
 /* ---------------- sail trim: who trims, the sheets, and every other line ---------------- */
@@ -335,7 +335,19 @@ function openLines(open = !band.open): void {
   document.body.classList.toggle('band-open', open);
   $('tpMore').textContent = open ? 'Sail controls ▾' : 'Sail controls ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
   $('bBand').classList.toggle('on', open); $('bBand').setAttribute('aria-pressed', String(open));
+  requestAnimationFrame(() => chaseFrame());
 }
+/**
+ * The chase camera's frame (render/scene.ts setChaseFrame, design/chase-layout.html): where the sail controls band's top
+ * edge is over the 3D view (its tabs included), or the view's bottom when it's put away. On a change of size, when the
+ * band opens or shuts, and once a second for anything else that moves it.
+ */
+function chaseFrame(): void {
+  const gl = $('gl').getBoundingClientRect(), b = document.getElementById('sailBand'), r = b && !b.hidden ? b.getBoundingClientRect() : null;
+  const tabs = b?.querySelector<HTMLElement>('.sb-tabs')?.getBoundingClientRect();
+  view.setChaseFrame({ top: 0, bottom: r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
+}
+addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 openLines((S.band ?? 1) === 1);
@@ -601,7 +613,7 @@ function applyHeld(): void {
   u.ctlCmd = cmd; u.sheetCmd.main = cmd.mainsheet ?? 0; u.sheetCmd.jib = cmd.jibsheet ?? 0;
 }
 function setView(i: number): void {
-  viewMode = i; lookAhead();
+  viewMode = i; lookAhead(); look.chase = undefined; // (the chase view starts framed: design/chase-layout.html)
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
@@ -740,8 +752,8 @@ function keyLook(dt: number): void {
   if (held.has('lookRight')) setLook(look.yaw - rate, look.pitch);
   if (held.has('lookUp')) setLook(look.yaw, look.pitch + rate);
   if (held.has('lookDown')) setLook(look.yaw, look.pitch - rate);
-  if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); else look.chase = Math.max(8, look.chase * Math.exp(-1.2 * dt)); }
-  if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); else look.chase = Math.min(90, look.chase * Math.exp(1.2 * dt)); }
+  if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); else look.chase = Math.max(8, (look.chase ?? view.chaseDist) * Math.exp(-1.2 * dt)); }
+  if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); else look.chase = Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(1.2 * dt)); }
 }
 function lookLabel(): void {
   const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
@@ -914,11 +926,11 @@ function paintSeg(): void {
     const k = seg.dataset.k as keyof Settings;
     const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
-  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = S[c.dataset.t as 'aids' | 'windDial'] === 1; });
+  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (S[c.dataset.t as 'aids' | 'windDial' | 'rideSwell'] ?? 1) === 1; });
 }
 // the on-screen training aids: a switch each (on = shown)
 document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => c.addEventListener('change', () => {
-  const k = c.dataset.t as 'aids' | 'windDial'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
+  const k = c.dataset.t as 'aids' | 'windDial' | 'rideSwell'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
 }));
 document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
@@ -1215,7 +1227,7 @@ let fleetFrom: 'home' | 'setup' = 'home';
 function showroom(on: boolean): void {
   if (on && !document.body.classList.contains('showroom')) { look.yaw = 0.6; look.pitch = 0; }
   document.body.classList.toggle('showroom', on);
-  if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = 24; }
+  if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = undefined; }
 }
 const fleet: Fleet = new Fleet(S, {
   changed: () => { fleetChanged(); boatSummary(); },
