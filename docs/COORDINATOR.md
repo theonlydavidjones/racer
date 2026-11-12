@@ -28,6 +28,7 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 | UI & Experience | session_012Uu5QhhvZC9XxYh89Bbjtr | Design only: the sail controls band mock-up (ROADMAP Priorities #3), UI vision. No src/ changes until the owner agrees; agreed builds come to the Coordinator. |
 | Rules | session_012Uu5QmJbE8BAU8Bo9CJqzC | Ranked #6: finish the racing rules (20.3, 20.2(e), blanketing for Rule 23, a boat as obstruction). |
 | Debrief | session_012Uu5QjfJMjn9aQ2ePP43Wo | Ranked #7: the debrief shown on the replay. Layout to the owner first. |
+| Rigging | session_012Uu5Qheec6yzUhFvm29AbD | Rig tuning and its physics (rake, shrouds, chocks, backstay, mast bend, forestay sag). Proposal to the owner before the player-facing build. |
 
 ## Queued for idle sessions (see ROADMAP.md)
 - Crew Controls: original flag motion + "Strike ensign" button (cruise, high wind).
