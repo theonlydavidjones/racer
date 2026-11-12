@@ -27,8 +27,11 @@ What's planned, roughly in order. Done work is described in the README.
 ## Priorities (owner's ranking, November 2026)
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
-1. P0 phase 2: the interior true to a real Folkboat (Boat Detail, running; 6–10 h).
-2. Finish the crew figures: the crew's stations onto the real benches. Owner chose option 2: the benches plus the side
+1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner moulding with brown cushions,
+   shelves and fiddles, floorboards, knees, a hanging locker, the forepeak opening to the rule, the keel-stepped mast).
+   Next in P0: true-to-life rigging (the owner's top boat item, Rigging, begun with the mainsheet's blocks) and the
+   boat review's bugs, winching and polish (P0 items 6–7).
+2. ~~Finish the crew figures: the crew's stations onto the real benches~~ (done, crew-stations merged). Owner chose option 2: the benches plus the side
    deck alongside them and aft of the thwart beside the after shelf (hips 1.35–2.5 m), where crews really sit; about
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
    (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
@@ -202,7 +205,7 @@ work to do on the deck as well (lines, hatch, fairleads, etc) but that's not urg
 is now "much better" (owner).
 1. ~~The interior reads as real 3D by day~~ (done, v106) (parallax, daylight in through the companionway and lights), and the
    translucent panel over the companionway at night is gone (2–4 h).
-2. The interior true to a real Folkboat, from the construction plan and reference photos (6–10 h).
+2. ~~The interior true to a real Folkboat~~ (done), from the construction plan and reference photos (6–10 h).
 3. ~~The cockpit to the plan~~ (done: benches as lazarettes, footwell, thwart, after shelf, winches on pedestals from Josephine's photos), with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. ~~Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines~~ (done, v128–v134).
@@ -327,7 +330,8 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Race Chair with the OA decides, and tells the fleet by text. It's marked proposed; the bylaws say nothing on wind. So
   in racing: no reefing; the committee cancels in a blow, by the fleet's practice (the owner's 23 kt vote; the written
   proposal's 25 kt), signalled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
-  the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (the fleet's
+  the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (built: the committee calls racing off over 23 kt, AP or N over A, the
+  strategist warns ahead, CXL in the logbook) (the fleet's
   practice), and **reefing is held until there's a Folkboat-specific source** (a cruiser's account or a sailmaker). For cruising: the owner expects blue-water
   Folkboats to reef; still unconfirmed. Ann Gash (solo round the world, 1975–77) reportedly used a working jib and a
   trysail in a storm, not a reefed main (a search summary of her memoir, not read); Hasler's Jester was junk-rigged
