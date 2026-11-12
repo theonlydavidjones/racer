@@ -503,7 +503,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // still sitting there, not drawn flicking from sitting to hiking and back several times a second)
     const was = a.pose, hikeAt = was === 'hike' ? 0.02 : 0.08, leeAt = was === 'lee' ? -0.02 : -0.08;
     const settled: Pose = free ? (arm < leeAt ? 'lee' : a.lean > hikeAt ? 'hike' : 'sit') : t.pose;
-    a.pose = Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5 ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
+    // (moving out to the rail or in from it on their own side, to a seat, is still sitting or hiking: not 'cross', the
+    // crouch across under the boom, which had them bob up for a moment with every puff)
+    const outOrIn = !crossing && free && Math.abs(goal.z - a.z) <= 0.5;
+    a.pose = !outOrIn && (Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5) ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
     a.fatigue = clamp(a.fatigue + dt * (e * e / ENDURE(p) - (1 - e) * a.fatigue / RECOVER), 0, 1);

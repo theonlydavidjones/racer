@@ -22,7 +22,7 @@ describe('Settled crew stay settled (render/crew.ts, boat/crewWork.ts)', () => {
     const lastTurn = ai.map(() => -99), side = ai.map(b => Math.sign(b.rel));
     type Watch = { secs: number; poses: number; trips: number; knee: number; spin: number; turned: number; hist: number[]; prev?: { pose: string; gx: number; gz: number; yaw: number; knee: number[] } };
     const watch: Watch[][] = ai.map(b => b.crew!.people.slice(1).map(() => ({ secs: 0, poses: 0, trips: 0, knee: 0, spin: 0, turned: 0, hist: [] })));
-    while (w.t < 420) {
+    while (w.t < 600) { // (long enough for minutes of steady sailing each: a boat that tacks often has few)
       w.step(DT);
       ai.forEach((b, k) => {
         syncCrew(crs[k], b.rel >= 0 ? 1 : -1, b.crew, DT, false, undefined, b.heel, b.tacking);

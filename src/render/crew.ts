@@ -599,7 +599,14 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   if (rising) c.hip.y = Math.min(aim.y, Math.max(c.hip.y, c.hip.y + 1.0 * dt)); // (pushing up off the seat: briskly)
   // (turning: eased, and no quicker than a person turns their body, about 3 rad/s)
   // (and not while rising over the coaming out of a seat on the side deck: up first, knees still over it, then round)
-  if (!rising) { const dy = Math.atan2(Math.sin(want.yaw - c.yaw), Math.cos(want.yaw - c.yaw)) * a; c.yaw += Math.max(-3 * dt, Math.min(3 * dt, dy)); }
+  if (!rising) {
+    let d = Math.atan2(Math.sin(want.yaw - c.yaw), Math.cos(want.yaw - c.yaw));
+    // (turning round on a side deck, about half a turn: through facing inboard, toward the cockpit, as anyone turns there,
+    // not out over the water; then the turn to sit facing in is back the other way, not on round a whole circle)
+    const sx = Math.sign(c.hip.x);
+    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < 0) d -= Math.sign(d) * 2 * Math.PI;
+    const dy = d * a; c.yaw += Math.max(-3 * dt, Math.min(3 * dt, dy));
+  }
   // the lean on a slower spring (leaning out as a puff comes, in as it goes: about a third of a second, never a snap)
   const P = 7; f.pitchV = ((f.pitchV ?? 0) + P * P * (want.pitch - c.pitch) * dt) * Math.max(0, 1 - 2 * P * dt); c.pitch += f.pitchV * dt;
   c.roll += (want.roll - c.roll) * a;
