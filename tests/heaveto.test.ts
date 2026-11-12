@@ -46,7 +46,7 @@ describe('taking one line off the crew', () => {
   it('all back to the crew at once, including lines from the old "trim all" setting', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 12 });
     b.manualTrim = b.trimAll = true; takeLine(b, 'jibsheetW');
-    expect(linesByHand(b).length).toBe(11);
+    expect(linesByHand(b).length).toBe(12); // (eleven lines and the cars, with the jib halyard)
     allToCrew(b);
     expect(linesByHand(b)).toEqual([]);
   });
