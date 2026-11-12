@@ -1,5 +1,5 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, asternCoast, crewRig, moveBoat } from '../boat/physics';
+import { HOVE, apparent, asternCoast, crewRig, moveBoat } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
@@ -1044,13 +1044,17 @@ export class World {
           H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + rate * dt);
           const q = swingAbout(start, H.h0, 3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); b.astern = 0;
         } else if (P.hold && H.held !== false) {
-          // head to wind, held on the bow line: waiting for the main to go up and the word to let go
+          // head to wind, held on the bow line: waiting for the main to go up and the word to let go; she lies to the wind as
+          // it shifts (a boat on a bow line follows it), within 20 degrees of where she came to
           if (H.held == null) { H.held = true; this.emit({ type: 'toast', msg: 'She\'s lying head to wind, held on the bow line. Hoist the main (U), then push off (G) to let her go.', ms: 6000 }); }
+          const want = clamp(wrap(ww.from - n360(H.h0 + P.turn)), -20, 20), cur = H.follow ?? 0;
+          H.follow = cur + clamp(want - cur, -CREW_TURN * dt, CREW_TURN * dt);
+          const q = swingAbout(start, H.h0, 3.8, P.turn + H.follow); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
         } else if (P.hold && (H.releasing ?? 0) < 1) {
           // her bow pushed off the wind, about the bow, toward the way out
           H.releasing = Math.min(1, (H.releasing ?? 0) + dt * CREW_TURN * 2 / Math.abs(P.hold.off));
-          const q0 = swingAbout(start, H.h0, 3.8, P.turn), q = swingAbout(q0.c, q0.h, 3.8, P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
-        } else this.letGo(b, P.h, SHOVE, 0);
+          const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, 3.8, P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
+        } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
       } else {
         // shoved off astern: enough to coast her into the fairway on the water's drag
         let lo = 0, hi = 1.5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
@@ -1104,6 +1108,7 @@ export class World {
   private dockStep(b: Boat, dt: number): void {
     b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
     b.boom += (side * 75 - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
     crewRig(b, dt, this.emit);

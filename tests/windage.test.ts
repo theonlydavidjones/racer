@@ -38,6 +38,24 @@ describe('the wind on her with no way on (bare poles)', () => {
     // the wind's from her port side (heading 90 degrees to the right of it): she's set to starboard
     expect(u.sway ?? 0).toBeGreaterThan(0.6 * steady); expect(u.sway ?? 0).toBeLessThan(1.4 * steady);
   });
+  it('never ahead and astern at once: driven astern head to wind, then turned off it and blown ahead, it\'s one motion', () => {
+    const { w, u } = world(15);
+    for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
+    expect(u.astern ?? 0).toBeGreaterThan(0.3);
+    for (let i = 0; i < 60 * 60; i++) { hold(w, w.windHere(u, u).from + 150); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
+    expect(u.v).toBeGreaterThan(0.2); expect(u.astern ?? 0).toBe(0); // (blown off downwind on her bare rig, ahead now)
+  });
+  it('in irons with her sails up she stops, as before (no sternway: the AI\'s sailing doesn\'t reckon with it yet)', () => {
+    const { w, u } = world(15);
+    u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
+    for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from); w.step(DT); }
+    expect(u.astern ?? 0).toBe(0);
+  });
+  it('on bare poles the rig\'s windage acts at any angle forward of the beam: stopped 40 degrees off the wind, she\'s pushed astern', () => {
+    const { w, u } = world(15);
+    for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from + 40); w.step(DT); }
+    expect(u.astern ?? 0).toBeGreaterThan(0.1);
+  });
   it('sailing, nothing changes: no sternway, and the keel holds her (the polar carries her leeway)', () => {
     const { w, u } = world(12);
     u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true }; u.v = 3;

@@ -72,7 +72,7 @@ export interface Boat {
    * bow (`s` m walked, `a` deg swung so far), or pushed off an end tie (`s` 0…1 of the way out), from her berth
    * (`from`, heading `h0`). The crew moves her by hand, so the physics waits until they let her go with a shove.
    */
-  handled?: { plan: import('../geo/marina').PushOff; from: { x: number; y: number }; h0: number; s: number; a: number; /** held head to wind on the bow line (true), or told to let go (false) */ held?: boolean; releasing?: number };
+  handled?: { plan: import('../geo/marina').PushOff; from: { x: number; y: number }; h0: number; s: number; a: number; /** held head to wind on the bow line (true), or told to let go (false) */ held?: boolean; releasing?: number; /** deg she's followed the wind round while held */ follow?: number };
   /** Her sails: how far each is hoisted (0 down … 1 up) and whether the crew is hoisting (true) or striking (false) it. Absent: both up. */
   rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean };
   v: number; // speed through the water, m/s

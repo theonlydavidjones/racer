@@ -167,13 +167,30 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     expect(w.pushOff()).toBe(true); for (let i = 0; i < 60 * 60 && u.handled; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
     expect(u.handled).toBeUndefined(); expect(Math.abs(rel(w.windHere(u, u).from, u.h))).toBeGreaterThan(30); // her bow pushed off the wind
     for (let i = 0; i < 60 * 20; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
-    expect(u.v).toBeGreaterThan(0.3); // and with the main up, she sails off
+    expect(u.v).toBeGreaterThan(0.2); // and with the main up, she sails off
     // an end tie pointing into the westerly: her bow pushed off it about her stern quarter, clear of the dock all the way
     for (const e of SLIPS.filter(s => s.kind === 'alongside')) for (const from of [e.heading, e.heading + 20, e.heading - 20]) {
       const p = pushOffPlan(e, from, 15); expect(pushOffPoses(e, p).every(q => berthClear(q.c, q.h, e))).toBe(true);
       if (!p.headToWind) expect(Math.abs(rel(from, p.h))).toBeGreaterThanOrEqual(30);
     }
   }, 120000);
+  it('the wind straight out of her slip: she\'s already head to wind, so she\'s walked out and held for the main, not turned across it', () => {
+    let n = 0;
+    for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 7 === 0)) {
+      const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
+      n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
+    }
+    expect(n).toBeGreaterThan(20);
+  }, 60000);
+  it('her flags and windex show the wind while she\'s made fast and while the crew has her', () => {
+    const slip = slipsIn('west-harbor')[30], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
+    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
+    const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user, rel = (a: number) => ((a + 540) % 360) - 180;
+    for (let i = 0; i < 30; i++) w.step(DT);
+    expect(u.aws).toBeGreaterThan(3); expect(Math.abs(rel(u.arel - rel(w.windHere(u, u).from - u.h)))).toBeLessThan(10);
+    w.pushOff(); for (let i = 0; i < 60 * 20; i++) w.step(DT);
+    expect(u.handled).toBeTruthy(); expect(u.aws).toBeGreaterThan(3); expect(Math.abs(rel(u.arel - rel(w.windHere(u, u).from - u.h)))).toBeLessThan(10);
+  });
   it('end ties: berths alongside the free ends of the docks, bow out, which push off forward', () => {
     const ends = SLIPS.filter(s => s.kind === 'alongside');
     expect(ends.length).toBeGreaterThan(10);

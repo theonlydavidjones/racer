@@ -283,7 +283,7 @@ export function berthClear(c: Vec, h: number, except: Slip): boolean {
  *   end (`back`: how far her middle goes back, m; half a metre to two and a half past it, as little as clears the boats either
  *   side) while her
  *   stern swings out across the fairway about it (`turn`, deg, + to starboard; to heading `h`). In a breeze across her
- *   (4 kt and more of it on her side) the wind swings the stern, downwind: she ends up pointing toward the wind, and if
+ *   (4 kt and more: WIND_SWINGS) the wind swings the stern, downwind: she ends up pointing toward the wind, and if
  *   that's head to wind (`hold`) the crew holds her there, bow to the wind, while you hoist the main; then they push her
  *   bow off until the main fills (`off`: 60 deg from head to wind, or as far as there's clear water for, toward the way out) and let her go. In light air they walk the
  *   bow round whichever way points her down the fairway toward the way out. Then they slip the line and push her off
@@ -298,7 +298,11 @@ export function berthClear(c: Vec, h: number, except: Slip): boolean {
 export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number } } | { kind: 'astern'; back: number; coast: number } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean };
 /** Her bow is 3.8 m ahead of her middle. */
 const BOW = 3.8;
-/** A breeze across her this strong (knots of it on her side) and the wind swings her stern, whatever the crew would like. */
+/**
+ * A breeze this strong (kt) and the wind swings her stern about the bow line, whatever the crew would like: she weathervanes
+ * toward head to wind from any angle (only dead downwind is a balance, and an unstable one). At 4 kt the turning force about
+ * her bow is about 50 N·m, which a crew member could still hold; but by then they're aboard, holding the line, not pushing.
+ */
 export const WIND_SWINGS = 4;
 const plans = new Map<string, PushOff>();
 export function pushOffPlan(s: Slip, windFrom?: number, windKt = 0): PushOff {
@@ -394,10 +398,10 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   const at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back });
   const tip = 0.45 * s.finger; // her middle to the end of her finger
   let reach = 0; while (reach < tip + 40 && berthClear(at(reach + 0.5), s.heading, s)) reach += 0.5;
-  // how much breeze she has on her side, and which way it swings her stern: downwind, so her bow comes toward the wind
-  const side = windFrom == null ? 0 : windKt * Math.abs(Math.sin(wrap180(windFrom - s.heading) * Math.PI / 180));
+  // which way the wind swings her stern: downwind, so her bow comes round toward the wind
+  const fromBow = windFrom == null ? 0 : Math.abs(wrap180(windFrom - s.heading)); // (0: the wind blowing straight out of the slip, already on her bow)
   const windTurn = windFrom == null ? 0 : Math.sign(wrap180(windFrom - s.heading)) || 1;
-  const swings = side >= WIND_SWINGS; // (the wind has the say)
+  const swings = windFrom != null && windKt >= WIND_SWINGS && fromBow < 165; // (the wind has the say; blowing straight into the slip from astern, it could swing her either way: the crew's choice)
   // her bow held on a short bow line by a crew member on the finger's end, half a metre to two and a half past it (the boats
   // in the slips either side overhang their fingers' ends: her bow has to clear their sterns as she swings)
   type Way = { back: number; turn: number; h: number; gain: number; run: number; hold?: { off: number } };
@@ -413,7 +417,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
       let hold: { off: number } | undefined;
       if (swings) {
         const toWind = wrap180(windFrom! - s.heading) * sign; // (degrees to come round to point at the wind, the way she's swinging)
-        if (toWind > 0 && toWind <= sq + 10) {
+        if (toWind >= 0 && toWind <= sq + 10) { // (0: already head to wind, the wind straight out of the slip: no swing to speak of, held there for the main)
           turn = sign * toWind;
           // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
           // wind; less, if that would point her into the docks: with the main up and the shove's way on she bears away from there)

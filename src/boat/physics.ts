@@ -177,7 +177,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // the rig rolling: the sails move through the air sideways at the roll rate times their height (rolling to windward,
   // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
   // the wind the sails see: at their height, in the plane of the heeled mast (sailWind), as the crew trims to it
-  const ap = sailWind(ww.from, ww.kt, b.h, b.v, rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), rigSway(b), b.heel ?? 0); // (going astern, into the wind she sees more of it)
   trimSails(b, ap.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
@@ -239,14 +239,19 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // pinching: the sails flog (their windage, and the hull's and rig's no longer paid for by the polar's drive) as far as
   // they're luffing (trim.ts), and, below the beat angle, as the square of how far below it she is (pinchFlog): nothing
   // to speak of a degree or two low, so the polar's VMG peak stays at ORC's beat angle, rising to all of it in the no-go
-  // zone, where she stops (the flogging cloth as much as is hoisted: struck, only the bare rig's windage)
+  // zone, where she stops (the flogging cloth only as much as is hoisted; struck, the bare rig's windage at any angle
+  // forward of the beam)
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, ap.awa), pinchFlog(twa, beat));
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep, disp);
-  // stopped, the wind still on her (on the bare rig, or sails flogging head to wind) drives her astern: what the surge
+  // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
-  const v1 = b.v + a * dt;
-  if (v1 >= 0) b.v = v1; else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
+  // (on a bare rig: with her sails struck, as at the dock. With them up, in irons, she'd drift astern too, but the AI's
+  // sailing doesn't yet reckon with sternway, so there she stops, as before: ROADMAP, for Deep Physics and the AI)
+  const v1 = b.v + a * dt, bareRig = hm + hj < 0.5;
+  if (v1 >= 0 || !bareRig) b.v = Math.max(0, v1); else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
+  // (headway and sternway are one motion through the water: netted, so the drag on each doesn't push the other)
+  if (b.v > 0 && (b.astern ?? 0) > 0) { const n = b.v - b.astern!; if (n >= 0) { b.v = n; b.astern = 0; } else { b.v = 0; b.astern = -n; } }
   // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
   // which is how a roll tack starts her turning with less rudder), so the same turn costs less or more by her balance
@@ -260,7 +265,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (HOVE.windSide) against her hull and keel broadside to the water (HOVE.crossCd), and with way on the keel's lift (its
   // slope by the profile's aspect ratio), as heaveTo works it out. Faster than a slow walk the keel's lift holds her and the
   // polar carries her leeway, so this fades out between 0.5 and 1 m/s and any slip dies away as before
-  const slow = clamp((1 - b.v) / 0.5, 0, 1);
+  // (on a bare rig, as at the dock; with sails up their own side force would set her further, and the AI's sailing doesn't
+  // reckon with leeway yet: ROADMAP, with the sternway)
+  const slow = hm + hj < 0.5 ? clamp((1 - b.v) / 0.5, 0, 1) : 0;
   if (slow > 0) {
     const awaR = ap.awa * D2R, q = 0.5 * 1.225 * ap.aws * ap.aws, side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
     const Fy = side * q * HOVE.windSide * Math.sin(awaR) ** 2;
@@ -627,7 +634,10 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // sternway (pushed off astern): she coasts back, slowing on the water's drag, which is slight at a walking pace (a
   // two-tonne boat glides a long way: from a shove, three or four lengths in most of a minute)
   const ast = b.astern ?? 0;
-  if (ast > 0) b.astern = Math.max(0, ast - (ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast) * dt); // (the drag's constant part stops her in a finite time; the wind's push astern builds a little a step)
+  // (the coast's law at a walk; faster, her hull's resistance going through the water, the same as ahead, which rises with
+  // the square of the speed and more; the drag's constant part stops her in a finite time, and the wind's push astern
+  // builds a little a step)
+  if (ast > 0) b.astern = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
   // sideways too, while she's slipping (hove to)
   const sw = b.sway ?? 0, stb = V(b.h + 90);
   b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;
@@ -645,7 +655,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)
-  const aw = apparent(ww.from, ww.kt, b.h, b.v, sw + rigSway(b), b.heel ?? 0);
+  const aw = apparent(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), sw + rigSway(b), b.heel ?? 0);
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
