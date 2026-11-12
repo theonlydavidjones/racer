@@ -172,7 +172,7 @@ export class PlanChart {
     if (w.dest) {
       const a = { x: w.user.x, y: w.user.y }, r = navRoute(a, w.dest), L = r.slice(1).reduce((s2, p, i) => s2 + dist(r[i], p), 0), b = brg(w.dest.p.x - a.x, w.dest.p.y - a.y);
       const twa = Math.abs(wrap(w.wind.from - b)), kind = twa < 45 ? 'a beat' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'a run';
-      way = `<p>${(L / 1852).toFixed(1)} nm by the navigator's route${r.length > 2 ? ` round the land (${(dist(a, w.dest.p) / 1852).toFixed(1)} nm straight)` : ''}; bearing ${String(Math.round(b) % 360).padStart(3, '0')}°, ${kind} in the wind as it is now.</p>`;
+      way = `<p>${(L / 1852).toFixed(1)} nm by the navigator's route${r.length > 2 && L > dist(a, w.dest.p) * 1.02 ? ` round the land (${(dist(a, w.dest.p) / 1852).toFixed(1)} nm straight)` : ''}; bearing ${String(Math.round(b) % 360).padStart(3, '0')}°, ${kind} in the wind as it is now.</p>`;
       // the course she'd sail leaving now (sim/navigator.ts passageNow): over the ground, tacks and gybes, and when she'd get there
       const pn = passageNow(w);
       if (pn) {
