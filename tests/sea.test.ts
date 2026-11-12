@@ -229,6 +229,11 @@ describe('the sea inside the marinas: entrances and breakwater heads', () => {
     expect(breakwaterKd(h, b, t, { x: -2 * L, y: 0.5 * L }, L)).toBeLessThan(0.2); // (deep in the shadow)
     expect(breakwaterKd(h, b, t, { x: -2 * L, y: 3 * L }, L)).toBeLessThan(breakwaterKd(h, b, t, { x: -0.5 * L, y: 3 * L }, L)); // (deeper, less)
     expect(breakwaterKd(h, b, t, { x: 2 * L, y: 3 * L }, L)).toBe(0); // (not shaded by it: none of this head's to give)
+    // and waves meeting the wall at 30° (square on, the solution can't tell the way they come from the way they go):
+    // travelling at 30° across a wall running east, north-east-wards past its head at the origin; the shadow north of it
+    const e = { x: 1, y: 0 }, t30 = { x: -Math.cos(30 * Math.PI / 180), y: Math.sin(30 * Math.PI / 180) }, edge = { x: t30.x * 15 * L, y: t30.y * 15 * L };
+    expect(breakwaterKd(h, e, t30, { x: edge.x + 5, y: edge.y }, L)).toBeCloseTo(0.5, 1); // (on the shadow's edge, just inside)
+    expect(breakwaterKd(h, e, t30, { x: 5 * L, y: 2 * L }, L)).toBeLessThan(0.2); // (well behind the wall)
   });
   it('every harbor the ocean swell reaches has an entrance to take it in by, and West Harbor\'s is its open east side', async () => {
     const { harborGaps, swellReach } = await import('../src/environment/sea');

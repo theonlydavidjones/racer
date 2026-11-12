@@ -108,7 +108,8 @@ export function fetchRay(p: Vec, from: number, fine = fineFetch(p)): number {
   // the Bay. Just outside the entrance is traced the same fine way as just inside, so the two agree (the coarse ~100 m
   // land cells, and their 50 m least fetch, would make the water outside a breakwater calmer than the water inside it).
   // (`fine` false: open water's fetch, measured coarsely as it always was, even from a point that's in a basin)
-  if (fine) { const r = basinRay(p, from); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
+  const H = fine ? fineHarbor(p) : null; // (none: a point just past the fine map's edge, traced coarsely after all)
+  if (H) { const r = basinRay(p, from, H); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
   const u = V(from);
   for (let d = 50; d < MAX_FETCH; d += 100) {
     const l = landAt({ x: p.x + u.x * d, y: p.y + u.y * d });
@@ -393,7 +394,7 @@ export function breakwaterKd(h: Vec, b: Vec, t: Vec, p: Vec, L: number): number 
   const hx = h.x - p.x, hy = h.y - p.y, back = (hx * -b.y + b.x * hy) / det, along = (-t.x * hy + t.y * hx) / det;
   if (back <= 0 || along <= 0) return 0;
   const e2 = { x: -b.y, y: b.x }, dx = p.x - h.x, dy = p.y - h.y, r = Math.hypot(dx, dy), kr = 2 * Math.PI * r / L;
-  const th = Math.atan2(dx * e2.x + dy * e2.y, dx * b.x + dy * b.y), th0 = Math.atan2(t.x * e2.x + t.y * e2.y, t.x * b.x + t.y * b.y);
+  const th = Math.atan2(dx * e2.x + dy * e2.y, dx * b.x + dy * b.y), th0 = Math.atan2(-(t.x * e2.x + t.y * e2.y), -(t.x * b.x + t.y * b.y)); // (the way the waves come from, as the solution is written)
   const F = (s: number): [number, number] => { const [C, S] = fresnel(s), a = C + 0.5, c = -(S + 0.5); return [(a - c) / 2, (a + c) / 2]; };
   const s1 = -2 * Math.sqrt(kr / Math.PI) * Math.cos((th - th0) / 2), s2 = -2 * Math.sqrt(kr / Math.PI) * Math.cos((th + th0) / 2);
   const [a1, b1] = F(s1), [a2, b2] = F(s2), p1 = kr * Math.cos(th - th0), p2 = kr * Math.cos(th + th0);

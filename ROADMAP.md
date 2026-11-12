@@ -13,7 +13,7 @@
   Cove's seawall reflects nearly all, so the real basin holds more than the bare diffraction gives, and long swell can
   set up a harbor's seiche); piers between an entrance and a slip (20 of Gashouse Cove's slips have none in sight); the
   tide's depth over the entrance (MLLW's); a curved breakwater taken straight at its head (West Harbor, facing east,
-  away from the swell, gets about 1 mm in a 2 m swell outside, where the old unsourced ×0.15 gave 3 cm)) (from review
+  away from the swell, gets well under a millimetre in a 2 m swell outside, where the old unsourced ×0.15 gave 3 cm)) (from review
   of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
   neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
