@@ -167,6 +167,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top
   const cab = cabinGeometry();
   const sideMat = glass ? MAT.cream : MAT.mahogany;
+  grp.userData.sideMat = sideMat; // (the winches' pedestals, moulded with the coamings: buildLines)
   grp.add(new THREE.Mesh(cab.sides, sideMat));
   grp.add(new THREE.Mesh(cab.top, cabinTopMat));
   grp.add(new THREE.Mesh(cab.aft, sideMat));
@@ -351,6 +352,7 @@ function line(points: THREE.Vector3[], mat: THREE.Material = LINE_MAT): THREE.Li
 }
 
 /** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
+const sideMatFor = (g: THREE.Group): THREE.Material => g.userData.sideMat ?? MAT.cream;
 function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // traveller: the thwart, a deep varnished beam across the cockpit in front of the helm, on its post (hull.ts
   // COCKPIT_FIT), the track on its top, and the car
@@ -373,11 +375,12 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
-    // the jib sheet winch: on the coaming at its forward end, centred over it on a teak pad (the coaming's cap is only
-    // 40 mm wide; the winch's base is about 130 mm), chromed: its flanged base, the drum and the top cap
-    const u = COCKPIT.u0 + 0.03, zw = -L / 2 + u * L, wx = side * (cockpitHalf(u) + COAMING_T / 2), top = deckY(u, cockpitHalf(u) + COAMING_T / 2) + COAMING_H(zw) + 0.02;
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.025, 20), MAT.wood); pad.position.set(wx, top + 0.0125, zw); grp.add(pad);
-    const wy = top + 0.025, winch = new THREE.Group(); winch.position.set(wx, wy, zw); grp.add(winch);
+    // the jib sheet winch, as on Josephine (the owner's photos): on a moulded pedestal standing on the side deck against
+    // the coaming's outer face, about 1.4 m aft of amidships (just aft of her name, some 0.6 m forward of the thwart);
+    // the pedestal tapers up from a broader foot to about the coaming's top, and the chromed winch stands on it
+    const zw = 1.4, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) + 0.03;
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.095, top - deck, 20), sideMatFor(grp)); ped.scale.z = 1.25; ped.position.set(wx, (top + deck) / 2, zw); grp.add(ped);
+    const wy = top, winch = new THREE.Group(); winch.position.set(wx, wy, zw); grp.add(winch);
     for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 20), CHROME); m.position.y = y; winch.add(m);
     }
