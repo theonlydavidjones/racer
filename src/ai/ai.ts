@@ -228,7 +228,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     b.luff = false; return;
   }
   ai.clearing = false;
-  if (b.finished) { b.desired = n360(ww.from + 90); b.luff = true; return; }
+  if (b.finished || w.cancelled) { b.desired = n360(ww.from + 90); b.luff = true; return; } // (racing called off for the wind: she stops racing too)
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % 6 === 0; // heavy predictions 10× a second
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only

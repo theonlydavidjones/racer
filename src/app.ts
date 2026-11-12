@@ -1137,6 +1137,10 @@ function logOuting(): void {
     w.logged = true;
     const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : place(S.sailFrom)?.name ?? 'the Bay';
     stage([{ ...outing(S.boat, true), kind: 'cruise', title: `From ${from}${w.dest ? ` to ${w.dest.name}` : ''}`, elapsed: Math.round(w.t), nm: w.sailedM / 1852, arrived: w.arrivedT != null }]);
+  } else if (S.mode === 'race' && !w.freeSail && w.cancelled) {
+    // racing called off for the wind: no result, but the outing goes in her logbook
+    w.logged = true;
+    stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'CXL', of: w.boats.length, setup: raceSetup() }]);
   } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
     // you left the race before finishing: retired
     w.logged = true;
@@ -1158,7 +1162,7 @@ function settleLog(next: () => void): void {
   const mins = (s?: number) => s == null ? '' : `${Math.floor(s / 60)} min`;
   $('keepTitle').textContent = e.kind === 'race' ? 'Keep this race?' : 'Keep this cruise?';
   $('keepWhat').textContent = e.kind === 'race'
-    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
+    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing cancelled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
     : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}. Saved, it goes in her logbook.`;
   $('keepAsk').hidden = false;
   const done = (keep: boolean) => {
@@ -1328,7 +1332,7 @@ const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id
 function pastRaces(): void {
   pastList = loadLog().filter(e => e.kind === 'race' && e.skipper === 'you').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${ordinal(e.place)} of ${e.of}` : '';
+  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'CXL' ? 'Cancelled (wind)' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${ordinal(e.place)} of ${e.of}` : '';
   $('pastRows').innerHTML = pastList.length ? pastList.map((e, i) => {
     const boat = S.boats.find(b => b.id === e.boatId), ok = !!courseOfEntry(e);
     const day = new Date(e.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
