@@ -19,7 +19,8 @@ const polarSpeed = (w: number, a: number) => polar(w, a, 'jib');
  * course's angle (the polar's), upright. Cached by the knot, 5° of angle and a twentieth of the speed ratio.
  */
 const GRADIENT = Math.log(CE_ABOVE_WL / 0.005) / Math.log(10 / 0.005);
-const cache = new Map<number, number>();
+/** The ratios, filled in as asked for (0: not yet): a flat table, as the AI's predictions ask thousands of times a step. */
+const cache = new Float64Array(41 * 64 * 32);
 
 /** The sails' drive (N) along her course at speed u (m/s) in tws kt at twa deg, trimmed for that apparent wind. */
 function sailDrive(tws: number, twa: number, u: number): number {
@@ -38,12 +39,12 @@ export function driveRatio(tws: number, twa: number, v: number, vt: number): num
 }
 function at(w: number, a: number, q: number): number {
   const key = (w * 64 + a / 5) * 32 + q; // (w ≤ 40, a/5 ≤ 36, q ≤ 30: each in its own field, no two conditions share a key)
-  let k = cache.get(key);
-  if (k == null) {
+  let k = cache[key];
+  if (k === 0) {
     const vt = polarSpeed(w, a), d1 = sailDrive(w, a, vt);
     // (at least a tenth: a sail model that turns the drive negative at some broad angle at speed mustn't stall the boat)
     k = d1 > 1 ? clamp(sailDrive(w, a, q / 20 * vt) / d1, 0.1, 3) : 1;
-    cache.set(key, k);
+    cache[key] = k;
   }
   return k;
 }

@@ -1,5 +1,5 @@
 import type { PrepFlag } from '../sim/signals';
-import { bow, type Boat } from '../boat/boat';
+import { bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveRatio } from '../boat/driveCurve';
@@ -50,15 +50,36 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
     if (m.q) { const ax = m.q.x - m.p.x, ay = m.q.y - m.p.y, k = clamp(((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay || 1), 0, 1); np = { x: m.p.x + ax * k, y: m.p.y + ay * k }; }
     const d = dist(b, np);
     if (d > 30 || d < 0.5) continue;
-    const rel = wrap(brg(np.x - b.x, np.y - b.y) - desired); // + = mark to starboard of the course
+    const bm = brg(np.x - b.x, np.y - b.y);
     // (room between her side and the mark's: MARK_ROOM, plus the mark's own radius and her half beam)
     const need = Math.asin(Math.min(1, (MARK_ROOM + m.r + HALF_BEAM) / d)) / (Math.PI / 180);
+    // close to it, a turn from her heading to the course she wants mustn't swing her across it on the way: if it lies
+    // inside that turn, she turns only as far as passes it on the side it's on now (then on round once she's past).
+    // At the start, round the committee boat and the pin while she's getting to the line: a mark she's rounding she
+    // means to sail round, close, and the rounding has its own course (aimPoint)
+    const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`;
+    if (d < 20 && !b.started) {
+      const relH = wrap(bm - b.h), turn = wrap(desired - b.h), side = Math.sign(relH || 1);
+      if (Math.sign(relH) === Math.sign(turn) && Math.abs(relH) < Math.abs(turn) + need) {
+        // (and that's the side she passes it on, until she's clear: the rule below would otherwise pick the other)
+        // (and if passing it there would take her above close-hauled, she can't: pinned there, her leeway carries her on
+        // to it. She turns away from it instead, through the wind if need be, the way that doesn't swing her across it)
+        // (the turn away committed to that side, through the wind, even slow: steered the short way round by the helm's
+        // own rule, a slow boat would gybe instead, the long way, and swing her bow across the mark: physics review)
+        const keepH = n360(bm - side * need), away = Math.abs(wrap(sailable(b, keepH) - keepH)) > 1;
+        desired = away ? n360(bm + 180) : keepH; near = key;
+        if (away && b.ai && b.ai.turnCommit !== -side) { b.ai.turnCommit = -side; b.ai.commitFor = desired; }
+        if (b.ai) b.ai.passing = { key, side };
+        continue;
+      }
+    }
+    const rel = wrap(bm - desired); // + = mark to starboard of the course
     if (Math.abs(rel) < need && Math.abs(rel) < 90) {
       // pass it on the side it's already on; if that means heading up past close-hauled (sailable would undo it, and she'd
       // sail on into it), pass it on the other side, bearing away. Once she's chosen a side she holds to it until she's
       // clear (her course swinging as she turns would swap them back and forth, and she'd hold on into it)
       const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
-      const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`, prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
+      const prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
       const useKeep = prev ? Math.sign(rel || 1) === prev : Math.abs(wrap(sailable(b, keep) - keep)) < 1;
       desired = useKeep ? keep : other;
       near = key; if (b.ai && !prev) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
@@ -327,11 +348,17 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       P = { x: w.center.x + L.x * s * (half + 20) + N.x * (out ? -20 : 8), y: w.center.y + L.y * s * (half + 20) + N.y * (out ? -20 : 8) };
     } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
     else if (!b.started) {
-      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on). On
-      // the course side already (she crossed an extension of the line, or drifted over doing her turns at the gun), she
-      // isn't started: back below the line first, then up across it between the ends (RRS Definitions, Start)
-      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half), above = w.lineD(b) > 0;
-      P = { x: w.center.x + N.x * (above ? -18 : 10) + L.x * a, y: w.center.y + N.y * (above ? -18 : 10) + L.y * a }; void along;
+      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on).
+      // But on the course side of it without having started (come round outside an end, above an extension of the line,
+      // or drifted over doing her turns at the gun), she isn't started until she has crossed it from the pre-start side
+      // (Definitions, Start): back below it first, her whole hull, bow and stern, then up across it. Latched until then,
+      // so she doesn't turn back up the moment her middle is below with her stern still over; and set again whenever
+      // she's over (round outside an end a second time). (Aiming above the line from above, she wandered there for
+      // minutes.) Crew Controls' whole-hull latch and Crew Figures' re-arming, together.
+      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
+      if (w.lineD(bow(b)) > 0) ai.below = true; else if (Math.max(w.lineD(bow(b)), w.lineD(stern(b))) < -2) ai.below = false;
+      const off = ai.below ? -18 : 10;
+      P = { x: w.center.x + N.x * off + L.x * a, y: w.center.y + N.y * off + L.y * a }; void along;
     }
     else {
       P = aimPoint(w, b);
@@ -358,9 +385,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // wind or wheel round and run off). Dropped once she's round, if it hasn't happened in 20 s (something stopped her),
     // or if she's on another leg or point of sail than the one she decided it for.
     const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt), upwind = rel < 44 && !b.ocs;
+    // the course she'd steer to make good the straight line to it, up-current of it by as much as the current across
+    // her track would set her down (a crew that reckons with the current allows for all of it, the others for some)
+    const crab = crabFor(bP, targetFor(b, rel) * 0.9, { x: c.x * (ai.aware ? 1 : 0.6), y: c.y * (ai.aware ? 1 : 0.6) });
     // (running for a mark deeper than her best downwind angle, with some hysteresis so she doesn't flip between sailing
-    // the angle and steering at the mark as the wind swings about it)
-    ai.running = b.started && !b.ocs && (ai.running ? rel > ra - 8 : rel > ra - 2);
+    // the angle and steering at the mark as the wind swings about it. By the course she'd steer, not the bearing: a
+    // current across a broad reach can put that course past dead downwind, and the run's held gybe then decides the
+    // gybe, once; steered as a reach she gybed back and forth across it every few seconds: physics review)
+    const relC = Math.abs(wrap(ww.from - crab));
+    ai.running = b.started && !b.ocs && (ai.running ? relC > ra - 8 : relC > ra - 2);
     const mode = upwind ? 'beat' : ai.running ? 'run' : 'reach';
     if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || w.t - ai.goTack.at > 20 || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
     let headedNow = false;
@@ -428,11 +461,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // reaching for the mark: steer up-current of it by as much as the current across her track would set her down, so
       // she makes good the straight line (as the tiller pilot and the planner do: autopilot.ts, routing.ts), not a curve
       // that ends with her beating or running to it (a crew that reckons with the current allows for all of it, the
-      // others for some); but never deeper than her best running angle on the gybe she's on (only the run's held gybe
-      // gybes her)
-      const vs = Math.max(b.v, targetFor(b, rel) * 0.8);
-      desired = sailable(b, crabFor(bP, vs, { x: c.x * (ai.aware ? 1 : 0.6), y: c.y * (ai.aware ? 1 : 0.6) }));
-      if (Math.abs(wrap(ww.from - desired)) > ra || Math.sign(wrap(ww.from - desired)) !== (b.tack === 'S' ? 1 : -1) && Math.abs(wrap(ww.from - desired)) > 150) desired = b.tack === 'S' ? n360(ww.from - ra) : n360(ww.from + ra);
+      // others for some); but never deeper than her best running angle. With the mark across on the other gybe's side
+      // (just short of a run, where the run's held gybe has let go of her as the mark's angle dipped under it), she
+      // gybes for it: held on this gybe at its running angle she sailed on away from the mark, a minute and a half and
+      // 30° of overstand in a 12 kt race (physics review)
+      desired = sailable(b, crab);
+      const sd = wrap(ww.from - desired);
+      if (Math.abs(sd) > ra) desired = n360(ww.from - Math.sign(sd || 1) * ra);
     }
     if (!headedNow) ai.headedT = 0;
   }
@@ -450,7 +485,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // more, so she holds on while the chain answers; if it never does, the boat she hailed can't tack, nor can she)
     const chain = pinned ? w.pairRecord(b, pinned)?.hail : null, relay = chain?.kind === 'room' && chain.by === b.id && chain.passedOn && chain.respondedAt == null ? chain.passedOn : null;
     const waiting = pinned && (relay ? !relay.failed : may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
+    // pinned, but bearing away about SUBSTANTIAL_TURN clears it (so she may not hail: rule 20.1(a)): she bears away round
+    // it, rather than tack into the boat to windward (rule 13)
+    const bearAway = pinned && !may && !relay && obstructionAhead(b, b.h, b.tack, 45) === null
+      ? [8, 12, 16, 22, 30].map(k => n360(b.h + (b.tack === 'S' ? -k : k))).find(h => !blocked(w, b, h, 45)) : undefined;
     if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;
+    else if (bearAway != null) desired = bearAway;
     else if (beating && w.t - b.lastTackT > 4 && !(pinned && w.roomBlockedByMark(b)) && !relay) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   } else if (beating && b.started && b.twa <= beatFor(b) + 8 && !b.tacking && w.t - ai.lastHail > 40) {

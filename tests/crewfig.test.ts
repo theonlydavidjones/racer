@@ -103,8 +103,9 @@ describe('Everyone sits on something (render/crew.ts)', () => {
       if (i < 30) continue;
       [cr.helm, ...cr.crew].forEach((f, w) => {
         const p = b.crew!.people[w];
-        // (kneeling in the middle of the cockpit is on a knee, not the pelvis: the clipping checks cover it)
-        if (!['sit', 'hike', 'lee', 'helm'].includes(p.pose) || f.going || f.tack || (w > 0 && Math.abs(p.x) < 0.3)) return;
+        // (kneeling in the middle of the cockpit is on a knee, not the pelvis: the clipping checks cover it; walking along
+        // the side deck or settling into the place they've walked to, they're not seated yet)
+        if (!['sit', 'hike', 'lee', 'helm'].includes(p.pose) || f.going || f.tack || f.walked || (w > 0 && Math.abs(p.x) < 0.3)) return;
         f.root.updateMatrixWorld(true);
         const hip = f.root.getWorldPosition(new THREE.Vector3()), e = halfBeam(uAtZ(hip.z));
         // (stepping from one seat to another, over the coaming, the pelvis is up for a moment: settled ones only)

@@ -1,3 +1,4 @@
+import northAnchorage from '../geo/data/gg-north-anchorage.json';
 import './three-setup';
 import * as THREE from 'three';
 import { LL } from '../geo/geo';
@@ -430,7 +431,33 @@ function buildBridge(scene: THREE.Scene, groundAt: (x: number, y: number) => num
     box(28, 6, 21, 0, top + 3, z, CONCRETE); box(20, 4, 15, 0, top + 8, z, CONCRETE); // the stepped top
     for (const sx of [-1, 1]) box(1.2, top - g0 - 12, 0.8, sx * 9, (top + g0) / 2, z + 13.2 * Math.sign(z), DARK); // fluting on the faces
   };
-  for (const z of [-END, END]) { const g0 = ground(z); box(50, deckY(z) - 6 - g0, 45, 0, (deckY(z) - 6 + g0) / 2, z, CONCRETE); pylon(z); }
+  // the San Francisco anchorage at Fort Point
+  { const z = -END, g0 = ground(z); box(50, deckY(z) - 6 - g0, 45, 0, (deckY(z) - 6 + g0) / 2, z, CONCRETE); pylon(z); }
+  // the Marin anchorage on the hillside at Lime Point, in OpenStreetMap's outlines (scripts/make-marin-piers.mjs): the
+  // housing the cables go down into, about 109 × 48 m along the bridge from where the side span ends, and its four pylons,
+  // N1 and N2 either side of the roadway, about 9 × 5 m each. Their heights aren't in the data: the housing up to just
+  // under the roadway and the pylons standing 14 m above it, as at the San Francisco end (estimates).
+  {
+    const A = northAnchorage as unknown as { housing: { pts: [number, number][] }; pylons: { pts: [number, number][] }[] };
+    const deck = deckY(END), up = (pts: [number, number][], top: number, mat: THREE.Material) => {
+      const v = pts.map(q => LL(q[0], q[1])), low = Math.min(...v.map(p => groundAt(p.x, p.y))) - 3; // (into the hillside, down to its lowest corner)
+      const sh = new THREE.Shape(); v.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y));
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: top - low, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, low, 0);
+      const m = new THREE.Mesh(geo, mat); scene.add(m); return { v, low };
+    };
+    up(A.housing.pts, deck - 6, CONCRETE);
+    for (const P of A.pylons) {
+      const { v } = up(P.pts, deck + 14, CONCRETE);
+      // the stepped art-deco top, as the San Francisco pylons'
+      const c = v.reduce((a, p) => ({ x: a.x + p.x / v.length, y: a.y + p.y / v.length }), { x: 0, y: 0 });
+      for (const [k, h, y] of [[0.8, 3, deck + 15.5], [0.6, 2.5, deck + 18.2]] as const) {
+        const shrunk = v.map(p => ({ x: c.x + (p.x - c.x) * k, y: c.y + (p.y - c.y) * k })), sh = new THREE.Shape();
+        shrunk.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y));
+        const geo = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, y - h / 2 - 1, 0);
+        scene.add(new THREE.Mesh(geo, CONCRETE));
+      }
+    }
+  }
   pylon(-(END + ARCH));
   // the Fort Point arch: two steel ribs under the roadway, springing from the rock either side of the fort, with
   // posts up to the deck
