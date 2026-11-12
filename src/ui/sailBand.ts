@@ -27,8 +27,15 @@ export interface BandHost {
   /** Something changed hands: the trim panel's line. */
   changed(): void;
   toast(msg: string, ms?: number): void;
-  /** Every line back to the crew (and their settings). */
+  /** Every line, both cars and the pole back to the crew (and their settings). */
   allBack(): void;
+  /** Set or stow the whisker pole (it becomes yours). */
+  pole(): void;
+  /** The hail you could make now (world.ts hailOption), and making it. */
+  hailWords(): string | null;
+  hail(): void;
+  /** The key bound to Hail, for its tab. */
+  hailKey(): string;
 }
 
 type Side = 'P' | 'S';
@@ -78,6 +85,32 @@ const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-t
   <button type="button" class="sb-a" data-act="left" aria-label="${k === 'mainsheet' ? 'Boom toward port' : 'Car to port'}">${chev('l')}</button>
   <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
   <button type="button" class="sb-a" data-act="right" aria-label="${k === 'mainsheet' ? 'Boom toward starboard' : 'Car to starboard'}">${chev('r')}</button><span class="sb-end s">S</span></div>`;
+/**
+ * The windex, as you'd see it looking up at the masthead (in the band's middle, where the helm looks up past the
+ * companionway): the boat from above, bow up; the vane points into the apparent wind; the white tabs at 28° either side
+ * of the bow mark close-hauled, and the red wedge between them is too close to the wind to sail. The number is the
+ * apparent wind angle. (The same geometry as the old top-centre windex: the UI session's mock-up, design/chase-view.)
+ */
+const windexSvg = () => {
+  const P = (deg: number, r: number) => [70 + Math.sin(deg * D2R) * r, 70 - Math.cos(deg * D2R) * r].map(n => n.toFixed(1));
+  let ticks = '';
+  for (let d = 0; d < 360; d += 10) {
+    const big = d % 30 === 0, [x1, y1] = P(d, 64), [x2, y2] = P(d, big ? 58 : 61);
+    ticks += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${big ? '#8fa9b8' : '#3b5566'}" stroke-width="${big ? 1.6 : 1}"/>`;
+  }
+  const [wx1, wy1] = P(-28, 56), [wx2, wy2] = P(28, 56);
+  const tab = (s: number) => { const [a, b] = P(s * 28, 40), [c, d] = P(s * 28, 57); return `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#eef3f5" stroke-width="3" stroke-linecap="round"/>`; };
+  return `<svg viewBox="0 0 140 140" aria-hidden="true">
+  <defs><radialGradient id="sbWxBg" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#17344a"/><stop offset="1" stop-color="#08141e"/></radialGradient>
+  <linearGradient id="sbWxHull" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a4657"/><stop offset=".5" stop-color="#4b6b7d"/><stop offset="1" stop-color="#2a4657"/></linearGradient></defs>
+  <circle cx="70" cy="70" r="69" fill="#0b1a26"/><circle cx="70" cy="70" r="67" fill="url(#sbWxBg)" stroke="rgba(150,196,218,.35)" stroke-width="1.5"/>${ticks}
+  <path d="M70 70 L${wx1} ${wy1} A56 56 0 0 1 ${wx2} ${wy2} Z" fill="#c8463a" opacity=".8"/>
+  <path d="M70 26 C 82 44, 84 70, 80 106 L 60 106 C 56 70, 58 44, 70 26 Z" fill="url(#sbWxHull)" opacity=".85"/>${tab(-1)}${tab(1)}
+  <g class="sb-vane"><line x1="70" y1="106" x2="70" y2="26" stroke="#ff6a3d" stroke-width="3" stroke-linecap="round"/><path d="M70 10 L79 30 L70 25 L61 30 Z" fill="#ffb627" stroke="#1a1205" stroke-width="1"/><path d="M70 98 L77 108 L77 114 L70 106 L63 114 L63 108 Z" fill="#ff6a3d" stroke="#1a1205" stroke-width="1"/></g>
+  <circle cx="70" cy="70" r="5" fill="#e9f2f5" stroke="#08141e" stroke-width="1.5"/>
+  <text class="sb-awa" x="70" y="131" text-anchor="middle">0°</text></svg>`;
+};
+
 /** A jib car on its H-shaped track: two fore-and-aft legs, a crossbar between them (7 rows), the car on it (5 pins). */
 const jcar = (side: Side) => {
   let holes = '';
@@ -94,15 +127,20 @@ export class SailBand {
   private holding: CtlKey | null = null;
   private sel: CtlKey | null = null;
   private lastTack: 'S' | 'P' | null = null;
+  /** Whether the pole tab is showing (a deep run, or the pole out): kept between frames for its hysteresis. */
+  private poleShown = false;
+  private hailT = 0;
 
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<button type="button" class="sb-all" data-act="all" title="Hand every line (and both jib cars) back to the crew">All ↺</button>
+    el.innerHTML = `<button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button>
+<span class="sb-tab sb-pen" hidden></span>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden title="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds); then it's yours until Auto-trim."></button><button type="button" class="sb-tab sb-all" data-act="all" title="Auto-trim: every line, both jib cars and the whisker pole back to the crew">Auto-trim</button></span>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
-  <span class="sb-gap" title="The companionway"></span>
+  <span class="sb-wx" role="img">${windexSvg()}</span>
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
@@ -124,8 +162,9 @@ export class SailBand {
     });
   }
 
-  get open(): boolean { return !this.el.hidden; }
-  show(on: boolean): void { this.el.hidden = !on; }
+  /** Put away, the band leaves only its windex (and a hail, when there is one): the helm still looks up at the masthead. */
+  get open(): boolean { return !this.el.classList.contains('shut'); }
+  show(on: boolean): void { this.el.classList.toggle('shut', !on); if (!on) this.up(null); }
   /** The line the keys ([ ] ; ') are on: lit in the band. */
   select(k: CtlKey | null): void { this.sel = k; }
 
@@ -197,6 +236,8 @@ export class SailBand {
     const t = e.target as HTMLElement, act = t.closest<HTMLElement>('[data-act]')?.dataset.act, d = t.closest<HTMLElement>('[data-line]');
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
+    if (act === 'pole') { this.host.pole(); return; }
+    if (act === 'hail') { this.host.hail(); this.hailT = 0; return; }
     if (act !== 'name' || !d) return;
     const u = this.host.world().user, k = this.keyOf(d) as LineKey | null; if (!k) return;
     // the name: amber (yours) hands it back; grey (the crew's) takes it where it is
@@ -227,10 +268,45 @@ export class SailBand {
     const from = u.carCmd ?? u.ctl.car[side]; takeLine(u, 'car'); moveLazyCar(u, row - from.fore, ins - from.ins); this.host.changed();
   }
 
+  /** The windex and the tabs on the band's top edge: Hail (when a hail applies), a penalty's turns, the pole, Auto-trim. */
+  private tabs(w: ReturnType<BandHost['world']>, u: Boat): void {
+    // the windex: the vane into the apparent wind (arel, + from starboard: clockwise looking down)
+    const wx = this.el.querySelector<HTMLElement>('.sb-wx')!;
+    wx.querySelector('.sb-vane')!.setAttribute('transform', `rotate(${u.arel.toFixed(1)} 70 70)`);
+    const awa = Math.round(Math.abs(u.awa));
+    wx.querySelector('.sb-awa')!.textContent = `${awa}°`;
+    wx.setAttribute('aria-label', `Windex: apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
+    wx.title = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`;
+    // a penalty's turns still to do
+    const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
+    pen.hidden = !turns; if (turns) pen.textContent = `Penalty · ${turns} turn${turns > 1 ? 's' : ''}`;
+    // Hail: only when there's a hail to make (checked a few times a second: it looks round the fleet)
+    const hail = this.el.querySelector<HTMLElement>('.sb-hail')!;
+    if (!w.running || w.paused) hail.hidden = true;
+    else if (--this.hailT <= 0) {
+      this.hailT = 15;
+      const words = this.host.hailWords();
+      hail.hidden = !words;
+      if (words) { hail.innerHTML = `Hail · ${words}<span class="k">${this.host.hailKey()}</span>`; hail.title = `Hail "${words}" (${this.host.hailKey()})`; }
+    }
+    // the pole: only on a deep run, where a poled-out jib fills (from about 145° true: polar.ts jibEfficiency): it shows
+    // at 140° as you bear away and goes below 135°, and stays while the pole is out or the crew is at it
+    const tab = this.el.querySelector<HTMLElement>('.sb-pole')!, deep = Math.abs(u.twa), busy = u.pole !== 'down' || u.poleWant;
+    this.poleShown = busy || deep >= (this.poleShown ? 135 : 140);
+    tab.hidden = !this.poleShown;
+    if (this.poleShown) {
+      // "Pole out" sets it, "Pole in" stows it; while the crew is at it, the next word dimmed
+      const moving = u.pole === 'setting' || u.pole === 'stowing' || (u.poleWant ? u.pole === 'down' : u.pole === 'set');
+      tab.textContent = u.poleWant ? 'Pole in' : 'Pole out';
+      tab.classList.toggle('dim', moving); tab.classList.toggle('mine', !!u.poleMine);
+    }
+  }
+
   /** Every frame while it's open: the ropes, the boom and the car, who has what, and where the crew would set it. */
   update(): void {
-    if (this.el.hidden) return;
     const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
+    this.tabs(w, u);
+    if (!this.open) return;
     // a tack ends a jib sheet's run: the sheets change roles (physics.ts carries your targets across), and a sheet still
     // winching after it would back the jib with nothing in the band to stop it
     if (this.lastTack && u.tack !== this.lastTack && (this.runKey === 'jibsheet' || this.runKey === 'jibsheetW') && u.ctlTarget) { delete u.ctlTarget.jibsheet; delete u.ctlTarget.jibsheetW; this.runKey = null; }
