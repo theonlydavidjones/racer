@@ -11,6 +11,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, windowLids } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
@@ -404,7 +405,11 @@ function buildRopes(grp: THREE.Group): Ropes {
   return { mesh, lines };
 }
 const R_M = new THREE.Matrix4(), R_T = new THREE.Matrix4(), R_ZERO = new THREE.Matrix4().makeScale(0, 0, 0), R_A = new THREE.Vector3(), R_B = new THREE.Vector3(), R_Q = new THREE.Quaternion(), R_S = new THREE.Vector3(), R_UP = new THREE.Vector3(0, 1, 0), R_D = new THREE.Vector3();
+const ROPE_BASE = Object.fromEntries(Object.entries(ROPE_MAT).map(([k, mt]) => [k, mt.color.clone()])) as Record<Rope, THREE.Color>;
 function syncRopes(m: BoatMesh): void {
+  // the screen lines aren't lit by the scene: dim their colours with the daylight, as the lit ropes over them go dark
+  const day = 1 - 0.85 * NIGHT.uNight.value;
+  for (const k of Object.keys(ROPE_MAT) as Rope[]) ROPE_MAT[k].color.copy(ROPE_BASE[k]).multiplyScalar(day);
   const { mesh, lines } = m.ropes; let k = 0;
   for (const { l, r } of lines) {
     // the line's frame relative to the boat's
