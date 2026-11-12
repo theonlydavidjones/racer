@@ -1112,12 +1112,12 @@ function crewRows(): void {
   const n = c.n, people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, n).map((p, i) => ({ who: n === 2 ? (i === 0 ? 'Middle crew' : 'Forward hand') : 'Crew', p }))];
   const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
   // (with two crew, who sits where: the middle crew has the main, the forward hand the jib, the cabin top and the pole)
-  const seat = (i: number) => n === 2 && i > 0 ? `<label title="Where they sit and what they do">Seat <select data-i="${i}" data-f="seat"><option value="1"${i === 1 ? ' selected' : ''}>Middle: main</option><option value="2"${i === 2 ? ' selected' : ''}>Forward: jib, pole</option></select></label>` : '';
-  const more = (i: number, p: Person) => `<details class="crewmore"><summary>More</summary>${ATTR_UI.map(([a, l, t]) => {
+  const seat = (i: number) => n === 2 && i > 0 ? `<label class="crewseat" title="Where they sit and what they do">Seat <select data-i="${i}" data-f="seat"><option value="1"${i === 1 ? ' selected' : ''}>Middle: main</option><option value="2"${i === 2 ? ' selected' : ''}>Forward: jib, pole</option></select></label>` : '';
+  const more = (i: number, p: Person) => `<details class="crewmore"><summary>More</summary><div class="crewattrs">${ATTR_UI.map(([a, l, t]) => {
     const v = attrOf(p, a), own = p.attr?.[a] != null;
     return `<label title="${t}">${l} <input type="range" min="0" max="1" step="0.05" value="${v}" data-i="${i}" data-a="${a}"><output>${own ? Math.round(v * 100) : 'as skill'}</output></label>`;
-  }).join('')}<button type="button" class="crewreset" data-i="${i}">All as skill</button></details>`;
-  rows.innerHTML = people.map((x, i) => `<div class="crewperson"><span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}${seat(i)}${more(i, x.p)}</div>`).join('')
+  }).join('')}</div><button type="button" class="crewreset" data-i="${i}">All as skill</button></details>`;
+  rows.innerHTML = people.map((x, i) => `<div class="crewperson"><span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h).replace(/"/g, '&quot;')}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}${seat(i)}${more(i, x.p)}</div>`).join('')
     + `<label class="crewfumble" title="Under pressure every crew fumbles now and then: a riding turn on the winch, the pole caught on the shrouds"><input type="checkbox" id="crewFumbles"${S.crewFumbles === false ? '' : ' checked'}> Your crew fumble now and then under pressure</label>`;
   const who = (i: number) => (i === 0 ? c.helm : c.people[i - 1]);
   rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {

@@ -604,13 +604,16 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .sibody{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--rule);border-radius:8px}
 .crewbox .crewrows{margin-top:6px}
 /* each person's row (app.ts crewRows): their measurements, skill and seat; their attributes under More */
-.crewperson{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
-.crewperson>span{min-width:96px;color:var(--text)}
-.crewmore{flex:1 0 100%;margin:0 0 4px 96px}
+.crewperson{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}
+.crewperson>span{width:92px;flex:none;color:var(--text)}
+.crewperson select{max-width:150px}
+.crewseat{margin-left:102px} /* (wraps under the fields, in line with them) */
+.crewmore{flex:1 1 100%;box-sizing:border-box;margin:0 0 4px 102px;max-width:calc(100% - 102px);min-width:0}
 .crewmore summary{cursor:pointer;color:var(--muted);font-size:12px}
-.crewmore label{display:inline-flex;width:250px;justify-content:space-between;margin:3px 12px 0 0}
-.crewmore input[type=range]{width:110px;padding:0}
-.crewmore output{width:44px;text-align:right;color:var(--text);font-size:12px}
+.crewattrs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 14px;margin-top:4px}
+.crewattrs label{display:grid;grid-template-columns:88px minmax(0,1fr) 46px;align-items:center;gap:6px;min-width:0;font-size:12px}
+.crewattrs input[type=range]{width:100%;min-width:0;padding:0}
+.crewattrs output{text-align:right;color:var(--text);font-size:12px}
 .crewreset{margin-top:6px;font:inherit;font-size:12px;background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:3px 8px;cursor:pointer}
 .crewfumble{grid-column:1/-1;margin-top:4px}
 .crewfumble input{width:auto}
