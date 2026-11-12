@@ -19,11 +19,13 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 | Crew Figures | session_012Uu5QiXrMLFqZYcrUp8g2b | Crew drawing/animation, crewPhys/crewWork. Adapting the crew to the new cockpit (one combined PR with Boat Detail). Skill tiers + "why" status line for the pole-out foredeck move. |
 | Deep Physics | session_012Uu5QkwUEDY7sN1x6b1deP | src/boat, src/environment, src/ai, src/rules physics. Next: gusts/turbulence vs records; sails-up sternway/leeway for the AI. |
 | Charts | session_012Uu5Qi9YBAXa3joTxFttkc | Map, chart, bridges. Waiting for Bay East's ENC land, then Lime Point render fit (branch claude/lime-point). |
-| Bay East | session_012Uu5QjZTdN1JNsYj2wpzVB | Berkeley/Alameda/Richmond: shore from NOAA ENC first, then marks, harbors, wind/current. |
-| Crew Controls | session_012Uu5QjU5RR6EcpHKNKPU9j | HUD and controls (idle). |
-| Marinas | session_012Uu5QhY7i2pxWmAtAggWhz | Marinas, push-off (idle). |
+| Bay East | session_012Uu5QjZTdN1JNsYj2wpzVB | Ranked #9: the flags' original motion and Strike ensign (East Bay world done). |
+| Crew Controls | session_012Uu5QjU5RR6EcpHKNKPU9j | The sail controls band (ranked #3, from the UI & Experience mock-up), then HUD and controls. |
+| Marinas | session_012Uu5QhY7i2pxWmAtAggWhz | Ranked #8: Home button, Move her here, setup chart, conditions mid-sail. |
 | Roadmap | session_012Uu5QhnkGorfpUrV4bt4Lt | Takes the owner's feedback, files it in ROADMAP.md, sends "now" bugs to the Coordinator. Builds nothing. |
 | UI & Experience | session_012Uu5QhhvZC9XxYh89Bbjtr | Design only: the sail controls band mock-up (ROADMAP Priorities #3), UI vision. No src/ changes until the owner agrees; agreed builds come to the Coordinator. |
+| Rules | session_012Uu5QmJbE8BAU8Bo9CJqzC | Ranked #6: finish the racing rules (20.3, 20.2(e), blanketing for Rule 23, a boat as obstruction). |
+| Debrief | session_012Uu5QjfJMjn9aQ2ePP43Wo | Ranked #7: the debrief shown on the replay. Layout to the owner first. |
 
 ## Queued for idle sessions (see ROADMAP.md)
 - Crew Controls: original flag motion + "Strike ensign" button (cruise, high wind).
