@@ -128,7 +128,7 @@ export interface CrewState {
   fore01?: number; foreT?: number;
   /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
    * whether, with the pole out, both crew right forward on the foredeck pays more: `layout`, and seconds since it changed. */
-  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number;
+  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; vAvg?: number;
   /** (true while both crew are right forward on the foredeck: the helm has the main then, crewWork.ts mainHand) */
   foredeck?: boolean;
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
@@ -334,12 +334,15 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // the bow hand goes forward to the mast downwind when the bow-down trim pays (light air: hullTrim.ts), if they know to
     // downwind, a good crew goes forward when the hull's trim says it pays (hullTrim.ts: in light air the transom lifts
     // clear): the bow hand to the mast, or, with the pole out and two crew, both right up on the foredeck. The least drag
-    // of the three, re-thought once a second, but moved only for a real gain (0.3%) and not within LAYOUT_STAY of the
-    // last move, so they don't shuttle along the deck as she speeds up and slows; through a pole gybe they stay forward
+    // of the three at her speed over the last minute, re-thought once a second, but moved only for a real gain and not
+    // within LAYOUT_STAY of the last move, so they don't shuttle along the deck as she speeds up and slows; through a pole
+    // gybe they stay forward
     c.layoutT = (c.layoutT ?? 1e9) + Math.max(dt, 0.05);
+    // (her speed over about a gust-lull cycle, a minute: the layout is for the wind there is, not each puff)
+    c.vAvg = c.vAvg == null ? k.v : c.vAvg + (k.v - c.vAvg) * Math.min(1, Math.max(dt, 0.05) / 60);
     const canGo = n > 0 && downwind && !pl?.fore && skill > 0.5;
-    if (c.foreT === 1) c.layout = canGo ? chooseLayout(c, k, foreF) : 'cockpit';
-    else if (!canGo) c.layout = 'cockpit';
+    if (c.foreT === 1 && canGo) c.layout = chooseLayout(c, k, foreF);
+    else if (!canGo) { c.layout = 'cockpit'; c.foredeck = false; }
     const atMast = c.layout === 'mast' || c.layout === 'foredeck', forward = c.layout === 'foredeck';
     // targets for each person: jobs first, then the helm, then the free crew share what's left of the wanted moment
     const tgt: Target[] = new Array(ppl.length);
@@ -473,14 +476,15 @@ const setGoal = (a: Aboard, x: number, z: number) => { if (a.goal) { a.goal.x = 
 const smoothSkill = (s: number) => { const t = clamp((s - 0.2) / 0.4, 0, 1); return t * t * (3 - 2 * t); };
 
 /** The least time a crew stays in a fore-and-aft layout once they've moved to it (s): a trip to the foredeck is a few
- * metres along the deck, not undone on the next lull. An estimate. */
-export const LAYOUT_STAY = 25;
+ * metres along the deck, not undone on the next lull; longer than a gust-lull cycle (about a minute: Bethwaite). An
+ * estimate. */
+export const LAYOUT_STAY = 60;
 /**
  * Where the crew go downwind: in the cockpit (at `foreF`), the bow hand at the mast, or (the pole out, two crew) one astride
  * the bow and one on the foredeck: the least resistance by the hull's trim (hullTrim.ts trimDrag), with hysteresis.
  */
 function chooseLayout(c: CrewState, k: CrewCall, foreF: number): 'cockpit' | 'mast' | 'foredeck' {
-  const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, v = Math.max(0.5, k.v), sea = k.sea ?? 0;
+  const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, v = Math.max(0.5, c.vAvg ?? k.v), sea = k.sea ?? 0;
   const cockpitZ = (j: number, count: number) => { const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (count - 1 - j) * Z.gap; return za + (zf - za) * foreF; };
   const drag = (zOf: (j: number) => number) => {
     let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
@@ -491,7 +495,9 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number): 'cockpit' | 'ma
   if (n >= 2 && (k.pole || now === 'foredeck')) opts.push(['foredeck', drag(j => j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2))]);
   const cur = opts.find(o => o[0] === now)?.[1] ?? Infinity;
   const [bestL, bestD] = opts.reduce((a, o) => (o[1] < a[1] ? o : a));
-  if (bestL !== now && cur - bestD > 0.003 && (c.layoutT ?? 1e9) >= LAYOUT_STAY) { c.layoutT = 0; c.foredeck = bestL === 'foredeck'; return bestL; }
+  // (a real gain: 0.3% for the trip to the foredeck, 0.1% for the short one to the mast and back)
+  const worth = bestL === 'foredeck' || now === 'foredeck' ? 0.003 : 0.001;
+  if (bestL !== now && cur - bestD > worth && (c.layoutT ?? 1e9) >= LAYOUT_STAY) { c.layoutT = 0; c.foredeck = bestL === 'foredeck'; return bestL; }
   c.foredeck = now === 'foredeck';
   return now;
 }
@@ -506,8 +512,14 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
     const t = trimFromMoment(m0 + momentOfCrewFore(c, x));
     const e = Math.abs(t - best); if (e < err - 1e-9) { err = e; f = x; }
   }
-  const sk = smoothSkill(skill);
-  c.fore01 = 0.5 + (f - 0.5) * sk;
+  const sk = smoothSkill(skill), want = 0.5 + (f - 0.5) * sk;
+  // (a move along the cockpit for a real gain only, 0.05%: the drag is nearly straight in the trim, so the best place is
+  // an end of the cockpit, and near the crossover it isn't worth the move. An estimate.)
+  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6) {
+    const v = Math.max(0.5, k.v), sea = k.sea ?? 0, dOf = (x: number) => trimDrag(v, trimFromMoment(m0 + momentOfCrewFore(c, x)), sea);
+    if (dOf(c.fore01) - dOf(want) < 0.0005) return c.fore01;
+  }
+  c.fore01 = want;
   return c.fore01;
 }
 /** The free crew's fore-and-aft moment (kg·m, + forward of their reference places) with them at `f` along the cockpit. */

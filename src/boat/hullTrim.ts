@@ -51,8 +51,10 @@ export const TRIM = {
   waveK: 0.6,
   /** The keel's profile for the centre of lateral resistance: length and depth (m), from the ORC draft and the profile. */
   keelL: 5.9, keelT: 0.5 * orc.boat.draft,
-  /** Added resistance in waves per metre of bow-down trim (fraction), an estimate. */
-  seaK: 2,
+  /** Added resistance in waves per metre of bow-down trim (fraction of the waves' own added resistance), an estimate: set
+   * so a light-air chop doesn't outweigh the wetted surface (the guides put light-air crews forward upwind, chop or not),
+   * while a breeze's steep sea does (the Year Book's weight aft upwind in heavy weather). */
+  seaK: 0.1,
   /** The trim a standard crew (two, 150 kg) can give her from the cockpit, aft end to forward end (m): the polar is the boat sailed well, within this. */
   reach: [-0.016, 0.011] as [number, number]
 };
@@ -106,7 +108,9 @@ export const bestTrim = (v: number, sea = 0) => best(v, sea).t;
 export function trimSpeedFactor(vt: number, t: number, sea = 0): number {
   const v = Math.max(0.5, vt), bt = best(v, sea);
   const d = bt.fF * TRIM.wsK * t + bt.wR * t - bt.d; // (trimDrag, at the cached speed)
-  return 1 / (1 + Math.max(0, d)) ** (1 / Math.max(1.5, bt.n));
+  // (and a trim the cockpit can't reach, the crew right up on the foredeck in light air, pays its little: the owner's
+  // crews go there because it's fast, and the polar is a crew sailing from the cockpit)
+  return 1 / (1 + d) ** (1 / Math.max(1.5, bt.n));
 }
 /** How far forward (m) the centre of lateral resistance moves with trim t (m, + bow down). */
 export const clrShift = (t: number) => (t / TRIM.lwl) * TRIM.keelL ** 2 / (12 * TRIM.keelT);
