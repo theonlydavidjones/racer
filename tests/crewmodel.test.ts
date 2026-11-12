@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { testBoat, sail } from './helpers/testBoat';
+import { testBoat, sail, startTack } from './helpers/testBoat';
 import { poleTrip, startThreshold } from '../src/boat/crewWork';
 import { POLE, poleEta, sailPlan } from '../src/boat/physics';
 import { beatAngle } from '../src/boat/polar';
@@ -172,5 +172,32 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
   it('in a breeze even novices are on the rail: their weight is wanted', () => {
     expect(go(crewOf(0.6, { trim: 0.15 }), 18, 60).at).toBe(-1);
     expect(go(crewOf(0.6), 18, 60, { cruising: true }).at).toBe(-1);
+  }, 30_000);
+  it('with one crew, they come out of the hatch as soon as she needs more weight than the helm sitting gives', () => {
+    const one = { helm: { ...DEFAULT_CREW.helm, skill: 0.6 }, crew: [{ ...DEFAULT_CREW.crew[0], skill: 0.6 }] };
+    for (const W of [10, 12]) {
+      const r = go(one, W, 120, { cruising: true });
+      expect(r.at, `${W} kt`).toBe(-1);
+      expect(r.b.crew!.people[0].pose).not.toBe('hike'); // (the helm isn't hiking alone for them)
+    }
+    expect(go(one, 4, 60, { cruising: true }).at).toBe(1); // (and in a drifter, there they are)
+  }, 60_000);
+  it('a tack takes the forward hand off the doors: the jib sheet comes first', () => {
+    const tack = (shut: boolean) => {
+      const twa = beatAngle(6), b = testBoat({ heading: 360 - twa, kt: 3, windKt: 6 });
+      b.crew = newCrew(crewOf(0.6, { handling: 0.3 }), 'S'); b.cruising = true;
+      if (shut) b.companionway = { doors: 'in', hatch: 'closed' };
+      sail(b, 5, () => { b.h = 360 - twa; });
+      const busy = b.crew!.people.some(p => p.job?.line === 'doors'), js: number[] = [];
+      startTack(b); sail(b, 12, () => { js.push(b.ctl.jibsheet); });
+      return { b, busy, js };
+    };
+    const shut = tack(true), open = tack(false);
+    expect(shut.busy).toBe(true); // (at the doors when the helm put the tiller over)
+    // (the jib sheet worked through the tack as it is with the hatch already open)
+    // (the jib sheet worked through the tack as it is with the hatch already open: from a second in, once the tack has
+    // called them off the doors; before it, in a drifter, the sheet waited for them)
+    shut.js.forEach((v, i) => { if (i > 60) expect(Math.abs(v - open.js[i])).toBeLessThan(0.05); });
+    sail(shut.b, 40); expect(shut.b.companionway).toEqual({ doors: 'out', hatch: 'open' }); // (and they open it afterwards)
   }, 30_000);
 });

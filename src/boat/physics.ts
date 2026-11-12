@@ -137,7 +137,10 @@ function crewHatch(b: Boat, dt: number): void {
   // (no one wants it open, or it is: nobody at it)
   if (!a || !shut) { for (const q of c.people) if (q.job?.line === 'doors' || q.job?.line === 'hatch') q.job = null; cw.t = undefined; return; }
   const line = cw.doors === 'in' ? 'doors' : 'hatch';
-  if (a.job && a.job.line !== line && a.job.line !== 'doors') return; // (busy with something else first)
+  // (through a tack or a hard turn the sheets come first: they leave the doors for it, and come back to them after)
+  if ((b.tacking || Math.abs(b.yawRate ?? 0) > 6) && (a.job?.line === 'doors' || a.job?.line === 'hatch')) { a.job = null; cw.t = undefined; return; }
+  if (a.job && a.job.line !== line) return; // (busy with something else first)
+  if (b.tacking || Math.abs(b.yawRate ?? 0) > 6) return;
   if (a.job?.line !== line) { a.job = { line, reach: 0, work: 1, station: { arm: 0, z: Z.hatchWork, pose: 'companionway' } }; cw.t = (line === 'doors' ? HATCH.doors : HATCH.slide) / workPace(b, who!); }
   if (Math.abs(a.z - Z.hatchWork) > 0.3 || Math.abs(a.x) > 0.35) return; // (on their way there)
   cw.t = (cw.t ?? 0) - dt;

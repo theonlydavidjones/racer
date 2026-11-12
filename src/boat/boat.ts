@@ -195,7 +195,8 @@ export interface Boat {
   /** Since when (race clock, s) she's been deep enough for the pole, and since when up past where it pays (ai.ts crewPoleCall). */
   poleDeepT?: number; poleHighT?: number;
   /** The companionway now: its doors (washboards) in or out, its sliding hatch shut or open (from spec.companionway;
-   * the crew open it to stand there, physics.ts crewHatch; `t`: seconds left of the motion under way). Drawn from here. */
+   * the crew open it to stand there, physics.ts crewHatch; `t`: seconds left of the motion under way). For the drawing to
+   * read (render/boatMesh.ts still draws the spec's setting: Boat Detail's to switch). */
   companionway?: { doors: 'in' | 'out'; hatch: 'closed' | 'open'; t?: number };
   /** Out cruising, not racing: the crew sit for comfort (crewPhys.ts standInHatch). */
   cruising?: boolean;

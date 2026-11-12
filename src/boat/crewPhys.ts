@@ -448,7 +448,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     if (!helmBusy) fixedM += W[0] * helmArm;
     let crewFull = false;
     let crewArm = freeW > 0 ? (want * total - fixedM) / freeW : 0;
-    c.crewArmLast = crewArm;
+    // (for standInHatch: the arm wanted of the free crew if the one in the hatch were among them: alone with the helm,
+    // their weight is wanted as soon as she needs more than the helm sitting gives)
+    const sw = c.stander != null && tgt[c.stander]?.pose === 'companionway' ? W[c.stander] : 0;
+    c.crewArmLast = freeW + sw > 0 ? (want * total - fixedM) / (freeW + sw) : 0;
     if (!helmBusy && freeW > 0) {
       const crewMax = free.reduce((a, i) => a + W[i] * maxOf(i), 0) / freeW;
       crewFull = crewArm >= crewMax - 1e-6; // (all the moment there is: each out as far as they go where they sit)
@@ -603,37 +606,40 @@ function crewDraw(spec: CrewSpec, k: number): number {
  * estimate. */
 export const LAYOUT_STAY = 60;
 /**
- * Where the crew go downwind: in the cockpit (at `foreF`), the bow hand at the mast, or (the pole out, two crew) one astride
- * the bow and one on the foredeck: the least resistance by the hull's trim (hullTrim.ts trimDrag), with hysteresis.
- */
-/**
  * Who stands in the companionway (the owner's request, 12 Nov 2026): on the steps in the open hatch, out of the boom's
  * way. Cruising, it's the most comfortable spot aboard, so a crew member whose weight isn't wanted on the rail goes
  * there. Racing, beginners and novices are inclined to do it too (it's where people stand when they don't know where
  * to be: a draw by their trim, fixed for the crew, crewDraw); better crews put their weight where it does the most good,
  * the rail or to leeward. Either way they leave when she needs them (heeling past the crew's best by a few degrees, or
  * their weight wanted hiking: the helm calls "weight out") at once, and no one stands there while you've placed the crew, alone,
- * downwind with the crew gone forward, or through a roll tack. One person at most: the forward hand (nearest the hatch)
- * or the middle crew; they still work their lines from there. Not back within 20 s of a change, so they don't pop in and out
+ * downwind with the crew gone forward, or through a roll tack. One person at most: the forward hand (the jib and the
+ * cabin-top lines, which they can reach from there) or else the middle crew; they still work their lines from there. Not back within 20 s of a change, so they don't pop in and out
  * with every puff. (The 0.55 and the margins: estimates of practice.)
  */
 function standInHatch(c: CrewState, k: CrewCall, downwind: boolean): void {
   const n = c.spec.crew.length, now = c.clock ?? 0, since = now - (c.standerT ?? -1e9);
-  const heelOver = Math.abs(k.heel ?? 0) - crewBestHeel(k.twa, k.tws, specAttr(c.spec, 'trim'));
+  // (nothing to judge by yet: the first look, before the crew have placed themselves or she's heeled)
+  if (c.crewArmLast == null || k.heel == null) return;
+  const heelOver = Math.abs(k.heel) - crewBestHeel(k.twa, k.tws, specAttr(c.spec, 'trim'));
   const off = n === 0 || c.place?.across != null || !!c.place?.fore || !!c.roll || (downwind && (c.layout ?? 'cockpit') !== 'cockpit');
   const set = (who: number | null) => { if (who !== (c.stander ?? null)) { c.stander = who; c.standerT = now; } };
   if (off || heelOver > 8) { set(null); return; }
-  // (the free crew's wanted arm, m to windward, against about a sitting arm on the side deck: with someone in the hatch,
-  // the others carry their share, so leaving and coming back have their own marks, and 20 s between)
-  const arm = c.crewArmLast ?? 0, SIT = 0.6;
-  if (c.stander != null) { if (arm > 0.9 * SIT || heelOver > 4) set(null); return; }
-  if (since < 20 || arm > 0.5 * SIT || heelOver > 2) return;
+  // (crewArmLast: the arm wanted of the free crew with the one in the hatch counted among them, placeCrew; against their
+  // own sitting arm on the side deck. Coming in and leaving have their own marks, and 20 s between, so they don't pop
+  // in and out: their weight's wanted once the crew would be sitting well up to windward)
+  const arm = c.crewArmLast;
+  if (c.stander != null) { if (arm > 0.7 * sitArm(c.spec.crew[c.stander - 1] ?? c.spec.helm) || heelOver > 4) set(null); return; }
+  if (since < 20 || heelOver > 2) return;
   for (let i = n; i >= 1; i--) {
     const p = c.spec.crew[i - 1], inclined = k.cruising || crewDraw(c.spec, 7 + i) < clamp((0.55 - attrOf(p, 'trim')) / 0.3, 0, 1);
-    if (inclined && !c.people[i].job?.station) { set(i); return; }
+    if (inclined && arm < 0.4 * sitArm(p) && !c.people[i].job?.station) { set(i); return; }
   }
 }
 
+/**
+ * Where the crew go downwind: in the cockpit (at `foreF`), the bow hand at the mast, or (the pole out, two crew) one astride
+ * the bow and one on the foredeck: the least resistance by the hull's trim (hullTrim.ts trimDrag), with hysteresis.
+ */
 function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 'cockpit' | 'mast' | 'foredeck' {
   const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, sea = k.sea ?? 0;
   const cockpitZ = (j: number, count: number) => stationZ(j, count, foreF, outOnDeck(c, j + 1));
