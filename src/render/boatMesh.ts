@@ -216,6 +216,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const cg = cockpitGeometry(), flat = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.map(g => (g.index ? g.toNonIndexed() : g)), false)!;
   grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), cockpitTeak)); // the sole, benches and shelf (one mesh)
   grp.add(new THREE.Mesh(flat(cg.lining), COCKPIT_LINING)); // the hull's inside round the footwell, under the side decks, and the after wall: smooth moulding
+  grp.add(new THREE.Mesh(flat(cg.panel), MAT.wood)); // the lazarettes' fronts and ends, varnished panels
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
@@ -313,6 +314,8 @@ interface Lines {
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
+/** Polished chrome (the winches): bright, mirror-like, taking the sky. */
+const CHROME = reflect(new THREE.MeshPhongMaterial({ color: 0xb4bac2, specular: 0xffffff, shininess: 160 }), 0.6);
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
 const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82, emissive: 0x000000, emissiveIntensity: 0 });
 /** The cockpit's moulded inside, where it isn't teak: smooth, off-white. */
@@ -357,9 +360,15 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
-    const u = COCKPIT.u0 + 0.03, zw = -L / 2 + u * L, wx = side * (cockpitHalf(u) + 0.06), wy = deckY(u, cockpitHalf(u)) + COAMING_H(zw) + 0.07; // on the coaming, at its forward end
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.13, 16), STEEL); w.position.set(wx, wy, zw); grp.add(w);
-    winches[tk] = new THREE.Vector3(wx, wy + 0.04, zw);
+    // the jib sheet winch: on the coaming at its forward end, centred over it on a teak pad (the coaming's cap is only
+    // 40 mm wide; the winch's base is about 130 mm), chromed: its flanged base, the drum and the top cap
+    const u = COCKPIT.u0 + 0.03, zw = -L / 2 + u * L, wx = side * (cockpitHalf(u) + COAMING_T / 2), top = deckY(u, cockpitHalf(u) + COAMING_T / 2) + COAMING_H(zw) + 0.02;
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.025, 20), MAT.wood); pad.position.set(wx, top + 0.0125, zw); grp.add(pad);
+    const wy = top + 0.025, winch = new THREE.Group(); winch.position.set(wx, wy, zw); grp.add(winch);
+    for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 20), CHROME); m.position.y = y; winch.add(m);
+    }
+    winches[tk] = new THREE.Vector3(wx, wy + 0.07, zw);
     // H-shaped car track on the cabin top: two short fore–aft rails and the cross rail
     const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1);
     for (const x of [a.x, b2.x]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, b2.z - a.z + 0.06), STEEL); r.position.set(x, a.y - 0.05, (a.z + b2.z) / 2); grp.add(r); }
