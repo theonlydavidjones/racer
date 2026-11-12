@@ -101,7 +101,7 @@ function groundNear(x: number, z: number, r: number): number {
 
 /** A pose in the boat's frame: the hips, which way they face (yaw: 0 forward, + turning to port), the torso's lean
  * (+ back, − forward) and roll, the ankles and the hands (left, right), and what they're looking at. */
-interface PoseT { hip: THREE.Vector3; yaw: number; pitch: number; roll: number; feet: [THREE.Vector3, THREE.Vector3]; hands: [THREE.Vector3, THREE.Vector3]; look: THREE.Vector3; /** walking or crawling: the feet step (planted, then swung) */ step?: boolean }
+interface PoseT { /** walking along the side deck (deckWalk): both feet up out of the cockpit at once */ deck?: boolean; hip: THREE.Vector3; yaw: number; pitch: number; roll: number; feet: [THREE.Vector3, THREE.Vector3]; hands: [THREE.Vector3, THREE.Vector3]; look: THREE.Vector3; /** walking or crawling: the feet step (planted, then swung) */ step?: boolean }
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** The figure's forward and right in the boat frame for a yaw (it faces −z at yaw 0). */
 const fwd = (yaw: number) => V(-Math.sin(yaw), 0, -Math.cos(yaw)), right = (yaw: number) => V(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -167,7 +167,7 @@ function deckWalk(s: number, z: number, dir: number, k: number): PoseT {
   const zo = z + dir * 0.36 * k, outboard = onDeckAt(V(s * (halfBeam(uAtZ(zo)) - 0.06), 0, zo)).add(V(0, -0.01, 0));
   // (which hand is inboard: the one on the cockpit's side of them as they face along the deck)
   const rightIsOut = Math.sign(r.x) === s;
-  return { hip, yaw, pitch: -0.75, roll: 0, feet, hands: rightIsOut ? [inboard, outboard] : [outboard, inboard], look: hip.clone().addScaledVector(f, 2).setY(hip.y + 0.5), step: true };
+  return { hip, yaw, pitch: -0.75, roll: 0, feet, hands: rightIsOut ? [inboard, outboard] : [outboard, inboard], look: hip.clone().addScaledVector(f, 2).setY(hip.y + 0.5), step: true, deck: true };
 }
 /**
  * The way from where someone is to where they're going, when it passes the thwart: not through the cockpit over it,
@@ -178,7 +178,7 @@ function deckWalk(s: number, z: number, dir: number, k: number): PoseT {
 function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
   const c = f.cur?.hip; if (!c) return null;
   const inLen = (z: number) => z > COCK0 && z < COCK1 + 0.2;
-  const tAft = inLen(want.hip.z) && want.hip.z > THW_A + 0.02, cAft = inLen(c.z) && c.z > THW_A + 0.02;
+  const tAft = inLen(want.hip.z) && want.hip.z > THWART.z + 0.05, cAft = inLen(c.z) && c.z > THWART.z + 0.05; // (aft of the thwart's line)
   const r = f.route;
   if (!r) {
     // (a move past the thwart, or from one side's seat aft of it to the other's)
@@ -188,6 +188,7 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
     f.route = { side, z: Math.min(c.z, cAft ? c.z : THW_A - 0.05), goal: tAft && !across ? want.hip.z : THW_A - 0.05 };
   }
   const q = f.route!;
+  if (tAft && Math.sign(want.hip.x) === q.side) q.goal = want.hip.z; // (going to a seat aft of it: wherever that is now)
   // (up onto the side deck first, where they are, if they're down in the cockpit)
   if (Math.abs(c.x) < chz(c.z) && Math.abs(q.z - c.z) < 0.3) return deckWalk(q.side, q.z, q.goal < q.z ? -1 : 1, k);
   const step = 0.9 * dt;
@@ -301,6 +302,8 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   // on deck on hands and knees where they are, not drawn back in the cockpit)
   // (a place up forward, not yet reached: still on the way there, along the side deck)
   if ((job === 'fore' || job === 'bow') && z > CAB0) { isMoving = true; dest = Math.min(dest, CAB0 - 0.5); }
+  // (and crawling on until they're there, not sat down while still on the way)
+  else if ((job === 'fore' || job === 'bow') && fig.cur && Math.abs(fig.cur.hip.z - z) > 0.15) { isMoving = true; dest = z; }
   if (z < COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) isMoving = true;
   // (seated along the cockpit, they're on its benches or the side deck beside them: the weight's place from the physics,
   // drawn within the benches' length)
@@ -511,7 +514,10 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       if (rising) { aim.x = c.hip.x + (want.hip.x - c.hip.x) * 0.3; aim.z = c.hip.z + (want.hip.z - c.hip.z) * 0.3; }
     }
   }
+  const y0 = c.hip.y;
   v.addScaledVector(_s.copy(aim).sub(c.hip), W * W * dt).multiplyScalar(Math.max(0, 1 - 2 * W * dt)); c.hip.addScaledVector(v, dt);
+  // (getting up, off the rail or a seat, takes a moment: the hips rise no faster than about 1.2 m/s)
+  if (c.hip.y > y0 + 1.2 * dt) { c.hip.y = y0 + 1.2 * dt; if (v.y > 1.2) v.y = 1.2; }
   if (rising) c.hip.y = Math.min(aim.y, Math.max(c.hip.y, c.hip.y + 1.0 * dt)); // (pushing up off the seat: briskly)
   // (turning: eased, and no quicker than a person turns their body, about 3 rad/s)
   // (and not while rising over the coaming out of a seat on the side deck: up first, knees still over it, then round)
@@ -553,7 +559,8 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         // (coming down off something it stepped over: at a foot's pace, not dropped in a frame; the step's done when it's down)
         foot.y = Math.max(foot.y, wasY - 2 * LIMB_SPEED * dt);
         if (sw.t >= 1 && foot.y <= sw.to.y + 0.01) f.swing![i] = null;
-      } else if (want.step && !f.swing![1 - i] && foot.distanceTo(want.feet[i]) > 0.16 * f.scale) {
+      } else if (want.step && foot.distanceTo(want.feet[i]) > 0.16 * f.scale && (!f.swing![1 - i] || (want.deck && inCockpit(Math.abs(foot.x), foot.z)))) {
+        // (one at a time; but setting off along the side deck, a foot still down in the cockpit comes up out of it at once)
         const ahead = want.feet[i].clone().addScaledVector(_s.copy(want.feet[i]).sub(foot).setY(0).normalize(), 0.08 * f.scale);
         const to = onGround(ahead); let top = Math.max(foot.y, to.y);
         for (let q = 1; q < 6; q++) { _t.copy(foot).lerp(to, q / 6); top = Math.max(top, ground(_t.x, _t.z) + 0.06); }
@@ -585,7 +592,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   // don't fold up under it)
   // (only on the move: seated, the feet may well be level with the hips, as when sitting on the deck with them on the seat)
   const lowest = Math.max(c.feet[0].y, c.feet[1].y) + 0.32 * f.scale;
-  if (want.step && c.hip.y < lowest) { c.hip.y = lowest; if (v.y < 0) v.y = 0; }
+  if (want.step && c.hip.y < lowest) { c.hip.y = Math.min(lowest, c.hip.y + 1.5 * dt); if (v.y < 0) v.y = 0; } // (rising with the step, at a person's pace)
   c.look.lerp(want.look, a);
   return c;
 }
@@ -685,7 +692,6 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (on the way along the side deck, and settling into the new place after it)
     const routed = route(f, want, dt, f.scale);
     if (routed) f.walked = true; else if (f.walked && f.cur && f.cur.hip.distanceTo(want.hip) < 0.03) f.walked = false;
-    if (f.walked) f.going = true;
     apply(f, ease(f, routed ?? want, dt), upright(f, against(pose), dt), dt);
     f.root.visible = true;
   });
