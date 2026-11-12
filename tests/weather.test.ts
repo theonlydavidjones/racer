@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import real from '../src/environment/data/sf-real-days.json';
 import { dayWeather } from '../src/environment/weather';
+import { swellShare } from '../src/environment/sea';
 import { sfLocalToUtcMin } from '../src/environment/tide';
 import { wrap } from '../src/core/math';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
@@ -8,7 +9,7 @@ import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { World } from '../src/sim/world';
 
-const R = real as unknown as { wind: Record<string, string>; swell: Record<string, number[]>; forecast: Record<string, unknown> };
+const R = real as unknown as { wind: Record<string, string>; swell: Record<string, number[]>; swellSplit?: Record<string, number[]>; forecast: Record<string, unknown> };
 const at = (date: string, time: string) => sfLocalToUtcMin(date, time);
 
 describe('the real day: what was observed', () => {
@@ -26,7 +27,14 @@ describe('the real day: what was observed', () => {
   });
   it('the observed swell at the Bar buoy', () => {
     const wx = dayWeather('2025-12-06');
-    expect(wx.realSwell).toBe(true); expect(wx.swell(1).hs).toBeCloseTo(R.swell['2025-12-06'][0], 5);
+    // (the buoy's total height less the ocean's own wind sea, which the sim makes for itself: sea.ts swellShare)
+    const total = R.swell['2025-12-06'][0];
+    expect(wx.realSwell).toBe(true); expect(wx.swell(1).hs).toBeCloseTo(total * swellShare(total), 5);
+  });
+  it("where the buoy's split is kept, the swell on its own (NDBC SwH): less than the total, with its own period and direction", () => {
+    const days = Object.keys(R.swellSplit ?? {}).filter(d => R.swell[d]);
+    expect(days.length).toBeGreaterThan(20);
+    for (const d of days) { const s = dayWeather(d).swell(1), [hs, tp, from] = R.swellSplit![d]; expect(s.hs).toBe(hs); expect(s.tp).toBe(tp); if (Number.isFinite(from)) expect(s.from).toBe(from); expect(s.hs).toBeLessThanOrEqual(R.swell[d][0] + 0.05); }
   });
   it('the observed days agree with the climatology: in December, more northerly days than westerly', () => {
     const dec = Object.keys(R.wind).filter(d => d.slice(5, 7) === '12').map(d => dayWeather(d).kind);

@@ -40,6 +40,12 @@
 <div id="linebox" hidden></div>
 <div id="transit" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<!-- the showroom: her on show at any time of day, in any conditions (just here: a race's or a cruise's own are set in Setup) -->
+<div id="showBar" class="showbar" aria-label="Showroom conditions">
+  <label>Time of day <input type="range" id="showTime" min="300" max="1410" step="15" aria-describedby="showTimeV"></label><b id="showTimeV"></b>
+  <button type="button" class="ghost sm" id="bShowCond" title="Wind, sea, sky: just for the showroom">Conditions…</button>
+  <button type="button" class="linkbtn" id="bShowReal" title="Back to the day's own time and conditions">Real</button>
+</div>
 <div id="coachTip" role="status" aria-live="polite"></div>
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
@@ -113,6 +119,7 @@
 <!-- the view: bottom right, with the keys line over it on hover -->
 <div class="ibar" id="viewBar">
   <button class="ib on" id="bBand" type="button" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
+  <button class="ib" id="bEnsign" type="button" hidden title="Strike the ensign in a blow: the flag lowered and its staff stowed below, before it flogs itself to rags. Again hoists it."><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V3"/><path d="M5 4h9l-2 3 2 3H5"/><path class="dn" d="M15 12v6M12.5 15.5 15 18l2.5-2.5"/></svg><span class="w">Strike ensign</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
   <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
 </div>
@@ -319,6 +326,7 @@
       <div class="togs">
         <label class="tog">Show laylines and zones<input type="checkbox" data-t="aids"><span class="tog-sw"></span></label>
         <label class="tog">Show wind-angle dial<input type="checkbox" data-t="windDial"><span class="tog-sw"></span></label>
+        <label class="tog" title="In the chase view, the camera rises and falls with her on the swell (smoothed, never tilting)">Chase camera rides the swell<input type="checkbox" data-t="rideSwell"><span class="tog-sw"></span></label>
       </div>
       <small>Real boats have neither: they have the windex and the telltales.</small></div>
     <details class="more"><summary><u>How to sail her ▸</u></summary>

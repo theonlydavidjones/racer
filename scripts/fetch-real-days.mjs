@@ -251,6 +251,7 @@ await writeFile(OUT, JSON.stringify({
   updated: new Date(now).toISOString(), forecastIssued: g.updateTime,
   slot0: SLOT0, slotMin: SLOT_MIN, slots: SLOTS,
   wind: Object.fromEntries(Object.entries(wind).sort()), swell: Object.fromEntries(Object.entries(swell).sort()), forecast,
+  swellSplit: prev?.swellSplit ?? {}, // (the swell on its own: scripts/fetch-swell-split.mjs, run after this)
   stationHours: HOURS,
   stations: Object.fromEntries(STATIONS.map(st => [st.id, { name: st.name, lat: st.lat, lon: st.lon, days: Object.fromEntries(Object.entries(stationsData[st.id]).sort()) }])),
   grid: { hours: GRID_HOURS, cells, days: gridDays, fogWords: FOG_WORDS },

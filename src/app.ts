@@ -23,7 +23,7 @@ import { FLEET } from './boat/boat';
 import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
-import { DT, World, describeTide } from './sim/world';
+import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
@@ -71,7 +71,7 @@ let w!: World;
 let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look = { yaw: 0, pitch: 0, aft: 6.5, chase: 24, shift: 0, spin: true };
+const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -104,6 +104,15 @@ const KIND_NOTE: Record<WindKind, string> = {
   light: 'Hardly any wind and no settled direction: patches of breeze come and go. Keep the boat moving and sail to the pressure.'
 };
 
+/**
+ * The showroom's own time of day (minutes after midnight, local) and conditions (the panel's settings): her on show at dawn,
+ * at dusk with her lights on, or in a blow, without changing the day and conditions of your races and cruises. Null: the
+ * day's own. (The world's clock starts the start sequence before the start time: the time set is the one shown.)
+ */
+let showMin: number | null = null, showCond: Partial<Settings> | null = null;
+/** The settings the conditions panel had before it was opened from the showroom (put back when it closes). */
+let showSaved: Partial<Settings> | null = null;
+const hhmm = (m: number) => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 /** The conditions panel open from the pause menu: its changes go to the sail that's running, not a new one. */
 let condLive = false;
 function newGame(seed = randomSeed()): void {
@@ -112,7 +121,9 @@ function newGame(seed = randomSeed()): void {
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
   // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
-  const WS = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
+  const WS1 = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
+  // (on show: the showroom's own time of day and conditions, if you've set them; your races' and cruises' are untouched)
+  const WS = shown ? { ...WS1, ...(showCond ?? {}), ...(showMin != null ? { tideTime: hhmm(showMin + WS1.seq) } : {}) } : WS1;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
@@ -271,7 +282,7 @@ gl.addEventListener('wheel', e => {
   if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
   if (viewMode === 2) zoomOverhead(Math.exp(e.deltaY * 0.0015));
   else if (viewMode === 0) setEye(look.aft + e.deltaY * 0.006); // cockpit: move your eye fore and aft
-  else look.chase = Math.max(8, Math.min(90, look.chase * Math.exp(e.deltaY * 0.0015))); // chase: closer or farther
+  else look.chase = Math.max(8, Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(e.deltaY * 0.0015))); // chase: closer or farther (from the framed distance)
 }, { passive: false });
 
 /* ---------------- sail trim: who trims, the sheets, and every other line ---------------- */
@@ -335,7 +346,19 @@ function openLines(open = !band.open): void {
   document.body.classList.toggle('band-open', open);
   $('tpMore').textContent = open ? 'Sail controls ▾' : 'Sail controls ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
   $('bBand').classList.toggle('on', open); $('bBand').setAttribute('aria-pressed', String(open));
+  requestAnimationFrame(() => chaseFrame());
 }
+/**
+ * The chase camera's frame (render/scene.ts setChaseFrame, design/chase-layout.html): where the sail controls band's top
+ * edge is over the 3D view (its tabs included), or the view's bottom when it's put away. On a change of size, when the
+ * band opens or shuts, and once a second for anything else that moves it.
+ */
+function chaseFrame(): void {
+  const gl = $('gl').getBoundingClientRect(), b = document.getElementById('sailBand'), r = b && !b.hidden ? b.getBoundingClientRect() : null;
+  const tabs = b?.querySelector<HTMLElement>('.sb-tabs')?.getBoundingClientRect();
+  view.setChaseFrame({ top: 0, bottom: r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
+}
+addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 openLines((S.band ?? 1) === 1);
@@ -514,6 +537,21 @@ function sailButtons(): void {
     el.classList.toggle('on', !up && h === 0);
   }
 }
+/**
+ * Strike the ensign: cruising in a blow, a crew takes the ensign down and unships its staff before it flogs itself to
+ * rags; a second press hoists it again. The button shows from 20 kt of true wind (the 20 s mean the crew works by;
+ * well into Beaufort force 5, 17–21 kt, the owner's mark for "high"), stays until the breeze is back under 17 (so a lull
+ * doesn't flick it away), and always while the ensign is down. Racing she flies no ensign at all (world.ts takes her flags down).
+ */
+let ensignShown = false;
+function ensignButton(): void {
+  const u = w.user, tws = u.twsSlow ?? 0, el = $('bEnsign');
+  ensignShown = !!u.ensign && w.running && w.freeSail && (!!u.ensignStruck || tws >= 20 || (ensignShown && tws >= 17));
+  if (el.hidden !== !ensignShown) el.hidden = !ensignShown;
+  word('bEnsign', u.ensignStruck ? 'Hoist ensign' : 'Strike ensign');
+  el.classList.toggle('on', !!u.ensignStruck);
+}
+$('bEnsign').onclick = () => { const u = w.user; u.ensignStruck = !u.ensignStruck; toast(u.ensignStruck ? 'Ensign struck: down and stowed below till the breeze eases.' : 'Ensign hoisted again.', 2500); };
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
@@ -601,7 +639,7 @@ function applyHeld(): void {
   u.ctlCmd = cmd; u.sheetCmd.main = cmd.mainsheet ?? 0; u.sheetCmd.jib = cmd.jibsheet ?? 0;
 }
 function setView(i: number): void {
-  viewMode = i; lookAhead();
+  viewMode = i; lookAhead(); look.chase = undefined; // (the chase view starts framed: design/chase-layout.html)
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
@@ -740,8 +778,8 @@ function keyLook(dt: number): void {
   if (held.has('lookRight')) setLook(look.yaw - rate, look.pitch);
   if (held.has('lookUp')) setLook(look.yaw, look.pitch + rate);
   if (held.has('lookDown')) setLook(look.yaw, look.pitch - rate);
-  if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); else look.chase = Math.max(8, look.chase * Math.exp(-1.2 * dt)); }
-  if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); else look.chase = Math.min(90, look.chase * Math.exp(1.2 * dt)); }
+  if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); else look.chase = Math.max(8, (look.chase ?? view.chaseDist) * Math.exp(-1.2 * dt)); }
+  if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); else look.chase = Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(1.2 * dt)); }
 }
 function lookLabel(): void {
   const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
@@ -890,7 +928,7 @@ function drawTideGraph(): void {
     rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (an older setting)` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (S.windTurn ? ` (${turnWords(S.windTurn)} from the usual ${compassPoint(b.from - S.windTurn)})` : '')}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
   } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]);
   if (!w.tide) rows.push(['Current', CURRENTS[S.current]?.label ?? S.current]);
-  rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
+  rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate${w.sea.swell.total ? ` (the buoy reads ${Math.round(w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(w.gunUtc * 60000), sp = sunPosition(w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';
@@ -914,11 +952,11 @@ function paintSeg(): void {
     const k = seg.dataset.k as keyof Settings;
     const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
-  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = S[c.dataset.t as 'aids' | 'windDial'] === 1; });
+  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (S[c.dataset.t as 'aids' | 'windDial' | 'rideSwell'] ?? 1) === 1; });
 }
 // the on-screen training aids: a switch each (on = shown)
 document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => c.addEventListener('change', () => {
-  const k = c.dataset.t as 'aids' | 'windDial'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
+  const k = c.dataset.t as 'aids' | 'windDial' | 'rideSwell'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
 }));
 document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
@@ -1016,7 +1054,34 @@ $('courseMode').addEventListener('click', e => {
 });
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
-$('bCondClose').onclick = $('bCondDone').onclick = () => { $('condDlg').hidden = true; if (condLive) { condLive = false; $('pause').hidden = false; } };
+$('bCondClose').onclick = $('bCondDone').onclick = () => {
+  $('condDlg').hidden = true;
+  if (condLive) { condLive = false; $('pause').hidden = false; }
+  if (showSaved) { // (from the showroom: what was set becomes the showroom's, and your own conditions go back as they were)
+    const cond: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
+    for (const k of CONDITION_KEYS) (cond as Record<string, unknown>)[k] = rec[k];
+    showCond = cond; Object.assign(S, showSaved); showSaved = null; saveSettings(S); paintSeg(); newGame(); showBar();
+  }
+};
+/* ---------------- the showroom's own time of day and conditions ---------------- */
+/** The bar under her on show: the time (and whether it's day, dusk or night there), and the conditions. */
+function showBar(): void {
+  const min = showMin ?? (([h, m]) => h * 60 + m)((S.tideTime || '12:00').split(':').map(Number));
+  ($('showTime') as HTMLInputElement).value = String(min);
+  const el = sunPosition(w.clockUtc * 60000).el; // (the sun at the time shown: the showroom's clock)
+  $('showTimeV').textContent = `${hhmm(min)} · ${el > 6 ? 'day' : el > -6 ? (min < 720 ? 'dawn' : 'dusk') : 'night'}`; // (civil twilight: the sun within 6° below the horizon)
+  $('bShowReal').hidden = showMin == null && showCond == null;
+}
+$('showTime').addEventListener('input', () => { const m = Number(($('showTime') as HTMLInputElement).value); $('showTimeV').textContent = hhmm(m); });
+$('showTime').addEventListener('change', () => { showMin = Number(($('showTime') as HTMLInputElement).value); newGame(); showBar(); });
+$('bShowCond').onclick = () => {
+  // the same panel; while it's open your conditions take the showroom's, and they're put back when it closes
+  const saved: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
+  for (const k of CONDITION_KEYS) (saved as Record<string, unknown>)[k] = rec[k];
+  showSaved = saved; Object.assign(S, showCond ?? {}); showCond = null;
+  paintSeg(); tideBox(); $('condDlg').hidden = false;
+};
+$('bShowReal').onclick = () => { showMin = null; showCond = null; newGame(); showBar(); };
 // mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
@@ -1072,6 +1137,10 @@ function logOuting(): void {
     w.logged = true;
     const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : place(S.sailFrom)?.name ?? 'the Bay';
     stage([{ ...outing(S.boat, true), kind: 'cruise', title: `From ${from}${w.dest ? ` to ${w.dest.name}` : ''}`, elapsed: Math.round(w.t), nm: w.sailedM / 1852, arrived: w.arrivedT != null }]);
+  } else if (S.mode === 'race' && !w.freeSail && w.cancelled) {
+    // racing called off for the wind: no result, but the outing goes in her logbook
+    w.logged = true;
+    stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'CXL', of: w.boats.length, setup: raceSetup() }]);
   } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
     // you left the race before finishing: retired
     w.logged = true;
@@ -1093,7 +1162,7 @@ function settleLog(next: () => void): void {
   const mins = (s?: number) => s == null ? '' : `${Math.floor(s / 60)} min`;
   $('keepTitle').textContent = e.kind === 'race' ? 'Keep this race?' : 'Keep this cruise?';
   $('keepWhat').textContent = e.kind === 'race'
-    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
+    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing cancelled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
     : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}. Saved, it goes in her logbook.`;
   $('keepAsk').hidden = false;
   const done = (keep: boolean) => {
@@ -1152,7 +1221,7 @@ function frame(now: number): void {
     acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); // (held head to wind on the bow line: push off again to let her go)
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1213,9 +1282,10 @@ $('bBoat').onclick = () => { fleetFrom = 'setup'; $('setup').hidden = true; flee
 let fleetFrom: 'home' | 'setup' = 'home';
 /** The showroom: on while one of your boats is on show (her page in the Fleet, or editing her). */
 function showroom(on: boolean): void {
+  if (on) queueMicrotask(showBar); // (once she's on show: the time she's shown at)
   if (on && !document.body.classList.contains('showroom')) { look.yaw = 0.6; look.pitch = 0; }
   document.body.classList.toggle('showroom', on);
-  if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = 24; }
+  if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = undefined; }
 }
 const fleet: Fleet = new Fleet(S, {
   changed: () => { fleetChanged(); boatSummary(); },
@@ -1262,7 +1332,7 @@ const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id
 function pastRaces(): void {
   pastList = loadLog().filter(e => e.kind === 'race' && e.skipper === 'you').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${ordinal(e.place)} of ${e.of}` : '';
+  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'CXL' ? 'Cancelled (wind)' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${ordinal(e.place)} of ${e.of}` : '';
   $('pastRows').innerHTML = pastList.length ? pastList.map((e, i) => {
     const boat = S.boats.find(b => b.id === e.boatId), ok = !!courseOfEntry(e);
     const day = new Date(e.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
