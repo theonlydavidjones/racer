@@ -340,7 +340,13 @@ const headUp = (h: number, windFrom: number | undefined) => windFrom != null && 
  * rounds up a few degrees more in the seconds it takes to gather way. The clear water ahead she's let go into has to be
  * there that much nearer the wind than she's pointed, not just dead ahead.
  */
-const WANDER = 8;
+const WANDER = 16; // (measured: let go 60° off a 14 kt westerly with the main alone she rounds up about 15° in the 17 s it takes to gather way; 8 let her bump the dock on main too, though the test caught it only after leeway)
+/**
+ * And she sags to leeward as she gathers way: slow, her keel holds her little (physics.ts leeway: about 6° of slip at
+ * 1.5 m/s with the main alone, 0.15 m/s sideways), so the water she's let go into has to be clear that much off the wind
+ * of where she's pointed too.
+ */
+const LEE_SAG = 8;
 /** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 14: enough to know there's the 12 m she needs). */
 function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
@@ -449,7 +455,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
           // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
           // and she falls back; and with the room ahead to gather way, allowing for her rounding up a little, WANDER)
           const c0 = about(at(back), s.heading, BOW, turn);
-          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && runAhead(e.c, e.h - Math.sign(o) * WANDER, s) >= 8; });
+          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && runAhead(e.c, e.h - Math.sign(o) * WANDER, s) >= 8 && runAhead(e.c, e.h + Math.sign(o) * LEE_SAG, s) >= 8; });
           if (!offs.length) continue;
           const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
           hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
