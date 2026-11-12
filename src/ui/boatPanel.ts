@@ -121,6 +121,7 @@ export class BoatPanel {
       case 'slip': this.set(b => { if (t.value) { b.slip = t.value; b.marina = slipById(t.value)?.marina ?? b.marina; } else delete b.slip; }); return;
       case 'weeks': { const out = this.el.querySelector('#bpWeeksV'); if (out) out.textContent = weeksLabel(Number(t.value)); if (final) this.set(b => { b.perf.cleanedWeeks = Number(t.value); }, false); return; }
       case 'gear': if (final) this.set(b => { b.perf.gearKg = Number(t.value) * 0.4536; }, false); return;
+      case 'jumpersUnderWay': if (final) this.set(b => { if ((t as HTMLInputElement).checked) b.perf.jumpersUnderWay = true; else delete b.perf.jumpersUnderWay; }); return;
       case 'tuneMark': case 'tuneFoot': case 'tuneShroud': case 'tuneJumper': {
         const key = ({ tuneMark: 'forestayMark', tuneFoot: 'footAft', tuneShroud: 'shroudTurns', tuneJumper: 'jumperTurns' } as const)[k];
         const val = key === 'forestayMark' ? Number(t.value) / 100 : Number(t.value);
@@ -306,5 +307,6 @@ function rigTuneFields(b: BoatSpec, seg: Seg): string {
     ${row('tuneFoot', 'footAft', 'Mast foot', 1, 1, TUNE_INFO.footAft)}
     ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25, TUNE_INFO.shroudTurns)}
     ${row('tuneJumper', 'jumperTurns', 'Jumpers', 1, 0.5, TUNE_INFO.jumperTurns)}
-    <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}`;
+    <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}
+    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band: the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
 }

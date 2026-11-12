@@ -244,6 +244,8 @@ export interface Boat {
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
   /** Her rig's tune this outing (rigTune.ts): absent, she's on the guide's tune for whatever wind she meets. */
   tune?: RigTune;
+  /** The jumpers' setting you've asked the crew for (turns), while they work toward it, and the time on this half turn (s). */
+  jumperTarget?: number; jumperT?: number;
   /** Her main's rig with the tune worked in (condition.ts mainRig): cleared when the tune changes. */
   rigMain?: SailRig;
   cond?: Condition;

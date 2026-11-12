@@ -29,7 +29,7 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { destMark, place as getPlace } from './places';
 import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
-import { condition } from '../boat/condition';
+import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_HEIKKILA, TUNE_PRESETS, fixTune, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
@@ -765,6 +765,7 @@ export class World {
     for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
+    for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
       if (b.handled) { this.handStep(b, dt); continue; }

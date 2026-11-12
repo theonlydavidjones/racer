@@ -1,11 +1,12 @@
 /**
  * The rig's tune: how the mast and its standing rigging are set up at the dock, and what that does to the sails.
  *
- * The class rules fix all of it before the start: "Adjustment of the forestay and shrouds is prohibited while racing"
- * (NFIA Nordic Folkboat Class Rules 2025–2028, March 2026 update, 7.40; also 12.10), and the mast foot must be "not
- * capable of being moved while racing" (6.1.5). The backstay's adjustment "is free" (7.70): it is the one rig control
- * under way, and stays in the sail controls (controls.ts). Rake is "optional", with no limit (6.1.5). So the tune is a
- * choice made for the day's forecast.
+ * The class rules fix most of it before the start: "Adjustment of the forestay and shrouds is prohibited while racing.
+ * The jumper stays may be adjustable above the deck only" (NFIA Nordic Folkboat Class Rules 2025–2028, March 2026
+ * update, 7.40; also 12.10), and the mast foot must be "not capable of being moved while racing" (6.1.5). The
+ * backstay's adjustment "is free" (7.70) and stays in the sail controls (controls.ts); the jumpers may be worked under
+ * way too (condition.ts wantJumpers). Rake is "optional", with no limit (6.1.5). So the tune is a choice made for the
+ * day's forecast.
  *
  * The settings, as North Sails' "Nordic Folkboat Tuning Guide for Aluminium Masts" sets them up
  * (northsails.com/sailing/en/resources/nordic-folkboat-tuning-guide, read 2026-11-12):
@@ -96,14 +97,16 @@ export const TUNE_INFO = {
   jumperTurns: 'Turns on the jumpers\' common turnbuckle: loose in light air and a breeze, 2–3 turns in medium (North Sails). Tight curves the lower mast and leaves the top straight (a closed upper leech); loose lets the top bend (a more open one).'
 };
 
-/** The middle setting: the zero the effects below are measured from. */
+/** The middle setting: the zero each tune's own part is measured from (not what a boat with no tune sails on: that's
+ * the guide's tune for the wind). Also what a partly saved tune is filled in from (fixTune). */
 export const TUNE_DEFAULT: RigTune = TUNE_PRESETS.medium;
 /** The range each setting can take in the boat panel. */
 export const TUNE_RANGE = { forestayMark: [1.21, 1.41], footAft: [6, 26], shroudTurns: [0, 4.5], jumperTurns: [0, 5] } as const;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-/** A saved tune made whole and within range (older saves have none: the default). */
+/** A saved tune made whole and within range (its missing settings from the middle setting). Only for a tune that's set:
+ * a boat with none is on the guide's tune for the wind. */
 export function fixTune(t: Partial<RigTune> | undefined): RigTune {
   const d = TUNE_DEFAULT, n = (v: unknown, k: keyof typeof TUNE_RANGE) => clamp(Number.isFinite(Number(v)) ? Number(v) : d[k], TUNE_RANGE[k][0], TUNE_RANGE[k][1]);
   if (!t) return { ...d };
@@ -112,8 +115,6 @@ export function fixTune(t: Partial<RigTune> | undefined): RigTune {
     shroudTurns: n(t.shroudTurns ?? d.shroudTurns, 'shroudTurns'), jumperTurns: n(t.jumperTurns ?? d.jumperTurns, 'jumperTurns')
   };
 }
-export const isDefaultTune = (t: RigTune) => t.forestayMark === TUNE_DEFAULT.forestayMark && t.footAft === TUNE_DEFAULT.footAft
-  && t.shroudTurns === TUNE_DEFAULT.shroudTurns && t.jumperTurns === TUNE_DEFAULT.jumperTurns;
 
 /* ---------- the geometry (class rules) ---------- */
 
@@ -219,24 +220,36 @@ function parts(t: RigTune, bend: number): TuneParts {
 export const tuneEffect = (t: RigTune, bend = 1): TuneEffect => ({ ...parts(t, bend), bend });
 
 /**
- * The guide's tune for a true wind (kt): light to 8 kt, medium 9–14, strong above, changing over a knot and a half
- * past each band's edge (a crew between two settings would pick one or the other; the blend is the sim's, so nothing
- * jumps as the wind changes).
+ * How far (0..1) the guide's tune is from light toward medium, and from medium toward strong, at a true wind (kt): its
+ * bands are 0–8, 9–14 and above, so the change runs from 8 to 9 kt and from 14 to 15 kt, and each setting is the
+ * guide's right across its own band. (The forestay's sag is touchy on a soft rig, sag ∝ 1/tension: in the knot
+ * between two settings either one costs a percent or so.)
+ */
+const guideWeights = (tws: number): [number, number] => [clamp(tws - 8, 0, 1), clamp(tws - 14, 0, 1)];
+
+/**
+ * The guide's tune for a true wind (kt): light to 8 kt, medium 9–14, strong above, changing over the knot between
+ * (a crew between two settings would pick one or the other; the blend is the sim's, so nothing jumps as the wind
+ * changes).
  */
 export function guideTune(tws: number): RigTune {
   const L = TUNE_PRESETS.light, M = TUNE_PRESETS.medium, S = TUNE_PRESETS.strong;
-  // (the forestay's sag is touchy on a soft rig, sag ∝ 1/tension, so in between two settings either costs a percent or
-  // two: the blend starts at the guide's band edges, so a tune is right across its whole band)
-  const a = clamp((tws - 8) / 1.5, 0, 1), b = clamp((tws - 14) / 1.5, 0, 1);
+  const [a, b] = guideWeights(tws);
   const mix = (k: keyof RigTune) => (L[k] + (M[k] - L[k]) * a) * (1 - b) + S[k] * b;
   return { forestayMark: mix('forestayMark'), footAft: mix('footAft'), shroudTurns: mix('shroudTurns'), jumperTurns: mix('jumperTurns') };
 }
-/** The guide's tune's part for each quarter knot of true wind, per mast bendiness (worked out as needed, then kept). */
-const guideCache = new Map<number, TuneParts[]>();
+/**
+ * The guide's tune's part at a true wind: every part is linear in the tune's settings (forestayTension's floor never
+ * binds on the guide's), so it's the three settings' parts blended with guideTune's weights: exact, and smooth in the
+ * wind (no steps for a puff to cross). Each setting's part is worked out once per mast bendiness.
+ */
+const presetParts = new Map<number, [TuneParts, TuneParts, TuneParts]>();
 function guideParts(tws: number, bend: number): TuneParts {
-  let arr = guideCache.get(bend); if (!arr) guideCache.set(bend, arr = []);
-  const i = Math.round(clamp(tws, 0, 40) * 4);
-  return arr[i] ??= parts(guideTune(i / 4), bend);
+  let p = presetParts.get(bend);
+  if (!p) presetParts.set(bend, p = [parts(TUNE_PRESETS.light, bend), parts(TUNE_PRESETS.medium, bend), parts(TUNE_PRESETS.strong, bend)]);
+  const [a, b] = guideWeights(tws), [L, M, S] = p;
+  const mix = (k: keyof TuneParts) => (L[k] + (M[k] - L[k]) * a) * (1 - b) + S[k] * b;
+  return { stay: mix('stay'), mainDepth: mix('mainDepth'), mainTwist: mix('mainTwist'), mainCeAft: mix('mainCeAft'), jibCeAft: mix('jibCeAft') };
 }
 
 /** The forestay's extra sag (m) over the guide's tune for this wind, at this backstay (0..1) and apparent wind (kt). */
@@ -244,13 +257,14 @@ export function sagDelta(e: TuneEffect, tws: number, backstay: number, aws: numb
   const g = guideParts(tws, e.bend);
   return forestaySag(withBackstay(e.stay, backstay), aws) - forestaySag(withBackstay(g.stay, backstay), aws);
 }
-/** The masthead falling off to leeward with a slacker rig opens the main's upper leech: a degree per 10 cm more sag (an estimate). */
+/** The masthead falling off to leeward with a slacker rig opens the main's upper leech, a tighter one holds it closed: a
+ * degree per 10 cm of sag more or less than the guide's (an estimate). */
 const MAIN_TWIST_PER_M_SAG = 10;
 
 /** The main's changes (camber, twist deg, ceAft) from her tune against the guide's for the wind. */
 export function mainTune(e: TuneEffect, tws: number, backstay: number, aws: number): { depth: number; twist: number; ceAft: number } {
   const g = guideParts(tws, e.bend);
-  return { depth: e.mainDepth - g.mainDepth, twist: e.mainTwist - g.mainTwist + MAIN_TWIST_PER_M_SAG * Math.max(0, sagDelta(e, tws, backstay, aws)), ceAft: e.mainCeAft - g.mainCeAft };
+  return { depth: e.mainDepth - g.mainDepth, twist: e.mainTwist - g.mainTwist + MAIN_TWIST_PER_M_SAG * sagDelta(e, tws, backstay, aws), ceAft: e.mainCeAft - g.mainCeAft };
 }
 /** The jib's changes (camber, ceAft): a forestay that sags more than the guide's puts depth into the jib's front. */
 export function jibTune(e: TuneEffect, tws: number, backstay: number, aws: number): { depth: number; ceAft: number } {

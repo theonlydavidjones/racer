@@ -79,6 +79,26 @@ export function setJumpers(b: Pick<Boat, 'tune' | 'rigMain'>, turns: number, tws
 }
 
 /**
+ * The jumpers under way (CR 7.40 allows them to be adjusted above deck while racing; Heikkilä Sailmaker's guide adjusts
+ * them during a race): you ask for a setting (turns, 0–5 in half turns) and the crew works the turnbuckle toward it, a
+ * half turn at a time. JUMPER_HALF_TURN_S: how long a half turn takes, by hand, with the rig loaded (an estimate).
+ */
+export const JUMPER_HALF_TURN_S = 4;
+export function wantJumpers(b: Pick<Boat, 'jumperTarget'>, turns: number): void {
+  b.jumperTarget = Math.max(0, Math.min(5, Math.round(turns * 2) / 2));
+}
+/** The crew on the jumpers: a half turn every JUMPER_HALF_TURN_S toward the target (world.ts, each step). */
+export function stepJumpers(b: Pick<Boat, 'tune' | 'rigMain' | 'jumperTarget' | 'jumperT'>, dt: number, tws: number): void {
+  if (b.jumperTarget == null) return;
+  const now = (b.tune ?? guideTune(tws)).jumperTurns;
+  if (Math.abs(b.jumperTarget - now) < 1e-6) { b.jumperTarget = undefined; b.jumperT = 0; return; }
+  b.jumperT = (b.jumperT ?? 0) + dt;
+  if (b.jumperT < JUMPER_HALF_TURN_S) return;
+  b.jumperT = 0;
+  setJumpers(b, now + Math.sign(b.jumperTarget - now) * Math.min(0.5, Math.abs(b.jumperTarget - now)), tws);
+}
+
+/**
  * The rig the main is set on, with her tune this outing (b.tune: the Boat panel's, or the one she was set to at the
  * dock for a race's forecast, rigTune.ts): worked out once and kept on the boat (b.rigMain), until the tune changes
  * (the jumpers, under way: setJumpers). No tune: her condition's rig, as before.

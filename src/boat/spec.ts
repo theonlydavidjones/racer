@@ -54,6 +54,8 @@ export interface BoatSpec {
     gearKg: number; // gear and stores beyond the racing minimum
     /** The rig's tune at the dock (rigTune.ts): absent, on the guide's tune for the wind (as the sim always sailed). */
     tune?: RigTune;
+    /** The jumpers adjustable under way: a row in the sail band (CR 7.40 allows it; most crews never do). */
+    jumpersUnderWay?: boolean;
   };
 }
 

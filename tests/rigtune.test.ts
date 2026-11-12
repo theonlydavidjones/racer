@@ -99,3 +99,28 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
   });
 });
+
+import { stepJumpers, wantJumpers } from '../src/boat/condition';
+describe('the jumpers under way', () => {
+  it('the crew turns them a half turn at a time toward what you ask, and the rig follows', () => {
+    const b = { tune: { ...TUNE_PRESETS.medium }, rigMain: undefined } as { tune: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
+    wantJumpers(b, 4);
+    for (let t = 0; t < 3.9; t += 0.1) stepJumpers(b as never, 0.1, 12);
+    expect(b.tune.jumperTurns).toBe(2.5);
+    for (let t = 0; t < 12.5; t += 0.1) stepJumpers(b as never, 0.1, 12);
+    expect(b.tune.jumperTurns).toBe(4); expect(b.jumperTarget).toBeUndefined();
+  });
+});
+
+import { jibTune, mainTune } from '../src/boat/rigTune';
+describe('the guide\'s tune follows the wind smoothly (physics review)', () => {
+  it('no steps as the wind crosses a setting: a tenth of a knot moves the effect a little', () => {
+    const e = tuneEffect({ ...TUNE_PRESETS.light, shroudTurns: 0.75 });
+    let prevJ = jibTune(e, 7.5, 0.3, 11).depth, prevM = mainTune(e, 7.5, 0.3, 11).twist;
+    for (let tws = 7.51; tws <= 15.5; tws += 0.01) {
+      const j = jibTune(e, tws, 0.3, 11).depth, m = mainTune(e, tws, 0.3, 11).twist;
+      expect(Math.abs(j - prevJ)).toBeLessThan(0.002); expect(Math.abs(m - prevM)).toBeLessThan(0.05);
+      prevJ = j; prevM = m;
+    }
+  });
+});

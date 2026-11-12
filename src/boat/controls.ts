@@ -124,7 +124,7 @@ export const SAIL_WEAR: Record<'new' | 'mid' | 'old', SailWear> = {
   old: { depth: 0.025, draft: 0.06, stretchDepth: 0.0008, stretchDraft: 0.0035, headTwist: 0.3, dcd: 0.015, clMul: 0.98 }
 };
 /** The rig a sail is set on: its wear, and (the main) how much the mast bends to flatten it under backstay, and the rig's
- * tune at the dock (rigTune.ts; absent: the default tune, the one the shapes here were set up on). */
+ * tune at the dock (rigTune.ts; absent: on the guide's tune for the wind, which the shapes here were set up as). */
 export interface SailRig { wear: SailWear; bend: number; tune?: TuneEffect }
 /** A new sail on an aluminium mast: the reference the trim settings were tuned on. */
 export const STD_RIG: SailRig = { wear: SAIL_WEAR.new, bend: 1 };
