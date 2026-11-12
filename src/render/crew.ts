@@ -744,7 +744,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const seated = (q: typeof a) => !!q && (q.pose === 'sit' || q.pose === 'lee' || q.pose === 'hike' || q.pose === 'cross');
     if (seated(a) && seated(o) && (Math.sign(o!.x) === Math.sign(a!.x) || a!.pose === 'cross' || o!.pose === 'cross') && inC(zs[i]) && inC(zs[j]) && Math.abs(zs[i] - zs[j]) < SEP) {
       const fore = Math.min(zs[i], zs[j]), lo = Math.min(fore, ZMAX - SEP);
-      if (zs[i] >= zs[j]) { zs[j] = lo; zs[i] = lo + SEP; } else { zs[i] = lo; zs[j] = lo + SEP; }
+      // (in their order along the cockpit, front to back, as the physics keeps them (crewPhys.ts stationZ): not by where
+      // each is this moment. One still crossing can be a little forward of the other for a second, and the one sat
+      // forward was put aft past the thwart, then left there when the other moved on)
+      zs[j] = lo; zs[i] = lo + SEP;
     }
   }
   // (two of them in the middle sit side by side on the sole)
