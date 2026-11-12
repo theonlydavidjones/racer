@@ -5,7 +5,7 @@ import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
-import { buildCourse, type Course, type CourseFile, type CourseMark } from '../courses/course';
+import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
@@ -149,39 +149,42 @@ function userCrew(s: Settings): CrewSpec {
 
 const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '-' + A.id;
 
+/** The settings the conditions panel sets: what applyConditions takes mid-sail. */
+export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDir', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
+
 export class World {
   readonly C: Course;
-  readonly settings: Settings;
+  settings: Settings;
   readonly seed: number;
   readonly rng: Rng;
   /** The current near the start line, summarized (direction, speed, words). Updated as the tide changes. */
   cur: CurrentPreset;
   cvec: Vec; // current near the start line, m/s
   /** Real tide: NOAA-based current field, and the start signal's time (minutes since epoch, UTC). */
-  readonly tide: CurrentField | null = null;
-  readonly gunUtc: number = 0;
+  tide: CurrentField | null = null;
+  gunUtc: number = 0;
   /** Race day (YYYY-MM-DD, San Francisco) and whether the clock time matters (real tide or sea breeze). */
-  readonly raceDate: string = '';
-  readonly realTime: boolean = false;
+  raceDate: string = '';
+  realTime: boolean = false;
   /** The afternoon westerly from the NOAA records (Settings.windKt 0), and which kind of day. */
-  readonly seaBreeze: boolean;
-  readonly windDay: WindDay;
+  seaBreeze: boolean;
+  windDay: WindDay;
   /** The kind of wind the day brings: the westerly, a northerly, a southerly, or light and variable. */
-  readonly windKind: WindKind;
+  windKind: WindKind;
   /** The day's weather: observed, forecast, or from the records (environment/weather.ts). */
-  readonly weather: DayWeather;
+  weather: DayWeather;
   /** Racing in the real day's wind (observed or forecast). */
   get realWind(): boolean { return this.weather.source === 'observed' || this.weather.source === 'forecast'; }
   breeze: Breeze | null = null;
   /** Puffs and lulls drifting across the course. */
-  readonly puffs: Puffs;
-  readonly windModel: WindModel;
+  puffs: Puffs;
+  windModel: WindModel;
   /** Ship traffic, and where the vessels are now. */
-  readonly traffic: Traffic;
+  traffic: Traffic;
   vessels: Vessel[] = [];
   private warned = new Map<number, number>();
   /** The waves: chop from the wind and current, swell through the Gate (or flat water). */
-  readonly sea: SeaField;
+  sea: SeaField;
 
   t: number; // race time, s; negative before the start signal
   steps = 0;
@@ -239,7 +242,12 @@ export class World {
   /** How far you've sailed, over the ground, m. */
   sailedM = 0;
 
+  /** (kept to work out new conditions mid-sail: applyConditions) */
+  private readonly file: CourseFile;
+  private readonly opts: WorldOptions;
+
   constructor(file: CourseFile, settings: Settings, seed: number, opts: WorldOptions = {}) {
+    this.file = file; this.opts = opts;
     this.settings = { ...settings };
     this.seed = seed;
     this.rng = makeRng(seed);
@@ -307,6 +315,7 @@ export class World {
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
     if (!this.freeSail) this.log = new RaceLog(this);
+    this.committeeFrom = this.C.base;
   }
 
   get user(): Boat { return this.boats[0]; }
@@ -381,10 +390,12 @@ export class World {
 
   /* ---------- queries used by AI, HUD and rendering ---------- */
   rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt), obstacle: this.obstacle }; }
+  /** The wind the committee boat lies head to, at anchor: the course's at the gun, the new one after a change of conditions. */
+  committeeFrom = 0;
   /** The committee boat's hull, as a line along the wind with its half-width (null if the committee end is not a boat). */
   get committeeHull(): Touchable | null {
     if (this.C.committeeKind !== 'boat') return null;
-    const u = V(this.C.base), c = this.C.committee;
+    const u = V(this.committeeFrom), c = this.C.committee;
     return { name: 'the committee boat', p: { x: c.x + u.x * 6, y: c.y + u.y * 6 }, q: { x: c.x - u.x * 6, y: c.y - u.y * 6 }, r: 2 };
   }
   /** Rule 19: the nearest obstruction (the shore, the islands and the Marin shore, the Wharf's piers and breakwaters; after the start, the committee boat) within 30 m. */
@@ -460,7 +471,7 @@ export class World {
     return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn + gt), kt: (U + gu) / KT };
   }
   /** The gusts (environment/gusts.ts): their own random numbers, so the rest of the race draws what it did. */
-  readonly gusts: GustField;
+  gusts: GustField;
   /** The wind's shifts (environment/shifts.ts), off on a past day (the record has its own). */
   shifts: ShiftField | null = null;
   /** The shift at the course's centre now, which the course-wide wind carries. */
@@ -1190,6 +1201,38 @@ export class World {
     if (this.dest && this.arrivedT != null && markDist(u, this.dest) > 40) this.arrivedT = null; // (somewhere to sail to again)
     this.emit({ type: 'toast', msg: `Moved to ${name}. The cruise and its log carry on.`, ms: 3500 });
     return true;
+  }
+
+  /**
+   * New conditions mid-sail, at once (the owner's choice), without a restart: the kind of wind, its strength and turn, the
+   * current, the sea, the rain and the fog, as the conditions panel sets them. They're worked out as a new start would work
+   * them out (a World for the new settings, its environment taken over), at this moment of the sail: the boats, the clock,
+   * the course (racing: the marks stay where they were laid; changing the course needs a signal), her destination and the
+   * log carry on. The day and the start time stay the sail's own.
+   */
+  applyConditions(next: Settings): void {
+    const s: Settings = { ...this.settings };
+    for (const k of CONDITION_KEYS) (s as unknown as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k];
+    const n = new World(this.file, { ...s, fleet: 0, opponents: [] }, this.seed, { ...this.opts, startAt: this.startAt });
+    this.settings = s;
+    this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
+    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; // (the piers' wakes from the new stream at once)
+    this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
+    if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
+    this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
+    this.updateBreeze(); this.courseWind(); this.buildField();
+    if (this.tide) this.updateTide();
+    // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
+    // as it would on the water, until the new mean settles in)
+    for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    if (!this.freeSail) {
+      // racing: the laid marks stay where they are, but which legs are beats, reaches and runs goes with the wind they're
+      // sailed in (rule 18.1(a), the laylines, the AI); the committee boat swings to the new wind at her anchor
+      classifyLegs(this.C, this.windModel.base); this.committeeFrom = this.windModel.base;
+    }
+    const sea = this.sea.flat ? 'flat water' : 'the sea from the wind' + (this.sea.swell ? ' and the swell' : '');
+    const laid = !this.freeSail && Math.abs(wrap(this.windModel.base - this.C.base)) > 20 ? ' The marks stay where the committee laid them, for the old wind: a real committee would postpone or move the marks (RRS 27.3, 33).' : '';
+    this.emit({ type: 'toast', msg: `Conditions changed: ${Math.round(this.wind.kt)} kt from ${String(Math.round(this.wind.from) % 360).padStart(3, '0')}°, ${this.cur.label.toLowerCase()}, ${sea}.${laid}`, ms: laid ? 7000 : 4500 });
   }
 
   /** Just sail: tell her when she gets to where she was going. */
