@@ -14,6 +14,8 @@ export interface LogEntry {
   title: string;
   /** Races: her place among the boats racing, out of how many; or a scoring code (DSQ, RET, ZFP) or 'unfinished'. */
   place?: number; of?: number; code?: string;
+  /** Races: she shared her place with another boat on equal points (RRS 44.3(c), A7). */
+  tied?: boolean;
   /** Elapsed time, s (races: from the gun to her finish; cruises: under way). */
   elapsed?: number;
   /** Cruises: how far she sailed, nm, and whether she got where she was going. */
