@@ -184,9 +184,9 @@ export class SceneView {
   setChaseFrame(f: { top: number; bottom: number }): void { this.chaseFrame = { ...f }; }
   /** The chase camera's distance now (m): the framed one until you zoom. */
   chaseDist = 24;
-  /** How much the chase camera rides her heave on the swell (0 off, 1 all of it; smoothed): the owner's to decide. */
+  /** How much the chase camera rides her heave on the swell (0 off, 1 all of it; smoothed): settings.rideSwell. */
   chaseHeave = 0;
-  private heaveS = 0;
+  private heave1 = 0; private heaveS = 0;
   /**
    * The chase camera's framed distance, looking along `dir` (deg) from `ratio` (height over distance) up: the distance at
    * which the masthead (RIG.MAST_TOP up, at the mast) and the hull nearest the camera (at the water) span from an eighth
@@ -765,7 +765,9 @@ export class SceneView {
     w.boats.forEach((b, i) => {
       const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
       const mo = boatOnWaves(this.waves, b, b.h, tw, kW, kS); this.pitches[i] = mo.pitch;
-      if (b.isUser) this.heaveS += (mo.heave - this.heaveS) * Math.min(1, dt * 1.5); // (her heave, smoothed: the chase camera can ride it)
+      // her heave, smoothed twice over (about 0.8 s each) for the chase camera to ride: it glides on a swell (90% of a 14 s
+      // one) but hardly stirs on the chop (15% of a 2 s one)
+      if (b.isUser) { const k = Math.min(1, dt / 0.8); this.heave1 += (mo.heave - this.heave1) * k; this.heaveS += (this.heave1 - this.heaveS) * k; }
       this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
@@ -797,12 +799,15 @@ export class SceneView {
       const hv = V(u.h - look.yaw / D2R), ratio = Math.max(0.05, (9 + look.pitch * 25) / 24); // (the camera's height over its distance)
       const fit = this.chaseFit(u.h - look.yaw / D2R, ratio), dist = look.chase ?? fit.dist;
       this.chaseDist = dist;
+      this.chaseHeave = (w.settings.rideSwell ?? 1) === 1 ? 1 : 0; // (the owner: heave only, smoothed, with a switch)
       const height = Math.max(1.2, ratio * dist) + this.chaseHeave * this.heaveS;
       camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
       // aimed down so the hull nearest the camera sits just above the band
       // (toward the boat across the water: the camera trails her a little as it eases into place)
       const c = camera.position, bp = P3(u.x, u.y), ex = bp.x - c.x, ez = bp.z - c.z, eh = Math.hypot(ex, ez) || 1;
-      const horiz = Math.max(1, eh - fit.near), beta = Math.atan(fit.tBot) - Math.atan2(0 - c.y, horiz);
+      // (aimed at her hull where it is, risen or fallen on the swell with the camera: she stays put in the frame and the
+      // sea and the horizon move past)
+      const horiz = Math.max(1, eh - fit.near), beta = Math.atan(fit.tBot) - Math.atan2(this.chaseHeave * this.heaveS - c.y, horiz);
       camera.lookAt(c.x + ex / eh * 100, c.y - Math.tan(beta) * 100, c.z + ez / eh * 100);
     } else if (viewMode === 3) {
       // the showroom (setting up your boat): a slow circle round her, from a little above the deck
