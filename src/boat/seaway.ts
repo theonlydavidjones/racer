@@ -68,16 +68,20 @@ export function speedInChop(kt: number, twa: number, hs: number, tp: number): nu
 const CHOP_MEMO = 16, chopMemo = Array.from({ length: CHOP_MEMO }, () => ({ kt: NaN, twa: NaN, hs: NaN, tp: NaN, v: 0 }));
 let chopNext = 0;
 
+function beatSearch(kt: number, hs: number, tp: number): number {
+  let best = 40, bestV = -1;
+  for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
+  return best;
+}
 const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
 export function beatInChop(kt: number, hs: number, tp: number): number {
   // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)
+  if (!Number.isFinite(kt + hs + tp)) return beatSearch(kt, hs, tp); // (no key for a NaN: worked out, not cached)
   const key = (Math.round(kt * 4) * 1048576 + Math.round(hs * 50)) * 1048576 + Math.round(tp * 10);
   let a = beatCache.get(key);
   if (a === undefined) {
-    let best = 40, bestV = -1;
-    for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
-    a = best;
+    a = beatSearch(kt, hs, tp);
     if (beatCache.size > 20000) beatCache.clear();
     beatCache.set(key, a);
   }

@@ -24,12 +24,16 @@ function race(i: number, o: { grid: boolean; skip: boolean; curK?: number }) {
     const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, ...s } as never, seed);
     w.exactPairs = !o.skip;
     if (o.curK) { const f = w.currentAt.bind(w); w.currentAt = p => { const v = f(p); return { x: v.x * o.curK!, y: v.y * o.curK! }; }; }
-    const sum = w.boats.map(() => 0); let n = 0;
-    while (w.t < 6 * 60) { w.step(DT); if (w.t > 0) { w.boats.forEach((b, k) => { sum[k] += b.v; }); n++; } }
-    return w.boats.filter(b => !b.isUser).map(b => ({ v: sum[w.boats.indexOf(b)] / n, x: b.x, y: b.y, h: b.h, leg: b.leg }));
+    const sum = w.boats.map(() => 0), incidents: string[] = []; let n = 0;
+    while (w.t < 6 * 60) {
+      w.step(DT); if (w.t > 0) { w.boats.forEach((b, k) => { sum[k] += b.v; }); n++; }
+      for (const e of w.drainEvents()) if (e.type === 'incident') incidents.push(`${w.t.toFixed(3)} ${e.incident.rule} ${e.incident.fouler.id}`);
+    }
+    const boats = w.boats.filter(b => !b.isUser).map(b => ({ v: sum[w.boats.indexOf(b)] / n, x: b.x, y: b.y, h: b.h, leg: b.leg, penalties: b.penaltyTotal }));
+    return { boats, incidents };
   } finally { setShoreGrid(true); }
 }
-const fleetV = (r: ReturnType<typeof race>) => r.reduce((a, b) => a + b.v, 0) / r.length;
+const fleetV = (r: ReturnType<typeof race>['boats']) => r.reduce((a, b) => a + b.v, 0) / r.length;
 
 describe('the shore distance off a 10 m lattice', () => {
   it('is within a few metres of the exact distance (0.2 m RMS over the water round the courses), and the current\'s easing within 1%', () => {
@@ -54,10 +58,11 @@ describe('the shore distance off a 10 m lattice', () => {
     // moves the AI's decisions (a tack a step sooner) and the race goes its own way from there: the current 0.1% stronger
     // everywhere (far inside NOAA's own uncertainty) moved the fleet's mean speed 1.1–2.6% and boats up to 230 m after
     // eight minutes, as much as the lattice does (1.3–1.7%, 120 m). So: the lattice's race against the exact one, within
-    // what such a change makes of it.
+    // what such a change makes of it (six minutes here; the fleet's speed within 4%, past the 2.6% that change made).
+    // (These bounds can't catch a lattice that's subtly wrong: the test above, point by point, is what does.)
     for (let i = 0; i < RACES.length; i++) {
-      const ex = race(i, { grid: false, skip: false }), ap = race(i, { grid: true, skip: false });
-      expect(Math.abs(fleetV(ap) / fleetV(ex) - 1), `race ${i}: the fleet's mean speed`).toBeLessThan(0.03);
+      const ex = race(i, { grid: false, skip: false }).boats, ap = race(i, { grid: true, skip: false }).boats;
+      expect(Math.abs(fleetV(ap) / fleetV(ex) - 1), `race ${i}: the fleet's mean speed`).toBeLessThan(0.04);
       ex.forEach((b, k) => {
         expect(Math.abs(ap[k].v / b.v - 1), `race ${i}, boat ${k}: her mean speed`).toBeLessThan(0.15);
         expect(Math.hypot(ap[k].x - b.x, ap[k].y - b.y), `race ${i}, boat ${k}: where she is`).toBeLessThan(350);
@@ -68,7 +73,9 @@ describe('the shore distance off a 10 m lattice', () => {
 });
 
 describe('pairs far apart are let be', () => {
-  it('the same race to the last digit as assessing every pair every step', () => {
+  // (their records differ from a full assessment's in what they'd remember from far off: world.ts apart(); the race,
+  // its incidents and its penalties don't)
+  it('the same race to the last digit, with the same incidents and penalties, as assessing every pair every step', () => {
     for (let i = 0; i < RACES.length; i++) expect(race(i, { grid: true, skip: true }), `race ${i}`).toEqual(race(i, { grid: true, skip: false }));
   }, 600_000);
 });

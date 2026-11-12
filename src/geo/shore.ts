@@ -595,11 +595,11 @@ export function landBetween(a: Vec, b: Vec): boolean {
 export const anyShoreDist = (p: Vec): number => Math.min(shoreDist(p), landDist(p));
 /**
  * The same, read off a 10 m lattice of the exact values, bilinearly: for what asks near the same places again and again
- * (the current's easing near the shore, environment/current.ts shoreRelief: every boat, every step), where the exact one
+ * (a boat's own current, eased near the shore: environment/current.ts shoreRelief, every boat every step), where the exact one
  * searches the shore's segments each time. (Not for what samples the whole Bay once in a while, as the wind's field
  * does: each such look would fill a tile for one use.) The
  * distance to a shore changes by no more than the distance moved, so between lattice points it is off by a few metres
- * at most, where two shores are equally near (tests/shore-grid.test.ts measures it). Filled in tiles of 32 × 32
+ * at most, where two shores are equally near (tests/approx.test.ts measures it). Filled in tiles of 32 × 32
  * spaces (320 m) as boats first come near them, each in a few milliseconds. setShoreGrid(false): the exact one.
  */
 export function anyShoreDistNear(p: Vec): number {

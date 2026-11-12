@@ -1,5 +1,5 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { anyShoreDistNear, wharfDist, wharfShelter } from '../geo/shore';
+import { anyShoreDist, anyShoreDistNear, wharfDist, wharfShelter } from '../geo/shore';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -24,14 +24,14 @@ export function currentVector(c: CurrentPreset): Vec {
  * Wharf's piers and breakwaters enclose (Aquatic Park, inside Municipal Pier and the Wharf's breakwater; the Pier 39
  * marina) they count as shore too; off a pier head, where the stream runs past, they don't.
  */
-export const shoreRelief = (p: Vec): number => {
-  const k = clamp(0.25 + 0.75 * anyShoreDistNear(p) / 350, 0.25, 1), w = wharfShelter(p); // (off the 10 m lattice: geo/shore.ts)
+export const shoreRelief = (p: Vec, lattice = false): number => {
+  const k = clamp(0.25 + 0.75 * (lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 350, 0.25, 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
   return w > 0 ? Math.min(k, 1 - w * (1 - clamp(0.25 + 0.75 * wharfDist(p, 350) / 350, 0.25, 1))) : k;
 };
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
-export function currentAt(p: Vec, open: Vec): Vec {
-  const k = shoreRelief(p);
+export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
+  const k = shoreRelief(p, lattice);
   return { x: open.x * k, y: open.y * k };
 }
 
