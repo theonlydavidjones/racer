@@ -258,42 +258,53 @@ export function guideTune(tws: number): RigTune {
  * wind (no steps for a puff to cross). Each setting's part is worked out once per mast bendiness.
  */
 const presetParts = new Map<number, [TuneParts, TuneParts, TuneParts]>();
-let lastG = { tws: NaN, bend: NaN, p: null as TuneParts | null };
+/** The guide's part at a true wind: the three settings' parts blended (exact: every part is linear in the settings). */
 function guideParts(tws: number, bend: number): TuneParts {
-  // (one entry kept: the crew's search tries ~180 settings at the same wind, and the main and jib ask in turn)
-  if (tws === lastG.tws && bend === lastG.bend) return lastG.p!;
   let p = presetParts.get(bend);
   if (!p) presetParts.set(bend, p = [parts(TUNE_PRESETS.light, bend), parts(TUNE_PRESETS.medium, bend), parts(TUNE_PRESETS.strong, bend)]);
-  const [a, b] = guideWeights(tws), [L, M, S] = p;
-  const mix = (k: keyof TuneParts) => (L[k] + (M[k] - L[k]) * a) * (1 - b) + S[k] * b;
-  const out = { stay: mix('stay'), mainDepth: mix('mainDepth'), mainTwist: mix('mainTwist'), mainCeAft: mix('mainCeAft'), jibCeAft: mix('jibCeAft') };
-  lastG = { tws, bend, p: out };
-  return out;
+  const a = clamp(tws - 8, 0, 1), b = clamp(tws - 14, 0, 1), L = p[0], M = p[1], S = p[2]; // (guideWeights, inline)
+  const wl = (1 - a) * (1 - b), wm = a * (1 - b);
+  return { stay: wl * L.stay + wm * M.stay + b * S.stay, mainDepth: wl * L.mainDepth + wm * M.mainDepth + b * S.mainDepth,
+    mainTwist: wl * L.mainTwist + wm * M.mainTwist + b * S.mainTwist, mainCeAft: wl * L.mainCeAft + wm * M.mainCeAft + b * S.mainCeAft,
+    jibCeAft: wl * L.jibCeAft + wm * M.jibCeAft + b * S.jibCeAft };
 }
 
+/** A tune's changes to both sails at one wind and backstay, kept on her tune (one entry each: rigTune's per-call cost is
+ * paid once for the main and the jib, and the crew's search (crewSolve) tries most settings at an unchanged backstay). */
+interface TuneAt { tws: number; bs: number; aws: number; mDepth: number; mTwist: number; mCe: number; jDepth: number; jCe: number; g: TuneParts | null; gTws: number }
+const atCache = new WeakMap<TuneEffect, TuneAt>();
+function tuneAt(e: TuneEffect, tws0: number, backstay0: number, aws0: number): TuneAt {
+  // (the true wind to a fiftieth of a knot, the apparent to a twentieth and the backstay to a hundredth: the wind moves a
+  // little every step, and at most these move the jib's camber by about 0.1% (in the knot where the guide changes
+  // setting, the touchiest), below anything the sails or the coach can tell; the cost is then paid every few steps)
+  const tws = Math.round(tws0 * 50) / 50, aws = Math.round(aws0 * 20) / 20, backstay = Math.round(backstay0 * 100) / 100;
+  let c = atCache.get(e);
+  if (!c) atCache.set(e, c = { tws: NaN, bs: NaN, aws: NaN, mDepth: 0, mTwist: 0, mCe: 0, jDepth: 0, jCe: 0, g: null, gTws: NaN });
+  if (c.tws === tws && c.bs === backstay && c.aws === aws) return c;
+  if (c.gTws !== tws) { c.g = guideParts(tws, e.bend); c.gTws = tws; }
+  const g = c.g!, sag = forestaySag(withBackstay(e.stay, backstay), aws) - forestaySag(withBackstay(g.stay, backstay), aws);
+  c.tws = tws; c.bs = backstay; c.aws = aws;
+  c.mDepth = e.mainDepth - g.mainDepth; c.mTwist = e.mainTwist - g.mainTwist + MAIN_TWIST_PER_M_SAG * sag; c.mCe = e.mainCeAft - g.mainCeAft;
+  c.jDepth = JIB_DEPTH_PER_M * sag; c.jCe = e.jibCeAft - g.jibCeAft;
+  return c;
+}
 /** The forestay's extra sag (m) over the guide's tune for this wind, at this backstay (0..1) and apparent wind (kt). */
 export function sagDelta(e: TuneEffect, tws: number, backstay: number, aws: number): number {
-  // (one entry kept: the main and the jib ask for the same one in turn)
-  const m = lastSag;
-  if (m.e === e && m.tws === tws && m.bs === backstay && m.aws === aws) return m.v;
-  const g = guideParts(tws, e.bend);
-  const v = forestaySag(withBackstay(e.stay, backstay), aws) - forestaySag(withBackstay(g.stay, backstay), aws);
-  lastSag = { e, tws, bs: backstay, aws, v };
-  return v;
+  return tuneAt(e, tws, backstay, aws).jDepth / JIB_DEPTH_PER_M;
 }
-let lastSag = { e: null as TuneEffect | null, tws: NaN, bs: NaN, aws: NaN, v: 0 };
 /** The masthead falling off to leeward with a slacker rig opens the main's upper leech, a tighter one holds it closed: a
  * degree per 10 cm of sag more or less than the guide's (an estimate). */
 const MAIN_TWIST_PER_M_SAG = 10;
 
 /** The main's changes (camber, twist deg, ceAft) from her tune against the guide's for the wind. */
 export function mainTune(e: TuneEffect, tws: number, backstay: number, aws: number): { depth: number; twist: number; ceAft: number } {
-  const g = guideParts(tws, e.bend);
-  return { depth: e.mainDepth - g.mainDepth, twist: e.mainTwist - g.mainTwist + MAIN_TWIST_PER_M_SAG * sagDelta(e, tws, backstay, aws), ceAft: e.mainCeAft - g.mainCeAft };
+  const c = tuneAt(e, tws, backstay, aws);
+  return { depth: c.mDepth, twist: c.mTwist, ceAft: c.mCe };
 }
 /** The jib's changes (camber, ceAft): a forestay that sags more than the guide's puts depth into the jib's front. */
 export function jibTune(e: TuneEffect, tws: number, backstay: number, aws: number): { depth: number; ceAft: number } {
-  return { depth: JIB_DEPTH_PER_M * sagDelta(e, tws, backstay, aws), ceAft: e.jibCeAft - guideParts(tws, e.bend).jibCeAft };
+  const c = tuneAt(e, tws, backstay, aws);
+  return { depth: c.jDepth, ceAft: c.jCe };
 }
 
 /* ---------- the coach's words ---------- */
