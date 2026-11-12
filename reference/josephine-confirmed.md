@@ -17,7 +17,9 @@ showing it, and add to it whenever the owner confirms something. One line each; 
 - The coaming doesn't change shape at the cabin's after end.
 
 ## Cabin
-- The cabin roof is a slice of a cone lying on its side, narrowing toward the bow, with its after end cut on a slant.
+- The cabin roof is a slice of a cone lying on its side, narrowing toward the bow.
+- The cabin's whole after wall (the bulkhead with the companionway) is a vertical plane, not slanted. (A slant seen in the
+  profile photo was an illusion of its angle.)
 - The cabin top rises toward its after end (profile photo).
 - The cabin front rounds down to the deck.
 - The grab rails run most of the cabin top's length, curved to follow the roof (which slants down forward), about
