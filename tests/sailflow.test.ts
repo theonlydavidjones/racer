@@ -89,7 +89,7 @@ describe('the flow view: what it says', () => {
   it('before the start, eased to hold her back: says so, with how far to trim to go', () => {
     const b = sailing(318, 12, b => { takeLine(b, 'jibsheet'); (b.ctlTarget ??= {}).jibsheet = 0.75; });
     const w = flowWords(flowState(b), b, { preStart: true }).map(x => x[1]).join(' ');
-    expect(w).toMatch(/hold her back before the start/); expect(w).toMatch(/to go/);
+    expect(w).toMatch(/hold her back/); expect(w).toMatch(/to go/);
   });
   it('luffing on purpose: says so', () => {
     const b = sailing(318, 12); b.luff = true;

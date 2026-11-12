@@ -177,8 +177,9 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
         : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': windward telltales lifting'}. Trim in about ${deg(by)}${turn}`)
       : s.atMax ? `<em class="stall">stalled</em> ${pct(t.amount)}, ${stallTell}, with the sheet all the way out: the wind's too far aft for it. Head up`
       : `<em class="stall">stalled</em> ${pct(t.amount)}: ${stallTell}. Ease about ${deg(by)}, or head up`;
-    const across = s.across >= 0 ? `the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)})` : `${foot[s.sail]} ${deg(-s.across)} outside the wind, flogging`;
-    p('fp-sail', `<b>${name[s.sail]}</b> ${across}: ${what}.`);
+    // (a sail with the wind outside its foot is just flogging: said once, with what to do)
+    if (s.across < 0) { p('fp-sail', `<b>${name[s.sail]}</b> flogging, ${foot[s.sail]} ${deg(-s.across)} outside the wind${ctx.preStart ? ': eased to hold her back. Trim in' : '. Trim in'} about ${deg(by)}${ctx.preStart ? ' to go' : ''}.`); continue; }
+    p('fp-sail', `<b>${name[s.sail]}</b> the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)}): ${what}.`);
   }
   // twist, as facts (no verdict: the sim's best twist is the crew's whole-boat choice, which the coach judges): how open
   // each head is set against its foot, and the wind's own twist up the sail
