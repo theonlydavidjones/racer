@@ -328,7 +328,7 @@ const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff,
 /** The lazarettes' varnished panels (seen from either side: the lockers are built of single surfaces). */
 const LOCKER = new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40, side: THREE.DoubleSide });
 /** Polished chrome (the winches): bright, mirror-like, taking the sky. */
-const CHROME = reflect(new THREE.MeshPhongMaterial({ color: 0xb4bac2, specular: 0xffffff, shininess: 160 }), 0.6);
+const CHROME = reflect(new THREE.MeshPhongMaterial({ color: 0x8c939c, specular: 0xffffff, shininess: 220 }), 0.32);
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
 const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82, emissive: 0x000000, emissiveIntensity: 0 });
 /** The cockpit's moulded inside, where it isn't teak: smooth, off-white. */
@@ -381,6 +381,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 20), CHROME); m.position.y = y; winch.add(m);
     }
+    const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.004, 12), BLACK); socket.position.y = 0.121; winch.add(socket); // the handle's socket
     winches[tk] = new THREE.Vector3(wx, wy + 0.07, zw);
     // H-shaped car track on the cabin top: two short fore–aft rails and the cross rail
     const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1);
