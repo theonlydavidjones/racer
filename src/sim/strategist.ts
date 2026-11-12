@@ -1,3 +1,4 @@
+import { CANCEL_KT } from './signals';
 import { D2R, KT, LOA, V, brg, clamp, cross, dot, markReach, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, polar } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
@@ -118,6 +119,29 @@ const srcWords = (w: World) => {
     : wx.source === 'records' ? { lede: `No forecast reaches this date yet, so the wind is a typical ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day for ${mo}, from five years of NOAA records at Crissy Field. The tide is NOAA's prediction and will hold; the wind on the real day could be anything ${mo} brings. Treat the wind calls as practice in how to think, not a forecast.`, sure: 'low' }
     : { lede: `A ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day you chose, shaped like the NOAA records for ${mo}${w.settings.current === 'real' ? ', with NOAA\'s tide predictions' : ''}.`, sure: 'low' };
 };
+
+/**
+ * Too windy to race? The SF Bay Folkboat fleet calls racing off at about 23 kt (signals.ts CANCEL_KT): if the forecast
+ * reaches it over the course between the warning signal and the finish, say so first, and when, ahead of the dock.
+ */
+function windLimitSection(w: World, o: Outlook, finishT: number): BriefSection | null {
+  const gun = o.t0, warn = gun - w.settings.seq;
+  let peak = { kt: 0, t: warn };
+  const pts = [w.C.center, ...w.C.marks.map(m => m.p)];
+  for (let t = warn - 10; t <= finishT; t += 5) { const kt = pts.reduce((a, p) => a + o.wind(p, t).kt, 0) / pts.length; if (kt > peak.kt) peak = { kt, t }; }
+  if (peak.kt < CANCEL_KT - 3) return null;
+  const over = peak.kt >= CANCEL_KT, when = peak.t < gun ? 'before the start' : `${Math.round(peak.t - gun)} min into the race`;
+  return {
+    id: 'limit', title: over ? 'Too much wind to race' : 'Close to the wind limit',
+    lede: over ? `The forecast reaches ${Math.round(peak.kt)} kt over the course (${clockOf(peak.t)}, ${when}): over the fleet's ${CANCEL_KT} kt limit. Expect the committee to call racing off.`
+      : `The forecast peaks at ${Math.round(peak.kt)} kt over the course (${clockOf(peak.t)}, ${when}): a few knots under the fleet's ${CANCEL_KT} kt limit.`,
+    items: [
+      { head: 'The fleet\'s practice', src: 'practice', text: `On the Bay, Folkboat racing is cancelled at about ${CANCEL_KT} kt: at that speed things start breaking on boats, and the fleet doesn't reef. Before the start the committee shows AP over A with two sounds (postponed, no more racing today); once racing, N over A with three sounds (abandoned, no more racing today).` },
+      over ? { head: 'Before you leave the dock', src: 'practice', text: 'Check for the race chair\'s word before casting off. If you go out, set her up for the top of the range (see Trim and tuning), and plan the way home: the ebb against the westerly makes the worst of the sea off the Cityfront and in the Gate.' }
+        : { head: 'If it builds', src: 'practice', text: `A puffier or later breeze than forecast can take it over ${CANCEL_KT} kt: if the committee calls it off, come home with the sails depowered (see Trim and tuning).` }
+    ]
+  };
+}
 
 /** The day: a timeline of the wind, tide and sea at the line, and what it means. */
 function daySection(w: World, o: Outlook, finishT: number): BriefSection {
@@ -328,7 +352,8 @@ function trimSection(w: World, o: Outlook, legs: LegPlan[], finishT: number): Br
 export function raceBrief(w: World): RaceBrief {
   const o = outlookFor(w), legs = planLegs(w, o), last = legs[legs.length - 1], finishT = last.t0 + last.minutes;
   const sure = srcWords(w).sure;
-  const sections = [daySection(w, o, finishT), startSection(w, o, legs), courseSection(o, legs), fleetSection(w), trimSection(w, o, legs, finishT)];
+  const limit = windLimitSection(w, o, finishT);
+  const sections = [...(limit ? [limit] : []), daySection(w, o, finishT), startSection(w, o, legs), courseSection(o, legs), fleetSection(w), trimSection(w, o, legs, finishT)];
   return {
     title: `${w.C.title}: the strategist's briefing`,
     sub: `${new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}, start ${clockOf(o.t0)}. About ${mins(finishT - o.t0)} round at the polar speeds on these plans; real fleets, and the sim's, take about 15% longer (puffs, lulls, tacks and each other's wind, as the committee's course table allows). Confidence in the wind: ${sure}.`,

@@ -27,6 +27,9 @@ export function flagCanvas(f: Flag): HTMLCanvasElement {
     case 'U': fill('#fff'); fill(RED, 0, 0, W / 2, H / 2); fill(RED, W / 2, H / 2, W / 2, H / 2); break; // red and white quarters
     case 'black': fill('#111'); break;
     case 'X': fill('#fff'); fill(BLUE, W / 2 - 10, 0, 20, H); fill(BLUE, 0, H / 2 - 10, W, 20); break; // white, blue cross
+    case 'AP': for (let i = 0; i < 5; i++) fill(i % 2 ? '#fff' : RED, i * W / 5, 0, W / 5 + 1, H); break; // red and white vertical stripes
+    case 'N': for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) fill((i + j) % 2 ? '#fff' : BLUE, i * W / 4, j * H / 4, W / 4 + 1, H / 4 + 1); break; // blue and white chequers
+    case 'A': { fill('#fff', 0, 0, W / 2, H); g.fillStyle = BLUE; g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W, 0); g.lineTo(W * 0.78, H / 2); g.lineTo(W, H); g.lineTo(W / 2, H); g.fill(); break; } // white at the hoist, blue swallowtail
     case 'class': fill('#fff'); g.fillStyle = BLUE; g.font = 'bold 66px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('F', W / 2, H / 2 + 3); break;
   }
   g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 2; g.strokeRect(1, 1, W - 2, H - 2);
@@ -67,8 +70,10 @@ export function pennantCanvas(digit: string): HTMLCanvasElement {
 }
 
 /** Which halyard each flag flies from: class flag to port, preparatory flags to starboard, X in the middle. */
-const SLOT: Record<Flag, number> = { class: -1, P: 1, I: 1, Z: 1, U: 1, black: 1, X: 0 };
-const ALL: Flag[] = ['class', 'P', 'I', 'Z', 'U', 'black', 'X'];
+const SLOT: Record<Flag, number> = { class: -1, P: 1, I: 1, Z: 1, U: 1, black: 1, X: 0, AP: 0, N: 0, A: 0 };
+/** How far below the yardarm a flag flies: A under AP or N on the same halyard ("AP over A"). */
+const LOW: Partial<Record<Flag, number>> = { A: 1.1 };
+const ALL: Flag[] = ['class', 'P', 'I', 'Z', 'U', 'black', 'X', 'AP', 'N', 'A'];
 
 export class SignalMast {
   readonly group = new THREE.Group();
@@ -114,7 +119,7 @@ export class SignalMast {
   sync(flying: Flag[], windFrom: number, heading: number, t: number, dt: number): void {
     const toward = -(windFrom + 180 - heading) * Math.PI / 180;
     for (const [f, s] of this.flags) {
-      const up = flying.includes(f), target = up ? this.yard - 0.05 : 0.3;
+      const up = flying.includes(f), target = up ? this.yard - 0.05 - (LOW[f] ?? 0) * this.size : 0.3;
       s.y += (target - s.y) * Math.min(1, dt * (up ? 1.2 : 2)); // hauled up steadily, down a little quicker
       const m = s.mesh; m.visible = s.y > 0.5;
       if (!m.visible) continue;

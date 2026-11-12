@@ -48,7 +48,7 @@ export function dropLog(boatId: string): void {
 
 /** Her race record in a line: races, wins, podiums, average place. */
 export function record(entries: LogEntry[]): { races: number; wins: number; podiums: number; avg: number | null } {
-  const r = entries.filter(e => e.kind === 'race'), placed = r.filter(e => e.place != null);
+  const r = entries.filter(e => e.kind === 'race' && e.code !== 'CXL'), placed = r.filter(e => e.place != null);
   return {
     races: r.length, wins: placed.filter(e => e.place === 1).length, podiums: placed.filter(e => e.place! <= 3).length,
     avg: placed.length ? placed.reduce((a, e) => a + e.place!, 0) / placed.length : null

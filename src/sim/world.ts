@@ -39,7 +39,7 @@ import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/cre
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
-import { FLAG_NAME, X_FLAG_MAX, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
+import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
@@ -214,6 +214,10 @@ export class World {
   readonly sequence: Signal[];
   readonly prepFlag: PrepFlag;
   flags: Flag[] = [];
+  /** Racing called off for the wind (signals.ts CANCEL_KT): when, the wind then, and the signal flying. */
+  cancelled: { t: number; kt: number; up: Flag[]; say: string } | null = null;
+  /** The wind the committee reads over the course, over about two minutes (kt). */
+  private cbMean: number | null = null;
   private xUntil = -Infinity;
   /** Every boat at the start signal (null until the gun). */
   gun: { windFrom: number; boats: GunSnap[] } | null = null;
@@ -684,7 +688,7 @@ export class World {
             const q = this.t < 3 && b.v / KT > 4 ? 'Great start' : this.t < 8 ? 'Decent start' : 'Late start';
             this.emit({ type: 'toast', msg: `${q}: +${this.t.toFixed(1)} s, ${where}, ${(b.v / KT).toFixed(1)} kt`, ms: 4000 });
           }
-        } else if (b.started && b.leg >= n && !b.finished && (C.finishSign > 0 ? crossedFwd : crossedBack)) {
+        } else if (b.started && b.leg >= n && !b.finished && !this.cancelled && (C.finishSign > 0 ? crossedFwd : crossedBack)) { // (not once racing's called off)
           b.finished = true; b.finishT = this.t;
           if (b.isUser) { this.userFinishT = this.t; this.emit({ type: 'toast', msg: 'Finished!' }); this.emit({ type: 'horn', dur: 0.5 }); this.emit({ type: 'finished' }); }
         } else if (this.obstructed(b) && (crossedFwd || crossedBack) && b.penalty <= 0) {
@@ -857,6 +861,19 @@ export class World {
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
   private signals(prevT: number): void {
+    // too much wind: from two minutes before the warning signal until the race is over, the committee watches the wind
+    // over the course (its middle and the marks: its own boat may sit in a lee) over a couple of minutes, and at the
+    // fleet's limit calls racing off for the day
+    if (this.cbMean == null || this.steps % 30 === 0) { // (twice a second is plenty for a two-minute mean)
+      const pts = [this.C.center, ...this.C.marks.map(m => m.p)], kt = pts.reduce((a, p) => a + this.windHere(p).kt, 0) / pts.length, dt = this.cbMean == null ? 0 : 0.5;
+      this.cbMean = this.cbMean == null ? kt : this.cbMean + (kt - this.cbMean) * Math.min(1, dt / 120);
+      if (!this.cancelled && this.t >= this.sequence[0].t - 120 && this.boats.some(b => !b.finished) && this.cbMean >= CANCEL_KT) {
+        const sig = cancelSignal(this.t >= 0, this.cbMean);
+        this.cancelled = { t: this.t, kt: this.cbMean, up: sig.up, say: sig.say };
+        for (let i = 0; i < sig.sounds; i++) this.emit({ type: 'horn', dur: 0.8, delayMs: i * 1100 });
+        this.emit({ type: 'toast', ms: 9000, msg: sig.say });
+      } }
+    if (this.cancelled) { this.flags = [...this.cancelled.up]; return; }
     if (this.steps === 1 && this.t < 0) {
       const T = this.lineTransit;
       if (T) this.emit({ type: 'toast', ms: 6000, msg: `Sight the line: from the ${this.C.committeeLabel} end, ${this.C.pinLabel} lines up with ${T.name}. Near the line, when ${this.C.pinLabel} and ${T.name} are in line, you're on it.` });
