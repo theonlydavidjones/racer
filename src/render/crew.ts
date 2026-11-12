@@ -152,6 +152,14 @@ function onDeck(s: number, z: number, lean: number, k: number): PoseT {
     : [knee.clone().addScaledVector(r, -0.1 * k).add(V(0, 0.08, 0)), knee.clone().addScaledVector(r, 0.1 * k).add(V(0, 0.08, 0))];
   return { hip, yaw, pitch: -0.15 + 1.35 * lean, roll: 0, feet: [foot(0), foot(1)], hands, look: JIB_LUFF.clone() };
 }
+/** Shuffling along the side deck fore and aft (`dir` −1 forward, +1 aft), sitting on it: facing the way they go, knees
+ * up ahead of them and the feet on the deck in front, out of the cockpit, clear of the coaming and the thwart. */
+function shuffle(p: PoseT, s: number, z: number, dir: number, k: number): void {
+  const u = uAtZ(z), fx = s * Math.min(halfBeam(u) - 0.12, chz(z) + 0.16);
+  p.yaw = dir < 0 ? s * 0.25 : Math.PI - s * 0.25; p.pitch = -0.1;
+  p.feet = [0, 1].map(j => { const fz = z + dir * 0.42 * k, q = V(fx + (j ? 1 : -1) * 0.07 * k, 0, fz); return q.setY(deckY(uAtZ(fz), Math.abs(q.x)) + 0.06); }) as [THREE.Vector3, THREE.Vector3];
+  p.hands = [0, 1].map(j => { const q = V(fx + (j ? 1 : -1) * 0.18, 0, z + dir * 0.1); return q.setY(deckY(u, Math.abs(q.x)) + 0.05); }) as [THREE.Vector3, THREE.Vector3];
+}
 /** On the cockpit seat, back to the coaming, feet on the sole. */
 function onSeat(s: number, x: number, z: number, k: number): PoseT {
   const c = chz(z), hx = Math.min(c - 0.1, Math.max(benchEdge(z) + 0.12, Math.abs(x) + 0.08));
@@ -234,6 +242,19 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
 /** Where a crew member is and what they're doing (crewPhys.ts), as a pose on something real. */
 function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, windward: number, isMoving: boolean, motion: number, idx: number, tackRole: 'jib' | 'main' | null = null, dest = z): PoseT {
   const k = fig.scale, s = Math.abs(x) > 0.05 ? Math.sign(x) : windward, ax = Math.abs(x);
+  // (between the side deck aft of the thwart and anywhere forward of it, a tack, the lines, the foredeck: not through the
+  // cockpit over the thwart, but up on their own side deck and along it past the thwart, feet up, then on)
+  const cur = fig.cur?.hip;
+  if (cur && cur.z > COCK0 && cur.z < COCK1 + 0.1) {
+    const forwardJob = !!tackRole || job === 'piano' || job === 'mast' || job === 'car' || job === 'bow' || job === 'fore' || job === 'winch';
+    const wantAft = !forwardJob && Math.min(z, dest) > THWART.z, curAft = cur.z > THWART.z;
+    if (wantAft !== curAft) {
+      const sd = Math.abs(cur.x) > 0.05 ? Math.sign(cur.x) : s, zz = curAft ? THW_A - 0.04 : THW_B + 0.04;
+      const p = onDeck(sd, zz, 0, k);
+      if (Math.abs(cur.x) > chz(cur.z) - 0.02) shuffle(p, sd, cur.z, zz < cur.z ? -1 : 1, k);
+      return p;
+    }
+  }
   if (tackRole) {
     // through a tack, down in the cockpit and across under the boom (the owner): the forward crew on one knee working
     // the jib sheets at the leeward winch, the middle crew up in a crouch tacking the main from the thwart
@@ -326,10 +347,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     p = onDeck(s, zc, lean, k);
     // (sliding along the side deck to a new place, past the thwart: feet pulled up onto the deck beside them, out of the
     // cockpit, then down inside again when they're there)
-    if (fig.cur && Math.abs(fig.cur.hip.z - zc) > 0.12) {
-      const zz = fig.cur.hip.z, u = uAtZ(zz), fx = s * Math.min(halfBeam(u) - 0.12, chz(zz) + 0.12);
-      p.feet = [0, 1].map(j => V(fx, deckY(u, Math.abs(fx)) + 0.06, zz + (j ? 0.12 : -0.12) * k)) as [THREE.Vector3, THREE.Vector3];
-    }
+    if (fig.cur && Math.abs(fig.cur.hip.z - zc) > 0.12 && Math.abs(fig.cur.hip.x) > chz(fig.cur.hip.z) - 0.02) shuffle(p, s, fig.cur.hip.z, zc < fig.cur.hip.z ? -1 : 1, k);
   }
   else if (ax >= 0.3) p = onSeat(s, x, zc, k);
   else p = onSole(x, zc, k);
