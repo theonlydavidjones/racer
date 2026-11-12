@@ -59,9 +59,20 @@ export class WaveSet {
 
   /**
    * Ease the component heights toward the sea at the focus (`s`), the chop running downwind of `windFrom`
-   * (the course's mean wind, so the pattern doesn't swing with every shift).
+   * (the course's mean wind, so the pattern doesn't swing with every shift). `focus`: where you are (sim coords).
+   * A wave's phase is k·(d·p) − ωt + φ at the world position p; swinging its direction d about the world's origin,
+   * kilometres off on the Bay, swept the whole pattern past you (at 3.6 km a 10° swing over half a minute ran the
+   * water by at many times the waves' own speed: the owner's "the water surface starts rushing by"). So as d turns,
+   * φ takes up the change at the focus, and the pattern turns about where you are.
    */
-  update(s: SeaHere, windFrom: number, dt: number): void {
+  update(s: SeaHere, windFrom: number, dt: number, focus: Vec = { x: 0, y: 0 }): void {
+    const turn = (c: WaveComp, dir: number) => {
+      if (dir === c.dir) return;
+      const a0 = c.dir * D2R, a1 = dir * D2R;
+      c.phase += c.k * ((Math.sin(a0) - Math.sin(a1)) * focus.x + (Math.cos(a0) - Math.cos(a1)) * focus.y);
+      c.phase %= 2 * Math.PI; // (kept small: float32 in the shader)
+      c.dir = dir;
+    };
     const travel = windFrom + 180;
     if (Number.isNaN(this.windDir)) this.windDir = travel;
     this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
@@ -77,13 +88,13 @@ export class WaveSet {
     this.comps.slice(0, N_WIND).forEach((c, i) => {
       const target = Math.sqrt(2 * raw[i] / tot) * hsW / 4; // Σ a²/2 = (Hs/4)²
       c.amp += (target - c.amp) * ease;
-      c.dir = this.windDir + WIND_SPREAD[i];
+      turn(c, this.windDir + WIND_SPREAD[i]);
       c.q = 0.45; // sharpen the crests of the chop (less with more components, so the sum never loops)
     });
     const hsS = s.hsS;
     this.comps.slice(N_WIND).forEach((c, i) => {
       const target = (i === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
-      c.amp += (target - c.amp) * ease; c.dir = s.fromS + 180 + SWELL_SPREAD[i]; c.q = 0.3;
+      c.amp += (target - c.amp) * ease; turn(c, s.fromS + 180 + SWELL_SPREAD[i]); c.q = 0.3;
     });
     this.ref.hsW += (hsW - this.ref.hsW) * ease; this.ref.hsS += (hsS - this.ref.hsS) * ease;
   }

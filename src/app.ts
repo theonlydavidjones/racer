@@ -360,7 +360,13 @@ const band = new SailBand({
   pole: () => togglePole(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
-  hailKey: () => keymap.label('hail')
+  hailKey: () => keymap.label('hail'),
+  // what the control under the mouse (or last touched) does: in the Coach card, not a hover title over the controls
+  help: t => {
+    const e = $('tpHelp'); e.hidden = !t; if (!t) return;
+    const i = t.indexOf(': '), b = document.createElement('b');
+    if (i > 0 && i < 40) { b.textContent = t.slice(0, i); e.replaceChildren(b, ' ' + t.slice(i + 2)); } else e.replaceChildren(t);
+  }
 }, document.body);
 // the tiller strip on the band's top edge, the tiller pilot's toggle at its right end and its panel over it (the UI
 // session's placement, 12 Nov: nothing fixed in the middle of the view, the helm's controls where the eye already is)

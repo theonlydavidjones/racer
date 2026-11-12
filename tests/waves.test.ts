@@ -38,3 +38,25 @@ describe('the waves you see', () => {
     expect(L).toBeGreaterThan(Lp * 0.6); expect(L).toBeLessThan(Lp * 1.3);
   });
 });
+
+describe('the water doesn\'t rush when the wind or the swell swings (owner\'s report, v146)', () => {
+  // Each wave's phase is k·(d·p) − ωt + φ at the world position p, kilometres from the origin on the Bay. Swinging its
+  // direction d (the chop eases round to the course's mean wind, the swell follows the buoy's direction) turned the
+  // whole pattern about the origin: at 3.6 km a 10° swing moved the water past you several times faster than it runs.
+  // Turned about where you are instead, it runs at its own speed there.
+  const phaseAt = (ws: WaveSet, p: { x: number; y: number }, t: number) => ws.comps.map(c => c.k * (Math.sin(c.dir * Math.PI / 180) * p.x + Math.cos(c.dir * Math.PI / 180) * p.y) - c.w * t + c.phase);
+  it('far from the origin, the mean wind shifting 10°: the pattern where you are runs at the waves\' own speed', () => {
+    const s = sea(0.6, 3, 0.5), ws = new WaveSet(); ws.setSwellPeriod(s.tpS);
+    const p = { x: 3000, y: 2000 }, dt = 1 / 60;
+    for (let i = 0; i < 400; i++) ws.update(s, 225, 0.1, p);
+    let t = 0, prev = phaseAt(ws, p, t), worst = 0;
+    for (let i = 0; i < 60 * 30; i++) {
+      t += dt; ws.update({ ...s, fromS: 260 + Math.min(10, i * dt) }, 225 + Math.min(10, i * dt), dt, p);
+      const now = phaseAt(ws, p, t);
+      // (the phase kept within a turn: its change taken the short way round)
+      ws.comps.forEach((c, k) => { if (c.amp > 0) { const d = now[k] - prev[k] + c.w * dt, dd = d - 2 * Math.PI * Math.round(d / (2 * Math.PI)); worst = Math.max(worst, Math.abs(dd / dt) / c.w); } });
+      prev = now;
+    }
+    expect(worst).toBeLessThan(0.02); // (it was many times the wave's own speed)
+  });
+});
