@@ -598,7 +598,10 @@ export class SceneView {
     // rain and fog (the conditions adjuster): overcast light, grey haze, and you see less far
     const murk = Math.max(rain === 2 ? 0.75 : rain === 1 ? 0.45 : 0, fog === 2 ? 0.85 : fog === 1 ? 0.5 : 0);
     if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
-    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3500 : rain === 1 ? 12000 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
+    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3100 : rain === 1 ? 7500 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
+    // (rain's visibility: V ≈ 11.6·R^−0.63 km for R mm/h, Atlas, "Optical extinction by rainfall", J. Meteor. 10, 486–488,
+    // 1953, as quoted in a secondary summary: the paper itself couldn't be reached to check it. Light rain about 2 mm/h,
+    // 7.5 km; heavy about 8 mm/h (heavy is over 7.6 mm/h, the US observing practice's class), 3.1 km)
     Object.assign(this.scene.fog as THREE.Fog, { near: fogN, far: fogF });
     setRestrictedVisibility(fog === 1 || fog === 2 || rain === 2); // the boats' lights by day too (navLights.ts)
     (this.scene.fog as THREE.Fog).color.copy(haze);
