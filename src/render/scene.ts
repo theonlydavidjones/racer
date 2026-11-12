@@ -184,7 +184,7 @@ export class SceneView {
   setChaseFrame(f: { top: number; bottom: number }): void { this.chaseFrame = { ...f }; }
   /** The chase camera's distance now (m): the framed one until you zoom. */
   chaseDist = 24;
-  /** How much the chase camera rides her heave on the swell (0 off, 1 all of it; smoothed): settings.rideSwell. */
+  /** How much the chase camera rides her heave on the swell (0 off, 1 all of it; smoothed): settings.camRide. */
   chaseHeave = 0;
   private heave1 = 0; private heaveS = 0;
   /** The view drawn last frame (the chase camera starts in place on coming to it). */
@@ -820,7 +820,10 @@ export class SceneView {
       const hv = V(this.chaseDir), ratio = Math.max(0.05, (9 + look.pitch * 25) / 24); // (the camera's height over its distance)
       const fit = this.chaseFit(this.chaseDir, ratio), dist = look.chase ?? fit.dist;
       this.chaseDist = dist;
-      this.chaseHeave = (w.settings.rideSwell ?? 1) === 1 ? 1 : 0; // (the owner: heave only, smoothed, with a switch)
+      // on the swell: by default the camera holds still and aims where her hull sits on still water, so she rises and falls
+      // in the frame against a steady horizon (a camera's height can't move the horizon: only its tilt can); switched on,
+      // it rides up and down with her (smoothed, heave only) and she stays put in the frame
+      this.chaseHeave = (w.settings.camRide ?? 0) === 1 ? 1 : 0;
       const height = Math.max(1.2, ratio * dist) + this.chaseHeave * this.heaveS;
       camera.position.copy(P3(u.x - hv.x * dist, u.y - hv.y * dist, height));
       // aimed across the water at the middle of her, hull and heeled rig together, and down so the hull nearest the camera
