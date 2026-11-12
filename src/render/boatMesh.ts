@@ -10,7 +10,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -202,23 +202,22 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const lanternArm = new THREE.Group(); lanternArm.add(new THREE.Mesh(lanternGeometry(), below)); grp.add(lanternArm);
   grp.userData.lantern = makeLanternSwing(lanternArm);
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
-  // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
-  // the companionway open (the hatch slid forward, the doors stowed below) or shut (the hatch slid aft, the doors in)
-  const shut = paint.companionway === 'closed';
-  const woodTop = [slidingHatch(shut).toNonIndexed(), ...(shut ? companionwayDoors().map(g => (g.index ? g.toNonIndexed() : g)) : [])];
-  if (shut) { // the doors' panels a darker varnish, set in; their hinges and latch bronze
-    const dp = companionwayDoorPanels(), keep = (g: THREE.BufferGeometry) => { const q = g.toNonIndexed(); for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; };
-    grp.add(new THREE.Mesh(mergeGeometries(dp.panels.map(keep), false)!, DOOR_PANEL));
-    grp.add(new THREE.Mesh(mergeGeometries(dp.metal.map(keep), false)!, BRONZE));
-  }
+  // the companionway (Josephine: the owner's photos): the sliding hatch, weathered teak, on bronze runners, and three
+  // varnished washboards of equal height in the doorway, a small brass lock at the top board's top centre. They move
+  // with her companionway's state (syncCompanionway): the hatch slides forward first, then the boards come out, the top
+  // one first, and are stowed below.
+  const comp = buildCompanionway(grp);
+  const woodTop: THREE.BufferGeometry[] = [];
   { // the doorway's frame (a post each side, the sill across its foot) and the hatch's runners along the cabin top
     const { hw, len, sill } = COMPANIONWAY, z1 = zc(CABIN.u1), top = cabinTopAt(CABIN.u1, hw);
     for (const sx of [1, -1]) {
       woodTop.push(new THREE.BoxGeometry(0.04, top - sill, 0.025).toNonIndexed().translate(sx * (hw + 0.02), (top + sill) / 2, z1 + 0.012));
-      const xr = sx * (hw + 0.045), zf = z1 - 2 * len - 0.08, zm = (z1 + zf) / 2;
-      woodTop.push(new THREE.BoxGeometry(0.025, 0.035, z1 - zf).toNonIndexed().translate(xr, cabinTopAt(uAtZ(zm), xr) + 0.017, zm));
+      const xr = sx * (hw + 0.045), zf = z1 - 2 * len - 0.08, N = 12; // (the hatch's runners: bronze, following the roof)
+      for (let i = 0; i < N; i++) { const za = zf + (z1 - zf) * i / N, zb = zf + (z1 - zf) * (i + 1) / N, ya = cabinTopAt(uAtZ(za), xr) + 0.017, yb = cabinTopAt(uAtZ(zb), xr) + 0.017;
+        const g = new THREE.BoxGeometry(0.02, 0.03, Math.hypot(zb - za, yb - ya) + 0.002); g.rotateX(-Math.atan2(yb - ya, zb - za)); g.translate(xr, (ya + yb) / 2, (za + zb) / 2); comp.runners.push(g); }
     }
     woodTop.push(new THREE.BoxGeometry(2 * hw + 0.08, 0.03, 0.05).toNonIndexed().translate(0, sill - 0.015, z1 + 0.005));
+    grp.add(new THREE.Mesh(mergeGeometries(comp.runners), BRONZE));
   }
   // the grab rails: along most of the cabin top, from abreast the jib cars' forward ends to near its after end, bent to
   // the roof's curve (it slants down forward), about halfway between the hatch's runner and the roof's edge (Josephine:
@@ -361,6 +360,8 @@ export interface BoatMesh {
   nav: NavLights;
   /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
   lantern: LanternSwing;
+  /** The companionway's sliding hatch and washboards, moved by syncCompanionway. */
+  companionway: Companionway;
 }
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
@@ -394,6 +395,48 @@ function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry
   for (const e of [0, n - 1]) { const o = e * 4; idx.push(o, o + 1, o + 2, o, o + 2, o + 3); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
   const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
+}
+/**
+ * The companionway's moving parts. The hatch is drawn shut (slid aft, its after edge flush with the top washboard) and
+ * moved forward along the roof by its state; each washboard lifts up out of its grooves and, once clear, is stowed below.
+ */
+interface Companionway { hatch: THREE.Group; hatchMesh: THREE.Mesh; hatchT: number; boards: THREE.Group[]; runners: THREE.BufferGeometry[]; boardH: number }
+function buildCompanionway(grp: THREE.Group): Companionway {
+  const { hw, sill } = COMPANIONWAY, z1 = -L / 2 + CABIN.u1 * L;
+  // the hatch, shut: a nearly flat board of weathered teak arched with the roof, a thick rounded after edge
+  const hatch = new THREE.Group(); grp.add(hatch);
+  const keep = (g: THREE.BufferGeometry) => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; };
+  const hatchMesh = new THREE.Mesh(keep(slidingHatch(0)), TEAK_WEATHERED); hatch.add(hatchMesh);
+  // (as it slides it's redrawn on the roof where it is, so it lies on the roof's curve all along its travel)
+  // the washboards: three of equal height from the sill up to the shut hatch's underside, in grooves inside the posts
+  const top = cabinTopAt(CABIN.u1, 0) + 0.045, boardH = (top - sill) / 3, boards: THREE.Group[] = [];
+  for (let k = 0; k < 3; k++) { // (k 0 the top board)
+    const y0 = sill + (2 - k) * boardH, y1 = y0 + boardH - 0.003, g = new THREE.Group(); grp.add(g);
+    let geo: THREE.BufferGeometry;
+    if (k === 0) { // the top board's upper edge follows the roof's arch
+      const ring: THREE.Vector2[] = [new THREE.Vector2(-hw - 0.012, y0), new THREE.Vector2(hw + 0.012, y0)];
+      for (let j = 0; j <= 10; j++) { const x = hw + 0.012 - (2 * hw + 0.024) * j / 10; ring.push(new THREE.Vector2(x, Math.min(top, cabinTopAt(CABIN.u1, Math.min(Math.abs(x), hw)) + 0.045))); }
+      geo = new THREE.ExtrudeGeometry(new THREE.Shape(ring), { depth: 0.02, bevelEnabled: false }).translate(0, 0, z1 + 0.002);
+    } else geo = new THREE.BoxGeometry(2 * hw + 0.024, y1 - y0, 0.02).translate(0, (y0 + y1) / 2, z1 + 0.012);
+    g.add(new THREE.Mesh(keep(geo), MAT.wood));
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(2 * hw - 0.08, 0.004, 0.004).translate(0, y1 - 0.02, z1 + 0.023), DOOR_PANEL)); // a chamfer line along its top
+    if (k === 0) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0095, 0.0095, 0.006, 16).rotateX(Math.PI / 2).translate(0, y1 - 0.06, z1 + 0.024), BRONZE)); // the lock, about 3/4 in across
+    boards.push(g);
+  }
+  const c: Companionway = { hatch, hatchMesh, hatchT: 0, boards, runners: [], boardH };
+  grp.userData.companionway = c;
+  return c;
+}
+/** The hatch and washboards where her state has them (b.companionway: hatchT 0 shut … 1 open; doorsT 0 in … 1 out). */
+function syncCompanionway(c: Companionway, b: Boat): void {
+  const st = (b as Boat & { companionway?: { hatchT: number; doorsT: number } }).companionway;
+  const open = (b.paint ?? FLEET[b.id]?.paint)?.companionway !== 'closed', hT = st ? st.hatchT : open ? 1 : 0, dT = st ? st.doorsT : open ? 1 : 0;
+  const t = Math.max(0, Math.min(1, hT));
+  if (Math.abs(t - c.hatchT) > 1e-4) { c.hatchMesh.geometry.dispose(); const g = slidingHatch(t).toNonIndexed(); g.computeVertexNormals(); c.hatchMesh.geometry = g; c.hatchT = t; }
+  c.boards.forEach((g, k) => { // (each board's share of the time: lifted straight up and out, then gone below)
+    const p = Math.max(0, Math.min(1, dT * 3 - k));
+    g.visible = p < 1; g.position.y = p * (c.boardH * (3 - k) + 0.12);
+  });
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
@@ -787,7 +830,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp);
-  return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, ensign, hideHelm: false, nav, ropes, lantern: grp.userData.lantern };
+  return { grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, ensign, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -800,6 +843,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // rudder and tiller follow the helm the sim is using (steady, not estimated from frame-to-frame heading changes,
   // which jitter with the frame rate); eased so it swings like a real tiller
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
+  // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
+  syncCompanionway(m.companionway, b);
   // the cabin's lantern swings on its chain under her motion, and its light goes with it
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);

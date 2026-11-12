@@ -357,7 +357,7 @@ export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.sea
  * estimated. Inside, the companionway's well and its steps down to the cabin floor, 1230 mm under the cabin top
  * (CR 3.14, at least, at St. 8); `well` how far forward of the bulkhead the well is drawn (m).
  */
-export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.15, headroom: 1.23, well: 0.5 };
+export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.03, /* (a slight sill just above the cockpit floor: Josephine, the owner) */ headroom: 1.23, well: 0.5 };
 /** The coaming's thickness (m): the cockpit opening is its inside face. */
 export const COAMING_T = 0.025;
 /** Cockpit half-width: inside the coaming, which follows the side line, narrowing aft with the hull. */
@@ -694,54 +694,35 @@ export function companionwayLid(): THREE.BufferGeometry {
     V(-hw, yc, z1), V(hw, yc, z1), V(hw, yc, zS), V(-hw, yc, z1), V(hw, yc, zS), V(-hw, yc, zS)]; // the hatch's opening
   return new THREE.BufferGeometry().setFromPoints(pts);
 }
-/** The sliding hatch, slid forward its own length onto its runners: a board arched like the cabin top, with its edges. */
-export function slidingHatch(closed = false): THREE.BufferGeometry {
-  // open: slid forward its own length; closed: slid aft over the opening, its after edge flush with the bulkhead
-  const hw = COMPANIONWAY.hw + 0.03, lift = 0.05, uA = closed ? CABIN.u1 + 0.01 / L : CABIN.u1 - COMPANIONWAY.len / L + 0.02 / L, uF = uA - (COMPANIONWAY.len + 0.04) / L;
-  const NXh = 8, pos: number[] = [], idx: number[] = [];
+/**
+ * The sliding hatch at `t` (0 shut, slid aft over the opening, its after edge flush with the top washboard; 1 slid
+ * forward its own length): a board lying on the cabin top's curve both ways (across the arch, and along the roof as it
+ * rises aft), a skirt down to the roof all round, and a thick rounded after edge that follows the arch (the owner's
+ * photos of Josephine).
+ */
+export function slidingHatch(t = 1): THREE.BufferGeometry {
+  const hw = COMPANIONWAY.hw + 0.03, lift = 0.05, uShut = CABIN.u1 + 0.01 / L, uOpen = CABIN.u1 - COMPANIONWAY.len / L + 0.02 / L;
+  const uA = uShut + (uOpen - uShut) * Math.min(1, Math.max(0, t)), uF = uA - (COMPANIONWAY.len + 0.04) / L;
+  const NXh = 10, NZ = 8, pos: number[] = [], idx: number[] = [];
   const P = (u: number, x: number, dy: number) => pos.push(x, cabinTopAt(u, x) + dy, zAt(u));
-  // the top (rows at the two ends), then a skirt down to the cabin top all round
-  for (const u of [uF, uA]) for (let j = 0; j <= NXh; j++) P(u, -hw + 2 * hw * j / NXh, lift);
-  for (let j = 0; j < NXh; j++) idx.push(j, NXh + 1 + j, j + 1, j + 1, NXh + 1 + j, NXh + 2 + j); // (facing up)
+  // the top: a grid over the roof's curve, forward to aft
+  for (let i = 0; i <= NZ; i++) for (let j = 0; j <= NXh; j++) P(uF + (uA - uF) * i / NZ, -hw + 2 * hw * j / NXh, lift);
+  for (let i = 0; i < NZ; i++) for (let j = 0; j < NXh; j++) { const a = i * (NXh + 1) + j, c = a + NXh + 1; idx.push(a, c, a + 1, a + 1, c, c + 1); } // (facing up)
+  // the skirt down to the roof all round
   const ring: [number, number][] = [];
   for (let j = 0; j <= NXh; j++) ring.push([uA, -hw + 2 * hw * j / NXh]);
-  for (let j = NXh; j >= 0; j--) ring.push([uF, -hw + 2 * hw * j / NXh]);
-  ring.push(ring[0]);
+  for (let i = NZ - 1; i >= 0; i--) ring.push([uF + (uA - uF) * i / NZ, hw]);
+  for (let j = NXh - 1; j >= 0; j--) ring.push([uF, -hw + 2 * hw * j / NXh]);
+  for (let i = 1; i <= NZ; i++) ring.push([uF + (uA - uF) * i / NZ, -hw]);
   const b0 = pos.length / 3;
   for (const [u, x] of ring) { P(u, x, lift); P(u, x, 0.005); }
   for (let i = 0; i < ring.length - 1; i++) { const a = b0 + 2 * i; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  // the thick rounded after edge, following the arch: a half-round 3 cm across along the after edge
+  const b1 = pos.length / 3, NR = 6;
+  for (let j = 0; j <= NXh; j++) { const x = -hw + 2 * hw * j / NXh, y = cabinTopAt(uA, x) + lift - 0.025, z = zAt(uA);
+    for (let k = 0; k <= NR; k++) { const a = -Math.PI / 2 + Math.PI * k / NR; pos.push(x, y + 0.03 * Math.sin(a), z + 0.03 * Math.cos(a)); } }
+  for (let j = 0; j < NXh; j++) for (let k = 0; k < NR; k++) { const a = b1 + j * (NR + 1) + k, c = a + NR + 1; idx.push(a, a + 1, c, a + 1, c + 1, c); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
-}
-
-/**
- * The companionway's doors, shut (CR 3.18: carried while racing): a pair of varnished leaves meeting on the centreline,
- * hinged at the doorway's posts, from the sill up under the closed hatch (their tops following the cabin top's arch),
- * each with a raised panel on its face. In the bulkhead's plane, in the boat's frame.
- */
-export function companionwayDoors(): THREE.BufferGeometry[] {
-  const { hw, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), out: THREE.BufferGeometry[] = [], t = 0.022;
-  for (const s of [1, -1]) {
-    // (each leaf's outline drawn on its own side, counter-clockwise, so its faces look outward)
-    const x0 = 0.003, x1 = hw - 0.004, N = 6, ring: THREE.Vector2[] = [new THREE.Vector2(x0, sill), new THREE.Vector2(x1, sill)];
-    for (let k = 0; k <= N; k++) { const x = x1 + (x0 - x1) * k / N; ring.push(new THREE.Vector2(x, cabinTopAt(CABIN.u1, x) + 0.045)); }
-    const pts = s > 0 ? ring : ring.map(p => new THREE.Vector2(-p.x, p.y)).reverse();
-    out.push(new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: t, bevelEnabled: false }).translate(0, 0, z1 - t / 2));
-    // the panel: set in from the leaf's face, inside its stiles and rails (drawn darker: companionwayDoorPanels)
-    void x1;
-  }
-  return out;
-}
-
-/** The doors' panels, each set into its leaf inside the stiles and rails, and their hinges and the latch. */
-export function companionwayDoorPanels(): { panels: THREE.BufferGeometry[]; metal: THREE.BufferGeometry[] } {
-  const { hw, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), t = 0.022, x0 = 0.003, x1 = hw - 0.004, panels: THREE.BufferGeometry[] = [], metal: THREE.BufferGeometry[] = [];
-  const py0 = sill + 0.09, py1 = cabinTopAt(CABIN.u1, hw) - 0.05, pw = (x1 - x0) - 0.11;
-  for (const s of [1, -1]) {
-    panels.push(new THREE.BoxGeometry(pw, py1 - py0, 0.004).translate(s * (x0 + x1) / 2, (py0 + py1) / 2, z1 + t / 2 + 0.001));
-    for (const y of [sill + 0.1, py1 - 0.02]) metal.push(new THREE.BoxGeometry(0.03, 0.06, 0.006).translate(s * (x1 - 0.008), y, z1 + t / 2 + 0.003)); // the hinges at the posts
-  }
-  metal.push(new THREE.BoxGeometry(0.05, 0.02, 0.012).translate(0, (sill + py1) / 2 + 0.05, z1 + t / 2 + 0.006)); // the latch across the meeting stiles
-  return { panels, metal };
 }
 
 /** Station u for a z position (m, aft positive). */
