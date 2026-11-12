@@ -20,6 +20,7 @@
  * Output: src/geo/data/<id>.json
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { SF_DOCKS, SOURCE_NOTE, sfNumbers, writeRenames } from './sf-marina-numbers.mjs';
 
 const HARBORS = {
   'gashouse-cove': {
@@ -337,12 +338,14 @@ async function make(id, H) {
   const beacons = [...nodes.values()].filter(n => n.tags['seamark:type'] === 'beacon_lateral' && near(xy([n.lat, n.lon]), 80))
     .map(n => ({ at: [r7(n.lat), r7(n.lon)], colour: n.tags['seamark:beacon_lateral:colour'] === 'green' ? 'green' : 'red' })).concat(H.beaconsExtra ?? []);
 
+  // the SF Marina's own numbers (Gashouse Cove: scripts/sf-marina-numbers.mjs), in place of the letters; old ids kept for saves
+  const sf = SF_DOCKS[id] ? sfNumbers(id, out) : null; if (sf) await writeRenames(id, sf.renames);
   await writeFile(new URL(`../src/geo/data/${id}.json`, import.meta.url), JSON.stringify({
-    source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? `Dock letters are the docks' names in OSM; slip numbers ${H.odd ? 'as on the harbor\'s own map' : 'are this sim\'s'}.` : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}`,
+    source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? `Dock letters are the docks' names in OSM; slip numbers ${H.odd ? 'as on the harbor\'s own map' : 'are this sim\'s'}.` : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : sf ? '' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}${sf ? 'S' + SOURCE_NOTE.slice(3) : ''}`,
     fetched: new Date().toISOString().slice(0, 10), name: H.name,
     basin, breakwaters, walkways: walkways.map(w => w.pts), fingers: fingers.map(f => f.pts), areas,
     beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : basinFile?.shore ? { shore: basinFile.shore } : {}), ...(H.piles ? { piles: H.piles } : {}),
-    ...(H.pathIds ? { paths: ways.filter(w => H.pathIds.includes(w.id)).map(pts) } : {}), slips: out
+    ...(H.pathIds ? { paths: ways.filter(w => H.pathIds.includes(w.id)).map(pts) } : {}), slips: sf ? sf.slips : out
   }) + '\n');
   const docksUsed = [...new Set(out.map(s => s.dock))].join('');
   console.log(`${id}: basin ${basin.length} pts, ${breakwaters.length} breakwaters, ${walkways.length} walkways (docks ${docksUsed}), ${fingers.length} fingers (${fingers.filter(f => f.made).length} inferred), ${areas.length} pier areas, ${beacons.length} beacons, ${out.length} slips`);

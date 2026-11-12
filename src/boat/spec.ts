@@ -1,3 +1,5 @@
+import slipRenames from '../geo/data/slip-renames.json';
+
 /**
  * Your boat as you've set her up: how she looks (hull, deck, sails, flags) and the things about her that change
  * how fast she goes (her bottom, her sails' age, her spars, what's aboard). Looks never change performance unless
@@ -103,8 +105,9 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     companionway: x.companionway === 'closed' ? 'closed' : 'open',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
-    // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's
-    ...(typeof x.slip === 'string' && x.slip ? { marina: x.slip.includes(':') ? x.slip.split(':')[0] : 'west-harbor', slip: x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}` } : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
+    // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
+    // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
+    ...(typeof x.slip === 'string' && x.slip ? (sl => ({ marina: sl.split(':')[0], slip: sl }))((r => (slipRenames as Record<string, string>)[r] ?? r)(x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}`)) : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
