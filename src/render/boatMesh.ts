@@ -237,6 +237,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(mergeGeometries(seams.map(q => q.toNonIndexed()), false)!, BLACK));
     grp.add(new THREE.Mesh(mergeGeometries(hinges.map(q => q.toNonIndexed()), false)!, CHROME)); }
+  const strakes: THREE.BufferGeometry[] = [];
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
@@ -248,7 +249,12 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     grp.add(new THREE.Mesh(rail(caps, 0.02, 0.04), MAT.wood));
     // toerail along the sheer
     grp.add(new THREE.Mesh(rail(sheerLine(s, 0.03), 0.035, 0.03), MAT.wood));
+    // and the rubbing strake just under the sheer, a half-round of the same wood standing proud of the topsides (CR 2.218:
+    // 13 × 26 to 14 × 28 mm, round the sheer)
+    strakes.push(rail(sheerLine(s, -0.007).map(p => p.setY(p.y - 0.045)), 0.027, 0.014).toNonIndexed());
   }
+  grp.add(new THREE.Mesh(mergeGeometries(strakes, false)!, MAT.wood));
+  deckFittings(grp);
   // the raised lip across the after end of the cockpit, moulded in with the side coamings and turning into them round
   // its corners (at least 80 mm high at station 3, CR 3.22), so water on the after deck stays out of the cockpit
   {
@@ -359,6 +365,31 @@ const carPos = (side: number, fore: number, ins: number) => {
 const TRAV_Z = COCKPIT_FIT.thwart.z, TRAV_HALF = 0.5, MASTHEAD = new THREE.Vector3(0, MAST_TOP, MAST_Z);
 function line(points: THREE.Vector3[], mat: THREE.Material = LINE_MAT): THREE.Line {
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), mat); l.frustumCulled = false; return l;
+}
+
+/**
+ * The standing rigging's deck ends, in stainless steel, all one mesh: each shroud's chainplate (a strap through the side
+ * deck at the class position, CR 7.20) with its rigging screw, the forestay's stemhead fitting and rigging screw, the
+ * backstay bridle's two chainplates on the quarters; and a mooring cleat on the foredeck, aft of the forestay.
+ */
+function deckFittings(grp: THREE.Group): void {
+  const parts: THREE.BufferGeometry[] = [], up = new THREE.Vector3(0, 1, 0);
+  const along = (g: THREE.BufferGeometry, from: THREE.Vector3, dir: THREE.Vector3, at: number) => g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, dir)).translate(from.x + dir.x * at, from.y + dir.y * at, from.z + dir.z * at);
+  const screw = (foot: THREE.Vector3, toward: THREE.Vector3) => { // a strap on deck, and the rigging screw (turnbuckle) up the wire from it
+    const d = toward.clone().sub(foot).normalize();
+    parts.push(new THREE.BoxGeometry(0.03, 0.06, 0.008).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d)).translate(foot.x, foot.y + 0.02, foot.z));
+    parts.push(along(new THREE.CylinderGeometry(0.011, 0.011, 0.17, 8), foot, d, 0.13));
+    for (const at of [0.04, 0.22]) parts.push(along(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), foot, d, at)); // its studs
+  };
+  for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
+  screw(FORESTAY_DECK.clone(), HOUNDS);
+  parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
+  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * 0.3, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
+  { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
+    parts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 10).rotateX(Math.PI / 2).translate(0, cy + 0.035, cz));
+    for (const dz of [-0.035, 0.035]) parts.push(new THREE.BoxGeometry(0.022, 0.035, 0.022).translate(0, cy + 0.017, cz + dz)); }
+  const flat = parts.map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
+  grp.add(new THREE.Mesh(mergeGeometries(flat, false)!, STEEL));
 }
 
 /** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
