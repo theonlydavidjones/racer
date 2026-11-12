@@ -36,6 +36,8 @@ export interface AiState {
   tackNow?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
+  /** Racing called off for the day: her way home round the land (ai.ts goHome), the leg she's on, and the harbour's entrance */
+  home?: { route: Vec[]; i: number; at: Vec };
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
    * wind and slow, a passing change of plan mustn't turn her back. */
   hailTack?: { to: 'S' | 'P'; at: number; with: number } | null;

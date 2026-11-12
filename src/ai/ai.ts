@@ -11,6 +11,7 @@ import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
+import { HARBORS } from '../geo/marina';
 import type { World } from '../sim/world';
 
 /**
@@ -129,6 +130,33 @@ export function sailable(b: Boat, desired: number): number {
   if (b.tack === 'P' && rel > 25) return n360(from - ch);
   return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
 }
+
+/**
+ * Racing called off for the day (N over A, or AP over A: "no more racing today", RRS Race Signals), as it is in a breeze
+ * over the fleet's limit (sim/signals.ts): she sails home, to the entrance of the racing harbour nearest the course
+ * (geo/marina.ts), by the way round the land a skipper would draw (sim/routing.ts), beating on the tack that points
+ * nearer it and tacking off the shore; there, off the entrance, she lies to with her sails luffing (going in to her
+ * berth is the harbour's work, not drawn yet). She's not racing, so the rules' Part 2 doesn't apply between her and
+ * the others (keeping clear of the ships still does: World.keepClearOfShips).
+ */
+function goHome(w: World, b: Boat): void {
+  const ai = b.ai!, from = b.ww.from;
+  if (!ai.home) {
+    let at = w.C.center, best = Infinity;
+    for (const H of HARBORS) for (const e of H.exits) { const d = dist(e, w.C.center); if (d < best) { best = d; at = e; } }
+    ai.home = { route: routeAround(b, at, 120), i: 0, at };
+  }
+  const h = ai.home;
+  if (dist(b, h.at) < HOME_R) { b.desired = n360(from + 90); b.luff = true; return; } // (home: off the entrance)
+  while (h.i < h.route.length - 1 && dist(b, h.route[h.i]) < 60) h.i++; // (each turn of the way passed within 60 m)
+  let desired = sailable(b, brg(h.route[h.i].x - b.x, h.route[h.i].y - b.y));
+  // beating, with the shore 100 m ahead on this tack: tack (the way's turns keep 120 m off, but a beat zigzags across it)
+  const beating = Math.abs(wrap(from - desired)) < beatFor(b) + 5;
+  if (beating && blocked(w, b, desired, 100)) desired = n360(from + (b.tack === 'S' ? 1 : -1) * (beatFor(b) + 1));
+  b.desired = desired; b.luff = false;
+}
+/** How near the harbour's entrance (m) she counts herself home after racing's called off. */
+const HOME_R = 150;
 
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
  * a few metres wide is in the way even if the water beyond it is clear. */
@@ -267,7 +295,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     b.luff = false; return;
   }
   ai.clearing = false;
-  if (b.finished || w.cancelled) { b.desired = n360(ww.from + 90); b.luff = true; return; } // (racing called off for the wind: she stops racing too)
+  if (w.cancelled && !b.finished) { goHome(w, b); return; } // (no more racing today: she sails home)
+  if (b.finished) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % 6 === 0; // heavy predictions 10× a second
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
