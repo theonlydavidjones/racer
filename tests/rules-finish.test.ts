@@ -283,3 +283,36 @@ describe('proper course allows for the current (Rules 17, 23.2)', () => {
     expect(properTwa(w, b)).toBeNull(); // undetermined: neither above nor below it
   });
 });
+
+describe('Part 2 preamble: a boat not racing is not penalized (except rule 14 with injury or damage, and 23.1)', () => {
+  it('racing runs from the preparatory signal until she finishes and clears, retires, or racing is called off (Definitions, Racing)', () => {
+    const w = new World(SS2, settings(), 4), b = w.boats[1];
+    const prep = w.sequence.find(s => s.name === 'Preparatory signal')!.t;
+    w.t = prep - 5; expect(w.racing(b)).toBe(false);
+    w.t = prep + 5; expect(w.racing(b)).toBe(true);
+    w.cancelled = { t: w.t, kt: 30, up: [], say: '' }; expect(w.racing(b)).toBe(false);
+    w.cancelled = null; b.retired = true; expect(w.racing(b)).toBe(false);
+  });
+
+  it('two AI boats colliding after racing is called off: the right-of-way rules still decide, but nobody takes turns', () => {
+    for (const off of [false, true]) {
+      const w = race(), [u, A, B] = w.boats;
+      u.x = OPEN.x + 3000; w.boats[3].x = OPEN.x + 4000;
+      if (off) w.cancelled = { t: w.t, kt: 30, up: [], say: '' };
+      // A on port, B on starboard, meeting at OPEN
+      const hA = sail(w, A, off_(OPEN, -6, -6), 'P'), hB = sail(w, B, off_(OPEN, 6, -6), 'S');
+      A.desired = hA; B.desired = hB;
+      A.x = OPEN.x; A.y = OPEN.y; B.x = OPEN.x + 0.2; B.y = OPEN.y; // in contact, crossing
+      w.step(DT);
+      expect(A.penalty + B.penalty > 0, `called off: ${off}`).toBe(!off);
+    }
+  });
+});
+const off_ = (p: Vec, dx: number, dy: number) => ({ x: p.x + dx, y: p.y + dy });
+
+describe('hull contact geometry', () => {
+  it('two hulls crossing each other (an X) are in contact, not 3–4 m apart', () => {
+    const a = boat('A', { at: [0, 0], heading: 315 }), b = boat('B', { at: [0.2, 0], heading: 45 });
+    expect(hullGap(a, b)).toBe(0);
+  });
+});
