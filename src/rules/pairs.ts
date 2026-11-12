@@ -133,8 +133,8 @@ export const BLANKET_K = 0.12;
 /** Rule 23: blanketing held this long (s) is interference, not a boat passing through another's wind on her way by. */
 export const BLANKET_TIME = 8;
 
-/** Not racing: finished and cleared the finishing line and marks (Definitions, Racing). */
-export const notRacing = (b: RulesBoat): boolean => !!b.finished && (b.cleared ?? true);
+/** Not racing (Definitions, Racing: a boat races "until she finishes and clears the finishing line and marks or retires"). */
+export const notRacing = (b: RulesBoat): boolean => !!b.retired || (!!b.finished && (b.cleared ?? true));
 
 /**
  * Rule 23: could `X` be breaking rule 23 by taking `Y`'s wind? Only between these boats:
@@ -145,8 +145,9 @@ export const notRacing = (b: RulesBoat): boolean => !!b.finished && (b.cleared ?
  * only calls 23.2 blanketing it can tell was deliberate, so not then.
  */
 export function blanketRule<B extends RulesBoat>(X: B, Y: B, ctx: RulesContext): '23.1' | '23.2' | null {
-  if (Y.finished) return null;
-  if (X.finished) return notRacing(X) ? '23.1' : null; // just over the line, still clearing it, she is racing
+  if (Y.finished || notRacing(Y)) return null;
+  if (notRacing(X)) return '23.1';
+  if (X.finished) return null; // just over the line, still clearing it, she is racing
 
   if (ctx.t <= 0 || !X.started || !X.aboveProper) return null;
   const vulnerable = Y.penalty > 0 || Y.ocs || (Y.started && Y.leg !== X.leg);
@@ -159,8 +160,12 @@ export interface PairAssessment<B> { verdict: Verdict<B>; incident: Incident<B> 
  * reports any incident. Deterministic: depends only on its arguments. */
 export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation): PairAssessment<B> {
   const n = ctx.marks.length;
+  // (rule 18 applies between boats required to leave a mark on the same side (18.1): a boat that's retired has no mark to
+  // leave, so no mark-room either way between her and anyone)
+  const out = !!A.retired || !!B.retired;
+  if (out) { rec.mark = null; rec.r183 = null; }
   // Mark-room (Rule 18.2(a)): fixed when the first boat reaches the zone (three lengths from the mark).
-  if (A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round' && A.started && B.started) {
+  if (!out && A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round' && A.started && B.started) {
     const mk = ctx.marks[A.leg], dA = markDist(A, mk), dB = markDist(B, mk);
     // Rule 18.3 needs to know who has been on starboard since entering the zone.
     for (const [X, d] of [[A, dA], [B, dB]] as const) {
@@ -202,7 +207,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     const astern = rec.rule === '12' && rec.kc != null ? rec.kc : null;
     const tacker = ctx.t - A.lastTackT < JUST_TACKED + 1 ? A.id : ctx.t - B.lastTackT < JUST_TACKED + 1 ? B.id : null;
     let insideMark: number | null = null, markUnable = false, insideObst: number | null = null, obstUnable = false;
-    if (A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
+    if (!out && A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
       const mk = ctx.marks[A.leg], ins = markDist(A, mk) < markDist(B, mk) ? A : B, out = ins === A ? B : A;
       insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
     }
@@ -260,14 +265,15 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   else if (obs.swerve) kind = 'swerve';
   if (!kind) return { verdict: r, incident: blanketing(rec, A, B, ctx, obs, r) };
 
-  // boats that have both finished aren't racing: no penalties between them
-  if (A.finished && B.finished) return { verdict: r, incident: null };
+  // boats that have both finished (or retired) aren't racing: no penalties between them
+  const done = (b: typeof A) => b.finished || !!b.retired;
+  if (done(A) && done(B)) return { verdict: r, incident: null };
   rec.cool = ctx.t + INCIDENT_COOLDOWN;
   let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null, turned: number | undefined, part: string | undefined;
   const row = r.kc === A ? B : A, kc = r.kc;
   const obst = rule19(A, B, r.rule, rec, ctx);
-  if (kc.finished && !row.finished && notRacing(kc)) {
-    // Rule 23.1: a boat not racing (she has finished) shall not interfere with a boat that is racing
+  if (notRacing(kc) && !notRacing(row)) {
+    // Rule 23.1: a boat not racing (she has retired, or finished and cleared the line) shall not interfere with a boat that is racing
     rule = '23'; part = '23.1';
   } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
     // Rule 15: she only just got right of way
@@ -278,7 +284,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
-  } else if (!row.finished && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (kc.ocs && ctx.t > 0)) && ((ctx.t > 0 && row.aboveProper) || turnedToward(row, kc) > 0))) {
+  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (kc.ocs && ctx.t > 0)) && ((ctx.t > 0 && row.aboveProper) || turnedToward(row, kc) > 0))) {
     // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper course
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
   } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {
@@ -303,7 +309,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
  * blanketRule says rule 23 protects her.
  */
 function blanketing<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation, r: Verdict<B>): Incident<B> | null {
-  if ((A.finished && B.finished) || ctx.t < rec.blanketCool) { rec.blanket = {}; return null; }
+  if ((notRacing(A) && notRacing(B)) || ctx.t < rec.blanketCool) { rec.blanket = {}; return null; }
   for (const [X, Y, k] of [[A, B, obs.blanket?.byA ?? 0], [B, A, obs.blanket?.byB ?? 0]] as const) {
     const part = k >= BLANKET_K ? blanketRule(X, Y, ctx) : null;
     if (!part) { delete rec.blanket[X.id]; continue; }

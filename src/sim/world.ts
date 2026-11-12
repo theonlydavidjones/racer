@@ -16,7 +16,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, blanketRule, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, blanketRule, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -27,7 +27,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { berthClear, harborOf, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
@@ -437,9 +437,11 @@ export class World {
   lineD(p: Vec): number { return (p.x - this.center.x) * this.N.x + (p.y - this.center.y) * this.N.y; }
   /** Position along the line from its centre; positive toward the committee end. */
   lineA(p: Vec): number { return (p.x - this.center.x) * this.L.x + (p.y - this.center.y) * this.L.y; }
-  nextMark(b: Boat): CourseMark | null { return this.freeSail ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
+  /** Sailing free: a cruise, or a race she's retired from (she's no longer racing: her own destination, and the tiller pilot). */
+  get cruising(): boolean { return this.freeSail || !!this.user?.retired; }
+  nextMark(b: Boat): CourseMark | null { return this.freeSail || (b.isUser && b.retired) ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
-  obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
+  obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec): Vec {
     return withPierWakes(p, this.streamAt(p), this.pierFlows(), this.t);
@@ -623,7 +625,7 @@ export class World {
   /** The real tide at the course: refresh the field, and the summary used by the HUD, maps and messages. */
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
-    f.setTime(now);
+    f.cover(now); f.setTime(now); // (the predictions roll on past the race's window: a long sail)
     this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
@@ -658,8 +660,8 @@ export class World {
       if (b.docked) { this.dockStep(b, dt); continue; }
       if (b.handled) { this.handStep(b, dt); continue; }
       const x0 = b.x, y0 = b.y;
-      if (b.isUser) b.pilotSteers = this.freeSail && this.pilot.mode !== 'off';
-      if (b.isUser && this.freeSail && this.pilot.mode !== 'off') {
+      if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
+      if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
         pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
@@ -673,7 +675,7 @@ export class World {
     this.shipEncounters();
     this.checkPairs();
     if (!this.freeSail) this.signals(prevT);
-    else this.checkArrival();
+    if (this.cruising) this.checkArrival();
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
@@ -684,6 +686,7 @@ export class World {
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
     if (gun) this.snapGun();
     for (const b of this.boats) {
+      if (b.retired) continue; // (no longer racing: no start, finish, recall or rounding for her; her destination is checkArrival's)
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
       if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
@@ -707,7 +710,7 @@ export class World {
             const q = this.t < 3 && b.v / KT > 4 ? 'Great start' : this.t < 8 ? 'Decent start' : 'Late start';
             this.emit({ type: 'toast', msg: `${q}: +${this.t.toFixed(1)} s, ${where}, ${(b.v / KT).toFixed(1)} kt`, ms: 4000 });
           }
-        } else if (b.started && b.leg >= n && !b.finished && (C.finishSign > 0 ? crossedFwd : crossedBack)) {
+        } else if (b.started && b.leg >= n && !b.finished && !b.retired && (C.finishSign > 0 ? crossedFwd : crossedBack)) {
           b.finished = true; b.finishT = this.t; b.cleared = false;
           if (b.isUser) { this.userFinishT = this.t; this.emit({ type: 'toast', msg: 'Finished!' }); this.emit({ type: 'horn', dur: 0.5 }); this.emit({ type: 'finished' }); }
         } else if (this.obstructed(b) && (crossedFwd || crossedBack) && b.penalty <= 0) {
@@ -729,7 +732,7 @@ export class World {
    */
   touchableMarks(b: Boat): Touchable[] {
     const C = this.C, n = C.marks.length, out: Touchable[] = [];
-    if (b.finished) return out;
+    if (b.finished || b.retired) return out; // (no longer racing)
     const pinMark = C.marks.find(m => dist(m.p, C.pin) < 1);
     const pin: Touchable | null = C.pinKind === 'buoy' ? { name: C.pinLabel, p: C.pin, r: 0.9 }
       : pinMark ? { name: pinMark.name, p: C.pin, r: pinMark.shape === 'sphere' ? 1.2 : 1.0 } : null;
@@ -841,7 +844,7 @@ export class World {
       const h = this.hHist[i] ??= [];
       if (this.steps % RECORD_EVERY_STEPS === 0) { h.push(b.h); if (h.length > keep) h.shift(); }
       b.headingAgo = h.length ? h[0] : b.h;
-      b.aboveProper = this.t > 0 && b.started && !b.finished && b.twa < properTwa(this, b) - 10;
+      b.aboveProper = this.t > 0 && b.started && !b.finished && !b.retired && b.twa < properTwa(this, b) - 10;
     });
   }
 
@@ -880,7 +883,7 @@ export class World {
     for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // a boat that has finished isn't racing, so there are no penalty turns for her to take (rule 44.1)
-      if (incident.kind === 'blanket' && incident.fouler.cleared && A.ai && B.ai) continue;
+      if (incident.kind === 'blanket' && notRacing(incident.fouler) && A.ai && B.ai) continue;
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
       if (incident.kind !== 'hail' && incident.kind !== 'blanket' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
@@ -894,7 +897,7 @@ export class World {
         this.paused = true;
         if (incident.exoneratedBy == null) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.exoneratedBy == null && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them
+      } else if (incident.exoneratedBy == null && incident.part !== '23.1' && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them (and one not racing, under 23.1, takes none: rule 44.1)
     }
   }
 
@@ -993,6 +996,7 @@ export class World {
   private lastMinute(): void {
     const f = this.prepFlag, [a, b2, c] = this.triangle;
     for (const b of this.boats) {
+      if (b.retired) continue; // (she's out of the race: rule 30 is for boats starting)
       if (f === 'I') {
         // Rule 30.1: on the course side of the line or its extensions
         if (!b.roundEnd && this.lineD(bow(b)) > 0) {
@@ -1189,10 +1193,46 @@ export class World {
 
   /** Just sail: a new destination, a place or a spot picked on the chart. */
   setDest(p: Vec, name: string): void {
-    if (!this.freeSail) return;
+    if (!this.cruising) return;
     this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
     this.arrivedT = null;
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
+  }
+
+  /**
+   * Send her home: her home slip becomes where she's going, for the navigator's passage plan and the tiller pilot (on, it
+   * steers for it; you bring her into the slip yourself). Racing, before she's finished, it retires her first: she's no
+   * longer racing (the definition of Racing; scored RET, RRS A5.1), so she keeps clear of the boats still racing (RRS 23.1)
+   * and may use the pilot (RRS 52 binds only a boat racing). False when she has no home slip.
+   */
+  sendHome(): boolean {
+    const u = this.user, slip = this.homeSlip;
+    if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
+    if (!this.freeSail && !u.finished && !u.retired) {
+      u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
+      this.emit({ type: 'toast', msg: 'Retired (RET, RRS A5.1): she\'s no longer racing. Keep clear of the boats still racing (RRS 23.1).', ms: 5000 });
+    }
+    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
+    this.arrivedT = null;
+    if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
+    this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
+    return true;
+  }
+
+  /**
+   * Cruising, a new start without ending the cruise: she's put at `p`, stopped, on the heading she had, her sails as they
+   * were; the clock, her destination and the log carry on (the distance sailed counts only what she sails). Not racing:
+   * that would be a restart. False on land.
+   */
+  moveHere(p: Vec, name: string): boolean {
+    if (!this.freeSail || onLand(p) || hitsHarbor(p)) return false;
+    const u = this.user;
+    u.x = p.x; u.y = p.y; u.v = 0; u.astern = 0; u.sway = 0; u.vx = 0; u.vy = 0; u.turnTarget = null;
+    u.docked = undefined; u.handled = undefined; u.pushing = undefined;
+    if (this.pilot.mode !== 'off') this.pilot.mode = 'off'; // (stopped: a tiller pilot needs way on)
+    if (this.dest && this.arrivedT != null && markDist(u, this.dest) > 40) this.arrivedT = null; // (somewhere to sail to again)
+    this.emit({ type: 'toast', msg: `Moved to ${name}. The cruise and its log carry on.`, ms: 3500 });
+    return true;
   }
 
   /** Just sail: tell her when she gets to where she was going. */
@@ -1252,7 +1292,7 @@ export class World {
     const range = hailRange(b.v), v = Math.max(b.v, 0.5);
     for (const c of this.boats) {
       if (c === b || c === o || dist(b, c) > range + LOA) continue;
-      if (!(c.finished && c.cleared) && !this.keepsClearOf(b, c)) continue;
+      if (!notRacing(c) && !this.keepsClearOf(b, c)) continue;
       // within a hull length (between centres) of her on her course now, and still if she bore away 10°
       const meets = (h: number) => { const u = V(h), q = cpa({ x: b.x, y: b.y, vx: u.x * v, vy: u.y * v }, c); return q.d < LOA && q.t * v <= range; };
       if (meets(b.h) && meets(b.h + (b.tack === 'S' ? -SUBSTANTIAL_TURN : SUBSTANTIAL_TURN))) return c;

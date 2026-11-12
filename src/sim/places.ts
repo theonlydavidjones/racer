@@ -1,4 +1,4 @@
-import { LL } from '../geo/geo';
+import { LL, toLL } from '../geo/geo';
 import type { Vec } from '../core/math';
 import type { CourseMark, MarkShape } from '../courses/course';
 
@@ -105,7 +105,22 @@ export const PLACES: Place[] = [
   P('m-IYC3', 'Island YC 3', 37.783585, -122.257527, { shape: 'sphere', look: 'O' })
 ];
 
-export const place = (id: string | undefined): Place | null => PLACES.find(p => p.id === id) ?? null;
+/**
+ * A place by its id: one of the PLACES, or a spot picked on the chart, 'at:<lat>,<lon>' (named by its latitude and
+ * longitude, as on a chart).
+ */
+export const place = (id: string | undefined): Place | null => {
+  const m = id ? /^at:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(id) : null;
+  if (m) { const lat = Number(m[1]), lon = Number(m[2]); return { id: id!, name: latLon(LL(lat, lon)), group: 'Spots', p: LL(lat, lon) }; }
+  return PLACES.find(p => p.id === id) ?? null;
+};
+/** A spot picked on the chart, as a place id (to about a metre). */
+export const spotId = (p: Vec): string => { const { lat, lon } = toLL(p); return `at:${lat.toFixed(5)},${lon.toFixed(5)}`; };
+/** A spot by its latitude and longitude, as on a chart (degrees and decimal minutes). */
+export function latLon(q: Vec): string {
+  const { lat, lon } = toLL(q), dm = (v: number) => `${Math.floor(Math.abs(v))}°${((Math.abs(v) % 1) * 60).toFixed(2)}′`;
+  return `${dm(lat)}N ${dm(lon)}W`;
+}
 
 /** A place as the thing you're sailing to: the dials (compass bearing, laylines, range) treat it like a mark. */
 export function destMark(pl: Place | null): CourseMark | null {

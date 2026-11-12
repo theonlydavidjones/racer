@@ -128,6 +128,18 @@ describe('Rule 23 · interfering with another boat', () => {
     expect(pair(red, blue).at(300).foul).toMatchObject({ by: 'Red', rule: '23', part: '23.1' });
   });
 
+  it('23.1: a boat that has retired is no longer racing either: she mustn\'t interfere with one still racing', () => {
+    const red = boat('Red', { at: [0, 0], heading: 45, retired: true }); // port, retired (heading home)
+    const blue = boat('Blue', { at: [3, 3], heading: 315 }); // starboard, racing
+    expect(pair(red, blue).at(300).foul).toMatchObject({ by: 'Red', rule: '23', part: '23.1' });
+    // (Part 2 still applies between them (its preamble: boats that are racing or have been racing): a boat racing on port
+    // keeps clear of a retired one on starboard, as of a finished one)
+    const r1 = boat('Red', { at: [0, 0], heading: 315, retired: true }), b1 = boat('Blue', { at: [-3, 3], heading: 45 });
+    expect(pair(r1, b1).at(300).foul).toMatchObject({ by: 'Blue', rule: '10' });
+    const r2 = boat('Red', { at: [0, 0], heading: 45, retired: true }), b2 = boat('Blue', { at: [3, 3], heading: 315, finished: true });
+    expect(pair(r2, b2).at(300).foul).toBeNull(); // (neither racing: no penalties between them)
+  });
+
   it('two boats that have both finished: no penalties', () => {
     const red = boat('Red', { at: [0, 0], heading: 45, finished: true });
     const blue = boat('Blue', { at: [3, 3], heading: 315, finished: true });
