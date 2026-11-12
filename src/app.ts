@@ -887,7 +887,10 @@ function courseCard(): void {
     const slip = slipById(S.boat.slip), sl = slip ? slipPlace(slip) : null, f = $<HTMLOptionElement>('optSlipFrom'), t = $<HTMLOptionElement>('optSlipTo');
     f.textContent = sl ? `Her slip (${sl})` : 'Her slip (give her one in the Fleet)'; f.disabled = !sl;
     t.textContent = sl ? `Back to her slip (${sl})` : 'Back to her slip (give her one in the Fleet)'; t.disabled = !sl;
-    if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom; ($('sailToSel') as HTMLSelectElement).value = S.sailTo; }
+    if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; }
+    // (the menus show where she'll really start and go: the Fleet's "Sail her" sets her start, and a menu showing anything
+    // else would start her in her slip with another place showing, and choosing that place again changes nothing)
+    ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom ?? 'cityfront'; ($('sailToSel') as HTMLSelectElement).value = S.sailTo ?? '';
   }
   const cruise = S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
