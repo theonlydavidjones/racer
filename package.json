@@ -15,6 +15,7 @@
     "data:wind": "node scripts/fetch-wind-climate.mjs",
     "data:terrain": "node scripts/fetch-terrain.mjs && node scripts/make-land-mask.mjs",
     "data:swell": "node scripts/fetch-swell.mjs",
+    "data:swell-split": "NODE_USE_ENV_PROXY=1 node scripts/fetch-swell-split.mjs",
     "data:charts": "NODE_USE_ENV_PROXY=1 node scripts/fetch-charts.mjs",
     "data:wharf": "NODE_USE_ENV_PROXY=1 node scripts/make-wharf.mjs",
     "data:results": "NODE_USE_ENV_PROXY=1 node scripts/fetch-folkboat-results.mjs",

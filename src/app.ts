@@ -890,7 +890,7 @@ function drawTideGraph(): void {
     rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (an older setting)` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (S.windTurn ? ` (${turnWords(S.windTurn)} from the usual ${compassPoint(b.from - S.windTurn)})` : '')}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
   } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]);
   if (!w.tide) rows.push(['Current', CURRENTS[S.current]?.label ?? S.current]);
-  rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
+  rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate${w.sea.swell.total ? ` (the buoy reads ${Math.round(w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(w.gunUtc * 60000), sp = sunPosition(w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';

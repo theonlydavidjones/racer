@@ -282,7 +282,7 @@ export class World {
     this.traffic = new Traffic(settings.traffic !== 0, seed);
     { // the sea: the day's swell (or the adjuster's), and its chop × the adjuster's
       const sw = this.weather.swell(settings.swellDay ?? 1);
-      this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs } : sw, settings.chop ?? 1);
+      this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs, total: undefined } : sw, settings.chop ?? 1);
       this.sea.duration = this.seaDurationAt(this.clockUtc);
     }
     if (settings.current === 'real') {
