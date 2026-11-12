@@ -307,7 +307,8 @@ export class World {
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
-    for (const b of this.boats) if (!b.docked && !b.handled) settleTrim(b, b.ww.from, b.ww.kt);
+    // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
+    for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
     if (!this.freeSail) this.log = new RaceLog(this);
   }
 
