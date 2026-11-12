@@ -454,11 +454,16 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
 8. ~~**Too much push from rest and through a tack**~~ (done: the drive's shape from the sail model, driveCurve.ts; 1 kt → 90% close-hauled in 6 kt now 50 s; the Delft resistance, below, still to do) (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
-9. **Sail shape and speed** (sails 2, 6): RIG.fullDepth (unsourced) puts ORC's full power at a light-air shape, so the
-   force model never uses full lift upwind and is 17–28% short on a reach; set at the crew's medium-air shape, the speed
-   search starts depowering at 14 kt, where North Sails' guide does (most of the depowering question below). And speed
-   goes as the square root of drive where the resistance goes as v^3–5.6 near hull speed, so trim mistakes cost
-   1.5–2.8× too much.
+9. **Sail shape and speed** (sails 2, 6): ~~speed went as the square root of drive~~ (done, branch sail-shape: a share of
+   the drive is now worth what it is where it meets the hull's resistance, with the sails' drive changing with her speed:
+   dynamics.ts speedForDrive. The effective exponent runs from about 2 in 6 kt to 4.7 near hull speed in 20 kt, so a 20%
+   loss of drive costs 4–6% of speed in a breeze, not 11%; the step, the crew's depowering search, the coach and the
+   debrief all count it the same way). RIG.fullDepth: kept. ORC's own text (VPP Documentation 2022, §5 and after eq.
+   5.48) makes flat = 1 the maximum lift, and its maximum lift the sail at its fullest ("the inability to increase sail
+   camber in light airs" is why a simple rig has less), so full power at the light-air depth is ORC's reading, not an
+   error; no sourced camber figure for a Folkboat (or ORC's flat against camber) was found. Still open from the same
+   reading: ORC's least flat is 0.62 of full lift ("observed in wind tunnel tests"), where the sim's flatOf goes down to
+   0.42 (the fully depowered main, 8% against 14.5%, is 0.55).
 10. **In irons** (hull 3): at rest she turns 4°/s the way the tiller points and sails off; a real boat gathers sternway
    and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
    42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own

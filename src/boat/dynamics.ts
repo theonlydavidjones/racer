@@ -104,6 +104,25 @@ export function drive(v: number, vt: number, k?: DriveCurve): number {
 export const driveFrom = (rvt: number, v: number, _vt: number, k?: DriveCurve): number => rvt * (k ? k(v) : 1);
 
 /**
+ * The speed (m/s) she settles at with K times the drive that holds her at vt: a sheet off its mark, a sail half hoisted,
+ * a flatter shape. Where K × her drive (with `k`, how the sails' drive changes with her speed: driveCurve.ts) meets the
+ * hull's resistance. Near hull speed the resistance climbs as v^3 to v^5.6, so a 10% loss of drive there costs 2–3% of
+ * speed, not the 5% that "speed goes as the square root of drive" (resistance as v²) would make it.
+ */
+export function speedForDrive(vt: number, K: number, k?: DriveCurve): number {
+  if (vt <= 0 || K <= 0) return 0;
+  if (Math.abs(K - 1) < 1e-9) return vt;
+  const rvt = hullResistance(vt);
+  let lo = 0, hi = vt * (K > 1 ? 1.4 : 1);
+  for (let i = 0; i < 20; i++) { const v = (lo + hi) / 2; if (K * driveFrom(rvt, v, vt, k) > hullResistance(v)) lo = v; else hi = v; } // (to 1 ppm of vt)
+  return (lo + hi) / 2;
+}
+/** speedForDrive as a ratio of speeds: what K × the drive is worth at vt (1 at K = 1). */
+export const driveSpeedRatio = (vt: number, K: number, k?: DriveCurve): number => vt > 0.05 ? speedForDrive(vt, K, k) / vt : Math.sqrt(Math.max(0, K));
+/** The effective exponent n of drive against speed at vt (a drive ratio K is worth K^(1/n) in speed, near K = 1). */
+export const driveExponent = (vt: number, k?: DriveCurve): number => vt > 0.05 ? Math.log(0.95) / Math.log(speedForDrive(vt, 0.95, k) / vt) : 2;
+
+/**
  * Air drag (N) against forward motion when the sails aren't drawing: rig windage plus flogging sails.
  * `flog` is 0..1, how much the sails are flogging (1 when luffing or head to wind). `hoisted` 0..1: how much of her sail
  * is up (the area's share). The flogging cloth is no more than is hoisted; the rig's windage counts as far as the sails

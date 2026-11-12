@@ -3,7 +3,7 @@ import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
-import { HANDLING, HULL, airDrag, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, surgeAccel } from './dynamics';
+import { HANDLING, HULL, airDrag, driveExponent, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveRatio } from './driveCurve';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
@@ -227,17 +227,25 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const vAt = polar(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), plan), lwNow = lwAt(vAt);
   b.leeway = b.leeway == null ? lwNow : b.leeway + (lwNow - b.leeway) * Math.min(1, dt / 3);
   const vPolar = vAt;
-  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * heelWettedFactor(vPolar, b.heelMag!, crewBestHeel(Math.min(180, twa + b.leeway), ww.kt)) * Math.sqrt(clothFill(ap.aws, b.heelMag!));
-  if (b.luff) target *= luffDriveFactor(twa);
-  // Drive scales with trim efficiency; speed with roughly the square root of drive.
-  else target *= Math.sqrt((b.trimDriveK ?? trimDrive(b.trim.main, b.trim.jib)) * b.shape.eff * wornDrive) * powerFactor(b, jibOn, Math.min(180, twa + b.leeway), ww, disp, dt, plan); // (at her course's angle, as the polar: the search's wind triangle is the course's) // sheet angles, the sails' shape, worn cloth; flattened more (or less) than the polar's crew needs
-  if (hm < 1 || hj < 1) {
-    // part of the sail plan up: speed with roughly the square root of the drive, which goes with the area hoisted
+  // the hull's side of her speed (heel, weight, fore-and-aft trim, the heeled hull's wetted area), as speed factors
+  let target = vPolar * heelFactor(b.heelMag!) * displacementFactor(disp, ww.kt) * trimSpeedFactor(vPolar, cs.trim, b.seaShare ?? 0) * heelWettedFactor(vPolar, b.heelMag!, crewBestHeel(Math.min(180, twa + b.leeway), ww.kt));
+  // and the sails' side, as a share of the drive: the cloth filling, the sheets, the sails' shape, worn cloth, how hard
+  // they're driven against the polar's crew (powerFactor), how much of the sail plan is up. What a share of the drive is
+  // worth in speed is where that drive meets the hull's resistance (dynamics.ts speedForDrive), with the sails' drive
+  // changing with her speed as the apparent wind does (driveCurve.ts)
+  let K = clothFill(ap.aws, b.heelMag!);
+  if (!b.luff) K *= (b.trimDriveK ?? trimDrive(b.trim.main, b.trim.jib)) * b.shape.eff * wornDrive * powerFactor(b, jibOn, Math.min(180, twa + b.leeway), ww, disp, dt, plan); // (at her course's angle, as the polar: the search's wind triangle is the course's)
+  const partUp = hm < 1 || hj < 1;
+  if (partUp) {
+    // part of the sail plan up: the drive goes with the area hoisted
     const je = jibEfficiency(plan, twa), full = SAIL_AREA.main + SAIL_AREA.jib * je, up = SAIL_AREA.main * hm + SAIL_AREA.jib * je * hj;
-    target *= full > 0 ? Math.sqrt(up / full) : 0;
-    // under bare poles she still drifts off downwind on the windage of her hull and rig (about a tenth of the wind)
-    target = Math.max(target, 0.1 * ww.kt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)));
+    K *= full > 0 ? up / full : 0;
   }
+  const crs = Math.min(180, twa + (b.leeway ?? 0)), vB = target;
+  target = speedForDrive(vB, K, u => driveRatio(ww.kt, crs, u, vB));
+  if (b.luff) target *= luffDriveFactor(twa); // (luffing: HANDLING's calibrated slowing, on the speed)
+  // under bare poles she still drifts off downwind on the windage of her hull and rig (about a tenth of the wind)
+  if (partUp) target = Math.max(target, 0.1 * ww.kt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)));
   if (b.penalty > 0) target *= 0.7;
   const beat = beatAngle(ww.kt);
   // holding a lot of helm to keep her straight is a brake (the steady helm the sails demand; turning has its own cost)
@@ -503,7 +511,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  * Done twice a second: for the polar's standard crew (the reference: a boat sailed as the polar sails it), and for her
  * own crew as they are (how many, how heavy, how tired), whose fastest step the crew then works toward (trimSails).
  * (Once a second.)
- * The speed factor is the square root of her push, with her sails as they are, against the polar crew's.
+ * Returned as a share of the drive: her push, with her sails as they are, against the polar crew's (the step turns it into speed).
  */
 function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; shape: Shape } | null, twa: number, ww: { from: number; kt: number }, disp: number, dt: number, plan: SailPlan): number {
   // (the crew set their depowering for the breeze, not for each gust, which they ride out by easing and hiking: the wind
@@ -523,8 +531,10 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
   // counted once, in the step's trimDrive) and her own heel; her heel's cost to the hull is in the target already
   // (heelFactor), and her rudder's drag acts on her as a force in the step
   // (the polar has the polar crew's heel in it already: her speed is the polar's times heelFactor(hers) / heelFactor(theirs))
-  const dNow = sailPush(tws, twa, plan, b.shape.main, jibOn ? jibOn.shape : null, b.heelMag ?? 0, b.depower ?? 0), dRef = ref.p * heelFactor(ref.h) ** 2;
-  b.powerK = dRef > 1 ? clamp(Math.sqrt(Math.max(0, dNow) / dRef), 0.5, 1.05) : 1;
+  // (as shares of the drive: the polar crew's heel factor, a speed factor, is worth its n-th power in drive, n the
+  // exponent of drive against speed there, dynamics.ts driveExponent)
+  const dNow = sailPush(tws, twa, plan, b.shape.main, jibOn ? jibOn.shape : null, b.heelMag ?? 0, b.depower ?? 0), dRef = ref.p * heelFactor(ref.h) ** ref.n;
+  b.powerK = dRef > 1 ? clamp(Math.max(0, dNow) / dRef, 0.25, 1.1) : 1;
   return b.powerK;
 }
 /** The fastest depowering step for her own crew as they are (how many, how heavy, how tired), in this wind. */
@@ -557,7 +567,7 @@ const intendedForces = (m: Shape, j: Shape | null, aws: number, awa: number, mai
  * Returns the step, her heel there, the push and the speed it's worth. (It depends on nothing else about the boat, so
  * it's cached: by a knot, 2°, 20 kg, 10 kg of crew and 100 N·m of hiking.)
  */
-interface StepPick { d: number; h: number; p: number; speed: number }
+interface StepPick { d: number; h: number; p: number; speed: number; n: number }
 const stepCache = new Map<string, StepPick>();
 function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crewKg: number, crewM: number, bestHeel: number, sitM: number): StepPick {
   // (worked out from the rounded values themselves, so the answer doesn't depend on which boat asked first)
@@ -567,6 +577,8 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
   const hit = stepCache.get(key); if (hit) return hit;
   if (stepCache.size > 20000) stepCache.clear();
   const vP = Math.max(0.3, polar(tws, twa, plan)), jibOn = plan === 'jib';
+  // (speed from push where the push meets the hull's resistance: near K = 1 a share K of the drive is worth K^(1/n) in speed)
+  const n = driveExponent(vP, u => driveRatio(tws, twa, u, vP));
   const wind = (heel: number) => sailWind(0, tws, -twa, vP, 0, heel), awa = wind(0).awa;
   // the sails as the crew sets them at each step (controls.ts crewShapes)
   const jibAng = optimalSheet('jib', awa);
@@ -593,7 +605,7 @@ function fastestStep(tws: number, twa: number, plan: SailPlan, dsp: number, crew
     // (and the rudder held over against her weather helm: North Sails' Folkboat guide eases the traveller in a breeze "to
     // decrease heel and thus rudder pressure", and pulls the backstay "until the rudder feels light again")
     const helm = clamp(helmNeeded(r, h, out, vP, r.ceh), -12, 12), p = netDrive(r, h, vP);
-    return { d, h, p, speed: Math.sqrt(Math.max(0, p - rudderDrag(helm, vP))) * heelFactor(h) };
+    return { d, h, p, n, speed: Math.max(0, p - rudderDrag(helm, vP)) ** (1 / n) * heelFactor(h) };
   };
   const seen: StepPick[] = [], pick = (d: number) => { const t = sailAt(d); seen.push(t); return t; };
   let top = pick(0);

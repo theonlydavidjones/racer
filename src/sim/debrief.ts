@@ -4,6 +4,7 @@ import type { Boat } from '../boat/boat';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { heelFactor } from '../boat/balance';
 import { trimDrive } from '../boat/trim';
+import { driveSpeed } from '../boat/coach';
 import type { World } from './world';
 
 /**
@@ -200,7 +201,7 @@ export class RaceLog {
     this.heel.lost += dt * heelK; if ((u.heelMag ?? 0) > 22) this.heel.t += dt;
     this.spell(w, 'heel', heelK > 0.001, dt * heelK, u.heelMag ?? 0);
     const byHandTrim = (byHand(u, 'mainsheet') || byHand(u, 'jibsheet')) && !u.luff && !u.hove;
-    const trimK = byHandTrim ? 1 - Math.sqrt(clamp(trimDrive(u.trim.main, u.trim.jib) * u.shape.eff, 0, 1)) : 0;
+    const trimK = byHandTrim ? 1 - driveSpeed(u, clamp(trimDrive(u.trim.main, u.trim.jib) * u.shape.eff, 0, 1)) : 0;
     this.trim.lost += dt * trimK;
     this.spell(w, 'trim', trimK > 0.001, dt * trimK);
     // shifts, on a beat: on a header (against the mean wind), the other tack would be lifted

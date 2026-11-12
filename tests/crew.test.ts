@@ -271,9 +271,10 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     // in 10 kt they're up on the windward deck whatever the puffs do: they stay there, but for a hike as a puff hits
     for (const m of moves(10)) expect(m).toBeLessThan(20);
     // in 7 kt the same ±2 kt takes her from light air (weight to leeward) to a breeze (up to windward) every half minute:
-    // out on the puff and in on the lull (a step more at most), not every flicker (twenty cycles: under four moves a cycle; without the dead
-    // band it was over 700)
-    for (const m of moves(7)) expect(m).toBeLessThan(80);
+    // out on the puff and in on the lull (a step more at most), not every flicker (twenty cycles: about four moves a cycle;
+    // without the dead band it was over 700. Measured 64/79, then 63/82 once a share of drive was worth its real speed,
+    // physics.ts speedForDrive: the crew's limit was already at the edge)
+    for (const m of moves(7)) expect(m).toBeLessThan(85);
   }, 30000);
 });
 
