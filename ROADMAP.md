@@ -80,7 +80,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - ~~**Now — crew buttons fight auto**~~ (done, v82): "If auto is on and I click 'Hike' or anything else, Auto seems to stay
   on, and the crew doesn't stay hiked out." Picking a crew position should take the crew off auto, as the sail lines do
   (one line off auto, one tap back), and hold until changed.
-- **Now — the cockpit sole and companionway** (bug + accuracy; 2–4 h; Boat Detail; the first try, live in v86 (PR #39), was rejected by the owner: an orange cube aft, an orange disc forward on the cabin top, the doorway misunderstood, lines across the hatch; Boat Detail rolls it back and redoes it after the usage reset): water shows through the cockpit sole, and it's
+- ~~**Now — the cockpit sole and companionway**~~ (done, redone by v108: open or closed in the boat editor, panelled doors, hinges and latch; bug + accuracy; 2–4 h; Boat Detail; the first try, live in v86 (PR #39), was rejected by the owner: an orange cube aft, an orange disc forward on the cabin top, the doorway misunderstood, lines across the hatch; Boat Detail rolls it back and redoes it after the usage reset): water shows through the cockpit sole, and it's
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
@@ -127,7 +127,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
   sides on both tacks.
-- **Now — push off doesn't get her out of the slip** (bug; 2–3 h; in progress: Marinas, with a test over every slip): "push off action is still not getting me far
+- ~~**Now — push off doesn't get her out of the slip**~~ (done, by v96; bug; 2–3 h; Marinas, with a test over every slip): "push off action is still not getting me far
   enough into the fairway of any marina to be able to get out of the slip. also, push off should move me forward if
   I'm at a dock that doesn't require me to be nosed in." Today (geo/marina.ts planPushOff) every berth is treated as
   bow-in: the crew walks her back until her bow is level with the finger's end, swings her and shoves, and she stops
