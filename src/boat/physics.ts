@@ -489,7 +489,11 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  * The speed factor is the square root of her push, with her sails as they are, against the polar crew's.
  */
 function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; shape: Shape } | null, twa: number, ww: { from: number; kt: number }, disp: number, dt: number, plan: SailPlan): number {
-  const tws = ww.kt;
+  // (the crew set their depowering for the breeze, not for each gust, which they ride out by easing and hiking: the wind
+  // they judge it by is hers over the last 20 s or so; the gusts reach the boat through her sails' forces and heel)
+  b.twsSlow = b.twsSlow == null ? ww.kt : b.twsSlow + (ww.kt - b.twsSlow) * Math.min(1, dt / 20);
+  b.twaSlow = b.twaSlow == null ? Math.abs(twa) : b.twaSlow + (Math.abs(twa) - b.twaSlow) * Math.min(1, dt / 20);
+  const tws = b.twsSlow; twa = b.twaSlow;
   b.powerT = (b.powerT ?? 0) - dt;
   if (b.powerK != null && b.powerT > 0) return b.powerK;
   b.powerT = 1; // (once a second: her sails' power changes slowly)
