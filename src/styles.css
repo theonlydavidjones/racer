@@ -467,6 +467,32 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief li p{font-size:14px}
 .debrief .dbTip{color:var(--muted)}
 
+/* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */
+#raceReplay{z-index:30}
+.rrPanel{max-width:1320px}
+.rrHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rrHead .ghost{flex:0 0 auto}
+.rrGrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.rrMain{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rrCanvas{width:100%;height:min(62vh,640px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.rrTime{width:100%;height:50px;display:block;cursor:pointer;touch-action:none}
+.rrBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rrBtn{padding:8px 12px;font-size:13px}
+.rrPlay{min-width:84px}
+.rrSpeed{flex:0 0 auto}
+.rrSpeed button{padding:7px 10px}
+.rrClock{margin-left:auto;font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--muted)}
+.rrCaption{display:flex;gap:10px;align-items:center;min-height:40px;font-size:14px;line-height:1.4}
+.rrCaption .dbLost{font:600 13px/1 var(--f-inst);color:var(--accent);margin-left:4px}
+.rrCaption .ghost{margin-left:auto;flex:0 0 auto}
+.rrNo{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;margin-right:8px;
+  color:#0c2534;font:700 12px/1 var(--f-inst);flex:0 0 auto}
+.rrList{max-height:calc(62vh + 120px);overflow-y:auto;border-top:0;padding-top:0}
+.rrList li{border:1px solid transparent;border-radius:8px;padding:6px 8px}
+.rrList li.rrPick{cursor:pointer}
+.rrList li.rrPick:hover,.rrList li.rrPick:focus-visible{border-color:var(--rule);background:rgba(150,196,218,.05);outline:0}
+.rrList li.on{border-color:var(--accent)}
+
 /* the race committee's choice of course */
 .coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
 .coursecard .rcpick b{font:600 14px/1.2 var(--f-inst);color:var(--accent)}

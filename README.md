@@ -133,6 +133,8 @@ When you finish, the results show **what cost you time, most first**, in seconds
 
 Only items worth two seconds or more are listed.
 
+**Watch your race** (on the results, or *Watch your race so far* when paused) opens the race replay (`src/replay/raceReplay.ts`): your whole race from overhead, wind up, every boat's track (recorded once a second from 30 s before the gun). Each place the debrief says cost you time is a stretch of your track in that finding's colour, with its number from the list, and a bar on the timeline below (as long as it lasted, as tall as it cost). Pick a finding, a bar, or ◀ ▶ to jump there: it closes in on you and plays it from 10 s before, with a line on what happened. Rule incidents are on it too (red, "!"), with their close-up. Play at 10×, 30× or 60×, drag the timeline to scrub, or switch between the whole course and following you.
+
 ### Rules
 
 Checked against the official 2025–2028 rulebook (World Sailing, with changes and corrections, July 2025). Implemented: 10, 11, 12, 13 (including two boats tacking at once), 15, 16.1, 16.2, 17, 18.1(a), 18.2(a) to (d), 18.3, 18.4, 19, 20 (hail, "You tack" reply, and the hailing boat tacking after the response), 21.1, 21.2, 21.3, 23, 31 (including the committee boat), 43.1(a) and 44.1(a), plus a right-of-way boat forced to swerve (14). Rule numbers follow the 2025 edition: returning to start and taking a penalty are now 21.1 and 21.2 (they were 22.1 and 22.2), and mark-room at the zone is 18.2(a), which ends under 18.2(b) when the entitled boat passes head to wind or leaves the zone.
