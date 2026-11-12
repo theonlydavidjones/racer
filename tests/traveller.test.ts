@@ -18,13 +18,14 @@ describe('The traveller (owner, 12 Nov 2026: "releasing it is very rapid; pullin
   it('eased to leeward it runs end to end in about a second', () => {
     expect(run(10, 1)).toBeLessThan(1.3);
   });
-  it('hauled to windward it takes a few seconds, and longer in a breeze', () => {
-    const light = run(8, -1), breeze = run(20, -1);
-    expect(light).toBeGreaterThan(2); expect(light).toBeLessThan(4);
+  it('hauled to windward it is a little slower: under two seconds in light air, a few in a breeze', () => {
+    const light = run(5, -1), breeze = run(20, -1);
+    expect(light).toBeGreaterThan(1.2); expect(light).toBeLessThan(2);
     expect(breeze).toBeGreaterThan(light);
-    expect(breeze).toBeLessThan(7);
+    expect(breeze).toBeLessThan(4);
   });
-  it('easing is always quicker than hauling', () => {
-    for (const tws of [3, 10, 18, 28]) expect(travellerRate(true, tws)).toBeGreaterThan(travellerRate(false, tws) * 2);
+  it('easing is always quicker than hauling, and hauling slows as the breeze builds', () => {
+    for (const tws of [3, 10, 18, 28]) expect(travellerRate(true, tws)).toBeGreaterThan(travellerRate(false, tws));
+    expect(travellerRate(false, 18)).toBeLessThan(travellerRate(false, 6));
   });
 });
