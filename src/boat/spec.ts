@@ -30,7 +30,12 @@ export interface BoatSpec {
   /** The colour her name is lettered in on the cabin sides ('' or absent: one that stands out). */
   nameColor?: string;
   /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
-  sails: { country: string; number: string; color: 'white' | 'black' };
+  sails: {
+    country: string; number: string; color: 'white' | 'black';
+    /** The sail numbers' and national letters' colour, and the class insignia's (the F): absent, the ink that contrasts
+     * with the cloth (RRS Appendix G); the insignia absent, like the numbers. */
+    numberColor?: string; insigniaColor?: string;
+  };
   /** (Older saves: chosen flags. Now her club gives the burgee and her country the ensign; officers' flags go with skippers.) */
   flags?: { burgee?: string; ensign?: string; special?: string };
   // her particulars: who she belongs to and where she lives (they rarely change)
@@ -142,6 +147,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
   }
   spec.sails.number = String(spec.sails.number).replace(/\D/g, '').slice(0, 5) || d.sails.number;
+  for (const k of ['numberColor', 'insigniaColor'] as const) if (spec.sails[k] != null && !/^#[0-9a-f]{6}$/i.test(String(spec.sails[k]))) delete spec.sails[k];
   spec.perf.cleanedWeeks = Math.max(0, Math.min(26, Math.round(Number(spec.perf.cleanedWeeks) || 0)));
   spec.perf.gearKg = Math.max(0, Math.min(400, Number(spec.perf.gearKg) || 0));
   if (spec.perf.tune) spec.perf.tune = fixTune(spec.perf.tune); // (absent: the guide's tune for the wind, rigTune.ts)

@@ -278,7 +278,7 @@ export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood
 const WOOD: Build = { hull: 'wood', spars: 'wood' };
 
 /** How a boat looks: hull topsides, boot stripe, bottom paint, deck, and the name on her quarters (if shown). */
-export interface Paint { deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** her navigation lights under sail */ navLights?: 'deck' | 'tricolour'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic'; /** the companionway open or shut */ companionway?: 'open' | 'closed'; /** the colour her name is lettered in (else one that stands out on the cabin side) */ nameColor?: string }
+export interface Paint { /** the sail numbers' and the class insignia's colours, when chosen (spec.ts) */ numberColor?: string; insigniaColor?: string; deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** her navigation lights under sail */ navLights?: 'deck' | 'tricolour'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic'; /** the companionway open or shut */ companionway?: 'open' | 'closed'; /** the colour her name is lettered in (else one that stands out on the cabin side) */ nameColor?: string }
 export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
   // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom

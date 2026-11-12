@@ -708,7 +708,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // Appendix G), each side its own picture so the numbers read the right way round from both sides
   // Each side of the cloth has its own picture, by which way it faces (the sail mesh is mirrored to the boom's side,
   // which swaps the faces: syncBoatMesh puts the right picture on each face)
-  const pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true), mainPort: sailTexture(b.sailColor, b.no, 'port', true), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
+  const inks = { no: b.paint?.numberColor, f: b.paint?.insigniaColor }, pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true, inks), mainPort: sailTexture(b.sailColor, b.no, 'port', true, inks), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
   const sm = (side: 'front' | 'back', map: THREE.Texture) => new THREE.MeshLambertMaterial({
     map, side: side === 'front' ? THREE.FrontSide : THREE.BackSide, transparent: b.isUser, opacity: b.isUser ? 0.86 : 1
   });
@@ -758,12 +758,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   }
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; rig.add(pole);
-  // ... and stowed when it isn't: on the foredeck, a little to starboard of the centreline, from abreast the mast
-  // forward, in two deck chocks (the usual place on a small keelboat without lifelines, clear of the jib's tack)
+  // ... and stowed when it isn't: flat on a side deck in two chocks, from near the bow aft
   const stowed = new THREE.Group();
-  // (on a side deck, port or starboard as her owner keeps it, flat, just inboard of the toe rail, alongside the cabin)
+  // (on a side deck, port or starboard as her owner keeps it, flat, just inboard of the toe rail)
   { const side = (b.paint?.poleSide ?? 'port') === 'starboard' ? 1 : -1;
-    const z0 = -1.35, z1 = 0.72, xAt = (z: number) => side * (halfBeam(uAtZ(z)) - 0.11), yAt = (z: number) => deckY(uAtZ(z), Math.abs(xAt(z))) + 0.024;
+    // (2.85 m long: Theis Palm, North Sails' Folkboat talk to the Finnish class, 2023, "Whisker 'Jib' pole is 2,85 m";
+    // stowed well forward, its fore end near the bow, as the owner has it on Josephine)
+    // (just aft of the forestay, 0.22 m in from the side: clear of the forehatch, inboard of the shrouds' chainplates, and
+    // about 8 cm off the cabin's side at its after end)
+    const z0 = -L / 2 + 0.9, z1 = z0 + 2.85, xAt = (z: number) => side * (halfBeam(uAtZ(z)) - 0.22), yAt = (z: number) => deckY(uAtZ(z), Math.abs(xAt(z))) + 0.024;
     const a = new THREE.Vector3(xAt(z0), yAt(z0), z0), c = new THREE.Vector3(xAt(z1), yAt(z1), z1), len = a.distanceTo(c);
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT);
     sp.position.copy(a).lerp(c, 0.5); sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize()); stowed.add(sp);
@@ -1154,7 +1157,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
  */
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
-function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean): THREE.CanvasTexture {
+function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
   // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
   // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture
@@ -1241,14 +1244,15 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
         x += widths[k] + 0.06;
       }
     };
-    const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
+    // (the numbers' ink: the colour chosen on the Boat page, or the one that contrasts with the cloth; the F like the numbers unless chosen)
+    const ink = inks.no ?? (dark ? '#f2f2ee' : '#1c2128'), fInk = inks.f ?? ink, letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
     // each side carries its own: the F up near the head and the numbers below, the starboard set higher (RRS G1.3);
     // this side's reads crisply, the other side's shows through the cloth mirrored, a little softer
     const set = (s: 'stbd' | 'port', alpha: number) => {
       const mir = s === 'stbd';
       const hi = s === 'stbd', fT = hi ? 0.835 : 0.765, nT = hi ? 0.665 : 0.565, step = 0.42 / LUFF;
       g.globalAlpha = alpha;
-      figures('F', fT, ink, mir); // the class insignia, in the same ink as the numbers (as on San Francisco boats' sails)
+      figures('F', fT, fInk, mir); // the class insignia (by default in the same ink as the numbers, as on San Francisco boats' sails)
       if (letters) figures(letters, nT, ink, mir);
       figures(digits, nT - (letters ? step : 0), ink, mir);
       g.globalAlpha = 1;
