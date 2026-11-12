@@ -121,13 +121,13 @@ export class SignalMast {
       m.position.set(SLOT[f] * 1.4, s.y, 0);
       m.rotation.y = toward + Math.PI / 2; // the fly streams downwind
       const p = m.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array;
-      for (let i = 0; i < a.length; i += 3) { const x = s.base[i]; a[i + 2] = Math.sin(x * 2.4 - t * 5 + SLOT[f]) * 0.07 * x; }
+      for (let i = 0; i < a.length; i += 3) { const x = s.base[i]; a[i + 2] = Math.sin(x * 3.2 - t * 9 + SLOT[f]) * 0.12 * x; }
       p.needsUpdate = true;
     }
     this.course.forEach(({ mesh, base }, i) => {
       mesh.rotation.y = toward + Math.PI / 2;
       const p = mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array;
-      for (let k = 0; k < a.length; k += 3) { const x = base[k]; a[k + 2] = Math.sin(x * 2.6 - t * 5.5 + i) * 0.06 * x; }
+      for (let k = 0; k < a.length; k += 3) { const x = base[k]; a[k + 2] = Math.sin(x * 3.6 - t * 10 + i) * 0.1 * x; }
       p.needsUpdate = true;
     });
   }
