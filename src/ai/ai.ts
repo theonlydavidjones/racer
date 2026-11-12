@@ -1,5 +1,5 @@
 import type { PrepFlag } from '../sim/signals';
-import { bow, type Boat } from '../boat/boat';
+import { bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatFor, targetFor } from '../boat/seaway';
@@ -313,8 +313,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on). On
       // the course side already (she crossed an extension of the line, or drifted over doing her turns at the gun), she
       // isn't started: back below the line first, then up across it between the ends (RRS Definitions, Start)
-      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half), above = w.lineD(b) > 0;
-      P = { x: w.center.x + N.x * (above ? -18 : 10) + L.x * a, y: w.center.y + N.y * (above ? -18 : 10) + L.y * a }; void along;
+      // (her whole hull below, bow and stern, as the Definition asks; latched until she starts, so she doesn't turn back
+      // up the moment her middle is below with her stern still over)
+      if (Math.max(w.lineD(bow(b)), w.lineD(stern(b))) < 0) ai.belowSinceGun = true;
+      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half), down = !ai.belowSinceGun;
+      P = { x: w.center.x + N.x * (down ? -18 : 10) + L.x * a, y: w.center.y + N.y * (down ? -18 : 10) + L.y * a }; void along;
     }
     else {
       P = aimPoint(w, b);
