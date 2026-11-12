@@ -27,8 +27,6 @@ export interface RulesBoat {
   headingAgo?: number;
   /** She is sailing above her proper course (for Rules 17 and 23). Omit if unknown. */
   aboveProper?: boolean;
-  /** She is sailing well below her proper course, farther from the wind than it (for Rule 23.2). Omit if unknown. */
-  belowProper?: boolean;
   /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
   backing?: boolean;
   /** She has finished (crossed the finishing line). */
@@ -124,13 +122,6 @@ export interface PairRecord {
    * called, or it goes stale) before the hailing boat has tacked and got clear.
    */
   r202e: { hailer: number; at: number } | null;
-  /** No new rule 23 blanketing call for this pair until this time (its own, so it doesn't stop contact or a hail being judged). */
-  blanketCool: number;
-  /**
-   * Rule 23, interference by taking a boat's wind: how long (s) each boat has been blanketing the other (keyed by the
-   * id of the boat doing it), and how the blanketing began (her turn just before, for 23.2's proper course).
-   */
-  blanket: Record<number, { since: number; turned: number; boreAway?: number }>;
 }
 
 /** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */
@@ -160,12 +151,11 @@ export interface Hail {
 }
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null, blanketCool: -Infinity, blanket: {} });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 
-/** 'blanket': she took the other boat's wind (Rule 23's interference without contact). */
-export type IncidentKind = 'contact' | 'swerve' | 'hail' | 'blanket';
+export type IncidentKind = 'contact' | 'swerve' | 'hail';
 export interface Incident<B> {
   kind: IncidentKind;
   fouler: B;

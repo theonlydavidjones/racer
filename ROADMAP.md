@@ -103,16 +103,11 @@ What's planned, roughly in order. Done work is described in the README.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
-6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
-   Built on branch rules-finish (PR pending, not yet published): 20.2(e) holds until the hailer has tacked and kept
-   clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
-   20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
-   the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
-   Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
-   away below her proper course to blanket.
-   Rule 21.1 widened (branch rules-21-1): any boat sailing back to start, latched until her hull is below the line;
-   Rule 15 grace when she gets back. Noticed in review, not fixed: a not-started AI boat beyond an end of the line at the
-   gun (not OCS) aims for a point on the course side and never starts (ai.ts, the !b.started branch).
+6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
+   obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
+   Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
+   (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
+   tactical fact in the debrief ("in X's dirty air"); rule 23 is called for getting in a boat's way only.
 7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
    far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
    a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
@@ -121,8 +116,8 @@ What's planned, roughly in order. Done work is described in the README.
    ending the cruise; Home: back to her slip when cruising, retire and head home when racing). The showroom's own time
    of day and conditions are done too.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
-   11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by; 23.2
-   catches a boat that bore away well below her proper course (20°+) onto the wind of a boat on another leg.
+   11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
+   (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
@@ -714,7 +709,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~Afternoon westerly~~ (done: NOAA wind records by month and hour, the slot, shore effect, drifting puffs and lulls shown on the water). ~~Winter winds~~ (done: westerly, northerly, southerly and light days by their frequency in the records). ~~Real wind for a past race day~~ (done: observed every 6 minutes since 2021) and ~~the forecast~~ (done: NWS, refreshed daily). ~~The wind across the course~~ (done: the NWS grid for forecasts; station-nudged terrain model for past days). Later: the AI sailing to the pressure; a gridded observed analysis (NOAA's URMA) for past days.
 - ~~**Wind shadows**~~ (done: boats' dirty air, ships, the committee boat, the lee of the land). Later: wakes laid down as markers and carried by the wind (so a wake stays where a boat tacked); the AI choosing a clear-air hole on the line; the wind bending round the islands and speeding up on their flanks.
 - ~~**Race debrief**~~ (done: what cost you time, ranked, with tips). ~~Show each item on the replay~~ (done, v127). Later: compare against the boat that won.
-- ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: wind shadow (blanketing), which Rule 23 interference and real tactics both need; 19 with a boat as the obstruction; 20.3; backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
+- ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.

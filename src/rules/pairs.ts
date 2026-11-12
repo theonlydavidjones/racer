@@ -150,13 +150,6 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   return after < before - 5 ? Math.abs(turn) : 0;
 }
 
-/** How far (deg) she bore away (turned farther off the wind she's in) over the last RULE16_WINDOW seconds; 0 if she didn't. */
-function boreAwayBy(b: RulesBoat, ctx: RulesContext): number {
-  if (b.headingAgo == null) return 0;
-  const wf = windOf(b, ctx);
-  return Math.max(0, Math.abs(wrap(wf - b.h)) - Math.abs(wrap(wf - b.headingAgo)));
-}
-
 /** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
 function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
   if (b.headingAgo == null || b.tack !== 'S') return false;
@@ -167,42 +160,10 @@ function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
 export interface PairObservation {
   /** A right-of-way boat had to change course to avoid the other boat (Rule 14 / "forced to swerve"). */
   swerve: boolean;
-  /**
-   * How much of each boat's wind the other is taking (Rule 23): the fraction of the wind speed missing at B because of
-   * A's sails (`byA`), and at A because of B's (`byB`). From the caller's wind-shadow model; omitted, none.
-   */
-  blanket?: { byA: number; byB: number };
 }
-
-/**
- * Rule 23: a wind shadow taking this much of a boat's wind speed is interference: the sails' drive goes with the square
- * of the wind speed, so 12% less wind is about a quarter less drive. (environment/shadows.ts: a close-hauled Folkboat's
- * wake takes 10–15% two lengths downwind of her, a running one's much more.)
- */
-export const BLANKET_K = 0.12;
-/** Rule 23: blanketing held this long (s) is interference, not a boat passing through another's wind on her way by. */
-export const BLANKET_TIME = 8;
 
 /** Not racing (Definitions, Racing: a boat races "until she finishes and clears the finishing line and marks or retires"). */
 export const notRacing = (b: RulesBoat): boolean => !!b.retired || (!!b.finished && (b.cleared ?? true));
-
-/**
- * Rule 23: could `X` be breaking rule 23 by taking `Y`'s wind? Only between these boats:
- * 23.1, X is not racing (she has finished) and Y is;
- * 23.2, Y is taking a penalty, on another leg, or returning to start under rule 21.1 (`returning`), and X is not
- * sailing her proper course (after the starting signal she may sail it whatever it does to Y's wind): she is above it,
- * or well below it (and, blanketing() adds, bore away onto Y's wind to get there). Before the start there is no proper
- * course to judge interference by, and the sim only calls 23.2 blanketing it can tell was deliberate, so not then.
- */
-export function blanketRule<B extends RulesBoat>(X: B, Y: B, ctx: RulesContext): '23.1' | '23.2' | null {
-  if (Y.finished || notRacing(Y)) return null;
-  if (notRacing(X)) return '23.1';
-  if (X.finished) return null; // just over the line, still clearing it, she is racing
-
-  if (ctx.t <= 0 || !X.started || !(X.aboveProper || X.belowProper)) return null;
-  const vulnerable = Y.penalty > 0 || returning(Y) || (Y.started && Y.leg !== X.leg);
-  return vulnerable ? '23.2' : null;
-}
 
 export interface PairAssessment<B> { verdict: Verdict<B>; incident: Incident<B> | null }
 
@@ -318,7 +279,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   let kind: 'contact' | 'swerve' | null = null;
   if (gap < CONTACT_GAP) kind = 'contact';
   else if (obs.swerve) kind = 'swerve';
-  if (!kind) return { verdict: r, incident: blanketing(rec, A, B, ctx, obs, r) };
+  if (!kind) return { verdict: r, incident: null };
 
   // boats that have both finished (or retired) aren't racing: no penalties between them
   const done = (b: typeof A) => b.finished || !!b.retired;
@@ -351,34 +312,6 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     fouler = row; rule = '17';
   }
   return { verdict: r, incident: { kind, fouler, rule, byWhy, turned, part, verdict: r } };
-}
-
-/**
- * Rule 23: interference without contact, by taking the other boat's wind. Rule 23.1 forbids a boat not racing to
- * interfere with one racing, if reasonably possible; 23.2 forbids interfering with a boat taking a penalty, sailing on
- * another leg or subject to rule 21.1, except by sailing her proper course after the start (RRS 2025–2028).
- * "Interfere" isn't defined in the rules, and World Sailing's cases (Case 149) only show it as forcing a boat to change
- * course; no case or call rules on wind shadow either way. Taking a boat's wind slows her as surely as making her
- * luff, so the sim counts it too (the owner's call, ROADMAP item 6): an interpretation, not settled law. It is called
- * when one boat's wind shadow has taken BLANKET_K of the other's wind speed for BLANKET_TIME seconds while
- * blanketRule says rule 23 protects her.
- */
-function blanketing<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation, r: Verdict<B>): Incident<B> | null {
-  if ((notRacing(A) && notRacing(B)) || ctx.t < rec.blanketCool) { rec.blanket = {}; return null; }
-  for (const [X, Y, k] of [[A, B, obs.blanket?.byA ?? 0], [B, A, obs.blanket?.byB ?? 0]] as const) {
-    const part = k >= BLANKET_K ? blanketRule(X, Y, ctx) : null;
-    if (!part) { delete rec.blanket[X.id]; continue; }
-    const bl = rec.blanket[X.id] ??= { since: ctx.t, turned: turnedToward(X, Y), boreAway: boreAwayBy(X, ctx) };
-    // below her proper course, the sim calls 23.2 only if she bore away onto Y's wind. Rule 23.2 itself asks only that
-    // she not be sailing her proper course; this is the sim's guard against its own rough estimate of that course
-    // (world.ts properTwa), so a boat sailing low for her own reasons (footing, a crab for the tide) isn't called.
-    // Above it, any blanketing counts.
-    if (part === '23.2' && !X.aboveProper && (bl.boreAway ?? 0) < RULE16_MIN_TURN) continue;
-    if (ctx.t - bl.since < BLANKET_TIME) continue;
-    rec.blanket = {}; rec.blanketCool = ctx.t + INCIDENT_COOLDOWN;
-    return { kind: 'blanket', fouler: X, rule: '23', byWhy: null, part, turned: bl.turned || undefined, verdict: r };
-  }
-  return null;
 }
 
 /**
