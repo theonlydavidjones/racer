@@ -490,17 +490,17 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
  */
 function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; shape: Shape } | null, twa: number, ww: { from: number; kt: number }, disp: number, dt: number, plan: SailPlan): number {
   // (the crew set their depowering for the breeze, not for each gust, which they ride out by easing and hiking: the wind
-  // they judge it by is hers over the last 20 s or so; the gusts reach the boat through her sails' forces and heel)
+  // speed they judge it by is hers over the last 20 s or so; her heading they know at once. Her sails against the
+  // polar's crew are weighed in the wind as it is, as the polar and her heel are)
   b.twsSlow = b.twsSlow == null ? ww.kt : b.twsSlow + (ww.kt - b.twsSlow) * Math.min(1, dt / 20);
-  b.twaSlow = b.twaSlow == null ? Math.abs(twa) : b.twaSlow + (Math.abs(twa) - b.twaSlow) * Math.min(1, dt / 20);
-  const tws = b.twsSlow; twa = b.twaSlow;
+  const tws = ww.kt;
   b.powerT = (b.powerT ?? 0) - dt;
   if (b.powerK != null && b.powerT > 0) return b.powerK;
   b.powerT = 1; // (once a second: her sails' power changes slowly)
   // (the search, and her sails against it, in the wind rounded to a knot and 2°: cached, and like for like)
   const twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
   const ref = fastestStep(twsR, twaR, plan, STANDARD_DISP, crewMass(DEFAULT_CREW), standardCrewMoment(), crewBestHeel(twaR, twsR), sittingMoment(DEFAULT_CREW));
-  b.depowerBest = herFastestStep(b, twa, tws, plan, disp).d;
+  b.depowerBest = herFastestStep(b, twa, b.twsSlow, plan, disp).d;
   // hers: her sails as they are (no fuller than the full-power shape: fuller gains nothing the polar doesn't have, the
   // shape's own cost is shapeEfficiency's), at the crew's intended sheeting (a sheet set wrong, by you or the crew, is
   // counted once, in the step's trimDrive) and her own heel; her heel's cost to the hull is in the target already

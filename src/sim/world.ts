@@ -298,7 +298,7 @@ export class World {
     // rest of the race draws what it did)
     this.windModel.shifted = true;
     if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
-    this.gusts = new GustField(makeRng((seed ^ 0x6a57) >>> 0), this.windModel.base);
+    this.gusts = new GustField(makeRng((seed ^ 0x6a57) >>> 0), this.windModel.base, this.windModel.kt * KT);
     this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
