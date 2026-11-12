@@ -48,6 +48,11 @@ const VIEWS = {
   over_ryc: [LL(37.9085, -122.3830, 500), LL(37.9085, -122.38301, 0)], // overhead: Brickyard Cove, Richmond YC's harbor
   over_encinal: [LL(37.7830, -122.2625, 400), LL(37.7830, -122.26251, 0)], // overhead: Encinal YC on the Estuary
   over_estuary: [LL(37.7820, -122.2600, 1800), LL(37.7820, -122.26001, 0)], // overhead: the Estuary's harbors, Marina Village to Alameda Marina
+  // the Ferry Building (November 2026)
+  ferry_bay: [LL(37.7990, -122.3890, 6), LL(37.7955, -122.3937, 30)], // the Bay face, the gates and the sign, from off Pier 7
+  ferry_street: [LL(37.7935, -122.3965, 20), LL(37.7955, -122.3936, 30)], // the tower and the arcade from Market Street's foot
+  ferry_close: [LL(37.7962, -122.3915, 8), LL(37.7954, -122.3936, 45)], // the tower top and the dials, from the gates
+  over_ferry: [LL(37.7955, -122.3930, 500), LL(37.7955, -122.39301, 0)], // overhead: the outline and gates B–G
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);

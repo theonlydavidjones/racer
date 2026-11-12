@@ -1,4 +1,5 @@
 import northAnchorage from '../geo/data/gg-north-anchorage.json';
+import ferryBuilding from '../geo/data/ferry-building.json';
 import './three-setup';
 import * as THREE from 'three';
 import { LL } from '../geo/geo';
@@ -189,23 +190,112 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   tower(37.79285, -122.39793, 183, 18, 18, 0x6f7f88, { round: 1 }); // 101 California: 183 m, a faceted glass cylinder
   tower(37.7919, -122.4038, 237, 22, 30, 0x5e4a44, { round: 0.05, rot: 0 }); // 555 California: dark red granite (237 m, Wikipedia's figure not fetched)
   tower(37.7925, -122.4005, 212, 18, 24, 0xc4b2a2, { round: 0.1, rot: 0 }); // 345 California Center: 212 m, pink granite
-  // the Ferry Building: the long shed on the Embarcadero, and its 75 m clock tower
-  // Its four clock dials, 6.7 m (22 ft) across (Wikipedia, "San Francisco Ferry Building"), high on the tower, showing
-  // the time; at night the tower is floodlit and the dials glow from behind (both from photographs).
+  // the Ferry Building (1898), from OpenStreetMap (src/geo/data/ferry-building.json, scripts/make-ferry-building.mjs):
+  // the building's own outline, its 16.1 m hall, the clock tower stage by stage at OSM's heights (a 16 m square shaft to
+  // 43.5 m, setting back to a round cupola at 70 m), and the floating ferry gates B–G on the Bay side with their shelters.
+  // The four clock dials are 6.7 m (22 ft) across; "the entire base is an arched arcade" (Wikipedia, "San Francisco
+  // Ferry Building"). The tower's height is given as 235 ft (71 m) to 245 ft (75 m) (Wikipedia and others): OSM's
+  // cupola tops out at 70 m, and the flagstaff on it takes the tower to 75 m. At night the tower is floodlit and the
+  // dials glow from behind (photographs).
+  // Reasonable calls, not from a source: the dials sit at the top of the shaft; the arcade's bays are drawn 6 m wide;
+  // the colours; and the PORT OF SAN FRANCISCO sign (put up on the Bay side in 1951–52: photo captions, OpenSFHistory)
+  // is drawn in dark letters along the top of the Bay face, unlit: its lettering, colour and lighting weren't found
+  // (the Port's own Ferry Building Sign Guidelines are only at its Pier 1 offices: sfport.com, Sign Guidelines, 2021).
   {
-    const TWR = lam(0xe9e1cf); floodlit(TWR, 0xffe0b0, 2, 62, 0.75, 0.8, 'ferry');
-    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d')!, tex = new THREE.CanvasTexture(cv);
-    clocks.push((hh, mm) => {
-      cx.fillStyle = '#f4efe2'; cx.fillRect(0, 0, 128, 128); cx.strokeStyle = '#2a2722'; cx.lineCap = 'round';
-      cx.lineWidth = 5; cx.beginPath(); cx.arc(64, 64, 60, 0, 7); cx.stroke();
-      for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(64 + 50 * Math.sin(a), 64 - 50 * Math.cos(a)); cx.lineTo(64 + 57 * Math.sin(a), 64 - 57 * Math.cos(a)); cx.stroke(); }
-      const hand = (a: number, l: number, w: number) => { cx.lineWidth = w; cx.beginPath(); cx.moveTo(64, 64); cx.lineTo(64 + l * Math.sin(a), 64 - l * Math.cos(a)); cx.stroke(); };
-      hand(((hh % 12) + mm / 60) * Math.PI / 6, 30, 7); hand(mm * Math.PI / 30, 46, 5); tex.needsUpdate = true;
-    });
-    const DIAL = new THREE.MeshLambertMaterial({ map: tex }); floodlit(DIAL, 0xfff4dc, 0, 1, 1, 0.9, 'dial');
-    const dials = [0, 1, 2, 3].map(k => { const d = new THREE.Mesh(new THREE.CircleGeometry(3.35, 24), DIAL); d.rotation.y = k * Math.PI / 2; d.position.set(8.06 * Math.sin(k * Math.PI / 2), 52, 8.06 * Math.cos(k * Math.PI / 2)); return d; });
-    place(group(block(30, 200, 15, CREAM), block(16, 16, 60, TWR, 0), new THREE.Mesh(new THREE.ConeGeometry(9, 15, 4), lam(0x8f8a7c)).translateY(67.5), ...dials), 37.79554, -122.39369, 132, 2);
-    glows.push({ ...LL(37.79554, -122.39369), h: 45, color: 0xffe0b0, i: 0.45, w: 6 });
+    type Way = { pts: [number, number][]; height?: string };
+    const fb = ferryBuilding as unknown as { building: Way; hall: { height: string }; tower: Way[]; gates: Way[]; roofs: Way[] };
+    const B0 = 2, HALL = parseFloat(fb.hall.height); // the ground at the building (the Embarcadero's deck), and the hall's height
+    /** a way's outline in the sim's metres, anticlockwise (so outward is to the right of each edge) */
+    const ring = (w: Way) => { const r = w.pts.map(q => LL(q[0], q[1])); return r.reduce((s, p, i) => s + p.x * r[(i + 1) % r.length].y - r[(i + 1) % r.length].x * p.y, 0) < 0 ? r.reverse() : r; };
+    const slab = (pts: { x: number; y: number }[], y0: number, y1: number) => {
+      const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(p => new THREE.Vector2(p.x, p.y))), { depth: y1 - y0, bevelEnabled: false });
+      g.rotateX(-Math.PI / 2); g.translate(0, y0, 0); return g;
+    };
+    const fbg = new THREE.Group(); grp.add(fbg);
+    const ROOF = lam(0x9a968c), TWR = lam(0xe9e1cf), DECK = lam(0x77736b), SHELTER = lam(0x8d9296), POLE = lam(0x3a3a38);
+    floodlit(TWR, 0xffe0b0, 2, 72, 0.75, 0.8, 'ferry');
+    // the hall: its outline from the water's edge up to 16.1 m, roof grey, walls stone
+    const hall = ring(fb.building);
+    fbg.add(new THREE.Mesh(slab(hall, B0 - 3, B0 + HALL), [ROOF, CREAM]));
+    // the arcade along both long faces: arches at the street, a row of windows above, on the walls facing the
+    // Embarcadero (south-west) and the Bay (north-east)
+    {
+      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const c = cv.getContext('2d')!;
+      c.fillStyle = '#e9e1cf'; c.fillRect(0, 0, 64, 128);
+      c.fillStyle = '#3b3631'; // (v from the foot: the canvas's bottom is the street)
+      c.beginPath(); c.moveTo(10, 128); c.lineTo(10, 92); c.arc(32, 92, 22, Math.PI, 0); c.lineTo(54, 128); c.fill(); // the arch, 0–6 m
+      c.fillRect(20, 30, 24, 32); // an upper window
+      c.fillStyle = '#d6cdb8'; c.fillRect(0, 64, 64, 4); c.fillRect(0, 0, 64, 6); // the string course and the cornice
+      const tex = new THREE.CanvasTexture(cv); tex.wrapS = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
+      const geos: THREE.BufferGeometry[] = [], BAY = 6;
+      for (let i = 0; i < hall.length; i++) {
+        const a = hall[i], b = hall[(i + 1) % hall.length], L = Math.hypot(b.x - a.x, b.y - a.y);
+        const brg = (Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI + 360) % 360;
+        if (L < 10 || !(Math.abs(brg - 144) < 10 || Math.abs(brg - 324) < 10)) continue; // the long faces only
+        const n = Math.max(1, Math.round(L / BAY)), g = new THREE.PlaneGeometry(L, HALL);
+        const uv = g.getAttribute('uv') as THREE.BufferAttribute; for (let k = 0; k < uv.count; k++) uv.setX(k, uv.getX(k) * n);
+        const ox = (b.y - a.y) / L * 0.15, oy = -(b.x - a.x) / L * 0.15; // (out from the wall)
+        g.rotateY(Math.atan2(b.y - a.y, b.x - a.x)); // (the plane's x along the wall, its face outward)
+        g.translate(...P3((a.x + b.x) / 2 + ox, (a.y + b.y) / 2 + oy, B0 + HALL / 2).toArray());
+        geos.push(g);
+      }
+      const m = mergeGeometries(geos); geos.forEach(g => g.dispose());
+      if (m) fbg.add(new THREE.Mesh(m, new THREE.MeshLambertMaterial({ map: tex })));
+    }
+    // the clock tower, each stage on OSM's footprint up to OSM's height, and the flagstaff to 75 m
+    let y = B0;
+    for (const t of fb.tower) { const h = B0 + parseFloat(t.height!); fbg.add(new THREE.Mesh(slab(ring(t), y - 0.5, h), TWR)); y = h; }
+    const top = ring(fb.tower[fb.tower.length - 1]), tc = top.reduce((s, p) => ({ x: s.x + p.x / top.length, y: s.y + p.y / top.length }), { x: 0, y: 0 });
+    fbg.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, B0 + 75 - y, 6).translate(...P3(tc.x, tc.y, (y + B0 + 75) / 2).toArray()), POLE));
+    // the four dials, one on each face of the shaft, near its top
+    {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d')!, tex = new THREE.CanvasTexture(cv);
+      clocks.push((hh, mm) => {
+        cx.fillStyle = '#f4efe2'; cx.fillRect(0, 0, 128, 128); cx.strokeStyle = '#2a2722'; cx.lineCap = 'round';
+        cx.lineWidth = 5; cx.beginPath(); cx.arc(64, 64, 60, 0, 7); cx.stroke();
+        for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(64 + 50 * Math.sin(a), 64 - 50 * Math.cos(a)); cx.lineTo(64 + 57 * Math.sin(a), 64 - 57 * Math.cos(a)); cx.stroke(); }
+        const hand = (a: number, l: number, w: number) => { cx.lineWidth = w; cx.beginPath(); cx.moveTo(64, 64); cx.lineTo(64 + l * Math.sin(a), 64 - l * Math.cos(a)); cx.stroke(); };
+        hand(((hh % 12) + mm / 60) * Math.PI / 6, 30, 7); hand(mm * Math.PI / 30, 46, 5); tex.needsUpdate = true;
+      });
+      const DIAL = new THREE.MeshLambertMaterial({ map: tex }); floodlit(DIAL, 0xfff4dc, 0, 1, 1, 0.9, 'dial');
+      const sh = ring(fb.tower[0]), shTop = B0 + parseFloat(fb.tower[0].height!), R = 6.7 / 2;
+      for (let i = 0; i < sh.length; i++) {
+        const a = sh[i], b = sh[(i + 1) % sh.length], L = Math.hypot(b.x - a.x, b.y - a.y);
+        const d = new THREE.Mesh(new THREE.CircleGeometry(R, 24), DIAL);
+        d.rotation.y = Math.atan2(b.y - a.y, b.x - a.x);
+        d.position.copy(P3((a.x + b.x) / 2 + (b.y - a.y) / L * 0.08, (a.y + b.y) / 2 - (b.x - a.x) / L * 0.08, shTop - R - 0.9));
+        fbg.add(d);
+      }
+    }
+    // the sign on the Bay face: the long north-east wall nearest the tower, along its top
+    {
+      const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 64; const c = cv.getContext('2d')!;
+      c.fillStyle = '#2b2622'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PORT OF SAN FRANCISCO', 512, 34);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+      let best = -1, bd = Infinity;
+      for (let i = 0; i < hall.length; i++) {
+        const a = hall[i], b = hall[(i + 1) % hall.length], L = Math.hypot(b.x - a.x, b.y - a.y), brg = (Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI + 360) % 360;
+        if (L < 25 || Math.abs(brg - 324) > 10) continue;
+        const dd = Math.hypot((a.x + b.x) / 2 - tc.x, (a.y + b.y) / 2 - tc.y); if (dd < bd) { bd = dd; best = i; }
+      }
+      if (best >= 0) {
+        const a = hall[best], b = hall[(best + 1) % hall.length], L = Math.hypot(b.x - a.x, b.y - a.y), W = Math.min(L - 2, 30);
+        const s = new THREE.Mesh(new THREE.PlaneGeometry(W, W / 16), new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.4 }));
+        s.rotation.y = Math.atan2(b.y - a.y, b.x - a.x);
+        s.position.copy(P3((a.x + b.x) / 2 + (b.y - a.y) / L * 0.25, (a.y + b.y) / 2 - (b.x - a.x) / L * 0.25, B0 + HALL - 0.6 - W / 32));
+        fbg.add(s);
+      }
+    }
+    // the ferry gates: floating concrete pontoons riding 0.8 m out of the water, and the shelters over them at OSM's
+    // heights, on posts
+    for (const g of fb.gates) fbg.add(new THREE.Mesh(slab(ring(g), -0.6, 0.8), DECK));
+    for (const r of fb.roofs) {
+      const pts = ring(r), h = parseFloat(r.height!);
+      fbg.add(new THREE.Mesh(slab(pts, h - 0.5, h), SHELTER));
+      pts.forEach((p, i) => { if (i % 3 === 0) fbg.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, h - 0.8, 0.4).translate(...P3(p.x, p.y, (h + 0.8) / 2).toArray()), POLE)); });
+    }
+    mergeByMaterial(fbg, [TWR, DECK, SHELTER, POLE]);
+    glows.push({ ...tc, h: 45, color: 0xffe0b0, i: 0.45, w: 6 });
   }
   // Sutro Tower: three red-and-white legs on Mt Sutro, 298 m, crossarms at two levels, three masts on top
   {
