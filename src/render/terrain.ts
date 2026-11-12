@@ -4,6 +4,8 @@ import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
 import { limePointBox, limePointLand, onGround } from '../geo/shore';
+import { chartCoast } from './shoreFit';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -138,15 +140,6 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue;
       H[k] = onGround(p) ? Math.max(H[k], 2.5) : -30;
     }
-    // the shore's own vertices kept low: a 50 m triangle from a hilltop vertex down to a water one would otherwise run
-    // out over the water as a fin (the bluffs rise from the next row in)
-    const shore: number[] = [];
-    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
-      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
-      if (H[k] <= 0 || p.x < b.x0 - dx || p.x > b.x1 + dx || p.y < b.y0 + dy || p.y > b.y1 - dy) continue;
-      if ([-1, 1, -nx, nx, -nx - 1, -nx + 1, nx - 1, nx + 1].some(o => H[k + o] <= 0)) shore.push(k);
-    }
-    for (const k of shore) H[k] = 2.5;
     // and, for what's finer than the 50 m mesh, the point's own outline as a low rock bench under the hills: the neck
     // behind the north tower's base and the spit the Lime Point light stands on (only there, clipped to a box round them)
     const T = LL(37.8275, -122.4800), U = LL(37.8252, -122.4776);
@@ -157,6 +150,57 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x8b7f6d }))); // (the palette's rock)
     }
   }
+  // the rest of the shore fitted to NOAA's charted coast (render/shoreFit.ts): near the coast, land is where the chart
+  // has land; the land samples along the shore are moved onto the coast and brought down to the water, so the hills rise
+  // from the charted shoreline, not from a staircase of 50 m steps with sheer walls (the Cityfront and Lime Point, fitted
+  // above, are left as they are)
+  const sx = new Float32Array(nx * ny), sy = new Float32Array(nx * ny), wet = new Uint8Array(nx * ny);
+  {
+    const coast = chartCoast(), b = limePointBox(), cell = Math.hypot(dx, dy) / Math.SQRT2, zone = new Uint8Array(nx * ny);
+    const inLP = (p: { x: number; y: number }) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1;
+    // Lime Point's coast (OpenStreetMap's, fitted above): its outline's edges, less the box's own sides
+    const lp = limePointLand(), lpEdges: [number, number, number, number][] = [];
+    for (let k = 0; k < lp.length; k++) {
+      const a = lp[k], c = lp[(k + 1) % lp.length], on = (v: number, w: number) => Math.abs(v - w) < 0.5;
+      if ((on(a.x, b.x0) && on(c.x, b.x0)) || (on(a.x, b.x1) && on(c.x, b.x1)) || (on(a.y, b.y0) && on(c.y, b.y0)) || (on(a.y, b.y1) && on(c.y, b.y1))) continue;
+      lpEdges.push([a.x, a.y, c.x, c.y]);
+    }
+    const nearestLP = (x: number, y: number, max: number) => {
+      let best: { x: number; y: number; d: number } | null = null;
+      for (const [ax, ay, bx, by] of lpEdges) {
+        const vx = bx - ax, vy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1)));
+        const qx = ax + vx * t, qy = ay + vy * t, d = Math.hypot(x - qx, y - qy);
+        if (d <= max && (!best || d < best.d)) best = { x: qx, y: qy, d };
+      }
+      return best;
+    };
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const lat = M.north - (M.north - M.south) * j / (ny - 1), lon = M.west + (M.east - M.west) * i / (nx - 1);
+      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+      if (cityShore(lat, lon)) continue;
+      if (inLP(p)) { zone[k] = 2; continue; } // (classified above, by OpenStreetMap's coast)
+      if (!coast.nearest(p.x, p.y, 1.6 * cell)) continue; // (only near the coast)
+      zone[k] = 1; H[k] = coast.inside(p.x, p.y) ? Math.max(H[k], 2.5) : Math.min(H[k], -30);
+    }
+    // the samples either side of the shore moved onto it: the land ones 2 m up, the water ones 3 m down, so the
+    // waterline runs along the coast between them (and the bluffs rise from the next sample in)
+    const moves: [number, number, number, boolean][] = [];
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i; if (!zone[k]) continue;
+      const land = H[k] > 0;
+      if (![-1, 1, -nx, nx, -nx - 1, -nx + 1, nx - 1, nx + 1].some(o => (H[k + o] > 0) !== land)) continue;
+      const p = { x: corner.x + i * dx, y: corner.y + j * dy }, q = zone[k] === 2 ? nearestLP(p.x, p.y, 0.75 * cell) : coast.nearest(p.x, p.y, 0.75 * cell);
+      moves.push([k, q ? q.x - p.x : 0, q ? q.y - p.y : 0, land]);
+    }
+    for (const [k, mx, my, land] of moves) { sx[k] = mx; sy[k] = my; if (land) H[k] = 2; else wet[k] = 1; }
+    // the chart's rocks and islets too small for the mesh, each in its charted outline, a couple of metres out of the water
+    const rk: THREE.BufferGeometry[] = [];
+    for (const r of coast.rocks) {
+      const sh = new THREE.Shape(); r.forEach((q, i) => i ? sh.lineTo(q.x, q.y) : sh.moveTo(q.x, q.y));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -2, 0); rk.push(g);
+    }
+    if (rk.length) scene.add(new THREE.Mesh(mergeGeometries(rk), new THREE.MeshLambertMaterial({ color: 0x6f675c }))); // (dark wet rock)
+  }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i; if (H[k] <= 0) continue;
@@ -165,7 +209,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, h = H[k];
-    pos[k * 3] = corner.x + i * dx; pos[k * 3 + 1] = h > 0 ? h : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy);
+    pos[k * 3] = corner.x + i * dx + sx[k]; pos[k * 3 + 1] = h > 0 ? h : wet[k] ? -3 : Math.min(h, -12); pos[k * 3 + 2] = -(corner.y + j * dy + sy[k]);
   }
   const idx: number[] = [];
   for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { HEEL, TRANSOM_TOP, hullGeometry } from '../src/render/hull';
+import { HEEL, TRANSOM_TOP, cockpitGeometry, hullGeometry, hullInnerHalf, uAtZ } from '../src/render/hull';
 
 /** The hull shell's edges that only one triangle uses (open edges: anything behind them shows through a gap). */
 function openEdges(g: THREE.BufferGeometry): [THREE.Vector3, THREE.Vector3][] {
@@ -32,5 +32,15 @@ describe('hull shell', () => {
     const cracks = open.filter(([a, b]) => on(a) && on(b) && a.distanceTo(b) > 1e-5 && Math.min(a.y, b.y) < TRANSOM_TOP.y - 0.05);
     expect(cracks.length).toBeLessThanOrEqual(16); // 8 lands a side
     for (const [a, b] of cracks) expect(a.distanceTo(b)).toBeLessThan(0.06);
+  });
+  it('keeps the cockpit inside her: no locker or shelf panel pokes out through the hull', () => {
+    // (the lockers' after ends and the after shelf's front once ran straight down to the sole at their top's width,
+    // where the hull is narrower, and stood out through it under the water)
+    let worst = -1;
+    for (const list of Object.values(cockpitGeometry())) for (const g of list) {
+      const P = g.attributes.position.array;
+      for (let i = 0; i < P.length; i += 3) if (P[i + 1] < 0.5) worst = Math.max(worst, Math.abs(P[i]) - hullInnerHalf(uAtZ(P[i + 2]), P[i + 1]));
+    }
+    expect(worst).toBeLessThan(0.005);
   });
 });

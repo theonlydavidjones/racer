@@ -121,3 +121,21 @@ describe('Everyone sits on something (render/crew.ts)', () => {
   for (const [name, o] of [['a breeze', { kt: 12 }], ['hiking', { kt: 20 }], ['hiking in puffs', { kt: 17, puffy: true }], ['light air', { kt: 4 }], ['told to hike', { kt: 12, place: { across: 'hike', fore: null } }]] as const)
     it(`${name}: no pelvis more than 5 cm off its seat`, () => { const g = gaps(o); expect(g.worst, g.where).toBeLessThan(0.05); });
 });
+
+describe('Two crew keep to themselves (render/crew.ts)', () => {
+  it('kneeling side by side in the middle of the cockpit they don\'t pass through each other; in a gybe they brush for a moment at most', () => {
+    // (light air, deep downwind, both crew in the middle: on main before this they overlapped in every frame)
+    const twa = 160, b = testBoat({ heading: 360 - twa, kt: 4, windKt: 12 });
+    b.crew = newCrew(DEFAULT_CREW, 'S');
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1); let hold = true;
+    sail(b, 20, () => { b.h = 360 - twa; });
+    const step = () => { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = 360 - twa; }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); };
+    const touching = () => { const A = bones(cr.crew[0]), B = bones(cr.crew[1]); return A.some(a => B.some(q => a.p.distanceTo(q.p) < 0.06)); };
+    let steady = 0, gybe = 0;
+    for (let i = 0; i < 60; i++) { step(); if (touching()) steady++; }
+    hold = false; startTack(b);
+    for (let i = 0; i < 450; i++) { step(); if (touching()) gybe++; }
+    expect(steady).toBe(0);
+    expect(gybe).toBeLessThan(60); // (two seconds, as they change sides)
+  });
+});
