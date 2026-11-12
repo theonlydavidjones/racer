@@ -92,6 +92,9 @@ What's planned, roughly in order. Done work is described in the README.
    the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
    Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
    away below her proper course to blanket.
+   Rule 21.1 widened (branch rules-21-1): any boat sailing back to start, latched until her hull is below the line;
+   Rule 15 grace when she gets back. Noticed in review, not fixed: a not-started AI boat beyond an end of the line at the
+   gun (not OCS) aims for a point on the course side and never starts (ai.ts, the !b.started branch).
 7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
    far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
    a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
