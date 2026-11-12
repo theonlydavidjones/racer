@@ -356,6 +356,10 @@ export interface BoatMesh {
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
   travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; jibSheets: Record<Tack, THREE.Line>; winches: Record<Tack, THREE.Vector3>;
+  /** The traveller's control lines (port, starboard): from the car to the blocks at the track's ends and down to their cams. */
+  travLines: THREE.Line[];
+  /** Lines that run up the mast (the outhaul, the main Cunningham): their unbent points, moved with the mast's bend (syncRig). */
+  mastLines: { l: THREE.Line; base: Float32Array }[];
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
@@ -484,8 +488,18 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   grp.add(new THREE.Mesh(thwartGeometry()[0], MAT.wood));
   const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.08, 0.02, 0.035), STEEL); track.position.set(0, ty + 0.005, TRAV_Z); grp.add(track);
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
-  // the mainsheet's lower block, on its swivel on the car: a sheave between black cheeks (it turns with the car)
+  // the mainsheet's lower block, on its swivel on the car: a sheave between black cheeks (it turns with the car); the
+  // tackle is four parts (syncLines), the upper (double) block hanging from the boom right above the thwart
   travCar.add(sheaveBlock(0.03, 0.06));
+  // the traveller's control lines: from each end of the car to a block at that end of the track, then down the thwart's
+  // forward face to a cam (Josephine under way, looking aft: the lines along the thwart's face to its ends)
+  const travLines: THREE.Line[] = [];
+  for (const side of [-1, 1]) {
+    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
+    const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
+    const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
+    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main'); grp.add(tl); travLines.push(tl);
+  }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
   // its dual-ended control line: from the blocks on the quarters, forward along the inside of the hull to a cam
@@ -496,8 +510,14 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     grp.add(line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay'));
     grp.add(line([new THREE.Vector3(x, ty + 0.03, TRAV_Z - 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.06)], 'backstay')); // the tail
   }
-  // vang: a tackle from the boom down to the foot of the mast
-  for (const dx of [-0.03, 0.03]) boomPivot.add(line([new THREE.Vector3(dx, BOOM_TOP - 0.08, 0.75), new THREE.Vector3(dx * 0.5, deckY(uAtZ(MAST_Z), 0) + 0.12, 0.03)], 'main'));
+  // vang: a rope tackle from a block under the boom, about a quarter of the way out, down to a block at the foot of the
+  // mast, four parts (Josephine's photos: hauled out from starboard, and the mast foot from forward; CR 8.60 only limits
+  // what may hold the boom up, so a rope vang is legal). Its tail comes down to the turning blocks at the mast's foot and
+  // aft to the piano. (The part count is read off the photo: an estimate.)
+  { const top = new THREE.Vector3(0, BOOM_TOP - BOOM_R - 0.075, VANG_R), foot = new THREE.Vector3(0, DECK_AT_MAST + 0.16, 0.05);
+    const ub = sheaveBlock(0.025, -0.06); ub.position.set(0, BOOM_TOP - BOOM_R, VANG_R); boomPivot.add(ub);
+    const lb = sheaveBlock(0.025, 0.06); lb.position.set(0, DECK_AT_MAST + 0.1, 0.05); boomPivot.add(lb);
+    boomPivot.add(line(tackle(top, foot, 4, 0.011), 'main')); }
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
@@ -524,20 +544,69 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // outboard of the hatch's runners, as on Josephine, and turn in to the mast's foot only forward of the hatch)
   const zA = -L / 2 + CABIN.u1 * L - 0.05, zClear = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.15;
   const onTop = (x: number, z: number) => new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.025, z);
+  // Each line ends forward at a turning block on the deck at the mast's foot (Josephine's photos: a cluster of blocks at
+  // the partner, the lines coming down to them and running aft in a bundle), and goes on to what it works:
+  //  - the vang (dual-ended, both sides): to the vang's lower block, its tail;
+  //  - the outhaul (dual-ended): up the mast's after side to the gooseneck, and inside the boom to the clew (inside the
+  //    boom is an estimate: the photos don't show it, and CR 6.3.4 allows a groove for the boom's controls);
+  //  - the jib Cunningham (dual-ended): forward along the foredeck to a block at the stemhead and up the stay to the
+  //    jib's cringle (an estimate: not in the photos);
+  // and to port a clam cleat for the main Cunningham, up the mast to a block at the gooseneck and to its cringle above
+  // the main's tack (an estimate: not in the photos).
+  const mastLines: Lines['mastLines'] = [], deckM = DECK_AT_MAST + 0.03;
+  const footBlock = (x: number) => { const fb = sheaveBlock(0.016, 0.03); fb.position.set(x, DECK_AT_MAST, MAST_AFT_Z + 0.06); fb.rotation.y = Math.PI / 2; grp.add(fb); return new THREE.Vector3(x, deckM + 0.03, MAST_AFT_Z + 0.06); };
+  const upMast = (pts: THREE.Vector3[], role: Rope) => { const l = line(pts, role); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); };
+  const stem = new THREE.Vector3(0, FORESTAY_DECK.y + 0.04, FORESTAY_DECK.z + 0.14), jibCringle = FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP);
+  { const sb = sheaveBlock(0.016, 0.03); sb.position.copy(stem).setY(FORESTAY_DECK.y); grp.add(sb); }
   for (const side of [1, -1]) for (let i = 0; i < 3; i++) {
     const x = side * (0.37 + 0.065 * i), cp = onTop(x, zA);
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
     const run = [cp]; for (let k = 1; k <= 4; k++) run.push(onTop(x, zA + (zClear - zA) * k / 4));
-    run.push(onTop(side * 0.06 + (x - side * 0.06) * 0.35, (zClear + MAST_AFT_Z) / 2), new THREE.Vector3(side * 0.06, deckY(uAtZ(MAST_Z), 0) + 0.06, MAST_AFT_Z + 0.03));
+    const fb = footBlock(side * (0.05 + 0.035 * i));
+    run.push(onTop(side * 0.06 + (x - side * 0.06) * 0.35, (zClear + MAST_AFT_Z) / 2), fb.clone().setY(deckM));
     // (the piano, each side: the vang and the outhaul, the main's; the jib Cunningham, the jib's)
     const role: Rope = i === 2 ? 'jib' : 'main';
     grp.add(line(run, role));
     grp.add(line([cp.clone().setZ(zA + 0.02), new THREE.Vector3(x + side * 0.02, cp.y - 0.25 - 0.04 * i, zA + 0.1)], role)); // the tail, down the bulkhead
+    if (i === 0) upMast([fb, new THREE.Vector3(side * 0.012, DECK_AT_MAST + 0.13, MAST_AFT_Z + 0.05)], 'main'); // the vang's tail, from its lower block
+    else if (i === 1) upMast([fb, new THREE.Vector3(side * 0.03, deckM + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(side * 0.015, BOOM_TOP - BOOM_R, MAST_AFT_Z + 0.012)], 'main'); // the outhaul, up to the gooseneck
+    else grp.add(line([fb, new THREE.Vector3(side * 0.07, deckY(uAtZ(MAST_FRONT_Z - 0.1), 0.07) + 0.012, MAST_FRONT_Z - 0.1), new THREE.Vector3(side * 0.025, deckY(uAtZ(stem.z + 0.5), 0.025) + 0.012, stem.z + 0.5), stem, jibCringle], 'jib')); // the jib Cunningham, forward to the stem and up to its cringle
   }
-  return { travCar, backstay, cars, jibSheets, winches };
+  { // the main Cunningham's clam cleat, to port of the cams, and its line forward with the bundle, up the mast to a block at
+    // the gooseneck and to the cringle above the main's tack
+    const x = -(0.37 + 0.065 * 3), cp = onTop(x, zA);
+    const cl = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.025, 0.06), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
+    const fb = footBlock(-0.155), run = [cp]; for (let k = 1; k <= 4; k++) run.push(onTop(x, zA + (zClear - zA) * k / 4));
+    run.push(onTop(-0.06 + (x + 0.06) * 0.35, (zClear + MAST_AFT_Z) / 2), fb.clone().setY(deckM));
+    grp.add(line(run, 'main'));
+    const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.03, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02); grp.add(gb);
+    upMast([fb, new THREE.Vector3(-0.045, deckM + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(-0.03, BOOM_TOP - 0.01, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main');
+  }
+  // the mast's own bands: a black boot where it goes through the deck, and the lower band (CR 6.1.11: its upper edge the
+  // Lower Mast Point, 1.00 m up; dark on Josephine), from the photos of her mast foot
+  for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
+  }
+  return { travCar, backstay, cars, jibSheets, winches, travLines, mastLines };
 }
 /** Mainsheet: from the end of the boom (its height and distance from the gooseneck) down to the traveller. */
 const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Vector3(0, 0.78, 3.62);
+/**
+ * Where the mainsheet's upper block hangs from the boom (m from the gooseneck): right above the traveller on the thwart,
+ * about a sixth of the boom from its end (Josephine hauled out, from starboard), so the sheet comes straight down to the
+ * car upwind. And the vang's block under the boom, about a quarter of the way out (the same photo).
+ */
+const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
+/** The thwart's forward face from the track's centreline (m: an estimate, the thwart's depth not measured). */
+const THWART_FACE = 0.07;
+/** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
+const MAIN_CUNNINGHAM_UP = 0.22, JIB_CUNNINGHAM_UP = 0.3;
+/** A tackle of `parts` between a block at `a` and one at `b`: the parts side by side `w` m apart across the boat. */
+function tackle(a: THREE.Vector3, b: THREE.Vector3, parts: number, w: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= parts; i++) { const x = (i - parts / 2) * w / parts; pts.push((i % 2 ? a : b).clone().add(new THREE.Vector3(x, 0, 0))); }
+  return pts;
+}
 
 // Rig points in the boat group's frame: x to starboard, y up, z aft (the bow is at z = −3.82).
 const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = sheer(uAtZ(CHAINPLATE_Z));
@@ -592,7 +661,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   sailPics.set(jibMat, { front: jibMat, back: jibBack, stbd: pics.jibStbd, port: pics.jibPort });
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, MAST_AFT_Z); rig.add(boomPivot);
   // the mainsheet's upper block, hung from a strap under the boom's end
-  { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, BOOM_END.r); boomPivot.add(ub); }
+  { for (const dx of [-0.014, 0.014]) { const ub = sheaveBlock(0.03, -0.075); ub.position.set(dx, BOOM_END.y - BOOM_R, MS_R); boomPivot.add(ub); } } // (a double block)
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
   if (aluBoom) { // the extrusion's black moulded end fitting, at its after end (as CircleSea's)
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R * 1.05, BOOM_R * 1.05, 0.06, 10), MAT.dark); cap.rotation.x = Math.PI / 2; cap.position.set(0, BOOM_TOP - BOOM_R, E + 0.12 - 0.02); boomPivot.add(cap);
@@ -668,7 +737,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   for (const z of [0.5, 1.2, 1.9, 2.6]) { const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 4, 10), MAT.dark); tie.rotation.x = Math.PI / 2; tie.position.y = z - 1.55; mainFurl.add(tie); } // (along the cylinder's own axis)
   const jibBag = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshLambertMaterial({ color: 0x2c3e66 })); jibBag.scale.set(0.2, 0.12, 0.45);
   jibBag.position.set(-0.05, deckY(uAtZ(-2.9), 0.05) + 0.1, -2.9); jibBag.visible = false; grp.add(jibBag);
-  const mainsheet = line([TRAVELLER, TRAVELLER], 'main'); grp.add(mainsheet);
+  const mainsheet = line(Array.from({ length: 7 }, () => TRAVELLER.clone()), 'main'); grp.add(mainsheet); // (four parts and the tail)
   const lines = buildLines(grp, boomPivot);
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
   // starboard jumper strut (she has no spreaders; the masthead has the windex). Flying a foreign ensign on the Bay, she
@@ -888,6 +957,11 @@ function syncRig(m: BoatMesh, b: Boat, jibSgn: number, load: number, dt: number)
     m.windex.position.z = r.windexZ - at(MAST_TOP);
     r.windexTabs.forEach((t, k) => { t.position.z = r.tabZ[k] - at(MAST_TOP); });
     m.boomPivot.position.z = MAST_AFT_Z - at(BOOM_TOP);
+    for (const { l, base } of m.lines.mastLines) { // (the lines up the mast's after side follow it)
+      const q = l.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < q.count; i++) { const y = base[i * 3 + 1]; q.setZ(i, base[i * 3 + 2] - (y > DECK_AT_MAST + 0.06 ? at(y) : 0)); }
+      q.needsUpdate = true;
+    }
     for (const jl of r.jumperLines) { const q = jl.geometry.attributes.position as THREE.BufferAttribute; q.setZ(0, MAST_FRONT_Z - at(JUMPER_TOP)); q.setZ(2, MAST_FRONT_Z - at(JUMPER_FOOT)); q.needsUpdate = true; }
   }
   // the stay sags as far as the jib is pulling on it (none head to wind or luffing, the jib down or docked), and it
@@ -958,8 +1032,14 @@ function syncLines(m: BoatMesh, b: Boat): void {
   const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
-  p.setXYZ(0, cx, L2.travCar.position.y + 0.06, TRAV_Z);
-  p.setXYZ(1, Math.sin(a) * BOOM_END.r, BOOM_END.y - BOOM_R - 0.075, MAST_AFT_Z + Math.cos(a) * BOOM_END.r); p.needsUpdate = true;
+  // (four parts between the lower block's sheave on the car and the upper double block's under the boom, side by side
+  // across the boom, then the tail from the car's block aft to the helmsman's hand)
+  { const ux = Math.cos(a), uz = -Math.sin(a), lo = tmpC.set(cx, L2.travCar.position.y + 0.06, TRAV_Z), boomZ = m.boomPivot.position.z;
+    const hi = tmpD.set(Math.sin(a) * MS_R, BOOM_END.y - BOOM_R - 0.075, boomZ + Math.cos(a) * MS_R);
+    for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.007, q = i % 2 ? hi : lo; p.setXYZ(i, q.x + ux * o, q.y, q.z + uz * o); }
+    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.05, TRAV_Z + 0.45); p.needsUpdate = true; }
+  // the traveller's control lines: from the car's ends to the blocks at the track's ends
+  L2.travLines.forEach((tl, k) => { const side = k ? 1 : -1, q = tl.geometry.attributes.position as THREE.BufferAttribute; q.setXYZ(0, cx + side * 0.045, L2.travCar.position.y + 0.005, TRAV_Z); q.needsUpdate = true; });
   // backstay: the bridle's apex is pulled down as the backstay goes on
   { const q = L2.backstay.geometry.attributes.position as THREE.BufferAttribute, foot = new THREE.Vector3(0, sheer(1), 3.74);
     const ay = 2.7 - 1.3 * c.backstay, f = (MASTHEAD.y - ay) / (MASTHEAD.y - foot.y), apex = MASTHEAD.clone().lerp(foot, f);
