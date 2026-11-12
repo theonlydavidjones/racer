@@ -369,9 +369,11 @@ const band = new SailBand({
     if (i > 0 && i < 40) { b.textContent = t.slice(0, i); e.replaceChildren(b, ' ' + t.slice(i + 2)); } else e.replaceChildren(t);
   }
 }, document.body);
-// the tiller strip on the band's top edge, the tiller pilot's toggle at its right end and its panel over it (the UI
-// session's placement, 12 Nov: nothing fixed in the middle of the view, the helm's controls where the eye already is)
-band.tillerSlot.append($('tiller'), $('bPilot'), $('pilot'), $('motorHead')); // (her outboard's control head, above the band on the left)
+// the tiller strip on the band's top edge, and her outboard's control head above the band on the left. The tiller
+// pilot goes bottom left with the Navigator, its panel opening along the bottom edge in place of its button, never up over
+// the boat (owner, v148: the pilot's panel over the band hid her hull)
+band.tillerSlot.append($('tiller'), $('motorHead'));
+$('helmBar').append($('bPilot'), $('pilot'));
 function openLines(open = !band.open): void {
   band.show(open); S.band = open ? 1 : 0; saveSettings(S);
   document.body.classList.toggle('band-open', open);
@@ -520,7 +522,7 @@ function pilotTick(dt: number): void {
   const p = w.pilot, on = p.mode !== 'off' && w.running;
   if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) pilotAdjust(w.user, p, d * 20 * dt); }
   const chip = $('bPilot'), hide = !w.running || !w.cruising;
-  if (chip.hidden !== hide) chip.hidden = hide;
+  if (chip.hidden !== (hide || on)) chip.hidden = hide || on; // (while it steers, its panel takes the button's place)
   chip.classList.toggle('on', on);
   const panel = $('pilot'); if (panel.hidden === on) { panel.hidden = !on; document.body.classList.toggle('pilot-on', on); }
   if (!on) return;
@@ -532,7 +534,7 @@ function pilotTick(dt: number): void {
     const d = w.dest; const nm = d ? Math.hypot(d.p.x - u.x, d.p.y - u.y) / 1852 : 0;
     txt = d ? `→ ${d.name.replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
   }
-  if (txt !== pilotShown) { $('pilotRead').textContent = txt; pilotShown = txt; }
+  if (txt !== pilotShown) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
 }
 /* ---------------- her outboard (boat/motor.ts): the Motor button and its control head ---------------- */

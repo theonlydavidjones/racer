@@ -799,7 +799,25 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sb-tillerslot #bPilot:hover{border-color:var(--accent)}
 .sb-tillerslot #bPilot.on{border-color:var(--accent);color:var(--accent)}
 .sb-tillerslot #bPilot svg{width:12px;height:12px}
-.sb-tillerslot #pilot{position:absolute;right:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3}
+/* the tiller pilot, bottom left with the Navigator: while it steers, its panel opens along the bottom edge in the button's
+   place, two rows the height of a button, so it never covers the boat or reaches the band (owner, v148) */
+#helmBar #pilot{display:grid;grid-template-columns:repeat(6,auto);grid-template-rows:20px 20px;gap:2px;align-content:center;
+  height:46px;box-sizing:border-box;padding:2px 4px;width:max-content;flex:0 0 auto}
+#helmBar #pilot[hidden]{display:none}
+/* (Home sends her back under the pilot, so while the pilot steers it isn't needed, and its room keeps the panel clear of the band) */
+body.pilot-on #bHome{display:none}
+#helmBar #pilot .pl-lab{margin:0;align-self:center}
+#helmBar #pilot .tp-btn{height:20px;min-width:0;padding:0 4px;font-size:9.5px;letter-spacing:.03em}
+/* narrower windows (the band reaches further left): while the pilot steers, the helm's buttons go to icons and the panel
+   drops its word "Pilot", so it still ends short of the band */
+@media (max-width:1439px){
+  body.pilot-on #helmBar .ib{min-width:40px;padding:4px}
+  body.pilot-on #helmBar .ib .w{display:none}
+  #helmBar #pilot .pl-lab{display:none}
+  #helmBar #pilot .tp-btn{padding:0 3px;font-size:9px;letter-spacing:.02em}
+  body #helmBar #pilot .pl-read{grid-column:span 3;max-width:none;font-size:10px}
+}
+#helmBar #pilot .pl-read{grid-column:span 2;min-width:0;max-width:92px;padding:0 2px;font-size:11px;overflow:hidden;text-overflow:ellipsis}
 .sb-tillerslot #motorHead{position:absolute;left:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3;margin:0}
 .sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
