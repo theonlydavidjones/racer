@@ -235,14 +235,16 @@ function onSeat(s: number, x: number, z: number, k: number): PoseT {
  * cockpit. they would kneel, usually on one knee"), the other foot planted ahead, out from under the boom and with
  * leverage on the lines. `front` which leg is forward (0 left, 1 right).
  */
+/** On a locker lid: inside the coaming (the shin lying on the lid, not out through the coaming onto the deck). */
+const inLid = (q: THREE.Vector3) => { const m = chz(q.z) - 0.08; if (Math.abs(q.x) > m) q.x = Math.sign(q.x) * m; return q; };
 function kneelOne(x: number, z: number, yaw: number, front: number, hands: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
   const g = ground(x, z), f = fwd(yaw), r = right(yaw);
   // (the kneeling thigh near upright, its knee on the sole under the hips and the shin flat behind; the front foot
   // a stride ahead, its thigh about level)
   const hip = V(x, g + 0.47 * k, z);
   const feet = [0, 1].map(j => j === front
-    ? onGround(hip.clone().addScaledVector(f, 0.36 * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k))
-    : (g < SEAT_Y - 0.05 ? keepOnSole : (q: THREE.Vector3) => q)(hip.clone().addScaledVector(f, -0.4 * k).addScaledVector(r, (j ? 1 : -1) * 0.1 * k)).setY(g + 0.07)) as [THREE.Vector3, THREE.Vector3]; // (kneeling on the sole, the knee stays on it; on a lid, on the lid)
+    ? onGround((g < SEAT_Y - 0.05 ? (q: THREE.Vector3) => q : inLid)(hip.clone().addScaledVector(f, 0.36 * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k)))
+    : (g < SEAT_Y - 0.05 ? keepOnSole : inLid)(hip.clone().addScaledVector(f, -0.4 * k).addScaledVector(r, (j ? 1 : -1) * 0.1 * k)).setY(g + 0.07)) as [THREE.Vector3, THREE.Vector3]; // (kneeling on the sole, the knee stays on it; on a lid, on the lid)
   return { hip, yaw, pitch: -0.2, roll: 0, feet, hands, look: lookAt.clone() };
 }
 /** Up in a crouch, a slight bend at the waist and the knees, under the boom (the middle crew tacking the main). */
@@ -313,9 +315,11 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     if (tackRole === 'jib') {
       // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
       // within arm's reach of it, the sheet in the inboard hand)
-      const ws = -windward, w = winchAt(ws), wz = w.z + 0.1, bx = ws * (chz(wz) - 0.15);
+      const ws = -windward, w = winchAt(ws), wz = w.z + 0.2, bx = ws * (chz(wz) - 0.22); // (the forward knee clear of the bulkhead)
       const yaw = -ws * 0.15, hold = V(bx - ws * 0.12, SEAT_Y + 0.6 * k, wz - 0.25);
-      return kneelOne(bx, wz, yaw, ws > 0 ? 1 : 0, ws > 0 ? [hold, w] : [w, hold], k, w);
+      // (the inboard knee up and the outboard one down on the lid by the coaming: the other way round, the forward thigh
+      // would lie along the coaming and through it)
+      return kneelOne(bx, wz, yaw, ws > 0 ? 0 : 1, ws > 0 ? [hold, w] : [w, hold], k, w);
     }
     const sheet = V(px * 0.4, 0.9, THWART.z - 0.08);
     return crouch(px, zz, 0, [sheet.clone().add(V(-0.07, 0.05, 0)), sheet.clone().add(V(0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, -1)));
