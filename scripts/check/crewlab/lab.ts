@@ -18,7 +18,7 @@ const canvas = document.getElementById('c') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9cc3dc);
-scene.add(new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
+const hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff3dd, 0.75 * Math.PI); sun.position.set(-30, 50, 20); scene.add(sun);
 const sea = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x2f6f8f, transparent: true, opacity: 0.85 }));
 sea.rotation.x = -Math.PI / 2; scene.add(sea);
@@ -43,11 +43,12 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean }) {
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
     b.crew = newCrew({ helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) }, tack);
     if (o.place) b.crew.place = o.place;
+    if (o.pole) b.poleWant = true;
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
     (lab as any).hold = h; render();
@@ -68,6 +69,8 @@ const lab = {
   /** The wind on the water now (kt): a puff or a lull. */
   wind(kt: number) { b.ww = { ...b.ww, kt }; },
   cam(yaw: number, pitch: number, dist: number, at?: number[]) { cam = { yaw, pitch, dist, at: at ?? cam.at }; render(); },
+  /** Night (a moonless sky's faint light, as the game's night: render/scene.ts) or day. */
+  night(on: boolean) { hemi.intensity = (on ? 0.12 : 0.85) * Math.PI; sun.intensity = (on ? 0.05 : 0.75) * Math.PI; scene.background = new THREE.Color(on ? 0x0b1220 : 0x9cc3dc); (sea.material as THREE.MeshLambertMaterial).color.set(on ? 0x0a1a24 : 0x2f6f8f); render(); },
   boat: () => b,
   info: () => (document.getElementById('i') as HTMLElement).textContent,
   calls: () => renderer.info.render.calls
