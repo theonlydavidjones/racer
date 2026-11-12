@@ -125,14 +125,43 @@ describe('The crew', () => {
     expect(['windward', 'centre']).toContain(beat(10).crew!.mode);
     expect(beat(20).crew!.mode).toBe('hike');
   });
-  it('go forward downwind with the pole out (in light air both right up on the foredeck: one astride the bow, one between the mast and the forestay)', () => {
-    const b = testBoat({ heading: 195, kt: 4, windKt: 10 }); b.poleWant = true;
-    sail(b, 30, () => { b.h = 195; });
-    expect(b.crew!.mode).toBe('foredeck');
-    const [, mid, bow] = b.crew!.people;
-    expect(bow.pose).toBe('bow'); expect(bow.z).toBeLessThan(-3);
-    expect(mid.pose).toBe('fore'); expect(mid.z).toBeLessThan(-1.5); // the transom clear in light air
-    expect(b.crew!.trim).toBeGreaterThan(0); // trimmed by the bow
+  it('go right up on the foredeck as the pole goes out on a run (one astride the bow, one between the mast and the forestay), in light and moderate air', () => {
+    for (const W of [6, 8, 10]) {
+      const b = testBoat({ heading: 195, kt: 4, windKt: W }); b.poleWant = true;
+      let at = -1;
+      sail(b, 40, t => { b.h = 195; if (at < 0 && b.crew?.people[2]?.pose === 'bow') at = t; });
+      // (straight there as the pole is set, not after a stop at the mast)
+      expect(at).toBeGreaterThan(0); expect(at).toBeLessThan(15);
+      expect(b.crew!.mode).toBe('foredeck');
+      const [, mid, bow] = b.crew!.people;
+      expect(bow.pose).toBe('bow'); expect(bow.z).toBeLessThan(-3);
+      expect(mid.pose).toBe('fore'); expect(mid.z).toBeLessThan(-1.5);
+      expect(b.crew!.trim).toBeGreaterThan(0); // trimmed by the bow
+      // the pole stowed: nothing to do up there, so back aft
+      b.poleWant = false; sail(b, 30, () => { b.h = 195; });
+      expect(b.crew!.people.every(p => p.pose !== 'bow' && p.pose !== 'fore')).toBe(true);
+    }
+  });
+  it('but in a breeze, with the pole out, they stay aft to keep her bow up', () => {
+    for (const W of [14, 18]) {
+      const b = testBoat({ heading: 195, kt: 5, windKt: W }); b.poleWant = true;
+      let wentFwd = false;
+      sail(b, 60, () => { b.h = 195; if (b.crew?.people.some(p => p.pose === 'bow' || p.pose === 'fore')) wentFwd = true; });
+      expect(wentFwd).toBe(false);
+      expect(b.crew!.people.every(p => p.z > 0.5)).toBe(true);
+    }
+  });
+  it("in a gusty breeze near where it stops paying they don't walk up and down the deck with every puff and lull", () => {
+    // (11 kt mean, puffs to 13 and lulls to 9 every 40 s: the layout is for the wind over the last minute)
+    const b = testBoat({ heading: 195, kt: 4, windKt: 11 }); b.poleWant = true;
+    let moves = 0, was = '';
+    sail(b, 300, t => {
+      b.h = 195; b.ww = { ...b.ww, kt: 11 + 2 * Math.sin(2 * Math.PI * t / 40) };
+      const fwd = b.crew?.people.some(p => p.pose === 'bow') ? 'f' : 'a';
+      if (t > 20 && fwd !== was) moves++;
+      was = fwd;
+    });
+    expect(moves).toBeLessThanOrEqual(1);
   });
   it('sailing alone in a breeze she goes slower than with two crew: she heels more, or has to be depowered more', () => {
     const two = beat(20), solo = testBoat({ heading: 360 - beatAngle(20), kt: 4.5, windKt: 20 });
