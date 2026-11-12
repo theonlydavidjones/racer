@@ -26,7 +26,7 @@ export const LANTERN = new THREE.Vector3(0, 0, 0);
 { const um = (CABIN.u0 + 0.06 + CABIN.u1) / 2; LANTERN.set(0, cabinTopAt(um, 0) - 0.3, zAt(um)); }
 
 const INSET = 0.025; // how far inside the outer surfaces the lining lies (m)
-const LINING = new THREE.Color(0xe2d9c6), WOOD = new THREE.Color(0x8a5a36);
+const LINING = new THREE.Color(0xe8e3d6), WOOD = new THREE.Color(0x8a5a36), TEAK = new THREE.Color(0x9a6b3e), SEAM = new THREE.Color(0x2a1d14), CUSHION = new THREE.Color(0x6b4428), SPAR = new THREE.Color(0xb9bec4);
 
 /** The cross-section of the cabin's inside at station u, starboard half, from the sole's middle round to the cabin top's. */
 function section(u: number): { x: number; y: number; wood: boolean; win?: boolean; top?: boolean }[] {
@@ -35,8 +35,8 @@ function section(u: number): { x: number; y: number; wood: boolean; win?: boolea
   const ch = cabinHalf(u) - INSET, dS = deckY(u, cabinHalf(u)), top = cabinTopY(u);
   const pts: { x: number; y: number; wood: boolean; win?: boolean; top?: boolean }[] = [
     { x: 0, y: sole, wood: true }, { x: Math.min(soleHalf, hull(sole) - 0.01), y: sole, wood: true },
-    { x: Math.min(berthFoot, hull(sole)), y: sole, wood: true }, // the berth's front board, up to its top edge
-    { x: berthIn, y: berth, wood: true }, { x: hull(berth), y: berth, wood: true }, // the berth top, out to the hull
+    { x: Math.min(berthFoot, hull(sole)), y: sole, wood: false }, // the berth's front, up to its top edge (the GRP inner moulding, CR 2.405)
+    { x: berthIn, y: berth, wood: false }, { x: hull(berth), y: berth, wood: false }, // the berth top, out to the hull
   ];
   const sheerY = deckY(u, halfBeam(u)) - INSET;
   for (let k = 1; k <= 4; k++) { const y = berth + (sheerY - berth) * k / 4; pts.push({ x: hull(y), y, wood: false }); } // the lining
@@ -131,7 +131,7 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
   // forward, the opening into the forepeak (CR 2.405), and through it the forepeak itself: the berths' platform running
   // on forward under the foredeck, rising toward the bow (the plan's forepeak shelf, about 190 mm over the waterline
   // at St. 12.4), its lining going dark with the distance from the lantern
-  const zF = zAt(uF), fy0 = INTERIOR.berth + 0.04, fy1 = Math.min(deckY(uF, 0), cabinTopY(uF)) - 0.06, fw = 0.24;
+  const zF = zAt(uF), fy0 = INTERIOR.berth + 0.04, fy1 = Math.min(deckY(uF, 0), cabinTopY(uF)) - 0.06, fw = 0.33; // (the opening at least 0.55 m², CR 2.405)
   cap(uF, false, WOOD, [new THREE.Vector2(fw, fy0), new THREE.Vector2(fw, fy1), new THREE.Vector2(-fw, fy1), new THREE.Vector2(-fw, fy0)]);
   { const NF = 6, len = 1.0, v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z), rows: { z: number; w: number; f: number; t: number }[] = [];
     for (let k = 0; k <= NF; k++) {
@@ -145,12 +145,45 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
       for (const sx of [1, -1]) { tri(v(sx * a.w, a.f, a.z), v(sx * a.w, a.t, a.z), v(sx * b.w, b.t, b.z), LINING, LINING, LINING); tri(v(sx * a.w, a.f, a.z), v(sx * b.w, b.t, b.z), v(sx * b.w, b.f, b.z), LINING, LINING, LINING); }
     }
     const e = rows[NF]; tri(v(-e.w, e.f, e.z), v(e.w, e.f, e.z), v(e.w, e.t, e.z), LINING, LINING, LINING); tri(v(-e.w, e.f, e.z), v(e.w, e.t, e.z), v(-e.w, e.t, e.z), LINING, LINING, LINING); }
+  // the furniture, as boxes (each face its own colour, lit by the lantern like the rest)
+  const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, c: THREE.Color) => {
+    const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    const f = (a: THREE.Vector3, b: THREE.Vector3, cc: THREE.Vector3, d: THREE.Vector3) => { tri(a, b, cc, c, c, c); tri(a, cc, d, c, c, c); };
+    f(v(x0, y1, z0), v(x1, y1, z0), v(x1, y1, z1), v(x0, y1, z1)); // top
+    f(v(x0, y0, z1), v(x1, y0, z1), v(x1, y1, z1), v(x0, y1, z1)); f(v(x0, y0, z0), v(x1, y0, z0), v(x1, y1, z0), v(x0, y1, z0)); // ends
+    f(v(x0, y0, z0), v(x0, y0, z1), v(x0, y1, z1), v(x0, y1, z0)); f(v(x1, y0, z0), v(x1, y0, z1), v(x1, y1, z1), v(x1, y1, z0)); // sides
+  };
+  const zMain = zAt(uA), zEnd = zAt(uF) + 0.01, um = (uA + uF) / 2;
+  for (const sx of [1, -1]) {
+    const lo = (a: number, b: number) => (sx > 0 ? [a, b] : [-b, -a]) as [number, number];
+    // the berth's varnished trim along its front edge, and the brown cushions: a seat and a back against the hull
+    box(...lo(INTERIOR.berthIn - 0.02, INTERIOR.berthIn + 0.01), INTERIOR.berth - 0.06, INTERIOR.berth + 0.005, zEnd, zMain - 0.005, TEAK);
+    const hb = Math.min(hullInnerHalf(um, INTERIOR.berth + 0.1), halfBeam(um)) - INSET - 0.02;
+    box(...lo(INTERIOR.berthIn + 0.01, hb - 0.12), INTERIOR.berth, INTERIOR.berth + 0.09, zEnd + 0.02, zMain - 0.03, CUSHION);
+    box(...lo(hb - 0.12, hb - 0.02), INTERIOR.berth + 0.09, INTERIOR.berth + 0.45, zEnd + 0.02, zMain - 0.03, CUSHION);
+    // a shelf along the hull above the berth, its fiddle rail along the front
+    const ys = deckY(um, halfBeam(um)) - 0.16, hs = Math.min(hullInnerHalf(um, ys), halfBeam(um)) - INSET;
+    box(...lo(hs - 0.13, hs), ys - 0.015, ys, zEnd + 0.05, zMain - 0.08, WOOD);
+    box(...lo(hs - 0.135, hs - 0.12), ys, ys + 0.045, zEnd + 0.05, zMain - 0.08, WOOD);
+    // the plywood knees under the deck at the cabin's forward end, where the deck is supported (CR 2.409)
+    { const kz = zEnd + 0.01, kx = cabinHalf(uF) - INSET, ky = deckY(uF, cabinHalf(uF)) - INSET, v = (x: number, y: number) => new THREE.Vector3(sx * x, y, kz);
+      tri(v(kx, ky), v(kx - 0.2, ky), v(kx, ky - 0.22), WOOD, WOOD, WOOD); }
+  }
+  // the floorboards' seams, along the sole (CR 3.40: wooden boards between the berths)
+  for (const x of [-0.12, 0.12]) box(x - 0.004, x + 0.004, INTERIOR.sole, INTERIOR.sole + 0.002, zEnd, zMain - 0.01, SEAM);
+  // a hanging locker to port by the companionway, from the berth up under the side deck (as on Wilma)
+  { const zl0 = zMain - 0.42, zl1 = zMain - 0.01, xi = -(INTERIOR.berthIn + 0.02), xo = -(Math.min(hullInnerHalf(uAt(zMain - 0.2), 0.3), halfBeam(uAt(zMain - 0.2))) - INSET - 0.01), yt = deckY(uAt(zMain - 0.2), cabinHalf(uAt(zMain - 0.2))) - INSET;
+    box(xo, xi, INTERIOR.berth, yt, zl0, zl1, WOOD);
+    box(xi - 0.004, xi + 0.001, INTERIOR.berth + 0.06, yt - 0.06, zl0 + 0.04, zl1 - 0.04, SEAM); } // its door's outline
+  // the mast, stepped on the keel: through the forepeak from the deck down (aluminium, 133 × 110 mm; boatMesh MAST_Z)
+  { const mz = -L / 2 + 0.8 + 2.0 + 0.0665, top = deckY(uAt(mz), 0) - INSET;
+    box(-0.055, 0.055, INTERIOR.sole, top, mz - 0.0665, mz + 0.0665, SPAR); }
   // the lantern itself, hanging from the cabin top on a short chain: a small brass lamp, its glass bright when lit
   { const v = (x: number, y: number, z: number) => new THREE.Vector3(LANTERN.x + x, LANTERN.y + y, LANTERN.z + z), N = 8, r = 0.045, BRASS = new THREE.Color(0xb08a4a), GLOW = new THREE.Color(1, 0.95, 0.85);
     for (let k = 0; k < N; k++) {
       const a0 = 2 * Math.PI * k / N, a1 = 2 * Math.PI * (k + 1) / N, c0 = Math.cos(a0) * r, s0 = Math.sin(a0) * r, c1 = Math.cos(a1) * r, s1 = Math.sin(a1) * r;
       const glass = [v(c0, -0.05, s0), v(c1, -0.05, s1), v(c1, 0.05, s1), v(c0, 0.05, s0)];
-      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); day.push(0.5); } }
+      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); day.push(0.12); /* its glass by day: unlit, only the daylight on it */ } }
       for (const y of [0.05, -0.05]) { const cap3 = [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]; for (const p of cap3) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.4); day.push(0.35); } }
     }
     const top = cabinTopAt(uAt(LANTERN.z), 0) - INSET; // the chain
