@@ -705,7 +705,7 @@ const SLACK_RATE = 0.6;
 /* ---------- who has each line ---------- */
 
 /** Every line you can work, in the order they're shown. */
-export const LINES: readonly LineKey[] = ['mainsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibsheet', 'jibsheetW', 'car'];
+export const LINES: readonly LineKey[] = ['mainsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard', 'jibsheet', 'jibsheetW', 'car'];
 /** Whether you have this line (otherwise the crew works it). */
 export function byHand(b: Boat, k: LineKey): boolean {
   if (!b.isUser) return false;
@@ -798,7 +798,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
     if (b.isUser) {
-      for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) if (byHand(b, k)) fixed[k] = c[k];
+      for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) if (byHand(b, k)) fixed[k] = c[k];
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
     if (b.isUser && byHand(b, 'mainsheet')) fixed.mainsheet = c.mainsheet;
@@ -807,6 +807,11 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, cond?.main, cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
     b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, cond?.main, cond?.jib, b.aws / KT, b.depower, fixed.mainsheet);
+    // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
+    if (b.isUser) {
+      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, cond?.main, cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
+      b.crewIdeal = { ...free, mainsheet: mainsheetFor(wantMain, free.traveller), jibsheet: jibsheetFor(wantJib, c, b.tack) };
+    }
   }
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;
@@ -815,7 +820,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const want: Partial<Record<Ctl, number>> = {};
   // (a line is moved only if it's worth the trip: a skilled crew sees smaller gains, ~0.1% of drive; a novice ~0.4%)
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
-  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'traveller'] as const) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
+  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
   if (!byHand(b, 'mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!byHand(b, 'jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
@@ -828,7 +833,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (b.carPlan) { c.car.S = { ...b.carPlan }; c.car.P = { ...b.carPlan }; }
   }
   on = crewJobs(b, want, dt);
-  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) {
+  for (const k of ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
     if (byHand(b, k)) hand(k); else move(k, want[k]!);
   }
   // the main: traveller and mainsheet together, for the boom angle and the leech tension (whichever the crew has)

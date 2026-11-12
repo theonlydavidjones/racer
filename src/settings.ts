@@ -9,6 +9,8 @@ export interface Settings {
   windDir?: number | null; // (older saves and replays: the wind pinned to one direction; no longer set: windTurn replaced it)
   /** Turn the wind: the kind of day's own direction turned this far (deg, + clockwise), −30 … +30; 0 = as usual. */
   windTurn?: number;
+  /** The sail controls band open (1, the default) or put away (0). */
+  band?: 0 | 1;
   chop?: number; // conditions adjuster: the wind's chop × this (1 = real, 0 = glassy)
   swellHs?: number | null; // conditions adjuster: the ocean swell outside the Gate, m; null = real
   rain?: 0 | 1 | 2; // none, light, heavy
@@ -30,6 +32,7 @@ export interface Settings {
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
   traffic: 0 | 1; // ship traffic through the race area
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
+  rideSwell?: 0 | 1; // the chase camera rides her heave on the swell (smoothed; heave only), on unless switched off
   chartPal?: 'day' | 'dusk'; // the map's NOAA chart: the paper chart's colours, or dark (ECDIS dusk)
   mapLayers?: Partial<Record<'wind' | 'current' | 'sea' | 'fog' | 'ships' | 'laylines' | 'shadows', boolean>>; // the map's layers, on or off (ui/layers.ts; unset: the default)
   sailFrom: string; // Just sail: where you start (a place id, sim/places.ts)
@@ -44,7 +47,7 @@ export interface Settings {
   crew: { n: 0 | 1 | 2; helm: { h: number; w: number; skill?: number }; people: { h: number; w: number; skill?: number }[] }; // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, rideSwell: 1, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
 
 const KEY = 'fbsim-settings-v2';
 /** The most boats you can race against. */
