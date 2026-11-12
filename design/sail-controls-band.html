@@ -1,0 +1,358 @@
+<title>Sail Controls Band</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Saira+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: the live view fills the screen; one compact console sits at the bottom centre, as you see the boat facing
+   forward from the helm (port left). Centre: the piano's tails hanging from their cleats (pull down), the mainsheet on
+   the car in front of the companionway, the traveller track under them. Outboard each side: the jib sheet and the
+   backstay end, pulled outboard toward their winch and thwart end. */
+:root{
+  --ink:#0a1520; --panel:rgba(8,19,28,.86); --rule:rgba(150,196,218,.16); --text:#e9f2f5; --muted:#7f97a4;
+  --accent:#ffb627; --well:#040c13; --port:#ff5d4c; --stbd:#3fd197; --sea:#0d2a3b; --sea2:#174860;
+  --f-inst:"Saira Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--ink);color:var(--text);font:13px/1.3 var(--f-body);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.wrap{height:100%;overflow-x:auto}
+.stage{position:relative;min-width:900px;height:100%;min-height:520px;border:1px solid var(--rule);border-radius:10px;overflow:hidden;
+  background:linear-gradient(#5d7f97 0%,#9db6c4 34%,var(--sea2) 34.2%,var(--sea) 100%)}
+.scene{position:absolute;inset:0 0 120px;display:flex;align-items:center;justify-content:center}
+.scene svg{height:90%;width:auto}
+.mock{position:absolute;left:10px;top:10px;display:flex;gap:6px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.seg button{background:var(--panel);border:0;padding:5px 8px;cursor:pointer;color:var(--muted);font:600 11px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase}
+.seg button[aria-pressed="true"]{color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
+.toggle{position:absolute;right:10px;bottom:10px;background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--muted);font:600 11px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase}
+.k{font-size:9.5px;border:1px solid var(--rule);border-radius:3px;padding:1px 3px;margin-left:4px}
+
+/* the console */
+.band{position:absolute;left:50%;bottom:0;transform:translateX(-50%);background:var(--panel);backdrop-filter:blur(6px);
+  border:1px solid var(--rule);border-bottom:0;border-radius:12px 12px 0 0;padding:6px 12px 6px;
+  display:grid;grid-template-columns:auto;grid-template-rows:auto auto;column-gap:14px;row-gap:4px;align-items:stretch}
+/* the jib cars: a pin on each side's track, forward at the top, inboard toward the middle (7 × 5 pins, as in controls.ts) */
+.jcar{display:flex;flex-direction:column;align-items:center;gap:3px;margin:0 4px;align-self:flex-end}
+.jcar .grid{position:relative;display:grid;grid-template-columns:repeat(5,9px);grid-auto-rows:9px;padding:3px}
+.jcar .rail{position:absolute;background:#03090e;box-shadow:0 0 0 1px #2b4352;border-radius:2px}
+.jcar .pin.off::before{background:none}
+.jcar .bar{transition:top .12s}
+.jcar .pin{position:relative}
+.jcar .pin{width:9px;height:9px;padding:0;border:0;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.jcar .pin::before{content:"";width:3px;height:3px;border-radius:50%;background:#2b4352}
+.jcar .pin:hover::before{background:var(--muted)}
+.jcar .pin.on::before{width:9px;height:7px;border-radius:2px;background:#c9d2d6}
+.jcar.mine .pin.on::before{box-shadow:0 0 0 1.5px var(--accent)}
+.jcar .pin.crew::before{width:7px;height:5px;border-radius:2px;background:none;border:1px dashed var(--text)}
+.jcar .tag{font:600 8.5px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);height:9px}
+.jcar.mine .n{color:var(--accent);cursor:pointer}
+.thwart{grid-column:1/-1;display:flex;align-items:center;gap:14px;border-top:1px solid var(--rule);padding-top:4px}
+.thwart .h.P,.thwart .h.S{width:96px}
+/* the mainsheet: a short tail pulled down, its name beside it to keep the row low */
+.thwart .v.ms{position:relative;margin-left:58px}
+.thwart .v.ms .n{position:absolute;right:100%;top:50%;transform:translateY(-50%);height:auto;margin:0 4px 0 0;white-space:nowrap}
+.thwart .v.ms .well{height:26px}
+.thwart .v.ms .cleat{background:#c9d2d6}
+.h.C .rope{left:0}
+.side{display:flex;flex-direction:column;justify-content:center;padding-top:18px}
+.mid{display:flex;flex-direction:column;gap:4px}
+
+/* names: grey while the crew has the line; amber with ↺ once it's yours (tap the name to hand it back) */
+.n{background:none;border:0;padding:0;font:600 9.5px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);white-space:nowrap;cursor:default}
+.mine .n{color:var(--accent);cursor:pointer}
+
+/* arrows: small chevrons, no boxes */
+.a{width:18px;height:14px;padding:0;border:0;background:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.a svg{width:10px;height:7px;fill:currentColor}
+.a:hover,.a.held{color:var(--text)}
+.a.held{color:var(--accent)}
+
+/* rope: the line's own colour, laid like a three-strand, on a dark well */
+.well{position:relative;background:var(--well);border-radius:4px;box-shadow:inset 0 1px 2px rgba(0,0,0,.6);touch-action:none}
+.rope{position:absolute;border-radius:3px;background:var(--rc);background-image:repeating-linear-gradient(var(--lay,120deg),transparent 0 3px,var(--fleck) 3px 4.5px)}
+.mine .rope{box-shadow:0 0 0 1.5px var(--accent)}
+.t{position:absolute;background:var(--text);opacity:.75;border-radius:1px}
+
+/* piano: tails hang from their cleats; ▼ (or drag down) pulls on */
+.piano{display:flex;gap:2px;align-items:flex-end;justify-content:center}
+.v{width:36px;display:flex;flex-direction:column;align-items:center}
+.v .n{height:20px;display:flex;align-items:flex-end;text-align:center;white-space:normal;line-height:1;margin-bottom:3px}
+.v .cleat{width:14px;height:4px;border-radius:2px 2px 0 0;background:#2fa36f}
+.v.clam .cleat{background:#8f9ba2}
+.v.tackle .cleat{background:#6d7b84;width:10px;height:6px;border-radius:2px}
+.v.ww .cleat{box-shadow:0 0 0 1.5px var(--text)}
+.v .well{width:7px;height:38px;border-radius:0 0 4px 4px;cursor:pointer}
+.v .rope{left:0;right:0;top:0;--lay:30deg}
+.v .t{left:-3px;right:-3px;height:2px;margin-top:-1px}
+.v.off{opacity:.3} .v.off .well{cursor:default}
+.v.winch .cleat{background:#55656e}
+.v.winch .well{border-radius:4px}
+.gapl{width:1px;align-self:stretch;margin:22px 4px 14px;background:var(--rule)}
+
+/* horizontal: the jib sheets and backstay ends, pulled outboard */
+.h{display:flex;flex-direction:column;gap:2px}
+.h .n{align-self:var(--nalign)}
+.h .r{display:flex;align-items:center;gap:1px}
+.h .well{flex:1;height:7px;cursor:pointer}
+.h .rope{top:0;bottom:0}
+.h.P .rope{right:0} .h.S .rope{left:0}
+.h .t{top:-3px;bottom:-3px;width:2px;margin-left:-1px}
+.h.P{--nalign:flex-start} .h.S{--nalign:flex-end}
+
+/* traveller */
+.stack{flex:1;display:flex;flex-direction:column;gap:3px;min-width:320px}
+.trav{display:flex;flex-direction:column}
+.trav .n{width:62px;text-align:left}
+.track .car.bm,.track .ghost.bm{width:30px;height:6px;margin-left:-15px;top:4px;border-radius:3px}
+.track .car.bm{background:var(--rc,#3d8bff);background-image:repeating-linear-gradient(120deg,transparent 0 3px,rgba(255,255,255,.3) 3px 4.5px)}
+.trav.ms.mine .car{box-shadow:0 0 0 1.5px var(--accent)}
+.trav .r{display:flex;align-items:center;gap:3px}
+.track{position:relative;flex:1;height:14px;touch-action:none;cursor:pointer}
+.track .rail{position:absolute;left:0;right:0;top:5px;height:4px;border-radius:2px;background:#000;box-shadow:0 0 0 1px #2b4352}
+.track .cl{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--muted);opacity:.5}
+.track .car{position:absolute;top:1px;width:20px;height:12px;margin-left:-10px;border-radius:3px;background:#c9d2d6;cursor:grab}
+.trav.mine .car{box-shadow:0 0 0 1.5px var(--accent)}
+.track .ghost{position:absolute;top:1px;width:20px;height:12px;margin-left:-10px;border-radius:3px;border:1px dashed var(--text);opacity:.55;pointer-events:none}
+.end{font:700 9px/1 var(--f-inst)} .end.p{color:var(--port)} .end.s{color:var(--stbd)}
+.allcrew{position:absolute;right:10px;top:-19px;background:var(--panel);border:1px solid var(--rule);border-bottom:0;border-radius:6px 6px 0 0;padding:4px 7px;color:var(--muted);cursor:pointer;font:600 9.5px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase}
+.allcrew:hover{color:var(--text)}
+</style>
+
+<div class="wrap"><div class="stage">
+  <div class="scene">
+    <svg viewBox="0 0 240 300" role="img" aria-label="Josephine from above, bow up">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e9f2f5"/></marker></defs>
+      <g id="windArrow"></g>
+      <path d="M120 22 C 150 70, 156 150, 148 250 L 92 250 C 84 150, 90 70, 120 22 Z" fill="#e7ece9" stroke="#5f7f90" stroke-width="1.5"/>
+      <rect x="104" y="196" width="32" height="44" rx="4" fill="#3c5a6a"/>
+      <line x1="96" y1="214" x2="144" y2="214" stroke="#a07a4a" stroke-width="4"/>
+      <circle cx="120" cy="100" r="4" fill="#5f7f90"/>
+      <path id="jib" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+      <line id="boom" stroke="#2a3b47" stroke-width="4" stroke-linecap="round"/>
+      <rect id="tcar" y="210" width="10" height="8" rx="2" fill="#c9d2d6"/>
+    </svg>
+  </div>
+  <div class="mock">
+    <div class="seg" id="tackSeg"><button data-t="S" aria-pressed="true">Stbd tack</button><button data-t="P" aria-pressed="false">Port tack</button></div>
+    <div class="seg" id="windSeg"><button data-w="6">6 kt</button><button data-w="12" aria-pressed="true">12 kt</button><button data-w="20">20 kt</button></div>
+  </div>
+  <button class="toggle" id="bandToggle">Sail controls<span class="k">4</span></button>
+  <div class="band" id="band"></div>
+</div></div>
+
+<script>
+(() => {
+'use strict';
+// values as in src/boat/controls.ts (0..1; sheets 0 = hard in; traveller −1 windward .. +1 leeward)
+const L = { vang:{v:.3,a:1}, outhaul:{v:.6,a:1}, jibCunningham:{v:.3,a:1}, cunningham:{v:.2,a:1}, downhaul:{v:.85,a:1}, jibHalyard:{v:.5,a:1},
+  backstay:{v:.4,a:1}, mainsheet:{v:.1,a:1}, traveller:{v:0,a:1}, jibP:{v:1,a:1}, jibS:{v:.1,a:1} };
+let tack = 'S', wind = 12;
+const working = () => tack === 'S' ? 'jibP' : 'jibS';
+const SHEETS = new Set(['mainsheet','jibP','jibS']);
+
+// Rope colours, chosen to tell the lines apart at a glance: the jib's lines warm (orange sheets, yellow Cunningham),
+// the main's cool (blue sheet, cyan outhaul, violet vang, pink Cunningham, slate main halyard); the jib halyard a rust brown, the backstay white like
+// rigging. None is the port red or starboard green.
+const ROPE = {
+  jibP:['#ff8a3d','rgba(0,0,0,.22)'], jibS:['#ff8a3d','rgba(0,0,0,.22)'], jibCunningham:['#f2c230','rgba(0,0,0,.2)'],
+  mainsheet:['#3d8bff','rgba(255,255,255,.3)'], outhaul:['#2ec4d6','rgba(0,0,0,.2)'], vang:['#9b6bff','rgba(255,255,255,.22)'],
+  cunningham:['#ec6aae','rgba(0,0,0,.2)'], downhaul:['#8fa3b8','rgba(0,0,0,.25)'], jibHalyard:['#c0652a','rgba(0,0,0,.25)'], backstay:['#e9eef0','rgba(60,70,80,.5)'],
+};
+const NAME = { vang:'Vang', outhaul:'Outhaul', jibCunningham:'Jib Cunningham', cunningham:'Main Cunningham', downhaul:'Main halyard', jibHalyard:'Jib halyard',
+  backstay:'Backstay', mainsheet:'Mainsheet', jibP:'Port jib sheet', jibS:'Stbd jib sheet' };
+const SHORT = { vang:'Vang', outhaul:'Out-<br>haul', jibCunningham:'Jib<br>Cunn', cunningham:'Main<br>Cunn', downhaul:'Main<br>hal.', jibHalyard:'Jib<br>hal.',
+  mainsheet:'Mainsheet', backstay:'Backstay', jibP:'Jib<br>sheet', jibS:'Jib<br>sheet' };
+const ENDS = { vang:['off','bar tight'], outhaul:['3 cm off the band','on the band'], jibCunningham:['off','tight'], cunningham:['off','tight'],
+  downhaul:['eased: soft luff','tight: sail right up, luff hard'], jibHalyard:['eased: soft luff','tight: luff hard'], backstay:['off: straight mast','bar tight: bent mast'], mainsheet:['eased right out','hard in'],
+  jibP:['eased / slack','hard in'], jibS:['eased / slack','hard in'] };
+const tip = k => `${NAME[k]}: ${ENDS[k][0]} … ${ENDS[k][1]}. Click the arrows a step at a time, hold them, or drag the line. Amber name: yours; tap it to hand it back to the crew.`;
+const vars = k => `--rc:${ROPE[k][0]};--fleck:${ROPE[k][1]}`;
+const chev = dir => `<svg viewBox="0 0 10 7"><path d="${{u:'M0 7 L5 0 L10 7Z', d:'M0 0 L5 7 L10 0Z'}[dir] ?? ''}"/></svg>`;
+const chevH = dir => `<svg viewBox="0 0 7 10" style="width:7px;height:10px"><path d="${dir === 'l' ? 'M7 0 L0 5 L7 10Z' : 'M0 0 L7 5 L0 10Z'}"/></svg>`;
+
+// rough stand-ins for the crew's close-hauled settings (the build uses controls.ts)
+function crew(k){
+  const t = Math.min(1, Math.max(0, (wind - 6) / 14)), m = (a,b) => a + (b - a) * t;
+  return ({ vang:m(.1,.65), outhaul:m(.3,.95), jibCunningham:m(.1,.75), cunningham:m(0,.75), downhaul:.85, jibHalyard:.5, backstay:m(.1,.85),
+    mainsheet: wind === 12 ? .1 : .16, traveller: wind <= 6 ? -.4 : wind >= 20 ? .6 : 0,
+    jibP: k === working() ? (wind <= 6 ? .16 : .1) : 1, jibS: k === working() ? (wind <= 6 ? .16 : .1) : 1 })[k];
+}
+// the jib cars: fore 0 (forward) .. 6, ins 0 (inboard) .. 4; the leeward one carries the sheet's load
+const CAR = { P:{fore:3,ins:1,a:1}, S:{fore:3,ins:1,a:1} };
+const carCrew = () => wind <= 6 ? {fore:2,ins:1} : wind >= 20 ? {fore:4,ins:3} : {fore:3,ins:1};   // stand-ins
+const carLead = ins => 8 + 1.25 * ins;   // controls.ts carLead
+const leeCar = () => CAR[tack === 'S' ? 'P' : 'S'], wwCar = () => CAR[tack];
+const jcar = side => {
+  let pins = '';
+  // An H: the two legs are fore-and-aft tracks; the crossbar slides along them (pinned at 7 stops), and the car slides
+  // across the crossbar (pinned at 5). Click anywhere: the bar goes to that row and the car to that hole.
+  for (let f = 0; f < 7; f++) for (let c = 0; c < 5; c++) {
+    const ins = side === 'P' ? 4 - c : c;   // inboard toward the middle of the band
+    pins += `<button class="pin" type="button" data-car="${side}" data-fore="${f}" data-ins="${ins}" aria-label="${side === 'P' ? 'Port' : 'Starboard'} jib car: pin ${f + 1} from forward, ${ins + 1} from inboard"></button>`;
+  }
+  return `<div class="jcar" data-jcar="${side}" title="${side === 'P' ? 'Port' : 'Starboard'} jib car: click a pin to move it. Forward is up, inboard toward the middle. Forward closes the jib's leech; aft opens it. Inboard points higher; outboard gives power. The crew moves the loaded (leeward) one at the next tack."><button class="n" type="button" data-ncar="${side}">Jib car</button><div class="grid"><span class="rail" style="left:6px;width:3px;top:5px;bottom:5px"></span><span class="rail" style="right:6px;width:3px;top:5px;bottom:5px"></span><span class="rail bar" style="left:6px;right:6px;height:3px"></span>${pins}</div><span class="tag"></span></div>`;
+};
+const lead = 9.25;
+const boomAngle = () => Math.min(85, Math.max(-2, 9.5 * L.traveller.v + 80 * Math.pow(L.mainsheet.v, 1.5)));
+const jibClew = () => Math.min(Math.min(68, carLead(leeCar().ins) + 70 * Math.pow(L[working()].v, 1.4)), -carLead(wwCar().ins) + 140 * Math.pow(L[tack === 'S' ? 'jibS' : 'jibP'].v, 1.4));
+
+// --- building ---
+// vertical: ▲ eases, ▼ pulls on (you pull a tail down toward you)
+const vert = (k, side, cls = '') => `<div class="v ${cls}" data-k="${k}" data-side="${side}" title="${tip(k)}" style="${vars(k)}">
+  <button class="n" type="button" data-n="${k}">${SHORT[k]}</button>
+  <button class="a" type="button" data-k="${k}" data-d="-1" aria-label="${NAME[k]}: ease">${chev('u')}</button>
+  <div class="cleat"></div><div class="well" data-bar="${k}" data-dir="v"><div class="rope"></div><div class="t"></div></div>
+  <button class="a" type="button" data-k="${k}" data-d="1" aria-label="${NAME[k]}: pull on">${chev('d')}</button></div>`;
+// horizontal: pulled outboard, toward its winch or the thwart's end
+const horiz = (k, side) => {
+  const outL = side === 'P'; // the mainsheet ('C') reads left to right: ▶ trims
+  const pull = `<button class="a" type="button" data-k="${k}" data-d="1" aria-label="${NAME[k]}: pull on">${chevH(outL ? 'l' : 'r')}</button>`;
+  const ease = `<button class="a" type="button" data-k="${k}" data-d="-1" aria-label="${NAME[k]}: ease">${chevH(outL ? 'r' : 'l')}</button>`;
+  return `<div class="h ${side}" data-k="${k}" data-side="${side}" title="${tip(k)}" style="${vars(k)}">
+    <button class="n" type="button" data-n="${k}">${SHORT[k]}</button>
+    <div class="r">${outL ? pull : ease}<div class="well" data-bar="${k}" data-dir="${outL ? 'hl' : 'hr'}"><div class="rope"></div><div class="t"></div></div>${outL ? ease : pull}</div></div>`;
+};
+
+document.getElementById('band').innerHTML =
+  `<button class="allcrew" type="button" id="allCrew" title="Hand every line back to the crew">All ↺</button>
+  <div class="mid">
+    <div class="piano">${jcar('P')}${vert('jibP','P','winch')}<span class="gapl"></span>${vert('downhaul','P','tackle')}${vert('jibCunningham','P')}${vert('cunningham','P','clam')}${vert('outhaul','P')}${vert('vang','P')}
+      <span class="gapl"></span>
+      ${vert('vang','S')}${vert('outhaul','S')}${vert('jibCunningham','S')}${vert('jibHalyard','S')}<span class="gapl"></span>${vert('jibS','S','winch')}${jcar('S')}</div>
+  </div>
+  <div class="thwart">${horiz('backstay','P')}
+    <div class="stack">
+    <div class="trav ms" data-k="mainsheet" title="Mainsheet: the blue marker is the boom. Move it toward the centreline to trim, out to leeward to ease. Amber name: yours; tap it to hand it back.">
+      <div class="r"><button class="n" type="button" data-n="mainsheet">Mainsheet</button><span class="end p">P</span>
+      <button class="a" type="button" data-k="boom" data-d="-1" aria-label="Boom toward port">${chevH('l')}</button>
+      <div class="track" id="btrack" aria-label="Boom"><div class="rail"></div><div class="cl"></div><div class="ghost bm" id="bghost"></div><div class="car bm" id="bmark"></div></div>
+      <button class="a" type="button" data-k="boom" data-d="1" aria-label="Boom toward starboard">${chevH('r')}</button><span class="end s">S</span></div>
+    </div>
+    <div class="trav" data-k="traveller" title="Traveller: drag the car, or click the arrows. Amber name: yours; tap it to hand it back.">
+      <div class="r"><button class="n" type="button" data-n="traveller">Traveller</button><span class="end p">P</span>
+      <button class="a" type="button" data-k="traveller" data-d="-1" aria-label="Car to port">${chevH('l')}</button>
+      <div class="track" id="track" role="slider" tabindex="0" aria-label="Traveller car"><div class="rail"></div><div class="cl"></div><div class="ghost" id="ghost"></div><div class="car" id="car"></div></div>
+      <button class="a" type="button" data-k="traveller" data-d="1" aria-label="Car to starboard">${chevH('r')}</button><span class="end s">S</span></div>
+    </div></div>${horiz('backstay','S')}
+  </div>`;
+
+// --- input ---
+// one click is one step ("a click or two"); holding keeps pulling. The jib winches aren't self-tailing, so holding
+// trim in slows as the wind loads the sheet.
+const STEP = 0.05;
+const carX = () => tack === 'S' ? -L.traveller.v : L.traveller.v;
+const setCar = x => { x = Math.min(1, Math.max(-1, x)); L.traveller.v = tack === 'S' ? -x : x; L.traveller.a = 0; };
+const fillOf = k => SHEETS.has(k) ? 1 - L[k].v : L[k].v;
+const setFill = (k, f) => { f = Math.min(1, Math.max(0, f)); L[k].v = SHEETS.has(k) ? 1 - f : f; L[k].a = 0; };
+const rate = (k, d) => k === 'boom' ? 0.25 : (k === 'jibP' || k === 'jibS') && d > 0 ? 0.5 * (1 - 0.5 * Math.min(1, Math.max(0, (wind - 6) / 14))) : 0.5;
+// the boom: moving it toward leeward eases the sheet, toward the centreline trims it
+const lee = () => tack === 'S' ? -1 : 1;
+const step = (k, d, amt) => k === 'traveller' ? setCar(carX() + d * amt * 2)
+  : k === 'boom' ? setFill('mainsheet', fillOf('mainsheet') + (d === lee() ? -amt : amt)) : setFill(k, fillOf(k) + d * amt);
+// where the boom's end sits across the boat, as you see it from the helm: −1 port .. +1 starboard (sin of its angle)
+const boomX = a => lee() * Math.sin(Math.max(-5, a) * Math.PI / 180);
+const mainsheetFor = (angle, trav) => Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - 9.5 * trav) / 80, 1 / 1.5)));
+let hold = null, drag = null;
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest('button[data-d]');
+  if (b) { e.preventDefault(); step(b.dataset.k, +b.dataset.d, STEP); hold = { k: b.dataset.k, d: +b.dataset.d, el: b, t0: performance.now() }; b.classList.add('held'); return; }
+  const bar = e.target.closest('[data-bar]'); if (bar) { drag = bar; bar.setPointerCapture(e.pointerId); dragTo(e); }
+});
+// dragging: down, or outboard, pulls on
+function dragTo(e){
+  const r = drag.getBoundingClientRect(), k = drag.dataset.bar, dir = drag.dataset.dir;
+  setFill(k, dir === 'v' ? (e.clientY - r.top) / r.height : dir === 'hl' ? (r.right - e.clientX) / r.width : (e.clientX - r.left) / r.width);
+}
+addEventListener('pointermove', e => drag && dragTo(e));
+const rel = () => { if (hold) { hold.el.classList.remove('held'); hold = null; } drag = null; };
+addEventListener('pointerup', rel); addEventListener('pointercancel', rel);
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('button[data-d]')) { e.preventDefault(); step(e.target.dataset.k, +e.target.dataset.d, STEP); }
+  if (e.key === '4') toggle();
+  if (e.target.id === 'track' && /Arrow(Left|Right)/.test(e.key)) { e.preventDefault(); setCar(carX() + (e.key === 'ArrowRight' ? .1 : -.1)); }
+});
+document.addEventListener('click', e => {
+  const n = e.target.closest('button[data-n]'); if (n) L[n.dataset.n].a = 1;
+  const t = e.target.closest('#tackSeg button'); if (t) { const x = carX(); tack = t.dataset.t; if (!L.traveller.a) setCar(x); seg('tackSeg','t',tack); }
+  const wd = e.target.closest('#windSeg button'); if (wd) { wind = +wd.dataset.w; seg('windSeg','w',String(wind)); }
+});
+const seg = (id, a, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[a] === v)));
+document.getElementById('allCrew').onclick = () => { for (const k in L) L[k].a = 1; CAR.P.a = CAR.S.a = 1; };
+document.addEventListener('click', e => {
+  const pin = e.target.closest('.pin'); if (pin) { const c = CAR[pin.dataset.car]; c.fore = +pin.dataset.fore; c.ins = +pin.dataset.ins; c.a = 0; }
+  const nc = e.target.closest('[data-ncar]'); if (nc) CAR[nc.dataset.ncar].a = 1;
+});
+const toggle = () => { const b = document.getElementById('band'); b.hidden = !b.hidden; };
+document.getElementById('bandToggle').onclick = toggle;
+const track = document.getElementById('track'); let tdrag = false;
+const fromPtr = e => { const r = track.getBoundingClientRect(); setCar((e.clientX - r.left) / r.width * 2 - 1); };
+track.addEventListener('pointerdown', e => { tdrag = true; track.setPointerCapture(e.pointerId); fromPtr(e); });
+track.addEventListener('pointermove', e => tdrag && fromPtr(e));
+track.addEventListener('pointerup', () => tdrag = false);
+const btrack = document.getElementById('btrack'); let bdrag = false;
+const boomPtr = e => { const r = btrack.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 2 - 1;
+  const ang = Math.asin(Math.min(1, Math.max(0, x * lee()))) * 180 / Math.PI;
+  L.mainsheet.v = mainsheetFor(ang, L.traveller.v); L.mainsheet.a = 0; };
+btrack.addEventListener('pointerdown', e => { bdrag = true; btrack.setPointerCapture(e.pointerId); boomPtr(e); });
+btrack.addEventListener('pointermove', e => bdrag && boomPtr(e));
+btrack.addEventListener('pointerup', () => bdrag = false);
+
+// --- drawing ---
+const $ = id => document.getElementById(id);
+const DUAL = ['vang','outhaul','jibCunningham','backstay'];
+function draw(){
+  document.querySelectorAll('.v[data-k], .h[data-k]').forEach(el => {
+    const k = el.dataset.k, l = L[k], f = fillOf(k), tg = SHEETS.has(k) ? 1 - crew(k) : crew(k);
+    el.classList.toggle('mine', !l.a);
+    el.classList.toggle('ww', DUAL.includes(k) && el.dataset.side === tack);
+    const rope = el.querySelector('.rope'), t = el.querySelector('.t');
+    if (el.classList.contains('v')) { rope.style.height = (f * 100) + '%'; t.style.top = (tg * 100) + '%'; }
+    else { rope.style.width = (f * 100) + '%'; t.style.left = ((el.dataset.side === 'P' ? 1 - tg : tg) * 100) + '%'; }
+    t.hidden = !!l.a;
+  });
+  document.querySelector('.trav:not(.ms)').classList.toggle('mine', !L.traveller.a);
+  document.querySelector('.trav.ms').classList.toggle('mine', !L.mainsheet.a);
+  $('bmark').style.left = ((boomX(boomAngle()) + 1) * 50) + '%';
+  const crewBoom = Math.min(85, Math.max(-2, 9.5 * crew('traveller') + 80 * Math.pow(crew('mainsheet'), 1.5)));
+  $('bghost').style.left = ((boomX(crewBoom) + 1) * 50) + '%'; $('bghost').hidden = !!L.mainsheet.a;
+  const x = carX(); $('car').style.left = ((x + 1) * 50) + '%';
+  const gx = tack === 'S' ? -crew('traveller') : crew('traveller');
+  $('ghost').style.left = ((gx + 1) * 50) + '%'; $('ghost').hidden = !!L.traveller.a;
+
+  const s = tack === 'S' ? -1 : 1, b = boomAngle() * Math.PI / 180, c = jibClew() * Math.PI / 180;
+  const bm = $('boom'); bm.setAttribute('x1',120); bm.setAttribute('y1',100);
+  bm.setAttribute('x2',(120 + s * Math.sin(b) * 112).toFixed(1)); bm.setAttribute('y2',(100 + Math.cos(b) * 112).toFixed(1));
+  const cx = 120 + s * Math.sin(c) * 64, cy = 30 + Math.cos(c) * 64;
+  $('jib').setAttribute('d', `M120 30 Q ${((120 + cx) / 2 + s * 6 * Math.cos(c)).toFixed(1)} ${((30 + cy) / 2).toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)}`);
+  $('tcar').setAttribute('x', (120 + x * 22 - 5).toFixed(1));
+  const wx = tack === 'S' ? 1 : -1;
+  $('windArrow').innerHTML = `<line x1="${120 + wx * 98}" y1="4" x2="${120 + wx * 42}" y2="70" stroke="#e9f2f5" stroke-width="2" marker-end="url(#ah)"/>
+    <text x="${120 + wx * 76}" y="8" fill="#e9f2f5" font-size="11" font-family="Saira Semi Condensed, sans-serif" text-anchor="${wx > 0 ? 'end' : 'start'}">${wind} kt</text>`;
+}
+function frame(now){
+  const dt = Math.min(.05, (now - (frame.t || now)) / 1000); frame.t = now;
+  // a held arrow starts moving on its own after a short pause, so a single click stays a single step
+  if (hold && now - hold.t0 > 300) step(hold.k, hold.d, rate(hold.k, hold.d) * dt);
+  for (const k in L) if (L[k].a) L[k].v += (crew(k) - L[k].v) * Math.min(1, dt * 1.5);
+  for (const sd of ['P','S']) if (CAR[sd].a) Object.assign(CAR[sd], carCrew());
+  document.querySelectorAll('.jcar').forEach(el => {
+    const sd = el.dataset.jcar, c = CAR[sd], cc = carCrew();
+    el.classList.toggle('mine', !c.a);
+    el.querySelector('.tag').textContent = sd === (tack === 'S' ? 'P' : 'S') ? 'loaded' : '';
+    el.querySelector('.bar').style.top = (3 + c.fore * 9 + 3) + 'px';
+    el.querySelectorAll('.pin').forEach(p => {
+      const f = +p.dataset.fore, i = +p.dataset.ins;
+      p.classList.toggle('off', f !== c.fore && i !== 0 && i !== 4);   // holes show on the legs and along the bar
+      p.classList.toggle('on', f === c.fore && i === c.ins);
+      p.classList.toggle('crew', !c.a && f === cc.fore && i === cc.ins && !(f === c.fore && i === c.ins));
+    });
+  });
+  draw(); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
