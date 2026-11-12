@@ -81,8 +81,9 @@ What's planned, roughly in order. Done work is described in the README.
    clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
    20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
    the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
-   Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
-   away below her proper course to blanket.
+   Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
+   11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by; 23.2
+   catches a boat that bore away well below her proper course (20°+) onto the wind of a boat on another leg.
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before

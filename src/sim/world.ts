@@ -844,7 +844,11 @@ export class World {
       const h = this.hHist[i] ??= [];
       if (this.steps % RECORD_EVERY_STEPS === 0) { h.push(b.h); if (h.length > keep) h.shift(); }
       b.headingAgo = h.length ? h[0] : b.h;
-      b.aboveProper = this.t > 0 && b.started && !b.finished && !b.retired && b.twa < properTwa(this, b) - 10;
+      const racing = this.t > 0 && b.started && !b.finished && !b.retired, pt = racing ? properTwa(this, b) : 0;
+      b.aboveProper = racing && b.twa < pt - 10;
+      // (well below it: farther off the wind than her course to the mark, by more than footing for speed or a duck would
+      // take her for long; Rule 23.2 also asks that she bore away onto the other boat's wind: see rules/pairs.ts)
+      b.belowProper = racing && !b.tacking && b.penalty <= 0 && b.twa > pt + BELOW_PROPER;
     });
   }
 
@@ -1454,6 +1458,9 @@ export function youTackPays(hailer: Boat, to: Boat): boolean {
  * possible with no other boats around. Straight at her next mark if she can lay it; close-hauled
  * if it's upwind; no deeper than the best downwind angle if it's dead downwind.
  */
+/** Rule 23.2: how far (deg) farther off the wind than her proper course counts as leaving it. */
+export const BELOW_PROPER = 20;
+
 export function properTwa(w: World, b: Boat): number {
   const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), twa = Math.abs(wrap(b.ww.from - toMark));
   return Math.min(Math.max(twa, beatAngle(b.ww.kt)), Math.max(runAngle(b.ww.kt), 150));

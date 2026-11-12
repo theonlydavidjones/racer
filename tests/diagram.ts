@@ -21,6 +21,8 @@ export function boat(name: string, o: {
   headingAgo?: number;
   /** sailing above her proper course (Rules 17, 23) */
   aboveProper?: boolean;
+  /** sailing well below her proper course (Rule 23.2) */
+  belowProper?: boolean;
   /** moving astern by backing a sail (Rule 21.3) */
   backing?: boolean;
   /** has finished: no longer racing (Rule 23.1) */
@@ -33,7 +35,7 @@ export function boat(name: string, o: {
     id: nextId++, name, x: o.at[0], y: o.at[1], h: o.heading, vx: u.x * s, vy: u.y * s,
     tack: rel >= 0 ? 'S' : 'P', tacking: o.tacking ?? false, lastTackT: o.lastTackT ?? -999,
     penalty: o.penalty ?? 0, ocs: o.ocs ?? false, started: o.started ?? true, leg: o.leg ?? 0,
-    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false, backing: o.backing, finished: o.finished, retired: o.retired
+    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false, belowProper: o.belowProper ?? false, backing: o.backing, finished: o.finished, retired: o.retired
   };
 }
 
