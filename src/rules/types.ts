@@ -151,7 +151,7 @@ export interface Hail {
 }
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null, });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 

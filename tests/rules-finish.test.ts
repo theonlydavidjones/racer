@@ -1,5 +1,5 @@
 // The racing rules finished (RRS 2025–2028): 20.2(e)'s end, 20.3 passing on a hail, a boat as the obstruction
-// (rule 19, WS Case 11; and rule 20), and blanketing as rule 23 interference.
+// (rule 19, WS Case 11; and rule 20), and taking a boat's wind as tactics, not rule 23 interference (the owner's call).
 import { settleTrim } from '../src/boat/physics';
 import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
