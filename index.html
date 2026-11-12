@@ -17,12 +17,23 @@
 <header id="hud">
   <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
   <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
+  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The grey tick is your heading on the other tack (or gybe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
+</header>
+<!-- the wind and the water, and the app's own buttons: top right -->
+<div id="hudRight">
   <div class="pod"><span class="lab">TWS <i>kt</i></span><span class="val" id="tws">12</span><span class="sub" id="shiftLab">270°</span></div>
   <div class="pod"><span class="lab"><span id="tideLab">Tide</span> <i>kt</i></span><span class="val" id="tideVal">Slack</span><span class="sub" id="seaSub">no waves</span></div>
-</header>
-<canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas>
+  <!-- the app: small and dim -->
+<div class="ibar dim" id="appBar">
+  <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
+  <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
+  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
+  <button class="ib" id="bExit" type="button" title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
+</div>
+</div>
 <canvas id="dial" aria-label="Wind angle dial"></canvas>
-<div id="sigPanel" hidden><div class="sig-lab">Signals</div><div id="sigFlags"></div><div id="sigText"></div></div>
+<button type="button" id="sigPanel" hidden title="Flags flying now on the committee boat. Click for the flag index."><span class="sig-lab">Flags</span><span id="sigFlags"></span><span id="sigText"></span></button>
+<div id="flagIndex" hidden role="dialog" aria-labelledby="fiTitle"><button type="button" class="fi-x" id="bFlagIndexX" aria-label="Close the flag index">×</button><h3 id="fiTitle">Flag index</h3><div id="fiBody"></div></div>
 <canvas id="map" aria-label="Course map, tap to zoom"></canvas>
 <button type="button" id="bMapLayers" class="maplayers" title="Map layers: wind, current, sea, fog, ships…" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5Z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
 <div id="mapLayersPop" class="layerpop" hidden></div>
@@ -93,13 +104,6 @@
       <button class="tp-btn" type="button" data-pa="off" title="Hand the tiller back to you">Standby</button>
     </div>
   </div>
-</div>
-<!-- the app: small and dim, top right -->
-<div class="ibar dim" id="appBar">
-  <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
-  <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
-  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
-  <button class="ib" id="bExit" type="button" title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
 </div>
 <!-- the chart: beside the map (Course/Navigator is with the helm's buttons, bottom left) -->
 <div class="ibar col" id="mapBar">

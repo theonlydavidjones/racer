@@ -86,72 +86,51 @@ export class Hud {
   /** Mean close-hauled heading on each tack over the last couple of minutes (the reference for lifts and headers). */
   private meanHdg: Record<'S' | 'P', number | null> = { S: null, P: null };
   /**
-   * The tactical compass: a tape of headings around yours, with the bearing to the next mark, the wind, the heading
-   * you'd sail on the other tack (or gybe), and your average close-hauled heading on this tack. Steer above the
-   * average and you're lifted; below it, headed.
+   * The heading pod (the chase-view layout): her heading, over a tape 50° either side of it. Blue, where the true wind
+   * comes from; yellow, the next mark (an arrow at the tape's edge when either is off it); a grey tick under the tape
+   * for the heading she'd sail on the other tack (or after a gybe), a white one for her average close-hauled heading
+   * on this tack. Steer above the average and she's lifted, below it headed: the pod's label says by how much.
    */
   private compass(w: World, u: Boat, dt: number): void {
-    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), cx = W / 2, span = 70, px = W / (2 * span);
+    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), cx = W / 2, span = 50, px = (W - 12) / (2 * span);
     ctx.clearRect(0, 0, W, H);
     const h = u.h, x = (b: number) => cx + wrap(b - h) * px;
-    const nums: [string, number][] = []; // (the numbers are drawn last, where no label sits on them)
-    // ticks and numbers
-    ctx.strokeStyle = 'rgba(150,196,218,.45)'; ctx.fillStyle = '#c9dbe4'; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+    $('hdg').textContent = String(Math.round(n360(h)) % 360).padStart(3, '0') + '°';
+    // ticks every 5°, longer every 10°, numbers every 30° (N E S W at the cardinals)
+    ctx.strokeStyle = 'rgba(150,196,218,.45)'; ctx.fillStyle = '#9fb3bf'; ctx.font = '700 9px system-ui, sans-serif'; ctx.textAlign = 'center';
     for (let d = Math.ceil((h - span) / 5) * 5; d <= h + span; d += 5) {
       const X = x(d), big = d % 10 === 0;
-      ctx.beginPath(); ctx.moveTo(X, H - 1); ctx.lineTo(X, H - (big ? 12 : 7)); ctx.stroke();
-      if (d % 30 === 0) { const n = ((d % 360) + 360) % 360; nums.push([({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' } as Record<number, string>)[n] ?? String(n).padStart(3, '0'), X]); }
+      ctx.beginPath(); ctx.moveTo(X, H - 1); ctx.lineTo(X, H - (big ? 8 : 5)); ctx.stroke();
+      if (d % 30 === 0) { const n = ((d % 360) + 360) % 360; ctx.fillText(({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' } as Record<number, string>)[n] ?? String(n).padStart(3, '0'), X, H - 10); }
     }
-    // the labels are laid out after every marker is drawn, pushed apart so none sits on another (two marks off the same
-    // end of the tape, or the wind under the heading readout when she's head to wind)
-    const labels: { X: number; text: string; col: string; top: boolean }[] = [];
-    const marker = (b: number, col: string, label: string, top: boolean) => {
-      let X = x(b); const off = X < 8 || X > W - 8; X = Math.max(8, Math.min(W - 8, X));
-      ctx.fillStyle = col; ctx.beginPath();
-      if (top) { ctx.moveTo(X - 5, 2); ctx.lineTo(X + 5, 2); ctx.lineTo(X, 9); } else { ctx.moveTo(X - 4, 13); ctx.lineTo(X, 9); ctx.lineTo(X + 4, 13); }
+    // a marker from the top edge (wind, mark): a triangle on the tape, or an arrow at the end when it's off the tape
+    const top = (b: number, col: string) => {
+      const X = x(b); ctx.fillStyle = col; ctx.beginPath();
+      if (X < 6) { ctx.moveTo(0, 6); ctx.lineTo(7, 1); ctx.lineTo(7, 11); }
+      else if (X > W - 6) { ctx.moveTo(W, 6); ctx.lineTo(W - 7, 1); ctx.lineTo(W - 7, 11); }
+      else { ctx.moveTo(X - 5, 0); ctx.lineTo(X + 5, 0); ctx.lineTo(X, 7); }
       ctx.fill();
-      labels.push({ X, text: off ? (X < cx ? '◂ ' : '') + label + (X > cx ? ' ▸' : '') : label, col, top });
     };
-    const placeLabels = (taken: [number, number][]) => {
-      ctx.font = '700 10px system-ui, sans-serif'; ctx.textAlign = 'center';
-      // (both rows share one layout: the top labels sit only 4 px above the bottom ones)
-      const busy: [number, number][] = [...taken];
-      for (const row of [true, false]) {
-        for (const l of labels.filter(l => l.top === row).sort((a, b) => a.X - b.X)) {
-          const w2 = ctx.measureText(l.text).width / 2 + 3;
-          let c = Math.max(w2 + 2, Math.min(W - w2 - 2, l.X));
-          // slide right past anything in the way; if that runs off the tape, slide left instead
-          const clash = (c: number) => busy.find(([a, b]) => c + w2 > a && c - w2 < b);
-          for (let k; (k = clash(c)) && c < W - w2;) c = k[1] + w2 + 1;
-          if (c > W - w2 - 2 || clash(c)) { c = Math.min(W - w2 - 2, l.X); for (let k; (k = clash(c)) && c > w2;) c = k[0] - w2 - 1; }
-          busy.push([c - w2, c + w2]); if (!row) low.push([c - w2, c + w2]); ctx.fillStyle = l.col; ctx.fillText(l.text, c, row ? 20 : 24);
-        }
-      }
-      // the compass numbers, one row below the bottom labels: a number under a label gives way to it
-      ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = '#c9dbe4';
-      for (const [t, X] of nums) { const hw = ctx.measureText(t).width / 2 + 2; if (!low.some(([a, b]) => X + hw > a && X - hw < b)) ctx.fillText(t, X, H - 16); }
-    };
-    const low: [number, number][] = [];
+    // a small tick under the tape (the other tack, the average): only while it's on the tape
+    const low = (b: number, col: string) => { const X = x(b); if (X < 2 || X > W - 2) return; ctx.fillStyle = col; ctx.fillRect(X - 1, H - 10, 2, 10); };
     const upwind = u.twa < 80, from = u.ww.from;
-    // the other tack (or gybe): where you'd point after turning
     const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
-    marker(other, '#9fb3bf', upwind ? 'tack' : 'gybe', false);
+    low(other, '#7f949f');
     // average close-hauled heading on this tack: a slow running mean while you're close-hauled
     if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
-    const mean = this.meanHdg[u.tack];
+    const mean = this.meanHdg[u.tack], lift = $('hdgLift');
+    let note = '', cls = '';
     if (upwind && mean != null) {
-      marker(mean, '#e8e8e8', 'avg', false);
+      low(mean, '#e8e8e8');
       const d = wrap(h - mean) * (u.tack === 'S' ? -1 : 1); // starboard: lifted when heading is higher (smaller) than the mean
-      if (Math.abs(d) >= 3) { ctx.fillStyle = d > 0 ? '#3fd197' : '#ff6a5c'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`, cx - 34, 13); }
+      if (Math.abs(d) >= 3) { note = d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`; cls = d > 0 ? 'lift' : 'head'; }
     }
-    marker(from, '#6fb7ff', 'wind', true);
+    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls; }
+    top(from, '#6fb7ff');
     const m = w.nextMark(u);
-    if (m) marker(brg(m.p.x - u.x, m.p.y - u.y), '#ffd21a', m.key === 'dest' ? 'DEST' : m.name.split(' ')[0], true);
-    // the lubber line and the heading
+    if (m) top(brg(m.p.x - u.x, m.p.y - u.y), '#ffd21a');
+    // the lubber line
     ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
-    ctx.fillStyle = '#ffb35c'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(Math.round(n360(h))).padStart(3, '0') + '°', cx + 22, 13);
-    // (the heading readout and the lifted/headed note keep their places; the labels go round them)
-    placeLabels([[cx + 2, cx + 44], ...(upwind && mean != null ? [[cx - 72, cx - 2] as [number, number]] : [])]);
   }
 
   private trCache: { key: string; t: ReturnType<World['laylineTransit']> } = { key: '', t: null };
