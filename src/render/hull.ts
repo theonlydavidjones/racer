@@ -428,7 +428,18 @@ export const cabinSideH = (u: number) => (CABIN.h + CABIN_RISE * Math.min(1, Mat
 export const CABIN_NOSE = 0.38;
 function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sqrt(1 - (1 - d / CABIN_NOSE) ** 2); }
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
-export const cabinTopAt = (u: number, x: number) => { const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN); return cabinTopY(u) + CABIN.crown * cabinNose(u) * Math.max(0, 1 - (x / w) ** 2); };
+/**
+ * The cabin top is a slice of a cone lying on its side, its point toward the bow (the owner, of Josephine): each section
+ * across it is a circular arc, and as on a cone the arc's radius goes with the roof's width, so as the trunk narrows
+ * forward the arch narrows and lowers with it, in the same proportion. CONE_K is the radius over the half-width (an
+ * estimate, set so the arch is about 0.17 m high at the after end, as before).
+ */
+const CONE_K = 1.9;
+export const cabinTopAt = (u: number, x: number) => {
+  const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w);
+  const arch = Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w); // (the arc's height over the side's top edge at x)
+  return cabinTopY(u) + arch * cabinNose(u);
+};
 
 /** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
 export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } {
