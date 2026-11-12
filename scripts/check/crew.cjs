@@ -28,9 +28,10 @@ const CASES = [
     console.log(name, tack, (await p.evaluate(() => lab.info())).replace(/\n/g, ' | '));
   }
   for (const [name, setup] of [['tack', { windKt: 10 }], ['tackhike', { windKt: 20 }], ['gybe', { windKt: 12, twa: 160 }]]) {
-    await p.evaluate(([s, nt]) => { lab.setup(s); lab.night(nt); lab.sail(25); lab.tack(); }, [setup, night]);
-    for (let i = 0; i < 12; i++) {
-      await p.evaluate((fine) => { lab.frames(fine ? 0.2 : 0.6); lab.cam(-15, 35, 4.4, [0, 0.6, 1.9]); }, name === 'tackhike');
+    // (a second drawn frame by frame before the tack, so the figures start from where they are, not a 25 s jump)
+    await p.evaluate(([s, nt]) => { lab.setup(s); lab.night(nt); lab.sail(25); lab.frames(1); lab.tack(); }, [setup, night]);
+    for (let i = 0; i < (name === 'tackhike' ? 18 : 12); i++) {
+      await p.evaluate((fine) => { lab.frames(fine ? 0.4 : 0.6); lab.cam(-15, 35, 4.4, [0, 0.6, 1.9]); }, name === 'tackhike');
       await p.screenshot({ path: `${out}/${name}_${String(i).padStart(2, '0')}.png` });
     }
   }
