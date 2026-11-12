@@ -263,6 +263,36 @@ What it shows:
   model is for.
 - **Wind.** As in the real fleet, the spread is widest in light air.
 
+### The calibration harness on the real days (Phase 0, `npm run calibrate`, 12 November)
+
+The set-up:
+
+- the same 5 stock boats;
+- the five real Seaweed Soup days, two seeds each;
+- the real wind and tide, from the real start time;
+- the course the committee would choose for a race as long as the real one.
+
+It takes about 12 minutes on 4 cores.
+
+| Measure | Real | Sim, today's AI |
+|---|---|---|
+| Last finisher, % behind (median, IQR) | 11.9 (6.7–14.7) | 14.8 (7.6–24.2) |
+| Median boat, % behind | 5.8 | 7.7 |
+| By quarter after the winner, % | 1.8 / 2.9 / 5.8 / 10 | 0.7 / 5.1 / 9.5 / 14.8 |
+| Race-to-race Kendall's tau | 0.42 (all 55 races, places) | 0.09 |
+| Last % against wind (slope %/kt) | −2.0 (r −0.74) | −1.3 (r −0.27) |
+
+What it shows:
+
+- **Spread.** On full-length races on the real days, today's AI fleet spreads out about as much as the real one,
+  a little more. The short training course above exaggerated it.
+- **Order.** What's missing is skill. Who wins is nearly random race to race (tau 0.09 against 0.42).
+- **The first quarter.** The sim's leaders finish closer together than the real ones (0.7% against 1.8%). The real
+  fleet has a star, and the sim's has none.
+
+So the skipper model has to give the order its consistency and the front its star. It must do that while keeping
+the overall spread about where it is, or tightening it a little.
+
 ## 7. Phases and hours
 
 | Phase | What | Hours |
