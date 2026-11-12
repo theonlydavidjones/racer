@@ -23,6 +23,25 @@
  *   turns ... If the jumpers are too tight, the mast will curve too much in the bottom and be too straight in the top.
  *   If the jumpers are too loose, the bottom will be straight and the top will curve".
  *
+ * North Sails' guide is also in Theis Palm's 2023 talk to the Finnish class (Helsinki; the same text, plus: the vang
+ * "never ... upwind in less than 16 knots" where the web page says 18, and "with a medium set up the forestay moves
+ * 28 cm from max SB side to max BB side").
+ *
+ * Another sailmaker's guide disagrees in places: Heikkilä Sailmaker, "Kansanveneen trimmiohje" (2021, Finnish; for a
+ * mast through the deck, the foot just under 1.1 m below the partner, referenced to Folkebådcentralen boats of
+ * 1980–90):
+ * - rake: the forestay's mark (the lower band's top edge) 1350–1360 mm from the deck at the stemhead (4–5 cm more
+ *   forestay than North Sails' 1.31 m: more aft rake);
+ * - the mast foot locked in one place (A, 4970–5000 mm from the corner of the transom and deck to the foot's after
+ *   edge) whatever the wind;
+ * - the jib cut for 4–6 cm of sag beating in light and medium air, set by the shrouds and the lines under way, "but not
+ *   by the forestay's length";
+ * - the main cut for very little or no pre-bend at rest;
+ * - the jumpers may be adjusted while racing (CR 7.40 allows the jumper stays to be adjusted above deck): loose in
+ *   light air, tightened in medium "so the crew hiking can keep her pointing and fast", and tightened again in a
+ *   strong wind if the mast bends past the main's luff round.
+ * The presets here are North Sails'; Heikkilä's is TUNE_HEIKKILA.
+ *
  * The sim's sail shapes (controls.ts) were set up as a well-tuned boat's, whatever the wind: a boat on the guide's tune
  * for that wind (guideTune, blended between its three settings). So every effect here is the difference between her
  * tune and the guide's for the wind she's in: on the guide's tune she sails as before, and a boat with no tune set
@@ -49,6 +68,14 @@ export const TUNE_PRESETS: Record<'light' | 'medium' | 'strong', RigTune> = {
   medium: { forestayMark: 1.31, footAft: 16, shroudTurns: 1.5, jumperTurns: 2.5 },
   strong: { forestayMark: 1.31, footAft: 10, shroudTurns: 3, jumperTurns: 0 }
 };
+/**
+ * Heikkilä's tune (above), on this boat's scales: 1.355 m of forestay; the foot locked where the mast just meets the
+ * hole's after edge with a little pressure (his main wants no pre-bend: 10 mm here, the least of North Sails'); the
+ * shrouds set for his 4–6 cm in light and medium air (a quarter turn past North Sails' light setting gives about
+ * 2.5 cm in 6 kt, 5 cm in 9 kt and 8.5 cm in 12 kt, beating: forestaySag); the jumpers
+ * at North Sails' medium. (Its use for every wind is his; the fit to these scales is the sim's.)
+ */
+export const TUNE_HEIKKILA: RigTune = { forestayMark: 1.355, footAft: 10, shroudTurns: 0.25, jumperTurns: 2.5 };
 /** The middle setting: the zero the effects below are measured from. */
 export const TUNE_DEFAULT: RigTune = TUNE_PRESETS.medium;
 /** The range each setting can take in the boat panel. */
@@ -140,12 +167,14 @@ export interface TuneEffect extends TuneParts { bend: number }
 
 /**
  * Pre-bend from the foot pressed aft: the deck pushes the mast's middle forward. The bend per millimetre isn't
- * published. Its size here: the deck about 0.9 m above the step (an estimate), so 6 mm more at the foot leans the
- * mast's top 6.5/0.9 × 6 = 43 mm forward of the line the stays hold it to, bending its middle forward about half of
+ * published. Its size here: the deck partner just under 1.1 m above the mast's foot (Heikkilä Sailmaker, "Kansanveneen
+ * trimmiohje" 2021, for a mast through the deck), so 6 mm more at the foot leans the mast's top 6.5/1.1 × 6 = 35 mm
+ * forward of the line the stays hold it to, bending its middle forward about half of
  * that (a beam pinned at the hounds, pushed at the deck: an estimate). Taking the backstay's full range as about 60 mm of
- * bend (an estimate) for the 2.5% of camber the sim gives it (mainShape), that is about 0.15% of camber per mm.
+ * bend (an estimate) for the 2.5% of camber the sim gives it (mainShape), that is about 0.12% of camber per mm.
+ * (Heikkilä: his main is cut for "very little or no" pre-bend at rest: "Prebend flattens the mainsail unnecessarily".)
  */
-const PREBEND_DEPTH_PER_MM = 0.025 * (0.5 * (6.5 / 0.9)) / 60;
+const PREBEND_DEPTH_PER_MM = 0.025 * (0.5 * (6.5 / 1.1)) / 60;
 /**
  * The jumpers (the guide: too tight curves the bottom and leaves the top straight; too loose, the reverse). Per turn
  * from the guide's medium 2.5: tighter flattens the lower main a little and closes the upper leech, looser opens the
