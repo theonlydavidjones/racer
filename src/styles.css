@@ -961,3 +961,5 @@ body.showroom #crewPop{visibility:hidden}
 #trimPanel #tpWho{display:none}
 /* the where-next card: the big number, the sketch and one short line; the transit is its hover text */
 #nextCard #transit{display:none}
+/* the flag index stops above the band (its tab row included), scrolling inside, so the band stays usable */
+#flagIndex{max-height:calc(100vh - 76px - 250px)}
