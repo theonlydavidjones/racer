@@ -483,7 +483,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (may && w.t - ai.lastHail > 40) { w.hail(b, may, 'room'); ai.lastHail = w.t; }
     // (her hail passed on to a boat beyond (Rule 20.3): that one has 5 s to respond and the boat she hailed then has 5 s
     // more, so she holds on while the chain answers; if it never does, the boat she hailed can't tack, nor can she)
-    const chain = pinned ? w.pairRecord(b, pinned)?.hail : null, relay = chain?.kind === 'room' && chain.by === b.id && chain.passedOn && chain.respondedAt == null ? chain.passedOn : null;
+    const chain = pinned ? w.pairRecord(b, pinned)?.hail : null, relay = chain?.kind === 'room' && chain.by === b.id && chain.passedOn && chain.clearAt == null ? chain.passedOn : null; // (until the boat she hailed is through the wind: respondedAt is only her starting to tack)
     const waiting = pinned && (relay ? !relay.failed : may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
     // pinned, but bearing away about SUBSTANTIAL_TURN clears it (so she may not hail: rule 20.1(a)): she bears away round
     // it, rather than tack into the boat to windward (rule 13)

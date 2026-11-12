@@ -340,7 +340,7 @@ export class Hud {
           ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
           : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
-      } else if (hail.passedOn && hail.respondedAt == null) {
+      } else if (hail.passedOn && hail.clearAt == null) {
         const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
         $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
         el.className = 'row';
