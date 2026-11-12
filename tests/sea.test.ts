@@ -133,7 +133,7 @@ describe('the chop takes time to build (duration-limited growth)', () => {
   it('an hour after the breeze fills in to 18 kt the chop is the one 3 km of fetch makes; by four hours the full fetch', () => {
     const U = 18 * 0.5144, open = LL(37.865, -122.345), still = { x: 0, y: 0 }, cur = () => still; // (the Berkeley Circle)
     const sea = (f: SeaField) => f.at(open, { from: 250, kt: 18 }, still, cur).hsW, full = new SeaField({ hs: 0, tp: 10, from: 285 });
-    expect(full.fetch(open, 250)).toBeGreaterThan(15000); // (about 18 km of open water to the WSW)
+    expect(full.fetch(open, 250)).toBeGreaterThan(8000); // (18 km of open water straight to the WSW, out the Gate; averaged over ±42° (Saville), Tiburon, Angel Island and the Richmond shore bring it to about 8.7 km)
     const f = new SeaField({ hs: 0, tp: 10, from: 285 }); f.duration = 0; // (flat calm)
     for (let t = 0; t < 3600; t += 1) f.develop(U, 1);
     expect(sea(f)).toBeLessThan(0.6 * sea(full));

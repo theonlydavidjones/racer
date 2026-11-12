@@ -465,7 +465,19 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   compass and chart in it. Observed visibility comes from one sensor (Pier 17, 7 km inside the Gate): the Gate's own
   fog can differ.
 - **The Bay to Berkeley, Alameda and Richmond:** the shores, harbors and marks east and north, with the wind and current
-  fields extended over them (NOAA current stations and the NWS grid already reach there).
+  fields extended over them (NOAA current stations and the NWS grid already reach there). In progress (Bay East):
+  ~~the world east to Oakland and Alameda and north past Richmond to the Brothers (terrain, land from NOAA's chart, the
+  chart and inset map), the currents (75 NOAA stations, every one within 0.04 kt of NOAA's predictions) and the NWS grid
+  over the new water, every shore slowing the wind and easing the stream, the East Bay's and Richmond's marks, the
+  Richmond–San Rafael Bridge, the Brothers, the Berkeley Pier and Long Wharf (solid), the Port's cranes, the Bay
+  Bridge's East Span on its real line~~ (done). Next: the marinas (Berkeley with BYC's guest dock, Brickyard Cove for
+  Richmond YC, Encinal and the Estuary's harbors; only Berkeley's dock letters are published where we could reach).
+  Open questions from review: the current in the embayments with no NOAA station (San Rafael Bay, Richardson Bay, San
+  Leandro Bay) is the nearest stations' in sight, very likely too strong for such shallow water (a depth- or
+  tidal-prism-based easing needs a source); BYC's and Encinal YC's own racing marks aren't published where we could
+  reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
+  sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
+  (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
