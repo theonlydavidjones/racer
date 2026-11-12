@@ -639,7 +639,15 @@ the handbook (Raymarine document 81130) wasn't reachable.
 
 ~~The full-screen chart and a tiller pilot~~ (done; the ST2000+'s AutoTack and AutoTrim still unconfirmed).
 Then the skipper/crew model (calibration data first; Yacht Club sliders; crew skill driving trim, pole and puff calls; AI
-skippers acting on what they believe; cheating, protests and hearings). Also asked for:
+skippers acting on what they believe; cheating, protests and hearings).
+
+**The Yacht Club** (owner's direction, 12 November; Crew Model and Skipper Model are drafting a joint design): the Yacht
+Club is the place where crew members are created, configured and assigned to boats, and where the owner sees and
+creates the other skippers and their details. The race setup shows the boat's assigned crew, swappable there, but isn't
+where crew are configured. It's the home of the skipper and crew model's sliders above, and later of Seasons' rankings
+and awards (below), which become attributes of the winning boat and skipper.
+
+Also asked for:
 
 - **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
@@ -658,7 +666,7 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - ~~**Cleaner start screens.**~~ (done) Race: create a race (club sponsor, course or the committee's choice, competitors, your crew,
   start time; the real conditions for that day and time by default, overridable) or run a past race. Cruise: likewise
   pared back. First an audit of every start-state screen for redundancy and friction.
-- **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper.
+- **Seasons** from real events (the Midwinters…), with rankings and awards that become attributes of the winning boat and skipper (shown in the Yacht Club, above).
 - ~~**The Bay, in depth:**~~ (done: Fort Point, the Bay Bridge's west span, Angel Island, Coit and Salesforce, puffs, waves, wildlife; the wildlife remade from the species by v147, #143: gulls, pelicans, cormorants, seals, porpoises and Pier 39's
   sea lions). bridges that reach the shore, Angel Island without the odd houses, a true Coit Tower, the
   Salesforce Tower; puffs you can see on the water; natural waves; seals, porpoises and birds that look and move right.
