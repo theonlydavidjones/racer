@@ -17,7 +17,7 @@
  *  - Visibility observed: NOAA CO-OPS 9414296 (Pier 17, a PORTS visibility sensor), hourly 09:00–18:00 local.
  *  - Forecast: NWS gridded forecast (api.weather.gov): wind on the 2.5 km grid cell over the Cityfront race area
  *    (MTR 84,107), hourly; the wind, visibility, sky cover and cloud ceiling on every cell over the race area
- *    (MTR x 81–88, y 105–111), 09:00–18:00; swell at
+ *    (MTR x 81–94, y 102–115, inside the sim's world), 09:00–18:00; swell at
  *    the cell by the Bar buoy (MTR 77,107).
  *
  * Output: src/environment/data/sf-real-days.json
@@ -216,13 +216,17 @@ function fogWord(coverage, weather) {
 }
 
 /* ---------- the NWS forecast grid over the race area (2.5 km cells), for the wind across the course ---------- */
-const GRID_X = [81, 82, 83, 84, 85, 86, 87, 88], GRID_Y = [105, 106, 107, 108, 109, 110, 111], GRID_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+// (MTR's grid is a Lambert projection, turned against north: x 81–94, y 102–115 spans the sim's world, from the Gate to
+// the Oakland Estuary and Alameda and north past Richmond to the Brothers; cells whose middle is outside it are left out)
+const GRID_X = Array.from({ length: 14 }, (_, k) => 81 + k), GRID_Y = Array.from({ length: 14 }, (_, k) => 102 + k), GRID_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const WORLD = { south: 37.735, north: 37.985, west: -122.52, east: -122.215 };
 const cells = [], gridDays = {};
 for (const gx of GRID_X) for (const gy of GRID_Y) {
   const j = await fetchRetry(`https://api.weather.gov/gridpoints/MTR/${gx},${gy}`, 'json', { Accept: 'application/geo+json' });
   if (!j?.properties) continue;
   const ring = j.geometry?.coordinates?.[0] ?? [], n = Math.max(1, ring.length - 1);
   const lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n, lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n;
+  if (lat < WORLD.south || lat > WORLD.north || lon < WORLD.west || lon > WORLD.east) continue;
   const i = cells.push([Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]) - 1;
   const cs = hourly(j.properties.windSpeed, v => r1(v * KMH)), cd = hourly(j.properties.windDirection, v => Math.round(v));
   // the fog: visibility (m, to the nearest 10), sky cover (%) and the cloud ceiling (m), for the map's fog layer

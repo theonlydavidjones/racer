@@ -40,7 +40,57 @@ export const PLACES: Place[] = [
   P('m-18', '18 · Blossom Rock', 37.81838, -122.40345, { shape: 'lighted', look: 'GRG' }),
   P('m-21', '21 · North Channel G "1"', 37.83202, -122.40865, { shape: 'lighted', look: 'G' }),
   P('m-7', '7 · North Channel R "2"', 37.83332, -122.39644, { shape: 'lighted', look: 'R' }),
-  P('m-8', '8 · North Channel R "4"', 37.84704, -122.39647, { shape: 'lighted', look: 'R' })
+  P('m-8', '8 · North Channel R "4"', 37.84704, -122.39647, { shape: 'lighted', look: 'R' }),
+
+  // the East Bay and the north reach (November 2026). Spots: off the harbors and landmarks. Marks: the clubs' and the
+  // YRA's, at the positions in nkiesel's YRA-Marks list (github.com/nkiesel/YRA-Marks, from the official YRA mark list of
+  // 2024-12-23; the same source as the courses), checked against the Richmond YC's 2025 intraclub SIs (Race 2,
+  // Attachment A) where they appear there; the government buoys and lights at NOAA's ENC positions (src/geo/data/
+  // enc-chart.json), which agree with the list within 5 m. The clubs' inflatables are set near their positions (RYC:
+  // "or a temporary set within .25 nm").
+  P('berkeley', 'Off the Berkeley Marina', 37.8640, -122.3330),
+  P('circle', 'The Berkeley Circle', 37.8700, -122.3600),
+  P('emeryville', 'Off Emeryville', 37.8380, -122.3220),
+  P('estuary', 'Oakland Estuary, off Jack London Square', 37.7936, -122.2812),
+  P('alameda', 'Off Alameda Point', 37.7720, -122.3400),
+  P('richmond', 'Off Point Richmond', 37.9050, -122.4120),
+  P('redrock', 'Off Red Rock', 37.9260, -122.4380),
+  P('brothers', 'Off the Brothers', 37.9590, -122.4300),
+  P('m-XOC', 'XOC · Berkeley Circle "Bobbi Tosse"', 37.873333, -122.358333, { shape: 'cylinder' }),
+  P('m-FOC', 'FOC · Berkeley Circle', 37.865, -122.376667, { shape: 'cylinder' }),
+  P('m-DOC', 'DOC · Berkeley Marina G "3"', 37.85767, -122.34943, { shape: 'beacon', look: 'G' }),
+  P('m-24', '24 · North Channel R "6"', 37.86087, -122.39645, { shape: 'lighted', look: 'R' }),
+  P('m-19', '19 · North Channel R "8"', 37.87967, -122.41497, { shape: 'lighted', look: 'R' }),
+  P('m-NC10', 'North Channel R "10"', 37.90074, -122.43620, { shape: 'lighted', look: 'R' }),
+  P('m-NC12', 'North Channel R "12"', 37.91359, -122.44514, { shape: 'lighted', look: 'R' }),
+  P('m-RYCA', 'RYC A · Richmond YC', 37.89745, -122.389783, { shape: 'cylinder' }),
+  P('m-BK', 'BK · "Bob Klein" (Richmond YC)', 37.886117, -122.402367, { shape: 'sphere' }),
+  P('m-28', '28 · Southampton Shoal R "2"', 37.89057, -122.41764, { shape: 'lighted', look: 'R' }),
+  P('m-29', '29 · Southampton Shoal R "4"', 37.90390, -122.42014, { shape: 'lighted', look: 'R' }),
+  P('m-SS6', 'Southampton Shoal R "6"', 37.91624, -122.42233, { shape: 'lighted', look: 'R' }),
+  P('m-RHC2', 'Richmond Harbor R "2"', 37.91819, -122.41749, { shape: 'lighted', look: 'R' }),
+  P('m-RHC5', 'Richmond Harbor G "5"', 37.90844, -122.40014, { shape: 'lighted', look: 'G' }),
+  P('m-RHC6', 'Richmond Harbor R "6"', 37.90567, -122.39409, { shape: 'lighted', look: 'R' }),
+  P('m-RHC5A', 'Richmond Harbor G "5A"', 37.90738, -122.39183, { shape: 'lighted', look: 'G' }),
+  P('m-KG', 'KG · Richmond Harbor G "7" ("Killer Green")', 37.90659, -122.38622, { shape: 'lighted', look: 'G' }),
+  P('m-RHC8', 'Richmond Harbor light R "8"', 37.90444, -122.38499, { shape: 'beacon', look: 'R' }),
+  P('m-2CR', 'Castro Rocks R "2CR"', 37.93166, -122.42087, { shape: 'lighted', look: 'R' }),
+  P('m-CM2', 'Corte Madera Channel light R "2"', 37.92827, -122.46832, { shape: 'beacon', look: 'R' }),
+  P('m-33', '33 · Oakland Inner Harbor R "4"', 37.80098, -122.34776, { shape: 'lighted', look: 'R' }),
+  P('m-NAS1', 'Alameda NAS Channel G "1"', 37.77726, -122.34131, { shape: 'lighted', look: 'G' }),
+  P('m-NAS2', 'Alameda NAS Channel R "2"', 37.77419, -122.34105, { shape: 'lighted', look: 'R' }),
+  P('m-35', '35 · Alameda NAS Channel light G "3"', 37.77679, -122.33106, { shape: 'beacon', look: 'G' }),
+  P('m-36', '36 · Alameda NAS Channel light R "4"', 37.77336, -122.33015, { shape: 'beacon', look: 'R' }),
+  P('m-SC', 'SC · Preferred Channel "SC"', 37.77556, -122.36583, { shape: 'lighted', look: 'GRG' }),
+  // the Estuary's racing marks: Oakland YC's red balls and Island YC's red and orange ones
+  P('m-OYCDR', 'OYC DR · "Debby Ratto" (Jack London Sq)', 37.792363, -122.277332, { shape: 'sphere', look: 'R' }),
+  P('m-OYC2', 'OYC 2', 37.789632, -122.270968, { shape: 'sphere', look: 'R' }),
+  P('m-OYC6', 'OYC 6', 37.786055, -122.265329, { shape: 'sphere', look: 'R' }),
+  P('m-OYCX', 'OYC X', 37.785304, -122.263493, { shape: 'sphere', look: 'R' }),
+  P('m-OYC5', 'OYC 5 · Encinal Basin', 37.781967, -122.260063, { shape: 'sphere', look: 'R' }),
+  P('m-IYC1', 'Island YC 1', 37.793289, -122.278976, { shape: 'sphere', look: 'O' }),
+  P('m-IYC2', 'Island YC 2', 37.787647, -122.266652, { shape: 'sphere', look: 'O' }),
+  P('m-IYC3', 'Island YC 3', 37.783585, -122.257527, { shape: 'sphere', look: 'O' })
 ];
 
 export const place = (id: string | undefined): Place | null => PLACES.find(p => p.id === id) ?? null;

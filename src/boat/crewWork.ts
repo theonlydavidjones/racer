@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type CrewSpec, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -9,10 +9,11 @@ import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type Crew
  * them at the job's station, and the boat heels and trims to it). So the order and the pace of every adjustment
  * depend on how many hands there are and how good they are:
  *
- * - Three aboard (the usual Folkboat crew): the helm steers and has the mainsheet and backstay; the middle crew
- *   trims the jib and the traveller; the forward hand works the control lines on the cabin top (vang, outhaul,
- *   Cunninghams, downhaul), the jib cars and the pole.
- * - Two aboard: the helm takes the traveller too; the crew has everything else, one job after another.
+ * - Three aboard (the usual Folkboat crew): the helm steers and has the backstay; the middle crew trims the main and
+ *   the traveller (the helm keeps them if the middle crew is less experienced: mainHand); the forward hand has the jib
+ *   sheets and the control lines on the cabin top (vang, outhaul, Cunninghams, downhaul), the jib cars and the pole.
+ * - Two aboard: the more experienced of the two has the main and the traveller, the other the jib; the crew has the
+ *   rest, one job after another.
  * - Alone: the helm does it all, with one hand, and has to leave the tiller's end to reach the cabin top.
  *
  * Sheets come first: a trimmer drops a control line to trim the jib after a tack (not a job already under way
@@ -60,12 +61,28 @@ export function waitingLines(c: CrewState): readonly string[] {
  * new sheet starts right off. A puff's trim is a pull from where they sit. (An estimate.) */
 const JIB_HAUL = 0.25;
 
-/** Who works a line (an index into [helm, crew…]): by the number of crew. */
-export function ownerOf(line: string, nCrew: number): number {
+/**
+ * Who trims the main (an index into [helm, crew…]). The owner, who races them: "normally middle crew trims the main.
+ * sometimes it's the skipper if crew is less experienced. if only one crew member, then usually the crew and skipper
+ * share the duty on the main, depending on crew experience." So with two crew, the middle crew unless they're less
+ * experienced than the helm or a novice; with one, the more experienced of the two (the other has the jib).
+ */
+export const NOVICE = 0.3;
+export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): number {
+  // (crew gone forward on a light-air run, to the mast or the foredeck: the helm has the main, as on any boat)
+  if (forward) return 0;
+  if (nCrew === 0 || !spec) return nCrew >= 2 ? 1 : 0;
+  const helm = skillOf(spec.helm), mid = skillOf(spec.crew[0]);
+  return mid >= helm && mid >= NOVICE ? 1 : 0;
+}
+/** Who works a line (an index into [helm, crew…]): by the number of crew, and who has the main (mainHand). */
+export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = false): number {
   if (nCrew === 0) return 0;
-  if (line === 'mainsheet' || line === 'backstay') return 0;
-  if (line === 'traveller') return nCrew === 1 ? 0 : 1;
-  if (line === 'jibsheet' || line === 'jibsheetW') return 1;
+  const main = mainHand(nCrew, spec, forward);
+  if (line === 'mainsheet' || line === 'traveller') return main;
+  if (line === 'backstay') return 0;
+  // the jib: the forward crew (with one crew, whichever of the two hasn't the main)
+  if (line === 'jibsheet' || line === 'jibsheetW') return nCrew === 1 ? 1 - main : nCrew;
   return nCrew; // the forward hand: the cabin-top lines, the cars, the pole, the halyards
 }
 
@@ -92,6 +109,8 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
 export function startThreshold(line: string, skill: number, to?: number): number {
   // (the sheets are in hand and the trimmer watches the leech: small changes move the leech, controls.ts mainShape)
   if (line === 'jibsheet' || line === 'mainsheet') return 0.006;
+  // (the traveller is in the main trimmer's other hand on the thwart, played with the sheet: as fine, over its range of 2)
+  if (line === 'traveller') return 0.012;
   const range = line === 'traveller' ? 2 : 1;
   // a line wanted right on (or off) to its stop is pulled all the way: "backstay bar tight" is one clear action
   if (to != null && (to >= 0.98 || to <= (line === 'traveller' ? -0.98 : 0.02))) return 0.02;
@@ -123,7 +142,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   if (!c) { for (const k of Object.keys(want) as Ctl[]) out[k] = { pace: 1, to: want[k]! }; return out; }
   const n = c.spec.crew.length, ppl = allAboard(c.spec), windward = c.wind;
   const err = (k: Ctl) => Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
-  const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet';
+  const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
   // finish or drop jobs on lines that are done, or that you've taken. A control line is set to where the crew wanted it
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
@@ -144,7 +163,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); } c.lineT = 0; }
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
-    const who = ownerOf(k, n), a = c.people[who]; if (!a) continue;
+    const who = ownerOf(k, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who]; if (!a) continue;
     const skill = skillOf(ppl[who]), e = err(k);
     if (a.job?.line === k) continue;
     if (PIANO.has(k)) {
@@ -156,7 +175,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (since < LINE_TAU && Math.abs(dl) < 0.5) continue;
     }
     else if (e < startThreshold(k, skill, want[k])) continue;
-    const sheet = k === 'jibsheet' || k === 'mainsheet';
+    const sheet = sheetOf(k);
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
@@ -182,7 +201,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {
-    const who = ownerOf(k, n), a = c.people[who];
+    const who = ownerOf(k, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
     if (k === 'jibsheetW') { out[k] = { pace: workPace(b, who), to: want[k]! }; continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {
@@ -203,7 +222,7 @@ export const CAR = {
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
 function carJob(b: Boat, dt: number): void {
-  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n), a = c.people[who], p = allAboard(c.spec)[who];
+  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
   const lazy = b.ctl.car[b.tack];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
   // a job under way: on the car the boat has tacked onto, it's loaded now and can't be moved
@@ -233,7 +252,7 @@ function carJob(b: Boat, dt: number): void {
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;
-  const n = c.spec.crew.length, who = ownerOf(line, n), a = c.people[who];
+  const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
   if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);

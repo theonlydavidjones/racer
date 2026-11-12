@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { engage } from '../src/boat/autopilot';
 import { bow } from '../src/boat/boat';
-import { PIERS, landAlong, onLand, pierAt, wharfNearest } from '../src/geo/shore';
+import { PIERS, landAlong, onLand, pierAt, wharfNearest, landDist } from '../src/geo/shore';
 import { obstructionAhead } from '../src/sim/obstruction';
 import { routeAround } from '../src/sim/routing';
 import { PLACES } from '../src/sim/places';
@@ -33,7 +33,9 @@ function across(P: { pts: Vec[] }): Vec {
   return { x: NaN, y: NaN };
 }
 // the piers out in open water, with a clear way through them (a few of the Bay Bridge's stand against Yerba Buena Island's shore)
-const OPEN = PIERS.filter(P => Number.isFinite(across(P).x) && !/south tower$/.test(P.name ?? '')); // (the south tower is inside its fender)
+// (the south tower is inside its fender; a few of the Bay Bridge's piers stand against Yerba Buena Island's shore, where
+// the land, not the pier, is the nearest obstruction)
+const OPEN = PIERS.filter(P => Number.isFinite(across(P).x) && !/south tower$/.test(P.name ?? '') && landDist(centre(P.pts)) > 50);
 // the Golden Gate's north tower stands at the edge of Lime Point (OpenStreetMap's coastline runs round its base): a boat
 // meets it from the Gate, to the south of it
 const NORTH = PIERS.find(p => p.name === 'Golden Gate Bridge, north tower')!;

@@ -1,6 +1,12 @@
 # Build plan
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
+  stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
+  her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
+  (the sails' own side force), but the AI's sailing doesn't reckon with either yet (an AI boat luffing by the committee
+  boat drifts onto it), so with sails up she still stops dead and the keel holds her. Also: heaveTo still clamps
+  sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
 - **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
   neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
@@ -52,6 +58,18 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    gusts: Fort Point's records show peak gusts of 2–5 × the 6-minute mean on light, puffy days, while the sim's puffs
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
+
+**P0 — the Folkboat herself, a full true-to-life 3D model** (owner, 12 November 2026; owned by Boat Detail; about
+16–28 h over four phases): "this is a Folkboats simulator, and the accuracy of the boat itself is a P0… properly build
+out a full true-to-life 3D model of the folkboat… use as much care inside as we have everywhere else. we still have more
+work to do on the deck as well (lines, hatch, fairleads, etc) but that's not urgent either." The cabin lighting at night
+is now "much better" (owner).
+1. The interior reads as real 3D by day (parallax, daylight in through the companionway and lights), and the
+   translucent panel over the companionway at night is gone (2–4 h).
+2. The interior true to a real Folkboat, from the construction plan and reference photos (6–10 h).
+3. The cockpit to the plan, with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
+   cockpit's proportions and where the skipper sits", below, and reference/photos).
+4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
@@ -459,7 +477,24 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   compass and chart in it. Observed visibility comes from one sensor (Pier 17, 7 km inside the Gate): the Gate's own
   fog can differ.
 - **The Bay to Berkeley, Alameda and Richmond:** the shores, harbors and marks east and north, with the wind and current
-  fields extended over them (NOAA current stations and the NWS grid already reach there).
+  fields extended over them (NOAA current stations and the NWS grid already reach there). In progress (Bay East):
+  ~~the world east to Oakland and Alameda and north past Richmond to the Brothers (terrain, land from NOAA's chart, the
+  chart and inset map), the currents (75 NOAA stations, every one within 0.04 kt of NOAA's predictions) and the NWS grid
+  over the new water, every shore slowing the wind and easing the stream, the East Bay's and Richmond's marks, the
+  Richmond–San Rafael Bridge, the Brothers, the Berkeley Pier and Long Wharf (solid), the Port's cranes, the Bay
+  Bridge's East Span on its real line, the Berkeley Marina, Richmond YC's Brickyard Cove and Encinal YC as harbors you
+  can sail into, docks and breakwaters solid~~ (done). Next: their slips (only a few fingers are mapped in OSM: Berkeley's
+  B–E are combs, F–O lines; the other harbors' dock letters and slip numbers aren't published where we could reach;
+  berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and the Estuary's other harbors (Oakland
+  YC, Marina Village, Grand Marina, Alameda Marina with Island YC, Ballena Bay). Polish: the land's 50 m cells make a
+  stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
+  37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
+  Open questions from review: the current in the embayments with no NOAA station (San Rafael Bay, Richardson Bay, San
+  Leandro Bay) is the nearest stations' in sight, very likely too strong for such shallow water (a depth- or
+  tidal-prism-based easing needs a source); BYC's and Encinal YC's own racing marks aren't published where we could
+  reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
+  sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
+  (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
