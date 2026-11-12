@@ -147,6 +147,7 @@ export class Hud {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
       el.hidden = false;
       el.innerHTML = `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`;
+      $('nextCard').title = el.textContent ?? '';
       return;
     }
     const m = w.nextMark(u), L = laylinesFor(w, u);
@@ -156,6 +157,7 @@ export class Hud {
     const T = this.trCache.t; if (!T) { el.hidden = true; return; }
     el.hidden = false;
     el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
+    $('nextCard').title = el.textContent ?? '';
   }
 
   private sigKey = '';
@@ -180,7 +182,7 @@ export class Hud {
       if (w.courseSignal) { // the course number, in numeral pennants, top to bottom
         const col = document.createElement('span'); col.className = 'pennants'; col.title = `Course ${w.courseSignal.no}`;
         for (const d of String(w.courseSignal.no)) { const c = document.createElement('canvas'); c.width = 56; c.height = 28; c.getContext('2d')!.drawImage(pennantCanvas(d), 0, 0, 56, 28); col.appendChild(c); }
-        const lab = document.createElement('small'); lab.textContent = `Course ${w.courseSignal.no}`; col.appendChild(lab);
+        // (flags and pennants only on the tile, the owner: the index says what they mean)
         box.appendChild(col);
       }
     }
@@ -422,7 +424,9 @@ export class Hud {
       // the end closer to the wind on the water is favored
       const k = dot(sub(w.pin, w.committee), V(u.ww.from)) / w.lineLen, deg = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
       const favEnd: 0 | 1 | -1 = !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
-      const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${k > 0 ? C.pinLabel : C.committeeLabel} end favoured ${deg.toFixed(0)}°</span>`;
+      // (one short line on the card, the owner: no degrees; the end's name only)
+      const endName = (k > 0 ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
+      const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favoured</span>`;
       const ends: [string, string] = [C.pinLabel.toUpperCase().slice(0, 10), C.committeeLabel.toUpperCase().slice(0, 10)];
       if (d > 0) {
         this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
@@ -435,7 +439,8 @@ export class Hud {
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
       this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0));
-      el.innerHTML = (u.ocs ? 'You were over: now start properly · ' : '') + tStr + burn + fav;
+      // in the last minute, the time to burn matters more than which end is favoured
+      el.innerHTML = u.ocs ? 'You were over: now start properly' : w.t > -60 && burn ? tStr + burn : tStr + fav;
     } else {
       const m = w.nextMark(u), tgt = m ? m.p : w.center;
       const d = dist(u, tgt), b = brg(tgt.x - u.x, tgt.y - u.y), bs = String(Math.round(b)).padStart(3, '0'), [n, un] = this.range(d);
@@ -509,16 +514,17 @@ export class Hud {
       ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = I.text; ctx.fill(); ctx.restore();
       const t = (k: number) => [nx + Math.sin(a) * k, ny - Math.cos(a) * k]; const [lx, ly] = t(13); say('N', lx, ly + 3, 'center'); }
     const fog = this.fogNote(wd, true);
-    if (fog) say(fog, 6, h - 6, 'left');
+    // (the inset is a circle now: its labels go at the bottom middle, inside it, not in the corners)
+    if (fog) say(fog, w / 2, h - 10, 'center');
     const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
     if (ckt > 0.05 && layerOn(wd.settings, 'current')) {
       // the current where you are
-      const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w - 18, oy = 16;
+      const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w / 2, oy = h - 44 - (fog ? 12 : 0);
       const cc = day ? '#0060aa' : '#6fd0ff';
       ctx.strokeStyle = I.halo; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
       ctx.strokeStyle = cc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
       ctx.fillStyle = cc; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
-      say('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w - 6, h - 6 - (fog ? 12 : 0), 'right');
+      say('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w / 2, h - 22 - (fog ? 12 : 0), 'center');
     }
   }
 

@@ -953,3 +953,11 @@ body.showroom #crewPop{visibility:hidden}
 /* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
 .maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
 #mapHint{display:none}
+/* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
+#sigPanel #sigText{display:none}
+/* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */
+.sailband{left:calc(50% - 330px)!important}
+/* the Coach card: no header text (the Auto-trim tab says who trims) */
+#trimPanel #tpWho{display:none}
+/* the where-next card: the big number, the sketch and one short line; the transit is its hover text */
+#nextCard #transit{display:none}
