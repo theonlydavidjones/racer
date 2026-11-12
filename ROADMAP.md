@@ -59,6 +59,18 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
    deep physics pass.
 
+**P0 — the Folkboat herself, a full true-to-life 3D model** (owner, 12 November 2026; owned by Boat Detail; about
+16–28 h over four phases): "this is a Folkboats simulator, and the accuracy of the boat itself is a P0… properly build
+out a full true-to-life 3D model of the folkboat… use as much care inside as we have everywhere else. we still have more
+work to do on the deck as well (lines, hatch, fairleads, etc) but that's not urgent either." The cabin lighting at night
+is now "much better" (owner).
+1. The interior reads as real 3D by day (parallax, daylight in through the companionway and lights), and the
+   translucent panel over the companionway at night is gone (2–4 h).
+2. The interior true to a real Folkboat, from the construction plan and reference photos (6–10 h).
+3. The cockpit to the plan, with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
+   cockpit's proportions and where the skipper sits", below, and reference/photos).
+4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
+
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
 companionway redo) and Crew Figures; next as each finishes, Crew Controls and Marinas, then Bay East.
