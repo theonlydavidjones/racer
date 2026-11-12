@@ -30,6 +30,7 @@ import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
+import { ensureMembers, loadMembers, pullCrew, pushCrew, saveMembers, type Member } from './club/members';
 import { SailBand } from './ui/sailBand';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
@@ -52,6 +53,13 @@ import { SetupChart } from './ui/setupChart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
+// the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
+const MEMBERS: Member[] = loadMembers();
+/** Your boat's crew from her seats (after choosing a boat, or at the start); saves what changed. */
+function crewFromClub(): void { if (ensureMembers(S, MEMBERS)) { saveMembers(MEMBERS); saveSettings(S); } pullCrew(S, MEMBERS); }
+/** The setup's crew rows or count changed: back to the members and her seats, and saved. */
+function crewToClub(): void { pushCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); }
+crewFromClub();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
 S.raceLength ??= 'medium';
 // a new player's first race: the committee chooses the course for the day, as at a real club race (saves keep theirs)
@@ -1080,7 +1088,7 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewRows(); paintSeg(); newGame(); courseCard(); return; }
+  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewToClub(); crewRows(); paintSeg(); newGame(); courseCard(); return; }
   if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
@@ -1100,13 +1108,13 @@ function crewRows(): void {
   const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
   rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}`).join('');
   rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {
-    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); saveSettings(S); newGame();
+    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); crewToClub(); newGame();
   });
   rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
     const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
     if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
     else { const lb = Number(inp.value); if (lb > 70 && lb < 400) p.w = lb * LB; inp.value = String(Math.round(p.w / LB)); }
-    saveSettings(S); newGame(); courseCard();
+    crewToClub(); newGame(); courseCard();
   });
 }
 function openSetup(): void { settleLog(openSetupNow); }
@@ -1376,7 +1384,7 @@ function boatSummary(): void {
 }
 ($('boatPick') as HTMLSelectElement).onchange = e => {
   const b = S.boats.find(x => x.id === (e.target as HTMLSelectElement).value); if (!b) return;
-  S.boat = b; S.boatId = b.id; fleetChanged(); boatSummary();
+  S.boat = b; S.boatId = b.id; crewFromClub(); fleetChanged(); boatSummary();
 };
 
 /* The fleet: who you race against. Stock club boats and your own saved boats (not the one you're sailing). */
@@ -1426,7 +1434,7 @@ const fleet: Fleet = new Fleet(S, {
   edit: id => { showroom(true); boatPanel.show(id); newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
-    S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length;
+    S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
     if (mode === 'cruise') { S.mode = 'sail'; S.sailFrom = fromSlip && b.slip ? 'slip' : S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom; }
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); newGame(); openSetup();
@@ -1482,7 +1490,7 @@ $('pastRows').addEventListener('click', e => {
   if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
-  const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; }
+  const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
   if (!S.boat.slip) S.raceFrom = 'water';
   { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
   saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();

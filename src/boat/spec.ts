@@ -38,6 +38,9 @@ export interface BoatSpec {
   club: string;
   /** Who skippers her: you, or (until the Yacht Club has skippers) a generic AI skipper. */
   skipper: 'you' | 'ai';
+  /** Her crew from the Yacht Club's members, by seat: the middle crew (the main), then the forward hand (the jib, the
+   * cabin top, the pole). Absent: not assigned (club/members.ts). */
+  crewIds?: string[];
   /** Her home marina (geo/marina.ts MARINAS), and her slip in it. */
   marina?: string;
   slip?: string;
@@ -134,6 +137,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
       .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
+    // (her crew's seats, from the Yacht Club's members: at most two, ids only)
+    ...(Array.isArray(x.crewIds) ? { crewIds: x.crewIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 2) } : {}),
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
     ...(typeof x.slip === 'string' && x.slip ? (sl => ({ marina: sl.split(':')[0], slip: sl }))((r => (slipRenames as Record<string, string>)[r] ?? r)(x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}`)) : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
