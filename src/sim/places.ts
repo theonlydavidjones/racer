@@ -49,7 +49,8 @@ export const PLACES: Place[] = [
   // Richmond Harbor buoys against Richmond YC's 2025 intraclub SIs ("Description of Marks"), within 25 m. RYC A comes
   // only from the YRA-Marks list ("former Olympic Circle A"): none of the club's 2025 documents has it. The Estuary's
   // Oakland YC and Island YC balls come only from the YRA-Marks list too: the clubs publish no positions. Berkeley YC's
-  // own racing instructions (berkeleyyc.org's Race Docs) are on filesusr.com, which we couldn't reach; Encinal YC sails
+  // Friday night and Chowder marks are on its 2026–27 course sheet (below, with its start mark); its Midwinters use the
+  // YRA's marks and temporary buoys near XOC, with no positions published; Encinal YC sails
   // its Midwinters off YRA mark 10 (a temporary buoy, no published position) and its twilight series in the Estuary.
   // The government buoys and lights are at NOAA's ENC positions (src/geo/data/enc-chart.json), within 5 m of the list
   // (DOC, the Berkeley Marina channel's light 3, within 100 m of the YRA's 0.1′-rounded figure). The clubs' inflatables
@@ -62,6 +63,11 @@ export const PLACES: Place[] = [
   P('richmond', 'Off Point Richmond', 37.9050, -122.4120),
   P('redrock', 'Off Red Rock', 37.9260, -122.4380),
   P('brothers', 'Off the Brothers', 37.9590, -122.4300),
+  // Berkeley YC's starting mark for its Friday nights and Chowders, "approximately 1/4 mile outside the Berkeley
+  // breakwater" (BYC's 2026–27 Friday Night / Chowder courses, Attachment 1: 37°52.07′ N 122°19.56′ W, "for guidance
+  // only"). Its sheet also gives D (the Berkeley Marina light "3", the sim's DOC, within 6 m), and X and F about 220 m
+  // from the YRA's XOC and FOC: derived from D on a nominal circle, so the YRA's own positions are kept.
+  P('m-BYC', 'BYC · Berkeley YC start mark', 37.86783, -122.32600, { shape: 'column', look: 'Y' }),
   P('m-XOC', 'XOC · Berkeley Circle "Bobbi Tosse"', 37.873333, -122.358333, { shape: 'cylinder' }),
   P('m-FOC', 'FOC · Berkeley Circle', 37.865, -122.376667, { shape: 'cylinder' }),
   P('m-DOC', 'DOC · Berkeley Marina G "3"', 37.85767, -122.34943, { shape: 'beacon', look: 'G' }),
