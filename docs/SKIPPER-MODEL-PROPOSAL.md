@@ -224,7 +224,34 @@ believes she fouled, and how sure she is. That leads to:
 
 ## 6. Today's baseline (sim, no skippers)
 
-See the session's message to the Coordinator. The numbers are filled in there.
+Measured on 12 November at origin/main 18010c1. The setup:
+
+- the training windward-return course;
+- 5 stock AI boats, slack tide;
+- a westerly of 6, 12 and 18 kt, with seeds 3, 7 and 11;
+- a race lasting 40 minutes at most.
+
+| Wind | Winner | Gaps behind the winner, % | Order |
+|---|---|---|---|
+| 6 kt | 18.1 min | 0, 3.2, 14.3, 28.7, 69.4 | Varnish, Green, Black, Blue, Red |
+| 6 kt | 15.6 min | 0, 16.1, 27.2, 72.3, 79.6 | Black, Green, Red, Varnish, Blue |
+| 6 kt | 19.1 min | 0, 8.0, 21.4, 22.7, 27.9 | Blue, Green, Red, Black, Varnish |
+| 12 kt | 11.0 min | 0, 10.9, 13.7, 28.8, 32.2 | Red, Green, Black, Varnish, Blue |
+| 12 kt | 12.4 min | 0, 0.6, 12.0, 14.7, 24.0 | Varnish, Black, Blue, Red, Green |
+| 12 kt | 10.6 min | 0, 5.2, 10.3, 22.0, 24.6 | Varnish, Blue, Green, Red, Black |
+| 18 kt | 10.6 min | 0, 9.3, 12.5, 21.8, 40.7 | Varnish, Blue, Green, Black, Red |
+| 18 kt | 12.5 min | 0, 1.4, 8.8, 13.7, 22.1 | Green, Blue, Black, Red, Varnish |
+| 18 kt (seed 11) | — | **no boat finished in 40 min** | (needs looking into: Deep Physics) |
+
+What it shows:
+
+- **Spread.** The last finisher is a median **about 30%** behind, against the real 12%. The median boat is **about
+  13%** behind, against 5.8%. Part of that is the course: a 10–19 minute race magnifies the start's crush, where
+  real races run 45–100 minutes. Phase 0's harness will measure on full Seaweed Soup courses instead.
+- **Order.** There is no skill in it. Varnish has the weakest crew (0.45), yet won 4 of the 8 races. Every boat
+  wins sometimes, so the race-to-race tau is about 0, where the real fleet's is 0.43. That is what the skipper
+  model is for.
+- **Wind.** As in the real fleet, the spread is widest in light air.
 
 ## 7. Phases and hours
 
