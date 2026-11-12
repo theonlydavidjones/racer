@@ -310,9 +310,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       P = { x: w.center.x + L.x * s * (half + 20) + N.x * (out ? -20 : 8), y: w.center.y + L.y * s * (half + 20) + N.y * (out ? -20 : 8) };
     } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
     else if (!b.started) {
-      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on)
-      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
-      P = { x: w.center.x + N.x * 10 + L.x * a, y: w.center.y + N.y * 10 + L.y * a }; void along;
+      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on). On
+      // the course side already (she crossed an extension of the line, or drifted over doing her turns at the gun), she
+      // isn't started: back below the line first, then up across it between the ends (RRS Definitions, Start)
+      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half), above = w.lineD(b) > 0;
+      P = { x: w.center.x + N.x * (above ? -18 : 10) + L.x * a, y: w.center.y + N.y * (above ? -18 : 10) + L.y * a }; void along;
     }
     else {
       P = aimPoint(w, b);
