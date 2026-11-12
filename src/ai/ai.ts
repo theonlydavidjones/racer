@@ -47,8 +47,11 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
         // (and that's the side she passes it on, until she's clear: the rule below would otherwise pick the other)
         // (and if passing it there would take her above close-hauled, she can't: pinned there, her leeway carries her on
         // to it. She turns away from it instead, through the wind if need be, the way that doesn't swing her across it)
-        const keepH = n360(bm - side * need);
-        desired = Math.abs(wrap(sailable(b, keepH) - keepH)) > 1 ? n360(bm + 180) : keepH; near = key;
+        // (the turn away committed to that side, through the wind, even slow: steered the short way round by the helm's
+        // own rule, a slow boat would gybe instead, the long way, and swing her bow across the mark: physics review)
+        const keepH = n360(bm - side * need), away = Math.abs(wrap(sailable(b, keepH) - keepH)) > 1;
+        desired = away ? n360(bm + 180) : keepH; near = key;
+        if (away && b.ai && b.ai.turnCommit === 0) { b.ai.turnCommit = -side; b.ai.commitFor = desired; }
         if (b.ai) b.ai.passing = { key, side };
         continue;
       }
@@ -432,11 +435,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // reaching for the mark: steer up-current of it by as much as the current across her track would set her down, so
       // she makes good the straight line (as the tiller pilot and the planner do: autopilot.ts, routing.ts), not a curve
       // that ends with her beating or running to it (a crew that reckons with the current allows for all of it, the
-      // others for some); but never deeper than her best running angle on the gybe she's on (only the run's held gybe
-      // gybes her)
+      // others for some); but never deeper than her best running angle. With the mark across on the other gybe's side
+      // (just short of a run, where the run's held gybe has let go of her as the mark's angle dipped under it), she
+      // gybes for it: held on this gybe at its running angle she sailed on away from the mark, a minute and a half and
+      // 30° of overstand in a 12 kt race (physics review)
       const vs = Math.max(b.v, targetFor(b, rel) * 0.8);
       desired = sailable(b, crabFor(bP, vs, { x: c.x * (ai.aware ? 1 : 0.6), y: c.y * (ai.aware ? 1 : 0.6) }));
-      if (Math.abs(wrap(ww.from - desired)) > ra || Math.sign(wrap(ww.from - desired)) !== (b.tack === 'S' ? 1 : -1) && Math.abs(wrap(ww.from - desired)) > 150) desired = b.tack === 'S' ? n360(ww.from - ra) : n360(ww.from + ra);
+      const sd = wrap(ww.from - desired);
+      if (Math.abs(sd) > ra) desired = n360(ww.from - Math.sign(sd || 1) * ra);
     }
     if (!headedNow) ai.headedT = 0;
   }
