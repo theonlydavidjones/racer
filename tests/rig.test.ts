@@ -14,7 +14,7 @@ describe('the drawn rig and hull', () => {
   });
   it('puts the lower band\'s upper edge (the Lower Mast Point) 1000 ± 10 mm above the deck, along the mast\'s after side (CR 6.1.11)', () => {
     const aft = RIG.MAST_Z + 0.133 / 2, deck = deckY(uAtZ(aft), 0);
-    expect(Math.abs(RIG.BOOM_TOP - deck - 1.0)).toBeLessThan(0.01);
+    expect(Math.abs(RIG.BOOM_TOP - deck - 1.0)).toBeLessThan(0.003); // (the rule allows ±10 mm: drawn at its nominal 1000)
   });
   it('gives the sails the certificate\'s areas: main 18.51 m², jib 7.30 m² (ORC feed, Area_Main and Area_Jib)', () => {
     expect(sailArea(RIG.MAIN_DEF)).toBeGreaterThan(18.51 * 0.98);
