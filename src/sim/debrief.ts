@@ -4,7 +4,8 @@ import type { Boat } from '../boat/boat';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { heelFactor } from '../boat/balance';
 import { trimDrive } from '../boat/trim';
-import { driveSpeed } from '../boat/coach';
+import { driveSpeed, tuneLoss } from '../boat/coach';
+import { presetFor, tuneName, tuneWords, TUNE_PRESETS } from '../boat/rigTune';
 import type { World } from './world';
 
 /**
@@ -62,6 +63,8 @@ export class RaceLog {
   pole = { t: 0, lost: 0 };
   heel = { t: 0, lost: 0 };
   trim = { lost: 0 };
+  /** The rig's tune against the guide's for the wind she met, upwind (sampled every 2 s: speedFactor twice is not free). */
+  tune = { lost: 0, t: 0, every: 0, kt: 0, n: 0 };
   pen = { n: 0, t: 0 };
   private inPen = false;
   marks: MarkLog[] = [];
@@ -207,6 +210,9 @@ export class RaceLog {
     const trimK = byHandTrim ? 1 - driveSpeed(u, clamp(trimDrive(u.trim.main, u.trim.jib) * u.shape.eff, 0, 1)) : 0;
     this.trim.lost += dt * trimK;
     this.spell(w, 'trim', trimK > 0.001, dt * trimK);
+    if (u.tune && u.twa < 70 && !u.tacking && !u.luff && (this.tune.every -= dt) <= 0) {
+      this.tune.every = 2; const k = tuneLoss(u); this.tune.lost += 2 * k; this.tune.kt += ww.kt; this.tune.n++; if (k > 0.005) this.tune.t += 2;
+    }
     // shifts, on a beat: on a header (against the mean wind), the other tack would be lifted
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), headed = u.tack === 'S' ? -dev : dev; // + headed
     this.liftedAtTack = -headed;
@@ -295,6 +301,13 @@ export class RaceLog {
     if (this.trim.lost > 1) out.push({ key: 'trim', title: 'Sail trim', lost: this.trim.lost,
       detail: 'Your sheets and controls, against the best trim for the conditions.',
       tip: 'Watch the telltales, and open the Trim coach for what to change.' });
+    const u = w.user;
+    if (u.tune && this.tune.lost > 1 && this.tune.n) {
+      const kt = this.tune.kt / this.tune.n, want = presetFor(kt);
+      out.push({ key: 'tune', title: 'Rig tune', lost: this.tune.lost,
+        detail: `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)} in about ${Math.round(kt)} kt, where ${tuneName(u.tune) === want ? 'it was right only part of the time' : `${tuneWords(TUNE_PRESETS[want])} would have fitted`}.`,
+        tip: 'Tune the rig at the dock for the forecast: the forestay, shrouds and mast foot can\'t be touched once racing (CR 7.40). If the wind is forecast to cross a setting, tune for the part of the race that matters most, and use the backstay for the rest.' });
+    }
     if (this.pen.n) out.push({ key: 'penalty', title: 'Penalties', lost: this.pen.t,
       detail: `${this.pen.n} penalt${this.pen.n === 1 ? 'y' : 'ies'}: ${mmss(this.pen.t)} doing turns.`,
       tip: 'Know who has right of way before you get close: port gives way to starboard, windward to leeward, and give room at marks. The replay of each foul shows the rule.' });

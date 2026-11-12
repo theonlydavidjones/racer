@@ -1,8 +1,9 @@
-import { SAIL_WEAR, type SailRig, type SailWear } from './controls';
+import { SAIL_WEAR, STD_RIG, type SailRig, type SailWear } from './controls';
+import type { Boat } from './boat';
+import { fixTune, guideTune, tuneEffect, tuneName } from './rigTune';
 import type { BoatSpec } from './spec';
 import { HULL } from './dynamics';
 import { dCfAt, fouling, type Fouling } from './fouling';
-import { fixTune, tuneEffect } from './rigTune';
 
 /**
  * Your boat's condition, in physical terms: what each setting in the Boat panel does to her.
@@ -62,15 +63,31 @@ export function condition(s: BoatSpec, month = 9): Condition {
   const wood = s.perf.mast === 'wood';
   return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
-    main: ((bend: number) => {
-      // the rig's tune (rigTune.ts): worked out once here; none set, she's on the guide's tune for the wind (no change)
-      return { wear: SAIL_WEAR[s.perf.mainAge], bend, ...(s.perf.tune ? { tune: tuneEffect(fixTune(s.perf.tune), bend) } : {}) };
-    })(wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1),
+    main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1 },
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
       + (ob === 'bracket' ? -OUTBOARD_KG * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
   };
+}
+
+/** Set the jumpers (turns, under way: CR 7.40 lets them be adjusted above deck while racing): the rig is worked out again. */
+export function setJumpers(b: Pick<Boat, 'tune' | 'rigMain'>, turns: number, tws: number): void {
+  // (with no tune set she was on the guide's for the wind: the rest of it stays where that had it)
+  const t = fixTune({ ...(b.tune ?? guideTune(tws)), jumperTurns: turns });
+  b.tune = t; b.rigMain = undefined;
+}
+
+/**
+ * The rig the main is set on, with her tune this outing (b.tune: the Boat panel's, or the one she was set to at the
+ * dock for a race's forecast, rigTune.ts): worked out once and kept on the boat (b.rigMain), until the tune changes
+ * (the jumpers, under way: setJumpers). No tune: her condition's rig, as before.
+ */
+export function mainRig(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: BoatSpec }): SailRig | undefined {
+  if (b.spec && !b.cond) b.cond = condition(b.spec); // (as physics.ts does: her condition before her rig)
+  if (!b.tune) return b.cond?.main;
+  const base = b.cond?.main ?? STD_RIG;
+  return b.rigMain ??= { ...base, tune: tuneEffect(b.tune, base.bend) };
 }
 
 /** Added skin friction (N) at speed v (m/s) from roughness over the smooth-hull friction line, with the form factor. */
@@ -87,7 +104,7 @@ export const PERF_INFO = {
 };
 
 /** The reference boat the costs are measured against: clean bottom, new sails, aluminium spars, nothing extra aboard. */
-export const referencePerf = (s: BoatSpec): BoatSpec => ({ ...s, perf: { ...s.perf, cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 } });
+export const referencePerf = (s: BoatSpec): BoatSpec => ({ ...s, perf: { ...s.perf, cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 , tune: undefined} });
 
 /** Each thing about your boat that costs (or gains) speed, as a change from the reference boat. */
 export function conditionItems(s: BoatSpec, month = 9): { label: string; spec: BoatSpec }[] {
@@ -96,8 +113,11 @@ export function conditionItems(s: BoatSpec, month = 9): { label: string; spec: B
   if (p.cleanedWeeks > 0 || p.finish !== 'antifouling') w(`Bottom (${p.cleanedWeeks ? fouling(p.cleanedWeeks, month).label : 'clean'}${p.finish === 'race' ? ', racing finish' : ''})`, { cleanedWeeks: p.cleanedWeeks, finish: p.finish });
   if (p.mainAge !== 'new' || p.jibAge !== 'new') w(`Sails (main ${AGE[p.mainAge]}, jib ${AGE[p.jibAge]})`, { mainAge: p.mainAge, jibAge: p.jibAge });
   if (p.mast === 'wood') w(`Wooden mast${p.mastStiffness !== 'average' ? ` (${p.mastStiffness})` : ''}`, { mast: 'wood', mastStiffness: p.mastStiffness });
+  // (the rig's tune against the guide's for the wind the panel measures in: none set, nothing to count)
+  if (p.tune) w(`Rig tune (${TUNE_LABEL[tuneName(fixTune(p.tune))]})`, { tune: p.tune });
   if (p.outboard !== 'none') w(p.outboard === 'bracket' ? 'Outboard on the bracket' : 'Outboard stowed below', { outboard: p.outboard });
   if (p.gearKg > 0) w(`${Math.round(p.gearKg / 0.4536)} lb over the minimum`, { gearKg: p.gearKg });
   return items;
 }
 const AGE = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
+const TUNE_LABEL = { light: 'North Sails light', medium: 'North Sails medium', strong: 'North Sails strong', heikkila: 'Heikkilä', custom: 'your own' } as const;

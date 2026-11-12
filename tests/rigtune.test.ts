@@ -47,3 +47,55 @@ describe('rig tune (rigTune.ts): North Sails\' Nordic Folkboat guide', () => {
     expect(s.perf.tune).toEqual({ forestayMark: 1.41, footAft: 6, shroudTurns: 2, jumperTurns: 2.5 });
   });
 });
+
+import { COURSES } from '../src/courses/registry';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { World } from '../src/sim/world';
+import { tuneName, presetFor, tuneBrief, TUNE_HEIKKILA } from '../src/boat/rigTune';
+import { raceBrief } from '../src/sim/strategist';
+import { lessons } from '../src/boat/coach';
+import { testBoat, sail } from './helpers/testBoat';
+
+const S = (s: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...s }) as Settings;
+
+describe('the tune at the dock, racing (owner: North Sails\' setting for the forecast)', () => {
+  it('racing, with no tune of her own she is set to the guide\'s setting for the forecast; cruising, she has none', () => {
+    for (const windKt of [6, 12, 20]) {
+      const w = new World(COURSES[0], S({ windKt, fleet: 0 }), 3);
+      expect(w.forecastKt).toBeGreaterThan(0);
+      expect(tuneName(w.user.tune!)).toBe(presetFor(w.forecastKt));
+    }
+    expect(new World(COURSES[0], S({ windKt: 12 }), 3, { freeSail: true }).user.tune).toBeUndefined();
+  });
+
+  it('her own tune from the Boat panel stays hers', () => {
+    const boat = fixSpec({ ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, tune: { ...TUNE_HEIKKILA } } });
+    expect(new World(COURSES[0], S({ windKt: 20, fleet: 0, boat }), 3).user.tune).toEqual(TUNE_HEIKKILA);
+  });
+
+  it('the club fleet: most on the right setting, some on Heikkilä\'s or the next one; the same for the same seed', () => {
+    const names = (seed: number) => new World(COURSES[0], S({ windKt: 12, fleet: 12 }), seed).boats.slice(1).map(b => tuneName(b.tune!));
+    const all = [1, 2, 3, 4, 5].flatMap(names);
+    const right = all.filter(n => n === 'medium').length / all.length;
+    expect(right).toBeGreaterThan(0.55); expect(right).toBeLessThan(0.9);
+    expect(all).toContain('heikkila');
+    expect(names(7)).toEqual(names(7));
+  });
+
+  it('the brief says what the tune is and what it means for the day', () => {
+    const w = new World(COURSES[0], S({ windKt: 12, fleet: 0 }), 3);
+    const items = raceBrief(w).sections.find(s => s.id === 'trim')!.items, item = items.find(i => i.head === 'Rig tune')!;
+    expect(item.text).toMatch(/medium setting/);
+    expect(tuneBrief(TUNE_PRESETS.light, 15, 17, 19)).toMatch(/too soft/);
+    expect(tuneBrief(TUNE_PRESETS.strong, 4, 5, 6)).toMatch(/too tight/);
+  });
+
+  it('the coach says so, upwind, when the tune is wrong for the wind and costs her', () => {
+    const b = testBoat({ heading: 42, kt: 5, windKt: 18 }); b.tune = { ...TUNE_PRESETS.light };
+    sail(b, 30);
+    const l = lessons(b).list.find(x => x.id === 'rig:soft');
+    expect(l).toBeTruthy(); expect(l!.head).toMatch(/soft for 18 kt/);
+    const ok = testBoat({ heading: 42, kt: 5, windKt: 18 }); ok.tune = { ...TUNE_PRESETS.strong }; sail(ok, 30);
+    expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
+  });
+});

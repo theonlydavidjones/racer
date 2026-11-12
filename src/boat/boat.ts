@@ -5,7 +5,8 @@ import type { SeaHere } from '../environment/sea';
 import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
-import type { Controls, CrewSettings, Shape } from './controls';
+import type { Controls, CrewSettings, SailRig, Shape } from './controls';
+import type { RigTune } from './rigTune';
 
 /** A line you can work: every control, plus the lazy jib car's pins. */
 export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
@@ -241,6 +242,10 @@ export interface Boat {
   /** About a minute's running mean of the wind she's in (deg): her compass's average, for lifts and headers. */
   avgFrom?: number;
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
+  /** Her rig's tune this outing (rigTune.ts): absent, she's on the guide's tune for whatever wind she meets. */
+  tune?: RigTune;
+  /** Her main's rig with the tune worked in (condition.ts mainRig): cleared when the tune changes. */
+  rigMain?: SailRig;
   cond?: Condition;
 }
 

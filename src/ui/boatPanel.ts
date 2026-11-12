@@ -4,6 +4,7 @@ import { BURGEES, CLUBS } from '../render/burgees';
 import { ENSIGNS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
+import { TUNE_DEFAULT, TUNE_HEIKKILA, TUNE_INFO, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
 import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
 
 /**
@@ -98,6 +99,11 @@ export class BoatPanel {
       case 'boom': this.set(b => { b.perf.boom = v as 'wood' | 'aluminium'; }); return;
       case 'stiff': this.set(b => { b.perf.mastStiffness = v as BoatSpec['perf']['mastStiffness']; }); return;
       case 'outboard': this.set(b => { b.perf.outboard = v as BoatSpec['perf']['outboard']; }); return;
+      case 'tune': this.set(b => { // (Auto: none set, she's tuned for the forecast at the dock)
+        if (v === 'auto') delete b.perf.tune;
+        else if (v === 'heikkila') b.perf.tune = { ...TUNE_HEIKKILA };
+        else if (v in TUNE_PRESETS) b.perf.tune = { ...TUNE_PRESETS[v as keyof typeof TUNE_PRESETS] };
+      }); return;
       case 'finish': this.set(b => { b.perf.finish = v as BoatSpec['perf']['finish']; }); return;
       case 'lineColor': { const k = t.dataset.line as LineColorKey; this.set(b => { const c = { ...b.lineColors, [k]: v }; if (v === LINE_COLORS[k]) delete c[k]; if (Object.keys(c).length) b.lineColors = c; else delete b.lineColors; }); return; }
       case 'lineColorsReset': this.set(b => { delete b.lineColors; }); return;
@@ -115,8 +121,19 @@ export class BoatPanel {
       case 'slip': this.set(b => { if (t.value) { b.slip = t.value; b.marina = slipById(t.value)?.marina ?? b.marina; } else delete b.slip; }); return;
       case 'weeks': { const out = this.el.querySelector('#bpWeeksV'); if (out) out.textContent = weeksLabel(Number(t.value)); if (final) this.set(b => { b.perf.cleanedWeeks = Number(t.value); }, false); return; }
       case 'gear': if (final) this.set(b => { b.perf.gearKg = Number(t.value) * 0.4536; }, false); return;
+      case 'tuneMark': case 'tuneFoot': case 'tuneShroud': case 'tuneJumper': {
+        const key = ({ tuneMark: 'forestayMark', tuneFoot: 'footAft', tuneShroud: 'shroudTurns', tuneJumper: 'jumperTurns' } as const)[k];
+        const val = key === 'forestayMark' ? Number(t.value) / 100 : Number(t.value);
+        const tune = fixTune({ ...(this.b.perf.tune ?? TUNE_DEFAULT), [key]: val });
+        const out = this.el.querySelector(`#bp_${k}`); if (out) out.textContent = tuneLabel(key, tune);
+        if (final) this.set(b => { b.perf.tune = tune; }); else this.tuneReadout(tune); // (on release: redrawn, so the preset shows 'Your own')
+        return;
+      }
     }
   }
+
+  /** The forestay's sag and the rake for the tune being set, as you drag (before it's saved). */
+  private tuneReadout(t: RigTune): void { const el = this.el.querySelector('#bpTuneRead'); if (el) el.innerHTML = tuneReadout(t); }
 
   private job = 0;
   private cache = new Map<string, number>();
@@ -219,6 +236,7 @@ export class BoatPanel {
         <div class="field"><span>Mast</span>${seg('mast', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.mast)}
           ${b.perf.mast === 'wood' ? seg('stiff', [['soft', 'Soft'], ['average', 'Average'], ['stiff', 'Stiff']], b.perf.mastStiffness) : ''}</div>
         <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.boom)}<small>${PERF_INFO.spars}</small></div>
+        ${rigTuneFields(b, seg)}
         <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}<small>${PERF_INFO.outboard}</small></div>
         <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label><small>${PERF_INFO.gear}</small></div>
         <div class="bpreport" id="bpReport"></div>
@@ -256,3 +274,37 @@ function flagNote(b: BoatSpec): string {
   return notes.join(' ');
 }
 
+
+/* ---------- the rig tune (boat/rigTune.ts) ---------- */
+
+/** A tune setting in the guides' own units. */
+function tuneLabel(k: keyof RigTune, t: RigTune): string {
+  switch (k) {
+    case 'forestayMark': return `${(t.forestayMark * 100).toFixed(1)} cm`;
+    case 'footAft': return `${Math.round(t.footAft)} mm aft`;
+    case 'shroudTurns': return t.shroudTurns ? `+${t.shroudTurns} turns` : 'light-air setting';
+    case 'jumperTurns': return t.jumperTurns ? `${t.jumperTurns} turns` : 'loose';
+  }
+}
+/** What the tune does, as a sailor would check it: the forestay's sag beating with the backstay off, and the rake. */
+function tuneReadout(t: RigTune): string {
+  const T = forestayTension(t), sag = (tws: number) => { const m = forestaySag(T, tws * 1.45); return `${m >= 0.2 ? '20+' : Math.round(100 * m)} cm in ${tws} kt`; }; // (apparent ≈ 1.45 × true, beating)
+  const dr = rakeDeg(t) - rakeDeg(TUNE_DEFAULT);
+  return `Forestay sag beating, backstay off: ${[6, 12, 18].map(sag).join(' · ')}. Rake ${Math.abs(dr) < 0.05 ? 'as North Sails sets it' : `${Math.abs(dr).toFixed(1)}° ${dr > 0 ? 'more aft (more weather helm)' : 'more upright (less weather helm)'} than North Sails'`}.`;
+}
+type Seg = (act: string, opts: [string, string][], cur: string) => string;
+function rigTuneFields(b: BoatSpec, seg: Seg): string {
+  const t = b.perf.tune ? fixTune(b.perf.tune) : null, cur = t ? tuneName(t) : 'auto';
+  const range = (k: string, key: keyof RigTune, scale: number, step: number) => {
+    const [lo, hi] = TUNE_RANGE[key], v = (t ?? TUNE_DEFAULT)[key];
+    return `<input type="range" data-k="${k}" min="${lo * scale}" max="${hi * scale}" step="${step}" value="${v * scale}"${t ? '' : ' disabled'}>`;
+  };
+  const row = (k: string, key: keyof RigTune, label: string, scale: number, step: number, note: string) =>
+    `<div class="field"><span>${label} · <b id="bp_${k}">${tuneLabel(key, t ?? TUNE_DEFAULT)}</b></span>${range(k, key, scale, step)}<small>${note}</small></div>`;
+  return `<div class="field"><span>Rig tune · set at the dock</span>${seg('tune', [['auto', 'For the forecast'], ['light', 'North Sails light'], ['medium', 'North Sails medium'], ['strong', 'North Sails strong'], ['heikkila', 'Heikkilä'], ...(cur === 'custom' ? [['custom', 'Your own'] as [string, string]] : [])], cur)}<small>${TUNE_INFO.tune}</small></div>
+    ${t ? `${row('tuneMark', 'forestayMark', 'Forestay mark (rake)', 100, 0.5, TUNE_INFO.forestayMark)}
+    ${row('tuneFoot', 'footAft', 'Mast foot', 1, 1, TUNE_INFO.footAft)}
+    ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25, TUNE_INFO.shroudTurns)}
+    ${row('tuneJumper', 'jumperTurns', 'Jumpers', 1, 0.5, TUNE_INFO.jumperTurns)}
+    <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}`;
+}

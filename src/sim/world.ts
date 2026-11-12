@@ -30,6 +30,8 @@ import { destMark, place as getPlace } from './places';
 import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
+import { TUNE_HEIKKILA, TUNE_PRESETS, fixTune, presetFor, type RigTune } from '../boat/rigTune';
+import { outlookFor } from './outlook';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
@@ -324,8 +326,35 @@ export class World {
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
+    if (!this.freeSail) this.tuneAtDock();
     if (!this.freeSail) this.log = new RaceLog(this);
     this.committeeFrom = this.C.base;
+  }
+
+  /** The wind the forecast gives for the race (kt): the course-wide breeze over the first hour from the gun (outlook.ts). */
+  forecastKt = 0;
+  /**
+   * Racing, each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
+   * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5). A boat set up in the Boat panel keeps her
+   * own tune. With none, you're set to North Sails' setting for the forecast (rigTune.ts presetFor); the club boats
+   * mostly are too, a few on Heikkilä Sailmaker's all-round tune and a few on the setting next to the right one (a crew
+   * that read the forecast differently). Their own random draw, so the race's other draws (and replays) don't move.
+   */
+  private tuneAtDock(): void {
+    const o = outlookFor(this);
+    let n = 0, sum = 0; for (let m = 0; m <= 60; m += 10) { sum += o.breeze(this.gunUtc + m).kt; n++; }
+    const kt = this.forecastKt = sum / n, right = presetFor(kt);
+    const r = makeRng((this.seed ^ 0x71a3e) >>> 0), order = ['light', 'medium', 'strong'] as const;
+    for (const b of this.boats) {
+      if (b.tune) continue;
+      let t: RigTune = TUNE_PRESETS[right];
+      if (!b.isUser) {
+        const x = r(), i = order.indexOf(right);
+        if (x > 0.85) t = TUNE_HEIKKILA;
+        else if (x > 0.7) t = TUNE_PRESETS[order[i === 0 ? 1 : i === 2 ? 1 : (r() < 0.5 ? 0 : 2)]];
+      }
+      b.tune = { ...t };
+    }
   }
 
   get user(): Boat { return this.boats[0]; }
@@ -382,6 +411,7 @@ export class World {
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor } } : { paint: F.paint }),
+      ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
