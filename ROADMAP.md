@@ -21,9 +21,10 @@ What's planned, roughly in order. Done work is described in the README.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. P0 phase 2: the interior true to a real Folkboat (Boat Detail, running; 6–10 h).
-2. Crystal clarity on the crew and trim controls: the full trim-panel review (the lines' ends are named, v104; 4–6 h).
-3. Finish the crew figures: the owner's choice on moving the crew's stations onto the real benches (<1 h once chosen,
+2. Finish the crew figures: the owner's choice on moving the crew's stations onto the real benches (<1 h once chosen,
    then its own reviewed PR for the trim calibration).
+3. Crystal clarity on the crew and trim controls: a new, more true-to-life view of the trim controls, which the owner
+   is planning and will describe; nothing is built until it's agreed (the lines' ends are named, v104; 4–6 h).
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
