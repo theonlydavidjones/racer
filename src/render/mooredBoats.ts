@@ -90,14 +90,22 @@ function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, seg = 5): THREE.Buff
 }
 
 /**
- * The figures behind the shapes, as fractions of the length overall: approximate, typical of 30–36 ft production boats, from
- * general knowledge. NOT yet checked against the builders' or sailboatdata.com's figures: those hosts weren't reachable from
- * the session that drew them (to do: check and correct). Sail: beam about a third of her length; the mast about 1.4 times her
- * length above the water; freeboard about 4 ft at the bow and 3 ft at the stern on a 30-footer; the cabin top about 2 ft
- * above the deck. Power: an express or sedan cruiser, a little beamier and higher-sided, the deckhouse about 4 ft high.
+ * The figures behind the shapes, as fractions of the length overall.
+ * Sail, from the builder's figures for the J/105, the Bay's biggest one-design fleet of keelboats this size (J/Boats,
+ * jboats.com/j105-tech-specs: LOA 34.50 ft, LWL 29.50, beam 11.00, draft 6.50; I 40.60, J 13.50, P 41.50, E 14.60; "white gel
+ * coat hull"):
+ * - beam 11.00 / 34.50 = 0.32;
+ * - the mast at J / LOA = 13.50 / 34.50 = 0.39 of her length from the stem (J is the foretriangle's base, stem to mast);
+ * - the boom E / LOA = 14.60 / 34.50 = 0.42 long, so to 0.39 + 0.42 = 0.81 of her length;
+ * - the masthead above the water: P (41.50 ft, the main's luff, from the boom to the top band) and the boom's height above the
+ *   deck and the deck's above the water (about 3 ft and 3.5 ft: estimates), about 48 ft, 1.39 of her length.
+ * Estimates still (no builder's figure reached: sailboatdata.com is behind a browser check, and the other builders' sites
+ * weren't reachable): the freeboard (about 4 ft at the bow and 3 ft at the stern on a 30-footer), the cabin top's height
+ * (about 2 ft above the deck), and the powerboat's (an express or sedan cruiser, a little beamier and higher-sided, the
+ * deckhouse about 4 ft high).
  */
 export const MOORED = {
-  sail: { beam: 0.34, fbBow: 0.11, fbStern: 0.085, transom: 0.78, draft: 0.06, rake: 0.08, mastAbove: 1.38, mastAt: 0.4, cabin: 0.065, boom: 0.115, boomTo: 0.78 },
+  sail: { beam: 0.32, fbBow: 0.11, fbStern: 0.085, transom: 0.78, draft: 0.06, rake: 0.08, mastAbove: 1.39, mastAt: 0.39, cabin: 0.065, boom: 0.115, boomTo: 0.81 },
   power: { beam: 0.36, fbBow: 0.15, fbStern: 0.115, transom: 0.9, draft: 0.05, rake: 0.1, house: 0.13 }
 };
 
