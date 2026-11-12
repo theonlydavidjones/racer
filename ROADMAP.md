@@ -70,6 +70,9 @@ is now "much better" (owner).
 3. The cockpit to the plan, with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
+5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
+   of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
+   hull's heel, pitch and roll, its light moving with it (1–2 h).
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
@@ -87,7 +90,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
-- **Now — cruise ignores the chosen origin** (bug; ~1 h; for Marinas after the reset): owner, "there's a bug in cruise
+- ~~**Now — cruise ignores the chosen origin**~~ (done: 1ace228 in #54, checked in the browser by Marinas; bug; ~1 h): owner, "there's a bug in cruise
   mode where I have an origin selected but it still starts me in the slip." When a cruise origin other than her slip is
   chosen, she must start there (sim/world.ts, the slip and docked start, near line 301). Goes with the push-off fix.
 - **Now — double-click to lash the tiller always lashes it amidships** (bug; <1 h; Crew Controls after the reset, with
