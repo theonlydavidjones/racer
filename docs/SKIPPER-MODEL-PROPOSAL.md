@@ -222,6 +222,16 @@ believes she fouled, and how sure she is. That leads to:
   other boats whose minds saw the incident, each with their own view. A hearing compares them, as the RRS Part 5
   hearing does, and can find against the true state when the testimony is poor, as real ones sometimes do.
 
+**From Rules (12 November):**
+
+- **One rules model.** A skipper's beliefs reuse the pure `rightOfWay(A, B, ctx, rec)`, called on her own view: the
+  boats as she sees them, with what she doesn't know taken out of `ctx`/`rec`. That way there is no second rules
+  model to drift from the real one.
+- **Incident memory.** It keeps the World's `Incident`, and a copy of the pair record at that moment, because pair
+  records are mutable.
+- **Penalties.** A boat not racing can't take turns (Rule 44.1). Rule 23.1 can only be protested.
+- **Blanketing.** It is no foul (the owner, 12 November), so protests about wind shadow are found against.
+
 ## 6. Today's baseline (sim, no skippers)
 
 Measured on 12 November at origin/main 18010c1. The setup:
