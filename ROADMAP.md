@@ -6,7 +6,7 @@
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
   (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
   yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
-  sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
+  sternway; ~~the end tie's push-off doesn't allow for the wind setting her back onto the dock~~ (done: her bow's pushed off to close-hauled, away from the dock; a boat set sideways now stops against a dock or the shore instead of passing through).
 - ~~**The sea inside the marinas**~~ (done, bay-east-7: the swell diffracts through each entrance by the exact gap solution, scripts/make-gap-diffraction.py, the Penney & Price problem the Shore Protection Manual draws for B/L 0.5–5; the fetch is traced finely just outside a marina as well as inside, every 2° by one, and blended between its 10 m nodes;
   swell running past an entrance bends round its breakwater head by Sommerfeld's half-plane solution; over a swell's
   spread of directions, Mitsuyasu/Goda s 75. Left out, from review: the basin's own walls reflecting the waves (Gashouse
