@@ -115,9 +115,19 @@ const WATER_FRAGMENT = `
   vec3 waveN = normalize((viewMatrix * vec4(normalize(vec3(-ws.x, 1.0, ws.y)), 0.0)).xyz);
   float hsLocal = max(0.04, length(vec2(vKW * uHs.x, vKS * uHs.y)));
   float crest = ws.z / (0.5 * hsLocal) * (1.0 - smoothstep(300.0, 1500.0, camDF));
-  float caps = clamp(vWhite * 35.0, 0.0, 1.0);
-  float speck = smoothstep(0.92 - 0.2 * caps, 0.99, fine.r * texelColor.r + 0.18 * crest);
-  float foam = caps * (smoothstep(0.6, 1.3, crest) * (0.55 + 0.45 * fine.g) + 0.6 * speck);
+  // whitecaps: patches a few metres across covering the fraction of the water the coverage law gives (vWhite: sea.ts),
+  // drifting with the wind and breaking and fading in seconds, leaning to the crests. The threshold is the noise field's
+  // own quantile for that fraction (fitted from its distribution: T = 0.5665 − 0.1835·x − 0.0227·x², x = log10 W),
+  // so the area that shows white is the area the law says is white
+  float Wc = clamp(vWhite, 0.0, 0.2), lx = log(max(Wc, 1e-4)) / log(10.0), thr = 0.5665 - 0.1835 * lx - 0.0227 * lx * lx;
+  vec2 cp = adv / 2.6 + vec2(0.0, uTime * 0.25);
+  float cf = 0.65 * vnoise(cp) + 0.35 * vnoise(cp * 2.3 + vec2(7.1, 3.3)) + 0.06 * (clamp(crest, -1.0, 1.5) - 0.2);
+  float caps = Wc > 1e-4 ? smoothstep(thr, thr + 0.025, cf) : 0.0;
+  // ... and from Beaufort 7 (28–33 kt), white foam from the breaking waves blown in streaks along the wind (WMO's
+  // Beaufort scale), more as it blows harder
+  vec2 wd = normalize(uPuffV + vec2(1e-5, 0.0)), wq = vec2(dot(vWaveP, wd) / 9.0, dot(vWaveP, vec2(-wd.y, wd.x)) / 0.7);
+  float streak = smoothstep(13.0, 17.0, uMeanKt * 0.5144) * smoothstep(0.7, 0.9, vnoise(wq + vec2(uTime * 0.05, 0.0))) * 0.45;
+  float foam = max(caps * (0.75 + 0.25 * fine.g), streak) * (1.0 - smoothstep(600.0, 2500.0, camDF));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), clamp(foam, 0.0, 0.85));
   // the sky reflected in the water, strongest at a glancing angle (toward the horizon)
   // (Schlick's Fresnel for water: 2% straight down, nearly all at a glancing angle; the wave slopes facing away
@@ -277,7 +287,7 @@ export class SceneView {
           vec2 puvV = (simP - uPuffO) / uPuffS;
           float edgeV = 1.0 - smoothstep(0.3, 0.5, length(puvV - 0.5));
           vec4 smV = texture2D(uPuff, clamp(puvV, 0.0, 1.0));
-          vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 20.0, edgeV);
+          vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 10.0, edgeV); // (whitecaps stored ×10: up to the 10% cap)
           vWaveP = simP;
           vec3 dsp = waveDisp(simP, vKW, vKS, length(wp0.xz - cameraPosition.xz));
           transformed += vec3(dsp.x, dsp.z, -dsp.y);
@@ -514,7 +524,7 @@ export class SceneView {
         for (let ch = 0; ch < 3; ch++) {
           const q = (ii: number, jj: number) => sg.v[(jj * SEA_N + ii) * 3 + ch];
           const val = (q(a, b) * (1 - u) + q(a + 1, b) * u) * (1 - v) + (q(a, b + 1) * (1 - u) + q(a + 1, b + 1) * u) * v;
-          d[o + 1 + ch] = Math.round(Math.min(1, Math.max(0, ch < 2 ? val / 2 : val * 20)) * 255);
+          d[o + 1 + ch] = Math.round(Math.min(1, Math.max(0, ch < 2 ? val / 2 : val * 10)) * 255);
         }
       } else { d[o + 1] = d[o + 2] = 128; d[o + 3] = 0; }
     }
