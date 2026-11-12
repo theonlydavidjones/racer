@@ -341,11 +341,11 @@ export const COCKPIT_FIT = {
 export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
 /** The thwart's top (m over the waterline). */
 /**
- * Where the jib winches stand fore and aft (m aft of amidships): 0.52 m aft of the cabin's after end and 0.45 m forward
- * of the thwart's front face, so a crew sits on the rail between it and the cabin, and another, with a little less room,
- * between it and the thwart (the owner, of Josephine).
+ * Where the jib winches stand fore and aft (m aft of amidships): about a third of the way aft along the cockpit, 0.58 m
+ * aft of the cabin's after end and 0.39 m forward of the thwart's front face, so a crew sits on the rail between it and
+ * the cabin, and another, with a little less room, between it and the thwart (the owner, and Josephine's profile photo).
  */
-export const JIB_WINCH_Z = 1.58;
+export const JIB_WINCH_Z = 1.64;
 export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
 /** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
 export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
@@ -419,9 +419,16 @@ export const WINDOW = { uc: zU(-0.05), len: 0.95, h0: CABIN.h * 0.32, h1: CABIN.
 export const CABIN_RISE = 0.18;
 export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + cabinSideH(u);
 /** The cabin side's height above the deck at station u. */
-export const cabinSideH = (u: number) => CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)));
+export const cabinSideH = (u: number) => (CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)))) * cabinNose(u);
+/**
+ * The cabin's front, seen from the side, isn't a flat face: the trunk rounds down to the deck over its first CABIN_NOSE m,
+ * the sides and the top's arch alike (Josephine's profile photos: a big, soft curve from the foredeck up onto the cabin
+ * top). A quarter ellipse: 0 at the very front, 1 from CABIN_NOSE aft.
+ */
+export const CABIN_NOSE = 0.38;
+function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sqrt(1 - (1 - d / CABIN_NOSE) ** 2); }
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
-export const cabinTopAt = (u: number, x: number) => { const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN); return cabinTopY(u) + CABIN.crown * Math.max(0, 1 - (x / w) ** 2); };
+export const cabinTopAt = (u: number, x: number) => { const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN); return cabinTopY(u) + CABIN.crown * cabinNose(u) * Math.max(0, 1 - (x / w) ** 2); };
 
 /** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
 export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } {
@@ -436,8 +443,8 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   // four rows up each side: from below the deck, the window's sill and head, the top edge; the window's band is open
   const R = 4;
   for (const o of ring) {
-    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, d + WINDOW.h0, d + WINDOW.h1, t];
-    for (const y of hs) { const f = Math.max(0, (y - d) / (t - d)); sides.push(o.x - Math.sign(o.x) * CABIN_LEAN * f, y, zAt(o.u)); }
+    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, Math.min(d + WINDOW.h0, t), Math.min(d + WINDOW.h1, t), t]; // (where the nose is lower than the window's band, the rows close up under the top)
+    for (const y of hs) { const f = t - d > 1e-4 ? Math.max(0, (y - d) / (t - d)) : 1; sides.push(o.x - Math.sign(o.x) * CABIN_LEAN * f, y, zAt(o.u)); }
   }
   // (all round but the after end: that's the bulkhead, with the companionway in it)
   const aftSeg = outline.length - 1;

@@ -367,6 +367,8 @@ interface Lines {
  * against the deck's and coaming's known widths: an estimate, within a centimetre.
  */
 const CABIN_Z0 = -L / 2 + CABIN.u0 * L, CABIN_Z1 = -L / 2 + CABIN.u1 * L;
+/** The jib winch's height, base to the top of its drum's cap. */
+const WINCH_H = 0.123;
 const HIKE_RAIL = { z0: CABIN_Z0 + 0.15, z1: CABIN_Z1 + 0.05, inset: 0.045, w: 0.08, t: 0.028, gap: 0.014 };
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
@@ -524,8 +526,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     // the jib sheet winch, as on Josephine (the owner's photos): on a moulded pedestal standing on the side deck against
     // the coaming's outer face, about half-way between the cabin's after end and the thwart, a little nearer the thwart:
     // room for a crew to sit on the rail forward of it and another, a little less, aft of it (the owner);
-    // the pedestal tapers up from a broader foot to about the coaming's top, and the chromed winch stands on it
-    const zw = JIB_WINCH_Z, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) + 0.03;
+    // the pedestal tapers up from a broader foot, and the chromed winch stands on it, its top about flush with the coaming's
+    const zw = JIB_WINCH_Z, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) - WINCH_H + 0.01; // (the winch's top about flush with the coaming's: the owner, Josephine's photo)
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.095, top - deck, 20), sideMatFor(grp)); ped.scale.z = 1.25; ped.position.set(wx, (top + deck) / 2, zw); grp.add(ped);
     const wy = top, winch = new THREE.Group(); winch.position.set(wx, wy, zw); grp.add(winch);
     for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {
