@@ -1,7 +1,7 @@
 import { CE_ABOVE_WL, RIG } from '../boat/balance';
 import type { Boat } from '../boat/boat';
 import { sailFrame } from '../boat/physics';
-import { SAILS, sailTrim, type SailName, type SailTrim } from '../boat/trim';
+import { downwindness, SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
 import { leechTellState, luffTellStates, type TellState } from '../render/sails';
 
@@ -13,20 +13,21 @@ import { leechTellState, luffTellStates, type TellState } from '../render/sails'
  * From the sim:
  *  - the apparent wind at each height: the same wind the physics trims to (physics.ts sailWind: ORC VPP Documentation
  *    2025 §7.1, the log profile VT(z) = VT(10 m)·ln(z/z0)/ln(10/z0), z0 = 0.005 m, eq. 7.1, its cross-wind part reduced
- *    by cos heel, eqs. 7.2–7.3), in the frame the sails are trimmed in (sailFrame: her course through the water). At the
- *    centre of effort's height it is the sim's own wind exactly; above it there's more wind and it comes from further
- *    aft, below it less and further forward: why sails are twisted.
- *  - each section's angle to the centreline: the sheet's (b.sheets), the sim's one angle for the whole sail, taken as the
- *    section at the centre of effort's height; up and down the sail it opens and closes by the sail's twist (b.shape:
- *    head against foot), spread evenly over the luff;
- *  - whether the flow is attached, luffing or stalled, and how much: the sim's own trim function (trim.ts sailTrim) at
- *    each section's angle of attack. At the centre of effort that's the sim's b.trim; above and below it the same
- *    function at that height's wind and angle (the sim's forces use the one section);
- *  - the telltales: luffTellStates, the function the 3D telltales use;
- *  - each sail's depth and draft (b.shape), the same at every height (the sim has one of each);
+ *    by cos heel, eqs. 7.2–7.3), in the frame the sails are trimmed in (sailFrame: her course through the water; her
+ *    heading when she's hove to, as heaveTo has it). At the centre of effort's height it is the sim's own wind exactly;
+ *    above it there's more wind and it comes from further aft, below it less and further forward;
+ *  - each sail's flow (attached, luffing, stalled, and how much) and its telltales: the sim has one trim for each sail
+ *    (b.trim: its wind at the centre of effort against its sheet), and that's what every cut shows, as the 3D telltales
+ *    at every height do. The sim's forces see nothing else;
+ *  - each sail's depth, draft and twist (b.shape);
  *  - leeway (b.leeway).
- * Illustrative (the panel says so): the streamlines and the speed around the sections (a 2D potential flow, flowField,
- * which never feeds back into the sim), and where the flow separates, drawn from the sim's stall and luff amounts.
+ * Our reading of the sim's numbers, drawn (the panel says so):
+ *  - each section's angle to the centreline: the sheet sets the foot (the boom's angle, b.sheets.main; the jib's clew
+ *    seen from its tack, b.sheets.jib), and the sail's twist (head against foot) opens it evenly up the luff;
+ *  - the streamlines and the speed around the sections (a 2D potential flow, flowField, which never feeds back into the
+ *    sim), and where the flow has left the sail, drawn from the sim's stall amount (or off the wind, where a sail works
+ *    stalled, behind all of it). The sim has no slot or backwinding of its own: what the panel says of the slot is how
+ *    real boats behave.
  */
 
 /** The rig's geometry for the sections (balance.ts RIG, from the ORC certificates; m). Heights above the waterline. */
@@ -51,11 +52,12 @@ export const windShare = (z: number) => Math.log(Math.max(0.05, z) / 0.005) / Ma
 
 /** The apparent wind the sails see at height z (m above the waterline), in the sails' frame: speed (kt) and angle (deg,
  * unsigned: off the bow). As physics.ts step() works it for the sails' centre of effort, at z. */
-export function windAt(b: Boat, z: number): { kt: number; awa: number } {
-  const fr = sailFrame(b), heel = b.heel ?? 0, c = Math.cos(heel * D2R);
+export function windAt(b: Boat, z: number, turn = 0): { kt: number; awa: number } {
+  // (hove to, the sim trims to the wind across her heading: physics.ts heaveTo)
+  const fr = b.hove ? { rot: 0, along: b.v, across: b.sway ?? 0 } : sailFrame(b), heel = b.heel ?? 0, c = Math.cos(heel * D2R);
   // (the rig sweeping through the air as she rolls: at height z the sails move z/CE as fast as at the centre of effort)
   const sway = -(b.heelRate ?? 0) * D2R * z * c;
-  const vt = b.ww.kt * KT * windShare(z), rel = wrap(b.ww.from - (b.h + fr.rot)) * D2R;
+  const vt = b.ww.kt * KT * windShare(z), rel = wrap(b.ww.from - (b.h + turn + fr.rot)) * D2R;
   const along = vt * Math.cos(rel) + fr.along - (b.astern ?? 0), across = vt * Math.sin(rel) * c + fr.across + sway;
   return { kt: Math.hypot(along, across) / KT, awa: Math.abs(Math.atan2(across, along) / D2R) };
 }
@@ -76,46 +78,62 @@ export function sectionAt(sail: SailName, z: number): { luff: number; chord: num
   return { luff: MAST_FA + RIG.J * (1 - s / RIG.IG), chord: JIB_FOOT_CHORD + (JIB_HEAD_CHORD - JIB_FOOT_CHORD) * f, f };
 }
 
-/** One sail cut across at one height: where it is, how it's set, and how the air's flowing over it. */
+/** One sail cut across at one height: where it is, how it's set, and the sim's flow over it. */
 export interface FlowSection {
   sail: SailName;
   /** Its luff (m forward of the mast's after side) and chord (m). */
   luff: number; chord: number;
-  /** Its angle to the centreline (deg, to leeward), depth (camber/chord) and draft (fraction of the chord from the luff). */
+  /** Its angle to the centreline (deg, to leeward: the foot's, opened by the twist up the luff), depth (camber/chord)
+   * and draft (fraction of the chord from the luff). */
   angle: number; depth: number; draft: number;
-  /** The apparent wind there (kt, deg off the bow) and the angle of attack (deg) against the sail's best one. */
-  aws: number; awa: number; aoa: number; best: number;
-  /** The sim's trim for this section, and the telltales it gives (the luff's; the main's leech one too): as the 3D ones. */
+  /** The sim's trim for the sail (its one trim: the same at every height), and its telltales as the 3D view has them. */
   trim: SailTrim; tells: { windward: TellState; leeward: TellState; leech?: TellState };
-  /** True at the centre of effort: these are the sim's own numbers (b.trim), not worked out again. */
-  sims: boolean;
 }
 
 /** A height's sections (the jib's first when it's there) and the wind there. */
 export interface FlowCut { name: string; z: number; aws: number; awa: number; sections: FlowSection[] }
 
-/** The sail's height fraction where the sim trims it (its centre of effort's height). */
-const fAt = (sail: SailName, z: number) => sectionAt(sail, z)?.f ?? (sail === 'main' ? (z - BOOM) / RIG.P : (z - JIB_TACK) / (JIB_HEAD - JIB_TACK));
+/** Each sail as the sim has it: the wind its trim was worked out at (the centre of effort's), the wind across its foot
+ * against the best (trim.ts: the boom, or the jib's clew from its tack, the sim's calibration), and its twist. */
+export interface FlowSail { sail: SailName; trim: SailTrim; awa: number; across: number; best: number; twist: number }
+export interface FlowState { cuts: FlowCut[]; sails: FlowSail[]; running: boolean; hove: boolean; leeway: number }
 
-/** The flow view's three cuts across her sails, from the sim's state. The jib only where it's drawing on its sheet. */
-export function flowCuts(b: Boat): FlowCut[] {
-  const ce = CE_ABOVE_WL;
-  return FLOW_HEIGHTS.map(({ name, z }) => {
+/** The sail's height fraction (0 at its foot, 1 at its head) at z, unclamped. */
+const fAt = (sail: SailName, z: number) => sail === 'main' ? (z - BOOM) / RIG.P : (z - JIB_TACK) / (JIB_HEAD - JIB_TACK);
+
+/** The flow view's state from the sim: its three cuts across her sails and each sail's own numbers. The jib only where
+ * it's drawing on its sheet. */
+export function flowState(b: Boat): FlowState {
+  const ce = windAt(b, CE_ABOVE_WL), sails: FlowSail[] = [];
+  for (const sail of ['jib', 'main'] as const) {
+    const trim = b.trim[sail], shape = b.shape[sail];
+    if (!trim || !shape) continue;
+    // (the wind the sim worked this trim out at: trim.ts err = (awa − sheet) − best, so its awa is err + sheet + best)
+    const awa = trim.err + b.sheets[sail] + SAILS[sail].aoa;
+    sails.push({ sail, trim, awa, across: awa - b.sheets[sail], best: SAILS[sail].aoa, twist: shape.twist });
+  }
+  const tellAwa = sails[0]?.awa ?? ce.awa;
+  const cuts = FLOW_HEIGHTS.map(({ name, z }) => {
     const w = windAt(b, z), sections: FlowSection[] = [];
-    for (const sail of ['jib', 'main'] as const) {
-      const at = sectionAt(sail, z), shape = b.shape[sail], simTrim = b.trim[sail];
-      if (!at || !shape || !simTrim) continue;
-      const sims = z === ce;
-      // (the sheet sets the section at the centre of effort; the twist opens it above and closes it below)
-      const angle = b.sheets[sail] + shape.twist * (at.f - fAt(sail, ce));
-      const trim = sims ? simTrim : sailTrim(sail, w.awa, angle);
+    for (const fs of sails) {
+      const at = sectionAt(fs.sail, z), shape = b.shape[fs.sail]!;
+      if (!at) continue;
       sections.push({
-        sail, luff: at.luff, chord: at.chord, angle, depth: shape.depth, draft: shape.draft,
-        aws: w.kt, awa: w.awa, aoa: w.awa - angle, best: SAILS[sail].aoa, trim, tells: { ...luffTellStates(trim, w.awa), ...(sail === 'main' ? { leech: leechTellState(trim, w.awa, !!b.luff) } : {}) }, sims
+        sail: fs.sail, luff: at.luff, chord: at.chord, angle: b.sheets[fs.sail] + shape.twist * fAt(fs.sail, z), depth: shape.depth, draft: shape.draft,
+        trim: fs.trim, tells: { ...luffTellStates(fs.trim, tellAwa), ...(fs.sail === 'main' ? { leech: leechTellState(fs.trim, tellAwa, !!b.luff) } : {}) }
       });
     }
     return { name, z, aws: w.kt, awa: w.awa, sections };
   });
+  return { cuts, sails, running: downwindness(tellAwa) > 0.5, hove: !!b.hove, leeway: b.leeway ?? 0 };
+}
+
+/** The heading change (deg, + away from the wind) that widens the sails' apparent wind by `dAwa` deg, from the sim's own
+ * wind at the centre of effort (the apparent wind swings less than the heading: her own speed holds it forward). */
+export function turnFor(b: Boat, dAwa: number): number {
+  const a0 = windAt(b, CE_ABOVE_WL).awa, away = b.tack === 'S' ? -1 : 1; // (bearing away on starboard tack turns her to port)
+  const per = (windAt(b, CE_ABOVE_WL, away * 2).awa - a0) / 2;
+  return per > 0.1 ? dAwa / per : dAwa;
 }
 
 /* ---------- the illustrative flow: a 2D potential flow around the sections ---------- */

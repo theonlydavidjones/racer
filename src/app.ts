@@ -405,6 +405,7 @@ function openFlow(open = !flowPanel.open): void {
   look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
 }
 $('bFlow').onclick = () => openFlow();
+addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 openLines((S.band ?? 1) === 1);

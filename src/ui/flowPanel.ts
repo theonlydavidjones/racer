@@ -1,6 +1,7 @@
 import type { Boat } from '../boat/boat';
+import { crewEaseBoom } from '../boat/physics';
 import type { TellState } from '../render/sails';
-import { camberLine, flowCuts, flowField, gridField, streamline, type FlowCut, type FlowSection } from './sailFlow';
+import { camberLine, flowField, flowState, gridField, streamline, turnFor, type FlowCut, type FlowSection, type FlowState } from './sailFlow';
 
 /*
  * The flow view (the owner's training tool #2): a panel beside the 3D view with her sails cut across at three heights,
@@ -32,10 +33,11 @@ function inside(poly: [number, number][], x: number, y: number): boolean {
 }
 
 /** The air that's left a stalled sail (illustrative, from the sim's stall amount): from where the flow parts from its lee
- * side to the leech, carried downstream as a widening wake. In the plan's metres. */
-function separated(s: FlowSection, U: [number, number]): [number, number][] | null {
-  if (s.trim.flow !== 'stalled' || s.trim.amount < 0.05) return null;
-  const p = camberLine(s, 20), i0 = Math.max(4, Math.round(20 * (1 - 0.65 * s.trim.amount))), L = s.chord * (0.5 + 0.6 * s.trim.amount);
+ * side to the leech, carried downstream as a widening wake. Off the wind, where a sail works stalled, all of it: the
+ * wake from its luff. In the plan's metres. */
+function separated(s: FlowSection, U: [number, number], running: boolean): [number, number][] | null {
+  if (!running && (s.trim.flow !== 'stalled' || s.trim.amount < 0.05)) return null;
+  const amt = running ? 1 : s.trim.amount, p = camberLine(s, 20), i0 = running ? 0 : Math.max(4, Math.round(20 * (1 - 0.65 * amt))), L = s.chord * (0.5 + 0.6 * amt);
   const lee = p.slice(i0).map(([x, y]) => [x + 0.02, y] as [number, number]), [lx, ly] = p[20], [sx, sy] = p[i0];
   // (the wake: off the leech downstream, and back from a point downstream and to leeward of where it parted)
   return [...lee, [lx + U[0] * L, ly + U[1] * L], [sx + U[0] * L * 0.7 + 0.25 * L, sy + U[1] * L * 0.7]]; // (x is to leeward in the plan)
@@ -50,7 +52,7 @@ export class FlowPanel {
 
   constructor(parent: HTMLElement, private onClose: () => void) {
     const el = this.el = document.createElement('div'); el.id = 'flowPanel'; el.hidden = true;
-    el.innerHTML = `<header><b>Flow over the sails</b><span class="fp-tags"><span class="fp-tag sim">wind, angles, flow, telltales: the sim's</span><span class="fp-tag">streamlines: illustration</span></span><button class="fp-x" aria-label="Close the flow view">×</button></header>
+    el.innerHTML = `<header><b>Flow over the sails</b><span class="fp-tags"><span class="fp-tag sim">wind, trim, telltales: the sim's</span><span class="fp-tag">sections and streamlines: drawn from them</span></span><button class="fp-x" aria-label="Close the flow view">×</button></header>
       <div class="fp-cuts"></div><div class="fp-key"></div><div class="fp-story"></div>`;
     const row = el.querySelector('.fp-cuts')!;
     for (let i = 0; i < 3; i++) {
@@ -70,7 +72,7 @@ export class FlowPanel {
   update(b: Boat, now: number): void {
     if (!this.open || now - this.last < 500) return;
     this.last = now;
-    const cuts = flowCuts(b), lee = b.tack === 'S' ? -1 : 1; // (leeward on the screen: port, left, on starboard tack)
+    const st = flowState(b), cuts = st.cuts, lee = b.tack === 'S' ? -1 : 1; // (leeward on the screen: port, left, on starboard tack)
     // one scale for all three, so they compare: fitted to every section's extent with room for the flow round it
     let x0 = -0.6, x1 = 0.6, y0 = 0, y1 = 0;
     for (const c of cuts) for (const s of c.sections) for (const [x, y] of camberLine(s, 6)) { x0 = Math.min(x0, x - 0.5); x1 = Math.max(x1, x + 0.5); y0 = Math.min(y0, y - 0.35); y1 = Math.max(y1, y + 0.35); }
@@ -78,11 +80,11 @@ export class FlowPanel {
     // (the flow's box: what the drawing shows, in metres, and a little beyond)
     const xa = -cx / (lee * sc), xb = (W - cx) / (lee * sc);
     const fit = { lee, sc, cx, cy, box: [Math.min(xa, xb) - 0.3, -cy / sc - 0.3, Math.max(xa, xb) + 0.3, (H - cy) / sc + 0.3] as [number, number, number, number] };
-    cuts.forEach((c, i) => this.draw(this.cuts[i], c, fit, b));
-    this.story.replaceChildren(...this.tell(cuts, b));
+    cuts.forEach((c, i) => this.draw(this.cuts[i], c, fit, b, st.running));
+    this.story.replaceChildren(...this.tell(st, b));
   }
 
-  private draw(slot: { cv: HTMLCanvasElement; cap: HTMLElement }, c: FlowCut, f: { lee: number; sc: number; cx: number; cy: number; box: [number, number, number, number] }, b: Boat): void {
+  private draw(slot: { cv: HTMLCanvasElement; cap: HTMLElement }, c: FlowCut, f: { lee: number; sc: number; cx: number; cy: number; box: [number, number, number, number] }, b: Boat, running: boolean): void {
     const { cv, cap } = slot, dpr = Math.min(2, devicePixelRatio || 1);
     if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
     const g = cv.getContext('2d')!; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -94,9 +96,10 @@ export class FlowPanel {
     g.closePath(); g.fillStyle = COL.hull; g.fill(); g.strokeStyle = COL.hullEdge; g.lineWidth = 1; g.stroke();
     const a = c.awa * Math.PI / 180, U: [number, number] = [Math.sin(a), Math.cos(a)];
     // the flow (illustrative): streamlines seeded across the stream well upwind, coloured by speed; none through dead air
-    const dead = c.sections.map(s => separated(s, U)).filter((p): p is [number, number][] => !!p);
+    const dead = c.sections.map(s => separated(s, U, running)).filter((p): p is [number, number][] => !!p);
     if (c.sections.length) {
-      const vel = gridField(flowField(c.sections, c.awa), f.box, 40), span = Math.hypot(f.box[2] - f.box[0], f.box[3] - f.box[1]);
+      // (off the wind the air doesn't follow the sails round: a potential flow would draw it attached, so plain stream and wake)
+      const vel = running ? (): [number, number] => U : gridField(flowField(c.sections, c.awa), f.box, 40), span = Math.hypot(f.box[2] - f.box[0], f.box[3] - f.box[1]);
       const mx = (f.box[0] + f.box[2]) / 2, my = (f.box[1] + f.box[3]) / 2, n = 26;
       g.lineWidth = 1.2;
       for (let k = 0; k < n; k++) {
@@ -152,30 +155,33 @@ export class FlowPanel {
     pts.forEach(([px, py], k) => k ? g.lineTo(X(px), Y(py)) : g.moveTo(X(px), Y(py))); g.stroke();
   }
 
-  /** What the flow and the telltales are saying, in words: the centre of effort's sections (the sim's own trim), what the
-   * twist is doing between the low and high cuts, the slot, and the keel's leeway. */
-  private tell(cuts: FlowCut[], b: Boat): HTMLElement[] {
+  /** What the flow and the telltales are saying, in words, from the sim's own trim for each sail (the same at every
+   * height, as the 3D telltales show it): how it's drawing and what to do; its twist against the crew's target for the
+   * wind; the slot; and the keel's leeway. */
+  private tell(st: FlowState, b: Boat): HTMLElement[] {
     const out: HTMLElement[] = [], p = (cls: string, html: string) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; out.push(e); };
-    const [lo, mid, hi] = cuts, name = { main: 'Main', jib: 'Jib' } as const;
-    for (const s of mid.sections) {
+    const name = { main: 'Main', jib: 'Jib' } as const, foot = { main: 'the boom', jib: "the jib's foot" } as const;
+    const keel = () => p('fp-keel', `<b>Under water</b> leeway ${st.leeway.toFixed(1)}°: the keel's angle to the water, which makes its lift against the sails' side force. Pinch and it grows.`);
+    if (st.hove) { p('fp-sail', `<b>Hove to</b>: the jib backed on purpose and the main eased, both meant to be stalled or luffing. She lies quiet, forereaching slowly.`); keel(); return out; }
+    if (!st.sails.length) { p('fp-sail', 'No sails drawing.'); return out; }
+    for (const s of st.sails) {
       const t = s.trim, by = Math.abs(t.err);
+      if (st.running) { p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, the telltales hanging. ${s.sail === 'main' ? 'Ease it till it\'s nearly square across the wind (the boom at the shrouds)' : 'Pole it out to windward, or let it fill on the leeward side'}.`); continue; }
+      const eased = s.sail === 'main' && crewEaseBoom(b) > 1;
       const what = t.flow === 'good' ? `attached: both telltales streaming`
-        : t.flow === 'luffing' ? `<em class="luff">luffing</em> ${pct(t.amount)}: windward telltales lifting. Trim in or bear away about ${deg(by)}`
-        : `<em class="stall">stalled</em> ${pct(t.amount)}: leeward telltales drooping${s.sail === 'main' && s.tells.leech === 'curl' ? ', leech telltale hiding' : ''}. Ease about ${deg(by)} or head up`;
-      p('fp-sail', `<b>${name[s.sail]}</b> angle of attack ${deg(s.aoa)} (best ${deg(s.best)}): ${what}.`);
+        : t.flow === 'luffing' ? (eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveller on purpose to keep her on her feet; the lifting luff is the price`
+          : `<em class="luff">luffing</em> ${pct(t.amount)}: windward telltales lifting. Trim in about ${deg(by)}, or bear away about ${deg(turnFor(b, by))}`)
+        : `<em class="stall">stalled</em> ${pct(t.amount)}: leeward telltales drooping${s.sail === 'main' && t.amount > 0.12 ? ', the leech telltale hiding' : ''}. Ease about ${deg(by)}, or head up`;
+      p('fp-sail', `<b>${name[s.sail]}</b> the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)}): ${what}.`);
     }
-    if (!mid.sections.length) p('fp-sail', 'No sails drawing.');
-    // twist: the same sail low and high
-    for (const sail of ['jib', 'main'] as const) {
-      const l = lo.sections.find(s => s.sail === sail), h = (sail === 'jib' ? mid : hi).sections.find(s => s.sail === sail);
-      if (!l || !h || l.trim.flow === h.trim.flow) continue;
-      const high = sail === 'jib' ? 'top' : 'upper';
-      if (h.trim.flow === 'luffing' && l.trim.flow !== 'luffing') p('fp-twist', `${name[sail]}: the ${high} telltales lift first: too much twist. ${sail === 'jib' ? 'Car forward' : 'More vang or sheet'}.`);
-      else if (l.trim.flow === 'luffing' && h.trim.flow !== 'luffing') p('fp-twist', `${name[sail]}: the lower telltales lift first: too little twist. ${sail === 'jib' ? 'Car aft' : 'Ease the vang or sheet a little'}.`);
-      else if (h.trim.flow === 'stalled' && l.trim.flow === 'good') p('fp-twist', `${name[sail]}: stalled high, drawing low: the leech is closed. ${sail === 'jib' ? 'Car aft' : 'Ease the vang or sheet'}.`);
+    // twist, as facts (no verdict: the sim's best twist is the crew's whole-boat choice, which the coach judges): how open
+    // each head is set against its foot, and the wind's own twist up the sail
+    if (!st.running) {
+      const [lo, , hi] = st.cuts, set = st.sails.map(s => `${s.sail} ${deg(s.twist)}`).join(', ');
+      p('fp-twist', `<b>Twist</b> ${set}, the head open from the foot. Up there the wind is ${hi.aws.toFixed(1)} kt at ${deg(hi.awa)}, low down ${lo.aws.toFixed(1)} kt at ${deg(lo.awa)}: the head's wind is stronger and freer. The coach says which line to change.`);
     }
-    if (mid.sections.length === 2) p('fp-slot', `<b>The slot</b> (illustration): the jib bends the air along the main's lee side. Over-trim the jib and the main backs before it luffs.`);
-    p('fp-keel', `<b>Under water</b> leeway ${(b.leeway ?? 0).toFixed(1)}°: the keel's angle to the water, which makes its lift against the sails' side force. Pinch and it grows.`);
+    if (st.sails.length === 2 && !st.running) p('fp-slot', `<b>The slot</b>: on real boats the jib bends the air along the main's lee side, and an over-trimmed jib backs the main before it luffs. The sim doesn't model this; the streamlines show the idea.`);
+    keel();
     return out;
   }
 }
