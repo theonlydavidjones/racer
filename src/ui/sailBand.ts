@@ -189,7 +189,7 @@ export class SailBand {
     });
     const jt = `Jumpers: turns on their turnbuckle, 0 to ${JMAX}. On (more turns) stiffens the top of the mast, so the main's head twists off less; off lets it bend and twist (about ±1.5° up top). North Sails' medium is ${TUNE_PRESETS.medium.jumperTurns} turns (the tall tick); Heikkilä Sailmaker's guide: loose in light air, tighter in medium, tighter again in a breeze if the mast bends past the main's luff round. The crew turns them a half turn at a time, about ${JUMPER_HALF_TURN_S} s each. Auto-trim leaves them alone. Click the left half for a half turn off, the right half for a half turn on, or scroll.`;
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
-      d.title = jt;
+      d.dataset.help = jt; // (in the Coach card, as every control's help: no hover titles)
       d.addEventListener('wheel', e => { if (!this.ok()) return; e.preventDefault(); this.turnJumpers(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
     });
   }
