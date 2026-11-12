@@ -71,47 +71,43 @@ export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - 
 /**
  * Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. The stem meets the
  * water about 1.02 m aft of the bow at deck level, so with the raked transom's crossing (aftLineZ(0), 0.62 m forward
- * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem is straight
- * and raked, as the class drawing shows it, rounding into the forefoot below the water.
+ * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem and the
+ * forefoot are one long, gentle curve (below).
  */
-const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
-/** The stem's slope (m of height per unit of u): a straight, raked stem from the stemhead down to the forefoot. */
-const STEM_SLOPE = -1.06 / BOW;
+const BOW = 0.144; // where the keel's thickness begins, just aft of the stem's foot (fraction of L)
 /**
- * The underwater profile forward, below the stem, as one fair batten (a monotone cubic through the points): the stem's
- * rake rounding gently, just under the water, into a long raked forefoot, steepening a little as it runs down to the
- * keel's bottom about 3.9 m aft of the stemhead at 1.1 m draft, and the bottom on, nearly level, to the heel at 1.2 m.
- * Read off Josephine hauled out (the owner's photos from port, from the starboard bow and from the starboard quarter:
- * about 0.3 m deep 2 m aft of the stemhead, 0.6 m at 3 m, the keel's forward corner about under the cabin's window;
- * the class lines plan puts the corner a little further forward, at 3.1–3.3 m). The canoe body, the hull's bottom above the keel,
- * leaves it about a third of the way down and rounds into its depth amidships, 0.62 m (the plan's main section at St. 8).
+ * The bow's profile, from the stemhead to the keel's bottom, as one long, flat, gentle S with no straight stretch and no
+ * corner anywhere (the owner, from Josephine's haul-out photos and the lines plans): steep at the stemhead and easing
+ * all the way down through the waterline, steepening again a little into the ballast keel's leading edge, then easing
+ * out into the keel's bottom about 4.2 m aft of the stemhead, which runs on nearly level to the heel at 1.2 m. It's drawn
+ * by its slope (m of height per unit of u), eased between its values by cosines so the curvature changes smoothly too,
+ * and summed up from the stemhead. It meets the water about 0.97 m aft of the stemhead (the class's 6.00 m waterline).
+ * The canoe body, the hull's bottom above the keel, leaves it at U_SPLIT and eases out to its depth amidships, 0.62 m
+ * (the plan's main section at St. 8).
  */
 const U_HEEL = (HEEL.z + L / 2) / L;
-/**
- * The stem's foot: the straight raked stem turns into the forefoot's run in one long, even curve, from about 0.2 m above
- * the water (U_STEM) to about 0.35 m under it (U_RUN), leaving the stem's rake and arriving at the run's (a cubic Hermite:
- * no corner anywhere, the owner's photos), rather than turning in the last few centimetres under the water.
- */
-const U_STEM = 0.103, U_RUN = 0.25, Y_RUN = -0.3475, M_RUN = -2.25;
-const stemFoot = (u: number, yEnd: number, mEnd: number) => {
-  const h = U_RUN - U_STEM, t = Math.min(1, Math.max(0, (u - U_STEM) / h)), t2 = t * t, t3 = t2 * t;
-  return (2 * t3 - 3 * t2 + 1) * (0.96 + STEM_SLOPE * U_STEM) + (t3 - 2 * t2 + t) * h * STEM_SLOPE + (-2 * t3 + 3 * t2) * yEnd + (t3 - t2) * h * mEnd;
+const ease2 = (a: number, b: number, t: number) => a + (b - a) * (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, t)))) / 2;
+const SLOPE_KNOTS: [number, number][] = [[0, -8.5], [0.3, -2.2], [0.43, -3.0], [0.55, -0.3]];
+const profileSlope = (u: number) => {
+  let i = 0; while (i < SLOPE_KNOTS.length - 2 && u > SLOPE_KNOTS[i + 1][0]) i++;
+  const [u0, m0] = SLOPE_KNOTS[i], [u1, m1] = SLOPE_KNOTS[i + 1]; return ease2(m0, m1, (u - u0) / (u1 - u0));
 };
-const KEEL_LINE = fairCurve([[U_RUN, Y_RUN], [0.3, -0.46], [0.39, -0.68], [0.45, -0.88], [0.5, -1.04], [0.54, -1.1], [0.58, -1.12], [U_HEEL, -1.2]]);
-const CANOE_LINE = fairCurve([[U_RUN, Y_RUN], [0.3, -0.45], [0.4, -0.56], [0.5, -0.61], [0.56, -0.62], [0.62, -0.62]]);
-export function canoe(u: number): number {
-  // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then the
-  // forefoot's long raked run, and round into the hull's bottom amidships without a knuckle
-  if (u < U_STEM) return 0.96 + STEM_SLOPE * u;
-  if (u < U_RUN) return stemFoot(u, Y_RUN, -2.05);
-  if (u < 0.62) return CANOE_LINE(u);
-  return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
+const U_SPLIT = 0.2, U_CANOE = 0.33, DU = 0.001, PROFILE: number[] = [0.96], CANOE: number[] = [0.96];
+for (let k = 1; k * DU <= 0.62 + 1e-9; k++) {
+  const um = (k - 0.5) * DU;
+  PROFILE.push(PROFILE[k - 1] + profileSlope(Math.min(um, 0.55)) * DU);
+  CANOE.push(CANOE[k - 1] + (um < U_SPLIT ? profileSlope(um) : ease2(profileSlope(U_SPLIT), 0, (um - U_SPLIT) / (U_CANOE - U_SPLIT))) * DU);
 }
-/** Keel bottom: the forefoot, then the ballast keel's bottom, deepest at the heel (1.2 m with the keel band). */
+const table = (t: number[], u: number) => { const f = Math.min(t.length - 1.001, Math.max(0, u / DU)), i = Math.floor(f); return t[i] + (t[i + 1] - t[i]) * (f - i); };
+const Y_KEEL = table(PROFILE, 0.55);
+export function canoe(u: number): number {
+  if (u < 0.62) return Math.min(table(CANOE, u), 0.96);
+  return table(CANOE, 0.62) + (0.17 - table(CANOE, 0.62)) * ease((u - 0.62) / 0.38);
+}
+/** Keel bottom: the bow's profile, then the ballast keel's bottom, deepest at the heel (1.2 m with the keel band). */
 export function keel(u: number): number {
-  if (u < U_STEM) return canoe(u);
-  if (u < U_RUN) return Math.min(stemFoot(u, Y_RUN, M_RUN), canoe(u));
-  return Math.max(-1.2, Math.min(KEEL_LINE(Math.min(u, U_HEEL)), canoe(u)));
+  const y = u < 0.55 ? table(PROFILE, u) : Y_KEEL + (-1.2 - Y_KEEL) * Math.min(1, (u - 0.55) / (U_HEEL - 0.55));
+  return Math.max(-1.2, Math.min(y, canoe(u)));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
