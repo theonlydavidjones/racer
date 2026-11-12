@@ -17,7 +17,7 @@
  *  - Visibility observed: NOAA CO-OPS 9414296 (Pier 17, a PORTS visibility sensor), hourly 09:00–18:00 local.
  *  - Forecast: NWS gridded forecast (api.weather.gov): wind on the 2.5 km grid cell over the Cityfront race area
  *    (MTR 84,107), hourly; the wind, visibility, sky cover and cloud ceiling on every cell over the race area
- *    (MTR x 81–94, y 102–115, inside the sim's world), 09:00–18:00; swell at
+ *    (MTR x 81–95, y 102–115, inside the sim's world), 09:00–18:00; swell at
  *    the cell by the Bar buoy (MTR 77,107).
  *
  * Output: src/environment/data/sf-real-days.json
@@ -216,10 +216,11 @@ function fogWord(coverage, weather) {
 }
 
 /* ---------- the NWS forecast grid over the race area (2.5 km cells), for the wind across the course ---------- */
-// (MTR's grid is a Lambert projection, turned against north: x 81–94, y 102–115 spans the sim's world, from the Gate to
-// the Oakland Estuary and Alameda and north past Richmond to the Brothers; cells whose middle is outside it are left out)
-const GRID_X = Array.from({ length: 14 }, (_, k) => 81 + k), GRID_Y = Array.from({ length: 14 }, (_, k) => 102 + k), GRID_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-const WORLD = { south: 37.735, north: 37.985, west: -122.52, east: -122.215 };
+// (MTR's grid is a Lambert projection, turned against north: x 81–95, y 102–115 spans the sim's world, from the Gate to
+// the Oakland Estuary, Alameda and San Leandro Bay and north past Richmond to the Brothers; cells whose middle is outside
+// it are left out)
+const GRID_X = Array.from({ length: 15 }, (_, k) => 81 + k), GRID_Y = Array.from({ length: 14 }, (_, k) => 102 + k), GRID_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const WORLD = { south: 37.735, north: 37.985, west: -122.52, east: -122.188 };
 const cells = [], gridDays = {};
 for (const gx of GRID_X) for (const gy of GRID_Y) {
   const j = await fetchRetry(`https://api.weather.gov/gridpoints/MTR/${gx},${gy}`, 'json', { Accept: 'application/geo+json' });

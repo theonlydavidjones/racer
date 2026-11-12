@@ -243,7 +243,7 @@ export function waveLength(T: number, h: number): number {
 
 /** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
 export function chartDepth(p: Vec): number | null {
-  const E = enc as unknown as { depth: { d: number; p: number[][][] }[]; soundings: number[] };
+  const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[]; soundings: number[] };
   const bands = E.depth.map(b => b.d).filter((d, i, a) => a.indexOf(d) === i).sort((a, b) => a - b);
   for (const band of E.depth) {
     for (const poly of band.p) {
@@ -253,7 +253,7 @@ export function chartDepth(p: Vec): number | null {
         for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; ring.push(LL(y / 1e5, x / 1e5)); }
         for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
       }
-      if (inside) { const next = bands.find(d => d > band.d) ?? band.d + 10; return Math.max(0, (band.d + next) / 2); }
+      if (inside) { const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10; return Math.max(0, (band.d + deep) / 2); }
     }
   }
   let best: number | null = null, bd = 200;

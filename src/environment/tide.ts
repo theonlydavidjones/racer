@@ -105,12 +105,12 @@ export function stationVector(s: TideStation, tMin: number): Vec {
 //    same way all across, the speed goes as depth^(2/3), shared so that the flow across the line is still the tide's.
 //  - San Leandro Bay has a second way in, the Tidal Canal from the Oakland Estuary. Its flow is NOAA's measured stream in
 //    it (SFB1216, Alameda Estuary SE End, 2012: all nine of the ADCP's bins averaged, fitted by
-//    fit-current-station.mjs; the near-surface bin alone runs only 4% faster) times its section there (the sim's shore,
-//    the chart's depths and the tide: about 290 m² at MLLW, 440 at half tide, near USGS WRI 86-4057's 83.5 m by 5.5 m);
-//    the lines between the bay's mouth and the canal carry the rest. The canal carries about as much as fills the bay,
-//    so the San Leandro Channel carries the difference: a weak flow through the bay, at times out on the flood, its
-//    size and even its way within the uncertainty of the bay's area and its station's offsets (as USGS found, the
-//    channel west of Bay Farm Island shoaled once the canal was cut).
+//    fit-current-station.mjs; the near-surface bin alone runs only 4% faster) over its section there (the sim's shore,
+//    the chart's depth bands and the tide, near USGS WRI 86-4057's 83.5 m by 5.5 m), its shallow shoulders slower by
+//    Manning's depth^(2/3) (channelFlow); the bottom metre above the bed, unmeasured, is taken as running with the rest;
+//    the lines between the bay's mouth and the canal carry the rest. The canal carries much of what fills the bay (as
+//    USGS found, the channel west of Bay Farm Island shoaled once the canal was cut), so the San Leandro Channel's
+//    share, the difference, is the less certain: never taken against the tide's slope (bayStream).
 
 const BT = bayTides as unknown as { refMsl: number; refMhhw: number; hc: Constituents; stations: Record<string, { dtHigh: number; dtLow: number; kHigh: number; kLow: number; msl: number }> };
 /** San Francisco's high and low waters (ms UTC, m above its MLLW), found a day at a time (every 6 minutes, then the parabola through the three round each). */
@@ -155,19 +155,33 @@ export function bayTide(station: string, ms: number): { h: number; rise: number 
 /** Point San Quentin's tide (San Rafael Bay's). */
 export const sanQuentinTide = (ms: number) => bayTide('9414873', ms);
 
-const DGJ = depthGrid as { step: number; offset: number; grids: { name: string; south: number; north: number; west: number; east: number; nx: number; ny: number; data: string }[] };
-const DGRIDS = DGJ.grids.map(G => { const s = atob(G.data), g = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) g[i] = s.charCodeAt(i); return { ...G, g }; });
+const DGJ = depthGrid as { step: number; offset: number; grids: { name: string; south: number; north: number; west: number; east: number; nx: number; ny: number; data: string; deep: string }[] };
+const bytes = (b64: string) => { const s = atob(b64), g = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) g[i] = s.charCodeAt(i); return g; };
+const DGRIDS = DGJ.grids.map(G => ({ ...G, g: bytes(G.data), g2: bytes(G.deep) }));
 const D_MLAT = 111320, D_MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
-/** The water's depth below MLLW (m) in the bays, from NOAA's chart on a 50 m grid (negative: a flat drying that high; 0 off the chart). */
-export function depthAt(p: Vec): number {
+/** The chart's depth band (m below MLLW, shoal edge and deep edge; negative: a flat drying that high) in the bays, on a 50 m grid; [0, 0] off the chart. */
+export function depthBand(p: Vec): [number, number] {
   const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
   for (const G of DGRIDS) {
     const i = Math.floor((lon - G.west) / (G.east - G.west) * G.nx), j = Math.floor((G.north - lat) / (G.north - G.south) * G.ny);
     if (i < 0 || j < 0 || i >= G.nx || j >= G.ny) continue;
-    const b = G.g[j * G.nx + i];
-    return b ? b * DGJ.step + DGJ.offset : 0;
+    const b = G.g[j * G.nx + i], b2 = G.g2[j * G.nx + i];
+    return b ? [b * DGJ.step + DGJ.offset, b2 * DGJ.step + DGJ.offset] : [0, 0];
   }
-  return 0;
+  return [0, 0];
+}
+/** The water's depth below MLLW (m) in the bays: the middle of its band. */
+export const depthAt = (p: Vec): number => { const [a, b] = depthBand(p); return (a + b) / 2; };
+/**
+ * Over a band of the chart (shoal edge d1, deep edge d2, m below MLLW) with the tide h m up: the share of it that's wet,
+ * and the mean depth of the water over that share, taking the bottom as spread evenly through the band (a flat is
+ * wetted bit by bit as the tide comes up over it).
+ */
+export function wetBand(d1: number, d2: number, h: number): { wet: number; depth: number } {
+  const lo = d1 + h, hi = d2 + h; // (the water's depth over its shoalest and deepest bottom)
+  if (hi <= 0.05) return { wet: 0, depth: 0 };
+  if (lo >= 0.05 || d2 - d1 < 1e-6) return { wet: 1, depth: (lo + hi) / 2 };
+  return { wet: (hi - 0.05) / (hi - lo), depth: (hi + 0.05) / 2 };
 }
 
 interface Bay {
@@ -179,9 +193,9 @@ interface Bay {
   /**
    * Other ways in: a channel whose measured stream (a station's, depth-averaged, + its flood into the bay) runs through
    * its section across the line through `c` along `across` (the sim's shore, the chart's depths, the tide), joining the
-   * bay this far in (m).
+   * bay at `mouth`.
    */
-  inflows: { station: string; c: Vec; across: Vec; at: number }[];
+  inflows: { station: string; c: Vec; across: Vec; mouth: Vec }[];
 }
 const bay = (name: string, station: string, poly: Vec[], q: Vec, m: Vec, hand: number, inflows: Bay['inflows'] = []): Bay => {
   const L = Math.hypot(m.x - q.x, m.y - q.y); let into = { x: -(m.y - q.y) / L, y: (m.x - q.x) / L };
@@ -199,7 +213,7 @@ const SL_Q = LL(37.7455, -122.2445), SL_M = LL(37.7545, -122.2445), SL_CANAL = L
 export const BAYS: Bay[] = [
   bay('San Rafael Bay', '9414873', [SR_Q, SR_M, LL(37.985, -122.5450), LL(37.9700, -122.5400)], SR_Q, SR_M, 1000),
   bay('San Leandro Bay', '9414724', [SL_Q, SL_M, LL(37.7608, -122.2445), LL(37.7608, -122.1887), LL(37.7352, -122.1887), LL(37.7352, -122.2445)], SL_Q, SL_M, 500,
-    [{ station: 'SFB1216-mean', c: LL(37.76146, -122.22391), across: { x: 1, y: 0 }, at: SL_CANAL.x - SL_Q.x }])
+    [{ station: 'SFB1216-mean', c: LL(37.76146, -122.22391), across: { x: 1, y: 0 }, mouth: SL_CANAL }])
 ];
 /** How far into a bay a point is (m) from its mouth. */
 const bayIn = (B: Bay, p: Vec): number => (p.x - B.q.x) * B.into.x + (p.y - B.q.y) * B.into.y;
@@ -210,30 +224,38 @@ function inflowSpeed(id: string, tMin: number): number {
   const d = DEFS.find(x => x.id === id) as HarmonicDef | undefined;
   return d ? predict(d.z0, d.hc, [tMin * 60e3])[0] : 0;
 }
-/** A channel's wetted section (m²) across the line through `c` along `across`, every 2 m out to 150 m either side, with the tide `h` m above MLLW. */
-const SECTIONS = new Map<string, { w: number; d: number }[]>();
-function channelSection(c: Vec, across: Vec, h: number): number {
+/**
+ * A channel's flow (m³/s) for a depth-averaged stream `u` (m/s) measured at `c`: across the line through it along
+ * `across`, every 2 m out to 150 m either side, with the tide `h` m above MLLW. The stream across the section goes as
+ * depth^(2/3) (Manning's, as across the bays' lines), so its shallow shoulders carry less than the measured stream
+ * where the station stands, in the channel.
+ */
+const SECTIONS = new Map<string, { d1: number; d2: number }[]>();
+function channelFlow(c: Vec, across: Vec, h: number, u: number): number {
   const key = `${c.x},${c.y}`;
   let cells = SECTIONS.get(key);
   if (!cells) {
     cells = [];
-    for (let s = -150; s <= 150; s += 2) { const p = { x: c.x + across.x * s, y: c.y + across.y * s }; if (!onGround(p)) cells.push({ w: 2, d: depthAt(p) }); }
+    for (let s = -150; s <= 150; s += 2) { const p = { x: c.x + across.x * s, y: c.y + across.y * s }; if (!onGround(p)) { const [d1, d2] = depthBand(p); cells.push({ d1, d2 }); } }
     SECTIONS.set(key, cells);
   }
-  return cells.reduce((t, k) => t + k.w * Math.max(0, k.d + h), 0);
+  const [a, b] = depthBand(c), here = wetBand(a, b, h).depth;
+  if (here <= 0) return 0;
+  return u * cells.reduce((t, k) => { const w = wetBand(k.d1, k.d2, h); return t + 2 * w.wet * w.depth * (w.depth / here) ** (2 / 3); }, 0);
 }
 const BAY_BIN = 50, BAY_CELL = 25; // (lines across a bay every 50 m; the water sampled every 25 m)
-/** A bay's water, sampled once: each sample's line (how far in, in 50 m steps) and charted depth. */
-const WATER = new Map<Bay, { bin: Int32Array; depth: Float64Array; bins: number }>();
+/** A bay's water, sampled once: each sample's line (how far in, in 50 m steps) and charted band. */
+const WATER = new Map<Bay, { bin: Int32Array; d1: Float64Array; d2: Float64Array; bins: number }>();
 function bayWater(B: Bay) {
   let w = WATER.get(B);
   if (w) return w;
-  const xs = B.poly.map(q => q.x), ys = B.poly.map(q => q.y), bin: number[] = [], depth: number[] = [];
+  const xs = B.poly.map(q => q.x), ys = B.poly.map(q => q.y), bin: number[] = [], d1: number[] = [], d2: number[] = [];
   for (let y = Math.min(...ys) + BAY_CELL / 2; y < Math.max(...ys); y += BAY_CELL) for (let x = Math.min(...xs) + BAY_CELL / 2; x < Math.max(...xs); x += BAY_CELL) {
     const q = { x, y }; if (!inPolyV(B.poly, q) || onGround(q)) continue;
-    bin.push(Math.max(0, Math.floor(bayIn(B, q) / BAY_BIN))); depth.push(depthAt(q));
+    const [a, b] = depthBand(q);
+    bin.push(Math.max(0, Math.floor(bayIn(B, q) / BAY_BIN))); d1.push(a); d2.push(b);
   }
-  w = { bin: Int32Array.from(bin), depth: Float64Array.from(depth), bins: Math.max(0, ...bin) + 1 };
+  w = { bin: Int32Array.from(bin), d1: Float64Array.from(d1), d2: Float64Array.from(d2), bins: Math.max(0, ...bin) + 1 };
   WATER.set(B, w);
   return w;
 }
@@ -342,7 +364,11 @@ export class CurrentField {
     const c = ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
     const B = bayAt(p);
     if (!B) return c;
-    const f = Math.min(1, Math.max(0, bayIn(B, p) / B.hand)), u = this.bayStream(B, p);
+    // (the open water's stream hands over to the bay's own across its mouth; and round where another channel comes in,
+    // its stream, the stations', to the bay's across the same distance)
+    let f = Math.min(1, Math.max(0, bayIn(B, p) / B.hand));
+    for (const k of B.inflows) f = Math.min(f, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B.hand);
+    const u = this.bayStream(B, p);
     return { x: c.x * (1 - f) + B.into.x * u * f, y: c.y * (1 - f) + B.into.y * u * f };
   }
   /** A bay's stream at a point inside it (m/s, + into the bay), by continuity (see above). */
@@ -351,9 +377,15 @@ export class CurrentField {
     if (!F || F.epoch !== this.epoch) {
       const W = bayWater(B), n = W.bins, area = new Float64Array(n), s53 = new Float64Array(n);
       const { h, rise } = bayTide(B.station, this.tMin * 60e3), a = BAY_CELL * BAY_CELL;
-      for (let k = 0; k < W.bin.length; k++) { const d = W.depth[k] + h; if (d > 0.05) { area[W.bin[k]] += a; s53[W.bin[k]] += a / BAY_BIN * d ** (5 / 3); } }
+      for (let k = 0; k < W.bin.length; k++) { const c = wetBand(W.d1[k], W.d2[k], h); if (c.wet > 0) { area[W.bin[k]] += a * c.wet; s53[W.bin[k]] += a * c.wet / BAY_BIN * c.depth ** (5 / 3); } }
       // (the other ways in: their measured flow, m³/s, + into the bay)
-      const flows = B.inflows.map(f => ({ at: f.at, q: inflowSpeed(f.station, this.tMin) * KT * channelSection(f.c, f.across, h) }));
+      const flows = B.inflows.map(f => ({ at: bayIn(B, f.mouth), q: channelFlow(f.c, f.across, h, inflowSpeed(f.station, this.tMin) * KT) }));
+      // (never more in through the canal than fills the whole bay, nor out more than empties it: the bay's tide lags the
+      // water outside both its ways in (San Leandro Channel's against Alameda's and the Estuary's, 9414750 and 9414746),
+      // so both run the same way, in on the rise and out on the fall; where the canal's measured flow is more than the
+      // bay the sim counts fills, it's the count that's short, the bay's water south of the world's edge and its marsh)
+      const fill = area.reduce((t, x) => t + x, 0) * rise;
+      for (const k of flows) if (k.q * fill > 0 && Math.abs(k.q) > Math.abs(fill)) k.q = fill;
       const u = new Float64Array(n);
       for (let b = n - 1, beyond = 0; b >= 0; b--) {
         beyond += area[b] / 2; // (the water beyond the line through the middle of these 50 m)
@@ -364,8 +396,8 @@ export class CurrentField {
       F = { epoch: this.epoch, u, h };
       this.bayFlow.set(B, F);
     }
-    const b = Math.min(F.u.length - 1, Math.max(0, Math.floor(bayIn(B, p) / BAY_BIN))), d = depthAt(p) + F.h;
-    return d > 0.05 ? F.u[b] * d ** (2 / 3) : 0;
+    const b = Math.min(F.u.length - 1, Math.max(0, Math.floor(bayIn(B, p) / BAY_BIN))), [d1, d2] = depthBand(p), c = wetBand(d1, d2, F.h);
+    return c.wet > 0 ? F.u[b] * c.depth ** (2 / 3) : 0;
   }
   /**
    * The current at a point, with the slack water along the Cityfront beach: the shore relief (current.ts) applies
@@ -376,7 +408,9 @@ export class CurrentField {
     { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest in sight is always among them)
     dn = Math.sqrt(dn);
     // (not in the bays filled by continuity, whose stream already runs slower over their shallower edges)
-    const B = bayAt(p), bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
+    const B = bayAt(p);
+    let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
+    for (const k of B?.inflows ?? []) bay = Math.min(bay, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
     const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
     return { x: c.x * k, y: c.y * k };
   }

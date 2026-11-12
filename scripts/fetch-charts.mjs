@@ -179,9 +179,10 @@ const list = v => (Array.isArray(v) ? v : v == null || v === '' ? [] : String(v)
 const anyIn = f => { const g = f.geometry; return g.type === 'Point' ? inBox(ll(g)) : JSON.stringify(g.coordinates).length > 0; };
 const all = n => (layers[n] ?? []).filter(anyIn);
 
-// depth areas: one list of polygons per band (DRVAL1, the shoal edge of the band, metres)
+// depth areas: one list of polygons per band (DRVAL1, the shoal edge of the band, and DRVAL2, its deep edge, metres: the
+// cells don't all break at the same depths, and a drying band runs from its height above the datum down to 0)
 const depth = {};
-for (const f of all('DEPARE')) for (const rings of polys(f.geometry)) { const p = fillPoly(rings); if (p) (depth[P(f).DRVAL1] ??= []).push(p); }
+for (const f of all('DEPARE')) for (const rings of polys(f.geometry)) { const p = fillPoly(rings); if (p) (depth[`${P(f).DRVAL1}:${P(f).DRVAL2 ?? ''}`] ??= []).push(p); }
 const contours = {};
 for (const f of all('DEPCNT')) for (const l of lines(f.geometry)) (contours[P(f).VALDCO] ??= []).push(...clipLine(l));
 const land = [], built = [], structures = [], shore = [], piers = [];
@@ -310,7 +311,7 @@ const out = {
   cells,
   units: 'positions: integer 1e-5 degrees WGS 84 [lon, lat], lines delta-coded; depths: metres below MLLW (sounding datum); heights and clearances: metres above MHW',
   box: BOX,
-  depth: Object.entries(depth).map(([d, p]) => ({ d: +d, p })).sort((a, b) => a.d - b.d),
+  depth: Object.entries(depth).map(([k, p]) => { const [d, d2] = k.split(':'); return { d: +d, ...(d2 !== '' && Number.isFinite(+d2) ? { d2: +d2 } : {}), p }; }).sort((a, b) => a.d - b.d || (a.d2 ?? 99) - (b.d2 ?? 99)),
   contours: Object.entries(contours).map(([d, l]) => ({ d: +d, l })).sort((a, b) => a.d - b.d),
   land, built, structures, shore, piers, islets, soundings, areas, aids, hazards, names
 };

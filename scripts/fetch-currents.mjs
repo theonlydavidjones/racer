@@ -25,7 +25,7 @@ const APP = 'folkboat-sim';
  */
 // (extended, November 2026, with the sim's world: east past Treasure Island to the Oakland Estuary and Alameda, the
 // Berkeley and Emeryville flats, and north past Richmond to San Pablo Strait and Point San Pedro)
-const AREA = { south: 37.74, north: 37.985, west: -122.50, east: -122.215 };
+const AREA = { south: 37.74, north: 37.985, west: -122.50, east: -122.188 };
 const NOTES = {
   SFB1203: 'Golden Gate Bridge, east of', SFB1202: 'north side of the channel', SFB1204: 'southwest of Alcatraz: the middle of the Cityfront race area',
   SFB1211: 'north of Alcatraz', SFB1205: 'north of Pier 35: east edge', PCT0286: 'off Crissy Field: the shore relief and early flood along the Presidio',
@@ -70,7 +70,7 @@ console.log(`${HARMONIC.length} harmonic, ${SUBORDINATE.length} subordinate stat
 const stations = [], fixtures = {};
 // A station NOAA publishes near the surface as offsets from its own deeper bin (Richmond, PCT0666: bin 1 from bin 2):
 // the deeper bin is kept only as the reference, under its own key (id@bin), and isn't one of the field's stations.
-const inWorld = m => m.lat > 37.735 && m.lat < 37.986 && m.lng > -122.61 && m.lng < -122.213; // (the sim's world: the terrain's box)
+const inWorld = m => m.lat > 37.735 && m.lat < 37.986 && m.lng > -122.61 && m.lng < -122.1886; // (the sim's world: the terrain's box)
 const key = s => SUBORDINATE.some(x => x.id === s.id) ? `${s.id}@${s.bin}` : s.id;
 for (const s of HARMONIC) {
   const m = await meta(s.id);

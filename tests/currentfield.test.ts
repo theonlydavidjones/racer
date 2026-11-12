@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAYS, CurrentField, bayTide, sanQuentinTide, stationsFor, sfLocalToUtcMin } from '../src/environment/tide';
+import { BAYS, CurrentField, bayTide, sanQuentinTide, stationsFor, sfLocalToUtcMin, wetBand } from '../src/environment/tide';
 import { LL } from '../src/geo/geo';
 import { onGround } from '../src/geo/shore';
 
@@ -74,4 +74,22 @@ describe('San Leandro Bay', () => {
     for (let lon = -122.2460; lon < -122.2392; lon += 0.0005) { const c = f.at(LL(37.7495, lon)), v = Math.hypot(c.x, c.y); worst = Math.max(worst, Math.abs(v - prev)); prev = v; }
     expect(worst / 0.5144).toBeLessThan(0.1);
   });
+  it('at its mouth, the San Leandro Channel runs in on the rising tide and out on the falling (the bay\'s tide lags the water outside both its ways in)', () => {
+    const f = new CurrentField(stationsFor(t0, t0 + 3 * 1440));
+    let rising = 0, inOnRise = 0, falling = 0, outOnFall = 0;
+    for (let m = 0; m < 3 * 1440; m += 20) {
+      const r = bayTide('9414724', (t0 + m) * 60e3).rise * 3600; f.setTime(t0 + m);
+      const c = f.at(LL(37.7495, -122.2405));
+      if (r > 0.1) { rising++; if (c.x > 0) inOnRise++; } if (r < -0.1) { falling++; if (c.x < 0) outOnFall++; }
+    }
+    expect(inOnRise / rising).toBeGreaterThan(0.95); expect(outOnFall / falling).toBeGreaterThan(0.95);
+  }, 60_000);
+  it('a drying flat is wetted bit by bit as the tide comes up over it (the chart\'s band, from its height to the datum)', () => {
+    // a flat drying from 1.7 m to the datum
+    expect(wetBand(-1.7, 0, 0).wet).toBe(0);
+    expect(wetBand(-1.7, 0, 0.85).wet).toBeGreaterThan(0.4); expect(wetBand(-1.7, 0, 0.85).wet).toBeLessThan(0.6);
+    expect(wetBand(-1.7, 0, 1.8).wet).toBe(1);
+    expect(wetBand(2, 4, 1).depth).toBeCloseTo(4, 6); // (always wet: its mean depth, with the tide)
+  });
 });
+
