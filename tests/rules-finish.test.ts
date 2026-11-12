@@ -277,6 +277,9 @@ describe('proper course allows for the current (Rules 17, 23.2)', () => {
     const still = properTwa(w, b);
     b.cur = { x: -wv.x * 1.2, y: -wv.y * 1.2 }; // 2.3 kt setting her to leeward
     const tide = properTwa(w, b);
-    expect(tide).toBeLessThan(still - 10); // she must point higher to make good the line
+    expect(tide).not.toBeNull();
+    expect(tide!).toBeLessThan(still! - 10); // she must point higher to make good the line
+    b.cur = { x: -wv.x * 4, y: -wv.y * 4 }; // nearly 8 kt across her track: no heading makes good the line
+    expect(properTwa(w, b)).toBeNull(); // undetermined: neither above nor below it
   });
 });
