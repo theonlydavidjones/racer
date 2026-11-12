@@ -496,14 +496,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
 }
 
 /**
- * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark or
- * once she comes up onto a reach. A poled-out jib fills from about 145° true (polar.ts jibEfficiency); the 146°/156°
- * gap keeps them from setting and stowing it over and over as she wanders about a deep run. The AI boats' crews, and
- * yours while the pole is theirs (the band's Auto-trim).
+ * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
+ * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
+ * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
+ * from doing it over and over as she wanders about a deep run. The AI boats' crews, and yours while the pole is theirs
+ * (the band's Auto-trim).
  */
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
-  const twa = Math.abs(b.twa), jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 146 || jibDown || b.docked) b.poleWant = false;
-  else if (twa > 156) b.poleWant = true;
+  const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
+  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
+  else if (twa > 157) b.poleWant = true;
 }
