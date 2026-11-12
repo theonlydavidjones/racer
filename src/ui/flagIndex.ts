@@ -9,7 +9,11 @@ import { FLAG_NAME, PREP_MEANING, type Flag, type PrepFlag } from '../sim/signal
 const MEANING: Record<Flag, string> = {
   class: 'The warning signal (Rule 26): up with one sound at the start of the sequence, down with one sound at the start. Your class is next.',
   ...PREP_MEANING,
-  X: 'Individual recall (Rule 29.1): flown at the start, with one sound, when boats are over early. If you\'re over, go back and start.'
+  X: 'Individual recall (Rule 29.1): flown at the start, with one sound, when boats are over early. If you\'re over, go back and start.',
+  // the postponement and abandonment signals (RRS 2025–2028, Race Signals; signals.ts cancelSignal flies them over A)
+  AP: 'Postponement (Race Signals): races not started are postponed, with two sounds. The warning signal is made 1 minute after it comes down (one sound), unless the race is postponed again or abandoned then. Over A: all races not started are postponed; no more racing today.',
+  N: 'Abandonment (Race Signals): all races that have started are abandoned, with three sounds. Return to the starting area; the warning signal is made 1 minute after it comes down. Over A: all races are abandoned; no more racing today.',
+  A: 'Flown under AP or N (Race Signals): no more racing today.'
 };
 const PREPS: PrepFlag[] = ['P', 'I', 'Z', 'U', 'black'];
 
@@ -32,6 +36,7 @@ export function fillFlagIndex(el: HTMLElement, o: { flying: Flag[]; prep: PrepFl
   h4('This race\'s start sequence'); row('class'); row(o.prep, ' (preparatory)');
   h4('After the start'); row('X');
   h4('The other preparatory flags'); for (const p of PREPS) if (p !== o.prep) row(p);
+  h4('Calling it off'); row('AP'); row('N'); row('A');
   h4('Numeral pennants: the course number');
   const intro = document.createElement('div'); intro.style.marginBottom = '8px';
   intro.textContent = `Flown with the warning signal, read top to bottom.${o.course != null ? ` Flying now: course ${o.course}.` : ''}`;

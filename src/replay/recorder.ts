@@ -9,3 +9,7 @@ export const RECORD_KEEP = 450; // 45 s of history (incident replays use the las
 
 export const snapshot = (t: number, boats: { x: number; y: number; h: number; tack: Tack; boom: number }[]): Frame =>
   ({ t, b: boats.map(b => [b.x, b.y, b.h, b.tack, b.boom]) });
+
+/** The whole race, for the race replay: every boat once a second, from TRACK_FROM s before the gun to the end. */
+export const TRACK_EVERY_STEPS = 60;
+export const TRACK_FROM = -30;

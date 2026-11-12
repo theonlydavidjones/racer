@@ -418,6 +418,11 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
 body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #keysHint,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,
+#showBar{display:none}
+body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-index:5;align-items:center;gap:10px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font:600 12px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+#showBar label{display:flex;align-items:center;gap:8px}
+#showBar input{width:200px}
+#showBar b{min-width:92px;color:var(--text)}
 body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
 
 .garage{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-bottom:1px solid var(--rule)}
@@ -447,6 +452,32 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief .dbLost{font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap}
 .debrief li p{font-size:14px}
 .debrief .dbTip{color:var(--muted)}
+
+/* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */
+#raceReplay{z-index:30}
+.rrPanel{max-width:1320px}
+.rrHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rrHead .ghost{flex:0 0 auto}
+.rrGrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.rrMain{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rrCanvas{width:100%;height:min(62vh,640px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.rrTime{width:100%;height:50px;display:block;cursor:pointer;touch-action:none}
+.rrBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rrBtn{padding:8px 12px;font-size:13px}
+.rrPlay{min-width:84px}
+.rrSpeed{flex:0 0 auto}
+.rrSpeed button{padding:7px 10px}
+.rrClock{margin-left:auto;font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--muted)}
+.rrCaption{display:flex;gap:10px;align-items:center;min-height:40px;font-size:14px;line-height:1.4}
+.rrCaption .dbLost{font:600 13px/1 var(--f-inst);color:var(--accent);margin-left:4px}
+.rrCaption .ghost{margin-left:auto;flex:0 0 auto}
+.rrNo{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;margin-right:8px;
+  color:#0c2534;font:700 12px/1 var(--f-inst);flex:0 0 auto}
+.rrList{max-height:calc(62vh + 120px);overflow-y:auto;border-top:0;padding-top:0}
+.rrList li{border:1px solid transparent;border-radius:8px;padding:6px 8px}
+.rrList li.rrPick{cursor:pointer}
+.rrList li.rrPick:hover,.rrList li.rrPick:focus-visible{border-color:var(--rule);background:rgba(150,196,218,.05);outline:0}
+.rrList li.on{border-color:var(--accent)}
 
 /* the race committee's choice of course */
 .coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
