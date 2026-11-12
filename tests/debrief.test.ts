@@ -114,4 +114,26 @@ describe('the tactics debrief', () => {
     expect(w.track[0].b.length).toBe(w.boats.length);
     expect(new World(TRAIN, settings({ mode: 'sail' }), 1, { freeSail: true }).track).toEqual([]);
   });
+
+  it('penalty turns aren\'t a tack or gybe on the replay, and end the spells running when they start', () => {
+    const { w, u, log, run } = midBeat();
+    u.shadowK = 0.7; run(10);
+    u.penalty = 720; u.lastTackT = w.t; run(5); u.lastTackT = w.t; run(5); u.penalty = 0; // the circles tack and gybe her
+    u.v = 0.5; run(25); // slow after them
+    const ms = log.moments(w);
+    expect(ms.some(m => m.key === 'tacks')).toBe(false);
+    expect(log.tacks.n + log.tacks.gybes).toBe(0);
+    const dirty = ms.filter(m => m.key === 'dirty');
+    expect(dirty[0].t1).toBeLessThanOrEqual(130.5); // closed when the turns began, not stretched across them
+    expect(ms.some(m => m.key === 'penalty')).toBe(true);
+  });
+
+  it('the laylines moments add up to the laylines finding: each beat\'s worst, counted once', () => {
+    const from = 260, beat = beatAngle(12), t = midBeat(from), m = t.w.C.marks[0].p;
+    const at = (rel: number) => { const v = V(from + beat + rel); return { x: m.x - 250 * v.x, y: m.y - 250 * v.y }; };
+    Object.assign(t.u, at(25)); t.run(5); Object.assign(t.u, at(-25)); t.run(10); Object.assign(t.u, at(15)); t.run(5); // past, back, past less
+    const ms = t.log.moments(t.w).filter(x => x.key === 'laylines'), f = t.log.findings(t.w).find(x => x.key === 'laylines')!;
+    expect(ms.length).toBe(1);
+    expect(Math.round(ms[0].lost)).toBe(f.lost);
+  });
 });
