@@ -635,7 +635,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       upMast([exit, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, down the mast's side to the block
       // the tackle's two parts: the standing part from the foot block's becket up to the moving block, and back down to the
       // foot block's sheave (the fall, which goes aft to the piano)
-      upMast([fb.clone().setX(fb.x + side * 0.008), new THREE.Vector3(sx + side * 0.006, my - 0.015, mz), new THREE.Vector3(sx - side * 0.006, my - 0.015, mz), fb.clone()], role, key);
+      upMast([fb.clone().setX(fb.x + side * 0.03), new THREE.Vector3(sx + side * 0.014, my - 0.01, mz), new THREE.Vector3(sx - side * 0.014, my - 0.01, mz), fb.clone()], role, key); // (the two parts a sheave's width apart, either side of it)
     }
   });
   // the mast's own bands: a black boot where it goes through the deck, and the lower band (CR 6.1.11: its upper edge the
