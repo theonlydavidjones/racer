@@ -17,7 +17,17 @@ describe('what each control does to the sails', () => {
     const c = defaultControls();
     expect(mainShape({ ...c, cunningham: 1, downhaul: 1 }, 12).draft).toBeLessThan(mainShape(c, 12).draft - 0.05);
     expect(mainShape(c, 20).draft).toBeGreaterThan(mainShape(c, 8).draft);
-    expect(jibShape({ ...c, jibCunningham: 1 }, 12, 'S').draft).toBeLessThan(jibShape(c, 12, 'S').draft - 0.05);
+    expect(jibShape({ ...c, jibCunningham: 1, jibHalyard: 1 }, 12, 'S').draft).toBeLessThan(jibShape(c, 12, 'S').draft - 0.05);
+  });
+  it('the jib halyard and jib Cunningham share the jib\'s luff tension, as the main halyard and Cunningham the main\'s', () => {
+    const c = defaultControls(), d = (x: Partial<typeof c>) => jibShape({ ...c, ...x }, 12, 'S').draft;
+    // the halyard coarse (60%), the Cunningham fine (40%); either alone pulls the draft forward, both more
+    expect(d({ jibHalyard: 1 })).toBeLessThan(d({}) - 0.03);
+    expect(d({ jibCunningham: 1 })).toBeLessThan(d({}) - 0.02);
+    expect(d({ jibHalyard: 1 })).toBeLessThan(d({ jibCunningham: 1 }));
+    expect(d({ jibHalyard: 1, jibCunningham: 1 })).toBeLessThan(d({ jibHalyard: 1 }));
+    // at their defaults (0.3 each) the jib is as it was before the halyard was a control: luff tension 0.3
+    expect(d({})).toBeCloseTo(0.44 - 0.09 * 0.3 + 0.004 * 2, 6);
   });
   it('with the sheet eased, the vang stops the main twisting open', () => {
     const c = { ...defaultControls(), mainsheet: 0.6 };

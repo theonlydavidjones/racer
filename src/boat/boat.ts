@@ -109,6 +109,7 @@ export interface Boat {
   markTouch: string | null; // the mark she is touching right now (Rule 31), if any
   headingAgo?: number; // heading RULE16_WINDOW seconds ago (Rule 16.1), kept by the World
   aboveProper?: boolean; // sailing above her proper course (Rule 17), kept by the World
+  cleared?: boolean; // finished and cleared the finishing line and marks: no longer racing (Definitions, Racing), kept by the World
   // environment at the boat
   cur: Vec;
   ww: Wind;
@@ -152,6 +153,11 @@ export interface Boat {
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
+  /**
+   * (Yours, for the sail controls band) where the crew would set every line if they had them all: their plan without your
+   * lines fixed (the same as crewPlan when you hold none), and the sheets for the angles they'd trim to. Display only.
+   */
+  crewIdeal?: CrewSettings & { mainsheet: number; jibsheet: number } | null;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
   depower?: number;
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
@@ -208,6 +214,8 @@ export interface Boat {
   burgee?: string;
   /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */
   ensign?: string; special?: string;
+  /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
+  ensignStruck?: boolean;
   /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */
   paint?: Paint;
   /** How you've set her up (your boat only): looks and condition. */

@@ -137,7 +137,7 @@ describe('Roll tacking (RRS 42.3(b))', () => {
 });
 
 describe('Crew work: one job at a time, at their pace (2d)', () => {
-  const lines = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'traveller'] as const;
+  const lines = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const;
   it('alone, the helm works one control line at a time; three aboard work several at once', () => {
     const most = (n: number) => {
       const twa = beatAngle(18), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 18 }); b.crew = newCrew(crewOf(0.6, n), 'S');
@@ -200,7 +200,7 @@ describe('The jib cars: rarely moved', () => {
 });
 
 describe('Placing the crew yourself: off auto until you give it back (owner, 11 Nov 2026)', () => {
-  const PIANO = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham'];
+  const PIANO = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'];
   it('told to hike, they stay hiked through puffs, lulls, a tack and minutes on end; Auto gives it back', () => {
     const W = 12, b = testBoat({ heading: 360 - beatAngle(W), kt: 4.5, windKt: W });
     b.crew = newCrew(crewOf(0.6), 'S'); sail(b, 20);

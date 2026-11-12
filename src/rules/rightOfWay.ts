@@ -32,8 +32,8 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   // mark-room from the moment it began, earns no mark-room under 18.2(a) or (c).
   const noRoom18 = (inside: number) => { const o = rec?.ovStart; return !!o && o.insideMark === inside && o.markUnable && (o.astern === inside || o.tacker === inside); };
   // Rule 20.2(e): from the time a boat hails for room to tack until she has tacked and avoided the hailed boat, rule
-  // 18.2 does not apply between them (the hail stays on the pair's record until then: see assessPair).
-  const hailing = !!h && h.kind === 'room';
+  // 18.2 does not apply between them (rec.r202e, kept by assessPair until then, outlasting the hail itself).
+  const hailing = (!!h && h.kind === 'room') || !!rec?.r202e;
   if (!hailing && rec && rec.mark && !rec.mark.ended && A.leg === rec.mark.idx && B.leg === rec.mark.idx) {
     const mk = ctx.marks[rec.mark.idx], m = rec.mark;
     if (A.tack === B.tack || !mk.beat) {
