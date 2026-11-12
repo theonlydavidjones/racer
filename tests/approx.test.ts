@@ -58,11 +58,13 @@ describe('the shore distance off a 10 m lattice', () => {
     // moves the AI's decisions (a tack a step sooner) and the race goes its own way from there: the current 0.1% stronger
     // everywhere (far inside NOAA's own uncertainty) moved the fleet's mean speed 1.1–2.6% and boats up to 230 m after
     // eight minutes, as much as the lattice does (1.3–1.7%, 120 m). So: the lattice's race against the exact one, within
-    // what such a change makes of it (six minutes here; the fleet's speed within 4%, past the 2.6% that change made).
+    // what such a change makes of it (six minutes here). Since her turn has had inertia (physics.ts yawLag), a race is
+    // more easily turned: a tack a moment later, a contact, a penalty's two turns. Re-measured then: the current 0.1%
+    // stronger or weaker moved the fleet's mean speed 6–17% over six minutes; the lattice 2.3–4.6%. The fleet within 8%.
     // (These bounds can't catch a lattice that's subtly wrong: the test above, point by point, is what does.)
     for (let i = 0; i < RACES.length; i++) {
       const ex = race(i, { grid: false, skip: false }).boats, ap = race(i, { grid: true, skip: false }).boats;
-      expect(Math.abs(fleetV(ap) / fleetV(ex) - 1), `race ${i}: the fleet's mean speed`).toBeLessThan(0.04);
+      expect(Math.abs(fleetV(ap) / fleetV(ex) - 1), `race ${i}: the fleet's mean speed`).toBeLessThan(0.08);
       // (boat by boat, the median: one boat whose tack went the other way is the race's own sensitivity, not the lattice;
       // a 0.1% stronger current moved single boats' mean speed up to 8%, a 1% one up to 25%)
       const med = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1];
