@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { engage } from '../src/boat/autopilot';
 import { bow } from '../src/boat/boat';
-import { PIERS, landAlong, onLand, pierAt, wharfNearest } from '../src/geo/shore';
+import { PIERS, landAlong, onLand, pierAt, wharfNearest, landDist } from '../src/geo/shore';
 import { obstructionAhead } from '../src/sim/obstruction';
 import { routeAround } from '../src/sim/routing';
 import { PLACES } from '../src/sim/places';
@@ -33,7 +33,9 @@ function across(P: { pts: Vec[] }): Vec {
   return { x: NaN, y: NaN };
 }
 // the piers out in open water, with a clear way through them (a few of the Bay Bridge's stand against Yerba Buena Island's shore)
-const OPEN = PIERS.filter(P => Number.isFinite(across(P).x) && !/south tower$/.test(P.name ?? '')); // (the south tower is inside its fender)
+// (the south tower is inside its fender; the north tower stands at Lime Point, the chart's land within 15 m of it on the
+// 50 m land cells, so the land, not the tower, is the nearest obstruction on its shore side)
+const OPEN = PIERS.filter(P => Number.isFinite(across(P).x) && !/south tower$/.test(P.name ?? '') && landDist(centre(P.pts)) > 50);
 
 describe('the bridges\' towers and piers: solid', () => {
   it('has both Golden Gate towers, the south tower\'s fender and the Bay Bridge\'s piers, from NOAA\'s chart and OpenStreetMap', () => {

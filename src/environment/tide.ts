@@ -1,6 +1,7 @@
 import { shoreRelief } from './current';
 import { KT, V, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
+import { landBetween, onGround } from '../geo/shore';
 import { predict, type Constituents } from './harmonics';
 import raw from './data/sf-currents.json';
 
@@ -14,7 +15,7 @@ import raw from './data/sf-currents.json';
  * eases them further (no station sits right on the Marina Green / Fort Mason shoreline).
  */
 
-interface HarmonicDef { id: string; kind: 'harmonic'; name: string; lat: number; lon: number; flood: number; ebb: number; z0: number; hc: Constituents }
+interface HarmonicDef { id: string; /** only a subordinate station's reference (its deeper bin), not in the field */ refOnly?: boolean; kind: 'harmonic'; name: string; lat: number; lon: number; flood: number; ebb: number; z0: number; hc: Constituents }
 interface SubordinateDef { id: string; kind: 'subordinate'; name: string; lat: number; lon: number; flood: number; ebb: number; ref: string; dt: [number, number, number, number]; amp: [number, number] }
 type StationDef = HarmonicDef | SubordinateDef;
 const DEFS = (raw as unknown as { stations: StationDef[] }).stations;
@@ -61,7 +62,7 @@ function build(def: StationDef, from: number, to: number, cache: Map<string, Tid
 /** All stations, predicted for a window of race time (minutes since epoch, UTC). */
 export function stationsFor(from: number, to: number): TideStation[] {
   const cache = new Map<string, TideStation>();
-  return DEFS.map(d => build(d, from, to, cache));
+  return DEFS.filter(d => d.kind !== 'harmonic' || !d.refOnly).map(d => build(d, from, to, cache));
 }
 
 /** Signed speed (kt, + flood) at a station at time `tMin` (minutes since epoch, UTC). */
@@ -84,15 +85,82 @@ export function stationVector(s: TideStation, tMin: number): Vec {
 
 /** The current field at one moment: station currents blended across the water by inverse-distance weighting. */
 export class CurrentField {
+  /** Each station's current at the field's time, worked out only when a point near it is asked about (stamp: which time). */
   private vecs: Vec[] = [];
-  constructor(readonly stations: TideStation[]) {}
-  setTime(tMin: number): void { this.vecs = this.stations.map(s => stationVector(s, tMin)); }
+  private stamp: Int32Array;
+  private sx: Float64Array;
+  private sy: Float64Array;
+  private tMin = 0;
+  private epoch = 0;
+  /**
+   * Each station's smoothing length (m): 150 m, so the field is smooth round a station instead of spiking at it, but no
+   * more than a quarter of the way to its nearest neighbour, so two stations close together (Richmond and Red Rock,
+   * 290 m apart; the pairs off Treasure Island and Point Blunt) each still give their own prediction where they are.
+   */
+  private soft2: Float64Array;
+  constructor(readonly stations: TideStation[]) {
+    this.stamp = new Int32Array(stations.length).fill(-1);
+    this.sx = Float64Array.from(stations, s => s.p.x); this.sy = Float64Array.from(stations, s => s.p.y);
+    this.vecs = stations.map(() => ({ x: 0, y: 0 }));
+    this.soft2 = Float64Array.from(stations, (s, i) => {
+      let dn = Infinity;
+      stations.forEach((o, j) => { if (j !== i) dn = Math.min(dn, Math.hypot(s.p.x - o.p.x, s.p.y - o.p.y)); });
+      return Math.max(10, Math.min(150, dn / 4)) ** 2; // (10 m at least: two stations at one spot would otherwise divide by zero)
+    });
+  }
+  setTime(tMin: number): void { if (tMin !== this.tMin || this.epoch === 0) { this.tMin = tMin; this.epoch++; } }
+  /** Station i's current (m/s) at the field's time. */
+  stationVec(i: number): Vec {
+    if (this.stamp[i] !== this.epoch) { this.vecs[i] = stationVector(this.stations[i], this.tMin); this.stamp[i] = this.epoch; }
+    return this.vecs[i];
+  }
+  /**
+   * The stations that count in each 400 m cell, worked out the first time the cell is asked about (the weights don't
+   * change with time): those in sight over the water, less the weakest. The weakest are left out for as long as the most they could all weigh together, anywhere in the
+   * cell, is under 0.1% of the least the weights add up to there: the current changes by under 0.2% of the strongest
+   * station's (under 0.01 kt).
+   */
+  private cells = new Map<number, Int32Array>();
+  private lastKey = NaN;
+  private lastList: Int32Array = new Int32Array(0);
+  private near(p: Vec): Int32Array {
+    const C = 400, ci = Math.floor(p.x / C), cj = Math.floor(p.y / C), key = (ci + 512) * 1024 + (cj + 512); // (a small integer: 200 km each way)
+    if (key === this.lastKey) return this.lastList;
+    let l = this.cells.get(key);
+    if (!l) {
+      const cx = (ci + 0.5) * C, cy = (cj + 0.5) * C, R = C * Math.SQRT1_2, n = this.stations.length, hi = new Float64Array(n);
+      // only the stations in sight over the water: a station's stream doesn't reach through an island or a point of land
+      // (Clipper Cove isn't driven by the stream west of Treasure Island). Seen from the cell's middle, or the first spot
+      // in the cell that's water; a cell that sees none of them (a basin's corner) takes them all, eased by the shore.
+      const from = [[0, 0], [150, 0], [-150, 0], [0, 150], [0, -150], [150, 150], [-150, 150], [150, -150], [-150, -150]].map(([dx, dy]) => ({ x: cx + dx, y: cy + dy })).find(q => !onGround(q));
+      const sees = (i: number) => !from || !landBetween(from, this.stations[i].p);
+      let seen = Array.from({ length: n }, (_, i) => sees(i));
+      if (!seen.some(Boolean)) seen = seen.map(() => true);
+      let low = 0;
+      for (let i = 0; i < n; i++) {
+        if (!seen[i]) continue;
+        const s = this.stations[i].p, d = Math.hypot(cx - s.x, cy - s.y), dmin = Math.max(0, d - R), dmax = d + R;
+        hi[i] = 1 / (dmin * dmin + this.soft2[i]) ** 1.5; low += 1 / (dmax * dmax + this.soft2[i]) ** 1.5;
+      }
+      // the weakest go, for as long as all that's gone could weigh no more than 0.1% of the rest
+      const order = [...hi.keys()].filter(i => seen[i]).sort((a, b) => hi[a] - hi[b]), m = order.length;
+      let gone = 0, k = 0;
+      while (k < m - 1 && gone + hi[order[k]] <= 1e-3 * low) gone += hi[order[k++]];
+      l = Int32Array.from(order.slice(k).sort((a, b) => a - b));
+      if (!(Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(ci) < 512 && Math.abs(cj) < 512)) return l; // (far off: not filed)
+      this.cells.set(key, l);
+    }
+    this.lastKey = key; this.lastList = l;
+    return l;
+  }
   at(p: Vec): Vec {
     let wx = 0, wy = 0, ws = 0;
-    for (let i = 0; i < this.stations.length; i++) {
-      const s = this.stations[i].p, d2 = (p.x - s.x) ** 2 + (p.y - s.y) ** 2;
-      const w = 1 / (d2 + 150 * 150) ** 1.5; // the nearest stations count most; smooth near a station instead of a spike
-      wx += this.vecs[i].x * w; wy += this.vecs[i].y * w; ws += w;
+    const list = this.near(p), sx = this.sx, sy = this.sy, soft2 = this.soft2, stamp = this.stamp, epoch = this.epoch;
+    for (let k = 0; k < list.length; k++) {
+      const i = list[k], dx = p.x - sx[i], dy = p.y - sy[i], q = dx * dx + dy * dy + soft2[i];
+      const w = 1 / (q * Math.sqrt(q)); // 1 / (d² + soft²)^1.5: the nearest stations count most; smooth near a station instead of a spike
+      const v = stamp[i] === epoch ? this.vecs[i] : this.stationVec(i);
+      wx += v.x * w; wy += v.y * w; ws += w;
     }
     return ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
   }
@@ -102,7 +170,8 @@ export class CurrentField {
    */
   atShore(p: Vec): Vec {
     let dn = Infinity;
-    for (const s of this.stations) dn = Math.min(dn, Math.hypot(p.x - s.p.x, p.y - s.p.y));
+    { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest in sight is always among them)
+    dn = Math.sqrt(dn);
     const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600), c = this.at(p);
     return { x: c.x * k, y: c.y * k };
   }

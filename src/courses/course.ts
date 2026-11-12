@@ -13,7 +13,7 @@ export interface MarkDef {
   /** Colours of a column or lighted buoy, top to bottom: R, G, Y (e.g. "RGR": red with a green band). */
   look?: string;
 }
-export type MarkShape = 'cylinder' | 'sphere' | 'column' | 'lighted' | 'island';
+export type MarkShape = 'cylinder' | 'sphere' | 'column' | 'lighted' | 'island' | 'beacon';
 export interface LineEndDef { label: string; kind?: 'shore' | 'boat' | 'buoy'; lat?: number; lon?: number; mark?: string; verify?: string }
 export interface StartLineDef {
   committee: LineEndDef;

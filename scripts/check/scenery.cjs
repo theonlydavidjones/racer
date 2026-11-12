@@ -29,6 +29,24 @@ const VIEWS = {
   wharf: [LL(37.8128, -122.4075, 25), LL(37.8098, -122.4120, 0)], // Pier 39 and its marina, Pier 41, from above the water off Pier 35
   aquatic: [LL(37.8118, -122.4285, 20), LL(37.8095, -122.4225, 0)], // Municipal Pier round Aquatic Park, Hyde Street Pier, from above the water to the west
   over_wharf: [LL(37.8095, -122.4160, 1400), LL(37.8095, -122.41601, 0)], // overhead: Aquatic Park to Pier 35
+  // the East Bay and the north reach (extended November 2026)
+  over_east: [LL(37.8300, -122.3000, 14000), LL(37.8300, -122.30001, 0)], // overhead: Oakland, Alameda, Emeryville and Berkeley
+  over_north: [LL(37.9300, -122.4000, 12000), LL(37.9300, -122.40001, 0)], // overhead: Richmond, Red Rock, Point San Pablo and the Brothers
+  berkeley: [LL(37.8650, -122.3600, 5), LL(37.8700, -122.2900, 120)], // the Berkeley shore and hills from the Berkeley Circle
+  oakland: [LL(37.8100, -122.3550, 5), LL(37.8000, -122.3100, 60)], // the Port of Oakland from off Yerba Buena Island
+  alameda: [LL(37.7800, -122.3600, 5), LL(37.7750, -122.3000, 40)], // Alameda Point and the Estuary's mouth from the south of the Bay Bridge
+  richmond: [LL(37.8950, -122.4250, 5), LL(37.9250, -122.3900, 60)], // Point Richmond and the Long Wharf from Southampton Shoal
+  sanpablo: [LL(37.9200, -122.4350, 5), LL(37.9620, -122.4330, 30)], // Red Rock, the Richmond–San Rafael Bridge and the Brothers from the south
+  rsr: [LL(37.9250, -122.4520, 5), LL(37.9350, -122.4460, 50)], // the Richmond–San Rafael Bridge's west channel span, from the south
+  rsr_side: [LL(37.9150, -122.4300, 300), LL(37.9350, -122.4400, 30)], // the whole bridge's roller coaster, from above Red Rock's south
+  brothers_close: [LL(37.9600, -122.4300, 6), LL(37.9632, -122.4336, 12)], // East Brother Light Station
+  cranes: [LL(37.8040, -122.3300, 8), LL(37.8090, -122.3240, 40)], // the Port of Oakland's cranes from the Outer Harbor channel
+  bpier: [LL(37.8560, -122.3400, 8), LL(37.8600, -122.3250, 2)], // the Berkeley Pier and its ruined outer part
+  longwharf: [LL(37.9150, -122.4180, 8), LL(37.9240, -122.4080, 5)], // Chevron's Long Wharf at Richmond
+  over_bmarina: [LL(37.8665, -122.3180, 900), LL(37.8665, -122.31801, 0)], // overhead: the Berkeley Marina, its breakwaters and three ways in
+  bmarina: [LL(37.8660, -122.3240, 6), LL(37.8665, -122.3170, 4)], // the Berkeley Marina's middle entrance and BYC beyond it
+  over_ryc: [LL(37.9085, -122.3830, 500), LL(37.9085, -122.38301, 0)], // overhead: Brickyard Cove, Richmond YC's harbor
+  over_encinal: [LL(37.7830, -122.2625, 400), LL(37.7830, -122.26251, 0)], // overhead: Encinal YC on the Estuary
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);
