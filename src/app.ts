@@ -1430,6 +1430,9 @@ function showroom(on: boolean): void {
 }
 const fleet: Fleet = new Fleet(S, {
   changed: () => { fleetChanged(); boatSummary(); },
+  members: () => MEMBERS,
+  // (a member changed: saved, and your boat's race crew drawn again from her seats)
+  membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); newGame(); },
   edit: id => { showroom(true); boatPanel.show(id); newGame(); },
   sail: (id, mode, fromSlip) => {
