@@ -77,6 +77,12 @@ What's planned, roughly in order. Done work is described in the README.
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
+   Built on branch rules-finish (PR pending, not yet published): 20.2(e) holds until the hailer has tacked and kept
+   clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
+   20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
+   the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
+   Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
+   away below her proper course to blanket.
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
@@ -266,7 +272,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   cruise, and in both modes I would like a 'Send her home' feature (copy TBD) that auto-sets her home slip as the
   destination. In race mode, send her home would essentially be withdrawing from the race, if actioned before race is
   complete." ~~(1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns~~ (done).
-  (2) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
+  ~~(2)~~ (done: Pause → Change the conditions…, at once) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
   restart (2–4 h). ~~(3) "Send her home"~~ (done: the *Home* button, "Send her back to her home slip") (wording to be settled), in both modes: sets her home slip as the destination for
   the navigator or tiller pilot; before she finishes a race it retires her (scored RET under RRS A5.1 and A11) (1–3 h).
   ~~(4)~~ (done: "Move her here" on the chart) After "cast off", change where she starts without ending the cruise (owner, "once I tap 'cast off' in cruise

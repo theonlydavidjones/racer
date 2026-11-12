@@ -102,7 +102,10 @@ const KIND_NOTE: Record<WindKind, string> = {
   light: 'Hardly any wind and no settled direction: patches of breeze come and go. Keep the boat moving and sail to the pressure.'
 };
 
+/** The conditions panel open from the pause menu: its changes go to the sail that's running, not a new one. */
+let condLive = false;
 function newGame(seed = randomSeed()): void {
+  if (condLive && w?.running) { w.applyConditions(S); saveSettings(S); view.conditionsChanged(w); return; } // (the owner: at once, without a restart)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
@@ -140,7 +143,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
     part: inc.part, exoneratedBy: inc.exoneratedBy != null ? w.boats[inc.exoneratedBy].name : undefined
   });
   const exonerated = inc.exoneratedBy != null;
-  $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : inc.kind === 'hail' ? 'Didn\'t answer a hail' : 'Forced to avoid'}` : `${other.name} fouled you`;
+  $('rEyebrow').textContent = youFault ? `Foul · ${inc.kind === 'contact' ? 'Contact' : inc.kind === 'hail' ? 'Didn\'t answer a hail' : inc.kind === 'blanket' ? 'Took their wind' : 'Forced to avoid'}` : `${other.name} fouled you`;
   $('rTitle').textContent = RULES[inc.rule][0];
   $('rRule').textContent = RULES[inc.rule][1] + (exonerated ? ' ' + EXONERATION : '');
   $('rVerdict').className = 'verdict' + (youFault ? '' : ' ok');
@@ -635,6 +638,7 @@ $('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 $('bPause').onclick = () => {
   if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false;
+  $('bRestart').textContent = w.freeSail ? 'Restart this cruise' : 'Restart this race';
   const d = $('pauseDebrief'), html = w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
 };
 $('bResume').onclick = () => { $('pause').hidden = true; w.paused = false; };
@@ -730,6 +734,7 @@ addEventListener('keydown', e => {
     if (chart.isOpen) { chart.close(); return; }
     if (!$('logView').hidden) { $('logView').hidden = true; return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
+    if (condLive && !$('condDlg').hidden) { $('bCondDone').click(); return; } // (back to the pause menu)
     if (!$('pause').hidden) { $('bResume').click(); return; }
     if (!anyOverlay() && w.running) $('bPause').click();
     return;
@@ -1122,7 +1127,9 @@ $('courseMode').addEventListener('click', e => {
 });
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
-$('bCondClose').onclick = $('bCondDone').onclick = () => { $('condDlg').hidden = true; };
+$('bCondClose').onclick = $('bCondDone').onclick = () => { $('condDlg').hidden = true; if (condLive) { condLive = false; $('pause').hidden = false; } };
+// mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
+$('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
   Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
   saveSettings(S); paintSeg(); newGame(); courseCard(); tideBox();
