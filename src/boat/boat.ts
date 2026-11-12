@@ -210,8 +210,8 @@ export interface Boat {
   /** Since when (race clock, s) she's been deep enough for the pole, and since when up past where it pays (ai.ts crewPoleCall). */
   poleDeepT?: number; poleHighT?: number;
   /** The companionway now: its doors (washboards) in or out, its sliding hatch shut or open (from spec.companionway;
-   * the crew open it to stand there, physics.ts crewHatch; doorsT 0 in … 1 out and stowed, hatchT 0 shut … 1 slid forward
-   * its own length: each motion's progress). For the drawing to
+   * the crew open it to stand there, physics.ts crewHatch: the hatch first, then the boards; hatchT 0 shut … 1 slid
+   * forward its own length; doorsT 0 the three washboards in … 1 all out and stowed, a third a board, top first). For the drawing to
    * read (render/boatMesh.ts still draws the spec's setting: Boat Detail's to switch). */
   companionway?: { doors: 'in' | 'out'; hatch: 'closed' | 'open'; doorsT: number; hatchT: number };
   /** No crew fumbles on this boat (your setting: Settings.crewFumbles). */
