@@ -9,7 +9,7 @@
  */
 
 export type PrepFlag = 'P' | 'I' | 'Z' | 'U' | 'black';
-export type Flag = 'class' | PrepFlag | 'X';
+export type Flag = 'class' | PrepFlag | 'X' | 'AP' | 'N' | 'A';
 
 export interface Signal {
   /** Race time, s (0 = the start signal). */
@@ -22,7 +22,24 @@ export interface Signal {
   say: string;
 }
 
-export const FLAG_NAME: Record<Flag, string> = { class: 'class flag', P: 'P', I: 'I', Z: 'Z', U: 'U', black: 'black flag', X: 'X' };
+export const FLAG_NAME: Record<Flag, string> = { class: 'class flag', P: 'P', I: 'I', Z: 'Z', U: 'U', black: 'black flag', X: 'X', AP: 'AP (answering pennant)', N: 'N', A: 'A' };
+
+/**
+ * Too much wind to race: the SF Bay Folkboat fleet cancels at about 23 kt (the owner, who races with them: "at 23 knots
+ * everyone takes a vote on canceling … at that speed things start breaking on boats"; the association's proposed
+ * protocol on sfbayfolkboats.org says above 25). The committee judges the wind over the course over a couple of
+ * minutes, not a single gust.
+ */
+export const CANCEL_KT = 23;
+/** The race signals for calling it off (RRS, Race Signals): before the start, AP over A, two sounds, "all races not
+ * started are postponed; no more racing today"; after it, N over A, three sounds, "all races are abandoned; no more
+ * racing today". */
+export function cancelSignal(started: boolean, kt: number): { up: Flag[]; sounds: number; say: string } {
+  const why = `${Math.round(kt)} kt over the course, over the fleet's ${CANCEL_KT} kt limit`;
+  return started
+    ? { up: ['N', 'A'], sounds: 3, say: `N over A, three sounds: all races abandoned, no more racing today (${why}). Sail home safely.` }
+    : { up: ['AP', 'A'], sounds: 2, say: `AP over A, two sounds: racing postponed, no more racing today (${why}). Sail home safely.` };
+}
 
 /** What each preparatory flag does in the last minute (RRS 30). */
 export const PREP_MEANING: Record<PrepFlag, string> = {
