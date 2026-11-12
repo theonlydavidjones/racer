@@ -21,8 +21,10 @@ What's planned, roughly in order. Done work is described in the README.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. P0 phase 2: the interior true to a real Folkboat (Boat Detail, running; 6–10 h).
-2. Finish the crew figures: the owner's choice on moving the crew's stations onto the real benches (<1 h once chosen,
-   then its own reviewed PR for the trim calibration).
+2. Finish the crew figures: the crew's stations onto the real benches. Owner chose option 2: the benches plus the side
+   deck alongside them and aft of the thwart beside the after shelf (hips 1.35–2.5 m), where crews really sit; about
+   today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
+   (in progress).
 3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
@@ -40,6 +42,12 @@ What's planned, roughly in order. Done work is described in the README.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
+8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
+   building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
+   southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
+   way to set the direction.
+   HUD note (Deep Physics, in progress): the inset map shows the boat's own visibility, and is north-up in Just sail,
+   with an N arrow.
 9. The flags' original motion back, and "Strike ensign" (1–2 h).
 10. P0 phase 4: deck hardware and lines, with the rigging detail (4–8 h).
 Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
