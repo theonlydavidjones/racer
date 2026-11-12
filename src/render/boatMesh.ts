@@ -12,7 +12,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -570,6 +570,20 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // and to port a clam cleat for the main Cunningham, up the mast to a block at the gooseneck and to its cringle above
   // the main's tack (an estimate: not in the photos).
   const mastLines: Lines['mastLines'] = [], deckM = DECK_AT_MAST + 0.03;
+  // (a line lying on the boat from a to b: straight in plan, following the cabin top, over its forward edge and down its
+  // face to the deck, sampled every 5 cm so it lies on the surface, not in steps)
+  const zFront = -L / 2 + CABIN.u0 * L;
+  const surf = (x: number, z: number) => { const u = uAtZ(z); return (u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u) ? cabinTopAt(u, x) : deckY(u, Math.abs(x))) + 0.012; };
+  const lay = (a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3[] => {
+    const n = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.05)), out: THREE.Vector3[] = [];
+    for (let i = 1; i <= n; i++) {
+      const t = i / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, zPrev = a.z + (b.z - a.z) * (i - 1) / n;
+      // (crossing the cabin's forward edge: a point on the edge, so the line goes over it and down the face)
+      if ((zPrev - zFront) * (z - zFront) < 0) { const tf = (zFront - a.z) / (b.z - a.z), xf = a.x + (b.x - a.x) * tf; out.push(new THREE.Vector3(xf, surf(xf, zFront + 0.002), zFront + 0.002), new THREE.Vector3(xf, deckY(uAtZ(zFront - 0.01), Math.abs(xf)) + 0.012, zFront - 0.01)); }
+      out.push(new THREE.Vector3(x, surf(x, z), z));
+    }
+    return out;
+  };
   const footBlock = (x: number) => { const fb = sheaveBlock(0.016, 0.03); fb.position.set(x, DECK_AT_MAST, MAST_AFT_Z + 0.06); fb.rotation.y = Math.PI / 2; grp.add(fb); return new THREE.Vector3(x, deckM + 0.03, MAST_AFT_Z + 0.06); };
   const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts, role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); };
   const stem = new THREE.Vector3(0, FORESTAY_DECK.y + 0.04, FORESTAY_DECK.z + 0.14), jibCringle = FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP);
@@ -577,9 +591,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const side of [1, -1]) for (let i = 0; i < 3; i++) {
     const x = side * (0.37 + 0.065 * i), cp = onTop(x, zA);
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
-    const run = [cp]; for (let k = 1; k <= 4; k++) run.push(onTop(x, zA + (zClear - zA) * k / 4));
-    const fb = footBlock(side * (0.05 + 0.035 * i));
-    run.push(onTop(side * 0.06 + (x - side * 0.06) * 0.35, (zClear + MAST_AFT_Z) / 2), fb.clone().setY(deckM));
+    // (straight forward along the cabin top outboard of the hatch, fanning a little inward, then straight in to its block
+    // at the mast's foot, as the photo of her cabin top looking forward shows)
+    const fb = footBlock(side * (0.05 + 0.035 * i)), mid = new THREE.Vector3(x * 0.95, 0, zClear);
+    const run = [cp, ...lay(cp, mid), ...lay(mid, fb.clone().setY(deckM))];
     // (the piano, each side: the vang and the outhaul, the main's; the jib Cunningham, the jib's)
     const role: Rope = i === 2 ? 'jib' : 'main', key = (['vang', 'outhaul', 'jibCunningham'] as const)[i];
     grp.add(line(run, role, key));
@@ -592,8 +607,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     // the gooseneck and to the cringle above the main's tack
     const x = -(0.37 + 0.065 * 3), cp = onTop(x, zA);
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.025, 0.06), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
-    const fb = footBlock(-0.155), run = [cp]; for (let k = 1; k <= 4; k++) run.push(onTop(x, zA + (zClear - zA) * k / 4));
-    run.push(onTop(-0.06 + (x + 0.06) * 0.35, (zClear + MAST_AFT_Z) / 2), fb.clone().setY(deckM));
+    const fb = footBlock(-0.155), mid = new THREE.Vector3(x * 0.95, 0, zClear), run = [cp, ...lay(cp, mid), ...lay(mid, fb.clone().setY(deckM))];
     grp.add(line(run, 'main', 'cunningham'));
     const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.03, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02); grp.add(gb);
     upMast([fb, new THREE.Vector3(-0.045, deckM + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(-0.03, BOOM_TOP - 0.01, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham');
