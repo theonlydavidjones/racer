@@ -834,6 +834,19 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-car{position:absolute;top:-3px;bottom:-3px;width:18px;margin-left:-9px;border-radius:3px;background:#c7d3db;box-shadow:0 1px 2px rgba(0,0,0,.5)}
 .sb-trk.mine .sb-boom,.sb-trk.mine .sb-car{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-trk .sb-mark{top:-3px;bottom:-3px;width:0;height:auto;border-left:2px dashed #fff;background:none}
+/* the jumpers (when her Rig tune has them adjusted under way): a turnbuckle's half turns, steel grey as the standing rigging */
+.sb-jump[hidden]{display:none}
+.sb-jump{--steel:#9aa3ab;margin-top:2px}
+.sb-jump .sb-nm{line-height:1.15}
+.sb-jv{font:600 9px/1 var(--f-inst);letter-spacing:0;text-transform:none;color:var(--steel);font-variant-numeric:tabular-nums}
+.sb-jrail{height:8px;margin:0 4px}
+.sb-jt{position:absolute;top:-2px;bottom:-2px;width:9px;margin-left:-4.5px;background:none!important;padding:0;border:0}
+.sb-jt::after{content:'';position:absolute;left:4px;top:2px;bottom:2px;width:1px;background:#4a6072}
+.sb-jt.med::after{top:-4px;bottom:-4px;background:#6a8094}
+.sb-jt:hover::after{background:var(--steel)}
+.sb-jcur{position:absolute;top:-3px;bottom:-3px;width:8px;margin-left:-4px;border-radius:2px;background:var(--steel);box-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none;transition:left .4s}
+.sb-jtgt{position:absolute;top:-4px;bottom:-4px;width:0;margin-left:-1px;border-left:2px dashed var(--steel);pointer-events:none}
+.sb-jump.busy .sb-jv{color:var(--text)}
 /* the jib car's H: two fore-and-aft legs, the crossbar on its row, the car on its pin (forward up, inboard toward the middle) */
 .sb-jc{display:flex;flex-direction:column;align-items:center;gap:2px;width:44px}
 .sb-h-grid{position:relative;display:grid;grid-template-columns:repeat(5,7px);grid-template-rows:repeat(7,7px);gap:1px;padding:2px 3px;

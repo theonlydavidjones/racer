@@ -5,6 +5,8 @@ import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
 import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
+import { JUMPER_HALF_TURN_S, wantJumpers } from '../boat/condition';
+import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 
 /**
  * The sail controls band (the owner's design, 12 Nov 2026; the UI session's mock-up, design/sail-controls-band.html):
@@ -123,6 +125,20 @@ const jcar = (side: Side) => {
   <span class="sb-h-grid">${holes}<span class="sb-xbar"></span><span class="sb-jcar"></span><span class="sb-jwant"></span><span class="sb-jideal"></span></span><span class="sb-tag"></span></div>`;
 };
 
+/** The jumpers (CR 7.40: adjustable above deck while racing), when her Rig tune says so: a turnbuckle, so a stepper in
+ * half turns, not a rope. The scale's ticks are the half turns from 0 to 5, the tall one North Sails' medium; the
+ * marker is where they are, the dashed one where the crew is turning them to. Steel grey, as the standing rigging. */
+const JMAX = TUNE_RANGE.jumperTurns[1];
+const jumpersRow = () => {
+  let ticks = '';
+  for (let i = 0; i <= JMAX * 2; i++) ticks += `<button type="button" class="sb-jt${i / 2 === TUNE_PRESETS.medium.jumperTurns ? ' med' : ''}" data-act="jset" data-v="${i / 2}" style="left:${(i / (JMAX * 2)) * 100}%" tabindex="-1" aria-label="Jumpers to ${i / 2} turns"></button>`;
+  return `<div class="sb-trk sb-jump" data-jump hidden>
+  <span class="sb-nm">Jumpers<br><span class="sb-jv"></span></span><span></span>
+  <button type="button" class="sb-a" data-act="jless" aria-label="Jumpers: a half turn off">${chev('l')}</button>
+  <span class="sb-rail sb-jrail">${ticks}<span class="sb-jtgt"></span><span class="sb-jcur"></span></span>
+  <button type="button" class="sb-a" data-act="jmore" aria-label="Jumpers: a half turn on">${chev('r')}</button><span></span></div>`;
+};
+
 export class SailBand {
   readonly el: HTMLElement;
   private runKey: CtlKey | null = null;
@@ -151,7 +167,7 @@ export class SailBand {
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
-<div class="sb-bot">${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveller')}</div>${bstay('S')}</div>`;
+<div class="sb-bot">${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveller')}${jumpersRow()}</div>${bstay('S')}</div>`;
     parent.appendChild(el);
     el.addEventListener('pointerdown', e => this.down(e));
     el.addEventListener('pointermove', e => this.move(e));
@@ -167,6 +183,7 @@ export class SailBand {
         : k === 'mainsheet' ? 'Mainsheet: the blue marker is where the boom is. Toward the middle trims, out to leeward eases. ' + lineHelp('mainsheet')
         : `${LINE_LABEL[k as CtlKey]}: ${lineHelp(k as CtlKey)}`;
     });
+    el.querySelector<HTMLElement>('.sb-jump')!.title = `Jumpers: turns on their turnbuckle, 0 to ${JMAX}. On (more turns) stiffens the top of the mast, so the main's head twists off less; off lets it bend and twist (about ±1.5° up top). North Sails' medium is ${TUNE_PRESETS.medium.jumperTurns} turns (the tall tick); Heikkilä Sailmaker's guide: loose in light air, tighter in medium, tighter again in a breeze if the mast bends past the main's luff round. The crew turns them a half turn at a time, about ${JUMPER_HALF_TURN_S} s each. Auto-trim leaves them alone.`;
   }
 
   /** The middle of the band's top edge, for the tiller strip (the app puts it there). */
@@ -247,6 +264,11 @@ export class SailBand {
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
     if (act === 'hail') { this.host.hail(); this.hailT = 0; return; } // (look again at once: the hail's been made)
+    if (act === 'jless' || act === 'jmore' || act === 'jset') {
+      const u = this.host.world().user, from = u.jumperTarget ?? this.jumpersNow(u);
+      wantJumpers(u, act === 'jset' ? Number(t.closest<HTMLElement>('[data-v]')!.dataset.v) : from + (act === 'jmore' ? 0.5 : -0.5));
+      this.host.changed(); return;
+    }
     if (act !== 'name' || !d) return;
     const u = this.host.world().user, k = this.keyOf(d) as LineKey | null; if (!k) return;
     // the name: amber (yours) hands it back; grey (the crew's) takes it where it is
@@ -275,6 +297,20 @@ export class SailBand {
     if (side !== windSide(u)) { this.host.toast('That\'s the loaded car, on the working sheet: the crew moves it at the next tack. Set the lazy one, on the windward side, for after the tack.', 4500); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
     const from = u.carCmd ?? u.ctl.car[side]; takeLine(u, 'car'); moveLazyCar(u, row - from.fore, ins - from.ins); this.host.changed();
+  }
+
+  /** Where the jumpers are now: her tune, or North's for the wind when she has none (cruising: rigTune.ts guideTune). */
+  private jumpersNow(u: Boat): number { return (u.tune ?? guideTune(u.ww.kt)).jumperTurns; }
+  /** The jumpers' row: shown only if her Rig tune has them adjusted under way. */
+  private jumpers(u: Boat): void {
+    const d = this.el.querySelector<HTMLElement>('.sb-jump')!, on = !!u.spec?.perf.jumpersUnderWay;
+    d.hidden = !on; if (!on) return;
+    const now = this.jumpersNow(u), want = u.jumperTarget, busy = want != null && Math.abs(want - now) > 1e-6, pct = (v: number) => `${(v / JMAX) * 100}%`;
+    const fmt = (v: number) => (v === 1 ? '1 turn' : `${v} turns`);
+    d.querySelector<HTMLElement>('.sb-jcur')!.style.left = pct(now);
+    const wm = d.querySelector<HTMLElement>('.sb-jtgt')!; wm.hidden = !busy; if (busy) wm.style.left = pct(want!);
+    d.querySelector<HTMLElement>('.sb-jv')!.textContent = busy ? `${now} → ${fmt(want!)}` : fmt(now);
+    d.classList.toggle('busy', busy);
   }
 
   /** Each rope in her own colours (the boat editor's Lines), set again only when they change. */
@@ -356,6 +392,7 @@ export class SailBand {
       const mark = d.querySelector<HTMLElement>('.sb-mark')!; mark.hidden = !mine || !ideal;
       if (ideal) mark.style.left = `${50 + ideal.traveller * leeSign(u) * 50}%`;
     }
+    this.jumpers(u);
     // the jib cars: the crossbar on its row, the car on its pin; the leeward one is loaded
     const carMine = byHand(u, 'car');
     this.el.querySelectorAll<HTMLElement>('.sb-jc').forEach(d => {
