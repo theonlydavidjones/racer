@@ -27,7 +27,9 @@ describe('the outboard', () => {
   });
   it('sails down, the 3.5 at full throttle motors her at about 4–5 kt; the 2.5 a little less, the 6 a little more', () => {
     const v = (hp: 2.5 | 3.5 | 6) => run({ hp }, 90).v / KT;
-    const v35 = v(3.5); expect(v35).toBeGreaterThan(3.8); expect(v35).toBeLessThan(5.6);
+    // (pinned to the derived figure, 4.6 kt: the thrust from momentum theory against the sim's own hull resistance; a change to
+    // either shows here)
+    const v35 = v(3.5); expect(v35).toBeGreaterThan(4.4); expect(v35).toBeLessThan(4.85);
     expect(v(2.5)).toBeLessThan(v35); expect(v(6)).toBeGreaterThan(v35);
   }, 60000);
   it('in reverse she goes astern, slower; in neutral or tilted up she just drifts', () => {
