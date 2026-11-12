@@ -128,9 +128,8 @@ function sectionShape(u: number): { al: number; be: number } {
   return { al: 1.15 + 2.85 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
 }
 
-const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
-/** Where strake k's top edge is (p; the last strake, the garboard, ends on the keel's side at 0.8). */
-const strakeP = (k: number) => (k >= STRAKES ? 0.8 : 0.8 * k / STRAKES);
+/** 16 planks a side (CR 2.207.5: no fewer than 16 at station 8; 2.207.6: none but the keel plank over 130 mm wide), each lapping 13 mm over the one below (about the plank's thickness, CR 2.207.2) */
+const NU = 72, NF = 5, STRAKES = 16, LAP = 0.013;
 /**
  * How far the plank stands out at fraction t down strake k: clinker, so each plank's lower edge laps over the outside
  * of the plank below and the plank lies at a slight angle, out toward its lower edge. The garboard's lower edge isn't
@@ -165,6 +164,44 @@ function uMax(p: number): number {
 }
 function hullPoint(u: number, p: number): THREE.Vector3 { const q = sectionPoint(u, p); return new THREE.Vector3(q.x, q.y, zAt(u)); }
 
+/**
+ * The planks' widths. A clinker plank keeps nearly its width the whole length of the hull, narrowing only a little toward
+ * the ends (to about 80%), so where the hull's section is shorter than the planks' sum, toward the bow and the stern, the
+ * lower planks run out one after another on the stem, the forefoot and the keel, rather than all narrowing to a point at
+ * the stemhead (the owner's photos: Josephine, and Inga hauled out). So the plank edges are laid off down each section
+ * by girth (distance round the section from the sheer): edge k at k plank widths, up to the section's whole girth; the
+ * garboard, the lowest, takes up what's left down to the keel.
+ */
+const GIRTH_N = 48, girthCache = new Map<number, Float64Array>();
+/** The section's girth from the sheer (p = 0) to each of GIRTH_N + 1 points down to the keel's side (p = 0.8). */
+function girthTable(u: number): Float64Array {
+  const key = Math.round(u * 1e6), c = girthCache.get(key); if (c) return c;
+  const t = new Float64Array(GIRTH_N + 1); let prev = sectionPoint(u, 0);
+  for (let i = 1; i <= GIRTH_N; i++) { const q = sectionPoint(u, 0.8 * i / GIRTH_N); t[i] = t[i - 1] + Math.hypot(q.x - prev.x, q.y - prev.y); prev = q; }
+  girthCache.set(key, t); return t;
+}
+/** p at girth g down the section at u. */
+function pAtGirth(u: number, g: number): number {
+  const t = girthTable(u), G = t[GIRTH_N]; if (g <= 0) return 0; if (g >= G - 0.002) return 0.8; // (within 2 mm of the keel's side: on it, so a plank that's all but run out ends exactly on the keel)
+  let i = 0; while (i < GIRTH_N - 1 && t[i + 1] < g) i++;
+  return 0.8 * (i + (g - t[i]) / Math.max(1e-9, t[i + 1] - t[i])) / GIRTH_N;
+}
+/** The girth down to p at u. */
+function girthAtP(u: number, p: number): number {
+  const t = girthTable(u), f = Math.min(GIRTH_N, Math.max(0, p / 0.8 * GIRTH_N)), i = Math.min(GIRTH_N - 1, Math.floor(f));
+  return t[i] + (t[i + 1] - t[i]) * (f - i);
+}
+/** A plank's width at u: the widest section's girth shared among the planks, narrowing a little toward the ends. */
+let plankRef = 0;
+const plankW = (u: number) => { if (!plankRef) plankRef = girthTable(0.52)[GIRTH_N] / STRAKES; return plankRef * (1 - 0.2 * ((u - 0.52) / 0.52) ** 2); };
+/** Plank edge k's girth at u (0 the sheer … STRAKES the keel's side). */
+function edgeGirth(u: number, k: number): number {
+  const G = girthTable(u)[GIRTH_N];
+  return k >= STRAKES ? G : Math.min(G, k * plankW(u));
+}
+/** Plank k's width at u (0 where it has run out on the stem or keel). */
+const plankWidthAt = (u: number, k: number) => edgeGirth(u, k + 1) - edgeGirth(u, k);
+
 export interface HullPaint { topsides: THREE.Color; boot: THREE.Color; bottom: THREE.Color }
 
 /** The hull shell (both sides), clinker planked, painted: bottom paint below the waterline, a boot stripe, topsides. */
@@ -179,29 +216,46 @@ export const paintLines = (z: number) => { const e = (2 * z / L) ** 2; return { 
 export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const white = new THREE.Color(1, 1, 1), colorAt = (_y: number) => white;
-  // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel
-  type Row = { p: number; lap: number; shade?: number; land?: boolean }[];
+  // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel. Each entry
+  // is a line along the hull: a place across plank `k` (t 0 its top edge … 1 its lower), or a fixed p on the keel.
+  type Entry = { k?: number; t?: number; dg?: number; p?: number; pl?: number; lap: number; shade?: number; land?: boolean };
+  type Row = Entry[];
   const strips: Row[] = [];
   for (let k = 0; k < STRAKES; k++) {
-    const p0 = strakeP(k), p1 = strakeP(k + 1), row: Row = [];
-    if (k > 0) row.push({ p: p0 - 0.02, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
-    for (let j = 0; j <= 3; j++) row.push({ p: j === 3 ? p1 : p0 + (p1 - p0) * j / 3, lap: strakeLap(k, j / 3), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
+    const row: Row = [];
+    if (k > 0) row.push({ k, t: 0, dg: -0.025, pl: k, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
+    for (let j = 0; j <= 3; j++) row.push({ k, t: j / 3, pl: k, lap: strakeLap(k, j / 3), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
     strips.push(row);
-    if (k < STRAKES - 1) strips.push([{ p: p1, lap: LAP }, { p: p1, lap: 0 }]); // the lap's edge, facing down
+    if (k < STRAKES - 1) strips.push([{ k: k + 1, t: 0, pl: k, lap: LAP }, { k: k + 1, t: 0, pl: k, lap: 0 }]); // the lap's edge, facing down
   }
   // the keel, from the garboard's lower edge (the same vertices: the garboard lands in the keel's rabbet, no gap)
   { const row: Row = []; for (let j = 0; j <= NF; j++) row.push({ p: j === 0 ? 0.8 : 0.8 + 0.2 * j / NF, lap: 0 }); strips.push(row); }
+  /** An entry's p at u. */
+  const pOf = (r: Entry, u: number) => {
+    if (r.p != null) return r.p;
+    const g = edgeGirth(u, r.k!) + (r.t ? (edgeGirth(u, r.k! + 1) - edgeGirth(u, r.k!)) * r.t : 0) + (r.dg ?? 0);
+    return pAtGirth(u, Math.max(0, g));
+  };
+  /** Where an entry's line meets the raked transom / sternpost plane. */
+  const endCache = new Map<string, number>();
+  const uEnd = (r: Entry) => {
+    if (r.p != null) return uMax(r.p);
+    const key = `${r.k},${r.t},${r.dg ?? 0}`, c = endCache.get(key); if (c != null) return c;
+    let lo = 0.6, hi = 1;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, q = sectionPoint(m, pOf(r, m)); if (zAt(m) < aftLineZ(q.y)) lo = m; else hi = m; }
+    endCache.set(key, lo); return lo;
+  };
   for (const side of [1, -1]) {
     for (const row of strips) {
       const base = pos.length / 3;
       for (let i = 0; i <= NU; i++) for (const r of row) {
-        const f = i / NU, u = f * uMax(r.p), pt = hullPoint(u, r.p);
-        // push the lap outward across the section (along the section's outward normal); the planks run out
-        // flush at the stem and the transom
-        const lap = r.lap * Math.min(1, f / 0.04, (1 - f) / 0.03);
-        if (lap > 0) lapOut(pt, u, r.p, lap);
+        const f = i / NU, u = f * uEnd(r), p = pOf(r, u), pt = hullPoint(u, p);
+        // push the lap outward across the section (along the section's outward normal); it runs out flush where its
+        // plank runs out on the stem or the keel, and at the transom
+        const lap = r.lap * (r.pl != null ? Math.min(1, plankWidthAt(u, r.pl) / (0.5 * plankW(u))) : 1) * Math.min(1, (1 - f) / 0.03);
+        if (lap > 0) lapOut(pt, u, p, lap);
         pos.push(pt.x * side, pt.y, pt.z);
-        const c = colorAt(pt.y), k = row.length === 2 && row[0].p === row[1].p ? 0.55 : r.shade ?? 1; col.push(c.r * k, c.g * k, c.b * k);
+        const c = colorAt(pt.y), k = row.length === 2 && row[0].k === row[1].k && row[0].t === row[1].t ? 0.55 : r.shade ?? 1; col.push(c.r * k, c.g * k, c.b * k);
       }
       // (a plank's faces look outboard; a lap's edge, running from the plank's outer face in to the plank below, faces
       // down into its own shadow: the same winding does both)
@@ -217,9 +271,9 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   // from a centre, and each face turned to look aft, out of the hull.
   // Its outline runs through the planks' own end points (no others, and not the lands hidden behind them), so the hull
   // and the transom share every vertex along their join and no crack opens between them.
-  { const ps = [...new Set(strips.flatMap(row => row.filter(r => !r.land).map(r => r.p)))].sort((a, b) => a - b), outline: THREE.Vector3[] = [];
-    for (const p of ps) outline.push(hullPoint(uMax(p), p));
-    for (let j = ps.length - 2; j >= 0; j--) { const pt = hullPoint(uMax(ps[j]), ps[j]); outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
+  { const ends = strips.flatMap(row => row.filter(r => !r.land)).map(r => { const u = uEnd(r), p = pOf(r, u); return { p, pt: hullPoint(u, p) }; }).sort((a, b) => a.p - b.p);
+    const ps = ends.map(e => e.pt), outline: THREE.Vector3[] = [...ps];
+    for (let j = ps.length - 2; j >= 0; j--) { const pt = ps[j]; outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
     const ring = outline.filter((q, i) => i === 0 || q.distanceTo(outline[i - 1]) > 1e-4);
     const base = pos.length / 3; transomFrom = base; transomTo = base + ring.length;
     for (const q of ring) { pos.push(q.x, q.y, q.z); const c = colorAt(q.y); col.push(c.r, c.g, c.b); }
@@ -553,8 +607,9 @@ export function hullFrame(u: number, p: number): { pos: THREE.Vector3; normal: T
 export function lappedPoint(u: number, p: number): THREE.Vector3 {
   const pt = hullPoint(u, p);
   if (p >= 0.8) return pt;
-  const k = Math.min(STRAKES - 1, Math.floor(p / 0.8 * STRAKES)), p0 = strakeP(k), p1 = strakeP(k + 1);
-  const f = u / Math.max(0.01, uMax(p)), lap = strakeLap(k, (p - p0) / (p1 - p0)) * Math.min(1, f / 0.04, (1 - f) / 0.03);
+  const g = girthAtP(u, p); let k = 0; while (k < STRAKES - 1 && edgeGirth(u, k + 1) <= g) k++;
+  const g0 = edgeGirth(u, k), g1 = edgeGirth(u, k + 1), f = u / Math.max(0.01, uMax(p));
+  const lap = strakeLap(k, (g - g0) / Math.max(1e-6, g1 - g0)) * Math.min(1, plankWidthAt(u, k) / (0.5 * plankW(u)), (1 - f) / 0.03);
   if (lap > 0) lapOut(pt, u, p, lap);
   return pt;
 }
