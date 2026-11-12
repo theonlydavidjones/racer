@@ -708,6 +708,19 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
+## Training tools (owner, 12 November; not ranked yet: the owner will rank them)
+
+Owner: "As part of the training tools suite, let's build a sort of midair wind indicator, like an arrow or series of
+arrows floating in the air showing where the wind is. Ideally we could also build a second view showing how the wind is
+traveling over the hull and sails to help players learn about sail shape and laminar flow."
+
+- **A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
+  wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
+  the rig (already in the physics) can be seen.
+- **A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+  jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
+  model. True to the physics, and labelled where it's illustrative.
+
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
