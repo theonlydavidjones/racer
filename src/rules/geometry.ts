@@ -8,9 +8,11 @@ const ends = (b: Hull): [Vec, Vec] => {
   return [{ x: b.x + u.x * HALF, y: b.y + u.y * HALF }, { x: b.x - u.x * HALF, y: b.y - u.y * HALF }];
 };
 
-/** Gap between two hulls, each modelled as a bow-to-stern segment. */
+/** Gap between two hulls, each modelled as a bow-to-stern segment (0 if the segments cross: one hull through the other). */
 export function hullGap(A: Hull, B: Hull): number {
   const [p1, p2] = ends(A), [q1, q2] = ends(B);
+  const side = (a: Vec, b: Vec, c: Vec) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  if (side(p1, p2, q1) * side(p1, p2, q2) < 0 && side(q1, q2, p1) * side(q1, q2, p2) < 0) return 0;
   return Math.min(segPt(p1, q1, q2), segPt(p2, q1, q2), segPt(q1, p1, p2), segPt(q2, p1, p2));
 }
 

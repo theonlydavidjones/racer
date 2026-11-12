@@ -179,5 +179,8 @@ export interface Incident<B> {
   part?: string;
   /** Rule 43.1(a): she broke the rule only because another boat's breach compelled her to: no penalty. The other boat's id. */
   exoneratedBy?: number;
+  /** Part 2 preamble: the boat that broke the rule wasn't racing (before her preparatory signal, after a postponement or
+   * abandonment, or finished and clear, or retired), so she isn't penalized for it. */
+  notRacing?: boolean;
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }

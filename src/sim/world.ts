@@ -586,6 +586,16 @@ export class World {
 
   /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
   private belowSinceGun = new Set<number>();
+  /**
+   * Definitions, Racing: "from her preparatory signal until she finishes and clears the finishing line and marks or
+   * retires, or until the race committee signals a general recall, postponement or abandonment".
+   */
+  racing(b: Boat): boolean {
+    if (this.freeSail || this.cancelled || notRacing(b)) return false;
+    const prep = this.sequence.find(s => s.name === 'Preparatory signal');
+    return !prep || this.t >= prep.t;
+  }
+
   /** Rule 21.1: how long (s) each returning boat has been sailing clearly away from the line (to release the latch). */
   private awayFromLine = new Map<number, number>();
   /**
@@ -850,7 +860,11 @@ export class World {
       // the same touch until she's got clearly away from that mark
       const prev = b.markTouch ? marks.find(m => m.name === b.markTouch) : undefined;
       const stillNear = !!prev && solidGap(bw, st, prev) - prev.r - HULL_HALF_BEAM < 1.5;
-      if (touching && b.markTouch !== touching.name) {
+      if (touching && b.markTouch !== touching.name && !this.racing(b)) {
+        // Rule 31 is "while racing": before her preparatory signal or once racing's called off, no penalty
+        b.v *= 0.6;
+        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
+      } else if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
         // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
         const sameIncident = this.t - (this.lastFoul.get(b.id) ?? -Infinity) < SAME_INCIDENT;
@@ -974,17 +988,22 @@ export class World {
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
       if (incident.kind !== 'hail' && incident.kind !== 'blanket' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
+      // Part 2 preamble: the rules of Part 2 still apply between boats that intend to race, are racing or have been racing,
+      // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
+      // sim doesn't model, and rule 23.1, handled as its own case)
+      if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
-      if (incident.exoneratedBy == null) this.lastFoul.set(f.id, this.t);
+      // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
+      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.lastFoul.set(f.id, this.t);
       if (A.isUser || B.isUser) {
         this.paused = true;
-        if (incident.exoneratedBy == null) { if (f.isUser) this.fouls++; else this.fouledBy++; }
+        if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.exoneratedBy == null && incident.part !== '23.1' && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them (and one not racing, under 23.1, takes none: rule 44.1)
+      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1' && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them (and one not racing, under 23.1, takes none: rule 44.1)
     }
   }
 
