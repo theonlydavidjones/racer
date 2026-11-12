@@ -178,7 +178,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, x = corner.x + i * dx, y = corner.y + j * dy;
     if (cityShore(latOf(j), lonOf(i)) || inLP(x, y)) continue; // (fitted above)
-    if (!coast.nearest(x, y, 1.6 * cell)) continue; // (only near the coast)
+    if (!coast.nearest(x, y, 4 * cell)) continue; // (only near the coast: the height data's own shore can be 100 m out)
     H[k] = coast.inside(x, y) ? Math.max(H[k], 2.5) : Math.min(H[k], -30);
   }
   // the cells the coast runs through (its nearest point within the cell's circle), outside the Cityfront
@@ -278,12 +278,12 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
         const o = fIndex.get((gj + b) * FW + gi + a); if (o !== undefined && (fPos[o * 3 + 1] > 0) !== land) { edge = true; break; }
       }
       if (!edge) continue;
-      const x = fPos[v * 3], y = -fPos[v * 3 + 2], q = nearCoast(x, y, 0.75 * fStep);
+      const x = fPos[v * 3], y = -fPos[v * 3 + 2], q = nearCoast(x, y, 1.45 * fStep); // (the coast is within a diagonal of a sample with the other side next to it)
       moves.push([v, q ? q.x : x, q ? q.y : y, land ? 1.5 : -2]);
     }
     for (const [v, x, y, h] of moves) { fPos[v * 3] = x; fPos[v * 3 + 1] = h; fPos[v * 3 + 2] = -y; }
   }
-  const fGeo = new THREE.BufferGeometry(), fCol = new Float32Array(fPos.length), fP = new Float32Array(fPos), fGi = new Int32Array(fG);
+  const fGeo = new THREE.BufferGeometry(), fCol = new Float32Array(fPos.length), fP = new Float32Array(fPos), fGi = new Int32Array(fG), fPin = new Uint8Array(fPinned);
   fGeo.setAttribute('position', new THREE.BufferAttribute(fP, 3));
   fGeo.setAttribute('color', new THREE.BufferAttribute(fCol, 3));
   {
@@ -295,6 +295,16 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       l.push(a, c, b, b, c, d); all.push(a, c, b, b, c, d); tiles.set(key, l);
     }
     fGeo.setIndex(all); fGeo.computeVertexNormals();
+    // on the edges a patch shares with the 50 m cells, the 50 m surface's own normals, so the light doesn't step there
+    const fn = fGeo.attributes.normal as THREE.BufferAttribute, n3 = new THREE.Vector3();
+    for (let v = 0; v < fPinned.length; v++) {
+      if (!fPinned[v]) continue;
+      const gi = fG[v * 2], gj = fG[v * 2 + 1], i = Math.min(nx - 2, Math.floor(gi / F)), j = Math.min(ny - 2, Math.floor(gj / F)), u = gi / F - i, w = gj / F - j;
+      n3.set(0, 0, 0);
+      for (const [k, kw] of [[j * nx + i, (1 - u) * (1 - w)], [j * nx + i + 1, u * (1 - w)], [(j + 1) * nx + i, (1 - u) * w], [(j + 1) * nx + i + 1, u * w]] as const)
+        n3.x += nrm.getX(k) * kw, n3.y += nrm.getY(k) * kw, n3.z += nrm.getZ(k) * kw;
+      n3.normalize(); fn.setXYZ(v, n3.x, n3.y, n3.z);
+    }
     for (const ix of tiles.values()) {
       const g = new THREE.BufferGeometry(), box = new THREE.Box3(), v3 = new THREE.Vector3();
       for (const n of ['position', 'color', 'normal']) g.setAttribute(n, fGeo.attributes[n]);
@@ -342,7 +352,8 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
         tmp.offsetHSL(0, 0, (n - 0.5) * 0.06);
       }
       const shore = H[k - 1] <= 0 || H[k + 1] <= 0 || H[k - nx] <= 0 || H[k + nx] <= 0 || H[k - 2] <= 0 || H[k + 2] <= 0 || H[k - 2 * nx] <= 0 || H[k + 2 * nx] <= 0; // within 100 m of the water
-      if (h < 5 && shore && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      const patchCorner = isShore(i - 1, j - 1) || isShore(i, j - 1) || isShore(i - 1, j) || isShore(i, j); // (the patches put the sand where the shore is)
+      if (h < 5 && shore && !patchCorner && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
       else if (slope > 0.55) tmp.lerp(PAL.rock, 0.6); // cliffs
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
     }
@@ -356,7 +367,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       }
       if (wt > 0) tmp.setRGB(r / wt, g / wt, bl / wt); else tmp.copy(PAL.sand);
       const h = fP[v * 3 + 1], lat = M.north - (M.north - M.south) * gj / F / (ny - 1), lon = M.west + (M.east - M.west) * gi / F / (nx - 1), rg = region(lat, lon, Math.max(h, 1));
-      if (h < 5 && rg !== 'city' && rg !== 'port') tmp.copy(1 - fNrm.getY(v) > 0.4 || rg === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      if (!fPin[v] && h < 5 && rg !== 'city' && rg !== 'port') tmp.copy(1 - fNrm.getY(v) > 0.4 || rg === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
       fCol[v * 3] = tmp.r; fCol[v * 3 + 1] = tmp.g; fCol[v * 3 + 2] = tmp.b;
     }
     (fGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
