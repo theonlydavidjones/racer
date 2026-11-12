@@ -28,7 +28,11 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   tracks at most 7 in; the car's forward edge level with the grab rail's forward end. (Photo looking aft from the mast.)
 - No T-bar or other fitting on the cabin top besides these.
 - The cabin may be dark inside by day. Cushions are brown. The mast is keel-stepped. The lantern stays mounted, dark when unlit.
-- The companionway hatch slides forward to open.
+- The companionway hatch slides forward to open, its own length, clearing the opening fully.
+- The companionway is closed by three washboards of equal size, varnished wood, which lift out of grooves at the doorway's
+  sides and are stowed below (not hinged doors). A small brass keyhole lock, about 3/4 in across, at the top centre of
+  the top board. They are a pain to get on and off.
+- Opening: the hatch first, then the washboards. Closing: the reverse.
 
 ## Cockpit
 - The lazarettes are solid lockers, not benches.
