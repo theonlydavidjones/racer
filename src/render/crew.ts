@@ -118,9 +118,10 @@ const keepOnSole = (p: THREE.Vector3) => {
   }
   return p;
 };
-/** The jib winch on side `ws` (hull.ts, Boat Detail's: centred on the coaming at the cockpit's forward end, on a 25 mm pad,
- * the sheet leading to it 0.07 above its base); `up` higher, as for the handle on top. */
-const winchAt = (ws: number, up = 0) => { const wz = COCK0 + 0.03 * L, c = chz(wz); return V(ws * (c + COAMING_T / 2), deckY(uAtZ(wz), c) + coamH(wz) + 0.025 + 0.07 + up, wz); };
+/** The jib winch on side `ws` (boatMesh.ts buildLines, Boat Detail's, from Josephine's photos: on a moulded pedestal on
+ * the side deck against the coaming's outer face, 1.4 m aft of amidships; the sheet leading to it 0.07 above its base);
+ * `up` higher, as for the handle on top. */
+const winchAt = (ws: number, up = 0) => { const wz = 1.4, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) + 0.03 + 0.07 + up, wz); };
 /** What the crew watch: the jib's luff (its telltales). */
 const JIB_LUFF = V(0, 1.5, -1.6);
 
