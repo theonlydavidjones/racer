@@ -37,8 +37,9 @@ export const CANCEL_KT = 23;
 export function cancelSignal(started: boolean, kt: number): { up: Flag[]; sounds: number; say: string } {
   const why = `${Math.round(kt)} kt over the course, over the fleet's ${CANCEL_KT} kt limit`;
   return started
-    ? { up: ['N', 'A'], sounds: 3, say: `N over A, three sounds: all races abandoned, no more racing today (${why}). Sail home safely.` }
-    : { up: ['AP', 'A'], sounds: 2, say: `AP over A, two sounds: racing postponed, no more racing today (${why}). Sail home safely.` };
+    // (the news first: on screen a message shows its headline, the words before the colon: ui/feedback.ts headline)
+    ? { up: ['N', 'A'], sounds: 3, say: `Racing abandoned, no more racing today: N over A, three sounds (${why}). Sail home safely.` }
+    : { up: ['AP', 'A'], sounds: 2, say: `Racing postponed, no more racing today: AP over A, two sounds (${why}). Sail home safely.` };
 }
 
 /** What each preparatory flag does in the last minute (RRS 30). */
