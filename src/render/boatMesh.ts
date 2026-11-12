@@ -575,7 +575,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1);
     for (const x of [a.x, b2.x]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, b2.z - a.z + 0.06), STEEL); r.position.set(x, a.y - 0.05, (a.z + b2.z) / 2); grp.add(r); }
     const cr = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(b2.x - a.x) + 0.025, 0.02, 0.025), STEEL); cr.position.set((a.x + b2.x) / 2, a.y - 0.05, (a.z + b2.z) / 2); grp.add(cr);
-    const car = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.07), BLACK); grp.add(car); cars[tk] = car;
+    // the car, and its block on top (the jib's lead: the car's pins set where it is, and with it the sheeting angle and
+    // the fore–aft lead; the fairlead behind only turns the sheet aft). The block's sheave runs fore and aft, its strap on the car
+    const car = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.07), BLACK); grp.add(car); cars[tk] = car;
+    const cb = sheaveBlock(0.02, 0.04); cb.position.y = 0.015; car.add(cb);
     // the fairlead: a block standing on the side deck, its sheave turning the sheet aft along the rail
     const fl = sheaveBlock(0.02, 0.035); fl.position.copy(fairlead(side)); grp.add(fl);
   }
@@ -1140,7 +1143,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     L2.cars[tk].position.copy(car);
     const loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
-    const sag = loaded ? 0 : 0.35, cy = car.y + 0.03;
+    const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
     for (let k = 1; k <= 3; k++) {
       const t = k / 4, x = clew.x + (car.x - clew.x) * t, z = clew.z + (car.z - clew.z) * t;
       at(k, x, Math.max(restOn(x, z) + 0.012, clew.y + (cy - clew.y) * t - 4 * t * (1 - t) * sag), z);
