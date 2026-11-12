@@ -97,6 +97,14 @@ const HARBORS = {
     // no breakwater: the club's docks open straight onto the Oakland Estuary, across the basin's north-east side
     exits: [[37.78320, -122.26195]]
   },
+  // the Oakland Estuary's other harbors, between Alameda and Oakland (OSM marina outlines; their ways out found from the
+  // chart's water beyond their edges): water to sail into, their docks solid. No berths: their dock letters and slips
+  // aren't published where we could reach
+  'oakland-yc': { name: 'Oakland Yacht Club, Alameda', bbox: [-122.2685, 37.7815, -122.2615, 37.7860], basin: { marina: 'Oakland Yacht Club' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'marina-village': { name: 'Marina Village Yacht Harbor, Alameda', bbox: [-122.2760, 37.7820, -122.2640, 37.7900], basin: { marina: 'Marina Village Yacht Harbor - East Basin' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'fortmann': { name: 'Fortmann Marina, Alameda', bbox: [-122.2590, 37.7765, -122.2540, 37.7820], basin: { marina: 'Fortmann Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'grand-marina': { name: 'Grand Marina, Alameda', bbox: [-122.2575, 37.7765, -122.2500, 37.7815], basin: { marina: 'Grand Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  'alameda-marina': { name: 'Alameda Marina (Island Yacht Club)', bbox: [-122.2535, 37.7725, -122.2435, 37.7790], basin: { marina: 'Alameda Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
   corinthian: {
     name: 'Corinthian Yacht Club', bbox: [-122.4600, 37.8700, -122.4535, 37.8740],
     basin: { pts: [ // the coastline round the club's point and the Main Street decks (OSM way 157393812), the entrance, the breakwater (OSM way 125807786)
@@ -249,6 +257,27 @@ async function make(id, H) {
         s0 += L;
       }
     }
+  }
+  // the ways out, where they aren't given: the basin's open edges, those with open water (the chart's, the sim's 50 m
+  // land cells) just beyond them; each run of them is one way out, at its middle
+  if (H.exits === 'auto') {
+    const M = JSON.parse(await readFile(new URL('../src/geo/data/shore-mask.json', import.meta.url), 'utf8')), G = new Uint8Array(M.nx * M.ny);
+    M.rows.forEach((runs, j) => { let i = 0, v = 0; for (const n of runs) { if (v) G.fill(1, j * M.nx + i, j * M.nx + i + n); i += n; v ^= 1; } });
+    const landAt = ([la, lo]) => { const i = Math.floor((lo - M.west) / (M.east - M.west) * (M.nx - 1) + 0.5), j = Math.floor((M.north - la) / (M.north - M.south) * (M.ny - 1) + 0.5); return i >= 0 && j >= 0 && i < M.nx && j < M.ny && G[j * M.nx + i] === 1; };
+    const runs = []; let cur = null;
+    for (let i = 0; i < BP.length; i++) {
+      const a = BP[i], b = BP[(i + 1) % BP.length], L = Math.hypot(b.x - a.x, b.y - a.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const n = { x: (b.y - a.y) / L, y: -(b.x - a.x) / L }, side = inBasin({ x: m.x + n.x, y: m.y + n.y }) ? -1 : 1; // (outward)
+      const open = L > 4 && [25, 45].every(d => { const q = { x: m.x + n.x * side * d, y: m.y + n.y * side * d }; return !inBasin(q) && !landAt(toLL(q)) && minDist(q, [...breakwaters, ...docks]) > 3; });
+      if (open) { if (!cur) runs.push(cur = []); cur.push({ a, b, L }); } else cur = null;
+    }
+    if (runs.length > 1 && cur && runs[0] !== cur && BP.length && runs[0][0].a === BP[0]) { runs[0].unshift(...runs.pop()); } // (a run across the outline's start)
+    H.exits = runs.filter(r => r.reduce((t, e) => t + e.L, 0) > 15).map(r => { // the middle of each run, along it
+      const tot = r.reduce((t, e) => t + e.L, 0); let s = tot / 2;
+      for (const e of r) { if (s <= e.L) { const t = s / e.L; return toLL({ x: e.a.x + (e.b.x - e.a.x) * t, y: e.a.y + (e.b.y - e.a.y) * t }); } s -= e.L; }
+      return toLL(r[0].a);
+    });
+    if (!H.exits.length) fail(`${id}: no way out found`);
   }
   // the entrance beacons (lateral marks, from NOAA's chart via OSM seamarks)
   const beacons = [...nodes.values()].filter(n => n.tags['seamark:type'] === 'beacon_lateral' && near(xy([n.lat, n.lon]), 80))

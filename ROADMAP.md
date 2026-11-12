@@ -486,8 +486,9 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   can sail into, docks and breakwaters solid, and a berth at BYC's guest dock, inside a basin that takes in the water
   within the breakwaters~~ (done). Next: their slips (only a few fingers are mapped in OSM: Berkeley's
   B–E are combs, F–O lines; the other harbors' dock letters and slip numbers aren't published where we could reach;
-  berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and the Estuary's other harbors (Oakland
-  YC, Marina Village, Grand Marina, Alameda Marina with Island YC, Ballena Bay). Polish: the land's 50 m cells make a
+  berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and Ballena Bay (no marina outline in OSM). ~~The Estuary's other harbors as water to sail into: Oakland YC, Marina
+  Village, Fortmann, Grand Marina, Alameda Marina (Island YC)~~ (done, no berths). Polish: the narrow basins (Marina
+  Village's) are only partly cut out of the 50 m terrain, so from the air a few docks seem to stand on land. Polish: the land's 50 m cells make a
   stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: the current in the embayments with no NOAA station (San Rafael Bay, Richardson Bay, San

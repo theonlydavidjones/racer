@@ -47,6 +47,7 @@ const VIEWS = {
   bmarina: [LL(37.8660, -122.3240, 6), LL(37.8665, -122.3170, 4)], // the Berkeley Marina's middle entrance and BYC beyond it
   over_ryc: [LL(37.9085, -122.3830, 500), LL(37.9085, -122.38301, 0)], // overhead: Brickyard Cove, Richmond YC's harbor
   over_encinal: [LL(37.7830, -122.2625, 400), LL(37.7830, -122.26251, 0)], // overhead: Encinal YC on the Estuary
+  over_estuary: [LL(37.7820, -122.2600, 1800), LL(37.7820, -122.26001, 0)], // overhead: the Estuary's harbors, Marina Village to Alameda Marina
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);

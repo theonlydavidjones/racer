@@ -272,6 +272,6 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     expect(slipById(wh.label)?.id).toBe(wh.id);
     expect(fixSpec({ ...DEFAULT_BOAT, slip: wh.label, marina: undefined })).toMatchObject({ marina: 'west-harbor', slip: wh.id });
     expect(fixSpec({ ...DEFAULT_BOAT, slip: 'south-beach:C12' })).toMatchObject({ marina: 'south-beach', slip: 'south-beach:C12' });
-    expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian', 'horseshoe-bay', 'berkeley', 'richmond-yc', 'encinal']);
+    expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian', 'horseshoe-bay', 'berkeley', 'richmond-yc', 'encinal', 'oakland-yc', 'marina-village', 'fortmann', 'grand-marina', 'alameda-marina']);
   });
 });
