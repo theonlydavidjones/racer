@@ -175,6 +175,16 @@ function deckWalk(s: number, z: number, dir: number, k: number): PoseT {
   return { hip, yaw, pitch: -0.75, roll: 0, feet, hands: rightIsOut ? [inboard, outboard] : [outboard, inboard], look: hip.clone().addScaledVector(f, 2).setY(hip.y + 0.5), step: true, deck: true, knee: f.clone().add(V(s * 0.35, 0.6, 0)) };
 }
 /**
+ * Sitting down on the side deck from the crouch along it: the hips kept up in the crouch (no higher) and the weight
+ * forward until the feet are in over the coaming, the knees coming round slowly; let down first, the thighs would be
+ * level with the coaming's top and the knees swept through it. Not stood up straight with the legs hanging.
+ */
+function sitDown(s: number, z: number, hip: THREE.Vector3, k: number): PoseT {
+  const d = onDeck(s, z, 0, k), crouch = deckWalk(s, z, -1, k).hip.y;
+  d.hip.y = Math.max(d.hip.y, Math.min(hip.y, crouch)); d.pitch = Math.min(d.pitch, -0.5); d.kneeSlow = true;
+  return d;
+}
+/**
  * The way from where someone is to where they're going, when it passes the thwart: not through the cockpit over it,
  * but along the side deck (deckWalk), on the side of the seat aft of it, up onto the deck forward of the thwart (or down
  * off it there). Null when the way's clear and the pose they're going to does it all. A move once begun goes on to its
@@ -199,7 +209,7 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
     // (across to the other side's seat aft of the thwart: sat on this side's deck, the legs swung in; down into the
     // cockpit forward of the thwart and across it low, under the boom; then up on to the other side's deck and aft along
     // it. Not slid through the air from one side deck to the other)
-    if (f.cur.feet.some(p => Math.abs(p.x) > chz(p.z))) { const d = onDeck(q.side, q.goal, 0, k); d.hip.y = Math.max(d.hip.y, c.y); return d; }
+    if (f.cur.feet.some(p => Math.abs(p.x) > chz(p.z))) return sitDown(q.side, q.goal, c, k);
     if (Math.sign(c.x) === q.side && Math.abs(c.x) > 0.15) return moving(f, 0, q.goal, q.side * Math.PI / 2, k);
     f.route = { side: -q.side, z: c.z, goal: tAft ? want.hip.z : THW_A - 0.05 };
     return route(f, want, dt, k);
@@ -231,11 +241,7 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
     // (there. Going on down into the cockpit: first sat on the side deck, the legs swung in over the coaming, as anyone
     // sits there; then down)
     // (by where their feet are going, not their hips: kneeling up at the cabin top's lines the hips are over the coaming)
-    if ((!tAft || Math.sign(want.hip.x) === q.side) && want.feet.some(p => Math.abs(p.x) < chz(p.z)) && f.cur && f.cur.feet.some(p => Math.abs(p.x) > chz(p.z))) {
-      // (the hips kept up in the crouch until the feet are in: let down first, the thighs would be level with the
-      // coaming's top and the knees swept through it)
-      const d = onDeck(q.side, q.goal, 0, k); d.hip.y = Math.max(d.hip.y, f.cur.hip.y); d.kneeSlow = true; return d;
-    }
+    if ((!tAft || Math.sign(want.hip.x) === q.side) && want.feet.some(p => Math.abs(p.x) < chz(p.z)) && f.cur && f.cur.feet.some(p => Math.abs(p.x) > chz(p.z))) return sitDown(q.side, q.goal, c, k);
     if (tAft && Math.sign(want.hip.x) !== q.side) { q.down = true; return route(f, want, dt, k); }
     f.route = undefined; return null;
   }
