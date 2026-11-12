@@ -317,8 +317,11 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    line sags onto the one below her and each tack costs 0.2–0.4 boat lengths more. Now: the sails' side force against
    the keel's lift (slender wing, Newman §5.12) and the hull's broadside drag, as a sideways motion; close-hauled 2.9°,
    4.3° and 6.0° in 6, 12 and 20 kt; slow, 0.36 kt at 1.5 kt in 12 kt. The polar's speed is her course's; the sails
-   are trimmed and their forces read in ORC's frame (the wind across her course, turned from her heading by her steady
-   leeway); she, the AI and Nav steer that much above the beat. The compass's "tack" marker and its mean close-hauled
+   are trimmed and their forces read in the wind across her course (turned from her heading by her steady leeway), the
+   frame the sail model was calibrated in before leeway: a calibration choice, not shown from ORC's documentation (its
+   VPP PDF isn't reachable from here). A real windex reads her leeway less; recalibrating trim.ts's angles (the jib's
+   8° sheeting limit and 18° angle of attack, both unsourced) in the hull's frame belongs with item 9. She, the AI and
+   Nav steer her leeway above the beat. The compass's "tack" marker and its mean close-hauled
    heading allow for it too (ui/hud.ts); the laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
    in and she rounds up and tacks; it was before leeway too).
 8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives

@@ -179,10 +179,12 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // the wind the sails see: at their height, in the plane of the heeled mast (sailWind), as the crew trims to it
   // (going astern, into the wind she sees more of it; slipping to leeward, the wind comes a little more abeam: leeway)
   const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
-  // (the sails, their trim and their forces, in the wind across her course through the water: ORC's frame. Its VPP's
-  // wind triangle is the course's, its sail coefficients and the polar it gives are read against that angle, and her
-  // leeway enters only on the keel's side; the trim's angles (trim.ts) are set in the same frame. Her heading is her
-  // leeway higher, so the wind's angle to the hull itself is that much less (ap, for the windage on her hull))
+  // (the sails, their trim and their forces, in the wind across her course through the water (sailFrame): the frame the
+  // sail model was calibrated in before she had leeway, when heading and course were one. A calibration choice, not
+  // something ORC's documentation is shown to say: the wind's angle to the hull itself is her leeway less (ap, for the
+  // windage on her hull), and a real windex would read that. Recalibrating the trim constants (trim.ts) in the hull's
+  // frame is on the ROADMAP)
+  stepFrame(b, dt);
   const fr = sailFrame(b), slip = fr.rot;
   const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0) : ap;
   trimSails(b, apF.awa, plan, dt);
@@ -905,15 +907,23 @@ export function sailWind(from: number, windKt: number, h: number, v: number, swa
 const leeSlip = (b: Boat) => b.v > 0.3 ? Math.max(0, Math.atan2(b.tack === 'S' ? -(b.sway ?? 0) : (b.sway ?? 0), b.v) / D2R) : 0;
 
 /**
- * The frame the sails are trimmed and their forces read in (ORC's: the wind across her course through the water, her
- * leeway outside its wind triangle). It turns from her heading by the steady leeway she makes at speed (b.leeway), the
- * polar's; her slip beyond it (stalled, pinching, slow, or the moment a puff heels her) is the wind drawing forward across
- * her sails, and they luff; short of it (just tacked, not yet sliding), the wind a little more abeam. Her velocity
- * through the water in that frame: along it and across it (+ starboard).
+ * The frame the sails are trimmed and their forces read in: the wind across her course through the water, the frame the
+ * sail model and its trim constants were calibrated in before she had leeway (a calibration choice: physics.ts step()).
+ * It turns from her heading by the steady leeway she makes at speed (b.leeway); her slip beyond it (stalled, pinching,
+ * slow, or the moment a puff heels her) is the wind drawing forward across her sails, and they luff; short of it (just
+ * tacked, not yet sliding), the wind a little more abeam. Through a tack, as the slip changes sides, the frame turns over
+ * at up to 10° a second (stepFrame) rather than at once. Her velocity through the water in that frame: along it
+ * and across it (+ starboard).
  */
+/** The frame's turn, worked toward her steady leeway on the side she's slipping, at up to 10° a second (sailFrame). */
+function stepFrame(b: Boat, dt: number): void {
+  const slip = b.v > 0.3 ? Math.atan2(b.sway ?? 0, b.v) / D2R : 0, want = Math.abs(slip) > 0.5 ? Math.sign(slip) * (b.leeway ?? 0) : 0;
+  const r0 = b.sailRot ?? want; b.sailRot = r0 + clamp(want - r0, -10 * dt, 10 * dt);
+}
+
 export function sailFrame(b: Boat): { rot: number; along: number; across: number } {
   const sw = b.sway ?? 0, slip = b.v > 0.3 ? Math.atan2(sw, b.v) / D2R : 0, lw = b.leeway ?? 0;
-  const rot = Math.abs(slip) > 0.5 ? Math.sign(slip) * lw : 0, r = rot * D2R;
+  const rot = b.sailRot ?? (Math.abs(slip) > 0.5 ? Math.sign(slip) * lw : 0), r = rot * D2R;
   return { rot, along: b.v * Math.cos(r) + sw * Math.sin(r), across: -b.v * Math.sin(r) + sw * Math.cos(r) };
 }
 

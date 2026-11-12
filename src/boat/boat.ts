@@ -155,6 +155,8 @@ export interface Boat {
   awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)
   /** Her steady leeway (deg, a few seconds' mean, at her polar speed here): her course through the water is this much further off the wind than her heading. */
   leeway?: number;
+  /** The sails' frame's turn from her heading (deg, + to starboard: physics.ts sailFrame). */
+  sailRot?: number;
   /** The true wind's speed (kt) over the last 20 s or so: the breeze the crew set their depowering for. */
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
