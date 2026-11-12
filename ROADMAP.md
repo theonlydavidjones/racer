@@ -71,7 +71,9 @@ What's planned, roughly in order. Done work is described in the README.
    sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
    band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
    the starting set; saved with the boat.
-4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
+4. ~~Outside the Gate, the sea dial against the chart and the water~~ (done: the tide predictions roll on past the
+   race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
+   with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
@@ -86,14 +88,18 @@ What's planned, roughly in order. Done work is described in the README.
 7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
    far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
    a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
-8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
+8. ~~Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home"~~ (done: the start
+   and destination picked on the chart; Change the conditions mid-sail, physics-reviewed; "Move her here" without
+   ending the cruise; Home: back to her slip when cruising, retire and head home when racing). The showroom's own time
+   of day and conditions are done too.
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
    way to set the direction.
    HUD note (Deep Physics, in progress): the inset map shows the boat's own visibility, and is north-up in Just sail,
    with an N arrow.
-9. The flags' original motion back, and "Strike ensign" (1–2 h).
+9. ~~The flags' original motion back, and "Strike ensign"~~ (done: the committee boat's signal flags have their
+   original motion back; the boats' flags keep the measured physics; the strike animates).
 10. P0 phase 4: deck hardware and lines, with the rigging detail (4–8 h).
 Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
 rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Building, aluminium spars, the boat cards, the
