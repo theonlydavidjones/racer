@@ -146,7 +146,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
         const them = e.part === '23.1' ? 'still racing' : 'on another leg, taking a penalty or returning to start';
         what = you ? `You ${not} and your sails sat on the wind of ${o}, who was ${them}, for several seconds. Taking a boat's wind interferes with her as much as getting in her way.`
           : `${o} ${e.part === '23.1' ? 'had finished and' : 'left their proper course and'} took your wind for several seconds while you were ${e.part === '23.1' ? 'still racing' : 'on another leg, taking a penalty or returning to start'}.`;
-        tip = you ? 'Your wind shadow streams off to leeward and astern of you, along the wind you feel. Keep it off boats you must not interfere with: bear away or head up out of line, or keep clear astern.' : 'Rule 23 protects you from boats that go out of their way to hinder you, by taking your wind as much as by blocking you.';
+        tip = you ? 'Your wind shadow streams off downwind of you, along the wind you feel: astern and to leeward when beating, ahead of you when running. Keep it off boats you must not interfere with: bear away or head up out of line, or keep clear astern.' : 'Rule 23 protects you from boats that go out of their way to hinder you, by taking your wind as much as by blocking you.';
         break;
       }
       if (e.part === '23.1') {

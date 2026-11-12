@@ -99,6 +99,20 @@ describe('Rule 23: interfering by taking a boat\'s wind', () => {
     for (let t = 300; t < 300 + BLANKET_TIME - 0.5; t += 0.5) expect(step(rec, fin, racer, t, BLANKET_K + 0.05)).toBeNull();
     expect(step(rec, fin, racer, 300 + BLANKET_TIME, BLANKET_K + 0.05)).toMatchObject({ kind: 'blanket', fouler: fin, rule: '23', part: '23.1' });
   });
+  it('just over the finishing line and still clearing it, she is racing: no 23.1 (Definitions, Racing)', () => {
+    const fin = boat('Fin', { at: [0, 20], heading: 180, finished: true }), racer = boat('Racer', { at: [0, 0], heading: 315 });
+    fin.cleared = false;
+    const rec = newPairRecord();
+    for (let t = 300; t < 300 + 3 * BLANKET_TIME; t += 0.5) expect(step(rec, fin, racer, t, 0.3)).toBeNull();
+  });
+  it('a blanketing call leaves the pair\'s other judging alone: contact just after is still a foul', () => {
+    const fin = boat('Fin', { at: [0, 20], heading: 180, finished: true }), racer = boat('Racer', { at: [0, 0], heading: 315 });
+    const rec = newPairRecord();
+    let t = 300;
+    for (; !step(rec, fin, racer, t, 0.3); t += 0.5) expect(t).toBeLessThan(320);
+    moveTo(fin, [-1, 1.5], 45); // then the finished boat, on port, runs into the racing boat
+    expect(step(rec, fin, racer, t + 1, 0)).toMatchObject({ kind: 'contact', fouler: fin, rule: '23' });
+  });
   it('passing through her wind for a moment is not interference', () => {
     const fin = boat('Fin', { at: [0, 20], heading: 180, finished: true }), racer = boat('Racer', { at: [0, 0], heading: 315 });
     const rec = newPairRecord();

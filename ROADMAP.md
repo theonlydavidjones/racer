@@ -58,6 +58,12 @@ What's planned, roughly in order. Done work is described in the README.
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
+   Built on branch rules-finish (PR pending, not yet published): 20.2(e) holds until the hailer has tacked and kept
+   clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
+   20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
+   the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
+   Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
+   away below her proper course to blanket.
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before

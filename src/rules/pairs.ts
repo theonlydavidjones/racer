@@ -133,6 +133,9 @@ export const BLANKET_K = 0.12;
 /** Rule 23: blanketing held this long (s) is interference, not a boat passing through another's wind on her way by. */
 export const BLANKET_TIME = 8;
 
+/** Not racing: finished and cleared the finishing line and marks (Definitions, Racing). */
+export const notRacing = (b: RulesBoat): boolean => !!b.finished && (b.cleared ?? true);
+
 /**
  * Rule 23: could `X` be breaking rule 23 by taking `Y`'s wind? Only between these boats:
  * 23.1, X is not racing (she has finished) and Y is;
@@ -143,7 +146,8 @@ export const BLANKET_TIME = 8;
  */
 export function blanketRule<B extends RulesBoat>(X: B, Y: B, ctx: RulesContext): '23.1' | '23.2' | null {
   if (Y.finished) return null;
-  if (X.finished) return '23.1';
+  if (X.finished) return notRacing(X) ? '23.1' : null; // just over the line, still clearing it, she is racing
+
   if (ctx.t <= 0 || !X.started || !X.aboveProper) return null;
   const vulnerable = Y.penalty > 0 || Y.ocs || (Y.started && Y.leg !== X.leg);
   return vulnerable ? '23.2' : null;
@@ -262,7 +266,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   let fouler = r.kc, rule = r.rule, byWhy: 'tack' | 'overlap' | null = null, turned: number | undefined, part: string | undefined;
   const row = r.kc === A ? B : A, kc = r.kc;
   const obst = rule19(A, B, r.rule, rec, ctx);
-  if (kc.finished && !row.finished) {
+  if (kc.finished && !row.finished && notRacing(kc)) {
     // Rule 23.1: a boat not racing (she has finished) shall not interfere with a boat that is racing
     rule = '23'; part = '23.1';
   } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
@@ -299,13 +303,13 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
  * blanketRule says rule 23 protects her.
  */
 function blanketing<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation, r: Verdict<B>): Incident<B> | null {
-  if (A.finished && B.finished) { rec.blanket = {}; return null; }
+  if ((A.finished && B.finished) || ctx.t < rec.blanketCool) { rec.blanket = {}; return null; }
   for (const [X, Y, k] of [[A, B, obs.blanket?.byA ?? 0], [B, A, obs.blanket?.byB ?? 0]] as const) {
     const part = k >= BLANKET_K ? blanketRule(X, Y, ctx) : null;
     if (!part) { delete rec.blanket[X.id]; continue; }
     const bl = rec.blanket[X.id] ??= { since: ctx.t, turned: turnedToward(X, Y) };
     if (ctx.t - bl.since < BLANKET_TIME) continue;
-    rec.blanket = {}; rec.cool = ctx.t + INCIDENT_COOLDOWN;
+    rec.blanket = {}; rec.blanketCool = ctx.t + INCIDENT_COOLDOWN;
     return { kind: 'blanket', fouler: X, rule: '23', byWhy: null, part, turned: bl.turned || undefined, verdict: r };
   }
   return null;
@@ -323,10 +327,11 @@ function boatObstruction<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec
   const ov = (X: RulesBoat, Y: RulesBoat) => !clearAstern(X, Y) && !clearAstern(Y, X);
   let best: [{ d: number; n: Vec; continuing: false }, { d: number; n: Vec; continuing: false }] | null = null, bd = 30;
   for (const C of ctx.fleet) {
-    if (C.id === A.id || C.id === B.id || C.finished) continue;
+    if (C.id === A.id || C.id === B.id) continue;
     if (Math.abs(C.x - A.x) > 45 || Math.abs(C.y - A.y) > 45) continue;
     const dA = hullGap(A, C), dB = hullGap(B, C);
-    if (Math.min(dA, dB) >= bd || !ctx.keepsClearOf(A, C) || !ctx.keepsClearOf(B, C)) continue;
+    // (a boat no longer racing is just a vessel in the way: an obstruction to everyone, like the committee boat)
+    if (Math.min(dA, dB) >= bd || (!notRacing(C) && (!ctx.keepsClearOf(A, C) || !ctx.keepsClearOf(B, C)))) continue;
     if (r18 && ov(A, C) && ov(B, C)) continue;
     const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - C.x) * u.x + (X.y - C.y) * u.y, -LOA / 2, LOA / 2), dx = X.x - C.x - u.x * k, dy = X.y - C.y - u.y * k, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
     best = [{ d: dA, n: toward(A), continuing: false }, { d: dB, n: toward(B), continuing: false }]; bd = Math.min(dA, dB);

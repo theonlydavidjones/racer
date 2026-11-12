@@ -375,9 +375,9 @@ export class Hud {
         el.className = left != null ? 'kc alarm' : 'kc';
       } else if (hail.by === o.id) {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
-        const blocked = !!w.tackBlocker(u) && w.tackBlocker(u) !== o && !youTackPays(o, u);
+        const passTo = !youTackPays(o, u) ? w.canPassOn(u, o) : null, blocked = !!passTo;
         $('situMsg').textContent = blocked
-          ? `${o.name} hailed "Room to tack!" With ${w.tackBlocker(u)!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
+          ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
           : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
       } else if (hail.passedOn && hail.respondedAt == null) {

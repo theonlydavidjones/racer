@@ -23,8 +23,14 @@ export interface RulesBoat {
   aboveProper?: boolean;
   /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
   backing?: boolean;
-  /** She has finished, so she is no longer racing (Rule 23.1). */
+  /** She has finished (crossed the finishing line). */
   finished?: boolean;
+  /**
+   * She has finished and cleared the finishing line and marks, so she is no longer racing (Definitions, Racing: a boat
+   * is racing "until she finishes and clears the finishing line and marks"), for rule 23.1. Omitted: as soon as she
+   * has finished.
+   */
+  cleared?: boolean;
 }
 
 export interface RulesMark {
@@ -108,6 +114,8 @@ export interface PairRecord {
    * called, or it goes stale) before the hailing boat has tacked and got clear.
    */
   r202e: { hailer: number; at: number } | null;
+  /** No new rule 23 blanketing call for this pair until this time (its own, so it doesn't stop contact or a hail being judged). */
+  blanketCool: number;
   /**
    * Rule 23, interference by taking a boat's wind: how long (s) each boat has been blanketing the other (keyed by the
    * id of the boat doing it), and how the blanketing began (her turn just before, for 23.2's proper course).
@@ -133,7 +141,7 @@ export interface Hail {
 }
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null, blanket: {} });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null, blanketCool: -Infinity, blanket: {} });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 

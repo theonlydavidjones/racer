@@ -391,7 +391,8 @@ export class World {
     let kc = this.kcMemo.m.get(key);
     if (kc === undefined) {
       const ctx: RulesContext = { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt) };
-      kc = rightOfWay(A, C, ctx, this.pairs[key]).kc.id; this.kcMemo.m.set(key, kc);
+      // only who is "required to keep clear" (rules 10–13, 21), not who owes room or mark-room: no pair record
+      kc = rightOfWay(A, C, ctx, null).kc.id; this.kcMemo.m.set(key, kc);
     }
     return kc === A.id;
   };
@@ -707,13 +708,16 @@ export class World {
             this.emit({ type: 'toast', msg: `${q}: +${this.t.toFixed(1)} s, ${where}, ${(b.v / KT).toFixed(1)} kt`, ms: 4000 });
           }
         } else if (b.started && b.leg >= n && !b.finished && (C.finishSign > 0 ? crossedFwd : crossedBack)) {
-          b.finished = true; b.finishT = this.t;
+          b.finished = true; b.finishT = this.t; b.cleared = false;
           if (b.isUser) { this.userFinishT = this.t; this.emit({ type: 'toast', msg: 'Finished!' }); this.emit({ type: 'horn', dur: 0.5 }); this.emit({ type: 'finished' }); }
         } else if (this.obstructed(b) && (crossedFwd || crossedBack) && b.penalty <= 0) {
           startPenalty(b, TWO_TURNS); // the Seaweed Soup addendum (B1.1) sets two turns for this, whatever the foul penalty
           if (b.isUser) this.emit({ type: 'toast', msg: 'You crossed the start/finish line mid-race. It is an obstruction here: two-turn penalty.', ms: 4500 });
         }
       }
+      // Definitions, Racing: she races on until she has finished and cleared the finishing line and marks (WS Case 127):
+      // here, once she is three of her lengths from the line and both its ends
+      if (b.finished && !b.cleared && segPt(b, C.pin, C.committee) > 3 * LOA) b.cleared = true;
       b.prevD = d;
       this.markProgress(b);
     }
@@ -842,6 +846,7 @@ export class World {
   }
 
   private checkPairs(): void {
+    this.kcMemo = { t: this.t, m: new Map() }; // after the boats have moved this step
     const bs = this.boats, ctx = this.rulesCtx(), found: { A: Boat; B: Boat; incident: Incident<Boat> }[] = [];
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
@@ -870,14 +875,15 @@ export class World {
       if (incident) found.push({ A, B, incident });
     }
     // who fouled whom this step, before deciding penalties (Rule 43.1(a) needs the whole picture)
-    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
+    // (losing her wind can't compel a boat to break a rule: blanketing isn't a breach that exonerates another)
+    for (const { A, B, incident } of found) if (incident.kind !== 'hail' && incident.kind !== 'blanket') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
     for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // a boat that has finished isn't racing, so there are no penalty turns for her to take (rule 44.1)
-      if (incident.kind === 'blanket' && incident.fouler.finished && A.ai && B.ai) continue;
+      if (incident.kind === 'blanket' && incident.fouler.cleared && A.ai && B.ai) continue;
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
-      if (incident.kind !== 'hail' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
+      if (incident.kind !== 'hail' && incident.kind !== 'blanket' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
@@ -1237,16 +1243,16 @@ export class World {
     return this.boatObstructionAhead(b, o) ? o : null;
   }
   /**
-   * Rule 20.1(a) with a boat as the obstruction: a boat that both she and `o` (the boat she'd hail) must keep clear of
-   * (Definitions, Obstruction: a boat racing is an obstruction to boats required to keep clear of her; WS Case 11: a
-   * starboard-tack boat ahead of two overlapped port-tack boats), which she is closing on within the hail's range and
-   * would still meet if she bore away SUBSTANTIAL_TURN°. Returns that boat, or null.
+   * Rule 20.1(a) with a boat as the obstruction: a boat she must keep clear of (Definitions, Obstruction: a boat racing
+   * is an obstruction to boats required to keep clear of her; WS Case 11: a starboard-tack boat ahead of two overlapped
+   * port-tack boats), or one no longer racing, which she is closing on within the hail's range and would still meet if
+   * she bore away SUBSTANTIAL_TURN°. Returns that boat, or null. (`o`, the boat she'd hail, isn't the obstruction.)
    */
   boatObstructionAhead(b: Boat, o: Boat): Boat | null {
     const range = hailRange(b.v), v = Math.max(b.v, 0.5);
     for (const c of this.boats) {
-      if (c === b || c === o || c.finished || dist(b, c) > range + LOA) continue;
-      if (!this.keepsClearOf(b, c) || !this.keepsClearOf(o, c)) continue;
+      if (c === b || c === o || dist(b, c) > range + LOA) continue;
+      if (!(c.finished && c.cleared) && !this.keepsClearOf(b, c)) continue;
       // within a hull length (between centres) of her on her course now, and still if she bore away 10°
       const meets = (h: number) => { const u = V(h), q = cpa({ x: b.x, y: b.y, vx: u.x * v, vy: u.y * v }, c); return q.d < LOA && q.t * v <= range; };
       if (meets(b.h) && meets(b.h + (b.tack === 'S' ? -SUBSTANTIAL_TURN : SUBSTANTIAL_TURN))) return c;
@@ -1319,15 +1325,22 @@ export class World {
    * reply "You tack" instead). Rule 20.2 then applies between her and that boat. Returns the boat hailed, or null.
    */
   passOnHail(b: Boat, hailer: Boat): Boat | null {
-    const rec = this.pairs[pairKey(b, hailer)], h = rec?.hail;
-    if (!h || h.kind !== 'room' || h.by !== hailer.id || h.replyAt != null || h.passedOn) return null;
-    const w = this.tackBlocker(b);
-    if (!w || w === hailer) return null;
-    const r2 = this.pairs[pairKey(b, w)];
-    if (r2?.hail?.kind === 'room') return null; // already a hail between them
+    const w = this.canPassOn(b, hailer);
+    if (!w) return null;
+    const h = this.pairs[pairKey(b, hailer)].hail!;
     h.passedOn = { to: w.id, at: this.t };
     if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: `You pass it on to ${w.name}: "Room to tack!" Tack as soon as they respond (Rule 20.3).` });
     this.hail(b, w, 'room', true);
+    return w;
+  }
+
+  /** Rule 20.3: the boat `b` could pass `hailer`'s hail on to (a boat on the same tack to windward stopping her tacking), or null. */
+  canPassOn(b: Boat, hailer: Boat): Boat | null {
+    const h = this.pairs[pairKey(b, hailer)]?.hail;
+    if (!h || h.kind !== 'room' || h.by !== hailer.id || h.replyAt != null || h.passedOn) return null;
+    const w = this.tackBlocker(b);
+    if (!w || w === hailer) return null;
+    if (this.pairs[pairKey(b, w)]?.hail?.kind === 'room') return null; // already a hail between them
     return w;
   }
 
