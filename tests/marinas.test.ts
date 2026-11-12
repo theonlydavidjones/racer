@@ -156,9 +156,9 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     }
     expect(n).toBeGreaterThan(40); expect(held).toBeGreaterThan(10); // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead)
     // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
-    // (West Harbor's 677, on its west dock: the berth main's old order picks, A7 when the docks had the sim's letters; the
-    // first there that's held head to wind now the plan leaves her room to leeward)
-    const slip = slipById('west-harbor:677')!, p0 = pushOffPlan(slip, 270, 14);
+    // (West Harbor's 135: the first of its berths still held head to wind now the let-go needs 20 m of clear water along her
+    // path as she rounds up and sags (pushoff-letgo.test.ts); 677, old A7, is shoved off astern instead)
+    const slip = slipById('west-harbor:135')!, p0 = pushOffPlan(slip, 270, 14);
     expect(slip.kind === 'bow-in' && p0.kind === 'swing' && !!p0.hold).toBe(true);
     expect(slip).toBeTruthy();
     const boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
