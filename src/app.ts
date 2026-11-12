@@ -433,6 +433,9 @@ function togglePole(): void {
   toast(u.poleWant ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
+// the Flags tile opens the flag index; × or Esc closes it
+$('sigPanel').addEventListener('click', () => hud.flagIndex(w, !!$('flagIndex').hidden));
+$('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
 function doHail(): void { if (w.running && !w.paused) w.userHail(); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) w.pushOff(); }
@@ -618,6 +621,7 @@ addEventListener('keydown', e => {
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
+    if (!$('flagIndex').hidden) { hud.flagIndex(w, false); return; }
     if (courseView.isOpen) { courseView.close(); return; }
     if (navView.isOpen) { navView.close(); return; }
     if (chart.isOpen) { chart.close(); return; }

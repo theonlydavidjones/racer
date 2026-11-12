@@ -1,3 +1,4 @@
+import { fillFlagIndex } from './flagIndex';
 import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
@@ -158,6 +159,12 @@ export class Hud {
   }
 
   private sigKey = '';
+  /** The flag index (the Flags tile opens it): every flag the committee can fly, what it means, and what's up now. */
+  flagIndex(w: World, open?: boolean): void {
+    const el = $('flagIndex');
+    if (open != null) el.hidden = !open;
+    if (!el.hidden) fillFlagIndex($('fiBody'), { flying: w.flags, prep: w.prepFlag, course: w.courseSignal?.no ?? null });
+  }
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
   private signals(w: World): void {
@@ -166,6 +173,7 @@ export class Hud {
     const key = w.flags.join(',') + '|' + (w.courseSignal?.no ?? '');
     if (key !== this.sigKey) {
       this.sigKey = key;
+      if (!$('flagIndex').hidden) this.flagIndex(w); // (open: what's flying changes under you)
       const box = $('sigFlags'); box.innerHTML = '';
       for (const f of w.flags) { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(flagCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; box.appendChild(c); }
       if (!w.flags.length) box.textContent = 'none';
