@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, STRESS, Z, allAboard, attrOf, fumble, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, STRESS, Z, allAboard, attrOf, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -218,12 +218,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
     const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);
     // the sheets are in hand: no walk unless they're away from them
-    let reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who], stressOf(c, ppl[who]));
-    // (the haul after a tack, under pressure: now and then it goes wrong, a riding turn or the sheet caught on the winch)
-    if (k === 'jibsheet' && st != null && hauling && e > JIB_HAUL) {
-      const lost = fumble(c, ppl[who], !b.noFumbles);
-      if (lost > 0) { reach += lost; c.fumbled = `A riding turn on the jib winch: the jib sheet's ${Math.round(lost)} s late coming in.`; }
-    }
+    const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who], stressOf(c, ppl[who]));
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
@@ -276,7 +271,7 @@ function carJob(b: Boat, dt: number): void {
   // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)
   const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && c.place?.across == null);
   if (!worth || a.job) return;
-  a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
+  a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p, stressOf(c, p)), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
 }
 
 
@@ -301,7 +296,8 @@ export function poleTrip(b: Boat, forward: number): number {
   const who = ownerFor(c, 'pole'), a = c.people[who];
   if (!a || a.z <= Z.mast + 0.6) return 0;
   const share = clamp((a.z - Z.mast) / (POLE_FROM - Z.mast), 0.2, 1.3);
-  return reactTime(allAboard(c.spec)[who]) + share * forward / workPace(b, who);
+  const p = allAboard(c.spec)[who];
+  return reactTime(p) * (1 + STRESS.react * stressOf(c, p)) + share * forward / workPace(b, who);
 }
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;

@@ -159,6 +159,21 @@ function crewHatch(b: Boat, dt: number): void {
   else { cw.hatchT = Math.min(1, cw.hatchT + rate); if (cw.hatchT >= 1) { cw.hatch = 'open'; a.job = null; } }
 }
 
+/**
+ * A fumble through a tack or a gybe, under pressure (crewPhys.ts fumble: a fixed draw for each crew and manoeuvre, as
+ * likely as the pressure gets to the jib trimmer): a riding turn on the winch, the new sheet slipping out as it's
+ * taken. The jib flaps half out (the sheet eased to about half its range) and can't be hauled in for the time it takes
+ * to clear the turn; the sails' physics charges the drive lost. Not when you hold the jib sheet yourself.
+ */
+function tackFumble(b: Boat): void {
+  const c = b.crew; if (!c || byHand(b, 'jibsheet')) return;
+  const p = trimmerOf(b, 'jibsheet'); if (!p) return;
+  const lost = fumble(c, p, !b.noFumbles);
+  if (lost <= 0) return;
+  b.ctl.jibsheet = Math.max(b.ctl.jibsheet, 0.5); b.jibSnagT = lost;
+  c.fumbled = `A riding turn on the jib winch through the tack: the jib's out for ${Math.round(lost)} s while it's cleared.`;
+}
+
 /** Penalty turns count only in one direction, so each full turn includes a tack and a gybe (Rule 44.2). The direction
  * is settled once she has turned 30° one way; nothing counts while she sails clear first. */
 function countPenalty(b: Boat, dh: number, emit: Emit): void {
@@ -276,7 +291,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
-  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); }
+  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); tackFumble(b); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
   crewPole(b, dt, emit); crewHatch(b, dt);
@@ -531,7 +546,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // tack and sails, as when sailing
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel); b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P'; if (twa > 176) tk = b.tack;
-  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); }
+  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); tackFumble(b); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
   crewRig(b, dt, emit); crewPole(b, dt, emit); crewHatch(b, dt);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
@@ -1133,6 +1148,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const backing = wMine && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
   if (byHand(b, 'jibsheet')) hand('jibsheet', CONTROL_RATE.jibsheet * winchFactor(tws, going('jibsheet') < 0));
   else if (backing) move('jibsheet', 1, CONTROL_RATE.jibsheet * winchFactor(tws, false));
+  // (a riding turn on the winch after a tack: the new sheet can't come in until it's cleared, tackFumble)
+  else if ((b.jibSnagT ?? 0) > 0) b.jibSnagT = Math.max(0, b.jibSnagT! - dt);
   else { const je = jibsheetFor(wantJib, c, b.tack); move('jibsheet', je, CONTROL_RATE.jibsheet * winchFactor(tws, je < c.jibsheet)); }
   b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);
   // the clew: to leeward on its sheet, or held to windward by the other one (backed)

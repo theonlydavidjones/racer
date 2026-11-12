@@ -214,6 +214,8 @@ export interface Boat {
   companionway?: { doors: 'in' | 'out'; hatch: 'closed' | 'open'; doorsT: number; hatchT: number };
   /** No crew fumbles on this boat (your setting: Settings.crewFumbles). */
   noFumbles?: boolean;
+  /** Seconds left clearing a riding turn on the jib winch (physics.ts tackFumble): the sheet can't come in. */
+  jibSnagT?: number;
   /** Out cruising, not racing: the crew sit for comfort (crewPhys.ts standInHatch). */
   cruising?: boolean;
   /** The crew's calls of the puffs and lulls coming (crewEyes.ts crewLook, once a second): what they believe, soonest first. */
