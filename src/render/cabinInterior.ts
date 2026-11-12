@@ -183,7 +183,7 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
     for (let k = 0; k < N; k++) {
       const a0 = 2 * Math.PI * k / N, a1 = 2 * Math.PI * (k + 1) / N, c0 = Math.cos(a0) * r, s0 = Math.sin(a0) * r, c1 = Math.cos(a1) * r, s1 = Math.sin(a1) * r;
       const glass = [v(c0, -0.05, s0), v(c1, -0.05, s1), v(c1, 0.05, s1), v(c0, 0.05, s0)];
-      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); day.push(0.5); } }
+      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); day.push(0.12); /* its glass by day: unlit, only the daylight on it */ } }
       for (const y of [0.05, -0.05]) { const cap3 = [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]; for (const p of cap3) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.4); day.push(0.35); } }
     }
     const top = cabinTopAt(uAt(LANTERN.z), 0) - INSET; // the chain
