@@ -40,6 +40,18 @@ What's planned, roughly in order. Done work is described in the README.
    Laid out as you face forward from the helm (port on the left), each control with its auto pill, its setting, and its
    ends named. Later: the jib cars and the rig ("we can figure that out later"). A clickable mock-up goes to the owner
    before the build. 6–10 h; replaces the trim-panel review.
+   **Design agreed with the owner, 12 November; handed to the Coordinator to build.** Mock-up:
+   https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB (source design/sail-controls-band.html on branch
+   ui/sail-controls-band-mockup). A compact console at the bottom centre:
+   - the piano lines and jib sheets vertical (▼ pulls on);
+   - the jib cars as an H: the crossbar slides fore and aft on two tracks, the car slides across it (controls.ts's 7×5
+     pins). The cars are now in scope, no longer later;
+   - the backstay's ends pulled outboard;
+   - the mainsheet shown as the boom's position, stacked above the traveller car;
+   - one click is one step; rope colours by sail (jib warm, main cool);
+   - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
+   Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
+   (starboard, jib luff tension), with a physics review.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the

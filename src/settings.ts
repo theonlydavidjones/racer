@@ -6,7 +6,9 @@ export interface Settings {
   raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
   windKind?: 'auto' | 'west' | 'north' | 'south' | 'light'; // the kind of wind: drawn from the records for the race day's month, or chosen
-  windDir?: number | null; // conditions adjuster: the wind from this direction (deg) instead of the day's; null = real
+  windDir?: number | null; // (older saves and replays: the wind pinned to one direction; no longer set: windTurn replaced it)
+  /** Turn the wind: the kind of day's own direction turned this far (deg, + clockwise), −30 … +30; 0 = as usual. */
+  windTurn?: number;
   chop?: number; // conditions adjuster: the wind's chop × this (1 = real, 0 = glassy)
   swellHs?: number | null; // conditions adjuster: the ocean swell outside the Gate, m; null = real
   rain?: 0 | 1 | 2; // none, light, heavy
@@ -42,7 +44,7 @@ export interface Settings {
   crew: { n: 0 | 1 | 2; helm: { h: number; w: number; skill?: number }; people: { h: number; w: number; skill?: number }[] }; // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
 
 const KEY = 'fbsim-settings-v2';
 /** The most boats you can race against. */
@@ -64,6 +66,8 @@ export function loadSettings(): Settings {
   const opp = Array.isArray(s.opponents) && s.opponents !== DEFAULT_SETTINGS.opponents ? s.opponents : Array.from({ length: Math.max(0, Math.min(5, s.fleet ?? 3)) }, (_, i) => `stock:${i + 1}`);
   s.opponents = opp.filter((o, i, a) => a.indexOf(o) === i && (/^stock:[1-5]$/.test(o) || isGeneric(o) || (ids.has(o) && o !== s.boatId))).slice(0, MAX_OPPONENTS);
   s.fleet = s.opponents.length;
+  // (a 'Wind from' saved before Turn the wind replaced it would pin the wind with nothing on screen to show it: drop it)
+  s.windDir = null;
   return s;
 }
 export function saveSettings(s: Settings): void {
@@ -71,8 +75,7 @@ export function saveSettings(s: Settings): void {
 }
 
 /**
- * Choosing a kind of wind (the real day, westerly, northerly, …) takes its own direction: a "Wind from" you set before
- * is cleared, so the slider shows the kind's direction again (owner, Nov 2026: a westerly chosen, then a stray slider
- * left the wind from 355°). Moving "Wind from" afterwards overrides the kind, and the panel says so.
+ * Choosing a kind of wind (the real day, westerly, northerly, …) takes its own direction, unturned (owner, Nov 2026:
+ * one clear way to set the wind; Turn the wind then nudges that kind up to 30° either way).
  */
-export function chooseWindKind(s: Settings, kind: Settings['windKind']): void { s.windKind = kind; s.windDir = null; }
+export function chooseWindKind(s: Settings, kind: Settings['windKind']): void { s.windKind = kind; s.windDir = null; s.windTurn = 0; }
