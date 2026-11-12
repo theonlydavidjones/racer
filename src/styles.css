@@ -432,6 +432,11 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
 body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #keysHint,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,
+#showBar{display:none}
+body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-index:5;align-items:center;gap:10px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font:600 12px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+#showBar label{display:flex;align-items:center;gap:8px}
+#showBar input{width:200px}
+#showBar b{min-width:92px;color:var(--text)}
 body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
 
 .garage{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-bottom:1px solid var(--rule)}
