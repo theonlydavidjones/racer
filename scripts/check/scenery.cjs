@@ -43,6 +43,10 @@ const VIEWS = {
   cranes: [LL(37.8040, -122.3300, 8), LL(37.8090, -122.3240, 40)], // the Port of Oakland's cranes from the Outer Harbor channel
   bpier: [LL(37.8560, -122.3400, 8), LL(37.8600, -122.3250, 2)], // the Berkeley Pier and its ruined outer part
   longwharf: [LL(37.9150, -122.4180, 8), LL(37.9240, -122.4080, 5)], // Chevron's Long Wharf at Richmond
+  over_bmarina: [LL(37.8665, -122.3180, 900), LL(37.8665, -122.31801, 0)], // overhead: the Berkeley Marina, its breakwaters and three ways in
+  bmarina: [LL(37.8660, -122.3240, 6), LL(37.8665, -122.3170, 4)], // the Berkeley Marina's middle entrance and BYC beyond it
+  over_ryc: [LL(37.9085, -122.3830, 500), LL(37.9085, -122.38301, 0)], // overhead: Brickyard Cove, Richmond YC's harbor
+  over_encinal: [LL(37.7830, -122.2625, 400), LL(37.7830, -122.26251, 0)], // overhead: Encinal YC on the Estuary
 };
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3);

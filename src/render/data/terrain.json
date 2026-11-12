@@ -1,6 +1,6 @@
 {
  "source": "AWS open terrain tiles (Terrarium; USGS 3DEP/NED, SRTM), zoom 13",
- "fetched": "2026-11-11",
+ "fetched": "2026-11-12",
  "land": "land and water from NOAA ENC land areas (LNDARE), src/geo/data/enc-chart.json, except along the Cityfront (OpenStreetMap, fitted in the sim)",
  "south": 37.735118,
  "north": 37.985307,

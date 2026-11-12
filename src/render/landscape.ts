@@ -60,9 +60,12 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       // the East Bay: downtown Oakland's towers round City Center and Lake Merritt (the tallest, the Ordway and 1111
       // Broadway, about 125 m), Emeryville's towers by the Bay Bridge's toll plaza, downtown Berkeley's few, and low
       // houses, flats and warehouses everywhere else from Alameda to Richmond
-      if (lat > 37.797 && lat < 37.812 && lon > -122.279 && lon < -122.259) return { p: 0.5, h: [14, 45], tall: [0.16, 60, 125], w: [24, 40] }; // downtown Oakland
-      if (lat > 37.829 && lat < 37.846 && lon > -122.298 && lon < -122.284) return { p: 0.4, h: [10, 28], tall: [0.08, 40, 90], w: [20, 36] }; // Emeryville
-      if (lat > 37.864 && lat < 37.876 && lon > -122.275 && lon < -122.262) return { p: 0.45, h: [10, 26], tall: [0.06, 35, 55], w: [18, 30] }; // downtown Berkeley
+      // (each downtown thinning out to the low town round it over its outer 250 m, so it has no hard edge)
+      const core = (s: number, n: number, w: number, e: number) => Math.min(1, Math.min(lat - s, n - lat, (lon - w) * 0.79, (e - lon) * 0.79) / 0.0023);
+      const town = (k: number, H: Hood): Hood | null => k <= 0 ? null : rand() < k ? H : { p: 0.22, h: [6, 11], w: [12, 22] };
+      { const k = core(37.797, 37.812, -122.279, -122.259); if (k > 0) return town(k, { p: 0.5, h: [14, 45], tall: [0.16, 60, 125], w: [24, 40] }); } // downtown Oakland
+      { const k = core(37.829, 37.846, -122.298, -122.284); if (k > 0) return town(k, { p: 0.4, h: [10, 28], tall: [0.08, 40, 90], w: [20, 36] }); } // Emeryville
+      { const k = core(37.864, 37.876, -122.275, -122.262); if (k > 0) return town(k, { p: 0.45, h: [10, 26], tall: [0.06, 35, 55], w: [18, 30] }); } // downtown Berkeley
       if (lon > -122.345 || (lat > 37.89 && lon > -122.437)) return { p: 0.22, h: [6, 11], w: [12, 22] }; // Alameda, Oakland, Berkeley, Albany, Richmond
       if (lat > 37.788 && lat < 37.7975 && lon > -122.406 && lon < -122.392) return { p: 0.55, h: [25, 70], tall: [0.3, 80, 150], w: [26, 42] }; // Financial District (its tallest towers are drawn below)
       if (lat > 37.776 && lat < 37.7915 && lon > -122.410 && lon < -122.386) return { p: 0.45, h: [14, 40], tall: [0.14, 50, 140], w: [24, 40] }; // SoMa, Rincon Hill

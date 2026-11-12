@@ -45,9 +45,12 @@ const hash = (i: number, j: number) => { const s = Math.sin(i * 127.1 + j * 311.
 export type Region = 'city' | 'woods' | 'grass' | 'suburb' | 'rock' | 'island' | 'port';
 
 /** The Port of Oakland's terminals and the old Naval Air Station at Alameda Point: flat paved fill, no houses. */
-export const onPort = (lat: number, lon: number): boolean =>
-  (lat > 37.793 && lat < 37.8195 && lon > -122.335 && lon < -122.296) || // the Outer and Middle Harbor terminals and the old Army base
-  (lat > 37.7695 && lat < 37.7955 && lon > -122.3295 && lon < -122.3); // Alameda Point: the runways, hangars and piers
+export const onPort = (lat: number, lon: number): boolean => {
+  // how far inside the terminals' outline (deg, about 0.001 = 100 m), less a ragged margin so its edge isn't a ruler line
+  const inside = (s: number, n: number, w: number, e: number) => Math.min(lat - s, n - lat, (lon - w) * 0.79, (e - lon) * 0.79);
+  const d = Math.max(inside(37.793, 37.8195, -122.335, -122.296), inside(37.7695, 37.7955, -122.3295, -122.3)); // the Outer and Middle Harbor terminals and the old Army base; Alameda Point's runways, hangars and piers
+  return d > 0.0018 * hash(Math.round(lat * 2000), Math.round(lon * 2000));
+};
 
 /** Angel Island's cells in the elevation grid (found by flooding the land out from Mount Livermore), once loaded. */
 let ANGEL: Uint8Array | null = null;
@@ -63,6 +66,9 @@ export function region(lat: number, lon: number, h: number): Region {
   if (lat > 37.804 && lat < 37.8155 && lon > -122.3745 && lon < -122.357) return 'woods'; // Yerba Buena Island: wooded, a few Navy houses
   if (lat > 37.8155 && lat < 37.8335 && lon > -122.381 && lon < -122.358) return 'city'; // Treasure Island: flat, built over (the old Navy base and the new blocks)
   if (lat > 37.8235 && lat < 37.8295 && lon > -122.4265 && lon < -122.418) return 'rock'; // Alcatraz
+  if (lat > 37.926 && lat < 37.9315 && lon > -122.4335 && lon < -122.4285) return 'rock'; // Red Rock: a steep rock island, scrub on top
+  if (lat > 37.961 && lat < 37.965 && lon > -122.437 && lon < -122.432) return 'rock'; // the Brothers
+  if (lat > 37.892 && lat < 37.903 && lon > -122.375 && lon < -122.349) return 'grass'; // Brooks Island: a regional preserve, no houses
   if (lon > -122.345) {
     // the East Bay, from Alameda and Oakland to Berkeley, Richmond and San Pablo: the flatlands built over to the foot of the hills;
     // the Berkeley and Oakland hills above about 120 m grassland (gold in summer), darker with oak, bay and eucalyptus on
@@ -149,7 +155,7 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   const C = (h: string) => new THREE.Color(h);
   const PAL = {
     city: [C('#a9a796'), C('#bdb9a8'), C('#8f8f82'), C('#c6c0ae')], woods: [C('#45603f'), C('#3b5236'), C('#56704a')],
-    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')], paved: [C('#8c8b86'), C('#9d9a92'), C('#7b7c7a')]
+    gold: C('#b89a5c'), green: C('#7d9650'), scrub: C('#5d6b45'), chaparral: C('#5a6343'), sand: C('#cdbd94'), rock: C('#8b7f6d'), stone: C('#8f8d86'), suburb: [C('#a9a493'), C('#6f8458')], paved: [C('#a9a69c'), C('#b4b0a5'), C('#9e9c95')]
   };
   const wood = new Uint8Array(nx * ny);
   const setSeason = (mo: number) => {

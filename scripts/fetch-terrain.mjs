@@ -118,6 +118,19 @@ try {
       if (i >= 0 && j >= 0 && i < nx && j < ny) { isLand[j * nx + i] = 1; islets++; }
     }
   }
+  // NOAA cuts its cells along a 0.075° grid, and a land area spanning two cells is two polygons meeting there: a line of
+  // cell centres right on the cut can fall in neither. A water cell on a cut with land either side across it is land.
+  {
+    const onCut = v => { const r = v / 0.075 - Math.round(v / 0.075); return Math.abs(r) * 0.075 < 0.0004; };
+    const fill = [];
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i; if (isLand[k]) continue;
+      const lat = BBOX.north - (BBOX.north - BBOX.south) * j / (ny - 1), lon = BBOX.west + (BBOX.east - BBOX.west) * i / (nx - 1);
+      if ((onCut(lon) && isLand[k - 1] && isLand[k + 1]) || (onCut(lat) && isLand[k - nx] && isLand[k + nx])) fill.push(k);
+    }
+    for (const k of fill) isLand[k] = 1;
+    console.log(`${fill.length} cells on the chart's cell cuts filled`);
+  }
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const lat = BBOX.north - (BBOX.north - BBOX.south) * j / (ny - 1), lon = BBOX.west + (BBOX.east - BBOX.west) * i / (nx - 1);
     if (lat > CITYFRONT.south && lat < CITYFRONT.north && lon > CITYFRONT.west && lon < CITYFRONT.east) continue;
