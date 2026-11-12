@@ -31,8 +31,9 @@ What's planned, roughly in order. Done work is described in the README.
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
    - **The piano**, "mirroring what really exists on Josephine" (the table under Full sail controls: starboard, inboard
-     to outboard, vang · outhaul · jib Cunningham; port, vang · outhaul · the main Cunningham's clam cleat · jib
-     Cunningham, with the downhaul and the jib halyard tail): trim / ease buttons on each.
+     to outboard, vang · outhaul · jib Cunningham · the jib halyard tail; port, vang · outhaul · the main Cunningham's
+     clam cleat · jib Cunningham, with the downhaul). Mock-up in progress with the UI & Experience session:
+     https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB: trim / ease buttons on each.
    - **The jib**: a sheet on each side, trim / ease.
    - **The main**: the mainsheet, the backstay, and "the traveller specifically I would want to move left and right
      like a real traveler" (a car you drag along a track).
@@ -670,8 +671,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 | Piano | Inboard (by the companionway) → outboard |
 |---|---|
-| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats) |
-| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main downhaul and the jib halyard tail (uncleated) |
+| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats), with the jib halyard tail (uncleated) just outboard of the jib Cunningham (owner, 12 November) |
+| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main downhaul |
 
 | Control | Sail | Led to | Notes |
 |---|---|---|---|
@@ -681,7 +682,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Main Cunningham | Main | Port piano only, fixed clam cleat | Its own line through a ring in the luff above the boom. Fine luff tension under way |
 | Main downhaul | Main | Port side, via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Modelled as a gooseneck downhaul (it sails the same as a halyard tensioner) |
 | Main halyard | Main | Not used under way | Hoisted before racing, not touched while racing |
-| Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
+| Jib halyard | Jib | Starboard piano, outboard of the jib Cunningham, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
 | Mainsheet | Main | Boom end to the traveller car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
 | Traveller | Main | Wooden thwart across the cockpit | Dual-ended |
 | Backstay | Rig | Each end of the cockpit thwart, where it meets the hull | Dual-ended; the bridle is on the transom |
