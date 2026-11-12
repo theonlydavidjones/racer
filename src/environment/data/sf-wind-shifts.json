@@ -1,6 +1,6 @@
 {
  "source": "NOAA CO-OPS 9414290 (NDBC FTPC1) 6-minute wind, racing hours 11:00–16:59, via src/environment/data/sf-real-days.json",
- "updated": "2026-11-11T04:28:27.746Z",
+ "updated": "2026-11-11T19:24:56.690Z",
  "lagsMin": [
   6,
   12,

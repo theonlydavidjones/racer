@@ -182,6 +182,15 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Also in the showroom (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
+- **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
+  - From Charts, after Lime Point (#64): blocky 50 m terrain cliffs along the Marin shore, Horseshoe Bay included (needs
+    a shore fit for all the ENC land); a small sand-coloured sliver floating southwest of Horseshoe Bay's marina; a
+    possible spike at the west edge of the Lime Point box; the tiller pilot tacks into the cove behind Lime Point on a
+    westerly beat out of the Gate (AI/pilot).
+  - From Crew Figures (#63): the crew's fore-and-aft stations (crewPhys) reach slightly past the real benches; fixing it
+    shifts the trim calibration, so it needs its own reviewed PR.
+  - From Bay East: Richmond YC and Encinal slips, BYC and Encinal racing marks, and the current in embayments without
+    NOAA stations all need sources it can't reach yet (the club sites aren't allowed hosts).
 - **Later — aluminium spars look like white plastic** (polish; 1–2 h): owner, "the aluminum on the masts and booms
   looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
   fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
@@ -270,7 +279,10 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    to windward gets a header about a minute before the one to leeward, and one side of the course gets a lift first.
    And on observed days the station's own 6-minute turbulence (about 5–6° of it) becomes a course-wide shift: smooth
    the record and hand the residue to the local turbulence (4).
-4. **Almost no gusts, and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
+4. ~~**Almost no gusts**~~ (done: environment/gusts.ts, open-water turbulence from the log law and Charnock's roughness,
+   IEC 61400-1's scales, the puffs keeping the minutes; in a race at 12–18 kt a 5-s gust factor of 1.24–1.28 at a fixed
+   point; light-air gusts in knots; later: more turbulence downwind of land (off the Cityfront), the light-air floor from a
+   sourced convective or stable scaling, the crests' lie turning with the wind) **and the gusts' peaks** (the item from the strategist's review): open water at 6 kt and up should
    not reach the records' 2–5× peaks: those are almost all below 6 kt mean (a third of 6-minute windows at 4–6 kt reach
    2×; none above 12 kt) and the station's off-land turbulence (TI ≈ 0.22). Open water: TI ≈ 0.09–0.12, a 5-s gust over
    the 2-min mean of 1.15–1.27 at 10–15 kt (WMO TD-1555, Harper et al. 2010). The sim's puffs give TI ≈ 0.03 and gust

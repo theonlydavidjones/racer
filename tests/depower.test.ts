@@ -7,14 +7,15 @@ import { DT, World } from '../src/sim/world';
 function beat(kt: number, holdFullPower = false) {
   const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', tideDate: '2026-07-11', current: 'slack', sea: 'flat' };
   const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user;
-  let vmg = 0, n = 0;
+  // (the wind gusts: her heel is taken as its mean over the last minute)
+  let vmg = 0, n = 0, heel = 0;
   for (let i = 0; i < 60 * 150; i++) {
     u.h = (w.wind.from + 42 + 360) % 360; u.turnTarget = null; u.steer = 0; u.tiller = 0;
     if (holdFullPower) u.depower = 0;
     w.step(DT);
-    if (i > 60 * 90) { vmg += u.v * Math.cos(42 * Math.PI / 180); n++; }
+    if (i > 60 * 90) { vmg += u.v * Math.cos(42 * Math.PI / 180); heel += u.heelMag ?? 0; n++; }
   }
-  return { ctl: { ...u.ctl }, depower: u.depower ?? 0, heel: u.heelMag ?? 0, helm: u.helmNeed ?? 0, vmg: vmg / n };
+  return { ctl: { ...u.ctl }, depower: u.depower ?? 0, heel: heel / n, helm: u.helmNeed ?? 0, vmg: vmg / n };
 }
 
 describe('the crew depowers when she is overpowered upwind', () => {

@@ -29,11 +29,11 @@ const INSET = 0.025; // how far inside the outer surfaces the lining lies (m)
 const LINING = new THREE.Color(0xe2d9c6), WOOD = new THREE.Color(0x8a5a36);
 
 /** The cross-section of the cabin's inside at station u, starboard half, from the sole's middle round to the cabin top's. */
-function section(u: number): { x: number; y: number; wood: boolean; win?: boolean }[] {
+function section(u: number): { x: number; y: number; wood: boolean; win?: boolean; top?: boolean }[] {
   const { sole, soleHalf, berth, berthIn, berthFoot } = INTERIOR;
   const hull = (y: number) => Math.min(hullInnerHalf(u, y), halfBeam(u)) - INSET;
   const ch = cabinHalf(u) - INSET, dS = deckY(u, cabinHalf(u)), top = cabinTopY(u);
-  const pts: { x: number; y: number; wood: boolean; win?: boolean }[] = [
+  const pts: { x: number; y: number; wood: boolean; win?: boolean; top?: boolean }[] = [
     { x: 0, y: sole, wood: true }, { x: Math.min(soleHalf, hull(sole) - 0.01), y: sole, wood: true },
     { x: Math.min(berthFoot, hull(sole)), y: sole, wood: true }, // the berth's front board, up to its top edge
     { x: berthIn, y: berth, wood: true }, { x: hull(berth), y: berth, wood: true }, // the berth top, out to the hull
@@ -44,7 +44,9 @@ function section(u: number): { x: number; y: number; wood: boolean; win?: boolea
   // the cabin side, up past the window to the top's edge (the window's band marked, for the opening)
   for (const h of [0, WINDOW.h0, WINDOW.h1, CABIN.h]) pts.push({ x: ch - CABIN_LEAN * h / CABIN.h, y: dS + h - (h === CABIN.h ? INSET : 0), wood: false, win: h === WINDOW.h0 });
   const w = ch - CABIN_LEAN;
-  for (let k = 1; k <= 5; k++) { const x = w * (1 - k / 5); pts.push({ x, y: cabinTopAt(u, x) - INSET, wood: false }); }
+  // the cabin top's underside, in to the centreline (a point at the hatch opening's edge, where it's cut through)
+  const xs = [...[1, 2, 3, 4, 5].map(k => w * (1 - k / 5)), COMPANIONWAY.hw].sort((a, b) => b - a);
+  for (const x of xs) pts.push({ x, y: cabinTopAt(u, x) - INSET, wood: false, top: true });
   // keep every point within the cabin's own height (the arch at the rounded front, where the trunk narrows)
   for (const q of pts) q.y = Math.min(q.y, top + CABIN.crown - INSET);
   return pts;
@@ -55,17 +57,48 @@ function lampAt(p: THREE.Vector3, n: THREE.Vector3): number {
   const l = LANTERN.clone().sub(p), d = l.length(); l.divideScalar(d || 1);
   return Math.max(0, n.dot(l)) / (1 + (d / 0.7) ** 2) + 0.12;
 }
+/**
+ * Daylight inside: what comes in through the openings, each taken as a patch of bright sky facing into the cabin. A
+ * surface takes light from an opening by how squarely it faces it, how squarely the opening faces it, and the square of
+ * the distance; plus a little bounced round the cabin. The companionway and the hatch's opening over it let in the
+ * most, so the cabin is brightest aft and darkens forward and down.
+ */
+const OPENINGS: { at: THREE.Vector3; dir: THREE.Vector3; k: number }[] = [];
+function dayAt(p: THREE.Vector3, n: THREE.Vector3): number {
+  if (!OPENINGS.length) {
+    const z1 = zAt(CABIN.u1), zs = z1 - COMPANIONWAY.len / 2;
+    OPENINGS.push({ at: new THREE.Vector3(0, (COMPANIONWAY.sill + cabinTopY(CABIN.u1)) / 2, z1), dir: new THREE.Vector3(0, -0.3, -1).normalize(), k: 1.0 }); // the doorway
+    OPENINGS.push({ at: new THREE.Vector3(0, cabinTopAt(uAt(zs), 0), zs), dir: new THREE.Vector3(0, -1, 0), k: 1.1 }); // the hatch's opening
+    for (const sx of [1, -1]) OPENINGS.push({ at: new THREE.Vector3(sx * (cabinHalf(WINDOW.uc) - 0.03), deckY(WINDOW.uc, cabinHalf(WINDOW.uc)) + (WINDOW.h0 + WINDOW.h1) / 2, zAt(WINDOW.uc)), dir: new THREE.Vector3(-sx, -0.2, 0).normalize(), k: 0.35 }); // the windows
+  }
+  let e = 0.05;
+  for (const o of OPENINGS) {
+    const l = o.at.clone().sub(p), d = l.length(); l.divideScalar(d || 1);
+    e += o.k * Math.max(0, n.dot(l)) * Math.max(0, -o.dir.dot(l)) / (1 + (d / 0.6) ** 2);
+  }
+  return e;
+}
+/**
+ * Contact shading: where two surfaces meet (the sole and the berth fronts, the berths and the hull, the lining and the
+ * deck over it, the bulkheads' corners) less of the room's light reaches, so corners and the far ends read darker.
+ */
+function aoAt(p: THREE.Vector3): number {
+  const u = uAt(p.z), ax = Math.abs(p.x), near = (d: number, k: number) => 1 - k * Math.exp(-Math.max(0, d) / 0.09);
+  const roof = ax < cabinHalf(u) - 0.02 ? cabinTopAt(u, Math.min(ax, cabinHalf(u) - CABIN_LEAN - 0.01)) : deckY(u, ax);
+  return near(p.y - INTERIOR.sole, 0.35) * near(roof - INSET - p.y, 0.3) * near(halfBeam(u) - INSET - ax, 0.2) * near(zAt(CABIN.u1) - p.z, 0.3) * near(p.z - zAt(CABIN.u0 + 0.06), 0.3)
+    * near(Math.abs(p.y - INTERIOR.berth) + Math.max(0, INTERIOR.berthIn - ax), 0.2);
+}
 
 /** The shell: positions, the lining's or the woodwork's colour, and the lantern's light, per vertex. */
 export function cabinInteriorGeometry(): THREE.BufferGeometry {
-  const pos: number[] = [], col: number[] = [], lamp: number[] = [];
+  const pos: number[] = [], col: number[] = [], lamp: number[] = [], day: number[] = [];
   const centre = new THREE.Vector3();
   const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, ca: THREE.Color, cb: THREE.Color, cc: THREE.Color, open = 1) => {
     // the face's normal, turned to look into the cabin (toward its middle line)
     const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
     centre.set(0, (INTERIOR.sole + cabinTopY(uAt(a.z)) + CABIN.crown) / 2, a.z);
     if (n.dot(centre.clone().sub(a)) < 0) { n.negate(); [b, c] = [c, b]; [cb, cc] = [cc, cb]; }
-    for (const [p, cl] of [[a, ca], [b, cb], [c, cc]] as const) { pos.push(p.x, p.y, p.z); col.push(cl.r, cl.g, cl.b); lamp.push(lampAt(p, n) * open); }
+    for (const [p, cl] of [[a, ca], [b, cb], [c, cc]] as const) { const ao = aoAt(p); pos.push(p.x, p.y, p.z); col.push(cl.r, cl.g, cl.b); lamp.push(lampAt(p, n) * open * ao); day.push(dayAt(p, n) * ao); }
   };
   // stations from the main bulkhead forward to where the trunk's rounded front begins, and the windows' ends
   const uA = CABIN.u1 - 0.002, uF = CABIN.u0 + 0.06, NS = 16;
@@ -75,6 +108,7 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
     const A = secs[i], B = secs[i + 1], za = zAt(us[i]), zb = zAt(us[i + 1]), um = (us[i] + us[i + 1]) / 2;
     for (let j = 0; j < A.length - 1; j++) {
       if (A[j].win && um > WINDOW.hole0 && um < WINDOW.hole1) continue; // the window's opening
+      if (A[j].top && A[j + 1].top && A[j].x <= COMPANIONWAY.hw + 1e-6 && um > CABIN.u1 - COMPANIONWAY.len / L) continue; // the hatch's opening
       const p = (q: typeof A[0], z: number) => new THREE.Vector3(side * q.x, q.y, z);
       const a = p(A[j], za), b = p(A[j + 1], za), cc = p(B[j], zb), d = p(B[j + 1], zb);
       const wj = A[j].wood && A[j + 1].wood ? WOOD : LINING;
@@ -116,11 +150,11 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
     for (let k = 0; k < N; k++) {
       const a0 = 2 * Math.PI * k / N, a1 = 2 * Math.PI * (k + 1) / N, c0 = Math.cos(a0) * r, s0 = Math.sin(a0) * r, c1 = Math.cos(a1) * r, s1 = Math.sin(a1) * r;
       const glass = [v(c0, -0.05, s0), v(c1, -0.05, s1), v(c1, 0.05, s1), v(c0, 0.05, s0)];
-      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); } }
-      for (const y of [0.05, -0.05]) { const cap3 = [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]; for (const p of cap3) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.4); } }
+      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); day.push(0.5); } }
+      for (const y of [0.05, -0.05]) { const cap3 = [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]; for (const p of cap3) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.4); day.push(0.35); } }
     }
     const top = cabinTopAt(uAt(LANTERN.z), 0) - INSET; // the chain
-    for (const p of [v(-0.004, 0.08, 0), v(0.004, 0.08, 0), new THREE.Vector3(LANTERN.x, top, LANTERN.z)]) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.3); } }
+    for (const p of [v(-0.004, 0.08, 0), v(0.004, 0.08, 0), new THREE.Vector3(LANTERN.x, top, LANTERN.z)]) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.3); day.push(0.3); } }
   // each window's reveal: the cabin side's thickness round the opening, lining to the outside skin, so no gap shows
   for (const side of [1, -1]) {
     const N = 8, outer = (u: number, h: number) => cabinHalf(u) - CABIN_LEAN * h / CABIN.h, inner = (u: number, h: number) => outer(u, h) - INSET;
@@ -146,6 +180,7 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setAttribute('aLamp', new THREE.Float32BufferAttribute(lamp, 1));
+  g.setAttribute('aDay', new THREE.Float32BufferAttribute(day, 1));
   return g;
 }
 
@@ -171,11 +206,11 @@ export function cabinInteriorMaterial(): THREE.MeshBasicMaterial & { uniforms: {
   m.uniforms = uniforms;
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
-    sh.vertexShader = 'attribute float aLamp;\nvarying float vLamp;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLamp = aLamp;');
-    sh.fragmentShader = 'uniform float uDay;\nuniform float uLamp;\nvarying float vLamp;\n' + sh.fragmentShader.replace(
+    sh.vertexShader = 'attribute float aLamp;\nattribute float aDay;\nvarying float vLamp;\nvarying float vDay;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLamp = aLamp; vDay = aDay;');
+    sh.fragmentShader = 'uniform float uDay;\nuniform float uLamp;\nvarying float vLamp;\nvarying float vDay;\n' + sh.fragmentShader.replace(
       'vec3 outgoingLight = reflectedLight.indirectDiffuse;',
       // a lamp's warm light (about 2700 K) on the cabin's colours, and the dim day
-      'vec3 outgoingLight = reflectedLight.indirectDiffuse * (uDay + uLamp * vLamp * vec3(1.5, 1.1, 0.7));');
+      'vec3 outgoingLight = reflectedLight.indirectDiffuse * (uDay * vDay + uLamp * vLamp * vec3(1.5, 1.1, 0.7));');
   };
   m.customProgramCacheKey = () => 'cabinInterior';
   return m;
