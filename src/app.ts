@@ -589,6 +589,23 @@ for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pa]')) b.o
   else pilotAdjust(w.user, p, +a);
 };
 /** The halyard buttons: a sail that's down (or on its way up or down) always has one; striking a sail is for the marina. */
+/*
+ * Strike the ensign (owner, Nov 2026): cruising in a blow, the ensign comes down and its staff out of its socket before
+ * the flag flogs itself to rags; a second press hoists it again. The button shows (bottom right, with the view) once the
+ * wind at the boat reaches 20 kt and stays down to 17 (no flicker in the puffs), and always while it's struck.
+ */
+let ensignShown = false;
+function ensignButton(): void {
+  const u = w.user, struck = !!u.ensignStruck;
+  const want = w.running && w.freeSail && (struck || u.ww.kt >= (ensignShown ? 17 : 20));
+  if (want !== ensignShown) { ensignShown = want; $('bEnsign').hidden = !want; }
+  if (want) word('bEnsign', struck ? 'Hoist ensign' : 'Strike ensign');
+}
+$('bEnsign').onclick = () => {
+  if (!w.running) return;
+  const u = w.user; u.ensignStruck = !u.ensignStruck; ensignButton();
+  toast(u.ensignStruck ? 'Ensign struck: lowered, and the staff stowed below before the flag flogs itself to rags. Hoist it again when the wind eases.' : 'Ensign hoisted: the staff back in its socket.', 3500);
+};
 function sailButtons(): void {
   const u = w.user, r = u.rig, inMarina = inBasin(u);
   for (const [k, id] of [['jib', 'bJib'], ['main', 'bMain']] as const) {
@@ -1239,7 +1256,7 @@ function frame(now: number): void {
   }
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); ensignButton(); showTiller(); showLines(); coachTick(dt);
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);

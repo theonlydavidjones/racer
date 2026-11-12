@@ -163,6 +163,8 @@ export interface Boat {
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
+  /** Her ensign struck (lowered, the staff out of its socket) in a blow: yours to strike or hoist, cruising. */
+  ensignStruck?: boolean;
   pole: PoleState;
   poleT: number; // seconds left in the current crew job
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
