@@ -1,0 +1,16 @@
+<!doctype html><html><body style="margin:0;background:#8cc"><script type="module">
+import * as THREE from 'three';
+import H from '/src/render/human.json';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x9cc8dc);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x556070, 1.2)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(2, 4, -3); sc.add(d);
+const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new URLSearchParams(location.search).has('orig') ? H.orig : H.pos, 3)); g.setIndex(H.idx); g.computeVertexNormals();
+const cols = [0x888888,0xaa6666,0xddbb88,0x5577cc,0x55aacc,0xcc7755,0xcccc55,0x66aa66,0x339944,0xaa66aa,0x774499];
+const c = new Float32Array(H.pos.length); const cc = new THREE.Color();
+for (let i = 0; i < H.w.length; i++) { const a = new THREE.Color(cols[H.bone[2*i]]), b = new THREE.Color(cols[H.bone[2*i+1]]); cc.copy(a).lerp(b, H.w[i]); if (!new URLSearchParams(location.search).has('w')) cc.set(0xd9b89c); c[3*i]=cc.r;c[3*i+1]=cc.g;c[3*i+2]=cc.b; }
+g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 15, flatShading: new URLSearchParams(location.search).has('flat') })); sc.add(m);
+const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 50);
+window.view = (yaw, y, dist, ty) => { const a = yaw * Math.PI / 180; cam.position.set(Math.sin(a) * dist, y, -Math.cos(a) * dist); cam.lookAt(0, ty, 0); r.render(sc, cam); };
+window.view(0, 0.3, 4, 0.1); window.ready = true;
+</script></body></html>
