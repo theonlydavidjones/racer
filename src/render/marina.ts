@@ -93,12 +93,21 @@ class SlipBoats {
   private mats: { slip: Slip; len: number }[] = [];
   readonly index = new Map<string, number>();
   private beam: number;
+  /** Where the boats are (their middle), the level-of-detail's own position: the parts' instances are placed relative to it. */
+  private at = new THREE.Vector3();
   constructor(group: THREE.Group, kind: MooredKind, boats: { slip: Slip; len: number; colour: number; cover: number }[]) {
     this.beam = MOORED[kind].beam;
     const n = boats.length; if (!n) return;
-    for (const p of kind === 'sail' ? sailParts() : powerParts()) {
-      const mesh = new THREE.InstancedMesh(p.geo, new THREE.MeshLambertMaterial({ color: p.colour }), n);
-      group.add(mesh); this.parts.push({ mesh, own: p.own });
+    for (const b of boats) this.at.add(P3(b.slip.p.x, b.slip.p.y, 0)); this.at.divideScalar(n);
+    // near by, every part; beyond 1.2 km, where a boat is a few pixels long, a simpler set (mooredBoats.ts `far`)
+    const lod = new THREE.LOD(); lod.position.copy(this.at); group.add(lod);
+    for (const [far, dist] of [[false, 0], [true, 1200]] as const) {
+      const level = new THREE.Group();
+      for (const p of kind === 'sail' ? sailParts(far) : powerParts(far)) {
+        const mesh = new THREE.InstancedMesh(p.geo, new THREE.MeshLambertMaterial({ color: p.colour }), n);
+        level.add(mesh); this.parts.push({ mesh, own: p.own });
+      }
+      lod.addLevel(level, dist);
     }
     boats.forEach((b, i) => {
       this.mats.push({ slip: b.slip, len: b.len }); this.index.set(b.slip.id, i);
@@ -111,7 +120,7 @@ class SlipBoats {
   private s = new THREE.Vector3(); private zero = new THREE.Vector3(0, 0, 0);
   /** Show or hide the boat in this slip (hidden: scaled to nothing). */
   place(i: number, show: boolean): void {
-    const { slip, len } = this.mats[i], c = P3(slip.p.x, slip.p.y, 0);
+    const { slip, len } = this.mats[i], c = P3(slip.p.x, slip.p.y, 0).sub(this.at);
     this.q.setFromAxisAngle(this.up, -slip.heading * Math.PI / 180); // her bow toward −z, as the parts are built
     this.m.compose(c, this.q, show ? this.s.set(Math.min(len, MAX_BEAM / this.beam), len, len) : this.zero); // (her beam to fit the slip)
     for (const p of this.parts) { p.mesh.setMatrixAt(i, this.m); p.mesh.instanceMatrix.needsUpdate = true; }

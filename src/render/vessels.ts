@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { D2R } from '../core/math';
 import { VESSEL, type Vessel, type VesselKind } from '../sim/traffic';
 import { Wakes } from './wake';
@@ -22,10 +23,14 @@ function model(kind: VesselKind): THREE.Group {
     case 'container': {
       g.add(hull(L, B, 12, 4, 0x2b3440));
       const cols = [0xb03a2e, 0x2e5b8a, 0x6c7a3f, 0xc78a2c, 0x7b4b8f, 0x3d8a86, 0xd8d4c8];
+      // the stacks, one mesh a colour (a few draw calls for the whole deck cargo, not one a box)
+      const byCol = new Map<number, THREE.BufferGeometry[]>();
       for (let z = -L * 0.38; z < L * 0.32; z += 13.5) for (let x = -B / 2 + 3; x < B / 2 - 2; x += 2.6) {
         const h = 2.6 * (2 + Math.floor((Math.sin(z * 0.37 + x) + 1) * 2)), c = cols[Math.abs(Math.floor(z * 0.13 + x * 0.7)) % cols.length];
-        g.add(box(2.4, h, 12.2, lam(c), x + 1.2, 12, z));
+        const bg = new THREE.BoxGeometry(2.4, h, 12.2).translate(x + 1.2, 12 + h / 2, z);
+        (byCol.get(c) ?? byCol.set(c, []).get(c)!).push(bg);
       }
+      for (const [c, gs] of byCol) { const merged = mergeGeometries(gs); gs.forEach(x => x.dispose()); if (merged) g.add(new THREE.Mesh(merged, lam(c))); }
       g.add(box(B * 0.9, 28, 14, lam(0xeeeae0), 0, 12, L * 0.38)); // the bridge, aft
       g.add(box(4, 10, 4, lam(0x222222), 0, 40, L * 0.42)); // funnel
       break;
