@@ -57,14 +57,28 @@ const HARBORS = {
   },
   berkeley: {
     name: 'Berkeley Marina', bbox: [-122.3235, 37.8615, -122.3100, 37.8705],
-    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
-    basin: { marina: 'Berkeley Marina' }, letter: 'named',
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no slips of its own, only the guest dock's berths)
+    // Berkeley Yacht Club's guest dock (OSM way 28239155, floating, 44 m, on the clubhouse's east side): visitors lie alongside
+    alongside: [{ way: '28239155', label: 'BYC guest ' }],
+    // the basin: OSM's marina outline (way 117767451), and the water inside the breakwaters west of it (the fairway, open
+    // to the Bay through the three ways in), bounded by OSM's coastline (ways 153288129, 153288138) round BYC's point and
+    // the north shore, and by the breakwaters between NOAA's charted lights
+    basin: { pts: [
+      [37.86631, -122.31772], [37.86621, -122.31801], [37.86612, -122.31806], [37.86601, -122.31806], [37.86598, -122.31797], [37.86593, -122.31792],
+      [37.86510, -122.31785], [37.86523, -122.31906], [37.86700, -122.32012], [37.86719, -122.32134], [37.86822, -122.32052],
+      [37.86830, -122.31911], [37.86806, -122.31886], [37.86788, -122.31873], [37.86775, -122.31866], [37.86768, -122.31864], [37.86734, -122.31861],
+      [37.86712, -122.31855], [37.86701, -122.31846], [37.86697, -122.31831], [37.86699, -122.31818], [37.86706, -122.31811],
+      [37.86700, -122.31811], [37.86709, -122.31805], [37.86719, -122.31804], [37.86728, -122.31813], [37.86734, -122.31824], [37.86795, -122.31828],
+      [37.86834, -122.31798], [37.86853, -122.31745], [37.86896, -122.31507], [37.86800, -122.31467], [37.86772, -122.31316], [37.86526, -122.31172],
+      [37.86501, -122.31254], [37.86487, -122.31252], [37.86413, -122.31593], [37.86438, -122.31659], [37.86590, -122.31720], [37.86614, -122.31719],
+      [37.86636, -122.31726], [37.86635, -122.31730]] },
+    letter: 'named',
     // the breakwaters (OSM 23617828, 23617829; NOAA's chart has the same two lines) and the three ways in: south of
     // Berkeley Breakwater Light 1 (the deepest, the one the guides use), the middle gap between Lights 2 and 3, and north
     // of North Breakwater Light 4 (ENC US5OAKFI)
     breakwaterIds: ['23617828', '23617829'],
     beaconsExtra: [{ at: [37.86523, -122.31906], colour: 'green' }, { at: [37.86700, -122.32012], colour: 'red' }, { at: [37.86718, -122.32134], colour: 'green' }, { at: [37.86831, -122.32047], colour: 'red' }],
-    exits: [[37.86470, -122.31930], [37.86709, -122.32073], [37.86870, -122.32010]]
+    exits: [[37.86516, -122.31845], [37.86709, -122.32073], [37.86826, -122.31980]] // (south, middle, north: on the basin's edge)
   },
   'richmond-yc': {
     name: 'Richmond Yacht Club, Brickyard Cove', bbox: [-122.3880, 37.9060, -122.3790, 37.9125],
@@ -216,6 +230,25 @@ async function make(id, H) {
     const d = { x: b.x - a.x, y: b.y - a.y }, along = s => (s.c.x - a.x) * d.x + (s.c.y - a.y) * d.y;
     slips.filter(s => s.dock === w).sort((s, t) => along(s) - along(t))
       .forEach((s, i) => out.push({ id: `${letter}${i + 1}`, dock: letter, at: toLL(s.c), heading: Math.round(s.heading), finger: s.len }));
+  }
+  // berths alongside a dock (a club's guest dock): along each side of it, a Folkboat's length and a bit apart, bow along
+  // the dock, where she lies clear of everything else in the basin
+  for (const { way, label, every = 9 } of H.alongside ?? []) {
+    const w = walkways.find(d => d.id === way) ?? fail(`no dock ${way}`), q = w.pts.map(xy);
+    const others = [...breakwaters, ...docks.filter(d => d !== w), ...fingers], off = 1.2 + 1.1 + 0.3; let k = 0;
+    for (const side of [1, -1]) {
+      let s0 = 0;
+      for (let i = 1; i < q.length; i++) {
+        const a = q[i - 1], b = q[i], L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 1e-6) continue;
+        const u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L }, n = { x: -u.y * side, y: u.x * side };
+        for (let t = 5.5; t <= L - 4.6; t += every) {
+          const c = { x: a.x + u.x * t + n.x * off, y: a.y + u.y * t + n.y * off };
+          const ok = [-3.6, 0, 3.6].every(e => { const p = { x: c.x + u.x * e, y: c.y + u.y * e }; return inBasin(p) && minDist(p, others) > 1.5 && edgeDist(p) > 1.5; });
+          if (ok) out.push({ id: `${label}${++k}`, dock: label, at: toLL(c), heading: Math.round((Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360), finger: 0, kind: 'alongside' });
+        }
+        s0 += L;
+      }
+    }
   }
   // the entrance beacons (lateral marks, from NOAA's chart via OSM seamarks)
   const beacons = [...nodes.values()].filter(n => n.tags['seamark:type'] === 'beacon_lateral' && near(xy([n.lat, n.lon]), 80))
