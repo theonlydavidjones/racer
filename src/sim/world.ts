@@ -304,6 +304,8 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    // the sea she's in from the first frame (step() works it out twice a second after that)
+    for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
     if (!this.freeSail) this.log = new RaceLog(this);
   }
 

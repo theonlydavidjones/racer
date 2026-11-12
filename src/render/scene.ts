@@ -233,13 +233,13 @@ export class SceneView {
     const sm = sky.material as THREE.ShaderMaterial;
     // Twilight: the analytic sky goes black once the sun is down, but the real one doesn't: a glow on the
     // horizon toward the sun and deep blue overhead, fading over the next half hour or so.
-    Object.assign(sm.uniforms, { skyExposure: { value: 1.25 }, uTwi: { value: 0 }, uTwiHor: { value: new THREE.Color() }, uTwiZen: { value: new THREE.Color() } });
-    sm.fragmentShader = 'uniform float skyExposure; uniform float uTwi; uniform vec3 uTwiHor; uniform vec3 uTwiZen;\n' + sm.fragmentShader
+    Object.assign(sm.uniforms, { skyExposure: { value: 1.25 }, uTwi: { value: 0 }, uTwiHor: { value: new THREE.Color() }, uTwiZen: { value: new THREE.Color() }, uMurk: { value: 0 }, uMurkCol: { value: new THREE.Color() } });
+    sm.fragmentShader = 'uniform float skyExposure; uniform float uTwi; uniform vec3 uTwiHor; uniform vec3 uTwiZen; uniform float uMurk; uniform vec3 uMurkCol;\n' + sm.fragmentShader
       .replace('gl_FragColor = vec4( texColor, 1.0 );', `vec3 outC = 1.0 - exp( -texColor * skyExposure );
       vec3 dirT = normalize( vWorldPosition - cameraPosition );
       float toward = max( 0.0, dot( normalize( dirT.xz + 1e-5 ), normalize( vSunDirection.xz + 1e-5 ) ) );
       vec3 tw = mix( uTwiHor * ( 0.55 + 0.6 * toward * toward ), uTwiZen, pow( clamp( dirT.y, 0.0, 1.0 ), 0.45 ) );
-      gl_FragColor = vec4( max( outC, tw * uTwi ), 1.0 );`);
+      gl_FragColor = vec4( mix( max( outC, tw * uTwi ), uMurkCol, uMurk ), 1.0 );`); // (under rain or fog, an overcast grey sky)
     Object.assign(sm.uniforms, { turbidity: { value: 2.0 }, rayleigh: { value: 2.6 }, mieCoefficient: { value: 0.004 } });
     sm.uniforms.mieDirectionalG.value = 0.8; sm.uniforms.cloudCoverage.value = 0.18; sm.uniforms.cloudDensity.value = 0.35;
     scene.add(sky); scene.background = null;
@@ -598,12 +598,18 @@ export class SceneView {
     // rain and fog (the conditions adjuster): overcast light, grey haze, and you see less far
     const murk = Math.max(rain === 2 ? 0.75 : rain === 1 ? 0.45 : 0, fog === 2 ? 0.85 : fog === 1 ? 0.5 : 0);
     if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
-    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3500 : rain === 1 ? 12000 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
+    // the sky itself overcast (the cloud's grey, darker with the day), and no sun glinting off the water through it
+    sm.uniforms.uMurk.value = Math.min(0.92, murk * 1.15); (sm.uniforms.uMurkCol.value as THREE.Color).copy(haze).multiplyScalar(0.92);
+    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3100 : rain === 1 ? 7500 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
+    // (rain's visibility: V ≈ 11.6·R^−0.63 km for R mm/h, Atlas, "Optical extinction by rainfall", J. Meteor. 10, 486–488,
+    // 1953, as quoted in a secondary summary, for a 0.055 threshold contrast: the paper itself couldn't be reached to check
+    // it. Taken as the fog's far edge, where the haze is complete: near enough the distance you lose sight of things. Light rain about 2 mm/h,
+    // 7.5 km; heavy about 8 mm/h (heavy is over 7.6 mm/h, the US observing practice's class), 3.1 km)
     Object.assign(this.scene.fog as THREE.Fog, { near: fogN, far: fogF });
     setRestrictedVisibility(fog === 1 || fog === 2 || rain === 2); // the boats' lights by day too (navLights.ts)
     (this.scene.fog as THREE.Fog).color.copy(haze);
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
-    (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up);
+    (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up * (1 - 0.9 * murk));
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
     if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
@@ -621,7 +627,7 @@ export class SceneView {
   private updateRain(w: World, dt: number, camera: THREE.Camera): void {
     const level = w.settings.rain ?? 0;
     if (!level) { if (this.rain) this.rain.mesh.visible = false; return; }
-    const N = 2400, R = 45, H = 30;
+    const N = 7200, R = 45, H = 30; // (heavy rain at all of them; light at a sixth)
     if (!this.rain) {
       const drops = new Float32Array(N * 3);
       for (let i = 0; i < N; i++) { drops[i * 3] = (Math.random() * 2 - 1) * R; drops[i * 3 + 1] = Math.random() * H; drops[i * 3 + 2] = (Math.random() * 2 - 1) * R; }
@@ -630,14 +636,17 @@ export class SceneView {
       mesh.frustumCulled = false; this.scene.add(mesh); this.rain = { mesh, drops };
     }
     const { mesh, drops } = this.rain, pos = mesh.geometry.attributes.position as THREE.BufferAttribute, a = pos.array as Float32Array;
-    mesh.visible = true; (mesh.material as THREE.LineBasicMaterial).opacity = level === 2 ? 0.45 : 0.28;
-    const n = level === 2 ? N : N / 3, fall = 8.5, wv = V(w.wind.from + 180), wk = w.wind.kt * 0.5144 * 0.6;
+    mesh.visible = true; (mesh.material as THREE.LineBasicMaterial).opacity = level === 2 ? 0.55 : 0.28;
+    const n = level === 2 ? N : N / 6, fall = 8.5, wv = V(w.wind.from + 180), wk = w.wind.kt * 0.5144 * 0.6;
     const vx = wv.x * wk, vz = -wv.y * wk, len = 0.06 * (1 + level); // streak: the drop's path over a sixtieth of a second, stretched for the eye
     const c = camera.position;
     for (let i = 0; i < N; i++) {
       const o = i * 3;
       drops[o] += vx * dt; drops[o + 1] -= fall * dt; drops[o + 2] += vz * dt;
       if (drops[o + 1] < -2) { drops[o + 1] += H; drops[o] = (Math.random() * 2 - 1) * R; drops[o + 2] = (Math.random() * 2 - 1) * R; }
+      // (blown along by the wind, a drop that leaves the box round the camera comes back in on the other side, so it stays full)
+      if (drops[o] > R) drops[o] -= 2 * R; else if (drops[o] < -R) drops[o] += 2 * R;
+      if (drops[o + 2] > R) drops[o + 2] -= 2 * R; else if (drops[o + 2] < -R) drops[o + 2] += 2 * R;
       const x = c.x + drops[o], y = c.y - 8 + drops[o + 1], z = c.z + drops[o + 2], q = i * 6;
       if (i >= n) { a[q] = a[q + 3] = x; a[q + 1] = a[q + 4] = -100; a[q + 2] = a[q + 5] = z; continue; }
       a[q] = x; a[q + 1] = y; a[q + 2] = z; a[q + 3] = x - vx * len; a[q + 4] = y + fall * len; a[q + 5] = z - vz * len;

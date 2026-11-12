@@ -129,10 +129,10 @@ export class Hud {
     const low: [number, number][] = [];
     const upwind = u.twa < 80, from = u.ww.from;
     // the other tack (or gybe): where you'd point after turning
-    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * beatFor(u)) : n360(from + wrap(from - h)); // the mirror image across the wind
+    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
     marker(other, '#9fb3bf', upwind ? 'tack' : 'gybe', false);
     // average close-hauled heading on this tack: a slow running mean while you're close-hauled
-    if (upwind && Math.abs(u.twa - beatFor(u)) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
+    if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
     const mean = this.meanHdg[u.tack];
     if (upwind && mean != null) {
       marker(mean, '#e8e8e8', 'avg', false);

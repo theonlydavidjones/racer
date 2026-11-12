@@ -108,7 +108,8 @@ const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); return la
 
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
 function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
-  const from = b.ww.from, beat = beatFor(b) + 1, csS = n360(from - beat), csP = n360(from + beat), c = b.cur;
+  // (the headings: her course is the polar's angle, so she steers her leeway higher than it, physics.ts b.leeway)
+  const from = b.ww.from, beat = beatFor(b) + 1, lw = b.leeway ?? 0, csS = n360(from - beat + lw), csP = n360(from + beat - lw), c = b.cur;
   const close = (tk: 'S' | 'P') => tk === 'S' ? csS : csP;
   // a tack it has decided on: steer for the new tack's close-hauled course until she's round
   if (p.goTack) { if (b.tack === p.goTack && !b.tacking) p.goTack = null; else return close(p.goTack); }
@@ -120,7 +121,8 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   } else p.detour = null;
   const bP = brg(P.x - b.x, P.y - b.y), vs = Math.max(b.v, targetFor(b, Math.abs(wrap(from - bP))) * 0.8);
   const cts = courseToSteer(bP, vs, c);
-  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) return cts; // she can lay it: steer the course that makes good the bearing
+  // she can lay it: steer the course that makes good the bearing (her leeway higher, toward the wind)
+  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) { const r = wrap(from - cts); return Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts; }
   // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
   const onS = b.tack === 'S', other = onS ? 'P' : 'S', cur = close(b.tack);
   if (t - p.lastTackT > 12 && !b.tacking) {

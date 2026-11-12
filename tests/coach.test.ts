@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { testBoat, sail, kt } from './helpers/testBoat';
+import { testBoat, sail, kt, courseHeading } from './helpers/testBoat';
 import { takeLine } from '../src/boat/physics';
 import { CoachMemory, FIX_MIN, addLessonSource, teach } from '../src/boat/coach';
 import type { Boat } from '../src/boat/boat';
@@ -8,7 +8,7 @@ import type { SeaHere } from '../src/environment/sea';
 /** Sail holding the heading exactly, so comparisons are like for like. */
 const hold = (b: Boat, t: number, each?: () => void) => { const h = b.h; sail(b, t, () => { b.h = h; each?.(); }); };
 const CHOP: SeaHere = { hsW: 0.6, tpW: 3, fromW: 0, hsS: 0, tpS: 10, fromS: 270, steep: 0.05, white: 0.03, fetch: 8000 };
-function boat(o: { heading: number; windKt: number; sea?: SeaHere }) { const b = testBoat({ heading: o.heading, kt: 5, windKt: o.windKt }); if (o.sea) b.sea = o.sea; hold(b, 30); return b; }
+function boat(o: { heading: number; windKt: number; sea?: SeaHere }) { const b = testBoat({ heading: o.heading, kt: 5, windKt: o.windKt }); if (o.sea) b.sea = o.sea; sail(b, 30, () => { b.h = courseHeading(b, o.heading); }); return b; } // (`heading`: her course, her leeway allowed for; then held)
 /** You take a line and set it wrong. */
 function wrong(b: Boat, k: 'jibsheet' | 'mainsheet' | 'backstay' | 'vang' | 'outhaul' | 'traveller', v: number) { takeLine(b, k); (b.ctlTarget ??= {})[k] = v; hold(b, 30); }
 

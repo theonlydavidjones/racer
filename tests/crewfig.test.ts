@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { testBoat, sail, startTack } from './helpers/testBoat';
+import { testBoat, sail, startTack, courseHeading } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew, type CrewPlace } from '../src/boat/crewPhys';
 import { buildCrew, ground, syncCrew, type Crew, type Figure } from '../src/render/crew';
@@ -36,8 +36,8 @@ function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; s
   b.crew = newCrew(spec, 'S'); if (o.place) b.crew.place = o.place;
   const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
   let hold = true;
-  sail(b, 20, () => { b.h = 360 - twa; });
-  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = 360 - twa; }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); } };
+  sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
+  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); } };
   frames(3);
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
   else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
@@ -63,8 +63,8 @@ function motion(o: { kt: number; twa?: number; tack?: boolean; puff?: number }, 
   b.crew = newCrew(DEFAULT_CREW, 'S');
   const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), dt = 1 / 30;
   let hold = true;
-  sail(b, 20, () => { b.h = 360 - twa; });
-  const step = () => { sail(b, dt, () => { if (hold && b.turnTarget == null) b.h = 360 - twa; }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, dt, false, undefined, b.heel, b.tacking); };
+  sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
+  const step = () => { sail(b, dt, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, dt, false, undefined, b.heel, b.tacking); };
   for (let i = 0; i < 60; i++) step();
   if (o.tack) { hold = false; startTack(b); }
   if (o.puff) b.ww = { ...b.ww, kt: o.puff };
@@ -95,10 +95,10 @@ describe('Everyone sits on something (render/crew.ts)', () => {
     const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
     b.crew = newCrew(DEFAULT_CREW, 'S'); if (o.place) b.crew.place = o.place;
     const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), dt = 1 / 30;
-    sail(b, 20, () => { b.h = 360 - twa; });
-    let worst = 0, where = '';
+    sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
+    const h0 = b.h; let worst = 0, where = '';
     for (let i = 0; i < secs * 30; i++) {
-      sail(b, dt, t => { b.h = 360 - twa; if (o.puffy) b.ww = { ...b.ww, kt: o.kt + 3 * Math.sin((i * dt + t) * 2 * Math.PI / 12) }; });
+      sail(b, dt, t => { b.h = h0; if (o.puffy) b.ww = { ...b.ww, kt: o.kt + 3 * Math.sin((i * dt + t) * 2 * Math.PI / 12) }; });
       syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, dt, false, undefined, b.heel, b.tacking);
       if (i < 30) continue;
       [cr.helm, ...cr.crew].forEach((f, w) => {

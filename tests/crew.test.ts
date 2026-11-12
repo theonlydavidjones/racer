@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { testBoat, sail, kt, startTack } from './helpers/testBoat';
+import { testBoat, sail, kt, startTack, courseHeading } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, hikeArm, newCrew, sitArm, type CrewPlace, type CrewSpec } from '../src/boat/crewPhys';
 import { bestTrim, heelWetted, heelWettedFactor, mct } from '../src/boat/hullTrim';
@@ -263,10 +263,10 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
   /** Ten minutes upwind in a puffy breeze (10 kt, ±2 kt over half a minute, flickering ±0.7 kt every few seconds): how many times each crew member sets off for a new place. */
   function moves(windKt: number) {
     const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4, windKt }); b.crew = newCrew(crewOf(0.6), 'S');
-    sail(b, 30, () => { b.h = 360 - twa; });
-    const last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0);
+    sail(b, 30, () => { b.h = courseHeading(b, 360 - twa); });
+    const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0); // (then held: her leeway at the mean wind)
     sail(b, 600, t => {
-      b.h = 360 - twa; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
+      b.h = h; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
       b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { n[i]++; last[i] = { ...p.goal }; } });
     });
     return n.slice(1);
