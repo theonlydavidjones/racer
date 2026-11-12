@@ -151,7 +151,7 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
   function go(spec: CrewSpec, W: number, secs: number, o: { cruising?: boolean; shut?: boolean } = {}) {
     const twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 4, windKt: W });
     b.crew = newCrew(spec, 'S'); b.cruising = !!o.cruising;
-    if (o.shut) b.companionway = { doors: 'in', hatch: 'closed' };
+    if (o.shut) b.companionway = { doors: 'in', hatch: 'closed', doorsT: 0, hatchT: 0 };
     const seen: string[] = [];
     sail(b, secs, () => { b.h = 360 - twa; const cw = b.companionway; if (!cw) return; const st = `${cw.doors}/${cw.hatch}`; if (seen[seen.length - 1] !== st) seen.push(st); });
     const at = b.crew!.people.findIndex(p => p.pose === 'companionway' && p.z < Z.companionway + 0.15);
@@ -186,7 +186,7 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     const tack = (shut: boolean) => {
       const twa = beatAngle(6), b = testBoat({ heading: 360 - twa, kt: 3, windKt: 6 });
       b.crew = newCrew(crewOf(0.6, { handling: 0.3 }), 'S'); b.cruising = true;
-      if (shut) b.companionway = { doors: 'in', hatch: 'closed' };
+      if (shut) b.companionway = { doors: 'in', hatch: 'closed', doorsT: 0, hatchT: 0 };
       sail(b, 5, () => { b.h = 360 - twa; });
       const busy = b.crew!.people.some(p => p.job?.line === 'doors'), js: number[] = [];
       startTack(b); sail(b, 12, () => { js.push(b.ctl.jibsheet); });
@@ -198,6 +198,6 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     // (the jib sheet worked through the tack as it is with the hatch already open: from a second in, once the tack has
     // called them off the doors; before it, in a drifter, the sheet waited for them)
     shut.js.forEach((v, i) => { if (i > 60) expect(Math.abs(v - open.js[i])).toBeLessThan(0.05); });
-    sail(shut.b, 40); expect(shut.b.companionway).toEqual({ doors: 'out', hatch: 'open' }); // (and they open it afterwards)
+    sail(shut.b, 40); expect(shut.b.companionway).toEqual({ doors: 'out', hatch: 'open', doorsT: 1, hatchT: 1 }); // (and they open it afterwards)
   }, 30_000);
 });
