@@ -213,7 +213,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // cockpit well, seats, and coamings
   // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
   const cockpitTeak = new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide });
-  grp.add(new THREE.Mesh(plankUV(mergeGeometries(cockpitGeometry().map(g => (g.index ? g.toNonIndexed() : g)), false)!), cockpitTeak)); // (one mesh)
+  const cg = cockpitGeometry(), flat = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.map(g => (g.index ? g.toNonIndexed() : g)), false)!;
+  grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), cockpitTeak)); // the sole, benches and shelf (one mesh)
+  grp.add(new THREE.Mesh(flat(cg.lining), COCKPIT_LINING)); // the hull's inside round the footwell, under the side decks, and the after wall: smooth moulding
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
@@ -313,6 +315,8 @@ const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
 const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xffffff, shininess: 110, transparent: true, opacity: 0.82, emissive: 0x000000, emissiveIntensity: 0 });
+/** The cockpit's moulded inside, where it isn't teak: smooth, off-white. */
+const COCKPIT_LINING = new THREE.MeshLambertMaterial({ color: 0xe9e3d4, side: THREE.DoubleSide });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), CAM_GREEN = new THREE.MeshLambertMaterial({ color: 0x3fb36a });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
 const carPos = (side: number, fore: number, ins: number) => {
