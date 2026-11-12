@@ -33,6 +33,8 @@ export interface Settings {
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
   traffic: 0 | 1; // ship traffic through the race area
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
+  /** The wind indicator (render/windLadder.ts) showing: off unless you turn it on, and remembered. */
+  windLadder?: boolean;
   camRide?: 0 | 1; // the chase camera rides up and down with her on the swell (smoothed; heave only); off: it holds still and she rises and falls in the frame
   chartPal?: 'day' | 'dusk'; // the map's NOAA chart: the paper chart's colours, or dark (ECDIS dusk)
   mapLayers?: Partial<Record<'wind' | 'current' | 'sea' | 'fog' | 'ships' | 'laylines' | 'shadows', boolean>>; // the map's layers, on or off (ui/layers.ts; unset: the default)

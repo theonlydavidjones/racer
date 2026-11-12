@@ -30,7 +30,9 @@ import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
+import { ensureMembers, loadMembers, pullCrew, pushCrew, saveMembers, type Member } from './club/members';
 import { SailBand } from './ui/sailBand';
+import { WindLadder } from './render/windLadder';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
@@ -52,6 +54,13 @@ import { SetupChart } from './ui/setupChart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
+// the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
+const MEMBERS: Member[] = loadMembers();
+/** Your boat's crew from her seats (after choosing a boat, or at the start); saves what changed. */
+function crewFromClub(): void { if (ensureMembers(S, MEMBERS)) { saveMembers(MEMBERS); saveSettings(S); } pullCrew(S, MEMBERS); }
+/** The setup's crew rows or count changed: back to the members and her seats, and saved. */
+function crewToClub(): void { pushCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); }
+crewFromClub();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
 S.raceLength ??= 'medium';
 // a new player's first race: the committee chooses the course for the day, as at a real club race (saves keep theirs)
@@ -75,7 +84,7 @@ let w!: World;
 let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
+const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -89,6 +98,37 @@ function setLook(yaw: number, pitch: number): void {
   look.pitch = Math.max(LOOK_PITCH_MIN, Math.min(LOOK_PITCH_MAX, pitch));
 }
 function lookAhead(): void { setLook(0, 0); }
+/**
+ * Looking at the cabin-top instrument (render/tacktick.ts): the eye at the helm, on the windward side as in the cockpit
+ * view, turned and tipped down to its face, held there each frame (she heels and tacks) until you press the key again or
+ * change view. The view, eye and look you had are put back after.
+ */
+let instLook: { view: number; aft: number; yaw: number; pitch: number } | null = null;
+function toggleInstrumentLook(): void {
+  if (instLook) { const b = instLook; instLook = null; look.fov = undefined; setView(b.view); look.aft = b.aft; setLook(b.yaw, b.pitch); return; }
+  if (!view.userMesh?.instrument) return;
+  instLook = { view: viewMode, aft: look.aft, yaw: look.yaw, pitch: look.pitch };
+  // the eye at the helm, and the view narrowed to about 22° (as your eye settles on a small thing 2½ m off: the unit is
+  // drawn true to size, its 28 mm digits a few pixels high in the cockpit view's 72°)
+  setView(0); look.aft = EYE_MIN; look.fov = 22; aimAtInstrument();
+}
+/** Each frame while you look at it: nudge the look so the instrument's face sits in the middle of the view (she heels,
+ * pitches and changes side at a tack, so the first aim drifts). */
+function centreInstrument(): void {
+  const inst = view.userMesh?.instrument; if (!inst) return;
+  const cam = view.camera, p = inst.grp.getWorldPosition(cam.position.clone()); p.y += 0.07; p.project(cam);
+  if (p.z > 1 || !Number.isFinite(p.x)) { aimAtInstrument(); return; } // (behind the eye, as just after a tack: start again)
+  const half = cam.fov / 2 * D2R;
+  setLook(look.yaw - p.x * half * cam.aspect * 0.3, look.pitch + p.y * half * 0.3);
+}
+function aimAtInstrument(): void {
+  const inst = view.userMesh?.instrument; if (!inst) return;
+  // the cockpit eye's place in her frame (as render/scene.ts sets it), and the instrument's face
+  const aft = look.aft, side = w.user.rel >= 0 ? 1 : -1;
+  const ex = Math.max(0.35, 0.8 - (aft - 3.3) * 0.06) * side, ey = 1.6 + Math.max(0, aft - 3.3) * 0.25;
+  const t = inst.grp.position, dx = t.x - ex, dy = t.y + 0.07 - ey, dz = t.z - aft;
+  setLook(Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)) + 4 * D2R); // (the cockpit camera tips down 4° of its own)
+}
 let setupChart: SetupChart | null = null;
 let pendingPenalty: Boat | null = null;
 
@@ -396,6 +436,20 @@ function chaseFrame(): void {
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
+/* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
+ * beside her at three heights, off unless you turn it on (the Wind button, or its key), and remembered. */
+const ladder = new WindLadder(); ladder.grp.visible = false; view.scene.add(ladder.grp);
+function windShow(on: boolean): void {
+  S.windLadder = on; saveSettings(S);
+  $('bWind').classList.toggle('on', on); $('bWind').setAttribute('aria-pressed', String(on));
+}
+$('bWind').onclick = () => windShow(!S.windLadder);
+windShow(!!S.windLadder);
+/** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
+function windTick(): void {
+  const on = !!S.windLadder && w.running && !w.user.docked;
+  ladder.grp.visible = on; if (on) ladder.update(w.user);
+}
 openLines((S.band ?? 1) === 1);
 /* The trim coach, as a teacher (boat/coach.ts): the one thing that matters now, why, and what to look at on the boat;
  * when you fix it, it says so. Its headline sits in the trim panel and, when there's something new to say, shows on
@@ -724,7 +778,7 @@ function keysHint(): void {
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
-    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
+    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot'], ['bWind', 'Wind indicator: the true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' centre and the masthead', 'windLadder']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
   $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off';
 }
@@ -790,6 +844,7 @@ addEventListener('keydown', e => {
     case 'ctlPrev': ctlSel = (ctlSel + CTL_UI.length - 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'sailBand': openLines(); break;
+    case 'lookInstrument': toggleInstrumentLook(); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': pilotOff('Pilot on standby.'); unlash(); centreTiller(); break;
     case 'lashTiller': lash(); break;
@@ -808,6 +863,7 @@ addEventListener('keydown', e => {
     case 'viewChase': setView(1); break;
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
+    case 'windLadder': windShow(!S.windLadder); break;
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
     case 'recentre': recentre(); break;
@@ -890,6 +946,7 @@ function keyLook(dt: number): void {
   if (held.has('lookRight')) setLook(look.yaw - rate, look.pitch);
   if (held.has('lookUp')) setLook(look.yaw, look.pitch + rate);
   if (held.has('lookDown')) setLook(look.yaw, look.pitch - rate);
+  if (instLook) { if (viewMode !== 0) { instLook = null; look.fov = undefined; } else centreInstrument(); }
   if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); else look.chase = Math.max(8, (look.chase ?? view.chaseDist) * Math.exp(-1.2 * dt)); }
   if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); else look.chase = Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(1.2 * dt)); }
 }
@@ -1080,7 +1137,7 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewRows(); paintSeg(); newGame(); courseCard(); return; }
+  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewToClub(); crewRows(); paintSeg(); newGame(); courseCard(); return; }
   if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
@@ -1100,13 +1157,13 @@ function crewRows(): void {
   const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
   rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}`).join('');
   rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {
-    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); saveSettings(S); newGame();
+    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); crewToClub(); newGame();
   });
   rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
     const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
     if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
     else { const lb = Number(inp.value); if (lb > 70 && lb < 400) p.w = lb * LB; inp.value = String(Math.round(p.w / LB)); }
-    saveSettings(S); newGame(); courseCard();
+    crewToClub(); newGame(); courseCard();
   });
 }
 function openSetup(): void { settleLog(openSetupNow); }
@@ -1355,7 +1412,7 @@ function frame(now: number): void {
   }
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
@@ -1376,7 +1433,7 @@ function boatSummary(): void {
 }
 ($('boatPick') as HTMLSelectElement).onchange = e => {
   const b = S.boats.find(x => x.id === (e.target as HTMLSelectElement).value); if (!b) return;
-  S.boat = b; S.boatId = b.id; fleetChanged(); boatSummary();
+  S.boat = b; S.boatId = b.id; crewFromClub(); fleetChanged(); boatSummary();
 };
 
 /* The fleet: who you race against. Stock club boats and your own saved boats (not the one you're sailing). */
@@ -1426,7 +1483,7 @@ const fleet: Fleet = new Fleet(S, {
   edit: id => { showroom(true); boatPanel.show(id); newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
-    S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length;
+    S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
     if (mode === 'cruise') { S.mode = 'sail'; S.sailFrom = fromSlip && b.slip ? 'slip' : S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom; }
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); newGame(); openSetup();
@@ -1482,7 +1539,7 @@ $('pastRows').addEventListener('click', e => {
   if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
-  const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; }
+  const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
   if (!S.boat.slip) S.raceFrom = 'water';
   { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
   saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
