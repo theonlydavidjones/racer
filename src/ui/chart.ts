@@ -11,6 +11,11 @@ import { beatFor } from '../boat/seaway';
  * The chart: tap the inset map and it opens full screen, with the sail paused. North up; drag to move it, scroll to
  * zoom. Cruising, tap the water (or a place) to pick a new destination and "Sail here"; racing, it's for looking.
  */
+/** The point on the water under (sx, sy) on the chart (north up, centred on cx, cy at `scale` px/m): makeTf's inverse
+ * for an unturned map, where a tap picks a destination. */
+export const chartPoint = (sx: number, sy: number, w: number, h: number, cx: number, cy: number, scale: number): Vec =>
+  ({ x: cx + (sx - w / 2) / scale, y: cy - (sy - h / 2) / scale });
+
 export class Chart {
   private w: World | null = null;
   private cx = 0; private cy = 0; private scale = 0.25; // px per metre
@@ -77,7 +82,7 @@ export class Chart {
   /** The point on the water under a spot on the canvas. */
   private at(sx: number, sy: number): Vec {
     const r = this.c.getBoundingClientRect();
-    return { x: this.cx + (sx - r.width / 2) / this.scale, y: this.cy - (sy - r.height / 2) / this.scale };
+    return chartPoint(sx, sy, r.width, r.height, this.cx, this.cy, this.scale);
   }
 
   private tap(clientX: number, clientY: number): void {

@@ -24,13 +24,16 @@ What's planned, roughly in order. Done work is described in the README.
 2. Finish the crew figures: the crew's stations onto the real benches. Owner chose option 2: the benches plus the side
    deck alongside them and aft of the thwart beside the after shelf (hips 1.35–2.5 m), where crews really sit; about
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
-   (in progress).
+   (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
+   a 20 kt hiking tack (around z 2.55, x 0.6; on main too): fix the crossing path, then sample every 2 cm along each
+   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h).
 3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
    - **The piano**, "mirroring what really exists on Josephine" (the table under Full sail controls: starboard, inboard
-     to outboard, vang · outhaul · jib Cunningham; port, vang · outhaul · the main Cunningham's clam cleat · jib
-     Cunningham, with the downhaul and the jib halyard tail): trim / ease buttons on each.
+     to outboard, vang · outhaul · jib Cunningham · the jib halyard tail; port, vang · outhaul · the main Cunningham's
+     clam cleat · jib Cunningham, with the downhaul). Mock-up in progress with the UI & Experience session:
+     https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB: trim / ease buttons on each.
    - **The jib**: a sheet on each side, trim / ease.
    - **The main**: the mainsheet, the backstay, and "the traveller specifically I would want to move left and right
      like a real traveler" (a car you drag along a track).
@@ -39,6 +42,9 @@ What's planned, roughly in order. Done work is described in the README.
    before the build. 6–10 h; replaces the trim-panel review.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
+   leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
+   crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
@@ -208,6 +214,18 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   (3) water in the cockpit: water shipped, its weight, the pump;
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
+  Update (12 November): owner, "nobody who races Folkboats on the bay has a reef setup. races just get canceled at 23
+  knots… at 23 knots everyone takes a vote on canceling. mostly bc at that speed things start breaking on boats." The
+  SFBFA's site (sfbayfolkboats.org/racing, fetched 12 November) has a "Proposed High Wind Race Cancellation Protocol":
+  "OA will cancel racing for the day when wind is above 25 knots"; before dockout, if the forecast is above 25 kt, the
+  Race Chair with the OA decides, and tells the fleet by text. It's marked proposed; the bylaws say nothing on wind. So
+  in racing: no reefing; the committee cancels in a blow, by the fleet's practice (the owner's 23 kt vote; the written
+  proposal's 25 kt), signalled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
+  the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (the fleet's
+  practice), and **reefing is held until there's a Folkboat-specific source** (a cruiser's account or a sailmaker). For cruising: the owner expects blue-water
+  Folkboats to reef; still unconfirmed. Ann Gash (solo round the world, 1975–77) reportedly used a working jib and a
+  trysail in a storm, not a reefed main (a search summary of her memoir, not read); Hasler's Jester was junk-rigged
+  (Folk Boat Year Book 2021, p.46). Richard Sherwood (1994, via Wikipedia): she "often carries full sail in 20–25".
 - **Next — cruising and racing: pick places on the map, change the conditions, and "Send her home"** (feature; 6–10 h
   in all): owner, "when cruising, I'd like to be able to pick my start and end locations on the map rather than in
   dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
@@ -653,8 +671,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 | Piano | Inboard (by the companionway) → outboard |
 |---|---|
-| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats) |
-| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main downhaul and the jib halyard tail (uncleated) |
+| Starboard | Vang · Outhaul · Jib Cunningham (three cam cleats), with the jib halyard tail (uncleated) just outboard of the jib Cunningham (owner, 12 November) |
+| Port | Vang · Outhaul · Jib Cunningham (three cam cleats, the other ends of the same dual-ended lines), plus a fixed clam cleat set ~2 in forward, between the outhaul and jib Cunningham cams, which holds the **main Cunningham** (thin line, stopper knot in the end). Also here: the main downhaul |
 
 | Control | Sail | Led to | Notes |
 |---|---|---|---|
@@ -664,7 +682,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Main Cunningham | Main | Port piano only, fixed clam cleat | Its own line through a ring in the luff above the boom. Fine luff tension under way |
 | Main downhaul | Main | Port side, via a block and tackle at the mast base | Pulls the luff down: coarse luff tension. Modelled as a gooseneck downhaul (it sails the same as a halyard tensioner) |
 | Main halyard | Main | Not used under way | Hoisted before racing, not touched while racing |
-| Jib halyard | Jib | Port piano, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
+| Jib halyard | Jib | Starboard piano, outboard of the jib Cunningham, uncleated | Set before racing, not touched under way; jib luff tension comes from the jib Cunningham |
 | Mainsheet | Main | Boom end to the traveller car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
 | Traveller | Main | Wooden thwart across the cockpit | Dual-ended |
 | Backstay | Rig | Each end of the cockpit thwart, where it meets the hull | Dual-ended; the bridle is on the transom |
