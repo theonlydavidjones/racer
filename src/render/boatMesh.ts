@@ -235,14 +235,14 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   for (const g of woodTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
   for (const g of railTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
   grp.add(new THREE.Mesh(grainUV(mergeGeometries(woodTop, false)!), teakMat().warm)); // the doorway's posts and sill: oiled teak
-  grp.add(new THREE.Mesh(grainUV(mergeGeometries(railTop, false)!), teakMat().silver)); // the grab rails: weathered teak
+  grp.add(new THREE.Mesh(grainUV(mergeGeometries(railTop, false)!), teakMat().trim)); // the grab rails: weathered teak
   // cockpit well, seats, and coamings
   // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
-  const cockpitTeak = teakMat().silverDeck; // (weathered: the owner)
+  const cockpitTeak = teakMat().deck; // (oiled: the owner)
   const cg = cockpitGeometry(), flat = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.map(g => (g.index ? g.toNonIndexed() : g)), false)!;
   grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), cockpitTeak)); // the sole, benches and shelf (one mesh)
   grp.add(new THREE.Mesh(flat(cg.lining), COCKPIT_LINING)); // the hull's inside round the footwell, under the side decks, and the after wall: smooth moulding
-  grp.add(new THREE.Mesh(grainUV(flat(cg.panel)), teakMat().silver)); // the lazarettes: teak lockers, fronts, ends and lids, weathered
+  grp.add(new THREE.Mesh(grainUV(flat(cg.panel)), teakMat().trim)); // the lazarettes: teak lockers, fronts, ends and lids, weathered
   // each lazarette's lid: the seam where it lifts, its two hinges along the outboard edge, and a finger-hole at the front
   { const seams: THREE.BufferGeometry[] = [], hinges: THREE.BufferGeometry[] = [], g = 0.007;
     for (const l of lazaretteLids()) {
@@ -267,11 +267,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
     // starboard side at the dock)
     const sl = sheerLine(s, 0.03, 160), aft = sheerLine(s, HIKE_RAIL.inset, 160).filter(p => p.z >= HIKE_RAIL.z0 && p.z <= HIKE_RAIL.z1);
-    grp.add(new THREE.Mesh(grainUV(rail(sl, 0.035, 0.03)), teakMat().silver)); // (the toerail, unbroken stem to transom)
-    grp.add(new THREE.Mesh(grainUV(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t)), teakMat().silver));
+    grp.add(new THREE.Mesh(grainUV(rail(sl, 0.035, 0.03)), teakMat().trim)); // (the toerail, unbroken stem to transom)
+    grp.add(new THREE.Mesh(grainUV(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t)), teakMat().trim));
     const blocks: THREE.BufferGeometry[] = [];
     for (let z = HIKE_RAIL.z0 + 0.05; z < HIKE_RAIL.z1; z += 0.38) { const u = uAtZ(z), x = s * (halfBeam(u) - HIKE_RAIL.inset); blocks.push(new THREE.BoxGeometry(HIKE_RAIL.w * 0.75, HIKE_RAIL.gap + 0.004, 0.05).translate(x, sheer(u) + HIKE_RAIL.gap / 2, z)); }
-    grp.add(new THREE.Mesh(grainUV(mergeGeometries(blocks)), teakMat().silver));
+    grp.add(new THREE.Mesh(grainUV(mergeGeometries(blocks)), teakMat().trim));
     // (no separate rubbing strake on the topsides: Josephine, a GRP boat, has only the one wooden rail capping the sheer
     // (the owner's photos from the bow and the dock); the class's half-round strake, CR 2.218, is a wooden boat's)
   }
@@ -386,17 +386,16 @@ const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 /** The jib winch's height, base to the top of its drum's cap. */
 const WINCH_H = 0.123;
-/** Bare teak weathered silver-tan, as Josephine's toerail and hiking rail are (the owner's photos): not varnished. */
-let teakMats: { silver: THREE.Material; silverDeck: THREE.Material; warm: THREE.Material } | null = null;
+let teakMats: { trim: THREE.Material; deck: THREE.Material; warm: THREE.Material } | null = null;
 /**
- * Josephine's teak (the owner): bare and weathered silver-grey outside (the hatch, the grab rails, the toerail and hiking
- * rail, the cockpit floor, the lazarettes, the thwart), oiled warm brown on the washboards and the doorway's posts (and
- * inside, the cabin's floor). Grain textures (teakTexture): the cockpit floor with its planks' seams, the rest plain grain.
+ * Josephine's teak (the owner): all of it oiled warm brown, the washboards, doorway posts, hatch, grab rails, toerail and
+ * hiking rail, cockpit floor, lazarettes and thwart. (Weathered silver-grey looked wrong beside it; one day a choice in
+ * the boat editor.) Grain textures (teakTexture): the cockpit floor with its planks' seams, the rest plain grain.
  */
 function teakMat() {
   return teakMats ??= {
-    silver: new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(true, false), side: THREE.DoubleSide }),
-    silverDeck: new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(true), side: THREE.DoubleSide }),
+    trim: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide }),
+    deck: new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide }),
     warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30 })
   };
 }
@@ -430,7 +429,7 @@ function buildCompanionway(grp: THREE.Group): Companionway {
   // the hatch, shut: a nearly flat board of weathered teak arched with the roof, a thick rounded after edge
   const hatch = new THREE.Group(); grp.add(hatch);
   const keep = (g: THREE.BufferGeometry) => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; };
-  const hatchMesh = new THREE.Mesh(grainUV(keep(slidingHatch(0))), teakMat().silver); hatch.add(hatchMesh);
+  const hatchMesh = new THREE.Mesh(grainUV(keep(slidingHatch(0))), teakMat().trim); hatch.add(hatchMesh);
   // (as it slides it's redrawn on the roof where it is, so it lies on the roof's curve all along its travel)
   // the washboards: three of equal height from the sill up to the shut hatch's underside, in grooves inside the posts
   const top = cabinTopAt(CABIN.u1, 0) + 0.045, boardH = (top - sill) / 3, boards: THREE.Group[] = [];
@@ -591,7 +590,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // traveller: the thwart, a deep varnished beam across the cockpit in front of the helm, on its post (hull.ts
   // COCKPIT_FIT), the track on its top, and the car
   const tu = uAtZ(TRAV_Z), tw = cockpitHalf(tu), ty = thwartTop();
-  grp.add(new THREE.Mesh(grainUV(thwartGeometry()[0].index ? thwartGeometry()[0].toNonIndexed() : thwartGeometry()[0], true), teakMat().silver));
+  grp.add(new THREE.Mesh(grainUV(thwartGeometry()[0].index ? thwartGeometry()[0].toNonIndexed() : thwartGeometry()[0], true), teakMat().trim));
   const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.08, 0.02, 0.035), STEEL); track.position.set(0, ty + 0.005, TRAV_Z); grp.add(track);
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
   // the mainsheet's lower block, on its swivel on the car: a sheave between black cheeks (it turns with the car)
