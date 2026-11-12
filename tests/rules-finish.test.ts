@@ -1,5 +1,6 @@
 // The racing rules finished (RRS 2025–2028): 20.2(e)'s end, 20.3 passing on a hail, a boat as the obstruction
 // (rule 19, WS Case 11; and rule 20), and blanketing as rule 23 interference.
+import { settleTrim } from '../src/boat/physics';
 import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
@@ -150,6 +151,8 @@ type B = World['boats'][number];
 function sail(w: World, b: B, p: Vec, tack: 'S' | 'P', v = 2.4) {
   const beat = beatAngle(w.wind.kt), h = n360(tack === 'S' ? w.wind.from - beat : w.wind.from + beat), u = V(h);
   Object.assign(b, { x: p.x, y: p.y, h, desired: h, v, vx: u.x * v, vy: u.y * v, tack, tacking: false, twa: beat, ww: { from: w.wind.from, kt: w.wind.kt }, lastTackT: -999, turnTarget: null });
+  settleTrim(b, w.wind.from, w.wind.kt); // (her sheets trimmed close-hauled, as a boat sailing there would have them)
+  if (b.ai) { b.ai.turnCommit = 0; b.ai.commitFor = 0; } // (no turn the AI committed to where she was before)
   return h;
 }
 const off = (p: Vec, u: Vec, k: number) => ({ x: p.x + u.x * k, y: p.y + u.y * k });
