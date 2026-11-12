@@ -19,7 +19,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '21.1': ['Rule 21.1 · Returning to start', 'After her starting signal, a boat sailing back toward the pre-start side of the starting line (or its extensions) to start keeps clear of boats that are not, until her hull is completely on the pre-start side.'],
   '21.2': ['Rule 21.2 · Taking a penalty', 'A boat taking a penalty keeps clear of boats that are not.'],
   '21.3': ['Rule 21.3 · Backing a sail', 'A boat moving astern, or sideways to windward, through the water by backing a sail keeps clear of one that is not.'],
-  '23': ['Rule 23 · Interfering with another boat', 'If reasonably possible, a boat not racing (one that has retired, or finished and cleared the finishing line) shall not interfere with a boat that is racing (23.1). And, if reasonably possible, a boat shall not interfere with a boat taking a penalty, sailing on another leg, or returning to start under rule 21.1, except that after the starting signal she may sail her proper course (23.2). Interfering includes getting in her way and, as this sim judges it, sitting on her wind.']
+  '23': ['Rule 23 · Interfering with another boat', 'If reasonably possible, a boat not racing (one that has retired, or finished and cleared the finishing line) shall not interfere with a boat that is racing (23.1). And, if reasonably possible, a boat shall not interfere with a boat taking a penalty, sailing on another leg, or returning to start under rule 21.1, except that after the starting signal she may sail her proper course (23.2). Taking another boat\'s wind is tactics, not interference: the sim calls rule 23 only for getting in her way.']
 };
 
 /** Rule 43.1(a): text added when a boat broke a rule only because another boat's breach compelled her to. */
@@ -141,14 +141,6 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       tip = you ? 'Backing a sail to get out of irons or off the line is fine, but while you go backwards you have no rights.' : 'A boat backing down has no rights over you.';
       break;
     case '23':
-      if (e.kind === 'blanket') {
-        const not = e.part === '23.1' ? 'had finished or retired, so you weren\'t racing any more,' : 'had left your proper course (sailing above it, or bearing away well below it)';
-        const them = e.part === '23.1' ? 'still racing' : 'on another leg, taking a penalty or returning to start';
-        what = you ? `You ${not} and your sails sat on the wind of ${o}, who was ${them}, for several seconds. Taking a boat's wind interferes with her as much as getting in her way.`
-          : `${o} ${e.part === '23.1' ? 'had finished or retired and' : 'left their proper course and'} took your wind for several seconds while you were ${e.part === '23.1' ? 'still racing' : 'on another leg, taking a penalty or returning to start'}.`;
-        tip = you ? 'Your wind shadow streams off downwind of you, along the wind you feel: astern and to leeward when beating, ahead of you when running. Keep it off boats you must not interfere with: bear away or head up out of line, or keep clear astern.' : 'Rule 23 protects you from boats that go out of their way to hinder you, by taking your wind as much as by blocking you.';
-        break;
-      }
       if (e.part === '23.1') {
         what = you ? `You had finished or retired, so you were no longer racing, and you got in the way of ${o}, who was.` : `${o} had finished or retired and got in your way while you were still racing.`;
         tip = you ? 'After you finish or retire, sail well clear of the line and the course: boats still racing come first.' : 'A boat that has finished or retired must not interfere with boats still racing.';
@@ -159,7 +151,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
   }
   if (e.exoneratedBy) { what += ` But ${e.exoneratedBy} broke a rule first and forced ${you ? 'you' : o} into it, so ${you ? 'you are' : `${o} is`} exonerated: no penalty (Rule 43.1(a)).`; }
-  if (e.kind === 'hail' || e.kind === 'blanket') return { what, tip };
+  if (e.kind === 'hail') return { what, tip };
   if (e.kind === 'swerve' && you) what += ` ${o} had to swerve to avoid contact. Forcing a right-of-way boat to change course is still a foul, even without a collision.`;
   return { what, tip };
 }

@@ -102,16 +102,11 @@ What's planned, roughly in order. Done work is described in the README.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
-6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
-   Built on branch rules-finish (PR pending, not yet published): 20.2(e) holds until the hailer has tacked and kept
-   clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
-   20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
-   the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
-   Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
-   away below her proper course to blanket.
-   Rule 21.1 widened (branch rules-21-1): any boat sailing back to start, latched until her hull is below the line;
-   Rule 15 grace when she gets back. Noticed in review, not fixed: a not-started AI boat beyond an end of the line at the
-   gun (not OCS) aims for a point on the course side and never starts (ai.ts, the !b.started branch).
+6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
+   obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
+   Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
+   (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
+   tactical fact in the debrief ("in X's dirty air"); rule 23 is called for getting in a boat's way only.
 7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
    far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
    a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
