@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { setVisibility } from '../environment/weather';
 import { D2R, V, ZONE } from '../core/math';
 import type { World } from '../sim/world';
 import type { MarkShape } from '../courses/course';
@@ -25,7 +26,7 @@ import { Wildlife } from './wildlife';
 import { Harbor } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
-import { landAt } from '../environment/sea';
+import { foamDrift, landAt } from '../environment/sea';
 import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
 import type { SeaHere } from '../environment/sea';
 
@@ -115,10 +116,30 @@ const WATER_FRAGMENT = `
   vec3 waveN = normalize((viewMatrix * vec4(normalize(vec3(-ws.x, 1.0, ws.y)), 0.0)).xyz);
   float hsLocal = max(0.04, length(vec2(vKW * uHs.x, vKS * uHs.y)));
   float crest = ws.z / (0.5 * hsLocal) * (1.0 - smoothstep(300.0, 1500.0, camDF));
-  float caps = clamp(vWhite * 35.0, 0.0, 1.0);
-  float speck = smoothstep(0.92 - 0.2 * caps, 0.99, fine.r * texelColor.r + 0.18 * crest);
-  float foam = caps * (smoothstep(0.6, 1.3, crest) * (0.55 + 0.45 * fine.g) + 0.6 * speck);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95), clamp(foam, 0.0, 0.85));
+  // whitecaps: patches a few metres across covering the fraction of the water the coverage law gives (vWhite: sea.ts).
+  // Each breaks and fades where it lies (two layers, each patch white within a second, then fading over about 8 s), and
+  // the foam drifts only with the surface water (uFoamOff: the current plus 3% of the wind, sea.ts foamDrift), not with
+  // the waves or the puffs. The threshold is the noise field's own quantile for that fraction (fitted from its
+  // distribution: T = 0.5665 − 0.1835·x − 0.0227·x², x = log10 W), so the area that shows white is the area the law says
+  float Wc = clamp(vWhite, 0.0, 0.2), lx = log(max(Wc, 1e-4)) / log(10.0), thr = 0.5665 - 0.1835 * lx - 0.0227 * lx * lx;
+  vec2 fadv = vWaveP - uFoamOff, wdc = normalize(uPuffV + vec2(1e-5, 0.0)), fq = vec2(dot(fadv, wdc) / 3.0, dot(fadv, vec2(-wdc.y, wdc.x)) / 1.6);
+  float caps = 0.0;
+  if (Wc > 1e-4) for (int k = 0; k < 2; k++) {
+    float a = uTime / 8.0 + 0.5 * float(k), ph = fract(a), seed = floor(a) + 3.7 * float(k);
+    float life = ph < 0.1 ? ph / 0.1 : 1.0 - (ph - 0.1) / 0.9; // (white at once as it breaks, then fading)
+    vec2 q = fq + seed * vec2(37.1, 17.3);
+    float cf = 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + vec2(7.1, 3.3)) + 0.06 * (vnoise(q * 7.0 + 2.0) - 0.5);
+    // lacy: a solid core, the edges thin and broken (foam bubbles drain from the outside in)
+    float core = smoothstep(thr - 0.005, thr + 0.03, cf), edge = smoothstep(thr - 0.035, thr, cf) * smoothstep(0.4, 0.75, vnoise(fadv / 0.35 + seed));
+    caps = max(caps, max(core * (0.7 + 0.3 * vnoise(fadv / 0.6 + seed * 1.3)), 0.6 * edge) * life);
+  }
+  caps *= 0.75 + 0.25 * smoothstep(0.0, 1.0, crest); // (brightest on the crests)
+  // ... and from Beaufort 7 (28–33 kt), white foam blown in streaks along the wind (WMO's Beaufort scale): thin lines,
+  // broken along their length, drifting with the rest of the foam
+  vec2 wq = vec2(dot(fadv, wdc) / 1.5, dot(fadv, vec2(-wdc.y, wdc.x)) / 0.12);
+  float streak = smoothstep(13.0, 17.0, uMeanKt * 0.5144) * smoothstep(0.82, 0.95, vnoise(vec2(wq.x / 6.0, wq.y))) * smoothstep(0.45, 0.7, vnoise(wq * vec2(1.0, 0.05) + 4.0)) * 0.3;
+  float foam = max(caps, streak) * (1.0 - smoothstep(1200.0, 4000.0, camDF));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.97), clamp(foam, 0.0, 0.8));
   // the sky reflected in the water, strongest at a glancing angle (toward the horizon)
   // (Schlick's Fresnel for water: 2% straight down, nearly all at a glancing angle; the wave slopes facing away
   // from you catch the bright sky, the ones facing you look into the dark water)
@@ -129,6 +150,7 @@ const WATER_FRAGMENT = `
   float mirror = clamp(1.4 - 0.5 * rough, 0.68, 1.28);
   diffuseColor.rgb *= 1.0 - 0.55 * fres * (1.0 - foam);
   totalEmissiveRadiance += uSkyCol * fres * 0.95 * uDay * mirror * (1.0 - foam);
+  totalEmissiveRadiance += vec3(0.22) * uDay * foam; // (foam scatters the overcast's light back up: it stays white against dark water even in rain)
 `;
 
 /** Overhead view state: which way is up, how high the camera is (m), and how far it's panned from the boat (m). */
@@ -159,7 +181,7 @@ export class SceneView {
   private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
   private puffSum = new Float32Array(PUFF_N * PUFF_N);
   private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
-  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() } };
+  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() }, uFoamOff: { value: new THREE.Vector2() } };
   private puffT: number | null = null;
   private puffAcc = 1;
   private terrain: TerrainGrid | null = null;
@@ -267,7 +289,7 @@ export class SceneView {
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -277,7 +299,7 @@ export class SceneView {
           vec2 puvV = (simP - uPuffO) / uPuffS;
           float edgeV = 1.0 - smoothstep(0.3, 0.5, length(puvV - 0.5));
           vec4 smV = texture2D(uPuff, clamp(puvV, 0.0, 1.0));
-          vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 20.0, edgeV);
+          vKW = mix(1.0, smV.g * 2.0, edgeV); vKS = mix(1.0, smV.b * 2.0, edgeV); vWhite = mix(uWhiteRef, smV.a / 10.0, edgeV); // (whitecaps stored ×10: up to the 10% cap)
           vWaveP = simP;
           vec3 dsp = waveDisp(simP, vKW, vKS, length(wp0.xz - cameraPosition.xz));
           transformed += vec3(dsp.x, dsp.z, -dsp.y);
@@ -403,6 +425,16 @@ export class SceneView {
 
   /** The course or destination changed (a new destination picked on the chart): build its marks again. */
   refreshCourse(w: World): void { this.buildCourse(w); }
+  /** New conditions mid-sail (World.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
+  conditionsChanged(w: World): void {
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.ripAngle = -w.windModel.base * D2R; // (the ripples lie across the new wind at once, not swept round to it)
+    this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12, w.t + 600); // (wave time: see sync)
+    // the lee of the land in the puffs' shading, for the new wind's direction
+    const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)},${Math.round(w.windModel.base)}`;
+    if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y, 5000, 50, w.windModel.base); this.terrainKey = key; }
+    this.buildCourse(w); // (the committee boat swung to the new wind)
+  }
 
   private buildCourse(w: World): void {
     const old = this.courseObjs;
@@ -429,10 +461,10 @@ export class SceneView {
       const rc = new THREE.Group();
       const rh = new THREE.Mesh(new THREE.BoxGeometry(4, 1.6, 12), new THREE.MeshLambertMaterial({ color: 0xf0f0ea })); rh.position.y = 0.5; rc.add(rh);
       const rcab = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 5), new THREE.MeshLambertMaterial({ color: 0xdedcd2 })); rcab.position.set(0, 2.2, 0.5); rc.add(rcab);
-      rc.position.copy(P3(C.committee.x, C.committee.y)); rc.rotation.y = -C.base * D2R; add(rc);
+      rc.position.copy(P3(C.committee.x, C.committee.y)); rc.rotation.y = -w.committeeFrom * D2R; add(rc); // (head to wind at her anchor)
       // the signal mast on her cabin top
       const mast = new SignalMast(5, true, 0.9); mast.group.position.set(0, 3.2, 0.5); rc.add(mast.group);
-      this.signal = { mast, heading: C.base };
+      this.signal = { mast, heading: w.committeeFrom };
     } else if (C.committeeKind === 'shore') {
       // flags on a yardarm on the club's flagpole (the pole itself is part of the landscape)
       const mast = new SignalMast(12, false, 1.3); mast.group.position.copy(P3(C.committee.x, C.committee.y, 2.3)); add(mast.group);
@@ -514,7 +546,7 @@ export class SceneView {
         for (let ch = 0; ch < 3; ch++) {
           const q = (ii: number, jj: number) => sg.v[(jj * SEA_N + ii) * 3 + ch];
           const val = (q(a, b) * (1 - u) + q(a + 1, b) * u) * (1 - v) + (q(a, b + 1) * (1 - u) + q(a + 1, b + 1) * u) * v;
-          d[o + 1 + ch] = Math.round(Math.min(1, Math.max(0, ch < 2 ? val / 2 : val * 20)) * 255);
+          d[o + 1 + ch] = Math.round(Math.min(1, Math.max(0, ch < 2 ? val / 2 : val * 10)) * 255);
         }
       } else { d[o + 1] = d[o + 2] = 128; d[o + 3] = 0; }
     }
@@ -600,7 +632,7 @@ export class SceneView {
     if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
     // the sky itself overcast (the cloud's grey, darker with the day), and no sun glinting off the water through it
     sm.uniforms.uMurk.value = Math.min(0.92, murk * 1.15); (sm.uniforms.uMurkCol.value as THREE.Color).copy(haze).multiplyScalar(0.92);
-    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3100 : rain === 1 ? 7500 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
+    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, setV = setVisibility({ fog, rain }).m, fogF = Number.isFinite(setV) ? setV : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R; set fog and rain: environment/weather.ts SET_VIS, which the map's visibility reads too)
     // (rain's visibility: V ≈ 11.6·R^−0.63 km for R mm/h, Atlas, "Optical extinction by rainfall", J. Meteor. 10, 486–488,
     // 1953, as quoted in a secondary summary, for a 0.055 threshold contrast: the paper itself couldn't be reached to check
     // it. Taken as the fog's far edge, where the haze is complete: near enough the distance you lose sight of things. Light rain about 2 mm/h,
@@ -687,6 +719,7 @@ export class SceneView {
     // the puffs' texture carried down the wind on the sim's clock (paused, sped up and replayed with it; a jump starts afresh)
     const pdt = this.puffT == null ? 0 : w.t - this.puffT; this.puffT = w.t;
     if (pdt > 0 && pdt < 5) this.puffUni.uPuffOff.value.addScaledVector(this.puffUni.uPuffV.value, pdt);
+    if (pdt > 0 && pdt < 5) { const fd = foamDrift(w.wind.from, w.wind.kt, w.cvec); this.puffUni.uFoamOff.value.x += fd.x * pdt; this.puffUni.uFoamOff.value.y += fd.y * pdt; } // (the foam with the surface water)
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     // the waves: heights for the sea where you are, then the sea map around you (every 2 s)

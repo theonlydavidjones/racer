@@ -10,7 +10,7 @@ import { byHand, sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
-import type { World } from '../sim/world';
+import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
 import { flagCanvas, pennantCanvas } from '../render/flags';
 import { FLAG_NAME } from '../sim/signals';
@@ -27,8 +27,8 @@ function shapeWords(u: Boat): string {
     const main = name === 'main', maxed = (...ks: (keyof typeof c)[]) => ks.every(k => (c[k] as number) >= 0.97);
     if (s.depth > t.depth + 0.012) out.push(maxed(...(main ? ['outhaul', 'backstay'] as const : ['backstay'] as const)) ? 'too full (flattening lines all on)' : `too full (${main ? 'outhaul, backstay' : 'backstay'} on)`);
     else if (s.depth < t.depth - 0.012) out.push(`too flat (ease ${main ? 'outhaul, backstay' : 'backstay'})`);
-    if (s.draft > t.draft + 0.04) out.push(maxed(...(main ? ['cunningham', 'downhaul'] as const : ['jibCunningham'] as const)) ? 'draft aft (the mast bend: Cunningham all on)' : `draft aft (${main ? 'Cunningham, downhaul' : 'jib Cunningham'} on)`);
-    else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib Cunningham'})`);
+    if (s.draft > t.draft + 0.04) out.push(maxed(...(main ? ['cunningham', 'downhaul'] as const : ['jibCunningham', 'jibHalyard'] as const)) ? (main ? 'draft aft (the mast bend: Cunningham all on)' : 'draft aft (jib luff all on)') : `draft aft (${main ? 'Cunningham, main halyard' : 'jib Cunningham, jib halyard'} on)`);
+    else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib halyard, jib Cunningham'})`);
     if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveller up') : 'jib car forward next tack'})`);
     else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : u.ww.kt >= 13 ? 'ease the sheet, traveller down' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
     parts.push(`<b>${main ? 'Main' : 'Jib'}:</b> ${out.length ? out.join(', ') : 'shape good'}`);
@@ -44,7 +44,7 @@ import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, t
 import { keySig, renderKey, type SimKey } from './legend';
 import { layerOn, type LayerKey } from './layers';
 import { drawFog, drawSea, nm } from './mapLayers';
-import { visibilityFor } from '../environment/weather';
+import { setVisibility, visibilityFor } from '../environment/weather';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
 
@@ -67,6 +67,13 @@ export function pointOfSail(u: Boat): { short: string; long: string } {
     : a < 160 ? ['broad reach', 'on a broad reach'] : ['run', 'running'];
   return { short, long };
 }
+
+/** Which way north points on a map turned so that `W` (deg, the wind's direction) is at the top: the angle (rad) to
+ * turn an up-pointing arrow by, clockwise on the canvas (makeTf: a bearing b is drawn at b − W from up). */
+export const northOnMap = (W: number) => -W * Math.PI / 180;
+/** How the inset map is turned (deg at the top): wind up in a race, as racers read a course; north up just sailing, as a
+ * cruising chart is (the owner picked a destination off a wind-up map in a westerly as if it were north-up). */
+export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) => wd.freeSail ? 0 : wd.C.base;
 
 export class Hud {
   private acc = 0;
@@ -156,7 +163,7 @@ export class Hud {
    */
   private transit(w: World, u: Boat): void {
     const el = $('transit');
-    if (w.freeSail || u.finished || !w.settings.aids) { el.hidden = true; return; }
+    if (w.freeSail || u.finished || u.retired || !w.settings.aids) { el.hidden = true; return; }
     const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
     if (w.t < 0 || !u.started) {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
@@ -229,7 +236,7 @@ export class Hud {
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
     $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Cruising' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+      u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
     this.windex(u);
@@ -317,7 +324,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: World, u: Boat): void {
-    if (w.t < 0 || u.finished) return;
+    if (w.t < 0 || u.finished || u.retired) return;
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
@@ -359,10 +366,24 @@ export class Hud {
       if (hail.replyAt != null) {
         $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now: they must give you room.`;
         el.className = hail.by === o.id ? 'kc' : 'row';
+      } else if (hail.by === o.id && hail.passedOn) {
+        // Rule 20.3: you passed the hail on to the boat to windward of you
+        const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';
+        const left = po.respondedAt != null ? Math.max(0, po.respondedAt + HAIL_RESPONSE - w.t) : null;
+        $('situMsg').textContent = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
+          : left == null ? `You passed the hail on to ${nm}. Tack as soon as they respond (Rule 20.3).` : `${nm} has responded. Tack now (Rule 20.3): ${left.toFixed(0)} s.`;
+        el.className = left != null ? 'kc alarm' : 'kc';
       } else if (hail.by === o.id) {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
-        $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
+        const passTo = !youTackPays(o, u) ? w.canPassOn(u, o) : null, blocked = !!passTo;
+        $('situMsg').textContent = blocked
+          ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
+          : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
+      } else if (hail.passedOn && hail.respondedAt == null) {
+        const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
+        $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
+        el.className = 'row';
       } else if (hail.respondedAt != null) {
         const left = Math.max(0, hail.respondedAt + HAIL_RESPONSE - w.t);
         $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
@@ -383,7 +404,7 @@ export class Hud {
   private lineBox(w: World, u: Boat): void {
     const el = $('linebox'), C = w.C;
     if (u.finished) { el.hidden = true; return; }
-    if (w.freeSail) {
+    if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
@@ -452,7 +473,7 @@ export class Hud {
   private map(wd: World, u: Boat): void {
     const [ctx, w, h] = fitCanvas(this.mapC);
     ctx.clearRect(0, 0, w, h);
-    const W = wd.C.base;
+    const W = insetRotation(wd);
     let tf: Tf, scale: number, ctr = { x: u.x, y: u.y };
     if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
     else if (wd.freeSail) { scale = Math.min(w, h) / 2800; tf = makeTf(u.x, u.y, W, scale, w, h); } // just sailing: the water around you, about 1.5 nm across
@@ -471,7 +492,14 @@ export class Hud {
     // the map's own words, each on a halo so it reads over the chart
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
-    say('WIND ↓', 34, 12, 'left'); // (right of the layers button on the map's corner)
+    const lab = W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
+    say(lab, 34, 12, 'left'); // (right of the layers button on the map's corner)
+    // north, as the map's turned (wind up in a race): a small arrow by the label, so a westerly's map isn't read as north-up
+    { const a = northOnMap(W), nx = 34 + ctx.measureText(lab).width + 16, ny = 9;
+      ctx.save(); ctx.translate(nx, ny); ctx.rotate(a); ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4, 4); ctx.lineTo(0, 2); ctx.lineTo(-4, 4); ctx.closePath();
+      ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = I.text; ctx.fill(); ctx.restore();
+      const t = (k: number) => [nx + Math.sin(a) * k, ny - Math.cos(a) * k]; const [lx, ly] = t(13); say('N', lx, ly + 3, 'center'); }
     const fog = this.fogNote(wd, true);
     if (fog) say(fog, 6, h - 6, 'left');
     const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
@@ -553,7 +581,12 @@ export class Hud {
   /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
   fogNote(wd: World, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
+    // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
+    const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
+    const here = (m: number) => short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`;
+    if (set.fogSet) return here(set.m);
     const v = visibilityFor(wd.raceDate, wd.clockUtc);
+    if (Number.isFinite(set.m)) { const real = 'none' in v || v.source === 'outlook' ? Infinity : v.source === 'observed' ? v.points[0].m : v.at(wd.user); if (!(real < set.m)) return here(set.m); }
     if ('none' in v) return short ? (v.noFog ? 'NO FOG FORECAST · NWS' : 'FOG: NO DATA') : `Fog: ${v.none}`;
     if (v.source === 'observed') { const m = v.points[0].m; return short ? `VIS ${nm(m, v.cap).toUpperCase()} AT PIER 17` : `Visibility ${nm(m, v.cap)} at Pier 17: ${v.says}.`; }
     if (v.source === 'outlook') { const w = v.words!(wd.user); return short ? (w ? `${w.toUpperCase()} · NWS` : w === '' ? 'NO FOG HERE · NWS' : 'FOG: OFF THE GRID') : `${w ? w[0].toUpperCase() + w.slice(1) : w === '' ? 'No fog' : 'Nothing'} here: ${v.says}.`; }

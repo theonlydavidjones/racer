@@ -25,13 +25,15 @@ export function boat(name: string, o: {
   backing?: boolean;
   /** has finished: no longer racing (Rule 23.1) */
   finished?: boolean;
+  /** has retired (RET): no longer racing either */
+  retired?: boolean;
 }): DiagramBoat {
   const rel = wrap(WIND - o.heading), u = V(o.heading), s = o.speed ?? 2.5;
   return {
     id: nextId++, name, x: o.at[0], y: o.at[1], h: o.heading, vx: u.x * s, vy: u.y * s,
     tack: rel >= 0 ? 'S' : 'P', tacking: o.tacking ?? false, lastTackT: o.lastTackT ?? -999,
     penalty: o.penalty ?? 0, ocs: o.ocs ?? false, started: o.started ?? true, leg: o.leg ?? 0,
-    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false, backing: o.backing, finished: o.finished
+    headingAgo: o.headingAgo ?? o.heading, aboveProper: o.aboveProper ?? false, backing: o.backing, finished: o.finished, retired: o.retired
   };
 }
 

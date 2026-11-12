@@ -450,9 +450,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const closeHauled = b.twa <= beatFor(b) + 8 && !b.tacking;
     const pinned = closeHauled ? w.tackBlocker(b) : null, may = pinned ? w.roomBlocker(b) : null;
     if (may && w.t - ai.lastHail > 40) { w.hail(b, may, 'room'); ai.lastHail = w.t; }
-    const waiting = pinned && (may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
+    // (her hail passed on to a boat beyond (Rule 20.3): that one has 5 s to respond and the boat she hailed then has 5 s
+    // more, so she holds on while the chain answers; if it never does, the boat she hailed can't tack, nor can she)
+    const chain = pinned ? w.pairRecord(b, pinned)?.hail : null, relay = chain?.kind === 'room' && chain.by === b.id && chain.passedOn && chain.respondedAt == null ? chain.passedOn : null;
+    const waiting = pinned && (relay ? !relay.failed : may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
     if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;
-    else if (beating && w.t - b.lastTackT > 4 && !(pinned && w.roomBlockedByMark(b))) desired = b.tack === 'S' ? csP : csS;
+    else if (beating && w.t - b.lastTackT > 4 && !(pinned && w.roomBlockedByMark(b)) && !relay) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   }
   // collision avoidance under the rules
@@ -504,7 +507,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const h = o !== b ? w.pairRecord(b, o)?.hail : null;
     if (!h || h.kind !== 'room') continue;
     // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(c)), unless she replied "You tack".
-    if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+    // With a boat on the same tack to windward stopping her, she first passes the hail on to it (Rule 20.3; WS Case 113)
+    // and holds her course until it responds; then she tacks.
+    if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) {
+      if (!h.passedOn) w.passOnHail(b, o);
+      const po = h.passedOn, waiting = !!po && po.respondedAt == null && !po.failed;
+      if (po?.failed) continue; // the boat she hailed never responded: she still can't tack into her
+      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+      else holdForHail = true;
+    }
     // She hailed and the other boat responded (tacked, or replied "You tack"): tack now (Rule 20.2(d)).
     if (h.by === b.id && h.respondedAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; }
   }
