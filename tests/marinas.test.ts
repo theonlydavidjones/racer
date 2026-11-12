@@ -181,7 +181,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
-    expect(n).toBeGreaterThan(20);
+    expect(n).toBeGreaterThan(8); // (was 20: since she must have 20 m clear along her path as she gathers way, main alone and hands off (pushoff-letgo.test.ts), many narrow berths shove her off astern instead)
   }, 120000); // (every fourth berth of all the marinas': about 35 s alone, since Richmond YC's 214 joined)
   it('her flags and windex show the wind while she\'s made fast and while the crew has her', () => {
     const slip = slipsIn('west-harbor')[30], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };

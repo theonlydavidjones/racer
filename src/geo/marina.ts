@@ -348,6 +348,22 @@ const WANDER = 16; // (measured: let go 60° off a 14 kt westerly with the main 
  * of where she's pointed too.
  */
 const LEE_SAG = 8;
+/** How far she runs, let go with the main alone, before she has the way on to steer clear of anything (m: Marinas' case,
+ * West Harbor 125 in 14 kt, ran 13 m into the dock rounding up; she needs about 18). */
+const GATHER = 20; // (with a margin: the test holds her to 18)
+/**
+ * Is her path clear for `len` m from her middle at `c` on heading `h`, her heading turning by `turn` degrees over it
+ * (rounding up as she gathers way) and her track `crab` degrees off her heading (her leeway, sagging to leeward)?
+ */
+function pathClear(c: Vec, h: number, s: Slip, turn: number, crab: number, len = GATHER): boolean {
+  let p = { ...c };
+  for (let d = 2; d <= len; d += 2) {
+    const hd = h + turn * d / len, v = dirOf(hd + crab);
+    p = { x: p.x + v.x * 2, y: p.y + v.y * 2 };
+    if (!berthClear(p, hd, s)) return false;
+  }
+  return true;
+}
 /** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 14: enough to know there's the 12 m she needs). */
 function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
@@ -454,9 +470,10 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
           turn = sign * toWind;
           // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
           // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
-          // and she falls back; and with the room ahead to gather way, allowing for her rounding up a little, WANDER)
+          // and she falls back; and with the room ahead to gather way (GATHER), along her path as she rounds up (WANDER) and as
+          // she sags to leeward (LEE_SAG))
           const c0 = about(at(back), s.heading, BOW, turn);
-          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && runAhead(e.c, e.h - Math.sign(o) * WANDER, s) >= 8 && runAhead(e.c, e.h + Math.sign(o) * LEE_SAG, s) >= 8; });
+          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(o) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(o) * LEE_SAG); });
           if (!offs.length) continue;
           const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
           hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
