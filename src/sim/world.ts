@@ -584,6 +584,39 @@ export class World {
     return { k: r.k * lee, shift: r.shift };
   }
 
+  /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
+  private belowSinceGun = new Set<number>();
+  /** Rule 21.1: how long (s) each returning boat has been sailing clearly away from the line (to release the latch). */
+  private awayFromLine = new Map<number, number>();
+  /**
+   * Rule 21.1, judged each step. "Sailing towards" the pre-start side is judged from her heading through the water (a
+   * boat headed back but set away by the tide is still returning). Once she is returning it holds (a latch) until her
+   * hull is completely on the pre-start side, or she clearly sails away from the line for RELEASE_AWAY seconds: slowing,
+   * luffing or a small turn on her way back doesn't give her rights back (Perry, on rule 21: she keeps her rights only
+   * until she is sailing back, converging with the line). Under the I flag (rule 30.1) she is returning while closing on
+   * the nearer end of the line to go round it, too. Not after the race is abandoned, and only within RETURN_RANGE of the
+   * line: beyond that the sim can't tell a boat going back to start from one sailing the course without having started.
+   */
+  private returningNow(b: Boat, d: number, was: boolean): boolean {
+    const C = this.C, RETURN_RANGE = 300, RELEASE_AWAY = 2;
+    const hullAbove = d > 0 || this.lineD(stern(b)) > 0;
+    if (this.t <= 0 || this.cancelled || b.started || b.finished || !hullAbove || d > RETURN_RANGE) { this.awayFromLine.delete(b.id); return false; }
+    const u = V(b.h), un = u.x * this.N.x + u.y * this.N.y;
+    if (was) {
+      const away = un > 0.3 && b.v > 0.2 ? (this.awayFromLine.get(b.id) ?? 0) + DT : 0;
+      this.awayFromLine.set(b.id, away);
+      return away < RELEASE_AWAY;
+    }
+    if (b.v <= 0.2) return false;
+    if (un < -0.1) return true;
+    if (b.roundEnd && b.ocs) {
+      // closing on the nearer end of the line, to round it (rule 30.1)
+      const bw = bow(b), e = dist(bw, C.pin) < dist(bw, C.committee) ? C.pin : C.committee, l = dist(bw, e) || 1;
+      return (u.x * (e.x - bw.x) + u.y * (e.y - bw.y)) / l > 0.3;
+    }
+    return false;
+  }
+
   /** Is she keeping clear of a boat she's closing on (her right of way the other's), within 12 s and 14 m? */
   private keepingClear(b: Boat): boolean {
     for (const o of this.boats) {
@@ -719,12 +752,22 @@ export class World {
   private checkLines(prevT: number): void {
     if (this.cancelled && this.cancelled.t < 0) return; // (postponed before the gun, AP over A: no start, nobody over early, nobody starts)
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
-    if (gun) this.snapGun();
+    if (gun) { this.snapGun(); this.belowSinceGun.clear(); }
     for (const b of this.boats) {
+      const wasReturning = !!b.returning;
+      b.returning = false;
       if (b.retired) continue; // (no longer racing: no start, finish, recall or rounding for her; her destination is checkArrival's)
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
-      const within = Math.abs(a) <= this.lineLen / 2 + 2;
-      if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
+      // Rule 21.1: after her starting signal, not yet started (over early, round an end under the I flag, or simply on the
+      // course side), with her hull not completely on the pre-start side of the line or its extensions, and sailing back
+      // toward it to start, she is returning and keeps clear of boats that aren't, until her hull is completely below it
+      b.returning = this.returningNow(b, d, wasReturning);
+      // Definitions, Start: she starts when, "her hull having been entirely on the pre-start side of the starting line at
+      // or after her starting signal", any part of her hull crosses it from the pre-start side to the course side. So: has it been, since the gun?
+      if (this.t >= 0 && d <= 0 && this.lineD(stern(b)) <= 0) this.belowSinceGun.add(b.id);
+      // (rules 29.1 and 30.1: "any part of her hull" on the course side, so her bow or her stern; the crossing is her bow's)
+      const within = Math.abs(this.lineA(bw)) <= this.lineLen / 2 + 2, over = Math.max(d, this.lineD(stern(b))) > 0;
+      if (gun && ((over && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
         b.ocs = true;
         if (b.isUser) this.emit({ type: 'toast', msg: 'Over early! Return below the line, then start. Keep clear while you do (Rule 21.1).', ms: 4500 });
       }
@@ -736,7 +779,10 @@ export class World {
       if (this.t >= 0 && b.prevD != null) {
         if (b.ocs && !b.roundEnd && d < 0 && this.lineD(stern(b)) < 0) { b.ocs = false; if (b.isUser) this.emit({ type: 'toast', msg: 'Cleared. Now start properly.' }); }
         const crossedFwd = b.prevD <= 0 && d > 0 && within, crossedBack = b.prevD > 0 && d <= 0 && within;
-        if (!b.started && !b.ocs && crossedFwd) {
+        if (!b.started && !b.ocs && crossedFwd && !this.belowSinceGun.has(b.id) && b.isUser) {
+          this.emit({ type: 'toast', ms: 4500, msg: 'Not started: your whole hull has to be below the line after the gun before you cross it to start. Go back below it, then start.' });
+        }
+        if (!b.started && !b.ocs && crossedFwd && this.belowSinceGun.has(b.id)) {
           b.started = true; this.startTimes[b.id] = this.t;
           if (b.isUser) {
             const frac = (a + this.lineLen / 2) / this.lineLen;
@@ -825,7 +871,7 @@ export class World {
       windFrom: this.wind.from,
       boats: this.boats.map(b => ({
         d: this.lineD(bow(b)), frac: (this.lineA(b) + this.lineLen / 2) / this.lineLen, v: b.v,
-        target: polar(b.ww.kt, beatAngle(b.ww.kt)), ocs: this.lineD(bow(b)) > 0 && Math.abs(this.lineA(b)) < this.lineLen / 2 + 25, penalty: b.penalty > 0
+        target: polar(b.ww.kt, beatAngle(b.ww.kt)), ocs: Math.max(this.lineD(bow(b)), this.lineD(stern(b))) > 0 && Math.abs(this.lineA(b)) < this.lineLen / 2 + 25, penalty: b.penalty > 0
       }))
     };
   }
@@ -1056,11 +1102,11 @@ export class World {
       if (b.retired) continue; // (she's out of the race: rule 30 is for boats starting)
       if (f === 'I') {
         // Rule 30.1: on the course side of the line or its extensions
-        if (!b.roundEnd && this.lineD(bow(b)) > 0) {
+        if (!b.roundEnd && Math.max(this.lineD(bow(b)), this.lineD(stern(b))) > 0) { // (any part of her hull: rule 30.1)
           b.roundEnd = true;
           if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'I flag: you were on the course side in the last minute. Sail back around an end of the line to the pre-start side, then start (Rule 30.1).' });
         }
-      } else if (!b.scoring && (inTriangle(bow(b), a, b2, c) || inTriangle(b, a, b2, c))) {
+      } else if (!b.scoring && (inTriangle(bow(b), a, b2, c) || inTriangle(b, a, b2, c) || inTriangle(stern(b), a, b2, c))) {
         b.scoring = f === 'Z' ? 'ZFP' : f === 'U' ? 'UFD' : 'BFD';
         if (b.isUser) this.emit({ type: 'toast', ms: 6000, msg: f === 'Z'
           ? 'Z flag: you were in the triangle in the last minute. 20% scoring penalty (Rule 30.2). Keep racing.'
@@ -1127,7 +1173,13 @@ export class World {
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'
         ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. She's going astern: steer with the tiller (the bow goes the way you push it), then get sail on her.${hoist}`
-        : `Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on).${hoist}` });
+        : plan.setBack
+          ? plan.h !== slip.heading
+            ? plan.headToWind
+              ? `Pushing off: the wind's onto the dock and nearly ahead, so your crew pushes her bow off as far as there's room. She'll be close to head to wind: get the main up first (U), then the jib, and sail off close-hauled, away from the dock.`
+              : `Pushing off: the wind's blowing her onto the dock, so your crew pushes her bow off toward the wind and shoves her out at an angle. Get the jib up quickly (J), sheeted in, and sail off close-hauled, away from the dock: don't bear away toward it.`
+            : `Pushing off: the wind's blowing her onto the dock and there's no room to angle her out, so she'll be set back on it. In real life you'd warp her along to the dock's end first; here, get sail up the moment she's off, sheeted in.`
+          : `Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on).${hoist}` });
     return true;
   }
 
