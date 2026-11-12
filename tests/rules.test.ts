@@ -387,6 +387,18 @@ describe('Rule 21.1 · returning after being over early', () => {
     expect(verdict(red, blue, 25)).toEqual({ keepsClear: 'Blue', rule: '10' });
   });
 
+  it('21.1 covers any boat sailing back to start, not only one over early: round an end, or above the line at the gun', () => {
+    const red = boat('Red', { at: [0, 0], heading: 225, started: false }); red.returning = true; // not OCS, coming back on starboard
+    const blue = boat('Blue', { at: [-8, -8], heading: 45 });
+    expect(verdict(red, blue, 30)).toEqual({ keepsClear: 'Red', rule: '21.1' });
+  });
+
+  it('over early but sailing on, away from the line, she keeps her rights until she turns back (21.1: "sailing towards")', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315, ocs: true, started: false }); red.returning = false;
+    const blue = boat('Blue', { at: [-8, -8], heading: 45 });
+    expect(verdict(red, blue, 10)).toEqual({ keepsClear: 'Blue', rule: '10' });
+  });
+
   it('before the start signal, being over the line gives up no rights', () => {
     const red = boat('Red', { at: [0, 0], heading: 315, ocs: true, started: false });
     const blue = boat('Blue', { at: [-8, -8], heading: 45 });

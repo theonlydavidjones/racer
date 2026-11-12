@@ -706,8 +706,17 @@ export class World {
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
     if (gun) this.snapGun();
     for (const b of this.boats) {
+      b.returning = false;
       if (b.retired) continue; // (no longer racing: no start, finish, recall or rounding for her; her destination is checkArrival's)
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
+      // Rule 21.1: after her starting signal, not yet started (over early, round an end under the I flag, or simply on the
+      // course side), with her hull not completely on the pre-start side of the line or its extensions, and making way
+      // back toward it, she is returning to start and keeps clear of boats that aren't
+      if (this.t > 0 && !b.started && !b.finished && (d > 0 || this.lineD(stern(b)) > 0)) {
+        // ("sailing towards": her heading through the water, under way; not the current setting her back)
+        const u = V(b.h);
+        b.returning = b.v > 0.2 && u.x * this.N.x + u.y * this.N.y < -0.1;
+      }
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
       if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
         b.ocs = true;

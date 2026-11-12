@@ -6,11 +6,18 @@ import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
  * 21 (returning to start, taking a penalty, backing a sail: Section A doesn't apply), 20.2(c) (replied "You tack"),
  * 18.3 (tacked in the zone), 18.2(a) and 18.2(c) mark-room (not while a hail for room to tack is under way: 20.2(e)), 13 (tacking), 10, 12, 11.
  * (Rule 19, room at an obstruction, is settled when there's an incident: see assessPair.) */
+/** Rule 21.1: is she returning to start (the World's judgement, or, if it hasn't made one, her being over early)? */
+export const returning = (b: RulesBoat): boolean => b.returning ?? b.ocs;
+
 export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, rec?: PairRecord | null): Verdict<B> {
   const B = B_;
   const after = ctx.t > 0;
-  if (after && A.ocs && !B.ocs) return { kc: A, rule: '21.1' };
-  if (after && B.ocs && !A.ocs) return { kc: B, rule: '21.1' };
+  // Rule 21.1: a boat sailing back toward the pre-start side after her starting signal, to start or to comply with rule
+  // 30.1, keeps clear of one not doing so, until her hull is completely on the pre-start side. (Over early but sailing on
+  // away from the line, she keeps her rights until she turns back: the World's `returning`.)
+  const ret = returning(A), retB = returning(B);
+  if (after && ret && !retB) return { kc: A, rule: '21.1' };
+  if (after && retB && !ret) return { kc: B, rule: '21.1' };
   if (A.penalty > 0 && !(B.penalty > 0)) return { kc: A, rule: '21.2' };
   if (B.penalty > 0 && !(A.penalty > 0)) return { kc: B, rule: '21.2' };
   if (A.backing && !B.backing) return { kc: A, rule: '21.3' };

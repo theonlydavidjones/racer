@@ -12,6 +12,12 @@ export interface RulesBoat {
   lastTackT: number; // race time she last passed head to wind
   penalty: number; // degrees of penalty turn still to do
   ocs: boolean; // over early and not yet returned
+  /**
+   * Rule 21.1: after her starting signal, sailing towards the pre-start side of the starting line or one of its
+   * extensions to start (over early, or not yet started: round an end, or above the line at the gun) or to comply with
+   * rule 30.1, with her hull not yet completely on the pre-start side. Omitted: taken as `ocs`.
+   */
+  returning?: boolean;
   started: boolean;
   leg: number; // index of her next mark
   /** The wind she's sailing in (the true wind over the water where she is: her tack is judged from it). Omitted: the

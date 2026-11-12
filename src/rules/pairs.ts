@@ -1,6 +1,6 @@
 import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec } from '../core/math';
 import { clearAstern, cpa, hullGap } from './geometry';
-import { rightOfWay } from './rightOfWay';
+import { returning, rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
 
 /** Hulls closer than this count as contact, m. */
@@ -139,7 +139,7 @@ export const notRacing = (b: RulesBoat): boolean => !!b.retired || (!!b.finished
 /**
  * Rule 23: could `X` be breaking rule 23 by taking `Y`'s wind? Only between these boats:
  * 23.1, X is not racing (she has finished) and Y is;
- * 23.2, Y is taking a penalty, on another leg, or returning to start under rule 21.1 (the sim's `ocs`), and X is not
+ * 23.2, Y is taking a penalty, on another leg, or returning to start under rule 21.1 (`returning`), and X is not
  * sailing her proper course (after the starting signal she may sail it whatever it does to Y's wind; the sim's sign of
  * leaving it is sailing above it). Before the start there is no proper course to judge interference by, and the sim
  * only calls 23.2 blanketing it can tell was deliberate, so not then.
@@ -150,7 +150,7 @@ export function blanketRule<B extends RulesBoat>(X: B, Y: B, ctx: RulesContext):
   if (X.finished) return null; // just over the line, still clearing it, she is racing
 
   if (ctx.t <= 0 || !X.started || !X.aboveProper) return null;
-  const vulnerable = Y.penalty > 0 || Y.ocs || (Y.started && Y.leg !== X.leg);
+  const vulnerable = Y.penalty > 0 || returning(Y) || (Y.started && Y.leg !== X.leg);
   return vulnerable ? '23.2' : null;
 }
 
@@ -284,7 +284,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
-  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (kc.ocs && ctx.t > 0)) && ((ctx.t > 0 && row.aboveProper) || turnedToward(row, kc) > 0))) {
+  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (returning(kc) && ctx.t > 0)) && ((ctx.t > 0 && row.aboveProper) || turnedToward(row, kc) > 0))) {
     // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper course
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
   } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {

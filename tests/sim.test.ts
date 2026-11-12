@@ -67,6 +67,19 @@ describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
     expect(w.startReport).not.toBeNull();
   });
 
+  it('Rule 21.1: after the gun, not started and on the course side, sailing back toward the line she is returning; sailing away she is not', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y);
+    w.t = 30; place(w, 15, toCourse + 180); w.user.v = 2; w.user.luff = false; // above the line, heading back down to it
+    w.step(DT); w.step(DT);
+    expect(w.user.started).toBe(false);
+    expect(w.user.returning).toBe(true);
+    place(w, 15, toCourse); w.user.v = 2; w.step(DT); // above it, sailing away
+    expect(w.user.returning).toBe(false);
+    place(w, -10, toCourse + 180); w.user.v = 2; w.step(DT); // hull completely below the line: done
+    expect(w.user.returning).toBe(false);
+  });
+
   it('behind the line at the gun → not OCS', () => {
     const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
     w.t = -0.5; place(w, -20, brg(w.N.x, w.N.y));
