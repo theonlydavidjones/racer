@@ -34,7 +34,7 @@ export function seaTI(U: number): number {
 /** σu (m/s) over open water for a 10 m wind of U m/s: the intensity's, or the light-air floor. */
 export const sigmaU = (U: number) => Math.max(seaTI(U) * U, GUSTS.sigmaFloor);
 
-const WAVES = 64;
+const WAVES = 32;
 interface Wave { kx: number; ky: number; ph: number }
 
 export class GustField {
