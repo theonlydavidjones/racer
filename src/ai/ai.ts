@@ -610,10 +610,13 @@ export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   // a seasoned forward hand goes up to the mast before the bear-away at a mark when the next leg is a run, so the pole
   // goes on as soon as she's down (the owner: from the foredeck, "already pre-positioned (which a seasoned crew member
-  // knows to do)", 10 s against 20 from the cockpit). About 15 s out (60 m); not alone, and not where you've put them.
+  // knows to do)", 10 s against 20 from the cockpit). Only in the last seconds before the bear-away (about 8 s out at
+  // her speed: off the rail any sooner costs her on the beat, and a tack with someone at the mast is slow), and not while
+  // she needs their weight hiking; not alone, not through a tack, and not where you've put them. (An estimate of practice.)
   const c = b.crew, fwd = c && c.spec.crew.length ? c.spec.crew[c.spec.crew.length - 1] : null;
   const nextDeep = !!nm && nm.type === 'round' && Math.abs(wrap(b.ww.from - brg(nm.next.x - nm.p.x, nm.next.y - nm.p.y) - 180)) < 30;
-  b.polePrep = !!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < 60 && w.t >= 0 && !b.docked && b.penalty <= 0;
+  b.polePrep = !!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < Math.max(12, 8 * b.v)
+    && (c!.hike ?? 0) < 0.3 && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
   if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
   else if (twa > 157) b.poleWant = true;

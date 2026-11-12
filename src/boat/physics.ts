@@ -11,7 +11,7 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, reactTime, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs, ownerOf, poleTrip, workPace } from './crewWork';
+import { bodyJob, crewJobs, ownerFor, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag } from './condition';
@@ -42,7 +42,7 @@ export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c
 export const POLE = { set: 13, stow: 8, gybe: 13, forward: 13 };
 /** About how long (s) your crew will take to set the pole from where they are now, and to stow it. */
 export function poleEta(b: Boat): { set: number; stow: number } {
-  const hands = b.crew ? workPace(b, ownerOf('pole', b.crew.spec.crew.length, b.crew.spec, (b.crew.layout ?? 'cockpit') !== 'cockpit')) : 1;
+  const hands = b.crew ? workPace(b, ownerFor(b.crew, 'pole')) : 1;
   return { set: poleTrip(b, POLE.forward) + POLE.set / hands, stow: POLE.stow / hands };
 }
 
@@ -810,7 +810,7 @@ type Ctl = Exclude<keyof Controls, 'car'>;
 function trimmerOf(b: Boat, line: 'mainsheet' | 'jibsheet'): Person | null {
   const c = b.crew; if (!c) return null;
   const ppl = c.ppl ??= allAboard(c.spec);
-  return ppl[ownerOf(line, c.spec.crew.length, c.spec, (c.layout ?? 'cockpit') !== 'cockpit')] ?? null;
+  return ppl[ownerFor(c, line)] ?? null;
 }
 /** The club crew's reaction time: the reference CREW_LAG was set for. */
 const CLUB_REACT = reactTime({ h: 1.75, w: 75 });
