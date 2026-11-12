@@ -149,8 +149,8 @@ function userCrew(s: Settings): CrewSpec {
 
 const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '-' + A.id;
 
-/** The settings the conditions panel sets: what applyConditions takes mid-sail. */
-export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDir', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
+/** The settings the conditions panel sets: what applyConditions takes mid-sail (windDir, a replay's legacy pin, isn't one: it stays the sail's). */
+export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
 
 export class World {
   readonly C: Course;
