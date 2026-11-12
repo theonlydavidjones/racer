@@ -97,7 +97,7 @@ type Target = Station;
 
 /** You placing the crew: across (to leeward, the middle, sitting up to windward, hiking) and fore-and-aft. null = their call. */
 export type PlaceAcross = 'lee' | 'mid' | 'up' | 'hike';
-export type PlaceFore = 'fwd' | 'mid' | 'aft';
+export type PlaceFore = 'fwd' | 'mid' | 'aft' | 'deck';
 export interface CrewPlace { across: PlaceAcross | null; fore: PlaceFore | null }
 
 export interface CrewState {
@@ -131,7 +131,7 @@ export interface CrewState {
   layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; vAvg?: number; twsAvg?: number; poleWas?: boolean;
   /** With the pole out: whether best practice has them forward, how long it's said so (s), and what they're doing about
    * it, in the status line's terms (ui/crewWords.ts). */
-  poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'stay' | 'aft' | 'late';
+  poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'stay' | 'aft' | 'late' | 'wrong';
   /** (true while both crew are right forward on the foredeck: the helm has the main then, crewWork.ts mainHand) */
   foredeck?: boolean;
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
@@ -333,7 +333,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // (they think about it every second or so, not every moment)
     c.foreT = (c.foreT ?? 0) - Math.max(dt, 0.05); // (this runs 20 times a second)
     if (c.fore01 == null || c.foreT <= 0) { chooseFore(c, k, skill); c.foreT = 1; }
-    const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0 }[pl.fore] : c.fore01!;
+    const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0, deck: 1 }[pl.fore] : c.fore01!;
     // downwind, a good crew goes forward: with the pole out and two crew, both right up on the foredeck as it goes out
     // (unless there's a breeze: chooseLayout); without it, the bow hand to the mast when the hull's trim says it pays
     // (hullTrim.ts: in light air the transom lifts clear). Re-thought once a second, moved back only for a real gain and
@@ -345,7 +345,11 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // (without the pole only a good crew thinks of the mast; with it out everyone decides, as well as their skill lets them)
     const canGo = n > 0 && downwind && !pl?.fore && (skill > 0.5 || (k.pole && n >= 2));
     if (!k.pole || !canGo) c.poleWhy = undefined;
-    if (c.foreT === 1 && canGo) c.layout = chooseLayout(c, k, foreF, skill);
+    if (pl?.fore === 'deck' && n > 0) {
+      // sent forward by you (the owner: "send the crew forward"): two right up on the foredeck, one to the mast
+      const l = n >= 2 ? 'foredeck' : 'mast'; if (c.layout !== l) c.layoutT = 0;
+      c.layout = l; c.foredeck = n >= 2; c.poleWhy = undefined;
+    } else if (c.foreT === 1 && canGo) c.layout = chooseLayout(c, k, foreF, skill);
     else if (!canGo) { c.layout = 'cockpit'; c.foredeck = false; }
     const atMast = c.layout === 'mast' || c.layout === 'foredeck', forward = c.layout === 'foredeck';
     // targets for each person: jobs first, then the helm, then the free crew share what's left of the wanted moment
@@ -518,21 +522,29 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
     const vt = Math.max(0.5, polar(c.twsAvg ?? k.tws, k.twa, 'wing'));
     const cost = dragAt(vt, j => j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2)) - dragAt(vt, j => cockpitZ(j, n));
     if (justOut) { c.layoutT = 1e9; c.poleFwd = undefined; }
-    const fwdNow = now !== 'cockpit', best = fwdNow ? cost <= 0.008 : cost < 0.003;
-    if (best !== c.poleFwd) { c.poleFwd = best; c.poleFwdT = 0; } else c.poleFwdT = (c.poleFwdT ?? 0) + 1; // (once a second)
-    // how well they follow it, by their skill (the owner: "best practice, according to their knowledge level"), drawn
-    // once for the boat from who's aboard so it's the same crew every time: an expert crew goes at once and right up on
-    // the foredeck; a club crew a little late (8 to 25 s), and half of them only as far as the bow hand at the mast; a
-    // novice crew mostly stays in the cockpit, the rest send the bow hand to the mast late (30 to 60 s). (An estimate of
-    // how crews sail, not from a source.)
-    const r1 = crewDraw(c.spec, 1), r2 = crewDraw(c.spec, 2);
-    const tier = skill >= 0.8 ? 2 : skill >= 0.45 ? 1 : 0;
-    const fwdAs: 'foredeck' | 'mast' | 'cockpit' = tier === 2 ? 'foredeck' : tier === 1 ? (r1 < 0.5 ? 'foredeck' : 'mast') : (r1 < 0.6 ? 'cockpit' : 'mast');
+    const fwdNow = now !== 'cockpit', call = (x: number) => fwdNow ? x <= 0.008 : x < 0.003, best = call(cost);
+    // how well they follow it (the owner: "best practice, according to their knowledge level"; club racers go "when
+    // conditions make sense, but slower than experts", and "sometimes make the mistake of going when the conditions are
+    // wrong"; all of it "shifts with the skipper's experience"): the call is the skipper's as much as the crew's, so
+    // judged on the two together. Drawn once for the boat from who's aboard, so it's the same crew every time:
+    // - an expert boat goes at once, right up on the foredeck, and only when it pays;
+    // - a club boat goes all the way too, but a little late (8 to 25 s); about a third of them misjudge the breeze and
+    //   go forward a knot or two past where it pays (the bow-down cost, about 1% a knot there, read 0.6 to 1.8% low);
+    // - a novice boat mostly stays in the cockpit (the rest send the bow hand to the mast, late: 30 to 60 s), and half
+    //   of those that go misjudge it further.
+    // (How crews sail, as the owner describes it: the numbers are estimates, not from a source.)
+    const r1 = crewDraw(c.spec, 1), r2 = crewDraw(c.spec, 2), r3 = crewDraw(c.spec, 3);
+    const judge = (skillOf(c.spec.helm) + skill) / 2, tier = judge >= 0.8 ? 2 : judge >= 0.45 ? 1 : 0;
+    const err = tier === 2 ? 0 : tier === 1 ? (r3 < 0.35 ? 0.006 + 0.012 * r1 : 0) : (r3 < 0.5 ? 0.02 : 0);
+    const theirs = call(cost - err);
+    if (theirs !== c.poleFwd) { c.poleFwd = theirs; c.poleFwdT = 0; } else c.poleFwdT = (c.poleFwdT ?? 0) + 1; // (once a second)
+    const fwdAs: 'foredeck' | 'mast' | 'cockpit' = tier >= 1 ? 'foredeck' : (r1 < 0.6 ? 'cockpit' : 'mast');
     const delay = tier === 2 ? 0 : tier === 1 ? 8 + 17 * r2 : 30 + 30 * r2;
-    const target = best ? fwdAs : 'cockpit';
+    const target = theirs ? fwdAs : 'cockpit';
     const late = (c.poleFwdT ?? 0) < delay;
-    c.poleWhy = best ? (target === 'cockpit' ? 'stay' : late && now === 'cockpit' ? 'soon' : target === 'foredeck' ? 'fwd' : 'part')
-      : late && fwdNow ? 'late' : 'aft';
+    c.poleWhy = best
+      ? (target === 'cockpit' && now === 'cockpit' ? 'stay' : now === 'foredeck' ? 'fwd' : now === 'mast' ? 'part' : 'soon')
+      : fwdNow ? (theirs ? 'wrong' : 'late') : 'aft';
     if (target !== now && !late && (settled || target === 'cockpit' && now !== 'cockpit' && (c.layoutT ?? 0) >= 10)) return go(target);
     return go(now);
   }

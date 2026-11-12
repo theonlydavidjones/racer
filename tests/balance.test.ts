@@ -167,21 +167,37 @@ describe('The crew', () => {
     });
     expect(moves).toBeLessThanOrEqual(1);
   });
-  it('follow best practice as well as their skill lets them: an expert crew at once, a club crew a little late or only to the mast, a novice crew mostly not at all', () => {
-    const run = (spec: ReturnType<typeof crewOf>) => {
-      const b = testBoat({ heading: 195, kt: 4, windKt: 8 }); b.poleWant = true; b.crew = newCrew(spec, 'S');
-      let at = -1; sail(b, 90, t => { b.h = 195; if (at < 0 && (b.crew!.layout ?? 'cockpit') !== 'cockpit') at = t; });
+  it('follow best practice as well as their skill lets them: an expert boat at once, a club boat a little late, a novice boat mostly not at all', () => {
+    const run = (spec: ReturnType<typeof crewOf>, W = 8, secs = 90) => {
+      const b = testBoat({ heading: 195, kt: 4, windKt: W }); b.poleWant = true; b.crew = newCrew(spec, 'S');
+      let at = -1; sail(b, secs, t => { b.h = 195; if (at < 0 && (b.crew!.layout ?? 'cockpit') !== 'cockpit') at = t; });
       return { at, layout: b.crew!.layout, why: b.crew!.poleWhy, words: crewWords(b) };
     };
     const ex = run(crewOf(0.9));
     expect(ex.layout).toBe('foredeck'); expect(ex.at).toBeLessThan(15); expect(ex.words).toMatch(/foredeck.*pole out in 8 kt/);
-    // (several club and novice crews: each crew's habits are their own, but the same every time)
-    const club = [1.6, 1.7, 1.8, 1.9, 2.0].map(h => run(crewOf(0.6, h))), nov = [1.6, 1.7, 1.8, 1.9, 2.0].map(h => run(crewOf(0.25, h)));
-    for (const r of club) { expect(r.layout).not.toBe('cockpit'); expect(r.at).toBeGreaterThan(ex.at + 5); }
-    expect(club.some(r => r.layout === 'mast')).toBe(true);
-    expect(nov.filter(r => r.layout === 'cockpit').length).toBeGreaterThanOrEqual(2);
+    // (several club and novice boats: each boat's habits are its own, but the same every time)
+    const hs = [1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2.0];
+    const club = hs.map(h => run(crewOf(0.6, h))), nov = hs.map(h => run(crewOf(0.25, h)));
+    // (the owner: club racers go "when conditions make sense, but slower than experts")
+    for (const r of club) { expect(r.layout).toBe('foredeck'); expect(r.at).toBeGreaterThan(ex.at + 5); }
+    expect(nov.filter(r => r.layout === 'cockpit').length).toBeGreaterThanOrEqual(3);
     for (const r of nov) if (r.layout === 'cockpit') expect(r.words).toMatch(/staying in the cockpit/);
-    expect(run(crewOf(0.6, 1.7))).toEqual(club[1]);
+    expect(run(crewOf(0.6, 1.7))).toEqual(club[2]);
+    // ("and sometimes make the mistake of going when the conditions are wrong"): a knot or so past where it pays, some
+    // club boats go up while an expert one stays aft, and the line says it's a misjudgement
+    expect(run(crewOf(0.9), 12, 60).layout).toBe('cockpit');
+    const windy = hs.map(h => run(crewOf(0.6, h), 12, 60)), wrong = windy.filter(r => r.layout === 'foredeck');
+    expect(wrong.length).toBeGreaterThan(0); expect(wrong.length).toBeLessThan(windy.length);
+    for (const r of wrong) expect(r.words).toMatch(/misjudgement/);
+    // (and it "shifts with the skipper's experience": an expert skipper with a novice crew make a club boat's call)
+    const mixed = { helm: { ...DEFAULT_CREW.helm, skill: 0.9 }, crew: [{ h: 1.75, w: 78, skill: 0.25 }, { h: 1.72, w: 72, skill: 0.25 }] };
+    expect(run(mixed).layout).toBe('foredeck');
+  });
+  it('go up on the foredeck when you send them there, and say so', () => {
+    const b = testBoat({ heading: 195, kt: 4, windKt: 16 }); b.crew = newCrew(crewOf(0.6), 'S'); b.crew.place = { across: null, fore: 'deck' };
+    sail(b, 20, () => { b.h = 195; });
+    expect(b.crew!.layout).toBe('foredeck'); expect(b.crew!.people[2].pose).toBe('bow');
+    expect(crewWords(b)).toMatch(/^You: up on the foredeck/);
   });
   it('say why they stay aft in a breeze with the pole out', () => {
     const b = testBoat({ heading: 195, kt: 5, windKt: 20 }); b.poleWant = true; b.crew = newCrew(EXPERT, 'S');

@@ -50,9 +50,9 @@ const MAST_Z = -0.95, Z_BOW = -3.32;
 const smooth01 = (t: number) => { const q = Math.max(0, Math.min(1, t)); return q * q * (3 - 2 * q); };
 const COCK0 = -L / 2 + COCKPIT.u0 * L, COCK1 = -L / 2 + COCKPIT.u1 * L, CAB0 = -L / 2 + CABIN.u0 * L;
 /** The cockpit, from hull.ts (COCKPIT_FIT, Boat Detail's, to the construction plan): side benches 300 mm over the sole
- * from the bulkhead aft to St. 4¾, a footwell (the sole, its sides sloping up to the deck) round the thwart, and a
+ * from the bulkhead aft to St. 4¾, a footwell round the thwart, and a
  * shelf at the benches' height across the after end; the thwart a deep beam across the cockpit, its top a little under
- * the coaming caps. */
+ * the coaming caps, the footwell either side of the sole open to the hull's inside, no post under the thwart. */
 const SEAT_Y = COCKPIT_FIT.seat, { benchAft: BENCH_AFT, shelfFwd: SHELF_FWD } = COCKPIT_FIT;
 const THWART = { z: COCKPIT_FIT.thwart.z, half: COCKPIT_FIT.thwart.half, top: thwartTop() };
 const coamH = COAMING_H;
@@ -74,7 +74,10 @@ export function ground(x: number, z: number): number {
     const sh = soleHalf(z);
     if (ax < sh) return COCKPIT.sole;
     if (z < BENCH_AFT) return SEAT_Y; // (a bench)
-    const c = chz(z); return COCKPIT.sole + (deckY(u, c) - COCKPIT.sole) * (ax - sh) / Math.max(0.01, c - sh); // (the footwell's sloping side)
+    // (the footwell beside the sole: open to the hull's own inside, curving out and up to the deck)
+    let lo = COCKPIT.sole - 0.5, hi = deckY(u, chz(z));
+    for (let q = 0; q < 14; q++) { const m = (lo + hi) / 2; if (hullInnerHalf(u, m) < ax) lo = m; else hi = m; }
+    return hi;
   }
   if (z > CAB0 && z < COCK0 && ax < cabinHalf(u)) return cabinTopAt(u, ax);
   const e = halfBeam(u);
@@ -234,6 +237,8 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
   // (somewhere forward of the cockpit with no job there, as after setting the pole, waiting to see where they go next:
   // on deck on hands and knees where they are, not drawn back in the cockpit)
+  // (a place up forward, not yet reached: still on the way there, along the side deck)
+  if ((job === 'fore' || job === 'bow') && z > CAB0) { isMoving = true; dest = Math.min(dest, CAB0 - 0.5); }
   if (z < COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) isMoving = true;
   // (seated along the cockpit, they're on its benches or the side deck beside them: the weight's place from the physics,
   // drawn within the benches' length)
