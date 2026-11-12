@@ -39,7 +39,7 @@ import { compass, sunPosition, sunTimes } from './environment/sun';
 import { startDebrief } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
-import { horn, logMessage, messageLog, setLogClock, sound, toast } from './ui/feedback';
+import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } from './ui/feedback';
 import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
@@ -632,13 +632,16 @@ const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const stamp = (t: number | null) => t == null ? '' : `<span class="lt">${fmtClock(t)}</span>`;
 function renderLog(): void {
   const recent = messageLog.filter(m => !m.msg.startsWith('— ')).slice(-4).reverse();
-  $('msgRecent').innerHTML = recent.map(m => `<li>${stamp(m.t)}${esc(m.msg)}</li>`).join('');
+  // one line each on screen, the headline (feedback.ts headline); the whole message on hover and in the log (All, or a tap)
+  $('msgRecent').innerHTML = recent.map(m => { const { head, cut } = headline(m.msg);
+    return `<li${cut ? ' class="cut"' : ''} title="${esc(m.msg).replace(/"/g, '&quot;')}">${stamp(m.t)}${esc(head)}</li>`; }).join('');
   if (!$('logView').hidden) $('logList').innerHTML = messageLog.slice().reverse().map(m =>
     m.msg.startsWith('— ') ? `<li class="sep">${esc(m.msg.slice(2))}</li>` : `<li>${stamp(m.t)}${esc(m.msg)}</li>`).join('');
 }
 setLogClock(() => (w && w.running ? w.t : null), renderLog);
 function openLog(): void { $('logView').hidden = false; renderLog(); }
 $('bLogAll').onclick = openLog;
+$('msgRecent').addEventListener('click', openLog); // (a message's whole text is in the log)
 $('bLogClose').onclick = () => { $('logView').hidden = true; };
 
 const keymap = new KeyMap();

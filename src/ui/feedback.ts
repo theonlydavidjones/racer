@@ -16,6 +16,34 @@ export function horn(dur: number): void {
   } catch { /* no audio */ }
 }
 
+/**
+ * A message's headline, for the one line it gets on screen (the owner, 12 Nov 2026: one-line messages, the full text in
+ * the log). The words before a colon when they say something on their own ("Sight the line: from the…" → "Sight the
+ * line"); otherwise the first sentence, or its first clause before a bracket or a semicolon. An abbreviation's full stop
+ * ("St. Francis", "Pt. Bonita") isn't a sentence's end. `cut`: whether there's more in the log.
+ */
+export function headline(msg: string): { head: string; cut: boolean } {
+  const s = msg.trim();
+  const stop = (t: string): string => {
+    for (let i = 0; i < t.length - 1; i++) {
+      const c = t[i], n = t[i + 1];
+      if ((c === '.' || c === '!' || c === '?') && n === ' ') {
+        if (c === '.' && /\b(St|Pt|Mt|Ft|No|vs|approx|e\.g|i\.e)$/i.test(t.slice(0, i))) continue; // (an abbreviation)
+        return t.slice(0, c === '.' ? i : i + 1);
+      }
+      if ((c === ' ' && n === '(') || c === ';') return t.slice(0, i);
+    }
+    return t.replace(/\.$/, '');
+  };
+  const colon = s.indexOf(': ');
+  // (a colon early on: what comes before it is the headline if it's more than a word or two, "Weather helm"; "Crew"
+  // alone says nothing, so then the clause runs on past the colon)
+  let head = colon > 0 && colon < 40 && colon >= 12 && !/\(/.test(s.slice(0, colon)) ? s.slice(0, colon) : stop(s);
+  head = head.replace(/[,.:]$/, '').trim();
+  if (head.length > 70) { const cut = head.lastIndexOf(' ', 68); head = head.slice(0, cut > 30 ? cut : 68).replace(/[,.:;]$/, '') + '…'; }
+  return { head, cut: head !== s && head + '.' !== s };
+}
+
 /** Everything the game has told you, with race time, so nothing is lost when a message fades. */
 export interface LogEntry { t: number | null; msg: string }
 export const messageLog: LogEntry[] = [];
