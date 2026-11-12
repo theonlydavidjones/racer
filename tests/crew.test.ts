@@ -26,9 +26,10 @@ describe('Hiking a Folkboat, by the class rules', () => {
   });
   it('hiking tires them: after minutes on the rail they lean out less, and recover sitting in', () => {
     const twa = beatAngle(22), b = testBoat({ heading: 360 - twa, kt: 5, windKt: 22 });
-    sail(b, 5, () => { b.h = 360 - twa; b.depower = 0; });
+    // (fresh: once they've settled where they hike, aft in a breeze where the deck's narrower, half a minute in)
+    sail(b, 30, () => { b.h = 360 - twa; b.depower = 0; });
     const fresh = Math.max(...b.crew!.people.slice(1).map(p => p.x));
-    sail(b, 420, () => { b.h = 360 - twa; b.depower = 0; });
+    sail(b, 395, () => { b.h = 360 - twa; b.depower = 0; });
     const tired = b.crew!.people.slice(1);
     expect(Math.max(...tired.map(p => p.fatigue))).toBeGreaterThan(0.3);
     expect(Math.max(...tired.map(p => p.x))).toBeLessThan(fresh - 0.03);
@@ -313,5 +314,16 @@ describe('A puff with someone away at a job (physics review)', () => {
     sail(b, 2.5, () => { b.h = 360 - twa; b.crew!.people[2].job = fwd.job; });
     expect(b.crew.people[1].lean).toBeGreaterThan(0.5);
     expect(b.crew.people[0].lean).toBeGreaterThan(0.3);
+  });
+});
+
+describe('The crew\'s places fore and aft and the trim the polar is sailed within', () => {
+  it('hullTrim.ts TRIM.reach is the trim a standard crew gives her from crewPhys.ts Z\'s forward and aft ends of the cockpit', async () => {
+    const { TRIM, trimFromMoment } = await import('../src/boat/hullTrim');
+    const { Z, DEFAULT_CREW } = await import('../src/boat/crewPhys');
+    const ref = [1.2, 1.8], at = (f: number) => trimFromMoment(DEFAULT_CREW.crew.reduce((m, p, j) => {
+      const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (1 - j) * Z.gap; return m + p.w * (ref[j] - (za + (zf - za) * f));
+    }, 0));
+    expect(TRIM.reach[0]).toBeCloseTo(at(0), 3); expect(TRIM.reach[1]).toBeCloseTo(at(1), 3);
   });
 });
