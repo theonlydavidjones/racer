@@ -1,13 +1,13 @@
 /**
  * Crew art studio (dev only: npm run dev, then http://localhost:5173/scripts/check/crewart/): the candidate figures of
- * src/render/crewArt.ts in the sim's own daylight (render/scene.ts: the same sky light, ground light and sun, colour
+ * src/render/crewBody.ts in the sim's own daylight (render/scene.ts: the same sky light, ground light and sun, colour
  * as-is, soft shadows), on a deck, laid out as a sheet of views. scripts/check/crew-art.cjs drives it.
  *   art.sheet(kitIndex)   the close-ups and full bodies of one candidate
  *   art.lineup()          all of them side by side
  */
 import '../../../src/render/three-setup';
 import * as THREE from 'three';
-import { buildArtBody, KITS } from '../../../src/render/crewArt';
+import { buildArtBody, KITS } from '../../../src/render/crewBody';
 
 const W = 1800, H = 1200;
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -33,7 +33,7 @@ function pose(b: ReturnType<typeof buildArtBody>, i: number) {
 function place(kits: number[]) {
   for (const f of figures) scene.remove(f);
   figures = kits.map((k, i) => {
-    const b = buildArtBody({ h: 1.78, w: 80 }, KITS[k], k + 1); pose(b, k);
+    const b = buildArtBody({ h: 1.78, w: 80 }, KITS[k]); pose(b, k);
     b.root.position.set((i - (kits.length - 1) / 2) * 0.9, 0, 0); scene.add(b.root);
     (b.root as any).tris = b.tris; return b.root;
   });

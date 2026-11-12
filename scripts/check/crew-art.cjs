@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The crew-art candidates (src/render/crewArt.ts) as sheets: close-ups of the head from the front, three-quarter and
+ * The crew's three reference kits (src/render/crewBody.ts KITS) as sheets: close-ups of the head from the front, three-quarter and
  * side, the upper body, and the whole figure in front and behind, in the sim's daylight. Needs the dev server on :5173.
  *   node scripts/check/crew-art.cjs <out-dir>   → out-dir/<A|B|C>-sheet.png, lineup.png
  */

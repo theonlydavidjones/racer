@@ -14,11 +14,6 @@ import { newCrew, DEFAULT_CREW, type CrewPlace } from '../../../src/boat/crewPhy
 import { testBoat, sail, startTack } from '../../../tests/helpers/testBoat';
 import { beatAngle } from '../../../src/boat/polar';
 import type { Boat } from '../../../src/boat/boat';
-import { bodyOverride } from '../../../src/render/crewBody';
-import { buildArtBody, KITS } from '../../../src/render/crewArt';
-
-// ?crewArt: the crew-art candidates (render/crewArt.ts: proposals/crew-art-1) in place of the figures, helm A, crew B, C
-if (new URLSearchParams(location.search).has('crewArt')) { let k = 0; bodyOverride.fn = p => buildArtBody(p, KITS[k++ % KITS.length]); }
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -31,11 +26,11 @@ sea.rotation.x = -Math.PI / 2; scene.add(sea);
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 2000);
 let b: Boat, m: BoatMesh | null = null, t = 0, cam = { yaw: 90, pitch: 15, dist: 5, at: [0, 0.8, 1.6] as number[] };
 
-const ART = new URLSearchParams(location.search).has('crewArt');
-if (ART) { sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 200 }); sun.shadow.bias = -0.0004; scene.add(sun.target); }
+// (the sun's shadows, as in the game: render/scene.ts, every boat mesh casting and receiving)
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 200 }); sun.shadow.bias = -0.0004; scene.add(sun.target);
 function render(): void {
   syncBoatMesh(m!, b, t);
-  if (ART) { sun.target.position.copy(m!.grp.position); sun.position.copy(m!.grp.position).add(new THREE.Vector3(-30, 50, 20)); }
+  sun.target.position.copy(m!.grp.position); sun.position.copy(m!.grp.position).add(new THREE.Vector3(-30, 50, 20));
   sea.position.set(m!.grp.position.x, 0, m!.grp.position.z);
   m!.grp.updateMatrixWorld(true);
   // the camera in the boat's own (unheeled) frame: yaw about her
@@ -60,7 +55,7 @@ const lab = {
     if (o.pole) b.poleWant = true;
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
-    if (ART) m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)
+    m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)
     (lab as any).hold = h; render();
   },
   /** Sail on for `s` seconds (holding her heading unless a tack is under way), then draw. */
