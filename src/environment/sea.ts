@@ -264,10 +264,13 @@ export class SeaField {
     if (inBasin(p) && !basinRay(p, reach.toward + 180).out) reach.k *= 0.15;
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
     const hsS = Math.min(sc.H, 0.1 * sc.L);
-    // whitecaps: the classic fraction-vs-wind law (Monahan), more where the chop is steep or blocked (a longer, older sea in
-    // the same wind, as the chop adjuster makes, is a little less steep and breaks a little less: real cover goes with wave age)
+    // whitecaps: the fraction of the water white, W = 3.84e-6·U^3.41 (U at 10 m, m/s: Monahan & O'Muircheartaigh, J. Phys.
+    // Oceanogr. 10, 2094–2099, 1980, the law most models use; quoted, the paper itself not reachable from here): 0.4% in
+    // 15 kt, 1.1% in 20, 2.4% in 25, 4.3% in 30. Doubled where an opposing current blocks the chop and it breaks (a
+    // judgement); and no more than about a tenth (W levels off in a gale: Brumer et al., J. Phys. Oceanogr. 47, 2017, as
+    // summarized). (It was scaled by the chop's steepness too, unsourced, which halved it in a breeze.)
     const steep = hsW / Math.max(1, wc.L);
-    const white = clamp(3.84e-6 * Math.pow(U, 3.41) * clamp(steep / 0.05, 0.5, 3) * (wc.blocked ? 2 : 1), 0, 0.2);
+    const white = clamp(3.84e-6 * Math.pow(U, 3.41) * (wc.blocked ? 2 : 1), 0, 0.1);
     return { hsW, tpW: w.tp, fromW: ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
   }
 }
