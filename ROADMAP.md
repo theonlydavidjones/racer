@@ -646,12 +646,11 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
   water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
   as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
-  behind it); San
-  Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong;
-  the same continuity would serve (Alameda's tide, NOAA 9414750), but the world, its terrain and the chart extracts
-  stop at 122.213 W, through the middle of the bay, so the water it fills (east to Arrowhead Marsh) isn't in the sim
-  yet: it needs the world taken a kilometre or two further east first (SFEI's San Leandro Bay model, the other lead,
-  sits behind a browser check that a fetch can't pass); BYC's and Encinal YC's own racing marks aren't published where we could
+  behind it); ~~San
+  Leandro Bay's current~~ (done, bay-east-8: the world taken 2 km further east, to 122.1886 W, and the bay filled
+  by continuity like San Rafael Bay, San Leandro Channel's tide, NOAA 9414724, less the Tidal Canal's measured flow,
+  NOAA's SFB1216 fitted depth-averaged; the canal carries about as much as fills the bay, so the San Leandro Channel's
+  own stream, the difference, is weak and uncertain even in its way, and the canal's jet into the bay isn't drawn); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

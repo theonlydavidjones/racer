@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CurrentField, sanQuentinTide, stationsFor, sfLocalToUtcMin } from '../src/environment/tide';
+import { BAYS, CurrentField, bayTide, sanQuentinTide, stationsFor, sfLocalToUtcMin } from '../src/environment/tide';
 import { LL } from '../src/geo/geo';
 import { onGround } from '../src/geo/shore';
 
@@ -17,16 +17,20 @@ describe('the current field across the race area', () => {
 });
 
 describe('San Rafael Bay', () => {
-  it('Point San Quentin\'s tide matches NOAA\'s own predictions (within 10 minutes and 0.08 m)', () => {
-    // NOAA CO-OPS, 9414873, high and low water, 14–15 November 2026, m above MLLW, GMT (fetched 2026-11-12)
-    const noaa: [string, 'H' | 'L', number][] = [['2026-11-14T04:50Z', 'L', -0.027], ['2026-11-14T12:38Z', 'H', 1.325], ['2026-11-14T16:51Z', 'L', 1.033], ['2026-11-14T22:16Z', 'H', 1.569],
-      ['2026-11-15T05:38Z', 'L', 0.031], ['2026-11-15T13:29Z', 'H', 1.326], ['2026-11-15T18:04Z', 'L', 1.018], ['2026-11-15T23:09Z', 'H', 1.47]];
-    for (const [t, k, v] of noaa) {
+  it('the bays\' tides match NOAA\'s own predictions (within 3 minutes and 2 cm): Point San Quentin and San Leandro Channel', () => {
+    // NOAA CO-OPS high and low water, 14–15 November 2026, m above MLLW, GMT (fetched 2026-11-12)
+    const noaa: Record<string, [string, 'H' | 'L', number][]> = {
+      '9414873': [['2026-11-14T04:50Z', 'L', -0.027], ['2026-11-14T12:38Z', 'H', 1.325], ['2026-11-14T16:51Z', 'L', 1.033], ['2026-11-14T22:16Z', 'H', 1.569],
+        ['2026-11-15T05:38Z', 'L', 0.031], ['2026-11-15T13:29Z', 'H', 1.326], ['2026-11-15T18:04Z', 'L', 1.018], ['2026-11-15T23:09Z', 'H', 1.47]],
+      '9414724': [['2026-11-14T04:52Z', 'L', -0.029], ['2026-11-14T12:38Z', 'H', 1.552], ['2026-11-14T16:53Z', 'L', 1.088], ['2026-11-14T22:16Z', 'H', 1.839],
+        ['2026-11-15T05:40Z', 'L', 0.032], ['2026-11-15T13:29Z', 'H', 1.554], ['2026-11-15T18:06Z', 'L', 1.073], ['2026-11-15T23:09Z', 'H', 1.722]]
+    };
+    for (const [st, ev] of Object.entries(noaa)) for (const [t, k, v] of ev) {
       const ms = Date.parse(t);
-      let best = 0, h = sanQuentinTide(ms).h;
-      for (let d = -60; d <= 60; d++) { const x = sanQuentinTide(ms + d * 60e3).h; if (k === 'H' ? x > h : x < h) { h = x; best = d; } }
-      expect(Math.abs(best)).toBeLessThanOrEqual(10);
-      expect(Math.abs(h - v)).toBeLessThan(0.08);
+      let best = 0, h = bayTide(st, ms).h;
+      for (let d = -60; d <= 60; d++) { const x = bayTide(st, ms + d * 60e3).h; if (k === 'H' ? x > h : x < h) { h = x; best = d; } }
+      expect(Math.abs(best), `${st} ${t}`).toBeLessThanOrEqual(3);
+      expect(Math.abs(h - v), `${st} ${t}`).toBeLessThan(0.02);
     }
   });
   it('a dead end: inside, only the tide\'s filling and emptying (a tenth or two of a knot), handed over from the strait without a step', () => {
@@ -47,5 +51,27 @@ describe('San Rafael Bay', () => {
       const ms = (t0 + h * 60) * 60e3, { rise } = sanQuentinTide(ms); f.setTime(t0 + h * 60);
       const c = f.at(p); if (Math.abs(rise) > 0.05 / 3600) expect(Math.sign(c.x)).toBe(-Math.sign(rise)); // (in = west-north-west)
     }
+  });
+});
+
+describe('San Leandro Bay', () => {
+  const t0 = sfLocalToUtcMin('2026-11-14', '00:00');
+  const peak = (f: CurrentField, lat: number, lon: number) => { let m = 0; for (let h = 0; h < 25; h += 0.25) { f.setTime(t0 + h * 60); const c = f.at(LL(lat, lon)); m = Math.max(m, Math.hypot(c.x, c.y) / 0.5144); } return m; };
+  it('in the world now, and filled by the tide: a weak stream over its flats, more in the San Leandro Channel, the Tidal Canal\'s measured stream at its station', () => {
+    const f = new CurrentField(stationsFor(t0, t0 + 1440));
+    for (const [a, b] of [[37.754, -122.222], [37.7495, -122.238]]) expect(onGround(LL(a, b))).toBe(false);
+    expect(peak(f, 37.754, -122.222)).toBeLessThan(0.3); // (mid-bay)
+    const ch = peak(f, 37.7495, -122.238); expect(ch).toBeGreaterThan(0.15); expect(ch).toBeLessThan(1.2); // (the channel by Bay Farm Island)
+    expect(peak(f, 37.76146, -122.22391)).toBeGreaterThan(0.8); // (the canal, NOAA's SFB1216: about a knot)
+  });
+  it('hands over from the open water\'s stream to the bay\'s own across its mouth without a step', () => {
+    const f = new CurrentField(stationsFor(t0, t0 + 1440)), B = BAYS.find(b => b.name === 'San Leandro Bay')!;
+    expect(B.inflows.length).toBe(1);
+    f.setTime(t0 + 60);
+    // (no step at the mouth from the open water's stream to the bay's own)
+    let prev = Math.hypot(f.at(LL(37.7495, -122.2465)).x, f.at(LL(37.7495, -122.2465)).y), worst = 0;
+    // (to the flats past the channel's mouth, which dry: none runs over them then)
+    for (let lon = -122.2460; lon < -122.2392; lon += 0.0005) { const c = f.at(LL(37.7495, lon)), v = Math.hypot(c.x, c.y); worst = Math.max(worst, Math.abs(v - prev)); prev = v; }
+    expect(worst / 0.5144).toBeLessThan(0.1);
   });
 });
