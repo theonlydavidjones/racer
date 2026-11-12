@@ -152,7 +152,7 @@ export class RaceReplay {
     const gap = Math.round(Math.abs(V.total)), mmss2 = (x: number) => x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${x % 60} s`;
     const lede = V.won ? `You finished ${mmss2(gap)} behind ${esc(V.rivalName)}.` : V.total < 0 ? `You were ${mmss2(gap)} ahead of ${esc(V.rivalName)}.` : `You were ${mmss2(gap)} behind ${esc(V.rivalName)} over the legs you've both sailed.`;
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
-      <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i || 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
+      <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p></li>`).join('');
     return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg to sail it side by side.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
@@ -255,7 +255,7 @@ export class RaceReplay {
     const m = this.sel, L = this.selLeg, V = this.D!.vs;
     if (L && V) {
       const sgn = Math.abs(L.lost) < 0.5 ? '±0 s' : `${L.lost > 0 ? '−' : '+'}${Math.round(Math.abs(L.lost))} s`;
-      el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i || 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> ${esc(legWords(L, V.rivalName))}</span>`;
+      el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> ${esc(legWords(L, V.rivalName))}</span>`;
       return;
     }
     if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is coloured where it cost you time.</span>'; return; }

@@ -473,7 +473,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .rrCaption .ghost{margin-left:auto;flex:0 0 auto}
 .rrNo{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;margin-right:8px;
   color:#0c2534;font:700 12px/1 var(--f-inst);flex:0 0 auto}
-.rrNo.rrVs{background:rgba(150,196,218,.3)} .rrNo.rrVs.lost{background:#ff6a2a} .rrNo.rrVs.won{background:#56b4e9}
+.rrNo.rrVs{background:rgba(150,196,218,.3);padding:0 4px;box-sizing:border-box} .rrNo.rrVs.lost{background:#ff6a2a} .rrNo.rrVs.won{background:#56b4e9}
 .rrNo.hollow{background:#0c2534;border:2px solid;box-sizing:border-box}
 .rrList{max-height:calc(62vh + 120px);overflow-y:auto;border-top:0;padding-top:0}
 .rrList li{border:1px solid transparent;border-radius:8px;padding:6px 8px}
