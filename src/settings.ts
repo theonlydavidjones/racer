@@ -9,6 +9,8 @@ export interface Settings {
   windDir?: number | null; // (older saves and replays: the wind pinned to one direction; no longer set: windTurn replaced it)
   /** Turn the wind: the kind of day's own direction turned this far (deg, + clockwise), −30 … +30; 0 = as usual. */
   windTurn?: number;
+  /** The sail controls band open (1, the default) or put away (0). */
+  band?: 0 | 1;
   chop?: number; // conditions adjuster: the wind's chop × this (1 = real, 0 = glassy)
   swellHs?: number | null; // conditions adjuster: the ocean swell outside the Gate, m; null = real
   rain?: 0 | 1 | 2; // none, light, heavy
