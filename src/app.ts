@@ -31,7 +31,7 @@ import { poleEta, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from '
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { SailBand } from './ui/sailBand';
 import { LINE_NAME } from './ui/lines';
-import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
+import { autoAcross, callShort, callWords, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { PerfMeter } from './ui/perfMeter';
 import { compassPoint, degAndPoint, turnWords } from './core/compass';
@@ -445,7 +445,10 @@ function showLines(): void {
   showTrimOwner();
   const k = CTL_UI[ctlSel].key; band.select(k === 'carFore' || k === 'carIn' ? null : k);
   band.update();
-  word('bCrew', w.user.crew?.place ? 'Crew · you' : 'Crew · auto'); $('bCrew').classList.toggle('mine', !!w.user.crew?.place);
+  // (a crew call, while it's live, on the button: it's always on screen; the whole call in its tooltip and the popover)
+  const call = callShort(w.user), b = $('bCrew');
+  word('bCrew', call || (w.user.crew?.place ? 'Crew · you' : 'Crew · auto')); b.classList.toggle('mine', !!w.user.crew?.place || !!call);
+  const tip = call ? callWords(w.user) : "The crew's weight: where they sit, fore and aft and across"; if (b.title !== tip) b.title = tip;
 }
 /* Placing the crew yourself (boat/crewPhys.ts): their weight across the boat and fore and aft. Choosing a place takes
  * the crew off auto and they stay there (through tacks, puffs and lulls) until you choose another or tap Auto, as a

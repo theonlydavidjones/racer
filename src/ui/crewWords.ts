@@ -125,7 +125,7 @@ export function callWords(u: Boat): string {
   if (near) {
     const t = near.in - age, pct = Math.round(Math.abs(near.strength - 1) * 100), puff = near.kind === 'puff';
     const shift = !upwind || Math.abs(near.lift) < 2 ? [] : [near.lift > 0 ? 'lifting' : 'heading'];
-    const say = t <= 0.5 ? `${puff ? 'Puff' : 'Lull'} on!` : `${puff ? 'Puff' : 'Lull'} in ${Math.ceil(t)}…`;
+    const say = t <= 0.5 ? `${puff ? 'Puff' : 'Lull'} on!` : `${puff ? 'Puff' : 'Lull'} in ${Math.max(1, Math.round(t))}…`;
     const rest = [...shift, `${pct}% ${puff ? 'more' : 'less'}`, `about ${Math.max(1, Math.round(near.lasts / 5) * 5)} s`];
     return `${names[near.who]}: “${say} ${rest.join(', ')}”`;
   }
@@ -136,4 +136,14 @@ export function callWords(u: Boat): string {
     return `${names[far.who]}: “Wind over there, ${where}, ${Math.max(2, Math.round(far.dist / LOA))} lengths”`;
   }
   return '';
+}
+
+/** The call in a few words, for the Crew button (always on screen: the crew line is in its popover): "Puff in 3",
+ * "Puff on!", "Lull in 2", "Wind to windward". Empty when nothing's called. */
+export function callShort(u: Boat): string {
+  const full = callWords(u); if (!full) return '';
+  const m = /“(Puff|Lull) (in \d+|on!)/.exec(full);
+  if (m) return `${m[1]} ${m[2].replace('…', '')}`;
+  const f = /Wind over there, ([a-z ]+),/.exec(full);
+  return f ? `Wind ${f[1]}` : '';
 }
