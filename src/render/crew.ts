@@ -671,8 +671,10 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   c.look.lerp(want.look, a);
   // (the knees turn to where the pose points them over a tenth of a second, and back to forward the same way; but at
   // once as a foot steps down inside the coaming, so that knee drops in with it rather than dragging across the top;
-  // and slowly, a third of a second, sitting down on the side deck with the hips held up clear of the coaming)
-  const kw = c.kneeW ?? (c.knee ? 1 : 0), tk = want.kneeSlow ? 0.3 : !want.knee && c.feet.some(p => Math.abs(p.x) < chz(p.z) + 0.03) ? 1e-3 : 0.1;
+  // and slowly, a third of a second, sitting down on the side deck with the hips held up clear of the coaming; and
+  // turning to the new way over a fifth when both feet are out on the deck already, as she sets off along it turning to
+  // face along it (the knee swung out at more than 5 m/s); stepping up out of the cockpit, over the coaming, as before)
+  const kw = c.kneeW ?? (c.knee ? 1 : 0), tk = want.kneeSlow ? 0.3 : !want.knee && c.feet.some(p => Math.abs(p.x) < chz(p.z) + 0.03) ? 1e-3 : want.knee && c.feet.every(p => Math.abs(p.x) > chz(p.z)) ? 0.2 : 0.1;
   c.kneeW = kw + Math.max(-dt / tk, Math.min(dt / tk, (want.knee ? 1 : 0) - kw));
   if (want.knee) c.knee = want.knee.clone(); else if (c.kneeW <= 0) c.knee = undefined;
   return c;
