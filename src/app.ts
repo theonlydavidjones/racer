@@ -601,9 +601,9 @@ function sailButtons(): void {
 }
 /**
  * Strike the ensign: cruising in a blow, a crew takes the ensign down and unships its staff before it flogs itself to
- * rags; a second press hoists it again. The button shows from 20 kt of true wind (the 20 s mean the crew works by; the
- * top of Beaufort force 5, the owner's mark for "high"), stays until the breeze is back under 17 (so a lull doesn't flick
- * it away), and always while the ensign is down. Racing she flies no ensign at all (world.ts takes her flags down).
+ * rags; a second press hoists it again. The button shows from 20 kt of true wind (the 20 s mean the crew works by;
+ * well into Beaufort force 5, 17–21 kt, the owner's mark for "high"), stays until the breeze is back under 17 (so a lull
+ * doesn't flick it away), and always while the ensign is down. Racing she flies no ensign at all (world.ts takes her flags down).
  */
 let ensignShown = false;
 function ensignButton(): void {

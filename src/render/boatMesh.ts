@@ -1,5 +1,5 @@
 import './three-setup';
-import { ensignStep, flagExtension, flagHz, flagOffset } from './flagWave';
+import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
@@ -309,7 +309,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   return turn;
 }
 
-interface FlyingFlag { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array; fly: number; ph: number }
+interface FlyingFlag { mesh: THREE.Mesh<THREE.PlaneGeometry>; base: Float32Array; fly: number; h: number; ph: number }
+const FLAG_SEGS = 30; // (along the fly: a dozen segments to each of the wave's half-waves and the faster ripple's)
+const ROW_X = new Float64Array(FLAG_SEGS + 1), ROW_Z = new Float64Array(FLAG_SEGS + 1);
 interface Ribbon { geom: THREE.BufferGeometry; anchor: THREE.Vector3; phase: number }
 export interface BoatMesh {
   grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: Sail; jib: Sail;
@@ -323,7 +325,7 @@ export interface BoatMesh {
   /** Her flags (stream in the apparent wind and flutter): ensign, burgee or officer's flag, courtesy flag. */
   flags: FlyingFlag[];
   /** The ensign, its staff and truck, and how far down it is (0 flying … 1 struck and the staff unshipped). */
-  ensign: { staff: THREE.Group; flag: THREE.Mesh | null; at: THREE.Vector3; axis: THREE.Vector3; down: number } | null;
+  ensign: { staff: THREE.Group; flag: THREE.Mesh | null; at: THREE.Vector3; axis: THREE.Vector3; slideMax: number; down: number } | null;
   /** The crew, and whether to hide the helm (you're looking through their eyes in the cockpit view). */
   crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
@@ -542,11 +544,11 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   let ensign: BoatMesh['ensign'] = null;
   const hoist = (canvas: HTMLCanvasElement | null, at: THREE.Vector3, h: number, parent: THREE.Object3D, tail = true) => {
     if (!canvas) return;
-    const fly = h * canvas.width / canvas.height, geo = new THREE.PlaneGeometry(fly, h, 10, 2); geo.translate(fly / 2, -h / 2, 0); // hoisted at its top corner
+    const fly = h * canvas.width / canvas.height, geo = new THREE.PlaneGeometry(fly, h, FLAG_SEGS, 2); geo.translate(fly / 2, -h / 2, 0); // hoisted at its top corner
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, alphaTest: 0.5 }));
     mesh.position.copy(at); parent.add(mesh);
     if (tail) parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), new THREE.Vector3(at.x, DECK_AT_MAST + 0.3, at.z)]), MAT.wire)); // the halyard's tail
-    flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly, ph: flags.length * 2.1 }); // (each its own phase)
+    flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly, h, ph: flags.length * 2.1 }); // (each its own phase)
   };
   // an officer's flag (her skipper's, when he or she is a flag officer of her club) flies by the club's rule: in place of
   // the burgee, or on the same halyard just below it
@@ -570,7 +572,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); staffG.add(truck);
     if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, staffG, false);
     const flag = ens ? flags[flags.length - 1].mesh : null;
-    ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), down: b.ensignStruck ? 1 : 0 };
+    // (down the staff no further than leaves the flag's foot clear of the deck: a Danish or Norwegian ensign is deep in the hoist)
+    const fh = ens ? 0.61 * ens.height / ens.width : 0, slideMax = Math.max(0, Math.min(0.62, staffH - 0.03 - fh - 0.05));
+    ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), slideMax, down: b.ensignStruck ? 1 : 0 };
   }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
@@ -630,17 +634,18 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   if (m.flags.length) {
     // each flag streams downwind of its hoist in the same apparent wind as the windex, sails and telltales, flapping in
     // waves that run out to the fly at the rate and swing measured for flags (render/flagWave.ts); in light air it hangs
-    const ext = flagExtension(b.aws);
+    const ext = flagExtension(b.aws), sag = (1 - ext) * 1.3, cs = Math.cos(sag), sn = Math.sin(sag); // (hanging: the fly falls about 75° from the wind's line)
     for (const f of m.flags) {
       const p = f.mesh.geometry.attributes.position as THREE.BufferAttribute, a = p.array as Float32Array;
       f.mesh.rotation.y = m.windex.rotation.y - Math.PI / 2;
-      f.ph = (f.ph + 2 * Math.PI * flagHz(b.aws, f.fly) * dt) % (2 * Math.PI * 100); // (the phase runs on: no jump as the wind changes)
+      const { hz, snap } = flagDrawn(b.aws, f.fly, dt);
+      f.ph = (f.ph + 2 * Math.PI * hz * dt) % (2 * Math.PI * 100); // (the phase runs on: no jump as the wind changes)
+      flagRow(FLAG_SEGS, f.ph, f.fly, ext, snap, ROW_X, ROW_Z);
       for (let i = 0; i < a.length; i += 3) {
-        const x = f.base[i], u = x / f.fly;
-        // hanging, it falls from the hoist toward the vertical; streaming, it lies out along the wind
-        a[i] = x * (1 - 0.55 * (1 - ext));
-        a[i + 1] = f.base[i + 1] - (1 - ext) * x * 0.85;
-        a[i + 2] = flagOffset(u, f.ph, f.fly, ext);
+        const k = (i / 3) % (FLAG_SEGS + 1), x = ROW_X[k], y = f.base[i + 1];
+        // streaming, it lies out along the wind; hanging, the fly falls away below the hoist, which stays on its staff or
+        // halyard (the foot folds in under it rather than hanging the whole flag's length lower)
+        a[i] = x * cs; a[i + 1] = y - x * sn * (1 + y / f.h); a[i + 2] = ROW_Z[k];
       }
       p.needsUpdate = true;
     }
@@ -649,8 +654,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     // striking the ensign: hand over hand down the staff (about 3 s), then the staff out of its socket and below (1 s);
     // hoisting it again, the other way round
     const e = m.ensign, { down, slide, out } = ensignStep(e.down, !!b.ensignStruck, dt); e.down = down;
-    if (e.flag) { e.flag.position.copy(e.at).addScaledVector(e.axis, -slide * 0.62); e.flag.visible = slide < 1; } // (down the raked staff to its foot, gathered in)
-    e.staff.position.y = -out * 0.4; e.staff.visible = out < 1;
+    if (e.flag) { e.flag.position.copy(e.at).addScaledVector(e.axis, -slide * e.slideMax); e.flag.visible = slide < 1; } // (down the raked staff, gathered in at the foot)
+    e.staff.position.copy(e.axis).multiplyScalar(out * 0.3); e.staff.visible = out < 1; // (lifted up out of its socket, along its rake)
   }
   m.card.rotation = b.h * D2R;
   // the crew on the windward side, hiking as hard as she needs
