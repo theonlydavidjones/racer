@@ -68,7 +68,8 @@ function meanOff(F: Frame[], id: number, t0: number, t1: number, a: Vec, u: Vec)
 export interface VsInput {
   frames: Frame[];
   you: number;
-  boats: { id: number; name: string; finishT: number | null; dsq: boolean }[];
+  /** `points`: her race score (rules/scoring.ts; the Z flag's penalty added), null while still racing. */
+  boats: { id: number; name: string; finishT: number | null; dsq: boolean; points?: number | null }[];
   /** Each boat's start crossing (race time, s), by id. */
   startTimes: (number | null)[];
   /** Each boat's mark times, by id (race time, s). */
@@ -78,13 +79,16 @@ export interface VsInput {
   from: Vec;
 }
 
+/** Finishers in order of their score (lower first; a Z-flag boat's penalty counts, RRS 44.3(c)), then time across the line. */
+const byScore = (a: VsInput['boats'][number], b: VsInput['boats'][number]) => (a.points != null && b.points != null ? a.points - b.points : 0) || a.finishT! - b.finishT!;
+
 /**
  * Who to measure against: the winner; if that's you, the boat second; with nobody else finished (you won and the
- * fleet's still racing, or nobody's in yet), the one furthest on. (By time across the line, as the results list them.)
+ * fleet's still racing, or nobody's in yet), the one furthest on. (By points, as the results list them: a Z-flag boat first across may not have won.)
  */
 export function rivalOf(I: VsInput): number | null {
   const ok = I.boats.filter(b => !b.dsq);
-  const fin = ok.filter(b => b.finishT != null && b.id !== I.you).sort((a, b) => a.finishT! - b.finishT!);
+  const fin = ok.filter(b => b.finishT != null && b.id !== I.you).sort(byScore);
   if (fin.length) return fin[0].id;
   // still racing: most marks reached, then soonest at the last of them
   const on = ok.filter(b => b.id !== I.you).map(b => { const m = (I.marks[b.id] ?? []).filter(x => x != null); return { id: b.id, n: m.length, t: m.length ? m[m.length - 1] : Infinity }; });
@@ -117,7 +121,7 @@ export function versus(I: VsInput): Versus | null {
   }
   const total = legs.reduce((s, l) => s + l.lost, 0);
   const rb = I.boats.find(b => b.id === r)!;
-  const mine = I.boats.find(b => b.id === me)!, first = I.boats.filter(b => !b.dsq && b.finishT != null).sort((a, b) => a.finishT! - b.finishT!)[0];
+  const mine = I.boats.find(b => b.id === me)!, first = I.boats.filter(b => !b.dsq && b.finishT != null).sort(byScore)[0];
   return { rival: r, rivalName: rb.name, won: first?.id === r, youWon: first?.id === me, youDone: mine.finishT != null && legs.length === I.legs.length + 1, legs, total };
 }
 
