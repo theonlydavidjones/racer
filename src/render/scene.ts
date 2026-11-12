@@ -187,6 +187,8 @@ export class SceneView {
   /** How much the chase camera rides her heave on the swell (0 off, 1 all of it; smoothed): settings.rideSwell. */
   chaseHeave = 0;
   private heave1 = 0; private heaveS = 0;
+  /** The view drawn last frame (the chase camera starts in place on coming to it). */
+  private lastView = -1;
   /**
    * The chase camera's framed distance, looking along `dir` (deg) from `ratio` (height over distance) up: the distance at
    * which the masthead (RIG.MAST_TOP up, at the mast) and the hull nearest the camera (at the water) span from an eighth
@@ -811,7 +813,10 @@ export class SceneView {
       this.chaseDist = dist;
       this.chaseHeave = (w.settings.rideSwell ?? 1) === 1 ? 1 : 0; // (the owner: heave only, smoothed, with a switch)
       const height = Math.max(1.2, ratio * dist) + this.chaseHeave * this.heaveS;
-      camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
+      // (eased after her as she moves; straight into place on coming to this view, so it starts framed even when frames
+      // come slowly: each frame's step is capped, and the ease would take many frames)
+      const to = P3(u.x - hv.x * dist, u.y - hv.y * dist, height);
+      if (this.lastView !== 1) camera.position.copy(to); else camera.position.lerp(to, Math.min(1, dt * 3));
       // aimed down so the hull nearest the camera sits just above the band
       // (toward the boat across the water: the camera trails her a little as it eases into place)
       const c = camera.position, bp = P3(u.x, u.y), ex = bp.x - c.x, ez = bp.z - c.z, eh = Math.hypot(ex, ez) || 1;
@@ -837,6 +842,7 @@ export class SceneView {
     // the showroom shifts the picture right, clear of the panel on the left
     const shift = viewMode === 3 ? (look.shift ?? 0) : 0, size = this.renderer.getSize(new THREE.Vector2());
     if (shift) camera.setViewOffset(size.x, size.y, -shift, 0, size.x, size.y); else if (camera.view?.enabled) camera.clearViewOffset();
+    this.lastView = viewMode;
     this.updateRain(w, dt, camera);
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
