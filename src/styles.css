@@ -828,6 +828,9 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sb-jc.mine .sb-jcar{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-tag{font:700 8px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-height:8px}
 body.showroom .sailband{visibility:hidden}
+/* (the band is added after the overlays, so it would sit on top of an open one and catch its clicks: the incident's
+   "Continue racing" at 1280×800, the pause and results buttons. It stays put away while any overlay is up) */
+body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 .sb-jwant,.sb-jideal{width:9px;height:9px;margin:-1px;border-radius:2px;pointer-events:none;z-index:2;box-sizing:border-box}
 .sb-jwant{border:1.5px dashed var(--accent)}
 .sb-jideal{border:1.5px dashed #fff}
