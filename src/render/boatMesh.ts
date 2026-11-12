@@ -251,7 +251,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     grp.add(new THREE.Mesh(rail(sheerLine(s, 0.03), 0.035, 0.03), MAT.wood));
     // and the rubbing strake just under the sheer, a half-round of the same wood standing proud of the topsides (CR 2.218:
     // 13 × 26 to 14 × 28 mm, round the sheer)
-    strakes.push(rail(sheerLine(s, -0.007).map(p => p.setY(p.y - 0.045)), 0.027, 0.014).toNonIndexed());
+    // (ending just short of the stem and of the transom's corner, where the strake is cut off)
+    strakes.push(rail(sheerLine(s, -0.007, 200).slice(3, -2).map(p => p.setY(p.y - 0.045)), 0.027, 0.014).toNonIndexed());
   }
   grp.add(new THREE.Mesh(mergeGeometries(strakes, false)!, MAT.wood));
   deckFittings(grp);
