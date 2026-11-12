@@ -174,7 +174,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (waits.includes(j.line) && !j.big) { a.job = null; return; }
     if (placed && BOTH_SIDES.has(j.line)) j.station = null;
     if (j.line in want) { const to = sheetOf(j.line) ? want[j.line as Ctl]! : j.to ?? want[j.line as Ctl]!; if (Math.abs(to - b.ctl[j.line as Ctl]) < DONE) a.job = null; }
-    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
+    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist' && j.line !== 'doors' && j.line !== 'hatch') a.job = null;
   });
   // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
   // times a second: quicker than anyone reacts)
@@ -207,7 +207,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
-      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
+      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist' || a.job.line === 'doors' || a.job.line === 'hatch';
       const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
       if (!sheet || committed || onSheet) continue;
     }

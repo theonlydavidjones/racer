@@ -10,7 +10,7 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, reactTime, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, reactTime, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -122,6 +122,28 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
   }
 }
 
+/**
+ * The companionway's doors (washboards) and sliding hatch (boat/spec.ts companionway, and the owner): when someone is
+ * to stand there (crewPhys.ts standInHatch) and it's shut, they open it first, in two motions: the doors out and
+ * stowed below, then the hatch slid forward over the cabin top. Each at their pace from the cockpit's forward end
+ * (`doors`, `slide`: s for a club crew, estimates). It stays open until someone shuts it.
+ */
+export const HATCH = { doors: 6, slide: 2 };
+function crewHatch(b: Boat, dt: number): void {
+  const c = b.crew; if (!c) return;
+  const cw = b.companionway ??= b.spec?.companionway === 'closed' ? { doors: 'in', hatch: 'closed' } : { doors: 'out', hatch: 'open' };
+  const who = c.stander ?? null, a = who != null ? c.people[who] : null;
+  const shut = cw.doors === 'in' || cw.hatch === 'closed';
+  // (no one wants it open, or it is: nobody at it)
+  if (!a || !shut) { for (const q of c.people) if (q.job?.line === 'doors' || q.job?.line === 'hatch') q.job = null; cw.t = undefined; return; }
+  const line = cw.doors === 'in' ? 'doors' : 'hatch';
+  if (a.job && a.job.line !== line && a.job.line !== 'doors') return; // (busy with something else first)
+  if (a.job?.line !== line) { a.job = { line, reach: 0, work: 1, station: { arm: 0, z: Z.hatchWork, pose: 'companionway' } }; cw.t = (line === 'doors' ? HATCH.doors : HATCH.slide) / workPace(b, who!); }
+  if (Math.abs(a.z - Z.hatchWork) > 0.3 || Math.abs(a.x) > 0.35) return; // (on their way there)
+  cw.t = (cw.t ?? 0) - dt;
+  if (cw.t <= 0) { if (line === 'doors') cw.doors = 'out'; else cw.hatch = 'open'; a.job = null; cw.t = undefined; }
+}
+
 /** Penalty turns count only in one direction, so each full turn includes a tack and a gybe (Rule 44.2). The direction
  * is settled once she has turned 30° one way; nothing counts while she sails clear first. */
 function countPenalty(b: Boat, dh: number, emit: Emit): void {
@@ -205,7 +227,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
-  crewPole(b, dt, emit);
+  crewPole(b, dt, emit); crewHatch(b, dt);
   const plan = sailPlan(b);
   // the rig rolling: the sails move through the air sideways at the roll rate times their height (rolling to windward,
   // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
@@ -439,7 +461,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P'; if (twa > 176) tk = b.tack;
   if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
-  crewRig(b, dt, emit); crewPole(b, dt, emit);
+  crewRig(b, dt, emit); crewPole(b, dt, emit); crewHatch(b, dt);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
   const u0 = b.v, d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.yawRate ?? 0) * D;
   const ap = sailWind(ww.from, ww.kt, b.h, u0, (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
@@ -527,7 +549,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting' || (b.poleWant && b.pole === 'down'), tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting' || (b.poleWant && b.pole === 'down'), cruising: !!b.cruising, hatchOpen: !b.companionway || (b.companionway.doors === 'out' && b.companionway.hatch === 'open'), tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }

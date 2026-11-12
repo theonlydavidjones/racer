@@ -145,3 +145,32 @@ describe('the crew model, phase B: the pole, by the owner\'s timings', () => {
     expect(b.crew!.people[2].job?.line).not.toBe('pole'); expect(b.pole).toBe('down');
   }, 30_000);
 });
+
+describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 2026)', () => {
+  /** A beat in `W` kt for `secs` with this crew, cruising or racing, the companionway shut or open to start. */
+  function go(spec: CrewSpec, W: number, secs: number, o: { cruising?: boolean; shut?: boolean } = {}) {
+    const twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 4, windKt: W });
+    b.crew = newCrew(spec, 'S'); b.cruising = !!o.cruising;
+    if (o.shut) b.companionway = { doors: 'in', hatch: 'closed' };
+    const seen: string[] = [];
+    sail(b, secs, () => { b.h = 360 - twa; const cw = b.companionway; if (!cw) return; const st = `${cw.doors}/${cw.hatch}`; if (seen[seen.length - 1] !== st) seen.push(st); });
+    const at = b.crew!.people.findIndex(p => p.pose === 'companionway' && p.z < Z.companionway + 0.15);
+    return { b, at, seen };
+  }
+  it('cruising in light air, a crew member opens the doors, then slides the hatch forward, then stands there', () => {
+    const r = go(crewOf(0.6), 6, 60, { cruising: true, shut: true });
+    expect(r.seen).toEqual(['in/closed', 'out/closed', 'out/open']); // (two motions, in order, and it stays open)
+    expect(r.at).toBeGreaterThan(0);
+    const p = r.b.crew!.people[r.at];
+    expect(Math.abs(p.x)).toBeLessThan(0.1); // (on the centreline: no moment across)
+  }, 30_000);
+  it('racing in light air: novices are inclined to stand there; a club or expert crew put their weight to work', () => {
+    expect(go(crewOf(0.6, { trim: 0.15 }), 6, 60).at).toBeGreaterThan(0);
+    expect(go(crewOf(0.6), 6, 60).at).toBe(-1);
+    expect(go(crewOf(0.9), 6, 60).at).toBe(-1);
+  }, 30_000);
+  it('in a breeze even novices are on the rail: their weight is wanted', () => {
+    expect(go(crewOf(0.6, { trim: 0.15 }), 18, 60).at).toBe(-1);
+    expect(go(crewOf(0.6), 18, 60, { cruising: true }).at).toBe(-1);
+  }, 30_000);
+});

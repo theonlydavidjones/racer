@@ -194,6 +194,11 @@ export interface Boat {
   polePrepUntil?: number;
   /** Since when (race clock, s) she's been deep enough for the pole, and since when up past where it pays (ai.ts crewPoleCall). */
   poleDeepT?: number; poleHighT?: number;
+  /** The companionway now: its doors (washboards) in or out, its sliding hatch shut or open (from spec.companionway;
+   * the crew open it to stand there, physics.ts crewHatch; `t`: seconds left of the motion under way). Drawn from here. */
+  companionway?: { doors: 'in' | 'out'; hatch: 'closed' | 'open'; t?: number };
+  /** Out cruising, not racing: the crew sit for comfort (crewPhys.ts standInHatch). */
+  cruising?: boolean;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
