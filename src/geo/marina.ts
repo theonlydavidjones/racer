@@ -8,6 +8,11 @@ import horseshoeBay from './data/horseshoe-bay.json';
 import berkeley from './data/berkeley.json';
 import richmondYc from './data/richmond-yc.json';
 import encinal from './data/encinal.json';
+import oaklandYc from './data/oakland-yc.json';
+import marinaVillage from './data/marina-village.json';
+import fortmann from './data/fortmann.json';
+import grandMarina from './data/grand-marina.json';
+import alamedaMarina from './data/alameda-marina.json';
 
 /**
  * The marinas your boats can call home, from OpenStreetMap (scripts/make-west-harbor.mjs, scripts/make-marinas.mjs): each
@@ -38,7 +43,12 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   // alongside Berkeley Yacht Club's guest dock
   { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
-  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData }
+  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
+  { id: 'oakland-yc', name: 'Oakland Yacht Club, Alameda', short: 'Oakland YC', data: oaklandYc as unknown as HarborData },
+  { id: 'marina-village', name: 'Marina Village Yacht Harbor, Alameda', short: 'Marina Village', data: marinaVillage as unknown as HarborData },
+  { id: 'fortmann', name: 'Fortmann Marina, Alameda', short: 'Fortmann Marina', data: fortmann as unknown as HarborData },
+  { id: 'grand-marina', name: 'Grand Marina, Alameda', short: 'Grand Marina', data: grandMarina as unknown as HarborData },
+  { id: 'alameda-marina', name: 'Alameda Marina (Island Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
