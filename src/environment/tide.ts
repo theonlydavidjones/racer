@@ -172,6 +172,19 @@ export class CurrentField {
     });
   }
   setTime(tMin: number): void { if (tMin !== this.tMin || this.epoch === 0) { this.tMin = tMin; this.epoch++; } }
+  /**
+   * Keep the stations' predictions running for as long as she sails: each is predicted over a window (stationsFor),
+   * and past its end it would hold its last value, every station frozen at a different point of its own tide (mid-flood
+   * at one, mid-ebb at the next). Within half an hour of the window's end (or before its start), the next six hours are
+   * predicted from the same harmonic constants.
+   */
+  cover(tMin: number): void {
+    const s0 = this.stations[0]; if (!s0?.t.length) return;
+    if (tMin >= s0.t[0] && tMin <= s0.t[s0.t.length - 1] - 30) return;
+    const fresh = new Map(stationsFor(tMin - 30, tMin + 6 * 60).map(x => [x.id, x]));
+    for (const st of this.stations) { const n = fresh.get(st.id); if (n) { st.t = n.t; st.v = n.v; } }
+    this.epoch++;
+  }
   /** Station i's current (m/s) at the field's time. */
   stationVec(i: number): Vec {
     if (this.stamp[i] !== this.epoch) { this.vecs[i] = stationVector(this.stations[i], this.tMin); this.stamp[i] = this.epoch; }
