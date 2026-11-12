@@ -9,7 +9,7 @@ import { camberLine, flowField, flowState, flowWords, gridField, streamline, typ
  * the streamlines and the separated air are labelled as illustrations.
  */
 
-const W = 200, H = 200; // each cut's drawing (CSS px)
+const W = 200, H = 180; // each cut's drawing (CSS px)
 const COL = { running: '#9aa7b3', attached: '#f4f1e8', luffing: '#ffd34d', stalled: '#ff6a5c', hull: 'rgba(36,56,75,0.55)', hullEdge: 'rgba(63,90,114,0.6)', wind: '#ffb627', port: '#e0281e', stbd: '#18a14a' };
 
 /** The flow's colour for its speed (share of the apparent wind): slow blue to fast mint. */
@@ -35,7 +35,7 @@ function inside(poly: [number, number][], x: number, y: number): boolean {
  * wake from its luff. In the plan's metres. */
 function separated(s: FlowSection, U: [number, number], running: boolean): [number, number][] | null {
   if (!running && (s.trim.flow !== 'stalled' || s.trim.amount < 0.05)) return null;
-  const amt = running ? 1 : s.trim.amount, p = camberLine(s, 20), i0 = running ? 0 : Math.max(4, Math.round(20 * (1 - 0.65 * amt))), L = s.chord * (0.5 + 0.6 * amt);
+  const amt = running ? 1 : s.trim.amount, p = camberLine(s, 20), i0 = running ? 0 : Math.max(4, Math.round(20 * (1 - 0.65 * amt))), L = s.chord * (running ? 0.7 : 0.5 + 0.6 * amt);
   const lee = p.slice(i0).map(([x, y]) => [x + 0.02, y] as [number, number]), [lx, ly] = p[20], [sx, sy] = p[i0];
   // (the wake: off the leech downstream, and back from a point downstream and to leeward of where it parted)
   return [...lee, [lx + U[0] * L, ly + U[1] * L], [sx + U[0] * L * 0.7 + 0.25 * L, sy + U[1] * L * 0.7]]; // (x is to leeward in the plan)
@@ -67,7 +67,7 @@ export class FlowPanel {
   show(open: boolean): void { this.open = open; this.el.hidden = !open; this.last = -1e9; }
 
   /** Redraw twice a second while it's open (the flow is worked out afresh each time: sailFlow's cost test). */
-  update(b: Boat, now: number): void {
+  update(b: Boat, now: number, ctx: { preStart?: boolean } = {}): void {
     if (!this.open || now - this.last < 500) return;
     this.last = now;
     const st = flowState(b), cuts = st.cuts, lee = b.tack === 'S' ? -1 : 1; // (leeward on the screen: port, left, on starboard tack)
@@ -79,7 +79,7 @@ export class FlowPanel {
     const xa = -cx / (lee * sc), xb = (W - cx) / (lee * sc);
     const fit = { lee, sc, cx, cy, box: [Math.min(xa, xb) - 0.3, -cy / sc - 0.3, Math.max(xa, xb) + 0.3, (H - cy) / sc + 0.3] as [number, number, number, number] };
     cuts.forEach((c, i) => this.draw(this.cuts[i], c, fit, b, st.running));
-    this.story.replaceChildren(...this.tell(st, b));
+    this.story.replaceChildren(...this.tell(st, b, ctx));
   }
 
   private draw(slot: { cv: HTMLCanvasElement; cap: HTMLElement }, c: FlowCut, f: { lee: number; sc: number; cx: number; cy: number; box: [number, number, number, number] }, b: Boat, running: boolean): void {
@@ -97,7 +97,9 @@ export class FlowPanel {
     const dead = c.sections.map(s => separated(s, U, running)).filter((p): p is [number, number][] => !!p);
     if (c.sections.length) {
       // (off the wind the air doesn't follow the sails round: a potential flow would draw it attached, so plain stream and wake)
-      const vel = running ? (): [number, number] => U : gridField(flowField(c.sections, c.awa), f.box, 40), span = Math.hypot(f.box[2] - f.box[0], f.box[3] - f.box[1]);
+      // (a sail flogging, luffing hard or with the wind outside it, makes no lift and doesn't turn the air)
+      const working = c.sections.filter(s => !(s.trim.flow === 'luffing' && s.trim.amount > 0.6));
+      const vel = running || !working.length ? (): [number, number] => U : gridField(flowField(working, c.awa), f.box, 40), span = Math.hypot(f.box[2] - f.box[0], f.box[3] - f.box[1]);
       const mx = (f.box[0] + f.box[2]) / 2, my = (f.box[1] + f.box[3]) / 2, n = 26;
       g.lineWidth = 1.2;
       for (let k = 0; k < n; k++) {
@@ -153,7 +155,7 @@ export class FlowPanel {
     pts.forEach(([px, py], k) => k ? g.lineTo(X(px), Y(py)) : g.moveTo(X(px), Y(py))); g.stroke();
   }
 
-  private tell(st: FlowState, b: Boat): HTMLElement[] {
-    return flowWords(st, b).map(([cls, html]) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; return e; });
+  private tell(st: FlowState, b: Boat, ctx: { preStart?: boolean }): HTMLElement[] {
+    return flowWords(st, b, ctx).map(([cls, html]) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; return e; });
   }
 }

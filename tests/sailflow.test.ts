@@ -86,6 +86,11 @@ describe('the flow view: what it says', () => {
     const b = sailing(318, 24, b => { b.manualTrim = true; b.trimAll = true; takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = Math.min(1, b.ctl.mainsheet + 0.05); });
     expect(words(b)).not.toMatch(/on purpose/);
   });
+  it('before the start, eased to hold her back: says so, with how far to trim to go', () => {
+    const b = sailing(318, 12, b => { takeLine(b, 'jibsheet'); (b.ctlTarget ??= {}).jibsheet = 0.75; });
+    const w = flowWords(flowState(b), b, { preStart: true }).map(x => x[1]).join(' ');
+    expect(w).toMatch(/hold her back before the start/); expect(w).toMatch(/to go/);
+  });
   it('luffing on purpose: says so', () => {
     const b = sailing(318, 12); b.luff = true;
     expect(words(b)).toMatch(/both sails let go/);

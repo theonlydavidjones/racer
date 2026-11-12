@@ -1059,7 +1059,7 @@ body.showroom #crewPop{visibility:hidden}
 #flowPanel .fp-key{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 4px;font-size:11px;color:var(--muted)}
 #flowPanel .fp-key i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 #flowPanel .fp-key .fp-speed i{width:44px}
-#flowPanel .fp-story p{margin:3px 0;font-size:12px}
+#flowPanel .fp-story p{margin:2px 0;font-size:11.5px;line-height:1.3}
 #flowPanel .fp-story b{color:var(--text)}
 #flowPanel .fp-story em{font-style:normal;font-weight:700}
 #flowPanel .fp-story em.luff{color:#ffd34d}#flowPanel .fp-story em.stall{color:#ff6a5c}

@@ -145,10 +145,10 @@ const deg = (x: number) => `${Math.round(x)}°`;
 /** What the flow and the telltales are saying, in words, from the sim's own trim for each sail (the same at every
  * height, as the 3D telltales show it): how it's drawing and what to do; its twist against the crew's target for the
  * wind; the slot; and the keel's leeway. */
-export function flowWords(st: FlowState, b: Boat): [string, string][] {
+export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = {}): [string, string][] {
   const out: [string, string][] = [], p = (cls: string, html: string) => { out.push([cls, html]); };
   const name = { main: 'Main', jib: 'Jib' } as const, foot = { main: 'the boom', jib: "the jib's foot" } as const;
-  const keel = () => p('fp-keel', `<b>Under water</b> leeway ${st.leeway.toFixed(1)}°: the keel's angle to the water, which makes its lift against the sails' side force. Pinch and it grows.`);
+  const keel = () => p('fp-keel', `<b>Under water</b> leeway ${st.leeway.toFixed(1)}°: the keel's angle to the water, which makes its lift. Pinching grows it.`);
   if (st.hove) { p('fp-sail', `<b>Hove to</b>: the jib backed on purpose, both sails meant to be stalled or luffing. With the main eased and the helm down she lies quiet, forereaching slowly.`); keel(); return out; }
   if (!st.sails.length) { p('fp-sail', 'No sails drawing.'); return out; }
   // (luffing on purpose, both sheets let go: the sim takes their drive away, and the telltales show it)
@@ -171,7 +171,8 @@ export function flowWords(st: FlowState, b: Boat): [string, string][] {
     const pastStop = s.atMax && t.err > 4;
     const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
       : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
-      : t.flow === 'luffing' ? (eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveller on purpose to keep her on her feet; the lifting luff is the price`
+      : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
+        : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveller on purpose to keep her on her feet; the lifting luff is the price`
         : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
         : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': windward telltales lifting'}. Trim in about ${deg(by)}${turn}`)
       : s.atMax ? `<em class="stall">stalled</em> ${pct(t.amount)}, ${stallTell}, with the sheet all the way out: the wind's too far aft for it. Head up`
@@ -183,9 +184,9 @@ export function flowWords(st: FlowState, b: Boat): [string, string][] {
   // each head is set against its foot, and the wind's own twist up the sail
   if (!st.running) {
     const [lo, , hi] = st.cuts, set = st.sails.map(s => `${s.sail} ${deg(s.twist)}`).join(', ');
-    p('fp-twist', `<b>Twist</b> ${set}, the head open from the foot. Up there the wind is ${hi.aws.toFixed(1)} kt at ${deg(hi.awa)}, low down ${lo.aws.toFixed(1)} kt at ${deg(lo.awa)}: the head's wind is stronger and freer. The coach says which line to change.`);
+    p('fp-twist', `<b>Twist</b> ${set}, head open from foot: up high the wind is ${hi.aws.toFixed(1)} kt at ${deg(hi.awa)}, low down ${lo.aws.toFixed(1)} kt at ${deg(lo.awa)}. The coach says which line to change.`);
   }
-  if (st.sails.length === 2 && !st.running) p('fp-slot', `<b>The slot</b>: on real boats the jib bends the air along the main's lee side, and an over-trimmed jib backs the main before it luffs. The sim doesn't model this; the streamlines show the idea.`);
+  if (st.sails.length === 2 && !st.running) p('fp-slot', `<b>The slot</b>: on real boats an over-trimmed jib backs the main before it luffs. The sim doesn't model it; the streamlines show the idea.`);
   keel();
   return out;
 }
