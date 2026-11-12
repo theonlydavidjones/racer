@@ -13,13 +13,16 @@ import marinaVillage from './data/marina-village.json';
 import fortmann from './data/fortmann.json';
 import grandMarina from './data/grand-marina.json';
 import alamedaMarina from './data/alameda-marina.json';
+import slipRenames from './data/slip-renames.json';
 
 /**
  * The marinas your boats can call home, from OpenStreetMap (scripts/make-west-harbor.mjs, scripts/make-marinas.mjs): each
  * basin is water you can sail in; its breakwaters, docks and piers are solid.
- * - West Harbor, San Francisco Marina (by the St. Francis and Golden Gate yacht clubs). Dock letters and slip numbers are
- *   this sim's: the harbor's own aren't published anywhere we could reach.
- * - Gashouse Cove, the Marina's East Harbor (by Fort Mason). Dock letters (north to south) and slip numbers are this sim's.
+ * - West Harbor, San Francisco Marina (by the St. Francis and Golden Gate yacht clubs), and Gashouse Cove, its East Harbor
+ *   (by Fort Mason): the marina's own slip numbers, bare numbers as the marina uses them (West Harbor's odd, Gashouse
+ *   Cove's even), each dock's range from SF Recreation and Parks' maps, and West Harbor's Docks E, F and G by name. Their
+ *   order within a dock is the map's where it shows it, and inferred where it doesn't (all of Gashouse Cove's): see
+ *   scripts/sf-marina-numbers.mjs.
  * - South Beach Harbor (by Oracle Park). Docks A to G are the harbor's own (their names in OSM), and so are the slip numbers (the harbor's map, sfport.com: from
  *   each dock's gate at the shore, odd on the north side, even on the south).
  * - Corinthian Yacht Club, Tiburon. A dock is the southernmost line, along the breakwater, as the club's visitor notes say;
@@ -179,7 +182,7 @@ export function hitsWall(p: Vec): boolean {
   return false;
 }
 
-const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: s.kind ?? 'bow-in' as const })));
+const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: /^\d+$/.test(s.id) ? `Slip ${s.id}` : s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: s.kind ?? 'bow-in' as const })));
 
 /** The slips a Folkboat fits in: her length (7.6 m) along it and her beam (2.2 m) across it, clear of every dock. */
 export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
@@ -218,7 +221,18 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
 SLIPS.push(...END_TIES);
 const BY_ID = new Map(SLIPS.map(s => [s.id, s]));
 /** A slip by its id (a bare label is one of West Harbor's: saves from before the other marinas). */
-export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(id.includes(':') ? id : `west-harbor:${id}`) ?? null;
+export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(currentSlipId(id)) ?? null;
+/**
+ * A slip's id as it is now: West Harbor's and Gashouse Cove's slips were the sim's lettered ones (A12) before they took the
+ * marina's own numbers (651), and a save from then follows its berth to its number (data/slip-renames.json, written by
+ * scripts/sf-marina-numbers.mjs); a bare label is one of West Harbor's.
+ */
+export function currentSlipId(id: string): string {
+  const full = id.includes(':') ? id : `west-harbor:${id}`;
+  return (slipRenames as Record<string, string>)[full] ?? full;
+}
+/** How a dock's named: 'dock E' (by its letter), or 'slips 651–685' (the SF Marina's docks go by their numbers). */
+export const dockName = (dock: string) => dock.includes('–') ? `slips ${dock}` : `dock ${dock}`;
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
@@ -493,7 +507,7 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
  * Cove's docks, by the seawall and the shore; two by Horseshoe Bay's L dock): with no engine there's no getting out. Kept
  * up to date by tests/pushoff-all.test.ts.
  */
-export const NO_WAY_OUT = ['gashouse-cove:D1', 'gashouse-cove:E1', 'gashouse-cove:F1', 'gashouse-cove:F2', 'gashouse-cove:G1', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
+export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-cove:82', 'gashouse-cove:2', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();
