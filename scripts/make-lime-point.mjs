@@ -13,7 +13,7 @@
  */
 import { writeFile } from 'node:fs/promises';
 
-const BOX = { south: 37.8230, north: 37.8300, west: -122.4935, east: -122.4760 }; // south of Horseshoe Bay's breakwater
+const BOX = { south: 37.8230, north: 37.8300, west: -122.4845, east: -122.4760 }; // the point's tip, where the terrain's cells are out (its west edge where they agree), south of Horseshoe Bay's breakwater
 const res = await fetch(`https://api.openstreetmap.org/api/0.6/map?bbox=${[BOX.west - 0.004, BOX.south - 0.004, BOX.east + 0.004, BOX.north + 0.004].join(',')}`, { headers: { 'User-Agent': 'folkboat-racing-sim (personal project)' } });
 if (!res.ok) throw new Error(`OSM: HTTP ${res.status}`);
 const xml = await res.text();
