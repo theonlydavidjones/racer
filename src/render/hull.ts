@@ -84,7 +84,9 @@ const STEM_SLOPE = -1.06 / BOW;
  */
 function entry(y0: number, y1: number, u: number, u1: number, m1: number): number {
   const h = u1 - BOW, t = Math.min(1, Math.max(0, (u - BOW) / h)), t2 = t * t, t3 = t2 * t;
-  return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * h * STEM_SLOPE + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h * m1;
+  // (leaving no steeper than three times its mean slope, so it never dips below y1 and comes back: a fair batten)
+  const m0h = Math.max(STEM_SLOPE * h, 3 * (y1 - y0));
+  return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * m0h + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h * m1;
 }
 export function canoe(u: number): number {
   // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then
