@@ -1,6 +1,7 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
+import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -25,7 +26,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { harborOf, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { berthClear, harborOf, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
@@ -991,7 +992,7 @@ export class World {
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip) { u.v = SHOVE; return true; }
     const wind = this.windHere(u, u), plan = pushOffPlan(slip, wind.from, wind.kt);
-    u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0 };
+    u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };
     // the finger she lay against: the nearest one, and which side of her it's on (a crew member walks her out along it)
     if (plan.kind !== 'off' && (u.crew?.spec.crew.length ?? 0) > 0) {
       const f = V(slip.heading), r = { x: f.y, y: -f.x }; // forward, and to starboard
@@ -1017,8 +1018,17 @@ export class World {
 
   /** The crew handling her off her berth by hand (pushOff), then letting her go: kinematic, while they hold her the physics waits. */
   private handStep(b: Boat, dt: number): void {
-    const H = b.handled!, P = H.plan, x0 = b.x, y0 = b.y;
+    const H = b.handled!, P = H.plan, x0 = b.x, y0 = b.y, steer = b.steer, helm = clamp(steer - b.tiller, -1, 1);
+    const slip = H.slip ? slipById(H.slip) : null;
     this.dockStep(b, dt); // (sails weathervane, hoisting goes on)
+    b.steer = steer; // (a steering key held through the push-off stays held: the keys only report a change)
+    b.helm = helm; // (the rudder drawn where you hold it)
+    // the rudder answers the helm as far as water flows along it, fore and aft: going astern it works backwards, the bow
+    // going the way you push the tiller, as physics.ts steers her astern, in proportion to the speed (the turning circle,
+    // with no floor: nothing at rest). Swinging about the bow line, or pushed off sideways, the water crosses the blade
+    // broadside: whichever way it's put over it only adds a little to the stern's resistance, the same both ways, so it
+    // neither hurries nor slows the swing. Held head to wind, stopped: nothing.
+    const astern = (vWater: number) => -helm * 0.7 * Math.min(HANDLING.maxTurnRate, vWater / HANDLING.turnRadius / D2R);
     if (P.kind === 'off') {
       // pushed out over about three seconds; then, if need be, her bow pushed off about her stern quarter
       if (H.s < 1) { H.s = Math.min(1, H.s + dt / 3); b.x = H.from.x + (P.out.x - H.from.x) * H.s; b.y = H.from.y + (P.out.y - H.from.y) * H.s; }
@@ -1033,6 +1043,14 @@ export class World {
         // walked back by the shroud, a crew member on the finger
         const step = Math.min(WALK * dt, back - H.s); H.s += step;
         b.x = H.from.x - u.x * H.s; b.y = H.from.y - u.y * H.s; b.astern = WALK; // (going astern at a walk: as the log shows)
+        // the tiller yaws her a little as she goes astern (the crew at the shroud lets her, a few degrees, clear of everything),
+        // and they straighten her over the last metre, before the finger runs out, so she swings out as planned
+        // (if the yaw she has wouldn't clear the boat or the dock beside her here, the crew straightens her: straight back is
+        // the path the plan cleared)
+        const cur = H.yaw ?? 0, straighten = cur - Math.sign(cur) * Math.min(Math.abs(cur), 3 * dt);
+        const yaw = back - H.s < 1 ? straighten : cur + clamp(clamp(cur + astern(WALK) * dt, -6, 6) - cur, -3 * dt, 3 * dt);
+        H.yaw = !slip || berthClear({ x: b.x, y: b.y }, n360(H.h0 + yaw), slip) ? yaw : straighten;
+        b.h = n360(H.h0 + H.yaw);
         const p = b.pushing; if (p) { p.moved += step; if (p.jump === 0 && p.moved >= p.clear) p.jump = 1e-3; } // (aboard at the finger's end)
       } else if (P.kind === 'swing') {
         const start = { x: H.from.x - u.x * back, y: H.from.y - u.y * back }, ww = this.windHere(b, b);
@@ -1041,12 +1059,13 @@ export class World {
           // swings her against the water's resistance (if it's helping), or the crew walks the bow round
           const rel = wrap(ww.from - n360(H.h0 + H.a)), helps = Math.sign(rel) === Math.sign(P.turn);
           const rate = Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
+          // (the tiller can't hurry or slow it: the water crosses the rudder broadside)
           H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + rate * dt);
           const q = swingAbout(start, H.h0, 3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); b.astern = 0;
         } else if (P.hold && H.held !== false) {
           // head to wind, held on the bow line: waiting for the main to go up and the word to let go; she lies to the wind as
           // it shifts (a boat on a bow line follows it), within 20 degrees of where she came to
-          if (H.held == null) { H.held = true; this.emit({ type: 'toast', msg: 'She\'s lying head to wind, held on the bow line. Hoist the main (U), then push off (G) to let her go.', ms: 6000 }); }
+          if (H.held == null) { H.held = true; this.emit({ type: 'toast', msg: 'She\'s lying head to wind, held on the bow line (stopped: no water past the rudder, so the tiller does little). Hoist the main (U), then push off (G) to let her go.', ms: 6000 }); }
           const want = clamp(wrap(ww.from - n360(H.h0 + P.turn)), -20, 20), cur = H.follow ?? 0;
           H.follow = cur + clamp(want - cur, -CREW_TURN * dt, CREW_TURN * dt);
           const q = swingAbout(start, H.h0, 3.8, P.turn + H.follow); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
@@ -1066,7 +1085,7 @@ export class World {
   }
   /** The crew lets her go with a shove as they step aboard (ahead, or astern): from here she's under her own way. */
   private letGo(b: Boat, h: number, ahead: number, astern: number): void {
-    b.handled = undefined; b.h = n360(h); b.v = ahead; b.astern = astern; b.turnTarget = null; b.steer = 0;
+    b.handled = undefined; b.h = n360(h); b.v = ahead; b.astern = astern; b.turnTarget = null; // (a steering key held stays held)
     const u = V(h); b.vx = u.x * (ahead - astern); b.vy = u.y * (ahead - astern);
     if (b.pushing && b.pushing.jump === 0) b.pushing.jump = 1e-3;
   }
