@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
-import { poleTrip, startThreshold } from '../src/boat/crewWork';
+import { poleTrip, startThreshold, travellerHand } from '../src/boat/crewWork';
 import { POLE, poleEta, sailPlan } from '../src/boat/physics';
 import { beatAngle } from '../src/boat/polar';
 import { ATTRS, Z, DEFAULT_CREW, DEFAULT_SKILL, ENDURE, attrOf, crewAttr, hikingMoment, newCrew, pace, reactTime, specAttr, type Attr, type CrewSpec } from '../src/boat/crewPhys';
@@ -222,5 +222,21 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     sail(b, 60, t => { b.h = 195; if (setAt < 0 && b.pole === 'set') setAt = t; if (drawsAt < 0 && sailPlan(b) === 'wing') drawsAt = t; });
     expect(setAt).toBeGreaterThan(0);
     expect(drawsAt - setAt).toBeGreaterThan(POLE.trim * 0.8); expect(drawsAt - setAt).toBeLessThan(POLE.trim * 2);
+  }, 30_000);
+  it('the traveller: the middle crew\'s by their skill, else the helm\'s (the owner); a novice hardly ever, an expert always', () => {
+    const share = (skill: number) => { let n = 0; for (let i = 0; i < 60; i++) { const sp = { helm: { ...DEFAULT_CREW.helm, h: 1.6 + i * 0.005 }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill })) }; if (travellerHand(2, sp) === 1) n++; } return n / 60; };
+    expect(share(0.95)).toBe(1); expect(share(0.2)).toBe(0);
+    expect(share(0.6)).toBeGreaterThan(0.45); expect(share(0.6)).toBeLessThan(0.9);
+    expect(travellerHand(0, DEFAULT_CREW)).toBe(0); // (alone: the helm)
+  });
+  it('at a tack the traveller car stays where it is on its track, then is hauled back up', () => {
+    const twa = beatAngle(5), b = testBoat({ heading: 360 - twa, kt: 3, windKt: 5 }); b.crew = newCrew(crewOf(0.9), "S");
+    sail(b, 20, () => { b.h = 360 - twa; });
+    const before = b.ctl.traveller; expect(before).toBeLessThan(-0.1); // (to windward in light air: North Sails' guide)
+    // (the step before she changes tack against the step after)
+    startTack(b); let last = before, was = NaN, after = NaN;
+    sail(b, 10, () => { if (b.tack === "P") { after = b.ctl.traveller; was = last; return true; } last = b.ctl.traveller; });
+    expect(after).toBeCloseTo(-was, 2); // (now as far to leeward as it was to windward)
+    sail(b, 20); expect(b.ctl.traveller).toBeLessThan(-0.1); // (hauled back up to windward on the new tack)
   }, 30_000);
 });

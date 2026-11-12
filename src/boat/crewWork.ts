@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, STRESS, Z, allAboard, attrOf, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, STRESS, Z, allAboard, attrOf, crewDraw, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -84,12 +84,25 @@ export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): numbe
 export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = false, poleUp = false): number {
   if (nCrew === 0) return 0;
   const main = mainHand(nCrew, spec, forward || poleUp);
-  if (line === 'mainsheet' || line === 'traveller') return main;
+  if (line === 'mainsheet') return main;
+  if (line === 'traveller') return travellerHand(nCrew, spec, forward || poleUp);
   if (line === 'backstay') return 0;
   // the jib: the forward crew (with one crew, whichever of the two hasn't the main); with the forward hand up at the
   // mast for the pole, the middle crew (alone with the helm: the helm)
   if (line === 'jibsheet' || line === 'jibsheetW') return poleUp ? (nCrew >= 2 ? 1 : 0) : nCrew === 1 ? 1 - main : nCrew;
   return nCrew; // the forward hand: the cabin-top lines, the cars, the pole, the halyards
+}
+/**
+ * Who works the traveller: the owner, "sometimes by the skipper, sometimes by the middle crew. The more skilled the
+ * middle crew, the more likely they manage it. An ideal crew handles all the lines and the skipper just drives." So the
+ * middle crew (the one crew, with two aboard), as a fixed habit of this crew drawn by their skill (a novice hardly ever,
+ * a club crew two times in three, an expert always: estimates), or else the helm, one-handed (workPace). With the crew
+ * gone forward, the helm.
+ */
+export function travellerHand(nCrew: number, spec?: CrewSpec, forward = false): number {
+  if (nCrew === 0 || forward || !spec) return nCrew === 0 || forward ? 0 : 1;
+  const mid = spec.crew[0], k = clamp((skillOf(mid) - 0.2) / 0.6, 0, 1);
+  return crewDraw(spec, 30) < k ? 1 : 0;
 }
 /** The forward hand is up at the mast for the pole (going to set it, setting, stowing or gybing it, or ready for it). */
 const poleUp = (c: CrewState) => c.spec.crew.length > 0 && c.people[c.spec.crew.length]?.job?.line === 'pole';
@@ -231,7 +244,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (k === 'jibsheetW') { out[k] = { pace: workPace(b, who), to: want[k]! }; continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {
-      if (j.reach > 0) { j.reach -= dt; out[k] = { pace: 0, to }; } else out[k] = { pace: workPace(b, who), to };
+      // (the helm with the traveller as well as the tiller: one hand for it, more slowly)
+      if (j.reach > 0) { j.reach -= dt; out[k] = { pace: 0, to }; } else out[k] = { pace: workPace(b, who) * (k === 'traveller' && who === 0 && n > 0 ? 0.6 : 1), to };
     } else out[k] = { pace: 0, to };
   }
   carJob(b, dt);

@@ -621,7 +621,7 @@ const smoothSkill = (s: number) => { const t = clamp((s - 0.2) / 0.4, 0, 1); ret
 
 /** A fixed draw in [0, 1) for this crew (from who's aboard: heights, weights, skill), so a boat's crew have the same
  * habits every time. */
-function crewDraw(spec: CrewSpec, k: number): number {
+export function crewDraw(spec: CrewSpec, k: number): number {
   let h = 2166136261 ^ k;
   for (const p of [spec.helm, ...spec.crew]) for (const x of [p.h, p.w, p.skill ?? DEFAULT_SKILL]) { h ^= Math.round(x * 1000); h = Math.imul(h, 16777619); }
   h ^= h >>> 15; h = Math.imul(h, 2246822507); h ^= h >>> 13;

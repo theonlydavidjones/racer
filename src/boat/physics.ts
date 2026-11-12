@@ -169,6 +169,17 @@ function crewHatch(b: Boat, dt: number): void {
 }
 
 /**
+ * The traveller car at a tack: it stays where it physically is on its track. The controls hold it by the tack (−1 to
+ * windward … +1 to leeward), so to windward on the old tack is to leeward on the new one: the car's number turns over
+ * (Crew Controls, from the physics review of #156: before, it jumped to the mirror position with nobody moving it).
+ * Then whoever has it hauls it back up to where they want it (crewWork.ts travellerHand), at the car's own rate.
+ */
+function travellerAtTack(b: Boat): void {
+  b.ctl.traveller = -b.ctl.traveller;
+  if (b.ctlTarget?.traveller != null) b.ctlTarget.traveller = -b.ctlTarget.traveller;
+}
+
+/**
  * A fumble through a tack or a gybe, under pressure (crewPhys.ts fumble: a fixed draw for each crew and manoeuvre, as
  * likely as the pressure gets to the jib trimmer): a riding turn on the winch, the new sheet slipping out as it's
  * taken. The jib flaps half out (the sheet eased to about half its range) and can't be hauled in for the time it takes
@@ -300,7 +311,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
-  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); tackFumble(b); }
+  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); tackFumble(b); travellerAtTack(b); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
   crewPole(b, dt, emit); crewHatch(b, dt);
@@ -555,7 +566,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // tack and sails, as when sailing
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel); b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P'; if (twa > 176) tk = b.tack;
-  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); tackFumble(b); }
+  if (tk !== b.tack) { if (twa < 90) b.tacking = true; b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); tackFumble(b); travellerAtTack(b); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
   crewRig(b, dt, emit); crewPole(b, dt, emit); crewHatch(b, dt);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
