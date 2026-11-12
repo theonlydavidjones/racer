@@ -64,10 +64,10 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 out a full true-to-life 3D model of the folkboat… use as much care inside as we have everywhere else. we still have more
 work to do on the deck as well (lines, hatch, fairleads, etc) but that's not urgent either." The cabin lighting at night
 is now "much better" (owner).
-1. The interior reads as real 3D by day (parallax, daylight in through the companionway and lights), and the
+1. ~~The interior reads as real 3D by day~~ (done, v106) (parallax, daylight in through the companionway and lights), and the
    translucent panel over the companionway at night is gone (2–4 h).
 2. The interior true to a real Folkboat, from the construction plan and reference photos (6–10 h).
-3. The cockpit to the plan, with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
+3. ~~The cockpit to the plan~~ (done: benches as lazarettes, footwell, thwart, after shelf, winches on pedestals from Josephine's photos), with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
 4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
 5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
@@ -87,7 +87,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   unclear whether the companionway is open or shut. Draw it open (more true to life under way): the opening, its washboards
   or door stowed, and at night "the cabin lights shining through it" (ties in with the warm cabin light planned under
   Lights on the boats). Check from both sides on both tacks.
-- **Now — bow spray** (bug; 1–2 h; in progress: Boat Detail): at night the spray against the bow is "white squares… they look fake and read as
+- ~~**Now — bow spray**~~ (done, #39: droplets lit by the scene; bug; 1–2 h): at night the spray against the bow is "white squares… they look fake and read as
   sparks, not water". Cause: square, unlit white points (render/wake.ts, PointsMaterial). Real spray is droplets and sheets
   that take the scene's light, so they go dark at night and catch only the boat's own lights.
 - ~~**Now — cruise ignores the chosen origin**~~ (done: 1ace228 in #54, checked in the browser by Marinas; bug; ~1 h): owner, "there's a bug in cruise
@@ -109,11 +109,11 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   downwind and a current wake downstream that turns with the tide (environment/pierWakes.ts). Tests: bridges.test.ts,
   pierWakes.test.ts. Still open: the wake's constants for long rectangular piers (C_D by side ratio, the recirculation
   length) and the bed friction c_f want primary sources (NACA TN 3038, Norberg 1993, Parnaudeau 2008 were out of reach).
-- **Now — a see-through seam between the keel and the hull** (bug; 1–2 h; in progress: Boat Detail): "a transparent seem between the keel and the
+- ~~**Now — a see-through seam between the keel and the hull**~~ (done, #39: the garboard lands flush in the keel's rabbet; bug; 1–2 h): "a transparent seem between the keel and the
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
   the keel's rabbet). Check from both sides.
-- **Next — the thwart, the cockpit's proportions and where the skipper sits** (accuracy; 4–6 h; owner: "when time is
+- ~~**Next — the thwart, the cockpit's proportions and where the skipper sits**~~ (done with P0 phase 3: the cockpit to the construction plan, the thwart a deep varnished beam with the traveller and cam cleats, the helm on the after deck; accuracy; 4–6 h; owner: "when time is
   right"): the thwart is drawn as "a horizontal plank", and "the skipper is crammed behind the thwart with the thwart in
   their lap. That's not true to life. While underway, skippers often (but not always) sit on the stern… or along the rear
   rail." From the owner's three photos (Josephine at the dock, Josephine under way looking aft, CircleSea side-on; the
@@ -220,7 +220,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   before it was toned down (render/boatMesh.ts flags; the earlier version is in git history). Add "Strike ensign" to
   the bottom-right cluster (#viewBar), shown only in a cruise when the wind is high (threshold to propose, about 20 kt):
   it lowers the ensign and its staff, and a second press hoists it again.
-- **Next — the boat's lights only when in use** (accuracy; ~1 h): "Remove the hull lights when they're not in use
+- ~~**Next — the boat's lights only when in use**~~ (done, #42: none in the slip or when switched off, Rule 25 under way, Rule 30 at anchor, the lanterns drawn only while lit; accuracy; ~1 h): "Remove the hull lights when they're not in use
   please." They're already off from sunrise to sunset (render/navLights.ts, ON()); still to do: off in the slip and tied
   up at a dock, the all-round anchor light alone at anchor or on a mooring, the sidelights and sternlight only under way
   (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
@@ -249,7 +249,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
-- **Next — the bow wave** (polish/accuracy; 2–3 h; in progress: Boat Detail): looks "like a big white V rather than water", worse at night. A bow
+- ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-coloured water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
 - ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
@@ -445,7 +445,7 @@ the handbook (Raymarine document 81130) wasn't reachable.
 
 ## The owner's list (November 2026, to prioritise)
 
-In progress: the full-screen chart (tap the inset map: the sim pauses, pick a destination) and a tiller pilot (cruising only; RRS 52).
+~~The full-screen chart and a tiller pilot~~ (done; the ST2000+'s AutoTack and AutoTrim still unconfirmed).
 Then the skipper/crew model (calibration data first; Yacht Club sliders; crew skill driving trim, pole and puff calls; AI
 skippers acting on what they believe; cheating, protests and hearings). Also asked for:
 
