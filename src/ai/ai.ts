@@ -8,7 +8,7 @@ import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong, onLand } from '../geo/shore';
-import { HAIL_RESPONSE, cpa } from '../rules';
+import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
 import { AI_EVERY, type World } from '../sim/world';
@@ -39,8 +39,14 @@ const MARK_CLEAR = 20;
 /** Pass marks with at least this much room between the mark and her centreline, m (Rule 31). */
 const MARK_ROOM = 5;
 
+/** Room to turn at her aim point clear of the shore beyond it, m: two lengths. */
+const SHORE_TURN = 15;
 /** Half a Folkboat's beam, m (2.20 m: NFIA class rules, principal dimensions). */
 const HALF_BEAM = 1.1;
+/** Overlapped and already parting, with at least 3 m of water between the hulls (about a beam and a half), a boat that
+ * must keep clear is doing so: she holds on rather than ease and head up further. Measured between the centrelines
+ * (rules hullGap), so the two half-beams are added. */
+const OPEN_GAP = 3 + 2 * HALF_BEAM;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   let near: string | null = null;
@@ -255,6 +261,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
   const beat = beatFor(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
+  let aim: Vec | null = null; // (the point she's steering for, racing)
   ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
   if (b.penalty > 0) {
     ai.goTack = null; ai.headedT = 0;
@@ -380,12 +387,17 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (ai.detour) P = ai.detour;
     } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)
     else ai.detour = null;
+    aim = P;
     const bP = brg(P.x - b.x, P.y - b.y);
     // a tack (or gybe) she's decided on she carries out, as a sailor does: round onto the new tack's close-hauled (or
     // running) course, deciding nothing else until she's there (re-deciding each moment, mid-tack, she'd stall head to
     // wind or wheel round and run off). Dropped once she's round, if it hasn't happened in 20 s (something stopped her),
     // or if she's on another leg or point of sail than the one she decided it for.
-    const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt), upwind = rel < 44 && !b.ocs;
+    // (upwind or not, with some hysteresis as for running below: rounding a leeward mark her aim point, 12 m off it,
+    // can sit right on the 44° line as she comes to it, and deciding afresh each time she thought, she flipped between
+    // close-hauled and the run every half second and sailed into the mark)
+    const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt);
+    const upwind = (ai.upwind = ai.upwind ? rel < 48 : rel < 44) && !b.ocs;
     // the course she'd steer to make good the straight line to it, up-current of it by as much as the current across
     // her track would set her down (a crew that reckons with the current allows for all of it, the others for some)
     const crab = crabFor(bP, targetFor(b, rel) * 0.9, { x: c.x * ai.kn.currentShare, y: c.y * ai.kn.currentShare });
@@ -474,7 +486,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   }
   // keep off the shore (and off the line mid-race)
   let holdForHail = false; let tackNow = false;
-  if (blocked(w, b, desired, 45)) {
+  // (steering for a point close ahead, a rounding mark's, the shore only matters as far as that point and room to turn
+  // there: rounding the Fort Mason mark off the pier's end, land 30 m beyond her aim point turned her back upwind every
+  // other moment, and she sailed on into the mark between turns. Off her aim, on a beat, she looks the full 45 m)
+  const look = aim && Math.abs(wrap(desired - brg(aim.x - b.x, aim.y - b.y))) < 30 ? Math.min(45, dist(b, aim) + SHORE_TURN) : 45;
+  if (blocked(w, b, desired, look)) {
     // Pinned by a boat to windward that she'd hit if she tacked? Hail for room to tack (Rule 20) as soon as she may
     // (close enough to the obstruction that she'll soon have to change course substantially: rule 20.1(a)), and hold on
     // while the other boat responds. If the island-mark rule forbids the hail (the other boat is fetching it), she bears
@@ -542,6 +558,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   }
   // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
   let avoiding = false;
+  const course = desired; // (where she'd steer with no boat to keep clear of)
   // (her turn answers the helm over a moment, physics.ts yawLag, in which she covers the same ground at any speed, the
   // time growing as the speed falls: v·τ = 1.46 m. She starts her keep-clear moves that much further off; and her Rule
   // 14 move that much sooner, up to a second and a half more, not seconds at a crawl, where she'd be swerving for a boat
@@ -555,10 +572,34 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (ducking && cp.t < 16 && cp.d < 22 + lagM) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); if (o.id !== ai.hailTack?.with) avoiding = true; continue; }
     // (the boat she has hailed about, while that hail is answered and there's still time: she holds on, to tack)
     if (boatHailOn && o.id === bh!.c && cp.t > BOAT_HAIL_MARGIN) continue;
-    if (r.kc === b && cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM) {
+    // (and, overlapped to windward, closing on her with less than that room already, however slowly: converging side
+    // by side at a few cm a second, the closest approach lies beyond the 12 s she looks ahead, and she'd drift on into
+    // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
+    const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
+    if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+      // Already opening, with room between the hulls: she is keeping clear (Definitions, Keep Clear: the other boat can
+      // sail her course with no need to act), so she sails on at full speed: on her course if that keeps the room, on
+      // her heading if her course would close it again. (Easing and heading up on regardless, a windward boat slowed
+      // beside a faster leeward one stayed overlapped, close-hauled at 1.7 kt, for half a minute after the gap had
+      // begun to open: the closest approach of boats already parting is the distance between them now, inside the
+      // keep-clear distance as long as they're overlapped. No helm sails that way.)
+      // (parting, or closing slower than 0.15 m/s, about a quarter of a knot: judged by the rate the gap changes, which is
+      // steady for boats sailing side by side, where the time to their closest approach swings about from moment to
+      // moment and she'd swap between holding on and turning away)
+      const rangeRate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
+      if (rangeRate > -0.15 && hullGap(b, o) >= OPEN_GAP) {
+        if (clearanceOn(w, b, desired, o) < Math.hypot(dx, dy) - 0.5) desired = sailable(b, b.h);
+        if (o.id !== ai.hailTack?.with) avoiding = true;
+        continue;
+      }
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
       if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
-      else if (r.rule === '11') { desired = sailable(b, b.tack === 'P' ? b.h - 20 : b.h + 20); luff = !running; }
+      else if (r.rule === '11') {
+        // head up from her heading, but no more than 35° above her course: turned up afresh from wherever she'd got to
+        // each time she thought, she ratcheted on up to close-hauled with her sails eased, and stalled
+        const up = b.tack === 'P' ? -1 : 1, cap = n360(course + up * 35), h = n360(b.h + up * 20);
+        desired = sailable(b, wrap(h - cap) * up > 0 ? cap : h); luff = !running;
+      }
       else if (running) { desired = startArea ? clearestHeading(w, b, b.h) : away; luff = false; } // easing barely slows her on a run: steer round instead
       else { luff = true; desired = away; }
       if (o.id !== ai.hailTack?.with) avoiding = true; // (the boat of the hail: rule 20.2 has their room in hand)
