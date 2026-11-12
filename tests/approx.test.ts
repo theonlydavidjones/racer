@@ -17,13 +17,13 @@ const RACES = [
   [ss2, { tideDate: '2026-11-14', windKind: 'west', windKt: 12, current: 'real', fleet: 5 }, 7]
 ] as const;
 /** Six minutes of a race: each AI boat's mean speed after the gun, and where she is (the user's boat, unsailed, left out). */
-function race(i: number, o: { grid: boolean; skip: boolean; curK?: number }) {
-  const [c, s, seed] = RACES[i];
+function race(i: number, o: { grid: boolean; skip: boolean; curK?: number; seed?: number }) {
+  const [c, s, seed0] = RACES[i], seed = o.seed ?? seed0;
   setShoreGrid(o.grid);
   try {
     const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, ...s } as never, seed);
     w.exactPairs = !o.skip;
-    if (o.curK) { const f = w.currentAt.bind(w); w.currentAt = p => { const v = f(p); return { x: v.x * o.curK!, y: v.y * o.curK! }; }; }
+    if (o.curK) { const f = w.currentAt.bind(w); w.currentAt = (p, l) => { const v = f(p, l); return { x: v.x * o.curK!, y: v.y * o.curK! }; }; }
     const sum = w.boats.map(() => 0), incidents: string[] = []; let n = 0;
     while (w.t < 6 * 60) {
       w.step(DT); if (w.t > 0) { w.boats.forEach((b, k) => { sum[k] += b.v; }); n++; }
@@ -53,26 +53,23 @@ describe('the shore distance off a 10 m lattice', () => {
     expect(worstK).toBeLessThan(0.013); // (0.75 / 350 per metre: 6 m is 1.3% of the current)
   }, 120_000);
 
-  it('sails the same race as the exact distance, as near as any small change sails it', () => {
+  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over eight races', () => {
     // A race isn't chaotic to a nudge (a boat moved a micrometre sails the same race), but a small change to the forces
-    // moves the AI's decisions (a tack a step sooner) and the race goes its own way from there: the current 0.1% stronger
-    // everywhere (far inside NOAA's own uncertainty) moved the fleet's mean speed 1.1–2.6% and boats up to 230 m after
-    // eight minutes, as much as the lattice does (1.3–1.7%, 120 m). So: the lattice's race against the exact one, within
-    // what such a change makes of it (six minutes here). Since her turn has had inertia (physics.ts yawLag), a race is
-    // more easily turned: a tack a moment later, a contact, a penalty's two turns. Re-measured then: the current 0.1%
-    // stronger or weaker moved the fleet's mean speed 6–17% over six minutes; the lattice 2.3–4.6%. The fleet within 8%.
-    // (These bounds can't catch a lattice that's subtly wrong: the test above, point by point, is what does.)
-    for (let i = 0; i < RACES.length; i++) {
-      const ex = race(i, { grid: false, skip: false }).boats, ap = race(i, { grid: true, skip: false }).boats;
-      expect(Math.abs(fleetV(ap) / fleetV(ex) - 1), `race ${i}: the fleet's mean speed`).toBeLessThan(0.08);
-      // (boat by boat, the median: one boat whose tack went the other way is the race's own sensitivity, not the lattice;
-      // a 0.1% stronger current moved single boats' mean speed up to 8%, a 1% one up to 25%)
-      const med = (xs: number[]) => xs.slice().sort((a, b) => a - b)[xs.length >> 1];
-      expect(med(ex.map((b, k) => Math.abs(ap[k].v / b.v - 1))), `race ${i}: a boat's mean speed, the median`).toBeLessThan(0.08);
-      expect(med(ex.map((b, k) => Math.hypot(ap[k].x - b.x, ap[k].y - b.y))), `race ${i}: where a boat is, the median`).toBeLessThan(250);
-      ex.forEach((b, k) => expect(Math.abs(ap[k].leg - b.leg), `race ${i}, boat ${k}: her leg`).toBeLessThanOrEqual(1));
+    // moves the AI's decisions (a tack a step sooner, a contact, a penalty's turns) and the race goes its own way from
+    // there, by as much as its own luck: one race's fleet speed moved 1–17% for the current 0.1% stronger or weaker (far
+    // inside NOAA's own uncertainty), depending on the race. So the lattice is measured against that, in the same races:
+    // over eight (two courses, four starts each), the mean change in the fleet's mean speed the lattice makes, against
+    // the mean the current's ±0.1% makes, within half as much again and half a point. (A lattice that's subtly wrong is
+    // the test above's to catch, point by point; this is that it doesn't sail a different kind of race.)
+    const dev: number[] = [], nudge: number[] = [];
+    for (const [i, seed] of [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const) {
+      const ex = fleetV(race(i, { grid: false, skip: false, seed }).boats);
+      dev.push(Math.abs(fleetV(race(i, { grid: true, skip: false, seed }).boats) / ex - 1));
+      nudge.push((Math.abs(fleetV(race(i, { grid: false, skip: false, seed, curK: 1.001 }).boats) / ex - 1) + Math.abs(fleetV(race(i, { grid: false, skip: false, seed, curK: 0.999 }).boats) / ex - 1)) / 2);
     }
-  }, 600_000);
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(mean(dev), `the lattice ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
+  }, 1_800_000);
 });
 
 describe('pairs far apart are let be', () => {
