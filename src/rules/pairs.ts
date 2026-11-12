@@ -1,5 +1,5 @@
-import { LOA, V, ZONE, brg, markDist, dot, segPt, wrap, type Vec } from '../core/math';
-import { clearAstern, hullGap } from './geometry';
+import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec } from '../core/math';
+import { clearAstern, cpa, hullGap } from './geometry';
 import { rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
 
@@ -36,7 +36,14 @@ export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: 
     if (h.replyAt != null) h.respondedAt = h.replyAt;
     else if (hailed.lastTackT >= h.at || hailed.tacking) h.respondedAt = t;
   }
-  if (h.respondedAt == null) return t >= h.at + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
+  if (h.respondedAt == null) {
+    // Rule 20.3: she passed the hail on to a boat to windward of her that stops her tacking. She can't tack until that
+    // boat has responded, so her own "as soon as possible" runs from then; and if that boat never does (her breach),
+    // she was never able to (rule 43.1(a)'s reasoning: compelled by another boat's breach).
+    const po = h.passedOn;
+    if (po) return po.failed || po.respondedAt == null ? null : t >= po.respondedAt + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
+    return t >= h.at + HAIL_RESPONSE ? { boat: hailed, role: 'hailed' } : null;
+  }
   const hailerTacked = hailer.lastTackT >= h.at || hailer.tacking;
   return !hailerTacked && t >= h.respondedAt + HAIL_RESPONSE ? { boat: hailer, role: 'hailer' } : null;
 }
@@ -110,6 +117,36 @@ function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
 export interface PairObservation {
   /** A right-of-way boat had to change course to avoid the other boat (Rule 14 / "forced to swerve"). */
   swerve: boolean;
+  /**
+   * How much of each boat's wind the other is taking (Rule 23): the fraction of the wind speed missing at B because of
+   * A's sails (`byA`), and at A because of B's (`byB`). From the caller's wind-shadow model; omitted, none.
+   */
+  blanket?: { byA: number; byB: number };
+}
+
+/**
+ * Rule 23: a wind shadow taking this much of a boat's wind speed is interference: the sails' drive goes with the square
+ * of the wind speed, so 12% less wind is about a quarter less drive. (environment/shadows.ts: a close-hauled Folkboat's
+ * wake takes 10–15% two lengths downwind of her, a running one's much more.)
+ */
+export const BLANKET_K = 0.12;
+/** Rule 23: blanketing held this long (s) is interference, not a boat passing through another's wind on her way by. */
+export const BLANKET_TIME = 8;
+
+/**
+ * Rule 23: could `X` be breaking rule 23 by taking `Y`'s wind? Only between these boats:
+ * 23.1, X is not racing (she has finished) and Y is;
+ * 23.2, Y is taking a penalty, on another leg, or returning to start under rule 21.1 (the sim's `ocs`), and X is not
+ * sailing her proper course (after the starting signal she may sail it whatever it does to Y's wind; the sim's sign of
+ * leaving it is sailing above it). Before the start there is no proper course to judge interference by, and the sim
+ * only calls 23.2 blanketing it can tell was deliberate, so not then.
+ */
+export function blanketRule<B extends RulesBoat>(X: B, Y: B, ctx: RulesContext): '23.1' | '23.2' | null {
+  if (Y.finished) return null;
+  if (X.finished) return '23.1';
+  if (ctx.t <= 0 || !X.started || !X.aboveProper) return null;
+  const vulnerable = Y.penalty > 0 || Y.ocs || (Y.started && Y.leg !== X.leg);
+  return vulnerable ? '23.2' : null;
 }
 
 export interface PairAssessment<B> { verdict: Verdict<B>; incident: Incident<B> | null }
@@ -165,13 +202,22 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
       const mk = ctx.marks[A.leg], ins = markDist(A, mk) < markDist(B, mk) ? A : B, out = ins === A ? B : A;
       insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
     }
-    const com = ctx.t > 0 && A.started && B.started, oA = ctx.obstacle?.(A, com), oB = ctx.obstacle?.(B, com);
+    const [oA, oB] = obstructionsFor(A, B, ctx, rec);
     if (oA && oB) { const ins = oA.d < oB.d ? A : B, oo = ins === A ? oB : oA; insideObst = ins.id; obstUnable = oo.d - 1.1 < ROOM_GAP; }
     rec.ovStart = { t: ctx.t, astern, tacker, insideMark, markUnable, insideObst, obstUnable };
   } else if (!overlapped) rec.ovStart = null;
   rec.wasOverlapped = overlapped;
   rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT;
 
+  // Rule 20.2(e): 18.2 is off from the hail until the hailing boat has tacked and avoided the hailed boat. Set when a
+  // hail for room to tack is made (on her record before this step), ended here once she has tacked, is out of the tack
+  // and won't meet the hailed boat, or once they're far enough apart to have nothing more to do with each other.
+  if (rec.hail?.kind === 'room' && rec.r202e?.at !== rec.hail.at) rec.r202e = { hailer: rec.hail.by, at: rec.hail.at };
+  if (rec.r202e) {
+    const H = rec.r202e.hailer === A.id ? A : B, O = H === A ? B : A, g = hullGap(A, B);
+    const avoided = H.lastTackT >= rec.r202e.at && !H.tacking && ctx.t - H.lastTackT > 2 && g > ROOM_GAP && cpa(H, O).d > LOA;
+    if (avoided || g > 6 * LOA) rec.r202e = null;
+  }
   const r = rightOfWay(A, B, ctx, rec);
   // Rule 15: right of way just changed hands because of a tack or an overlap from astern.
   // (Not when the change comes from the other boat's own action: a "You tack" reply, or a tack into the zone.)
@@ -208,7 +254,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   let kind: 'contact' | 'swerve' | null = null;
   if (gap < CONTACT_GAP) kind = 'contact';
   else if (obs.swerve) kind = 'swerve';
-  if (!kind) return { verdict: r, incident: null };
+  if (!kind) return { verdict: r, incident: blanketing(rec, A, B, ctx, obs, r) };
 
   // boats that have both finished aren't racing: no penalties between them
   if (A.finished && B.finished) return { verdict: r, incident: null };
@@ -243,6 +289,62 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
 }
 
 /**
+ * Rule 23: interference without contact, by taking the other boat's wind. Rule 23.1 forbids a boat not racing to
+ * interfere with one racing, if reasonably possible; 23.2 forbids interfering with a boat taking a penalty, sailing on
+ * another leg or subject to rule 21.1, except by sailing her proper course after the start (RRS 2025–2028).
+ * "Interfere" isn't defined in the rules, and World Sailing's cases (Case 149) only show it as forcing a boat to change
+ * course; no case or call rules on wind shadow either way. Taking a boat's wind slows her as surely as making her
+ * luff, so the sim counts it too (the owner's call, ROADMAP item 6): an interpretation, not settled law. It is called
+ * when one boat's wind shadow has taken BLANKET_K of the other's wind speed for BLANKET_TIME seconds while
+ * blanketRule says rule 23 protects her.
+ */
+function blanketing<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation, r: Verdict<B>): Incident<B> | null {
+  if (A.finished && B.finished) { rec.blanket = {}; return null; }
+  for (const [X, Y, k] of [[A, B, obs.blanket?.byA ?? 0], [B, A, obs.blanket?.byB ?? 0]] as const) {
+    const part = k >= BLANKET_K ? blanketRule(X, Y, ctx) : null;
+    if (!part) { delete rec.blanket[X.id]; continue; }
+    const bl = rec.blanket[X.id] ??= { since: ctx.t, turned: turnedToward(X, Y) };
+    if (ctx.t - bl.since < BLANKET_TIME) continue;
+    rec.blanket = {}; rec.cool = ctx.t + INCIDENT_COOLDOWN;
+    return { kind: 'blanket', fouler: X, rule: '23', byWhy: null, part, turned: bl.turned || undefined, verdict: r };
+  }
+  return null;
+}
+
+/**
+ * The boat that is an obstruction to both A and B, if one is near (Definitions, Obstruction: "a boat racing is not an
+ * obstruction to other boats unless they are required to keep clear of her". "A vessel under way, including a boat
+ * racing, is never a continuing obstruction"). Each boat's gap to her hull and the unit vector from her toward each.
+ * Rule 19.1(b): not when rule 18 applies between A and B and that boat is overlapped with each of them.
+ */
+function boatObstruction<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec: PairRecord): [{ d: number; n: Vec; continuing: false }, { d: number; n: Vec; continuing: false }] | null {
+  if (!ctx.fleet || !ctx.keepsClearOf) return null;
+  const r18 = !!rec.mark && !rec.mark.ended && A.leg === rec.mark.idx && B.leg === rec.mark.idx;
+  const ov = (X: RulesBoat, Y: RulesBoat) => !clearAstern(X, Y) && !clearAstern(Y, X);
+  let best: [{ d: number; n: Vec; continuing: false }, { d: number; n: Vec; continuing: false }] | null = null, bd = 30;
+  for (const C of ctx.fleet) {
+    if (C.id === A.id || C.id === B.id || C.finished) continue;
+    if (Math.abs(C.x - A.x) > 45 || Math.abs(C.y - A.y) > 45) continue;
+    const dA = hullGap(A, C), dB = hullGap(B, C);
+    if (Math.min(dA, dB) >= bd || !ctx.keepsClearOf(A, C) || !ctx.keepsClearOf(B, C)) continue;
+    if (r18 && ov(A, C) && ov(B, C)) continue;
+    const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - C.x) * u.x + (X.y - C.y) * u.y, -LOA / 2, LOA / 2), dx = X.x - C.x - u.x * k, dy = X.y - C.y - u.y * k, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
+    best = [{ d: dA, n: toward(A), continuing: false }, { d: dB, n: toward(B), continuing: false }]; bd = Math.min(dA, dB);
+  }
+  return best;
+}
+
+/** The obstruction nearest each of A and B: the shore, the committee boat after the start, or a boat both keep clear of. */
+function obstructionsFor<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec: PairRecord): [{ d: number; n: Vec; continuing: boolean } | null, { d: number; n: Vec; continuing: boolean } | null] {
+  const com = ctx.t > 0 && A.started && B.started;
+  let oA = ctx.obstacle?.(A, com) ?? null, oB = ctx.obstacle?.(B, com) ?? null;
+  const bo = boatObstruction(A, B, ctx, rec);
+  // the boat, if she is nearer the pair than the shore is: then she is the obstruction they're at
+  if (bo && (!oA || !oB || Math.min(bo[0].d, bo[1].d) < Math.min(oA.d, oB.d))) { oA = bo[0]; oB = bo[1]; }
+  return [oA, oB];
+}
+
+/**
  * Rule 19 at an incident between overlapped boats at an obstruction (the shore, or the committee boat after the start).
  * The boat nearer it is inside. 19.2(b): the outside boat gives the inside boat room between her and the obstruction,
  * unless she couldn't from the moment the overlap began; squeezing the inside boat toward it breaks the rule.
@@ -250,10 +352,10 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
  * isn't entitled to room, and keeps clear. Only in place of the basic rules (10–13), not Section D, 18 or 20.
  */
 function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord, ctx: RulesContext): { fouler: B; part: string } | null {
-  if (!ctx.obstacle || !['10', '11', '12', '13'].includes(basic)) return null;
+  if ((!ctx.obstacle && !ctx.fleet) || !['10', '11', '12', '13'].includes(basic)) return null;
   const sameTackOrDeep = A.tack === B.tack || (twaOf(A, ctx) > 90 && twaOf(B, ctx) > 90); // Definitions, Overlap (each in the wind she's in)
   if (!sameTackOrDeep || clearAstern(A, B) || clearAstern(B, A)) return null;
-  const com = ctx.t > 0 && A.started && B.started, oA = ctx.obstacle(A, com), oB = ctx.obstacle(B, com);
+  const [oA, oB] = obstructionsFor(A, B, ctx, rec);
   if (!oA || !oB) return null;
   const I = oA.d < oB.d ? A : B, O = I === A ? B : A, oI = I === A ? oA : oB;
   if (oI.d > AT_OBSTRUCTION) return null;

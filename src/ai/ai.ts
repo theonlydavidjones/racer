@@ -481,7 +481,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const h = o !== b ? w.pairRecord(b, o)?.hail : null;
     if (!h || h.kind !== 'room') continue;
     // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(c)), unless she replied "You tack".
-    if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+    // With a boat on the same tack to windward stopping her, she first passes the hail on to it (Rule 20.3; WS Case 113)
+    // and holds her course until it responds; then she tacks.
+    if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) {
+      if (!h.passedOn) w.passOnHail(b, o);
+      const po = h.passedOn, waiting = !!po && po.respondedAt == null && !po.failed;
+      if (po?.failed) continue; // the boat she hailed never responded: she still can't tack into her
+      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; }
+      else holdForHail = true;
+    }
     // She hailed and the other boat responded (tacked, or replied "You tack"): tack now (Rule 20.2(d)).
     if (h.by === b.id && h.respondedAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; }
   }

@@ -10,7 +10,7 @@ import { byHand, sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
-import type { World } from '../sim/world';
+import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
 import { flagCanvas, pennantCanvas } from '../render/flags';
 import { FLAG_NAME } from '../sim/signals';
@@ -366,10 +366,24 @@ export class Hud {
       if (hail.replyAt != null) {
         $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now: they must give you room.`;
         el.className = hail.by === o.id ? 'kc' : 'row';
+      } else if (hail.by === o.id && hail.passedOn) {
+        // Rule 20.3: you passed the hail on to the boat to windward of you
+        const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';
+        const left = po.respondedAt != null ? Math.max(0, po.respondedAt + HAIL_RESPONSE - w.t) : null;
+        $('situMsg').textContent = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
+          : left == null ? `You passed the hail on to ${nm}. Tack as soon as they respond (Rule 20.3).` : `${nm} has responded. Tack now (Rule 20.3): ${left.toFixed(0)} s.`;
+        el.className = left != null ? 'kc alarm' : 'kc';
       } else if (hail.by === o.id) {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
-        $('situMsg').textContent = `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
+        const blocked = !!w.tackBlocker(u) && w.tackBlocker(u) !== o && !youTackPays(o, u);
+        $('situMsg').textContent = blocked
+          ? `${o.name} hailed "Room to tack!" With ${w.tackBlocker(u)!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
+          : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
+      } else if (hail.passedOn && hail.respondedAt == null) {
+        const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
+        $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
+        el.className = 'row';
       } else if (hail.respondedAt != null) {
         const left = Math.max(0, hail.respondedAt + HAIL_RESPONSE - w.t);
         $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
