@@ -30,6 +30,8 @@ export interface AiState {
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
+  /** Not started yet: her whole hull has been on the pre-start side since the gun (bow and stern below, by a margin), so she may come up and start. */
+  belowSinceGun?: boolean;
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
@@ -110,6 +112,7 @@ export interface Boat {
   markTouch: string | null; // the mark she is touching right now (Rule 31), if any
   headingAgo?: number; // heading RULE16_WINDOW seconds ago (Rule 16.1), kept by the World
   aboveProper?: boolean; // sailing above her proper course (Rule 17), kept by the World
+  belowProper?: boolean; // sailing well below her proper course (Rule 23.2), kept by the World
   cleared?: boolean; // finished and cleared the finishing line and marks: no longer racing (Definitions, Racing), kept by the World
   // environment at the boat
   cur: Vec;
@@ -172,6 +175,8 @@ export interface Boat {
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
+  /** Your boat: the pole is yours to call (you've worked it), not the crew's (ai.ts crewPoleCall). */
+  poleMine?: boolean;
   pole: PoleState;
   poleT: number; // seconds left in the current crew job
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)

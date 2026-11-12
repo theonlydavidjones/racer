@@ -27,6 +27,8 @@ export interface RulesBoat {
   headingAgo?: number;
   /** She is sailing above her proper course (for Rules 17 and 23). Omit if unknown. */
   aboveProper?: boolean;
+  /** She is sailing well below her proper course, farther from the wind than it (for Rule 23.2). Omit if unknown. */
+  belowProper?: boolean;
   /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
   backing?: boolean;
   /** She has finished (crossed the finishing line). */
@@ -128,7 +130,7 @@ export interface PairRecord {
    * Rule 23, interference by taking a boat's wind: how long (s) each boat has been blanketing the other (keyed by the
    * id of the boat doing it), and how the blanketing began (her turn just before, for 23.2's proper course).
    */
-  blanket: Record<number, { since: number; turned: number }>;
+  blanket: Record<number, { since: number; turned: number; boreAway?: number }>;
 }
 
 /** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */

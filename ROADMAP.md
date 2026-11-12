@@ -1,13 +1,20 @@
 # Build plan
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighbouring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
   (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
   yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
   sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
-- **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
+- ~~**The sea inside the marinas**~~ (done, bay-east-7: the swell diffracts through each entrance by the exact gap solution, scripts/make-gap-diffraction.py, the Penney & Price problem the Shore Protection Manual draws for B/L 0.5–5; the fetch is traced finely just outside a marina as well as inside, every 2° by one, and blended between its 10 m nodes;
+  swell running past an entrance bends round its breakwater head by Sommerfeld's half-plane solution; over a swell's
+  spread of directions, Mitsuyasu/Goda s 75. Left out, from review: the basin's own walls reflecting the waves (Gashouse
+  Cove's seawall reflects nearly all, so the real basin holds more than the bare diffraction gives, and long swell can
+  set up a harbor's seiche); piers between an entrance and a slip (20 of Gashouse Cove's slips have none in sight); the
+  tide's depth over the entrance (MLLW's); a curved breakwater taken straight at its head (West Harbor, facing east,
+  away from the swell, gets well under a millimetre in a 2 m swell outside, where the old unsourced ×0.15 gave 3 cm)) (from review
+  of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
   neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
   sourced coefficients (Wiegel's diffraction diagrams, Shore Protection Manual) in place of the unsourced ×0.15;
@@ -95,6 +102,13 @@ What's planned, roughly in order. Done work is described in the README.
    and destination picked on the chart; Change the conditions mid-sail, physics-reviewed; "Move her here" without
    ending the cruise; Home: back to her slip when cruising, retire and head home when racing). The showroom's own time
    of day and conditions are done too.
+   Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
+   11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by; 23.2
+   catches a boat that bore away well below her proper course (20°+) onto the wind of a boat on another leg.
+   Later (from review): properTwa (world.ts) ignores the current, so a boat crabbing across a strong tide can read as
+   above or below her proper course (Rule 17, 23.2); make it current-aware.
+7. The debrief shown on the replay (3–5 h).
+8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
@@ -145,8 +159,12 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
    slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
    chart data; the crew-trim model's traveller (boat/controls.ts puts it to leeward in medium air: found in review).
-   Also from review: check the brief's leg times against the sim's own fleet sailing the same legs (an observed day's
-   long beat was planned at 38 min, the AI took 47–71); list a max flood or ebb already under way at the window's edges;
+   Also from review: ~~check the brief's leg times against the sim's own fleet sailing the same legs~~ (done, PR #111:
+   with four AI boats on Seaweed Soup course 2 and the training course, the 38 vs 47–71 gap is gone since the AI's held
+   tacks; runs and reaches match the plan or the fleet is a little faster; beats take 5–20% longer, the plan being a
+   perfect sail at 8 s a tack; the first beat and the leg after the first mark are slowest, from traffic and penalties
+   at the first rounding; the whole race 47 min planned, about 50 sailed; tests/sim-fleet.test.ts holds the brief to
+   the fleet, and the brief will say upwind times are for a perfect sail); list a max flood or ebb already under way at the window's edges;
    the tide predictions stop about 6 h after the gun (tide.ts stationsFor), so later passages see it frozen; and the
    gusts: Fort Point's records show peak gusts of 2–5 × the 6-minute mean on light, puffy days, while the sim's puffs
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the
@@ -321,7 +339,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min). And the Hail icon (owner, "the hail button icon is the same as the
   sound icon. let's fix that too."): a distinct icon, a hand cupped to the mouth or a sailor calling, never a speaker or
   megaphone (that reads as Sound).
-- **Next — the flags: bring back the original motion, and strike the ensign in a blow** (polish + feature; 1–2 h; for
+- ~~**The flags: bring back the original motion, and strike the ensign in a blow**~~ (done, v126, #92) (polish + feature; 1–2 h; for
   Boat Detail): owner, "I know we dialed down the flag flapping but the new flag physics are ugly and stiff. let's bring
   back the original physics, and add an option to strike the ensign in high wind. not urgent. put the 'strike ensign'
   button with the bottom-right controls, and only during cruise mode when winds are high." Restore the flag motion from

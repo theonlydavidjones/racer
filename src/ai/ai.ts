@@ -1,18 +1,34 @@
 import type { PrepFlag } from '../sim/signals';
-import { bow, type Boat } from '../boat/boat';
+import { bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK } from '../boat/physics';
-import { V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
+import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
 import type { World } from '../sim/world';
 
+/**
+ * Her hail "Room to tack" at a boat obstruction (WS Case 11): the boat she hailed, the boat that is the obstruction, and
+ * when. While it's being answered she holds close-hauled rather than ducking, so she can tack straight away once the
+ * hailed boat responds (Rule 20.2(d)); a duck first leaves her too far off the wind to tack in time.
+ */
+const boatHails = new WeakMap<Boat, { o: number; c: number; at: number }>();
+/**
+ * How long (s) she keeps her course for a hail at a boat obstruction, and how soon (s) before she'd meet the boat she
+ * must keep clear of she gives up waiting and ducks it (rule 10 comes first: no hail excuses her from it). Five seconds
+ * gives a Folkboat at 2–2.5 m/s time to bear away 30° and pass astern without the other boat having to act.
+ */
+const BOAT_HAIL_HOLD = HAIL_RESPONSE + 4, BOAT_HAIL_MARGIN = 5;
+/** She hails at a boat only if they'd meet no sooner than this (s): time for the response and her tack. */
+const BOAT_HAIL_LEAD = 9;
+
 /** Extra seconds of caution at the start under each preparatory flag. */
+
 const FLAG_CAUTION: Record<PrepFlag, number> = { P: 0, I: 1, Z: 2, U: 3, black: 3.5 };
 
 /** A boat owing a penalty first gets this far (m) from other boats before turning. */
@@ -310,9 +326,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       P = { x: w.center.x + L.x * s * (half + 20) + N.x * (out ? -20 : 8), y: w.center.y + L.y * s * (half + 20) + N.y * (out ? -20 : 8) };
     } else if (b.ocs) P = { x: w.center.x - N.x * 18 + L.x * along, y: w.center.y - N.y * 18 + L.y * along };
     else if (!b.started) {
-      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on)
-      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
-      P = { x: w.center.x + N.x * 10 + L.x * a, y: w.center.y + N.y * 10 + L.y * a }; void along;
+      // haven't started yet: cross the line between its ends, straight ahead (not back to the spot she'd planned on). On
+      // the course side already (she crossed an extension of the line, or drifted over doing her turns at the gun), she
+      // isn't started: back below the line first, then up across it between the ends (RRS Definitions, Start)
+      // (her whole hull below, bow and stern, as the Definition asks; latched until she starts, so she doesn't turn back
+      // up the moment her middle is below with her stern still over)
+      if (Math.max(w.lineD(bow(b)), w.lineD(stern(b))) < 0) ai.belowSinceGun = true;
+      const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half), down = !ai.belowSinceGun;
+      P = { x: w.center.x + N.x * (down ? -18 : 10) + L.x * a, y: w.center.y + N.y * (down ? -18 : 10) + L.y * a }; void along;
     }
     else {
       P = aimPoint(w, b);
@@ -434,7 +455,28 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;
     else if (beating && w.t - b.lastTackT > 4 && !(pinned && w.roomBlockedByMark(b)) && !relay) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
+  } else if (beating && b.started && b.twa <= beatFor(b) + 8 && !b.tacking && w.t - ai.lastHail > 40) {
+    // A boat as the obstruction (WS Case 11): close-hauled, closing on a boat she must keep clear of (a starboard-tack
+    // boat crossing, say) that bearing away 10° wouldn't clear, with a boat on her own tack to windward stopping her
+    // tacking. She may hail that boat "Room to tack" (Rule 20.1), and does, rather than drag both of them off to duck;
+    // until it responds she keeps clear as she must (below), then tacks (Rule 20.2(d), the hail loop below).
+    // (not in the crush just after the start, nor at a boat doing penalty turns, nor with another boat close by either of them that the tacks would bring them onto: there
+    // she ducks with the boat to windward, the simpler way to keep clear)
+    const o = w.tackBlocker(b), c = o && o.penalty <= 0 && w.t > 60 && w.roomBlocker(b) === o ? w.boatObstructionAhead(b, o) : null;
+    // (and only with time for the whole of it: the hailed boat's response, a few seconds, and then her own tack, about
+    // four from close-hauled through head to wind; later than that she ducks)
+    if (o && c && cpa(b, c).t >= BOAT_HAIL_LEAD && !w.boats.some(x => x !== b && x !== o && x !== c && !x.finished && (dist(x, b) < 2.5 * LOA || dist(x, o) < 2.5 * LOA))) { w.hail(b, o, 'room'); ai.lastHail = w.t; boatHails.set(b, { o: o.id, c: c.id, at: w.t }); }
   }
+  // her hail at a boat, still being answered (the hailed boat hasn't tacked or replied yet, or has and she hasn't yet
+  // tacked herself): hold close-hauled, keeping the boat she must avoid in view
+  const bh = boatHails.get(b), bhRec = bh ? w.boats.find(x => x.id === bh.o) : undefined, bhHail = bhRec ? w.pairRecord(b, bhRec)?.hail : null;
+  const bhC = bh ? w.boats.find(x => x.id === bh.c) : undefined;
+  // (released when time runs short to the meeting, or when a hail passed on beyond the boat she hailed failed: then the
+  // hold ends and her ordinary keep-clear below ducks the other boat)
+  const boatHailOn = !!bh && !!bhC && w.t - bh.at < BOAT_HAIL_HOLD && b.lastTackT < bh.at && bhHail?.kind === 'room' && bhHail.by === b.id
+    && !bhHail.passedOn?.failed && cpa(b, bhC).t > BOAT_HAIL_MARGIN;
+  if (bh && !boatHailOn) boatHails.delete(b);
+  if (boatHailOn) holdForHail = true;
   // collision avoidance under the rules
   // (around the start, in the pre-start and the first minute after the gun, when the fleet is bunched up, she also
   // looks at each heading's room to other boats: out on the course the simple moves below are enough, and cheaper)
@@ -465,6 +507,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // hailed "Starboard!" by this boat: duck early and generously
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
     if (ducking && cp.t < 16 && cp.d < 22) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); continue; }
+    // (the boat she has hailed about, while that hail is answered and there's still time: she holds on, to tack)
+    if (boatHailOn && o.id === bh!.c && cp.t > BOAT_HAIL_MARGIN) continue;
     if (r.kc === b && cp.t < 12 && cp.d < 14) {
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
       if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
@@ -503,8 +547,19 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
   if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
   b.desired = desired; b.luff = luff;
-  // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
+  crewPoleCall(w, b);
+}
+
+/**
+ * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
+ * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
+ * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
+ * from doing it over and over as she wanders about a deep run. The AI boats' crews, and yours while the pole is theirs
+ * (the band's Auto-trim).
+ */
+export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
-  if (w.t < 0 || nearMark || b.twa < 146) b.poleWant = false;
-  else if (b.twa > 156) b.poleWant = true;
+  const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
+  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
+  else if (twa > 157) b.poleWant = true;
 }

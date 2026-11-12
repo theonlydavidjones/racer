@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fitChase } from '../src/render/scene';
 import { RIG } from '../src/render/boatMesh';
-import { L } from '../src/render/hull';
+const L = 6.0; // (her waterline: the hull nearest the camera at the water)
 
 // where a point (forward distance z, height y, from the camera) lands on screen, as a fraction of the height down, for a
 // camera pitched down by beta with a vertical field of view fov
