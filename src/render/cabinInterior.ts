@@ -82,7 +82,7 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
     }
   }
   // the two ends: the main bulkhead's inside face (the companionway cut down to its sill), and the forward bulkhead
-  const cap = (u: number, notch: boolean, colour: THREE.Color) => {
+  const cap = (u: number, notch: boolean, colour: THREE.Color, hole: THREE.Vector2[] = []) => {
     const hw = COMPANIONWAY.hw, z = zAt(u);
     // round the section, starboard then port; with the doorway, the arch inside its width gives way to its posts and sill
     const keep = (q: { x: number; y: number }) => !notch || !(q.x < hw && q.y > COMPANIONWAY.sill);
@@ -90,10 +90,37 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
     if (notch) { const yt = cabinTopAt(u, hw) - INSET; ring.push(new THREE.Vector2(hw, yt), new THREE.Vector2(hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, yt)); }
     for (let k = stbd.length - 1; k >= 1; k--) if (stbd[k].x > 1e-4) ring.push(new THREE.Vector2(-stbd[k].x, stbd[k].y));
     const clean = ring.filter((q, k) => k === 0 || q.distanceTo(ring[k - 1]) > 1e-4);
-    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(clean, [])) tri(new THREE.Vector3(clean[a].x, clean[a].y, z), new THREE.Vector3(clean[b].x, clean[b].y, z), new THREE.Vector3(clean[c].x, clean[c].y, z), colour, colour, colour);
+    const all = [...clean, ...hole];
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(clean, hole.length ? [hole] : [])) tri(new THREE.Vector3(all[a].x, all[a].y, z), new THREE.Vector3(all[b].x, all[b].y, z), new THREE.Vector3(all[c].x, all[c].y, z), colour, colour, colour);
   };
   cap(uA, true, WOOD);
-  cap(uF, false, WOOD);
+  // forward, the opening into the forepeak (CR 2.405), and through it the forepeak itself: the berths' platform running
+  // on forward under the foredeck, rising toward the bow (the plan's forepeak shelf, about 190 mm over the waterline
+  // at St. 12.4), its lining going dark with the distance from the lantern
+  const zF = zAt(uF), fy0 = INTERIOR.berth + 0.04, fy1 = Math.min(deckY(uF, 0), cabinTopY(uF)) - 0.06, fw = 0.24;
+  cap(uF, false, WOOD, [new THREE.Vector2(fw, fy0), new THREE.Vector2(fw, fy1), new THREE.Vector2(-fw, fy1), new THREE.Vector2(-fw, fy0)]);
+  { const NF = 6, len = 1.0, v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z), rows: { z: number; w: number; f: number; t: number }[] = [];
+    for (let k = 0; k <= NF; k++) {
+      const z = zF - len * k / NF, u = uAt(z), f = fy0 + (0.19 - fy0) * k / NF, t = deckY(u, 0) - INSET;
+      rows.push({ z, f, t: Math.max(f + 0.1, Math.min(t, fy1)), w: Math.max(0.05, Math.min(fw, hullInnerHalf(u, f + 0.05) - INSET)) });
+    }
+    for (let k = 0; k < NF; k++) {
+      const a = rows[k], b = rows[k + 1];
+      tri(v(-a.w, a.f, a.z), v(a.w, a.f, a.z), v(b.w, b.f, b.z), WOOD, WOOD, WOOD); tri(v(-a.w, a.f, a.z), v(b.w, b.f, b.z), v(-b.w, b.f, b.z), WOOD, WOOD, WOOD); // the platform
+      tri(v(-a.w, a.t, a.z), v(a.w, a.t, a.z), v(b.w, b.t, b.z), LINING, LINING, LINING); tri(v(-a.w, a.t, a.z), v(b.w, b.t, b.z), v(-b.w, b.t, b.z), LINING, LINING, LINING); // under the deck
+      for (const sx of [1, -1]) { tri(v(sx * a.w, a.f, a.z), v(sx * a.w, a.t, a.z), v(sx * b.w, b.t, b.z), LINING, LINING, LINING); tri(v(sx * a.w, a.f, a.z), v(sx * b.w, b.t, b.z), v(sx * b.w, b.f, b.z), LINING, LINING, LINING); }
+    }
+    const e = rows[NF]; tri(v(-e.w, e.f, e.z), v(e.w, e.f, e.z), v(e.w, e.t, e.z), LINING, LINING, LINING); tri(v(-e.w, e.f, e.z), v(e.w, e.t, e.z), v(-e.w, e.t, e.z), LINING, LINING, LINING); }
+  // the lantern itself, hanging from the cabin top on a short chain: a small brass lamp, its glass bright when lit
+  { const v = (x: number, y: number, z: number) => new THREE.Vector3(LANTERN.x + x, LANTERN.y + y, LANTERN.z + z), N = 8, r = 0.045, BRASS = new THREE.Color(0xb08a4a), GLOW = new THREE.Color(1, 0.95, 0.85);
+    for (let k = 0; k < N; k++) {
+      const a0 = 2 * Math.PI * k / N, a1 = 2 * Math.PI * (k + 1) / N, c0 = Math.cos(a0) * r, s0 = Math.sin(a0) * r, c1 = Math.cos(a1) * r, s1 = Math.sin(a1) * r;
+      const glass = [v(c0, -0.05, s0), v(c1, -0.05, s1), v(c1, 0.05, s1), v(c0, 0.05, s0)];
+      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) { pos.push(glass[a].x, glass[a].y, glass[a].z, glass[b].x, glass[b].y, glass[b].z, glass[c].x, glass[c].y, glass[c].z); for (let q = 0; q < 3; q++) { col.push(GLOW.r, GLOW.g, GLOW.b); lamp.push(2.5); } }
+      for (const y of [0.05, -0.05]) { const cap3 = [v(0, y + (y > 0 ? 0.03 : -0.02), 0), v(c0, y, s0), v(c1, y, s1)]; for (const p of cap3) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.4); } }
+    }
+    const top = cabinTopAt(uAt(LANTERN.z), 0) - INSET; // the chain
+    for (const p of [v(-0.004, 0.08, 0), v(0.004, 0.08, 0), new THREE.Vector3(LANTERN.x, top, LANTERN.z)]) { pos.push(p.x, p.y, p.z); col.push(BRASS.r, BRASS.g, BRASS.b); lamp.push(0.3); } }
   // each window's reveal: the cabin side's thickness round the opening, lining to the outside skin, so no gap shows
   for (const side of [1, -1]) {
     const N = 8, outer = (u: number, h: number) => cabinHalf(u) - CABIN_LEAN * h / CABIN.h, inner = (u: number, h: number) => outer(u, h) - INSET;
