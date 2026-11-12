@@ -10,12 +10,26 @@ import { ReplayView, type ReplayClip } from './replayView';
  * you time is a coloured stretch of your track and a tick on the timeline; pick one to jump to it and watch it.
  */
 
-/** Each finding's colour, on the track, the timeline and the list. Rule incidents ('rule') are red, as on the water. */
+/**
+ * Each finding's colour, on the track, the timeline and the list. Eleven kinds can't all be told apart by colour,
+ * least of all by the one sailor in twelve who is colour-blind, so there are six colours from the Okabe–Ito set (chosen
+ * to stay distinct for red–green and blue–yellow colour blindness; lightened for the dark chart), and five kinds reuse
+ * one of them in a second style (STYLED): dashed on the track, hatched on the timeline, a hollow badge in the list.
+ * Rule incidents ('rule') are vermilion, as a foul is red on the water. Checked with Machado et al. (2009)'s
+ * simulations: the closest pair is ΔE ≈ 10 (deuteranopia, start/penalty; tritanopia, shifts/downwind), against 2–3 before.
+ */
+const OI = { orange: '#e69f00', sky: '#56b4e9', purple: '#d98cc0', yellow: '#f0e442', green: '#1fbf8f', verm: '#ff6a2a' };
 export const MOMENT_INK: Record<string, string> = {
-  start: '#ffb627', shifts: '#6fd0ff', laylines: '#d38cff', tacks: '#ff8fb1', dirty: '#9aa5ff', lee: '#7fd38a',
-  downwind: '#4fd1c5', heel: '#ff9f5a', trim: '#e6d36a', penalty: '#ff5d4c', roundings: '#c6e86a', rule: '#ff5d4c'
+  start: OI.orange, shifts: OI.sky, laylines: OI.purple, tacks: OI.yellow, downwind: OI.green, penalty: OI.verm, rule: OI.verm,
+  heel: OI.orange, dirty: OI.sky, roundings: OI.purple, trim: OI.yellow, lee: OI.green
 };
+/** The kinds drawn in the second style: dashed, hatched, hollow. */
+export const STYLED = new Set(['heel', 'dirty', 'roundings', 'trim', 'lee']);
 const ink = (key: string) => MOMENT_INK[key] ?? '#e9f2f5';
+/** A number badge: filled, or hollow for the second style. */
+const badge = (key: string, n: string | number) => STYLED.has(key)
+  ? `<span class="rrNo hollow" style="border-color:${ink(key)};color:${ink(key)}">${n}</span>`
+  : `<span class="rrNo" style="background:${ink(key)}">${n}</span>`;
 
 export interface RaceReplayData {
   frames: Frame[];
@@ -114,10 +128,10 @@ export class RaceReplay {
     const D = this.D!, total = D.findings.reduce((a, f) => a + f.lost, 0);
     const has = (key: string) => D.moments.some(m => m.key === key);
     const items = D.findings.map((f, i) => `<li class="${has(f.key) ? 'rrPick' : ''}" data-key="${f.key}" ${has(f.key) ? 'tabindex="0"' : ''}>
-      <div class="dbHead"><b><span class="rrNo" style="background:${ink(f.key)}">${i + 1}</span>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div>
+      <div class="dbHead"><b>${badge(f.key, i + 1)}${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div>
       <p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
     const rules = D.moments.filter(m => m.key === 'rule').map(m => `<li class="rrPick" data-at="${m.t1}" tabindex="0">
-      <div class="dbHead"><b><span class="rrNo" style="background:${ink('rule')}">!</span>${esc(m.text)}</b><span class="dbLost">${mmss(m.t1)}</span></div></li>`).join('');
+      <div class="dbHead"><b>${badge('rule', '!')}${esc(m.text)}</b><span class="dbLost">${mmss(m.t1)}</span></div></li>`).join('');
     return `<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
       <ol>${items}</ol>${rules ? `<div class="eyebrow">Rule incidents</div><ol>${rules}</ol>` : ''}`;
   }
@@ -207,7 +221,7 @@ export class RaceReplay {
     const m = this.sel;
     if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is coloured where it cost you time.</span>'; return; }
     const n = m.key === 'rule' ? '!' : this.rank.get(m.key) ?? '·', c = m.ref != null ? this.D!.clips[m.ref] : null;
-    el.innerHTML = `<span class="rrNo" style="background:${ink(m.key)}">${n}</span><span><b>${m.key === 'start' ? 'The start' : mmss(m.key === 'rule' ? m.t1 : m.t0)}</b> ${esc(c ? `${c.title}. ${c.what}` : m.text)}${m.lost >= 1 ? ` <span class="dbLost">about −${Math.round(m.lost)} s</span>` : ''}</span>${c ? '<button class="ghost rrBtn" type="button" data-rr="clip">Close-up</button>' : ''}`;
+    el.innerHTML = `${badge(m.key, n)}<span><b>${m.key === 'start' ? 'The start' : mmss(m.key === 'rule' ? m.t1 : m.t0)}</b> ${esc(c ? `${c.title}. ${c.what}` : m.text)}${m.lost >= 1 ? ` <span class="dbLost">about −${Math.round(m.lost)} s</span>` : ''}</span>${c ? '<button class="ghost rrBtn" type="button" data-rr="clip">Close-up</button>' : ''}`;
   }
 
   /* ---------- drawing ---------- */
@@ -274,17 +288,19 @@ export class RaceReplay {
     for (const m of D.moments) {
       // (still ahead of the playhead: dimmer and thinner, so it doesn't read as where you are now)
       const a = idx(m.t0), b = Math.max(a + 1, idx(m.t1)), on = this.sel === m, ahead = m.t0 > this.t;
-      ctx.strokeStyle = hexA(ink(m.key), on ? 1 : ahead ? .35 : .8); ctx.lineWidth = on ? 6 : ahead ? 2.5 : 4; ctx.lineCap = 'round';
+      ctx.strokeStyle = hexA(ink(m.key), on ? 1 : ahead ? .35 : .8); ctx.lineWidth = on ? 6 : ahead ? 2.5 : 4;
+      if (STYLED.has(m.key)) ctx.setLineDash(on ? [10, 6] : [8, 6]); else ctx.lineCap = 'round';
       if (line(u, a, b + 1)) ctx.stroke();
-      ctx.lineCap = 'butt';
+      ctx.lineCap = 'butt'; ctx.setLineDash([]);
     }
     for (const m of D.moments) {
       if (!this.pinned.has(m) && this.sel !== m) continue;
       const p = F[idx(m.t0)]?.b[u]; if (!p) continue;
       const q = P(p), on = this.sel === m, r = on ? 9 : 7;
-      ctx.fillStyle = ink(m.key); ctx.strokeStyle = '#0c2534'; ctx.lineWidth = 2;
+      const hollow = STYLED.has(m.key);
+      ctx.fillStyle = hollow ? '#0c2534' : ink(m.key); ctx.strokeStyle = hollow ? ink(m.key) : '#0c2534'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 6.29); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#0c2534'; ctx.font = `700 ${on ? 11 : 10}px "Saira Semi Condensed", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = hollow ? ink(m.key) : '#0c2534'; ctx.font = `700 ${on ? 11 : 10}px "Saira Semi Condensed", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(String(m.key === 'rule' ? '!' : this.rank.get(m.key) ?? '·'), q[0], q[1] + 0.5);
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     }
@@ -333,8 +349,14 @@ export class RaceReplay {
     // the moments: a bar for how long, its height for what it cost
     for (const m of D.moments) {
       const a = X(m.t0), b = Math.max(a + 3, X(m.t1)), h = Math.min(22, 6 + 2 * Math.sqrt(Math.max(0, m.lost)) * 2);
-      ctx.fillStyle = hexA(ink(m.key), this.sel === m ? 1 : .8);
-      ctx.fillRect(a, base - 2 - h, b - a, h);
+      if (STYLED.has(m.key)) {
+        // hatched: a pale fill with diagonal stripes in the colour
+        ctx.fillStyle = hexA(ink(m.key), .25); ctx.fillRect(a, base - 2 - h, b - a, h);
+        ctx.save(); ctx.beginPath(); ctx.rect(a, base - 2 - h, b - a, h); ctx.clip();
+        ctx.strokeStyle = hexA(ink(m.key), this.sel === m ? 1 : .9); ctx.lineWidth = 2;
+        for (let sx = a - h; sx < b; sx += 5) { ctx.beginPath(); ctx.moveTo(sx, base - 2); ctx.lineTo(sx + h, base - 2 - h); ctx.stroke(); }
+        ctx.restore();
+      } else { ctx.fillStyle = hexA(ink(m.key), this.sel === m ? 1 : .8); ctx.fillRect(a, base - 2 - h, b - a, h); }
       if (this.sel === m) { ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 1.5; ctx.strokeRect(a - 1, base - 3 - h, b - a + 2, h + 2); }
     }
     // the playhead

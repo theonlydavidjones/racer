@@ -97,9 +97,14 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
     // side, inboard of the jib winch and of a crewmate sitting out on the deck there (render/crew.ts draws them kneeling
     // at COCK0 + 0.55, about 1.6); the main Cunningham is on the port side, the downhaul in the middle
     if (BOTH_SIDES.has(line)) return { arm: 0.45, z: 1.6, pose: 'piano' };
-    if (line === 'cunningham') return { arm: windward < 0 ? 0.7 : -0.4, z: Z.piano, pose: 'piano' };
+    // The one-sided lines on the piano: from the windward side, as it's on that side; on the other tack the crew stay to
+    // windward and lean in across the piano to reach it, rather than move their weight to leeward in a breeze: kneeling
+    // on the cockpit sole's windward side (it's 0.70 m wide, the construction plan: hull.ts COCKPIT_FIT), hips about
+    // 0.2 m to windward, where render/crew.ts draws them, and the cleat 0.4–0.5 m to leeward an easy reach. An estimate
+    // from usual practice and the boat's own lines; no source describes it (12 Nov 2026: ask the owner how Josephine's crew does it)
+    if (line === 'cunningham') return { arm: windward < 0 ? 0.7 : 0.2, z: Z.piano, pose: 'piano' };
     // (the jib halyard's tail is on the starboard side of the piano, the owner's Josephine: the mirror of the main Cunningham)
-    if (line === 'jibHalyard') return { arm: windward > 0 ? 0.7 : -0.4, z: Z.piano, pose: 'piano' };
+    if (line === 'jibHalyard') return { arm: windward > 0 ? 0.7 : 0.2, z: Z.piano, pose: 'piano' };
     return { arm: 0.3, z: Z.piano, pose: 'piano' };
   }
   // hauling the jib sheet in (after a tack): at the leeward winch, or in a breeze from the windward side of the cockpit

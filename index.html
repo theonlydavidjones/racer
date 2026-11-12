@@ -17,14 +17,30 @@
 <header id="hud">
   <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
   <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
-  <div class="pod windex"><span class="lab">Windex</span><canvas id="windexDial" aria-label="Windex: the apparent wind at the masthead"></canvas><span class="sub" id="tackLab">Starboard</span></div>
+  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The grey tick is your heading on the other tack (or gybe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
+</header>
+<!-- the wind and the water, and the app's own buttons: top right -->
+<div id="hudRight">
   <div class="pod"><span class="lab">TWS <i>kt</i></span><span class="val" id="tws">12</span><span class="sub" id="shiftLab">270°</span></div>
   <div class="pod"><span class="lab"><span id="tideLab">Tide</span> <i>kt</i></span><span class="val" id="tideVal">Slack</span><span class="sub" id="seaSub">no waves</span></div>
-</header>
-<canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas>
-<canvas id="dial" aria-label="Wind angle dial"></canvas>
-<div id="sigPanel" hidden><div class="sig-lab">Signals</div><div id="sigFlags"></div><div id="sigText"></div></div>
-<canvas id="map" aria-label="Course map, tap to zoom"></canvas>
+  <!-- the app: small and dim -->
+<div class="ibar dim" id="appBar">
+  <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
+  <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
+  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
+  <button class="ib" id="bExit" type="button" title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
+</div>
+</div>
+<!-- top left, under the pods: where next, the flags flying, (the wind-angle dial, a training aid) -->
+<div id="leftCol">
+  <canvas id="dial" aria-label="Wind angle dial"></canvas>
+  <div id="nextCard" hidden title="Where next: the start line before the start, the next mark, the finish; cruising, the navigator. The last line is a transit: two things in line that tell you where you are."><div class="nc-h" id="ncHead"></div>
+    <div class="nc-row"><div class="nc-num" id="ncNum"></div><svg id="ncSketch" viewBox="0 0 150 46" aria-hidden="true" font-family="Saira Semi Condensed, sans-serif"></svg></div>
+    <div class="nc-sub" id="linebox"></div><div class="nc-sub nc-tr" id="transit" hidden></div></div>
+<button type="button" id="sigPanel" hidden title="Flags flying now on the committee boat. Click for the flag index."><span class="sig-lab">Flags</span><span id="sigFlags"></span><span id="sigText"></span></button>
+<div id="flagIndex" hidden role="dialog" aria-labelledby="fiTitle"><button type="button" class="fi-x" id="bFlagIndexX" aria-label="Close the flag index">×</button><h3 id="fiTitle">Flag index</h3><div id="fiBody"></div></div>
+</div>
+<canvas id="map" aria-label="Course map, tap to zoom" title="Tap the map for the chart"></canvas>
 <button type="button" id="bMapLayers" class="maplayers" title="Map layers: wind, current, sea, fog, ships…" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5Z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
 <div id="mapLayersPop" class="layerpop" hidden></div>
 <div id="mapHint">Tap map · chart</div>
@@ -36,9 +52,6 @@
   <canvas id="chartC" aria-label="Chart of the Bay: drag to move, scroll to zoom, tap to pick a destination"></canvas>
   <div class="ch-info"><div id="chartInfo"></div><button class="cta" type="button" id="bChartGo" hidden>Sail here</button><button class="ghost" type="button" id="bChartMove" hidden title="Put her here, stopped: the cruise and its log carry on">Move her here</button></div>
 </div>
-<div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
-<div id="linebox" hidden></div>
-<div id="transit" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <!-- the showroom: her on show at any time of day, in any conditions (just here: a race's or a cruise's own are set in Setup) -->
 <div id="showBar" class="showbar" aria-label="Showroom conditions">
@@ -50,25 +63,11 @@
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
-  <div class="tp-head"><span class="tp-lab">Sail trim</span><span id="tpWho">Crew trims every line</span></div>
+  <!-- the situation (who keeps clear, under which rule): a strip on top of the Coach card, only when there is one -->
+  <div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
+  <div class="tp-head"><span class="tp-lab">Coach</span><span id="tpWho">Crew trims every line</span></div>
   <!-- how each sail is drawing (its lines are in the sail controls band) -->
   <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
-  <div class="tp-row" id="tpPoleRow"><span class="tp-lab">Pole</span><span class="tp-state" id="tpPole"></span>
-    <button class="tp-btn tp-pole" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button></div>
-  <!-- the crew's weight: one line while they place themselves (tap it to open); open while you've placed them -->
-  <div class="tp-crewbox" id="tpCrewBox">
-    <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
-      <span class="who" id="whoCrew" data-line="crew" role="group" aria-label="Who works the crew weight"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
-    <div class="tp-crewopen" id="tpCrewOpen" hidden>
-      <div class="tp-wind" id="tpWind">Wind over the port side: port is windward, starboard leeward</div>
-      <div class="tp-seg tp-across" id="tpCrewRow" role="group" aria-label="Where the crew sit across the boat">
-        <button class="tp-btn two" type="button" data-ca="lee"><span class="w">Sit to leeward</span><small data-side="lee">stbd &middot; heels her</small></button><button class="tp-btn two" type="button" data-ca="mid"><span class="w">Middle</span><small>on the centreline</small></button><button class="tp-btn two" type="button" data-ca="up"><span class="w">Sit up</span><small data-side="up">port side deck</small></button><button class="tp-btn two" type="button" data-ca="hike"><span class="w">Hike out</span><small data-side="hike">port rail &middot; holds her up</small></button>
-      </div>
-      <div class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Where the crew sit fore and aft (tap the lit one again to leave it to the crew)">
-        <button class="tp-btn two" type="button" data-cf="fwd"><span class="w">Forward</span><small>bow down &middot; light, flat</small></button><button class="tp-btn two" type="button" data-cf="aft"><span class="w">Aft</span><small>stern down &middot; fast, or chop</small></button><button class="tp-btn two" type="button" data-cf="deck"><span class="w">Foredeck</span><small>up forward &middot; a light-air run</small></button>
-      </div>
-    </div>
-  </div>
   <div class="tp-hint" id="tpHint"></div>
   <div class="tp-shape" id="tpShape"></div>
   <div class="tp-balance" id="tpBalance"></div>
@@ -78,7 +77,6 @@
 <div id="controls">
   <!-- sailing the boat: what the helm does (the lashing is on the tiller itself: double-click) -->
   <div class="row1 ibar" id="helmBar">
-    <button class="ib" id="bHail" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 17v-2.5H6.8c-.9 0-1.4-.6-1.4-1.4v-1.6l-1-.4 1-1.8V8.6C5.4 5.6 7.4 3.5 10 3.5"/><path d="M9.2 8.2c1.6.2 2.6 1.3 2.6 2.7s-1 2.5-2.6 2.7"/><path d="M14 8.3a3.5 3.5 0 0 1 0 5.4"/><path d="M16.3 6.4a6.3 6.3 0 0 1 0 9.2"/></svg><span class="w">Hail</span></button>
     <button class="ib on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3v14"/><path d="M7 10h10"/><path d="M13 6l4 4-4 4"/></svg><span class="w">Push off</span></button>
     <button class="ib" id="bJib" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 17 12 3v14Z"/></svg><span class="w">Hoist jib</span></button>
     <button class="ib" id="bMain" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v14h9Z"/></svg><span class="w">Hoist main</span></button>
@@ -104,13 +102,6 @@
     </div>
   </div>
 </div>
-<!-- the app: small and dim, top right -->
-<div class="ibar dim" id="appBar">
-  <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
-  <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
-  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
-  <button class="ib" id="bExit" type="button" title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
-</div>
 <!-- the chart: beside the map (Course/Navigator is with the helm's buttons, bottom left) -->
 <div class="ibar col" id="mapBar">
   <button class="ib" id="bOrient" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3l4.5 14L10 14l-4.5 3Z"/></svg><span class="w">North up</span></button>
@@ -118,10 +109,26 @@
 </div>
 <!-- the view: bottom right, with the keys line over it on hover -->
 <div class="ibar" id="viewBar">
+  <button class="ib" id="bCrew" type="button" aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
   <button class="ib on" id="bBand" type="button" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
   <button class="ib" id="bEnsign" type="button" hidden title="Strike the ensign in a blow: the flag lowered and its staff stowed below, before it flogs itself to rags. Again hoists it."><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V3"/><path d="M5 4h9l-2 3 2 3H5"/><path class="dn" d="M15 12v6M12.5 15.5 15 18l2.5-2.5"/></svg><span class="w">Strike ensign</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
   <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
+</div>
+<div id="crewPop" hidden role="dialog" aria-label="The crew's weight">
+  <div class="tp-crewbox" id="tpCrewBox">
+    <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
+      <span class="who" id="whoCrew" data-line="crew" role="group" aria-label="Who works the crew weight"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
+    <div class="tp-crewopen" id="tpCrewOpen" hidden>
+      <div class="tp-wind" id="tpWind">Wind over the port side: port is windward, starboard leeward</div>
+      <div class="tp-seg tp-across" id="tpCrewRow" role="group" aria-label="Where the crew sit across the boat">
+        <button class="tp-btn two" type="button" data-ca="lee"><span class="w">Sit to leeward</span><small data-side="lee">stbd &middot; heels her</small></button><button class="tp-btn two" type="button" data-ca="mid"><span class="w">Middle</span><small>on the centreline</small></button><button class="tp-btn two" type="button" data-ca="up"><span class="w">Sit up</span><small data-side="up">port side deck</small></button><button class="tp-btn two" type="button" data-ca="hike"><span class="w">Hike out</span><small data-side="hike">port rail &middot; holds her up</small></button>
+      </div>
+      <div class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Where the crew sit fore and aft (tap the lit one again to leave it to the crew)">
+        <button class="tp-btn two" type="button" data-cf="fwd"><span class="w">Forward</span><small>bow down &middot; light, flat</small></button><button class="tp-btn two" type="button" data-cf="aft"><span class="w">Aft</span><small>stern down &middot; fast, or chop</small></button><button class="tp-btn two" type="button" data-cf="deck"><span class="w">Foredeck</span><small>up forward &middot; a light-air run</small></button>
+      </div>
+    </div>
+  </div>
 </div>
 <span class="keys" id="keysHint"></span>
 
@@ -334,7 +341,7 @@
       <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
       <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
-      <b>Hail</b><span>Hail button or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
+      <b>Hail</b><span>The Hail tab on the sail controls band (it shows when there's a hail to make) or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
     <div class="field"><span>Keyboard</span>
