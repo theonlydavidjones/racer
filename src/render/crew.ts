@@ -162,7 +162,8 @@ function deckWalk(s: number, z: number, dir: number, k: number): PoseT {
   const g = deckY(u, Math.abs(dx)), yaw = dir < 0 ? -s * 0.12 : Math.PI + s * 0.12, f = fwd(yaw), r = right(yaw); // (angled a touch outboard: the knees clear of the coaming)
   const hip = V(dx, g + 0.36 * k, z);
   // (the side deck's about 0.3 m wide: feet close under them and in its outboard part, so the knees stay over the deck)
-  const onDeckAt = (q: THREE.Vector3) => { const uq = uAtZ(q.z), lo = chz(q.z) + COAMING_T + 0.1, hi = halfBeam(uq) - 0.04; q.x = Math.sign(q.x || s) * Math.min(hi, Math.max(lo, Math.abs(q.x))); return q.setY(deckY(uq, Math.abs(q.x)) + 0.06); };
+  // (outside onGround's band by the coaming, which would put a foot back inside it)
+  const onDeckAt = (q: THREE.Vector3) => { const uq = uAtZ(q.z), lo = chz(q.z) + 0.15, hi = halfBeam(uq) - 0.03; q.x = Math.sign(q.x || s) * Math.min(hi, Math.max(lo, Math.abs(q.x))); return q.setY(deckY(uq, Math.abs(q.x)) + 0.06); };
   const feet = [0, 1].map(j => onDeckAt(hip.clone().addScaledVector(f, (j ? 0.12 : -0.08) * k).addScaledVector(r, (j ? 1 : -1) * 0.05 * k))) as [THREE.Vector3, THREE.Vector3];
   const zc = z + dir * 0.3 * k, inboard = V(s * (chz(zc) + COAMING_T / 2), deckY(uAtZ(zc), chz(zc)) + coamH(zc) + 0.03, zc);
   const zo = z + dir * 0.36 * k, outboard = onDeckAt(V(s * (halfBeam(uAtZ(zo)) - 0.06), 0, zo)).add(V(0, -0.01, 0));
@@ -201,7 +202,12 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
   q.z += Math.max(-step, Math.min(step, q.goal - q.z));
   // (no further ahead of where they are than a step: the body leads, the feet don't reach out ahead of it)
   if (Math.abs(q.z - c.z) > 0.15) q.z = c.z + Math.sign(q.z - c.z) * 0.15;
-  if (Math.abs(q.goal - q.z) < 0.01 && Math.abs(c.z - q.goal) < 0.06) { f.route = undefined; return null; } // (there)
+  if (Math.abs(q.goal - q.z) < 0.01 && Math.abs(c.z - q.goal) < 0.06) {
+    // (there. Going on down into the cockpit: first sat on the side deck, the legs swung in over the coaming, as anyone
+    // sits there; then down)
+    if (!tAft && Math.abs(want.hip.x) < chz(want.hip.z) && f.cur && f.cur.feet.some(p => Math.abs(p.x) > chz(p.z))) return onDeck(q.side, q.goal, 0, k);
+    f.route = undefined; return null;
+  }
   const w = deckWalk(q.side, q.z, q.goal < c.z ? -1 : 1, k);
   // (the knees out over the deck once both feet are on it; stepping out of the cockpit, up over the coaming as usual)
   if (f.cur?.feet.some(p => Math.abs(p.x) < chz(p.z) + 0.03)) w.knee = undefined;
@@ -578,7 +584,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       } else if (want.step && foot.distanceTo(want.feet[i]) > 0.16 * f.scale && (!f.swing![1 - i] || (want.deck && inCockpit(Math.abs(foot.x), foot.z)))) {
         // (one at a time; but setting off along the side deck, a foot still down in the cockpit comes up out of it at once)
         const ahead = want.feet[i].clone().addScaledVector(_s.copy(want.feet[i]).sub(foot).setY(0).normalize(), 0.08 * f.scale);
-        const to = onGround(ahead); let top = Math.max(foot.y, to.y);
+        const to = want.deck ? ahead.setX(want.feet[i].x).setY(ground(want.feet[i].x, ahead.z) + 0.06) : onGround(ahead); let top = Math.max(foot.y, to.y); // (on the side deck, as far out as it's meant to be)
         for (let q = 1; q < 6; q++) { _t.copy(foot).lerp(to, q / 6); top = Math.max(top, ground(_t.x, _t.z) + 0.06); }
         f.swing![i] = { from: foot.clone(), to, t: 0, top };
       }
