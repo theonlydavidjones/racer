@@ -698,7 +698,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // Appendix G), each side its own picture so the numbers read the right way round from both sides
   // Each side of the cloth has its own picture, by which way it faces (the sail mesh is mirrored to the boom's side,
   // which swaps the faces: syncBoatMesh puts the right picture on each face)
-  const pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true), mainPort: sailTexture(b.sailColor, b.no, 'port', true), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
+  const inks = { no: b.paint?.numberColor, f: b.paint?.insigniaColor }, pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true, inks), mainPort: sailTexture(b.sailColor, b.no, 'port', true, inks), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
   const sm = (side: 'front' | 'back', map: THREE.Texture) => new THREE.MeshLambertMaterial({
     map, side: side === 'front' ? THREE.FrontSide : THREE.BackSide, transparent: b.isUser, opacity: b.isUser ? 0.86 : 1
   });
@@ -1138,7 +1138,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
  */
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
-function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean): THREE.CanvasTexture {
+function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
   // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
   // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture
@@ -1225,14 +1225,15 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
         x += widths[k] + 0.06;
       }
     };
-    const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
+    // (the numbers' ink: the colour chosen on the Boat page, or the one that contrasts with the cloth; the F like the numbers unless chosen)
+    const ink = inks.no ?? (dark ? '#f2f2ee' : '#1c2128'), fInk = inks.f ?? ink, letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
     // each side carries its own: the F up near the head and the numbers below, the starboard set higher (RRS G1.3);
     // this side's reads crisply, the other side's shows through the cloth mirrored, a little softer
     const set = (s: 'stbd' | 'port', alpha: number) => {
       const mir = s === 'stbd';
       const hi = s === 'stbd', fT = hi ? 0.835 : 0.765, nT = hi ? 0.665 : 0.565, step = 0.42 / LUFF;
       g.globalAlpha = alpha;
-      figures('F', fT, ink, mir); // the class insignia, in the same ink as the numbers (as on San Francisco boats' sails)
+      figures('F', fT, fInk, mir); // the class insignia (by default in the same ink as the numbers, as on San Francisco boats' sails)
       if (letters) figures(letters, nT, ink, mir);
       figures(digits, nT - (letters ? step : 0), ink, mir);
       g.globalAlpha = 1;
