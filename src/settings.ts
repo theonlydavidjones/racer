@@ -69,3 +69,10 @@ export function loadSettings(): Settings {
 export function saveSettings(s: Settings): void {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
+
+/**
+ * Choosing a kind of wind (the real day, westerly, northerly, …) takes its own direction: a "Wind from" you set before
+ * is cleared, so the slider shows the kind's direction again (owner, Nov 2026: a westerly chosen, then a stray slider
+ * left the wind from 355°). Moving "Wind from" afterwards overrides the kind, and the panel says so.
+ */
+export function chooseWindKind(s: Settings, kind: Settings['windKind']): void { s.windKind = kind; s.windDir = null; }
