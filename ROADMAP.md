@@ -123,8 +123,6 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by; 23.2
    catches a boat that bore away well below her proper course (20°+) onto the wind of a boat on another leg.
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
-7. The debrief shown on the replay (3–5 h).
-8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
