@@ -1,6 +1,16 @@
 # Build plan
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighbouring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
+- **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
+  steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
+  so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
+  between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
+  neighbouring bins, as driveCalibration already does across the wind.
+- **AI boats into the harbour after an abandonment** (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
+  after N or AP over A the AI boats now sail home and stand off the nearest racing harbour, each at her own spot with
+  open water to leeward, lying to (ai.ts homeCourse). Real boats would go in: sail or motor through the entrance and
+  berth in the basin, out of the breeze (lying to for an hour in 23+ kt is hard on the sails). That needs the AI boats
+  given slips and the marina's way in (geo/marina.ts), as the user's boat has.
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
@@ -574,6 +584,15 @@ the guide's line settings and the search decides only the depowering past them. 
 optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
 settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
 heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Open, the rig's height datum (November 2026, the Coordinator: keep the physics on the ORC certificates; settle if the
+IMS rule text becomes reachable): the drawing measures the rig from the deck at the mast, as CR 6.1.11 does (the Lower
+Mast Point 1000 mm above the deck, along the mast's after side); the physics (balance.ts RIG) uses ORC's BAS 1.00 and
+IG 6.50, which ORC measures from the sheer at the mast (VPP Documentation 2026: HBI, "height of sheer at the base of
+I"). The deck's camber there is about 4.5 cm, so a class-legal Folkboat's band would be about 1.045 m above the sheer
+while the certificates say 1.00: one of them is nominal. If the class rule governs, the sails' heights rise 4.5 cm
+(about 0.9% less induced drag, 0.9% more heeling arm). The IMS definition of the mast datum point would settle it
+(orc2.orc.org and osiris.ffvoile.fr were blocked from the sessions).
+
 Open items from the physics review (November 2026): the sails' "full" depth (balance.ts RIG.fullDepth) is unsourced, so
 ORC's full-power lift is never reached above about 10 kt (this partly hides the gap above); ORC's default crew for
 the sailing displacement is about 300–330 kg against the sim's 240 (GM 0.50 rather than 0.52); the sails' own weight
