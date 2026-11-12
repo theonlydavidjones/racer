@@ -1,7 +1,7 @@
 import { D2R, KT, V, brg, clamp, dot, wrap, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import { onLand } from '../geo/shore';
-import { harborAt, harborNear, hitsWall, inBasin, type Harbor } from '../geo/marina';
+import { HARBORS, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import mask from './data/land-mask.json';
 import gapTable from './data/gap-diffraction.json';
 import enc from '../geo/data/enc-chart.json';
@@ -53,24 +53,55 @@ export function landAt(p: Vec): boolean | null {
 const CF = { x0: LL(0, -122.48).x, x1: LL(0, -122.40).x, y0: LL(37.79, 0).y, y1: LL(37.815, 0).y };
 const onLandNear = (p: Vec) => p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 && onLand(p);
 
-/**
- * In or by a marina, the waves from `from` (deg) at `p`: traced finely (every 2 m) out past its works, since its walls
- * are only metres away. `d`, m: how far to the wall or shore that stops them; or, if they come in through the entrance
- * (or past the breakwaters, outside), how far to where they're out past the harbor's walls (`out`), from where they're
- * open water again.
+/*
+ * By a marina the waves are traced finely, since its walls are only metres away: on a map of what stops them (a
+ * breakwater, a solid pier or the shore; not the floating docks, which ride on them) in 2 m cells, made a 64 m tile at a
+ * time as the rays first cross it and kept. It reaches 150 m out round each harbor's works, past the coarse land cells'
+ * ~100 m, so where the fine tracing hands over to the coarse there's open water both sides of the line.
  */
-function basinRay(p: Vec, from: number, H = harborAt(p) ?? harborNear(p)!): { d: number; out: Vec | null } {
-  const u = V(from);
-  for (let d = 2; d < 3000; d += 2) {
-    const q = { x: p.x + u.x * d, y: p.y + u.y * d };
-    if (inBasin(q) ? hitsWall(q) : onLand(q)) return { d, out: null };
-    if (q.x < H.reach.x0 || q.x > H.reach.x1 || q.y < H.reach.y0 || q.y > H.reach.y1) return { d, out: q };
+const WALL_CELL = 2, WALL_TILE = 32, FINE_PAD = 150;
+interface WallMap { x0: number; y0: number; x1: number; y1: number; tiles: Map<number, Uint8Array> }
+const WALLS = new Map<Harbor, WallMap>();
+const wallMap = (H: Harbor): WallMap => {
+  let m = WALLS.get(H);
+  if (!m) { m = { x0: H.reach.x0 - FINE_PAD, y0: H.reach.y0 - FINE_PAD, x1: H.reach.x1 + FINE_PAD, y1: H.reach.y1 + FINE_PAD, tiles: new Map() }; WALLS.set(H, m); }
+  return m;
+};
+/** Does a wall or the shore stop the waves at `q` (in harbor `H`'s fine map)? */
+function walled(H: Harbor, q: Vec): boolean {
+  const m = wallMap(H), i = Math.floor((q.x - m.x0) / WALL_CELL), j = Math.floor((q.y - m.y0) / WALL_CELL);
+  const ti = Math.floor(i / WALL_TILE), tj = Math.floor(j / WALL_TILE), key = ti * 4096 + tj;
+  let t = m.tiles.get(key);
+  if (!t) {
+    t = new Uint8Array(WALL_TILE * WALL_TILE);
+    for (let b = 0; b < WALL_TILE; b++) for (let a = 0; a < WALL_TILE; a++) {
+      const c = { x: m.x0 + ((ti * WALL_TILE + a) + 0.5) * WALL_CELL, y: m.y0 + ((tj * WALL_TILE + b) + 0.5) * WALL_CELL };
+      t[b * WALL_TILE + a] = (inBasin(c) ? hitsWall(c) : onLand(c)) ? 1 : 0;
+    }
+    m.tiles.set(key, t);
   }
-  return { d: 3000, out: null };
+  return t[(j - tj * WALL_TILE) * WALL_TILE + (i - ti * WALL_TILE)] === 1;
+}
+/** The harbor whose fine map takes in `p` (within 150 m of its works), if any. */
+const fineHarbor = (p: Vec): Harbor | null => harborAt(p) ?? HARBORS.find(h => p.x > h.reach.x0 - FINE_PAD && p.x < h.reach.x1 + FINE_PAD && p.y > h.reach.y0 - FINE_PAD && p.y < h.reach.y1 + FINE_PAD) ?? null;
+
+/**
+ * In or by a marina, the waves from `from` (deg) at `p`, traced every 2 m. `d`, m: how far to the wall or shore that
+ * stops them; or, if they come in through the entrance (or past the breakwaters, outside), how far to where they're out
+ * of the fine map (`out`), from where they're open water again.
+ */
+function basinRay(p: Vec, from: number, H = fineHarbor(p)!): { d: number; out: Vec | null } {
+  const u = V(from), m = wallMap(H);
+  for (let d = 2; d < 4000; d += 2) {
+    const q = { x: p.x + u.x * d, y: p.y + u.y * d };
+    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: q };
+    if (walled(H, q)) return { d, out: null };
+  }
+  return { d: 4000, out: null };
 }
 
-/** Where the fetch is traced finely: in a marina's basin, or by its works outside (its breakwaters, its shore). */
-export const fineFetch = (p: Vec): boolean => inBasin(p) || harborNear(p) !== null;
+/** Where the fetch is traced finely: in a marina's basin, or within 150 m of its works outside (its breakwaters, its shore). */
+export const fineFetch = (p: Vec): boolean => fineHarbor(p) !== null;
 /** Open water straight upwind of `p` for wind from `from` (deg), m: to the first land, or MAX_FETCH. */
 export function fetchRay(p: Vec, from: number, fine = fineFetch(p)): number {
   // in or by a marina: the breakwaters and the shore stop the chop within metres; through the entrance it comes in from
@@ -209,7 +240,7 @@ export function chartDepth(p: Vec): number | null {
 }
 
 /** A harbor's entrance: its middle, its width (m), the way into the harbor (unit), and the water's depth there (m). */
-export interface Gap { c: Vec; B: number; n: Vec; depth: number | null }
+export interface Gap { c: Vec; B: number; n: Vec; depth: number | null; /** its two heads, and the way each one's wall runs from it */ heads?: { h: Vec; b: Vec }[] }
 const GAPS = new Map<Harbor, Gap[]>();
 /** How far from `p` along `u` to a wall or the shore (m, every metre up to `max`). */
 function toWall(p: Vec, u: Vec, max: number): number {
@@ -228,6 +259,11 @@ function spanGap(e: Vec): Gap | null {
   const fwd = into(1), back = into(-1);
   if (!Number.isFinite(fwd) && !Number.isFinite(back)) return null;
   if (back < fwd) n = { x: -n.x, y: -n.y };
+  else if (back === fwd) {
+    // (an entrance marked inside the basin: in is away from the open water that lies beyond it)
+    const far = (s: number) => { const q = { x: c.x + n.x * s * (best.span / 2 + 20), y: c.y + n.y * s * (best.span / 2 + 20) }; return !inBasin(q) && !onLand(q) && !hitsWall(q); };
+    if (far(1) && !far(-1)) n = { x: -n.x, y: -n.y };
+  }
   return { c, B: best.span, n, depth: chartDepth(c) };
 }
 /** The stretches of a basin's edge where the water outside is open (not a breakwater, a pier or the shore), as gaps. */
@@ -253,9 +289,9 @@ function outlineGaps(H: Harbor): Gap[] {
     if (r.length < 3 || B < 4) continue; // (a crack of a few metres between rocks: none to speak of)
     let nx = 0, ny = 0; for (const s of r) { nx -= s.out.x; ny -= s.out.y; }
     const m = Math.hypot(nx, ny) || 1, c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, u = { x: nx / m, y: ny / m };
-    // (and a clear way through its middle: a stretch of edge with a breakwater just beyond it is no entrance)
+    // (and a clear way out through its middle: a stretch of edge with a breakwater just beyond it is no entrance)
     let clear = true;
-    for (let d = -10; d <= 10 && clear; d++) { const q = { x: c.x + u.x * d, y: c.y + u.y * d }; if (inBasin(q) ? hitsWall(q) : onLand(q)) clear = false; }
+    for (let d = -10; d <= 0 && clear; d++) { const q = { x: c.x + u.x * d, y: c.y + u.y * d }; if (inBasin(q) ? hitsWall(q) : onLand(q)) clear = false; }
     // (and its chord's middle on the edge, the water just outside it out of the basin: a long stretch round a corner,
     // its chord cutting across the basin, is the basin's side beside a channel, not a way in)
     const outside = { x: c.x - u.x * 6, y: c.y - u.y * 6 };
@@ -282,6 +318,22 @@ export function harborGaps(H: Harbor): Gap[] {
     }
     if (gap && !g.some(x => Math.hypot(x.c.x - gap!.c.x, x.c.y - gap!.c.y) < 20)) g.push(gap);
   }
+  // each entrance's two heads (the ends of the span across it), and the way the wall runs on from each: toward the walls
+  // within 30 m of it, on the side away from the entrance
+  for (const gap of g) {
+    const u = { x: gap.n.y, y: -gap.n.x };
+    gap.heads = [1, -1].map(side => {
+      const h = { x: gap.c.x + u.x * side * gap.B / 2, y: gap.c.y + u.y * side * gap.B / 2 };
+      let sx = 0, sy = 0;
+      for (let a = 0; a < 360; a += 10) for (let d = 4; d <= 30; d += 4) {
+        const q = { x: h.x + Math.sin(a * D2R) * d, y: h.y + Math.cos(a * D2R) * d };
+        if ((q.x - gap.c.x) * u.x * side + (q.y - gap.c.y) * u.y * side < gap.B / 2) continue; // (not back across the entrance)
+        if (inBasin(q) ? hitsWall(q) : onLand(q)) { sx += q.x - h.x; sy += q.y - h.y; }
+      }
+      const m = Math.hypot(sx, sy);
+      return { h, b: m > 0 ? { x: sx / m, y: sy / m } : { x: u.x * side, y: u.y * side } };
+    });
+  }
   GAPS.set(H, g);
   return g;
 }
@@ -305,9 +357,49 @@ export function gapKd(bl: number, rl: number, deg: number): number {
   let v = 0;
   for (const [a, wa] of [[i, 1 - fi], [i + 1, fi]] as const) for (const [b, wb] of [[j, 1 - fj], [j + 1, fj]] as const) for (const [c, wc] of [[k, 1 - fk], [k + 1, fk]] as const)
     if (wa * wb * wc > 0) v += GT.kd[a][b][c] * wa * wb * wc;
-  // (narrower than the table's narrowest gap, 0.05 L: a narrow slit passes a wave height in proportion to its width, roughly)
-  if (bl < GT.bl[0]) v *= bl / GT.bl[0];
+  // (narrower than the table's narrowest gap, 0.05 L: a slit radiates as a line source whose strength falls only as the
+  // log of its width, Kd ∝ 1/|1 + (2i/π)(ln(kB/8) + γ)| (Lamb 1932; Morse & Rubenstein 1938); the solver agrees to 3
+  // figures down to B/L 0.005)
+  const slit = (b: number) => { const a = (2 / Math.PI) * (Math.log(Math.PI * b / 4) + 0.5772156649); return 1 / Math.hypot(1, a); };
+  if (bl < GT.bl[0]) v *= slit(bl) / slit(GT.bl[0]);
   return rl > r ? v * Math.sqrt(r / rl) : v;
+}
+
+/** The Fresnel integrals C(x), S(x) (∫₀ˣ cos, sin of πt²/2): their series below 2.5, the asymptotic forms above (Abramowitz & Stegun 7.3). */
+function fresnel(x: number): [number, number] {
+  const ax = Math.abs(x); let C: number, S: number;
+  if (ax < 2.5) {
+    const z = Math.PI / 2 * ax * ax; let t = ax; C = ax;
+    for (let n = 1; n < 40; n++) { t *= -z * z / ((2 * n - 1) * (2 * n)); C += t / (4 * n + 1); }
+    t = ax * z; S = t / 3;
+    for (let n = 1; n < 40; n++) { t *= -z * z / ((2 * n) * (2 * n + 1)); S += t / (4 * n + 3); }
+  } else {
+    const z = Math.PI * ax * ax / 2, f = (1 - 3 / (z * z) + 105 / z ** 4) / (Math.PI * ax), g = (1 - 15 / (z * z)) / (Math.PI * Math.PI * ax ** 3);
+    C = 0.5 + f * Math.sin(z) - g * Math.cos(z); S = 0.5 - f * Math.cos(z) - g * Math.sin(z);
+  }
+  return x < 0 ? [-C, -S] : [C, S];
+}
+/**
+ * Behind the end of a long breakwater (its head at `h`, the wall running on from it along `b`), a wave travelling along
+ * `t` (unit), wavelength L: the height at `p` over the wave's, by the exact solution for a thin rigid half-plane
+ * (Sommerfeld's; Penney & Price 1952; Wiegel 1962's diagrams in the Shore Protection Manual): 1 in the open, about 0.5
+ * along the line of the shadow's edge, falling away into the shadow; up to 2 against the wall's face.
+ */
+export function breakwaterKd(h: Vec, b: Vec, t: Vec, p: Vec, L: number): number {
+  // (only where this head's wall shades `p`, its line back along the waves crossing the wall: elsewhere the water the
+  // solution takes as open is the harbor's own, walled, and what reaches `p` isn't this head's to give)
+  const det = t.x * b.y - b.x * t.y;
+  if (Math.abs(det) < 1e-9) return 0;
+  const hx = h.x - p.x, hy = h.y - p.y, back = (hx * -b.y + b.x * hy) / det, along = (-t.x * hy + t.y * hx) / det;
+  if (back <= 0 || along <= 0) return 0;
+  const e2 = { x: -b.y, y: b.x }, dx = p.x - h.x, dy = p.y - h.y, r = Math.hypot(dx, dy), kr = 2 * Math.PI * r / L;
+  const th = Math.atan2(dx * e2.x + dy * e2.y, dx * b.x + dy * b.y), th0 = Math.atan2(t.x * e2.x + t.y * e2.y, t.x * b.x + t.y * b.y);
+  const F = (s: number): [number, number] => { const [C, S] = fresnel(s), a = C + 0.5, c = -(S + 0.5); return [(a - c) / 2, (a + c) / 2]; };
+  const s1 = -2 * Math.sqrt(kr / Math.PI) * Math.cos((th - th0) / 2), s2 = -2 * Math.sqrt(kr / Math.PI) * Math.cos((th + th0) / 2);
+  const [a1, b1] = F(s1), [a2, b2] = F(s2), p1 = kr * Math.cos(th - th0), p2 = kr * Math.cos(th + th0);
+  const re = a1 * Math.cos(p1) - b1 * Math.sin(p1) + a2 * Math.cos(p2) - b2 * Math.sin(p2);
+  const im = a1 * Math.sin(p1) + b1 * Math.cos(p1) + a2 * Math.sin(p2) + b2 * Math.cos(p2);
+  return Math.hypot(re, im);
 }
 
 /**
@@ -322,8 +414,9 @@ export function harborSwell(p: Vec, T: number): { k: number; toward: number } {
   if (!gaps.length) return swellReach(p); // (a harbor open along its side, with no entrance to go through: the open water's)
   let e2 = 0, best = 0, toward = 0;
   for (const g of gaps) {
-    const out = { x: g.c.x - g.n.x * (g.B / 2 + 10), y: g.c.y - g.n.y * (g.B / 2 + 10) }, r = swellReach(out, true);
-    if (r.k <= 0) continue;
+    // (the swell outside it, without the 50 m terrain grid's shadow, which can land on the wrong side of a breakwater)
+    const out = { x: g.c.x - g.n.x * (g.B / 2 + 10), y: g.c.y - g.n.y * (g.B / 2 + 10) }, r = swellReach(out, false);
+    if (r.k <= 0 || (g.depth !== null && g.depth < 0.3)) continue; // (an entrance that dries: none gets in at the chart's datum)
     const L = waveLength(T, g.depth ?? 1e3), dx = p.x - g.c.x, dy = p.y - g.c.y, d = Math.hypot(dx, dy);
     // a swell's waves don't all run one way: spread about it as cos^2s(θ/2), s = 75 for a swell come from far off
     // (Mitsuyasu's spreading function with Goda's s_max for swell, Goda 1985, as the Coastal Engineering Manual II-2 gives
@@ -333,7 +426,15 @@ export function harborSwell(p: Vec, T: number): { k: number; toward: number } {
     for (let dd = -40; dd <= 40; dd += 4) {
       const w = Math.cos(dd * D2R / 2) ** 150, t = V(r.toward + dd), cosA = t.x * g.n.x + t.y * g.n.y;
       wsum += w;
-      if (cosA <= 0) continue; // (running out of the harbor, or along its shore: none goes in)
+      if (cosA <= 0) {
+        // running along the entrance or away from it: only what bends round a head into its lee gets in (the exact
+        // solution for waves past the end of a breakwater, Sommerfeld's, as Penney & Price 1952 gave it and Wiegel 1962
+        // drew it for the Shore Protection Manual), from whichever head lets more in
+        let best2 = 0;
+        for (const hd of g.heads ?? []) best2 = Math.max(best2, breakwaterKd(hd.h, hd.b, t, p, L));
+        kk += w * best2 * best2;
+        continue;
+      }
       const off = d > 0 ? Math.acos(clamp((dx * t.x + dy * t.y) / d, -1, 1)) / D2R : 0;
       kk += w * gapKd(g.B * cosA / L, d / L, off) ** 2;
     }
@@ -399,24 +500,35 @@ export class SeaField {
     // out at the grid node, so it's the same whichever point asks first (the same seed, the same race). A cell whose node
     // is on the other side of a basin's edge (a few, by the marinas) isn't cached: worked out at `p` itself, each time.
     const fine = fineFetch(p), basin = inBasin(p), g = fine ? 10 : 150, w = Math.round(from / 2) * 2;
-    const node = (i: number, j: number): number | null => {
-      const c = { x: i * g, y: j * g };
-      if (fineFetch(c) !== fine || inBasin(c) !== basin) return null;
-      const key = `${w}:${g}:${i}:${j}`;
+    const cached = (key: string, at: Vec) => {
       let f = this.cache.get(key);
       if (f === undefined) {
         if (this.cache.size > 60000) this.cache.clear();
-        f = fetchAt(c, w, fine);
+        f = fetchAt(at, w, fine);
         this.cache.set(key, f);
       }
       return f;
     };
+    const node = (i: number, j: number): number | null => {
+      const c = { x: i * g, y: j * g };
+      if (fineFetch(c) !== fine || inBasin(c) !== basin) return null;
+      return cached(`${w}:${g}:${i}:${j}`, c);
+    };
+    // (where the blend can't be used: worked out at the nearest metre, so still the same whichever point asks first)
+    const here = () => { const x = Math.round(p.x), y = Math.round(p.y); return cached(`${w}:1:${x}:${y}`, { x, y }); };
     if (!fine) { const f = node(Math.round(p.x / g), Math.round(p.y / g)); return f ?? fetchAt(p, w, fine); }
     // by a marina, blended between the four nodes round `p` (no step from one 10 m cell to the next); where one of
-    // them is across the basin's edge, worked out at `p` itself
-    const i = Math.floor(p.x / g), j = Math.floor(p.y / g), fx = p.x / g - i, fy = p.y / g - j;
-    const a = node(i, j), b = node(i + 1, j), c = node(i, j + 1), d = node(i + 1, j + 1);
-    if (a === null || b === null || c === null || d === null) return fetchAt(p, w, fine);
+    // them is across the basin's edge, or a wall or pier stands between it and `p` (its fetch is the other side's),
+    // worked out where `p` is
+    const H = fineHarbor(p)!, i = Math.floor(p.x / g), j = Math.floor(p.y / g), fx = p.x / g - i, fy = p.y / g - j;
+    const seen = (ni: number, nj: number) => {
+      const dx = ni * g - p.x, dy = nj * g - p.y, n = Math.ceil(Math.hypot(dx, dy) / 1);
+      for (let k = 0; k <= n; k++) if (walled(H, { x: p.x + dx * k / Math.max(1, n), y: p.y + dy * k / Math.max(1, n) })) return false;
+      return true;
+    };
+    const ok = (ni: number, nj: number) => seen(ni, nj) ? node(ni, nj) : null;
+    const a = ok(i, j), b = ok(i + 1, j), c = ok(i, j + 1), d = ok(i + 1, j + 1);
+    if (a === null || b === null || c === null || d === null) return here();
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
   }
 

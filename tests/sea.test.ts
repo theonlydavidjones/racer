@@ -219,3 +219,36 @@ describe('the sea inside the marinas', () => {
     }
   });
 });
+
+describe('the sea inside the marinas: entrances and breakwater heads', () => {
+  it('behind the end of a breakwater (Sommerfeld\'s exact solution): about 1 in the open, a half along the shadow\'s edge, falling into the shadow', async () => {
+    const { breakwaterKd } = await import('../src/environment/sea');
+    // a breakwater from (0,0) running west (−x); waves travelling north (+y) past its head: the shadow is north of it, west of x = 0
+    const h = { x: 0, y: 0 }, b = { x: -1, y: 0 }, t = { x: 0, y: 1 }, L = 60;
+    expect(breakwaterKd(h, b, t, { x: -1, y: 3 * L }, L)).toBeCloseTo(0.5, 1); // (along the shadow's edge)
+    expect(breakwaterKd(h, b, t, { x: -2 * L, y: 0.5 * L }, L)).toBeLessThan(0.2); // (deep in the shadow)
+    expect(breakwaterKd(h, b, t, { x: -2 * L, y: 3 * L }, L)).toBeLessThan(breakwaterKd(h, b, t, { x: -0.5 * L, y: 3 * L }, L)); // (deeper, less)
+    expect(breakwaterKd(h, b, t, { x: 2 * L, y: 3 * L }, L)).toBe(0); // (not shaded by it: none of this head's to give)
+  });
+  it('every harbor the ocean swell reaches has an entrance to take it in by, and West Harbor\'s is its open east side', async () => {
+    const { harborGaps, swellReach } = await import('../src/environment/sea');
+    const { HARBORS, inBasin } = await import('../src/geo/marina');
+    for (const H of HARBORS) {
+      const c = { x: (H.reach.x0 + H.reach.x1) / 2, y: (H.reach.y0 + H.reach.y1) / 2 };
+      if (swellReach(c, false).k > 0.01) expect(harborGaps(H).length, H.id).toBeGreaterThan(0);
+      // (and each one's way in points into the harbor: the water beyond it, the other way, is out of the basin)
+      for (const g of harborGaps(H)) expect(inBasin({ x: g.c.x - g.n.x * (g.B / 2 + 20), y: g.c.y - g.n.y * (g.B / 2 + 20) }), `${H.id} at ${g.c.x.toFixed(0)},${g.c.y.toFixed(0)}`).toBe(false);
+    }
+    const [w] = harborGaps(HARBORS.find(h => h.id === 'west-harbor')!);
+    expect(w.n.x).toBeLessThan(-0.8); // (in is west)
+  });
+  it('quick by a marina: a sea map\'s worth of fetch near Berkeley in well under a second, a boat\'s in milliseconds', async () => {
+    const { SeaField } = await import('../src/environment/sea');
+    const { HARBORS } = await import('../src/geo/marina');
+    const H = HARBORS.find(h => h.id === 'berkeley')!, cx = (H.reach.x0 + H.reach.x1) / 2, cy = (H.reach.y0 + H.reach.y1) / 2, f = new SeaField(null);
+    for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) f.fetch({ x: cx - 1600 + i * 139, y: cy - 1600 + j * 139 }, 270); // (its walls mapped)
+    const t0 = performance.now();
+    for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) f.fetch({ x: cx - 1600 + i * 139, y: cy - 1600 + j * 139 }, 276);
+    expect(performance.now() - t0).toBeLessThan(600);
+  }, 60_000);
+});
