@@ -86,19 +86,31 @@ const STEM_SLOPE = -1.06 / BOW;
  * the class lines plan puts the corner a little further forward, at 3.1–3.3 m). The canoe body, the hull's bottom above the keel,
  * leaves it about a third of the way down and rounds into its depth amidships, 0.62 m (the plan's main section at St. 8).
  */
-const U_HEEL = (HEEL.z + L / 2) / L, U_STEM = 0.125;
-const KEEL_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.46], [0.39, -0.68], [0.45, -0.88], [0.5, -1.04], [0.54, -1.1], [0.58, -1.12], [U_HEEL, -1.2]]);
-const CANOE_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.44], [0.4, -0.56], [0.5, -0.61], [0.56, -0.62], [0.62, -0.62]]);
+const U_HEEL = (HEEL.z + L / 2) / L;
+/**
+ * The stem's foot: the straight raked stem turns into the forefoot's run in one long, even curve, from about 0.2 m above
+ * the water (U_STEM) to about 0.35 m under it (U_RUN), leaving the stem's rake and arriving at the run's (a cubic Hermite:
+ * no corner anywhere, the owner's photos), rather than turning in the last few centimetres under the water.
+ */
+const U_STEM = 0.103, U_RUN = 0.25, Y_RUN = -0.3475, M_RUN = -2.25;
+const stemFoot = (u: number, yEnd: number, mEnd: number) => {
+  const h = U_RUN - U_STEM, t = Math.min(1, Math.max(0, (u - U_STEM) / h)), t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * (0.96 + STEM_SLOPE * U_STEM) + (t3 - 2 * t2 + t) * h * STEM_SLOPE + (-2 * t3 + 3 * t2) * yEnd + (t3 - t2) * h * mEnd;
+};
+const KEEL_LINE = fairCurve([[U_RUN, Y_RUN], [0.3, -0.46], [0.39, -0.68], [0.45, -0.88], [0.5, -1.04], [0.54, -1.1], [0.58, -1.12], [U_HEEL, -1.2]]);
+const CANOE_LINE = fairCurve([[U_RUN, Y_RUN], [0.3, -0.45], [0.4, -0.56], [0.5, -0.61], [0.56, -0.62], [0.62, -0.62]]);
 export function canoe(u: number): number {
   // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then the
   // forefoot's long raked run, and round into the hull's bottom amidships without a knuckle
   if (u < U_STEM) return 0.96 + STEM_SLOPE * u;
+  if (u < U_RUN) return stemFoot(u, Y_RUN, -2.05);
   if (u < 0.62) return CANOE_LINE(u);
   return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
 }
 /** Keel bottom: the forefoot, then the ballast keel's bottom, deepest at the heel (1.2 m with the keel band). */
 export function keel(u: number): number {
-  if (u <= U_STEM) return canoe(u);
+  if (u < U_STEM) return canoe(u);
+  if (u < U_RUN) return Math.min(stemFoot(u, Y_RUN, M_RUN), canoe(u));
   return Math.max(-1.2, Math.min(KEEL_LINE(Math.min(u, U_HEEL)), canoe(u)));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
@@ -112,14 +124,14 @@ function keelHalf(u: number): number {
  * Half-breadth = keel + (deck − keel) · F(q), q the height from the keel's side (0) to the sheer (1), with
  * F(q) = (1 − (1 − q)^α)^β: α sets how long the topsides stay upright, β > 1 the hollow into the keel. Fitted to the
  * St. 8 section (within about 3 cm at the waterline, the turn of the bilge and the garboards); finer and more V-shaped
- * forward (nearly straight-sided V's at the bow, as the lines plan's body plan draws them), and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
+ * forward (the topsides still rounding out at the bow, as on Josephine: the owner), and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
  * nearly upright-sided at the deck, curving in to meet the sternpost near the waterline (the owner's photos).
  */
 function sectionShape(u: number): { al: number; be: number } {
   // toward the transom the hollow gives way to a full, round run (Josephine hauled out: the owner's photo), so the
   // transom's foot is a broad, nearly flat U at about the waterline, not a point
   const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.78) / 0.18);
-  return { al: 1.15 + 2.85 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
+  return { al: 1.7 + 2.3 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
 }
 
 /** 16 planks a side (CR 2.207.5: no fewer than 16 at station 8; 2.207.6: none but the keel plank over 130 mm wide), each lapping 13 mm over the one below (about the plank's thickness, CR 2.207.2) */
