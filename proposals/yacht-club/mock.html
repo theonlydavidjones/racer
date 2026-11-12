@@ -1,0 +1,129 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Yacht Club mock-up</title>
+<style>
+:root{--ink:#0a1520;--pod-solid:#0f2130;--rule:rgba(150,196,218,.2);--text:#e9f2f5;--muted:#94abb7;--accent:#ffb627;--row:#3fd197;--btn:#18303f;--btn-hi:#22445a;--f-inst:"Arial Narrow",system-ui,sans-serif;--f-body:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;background:#0b1a26;color:var(--text);font:14px/1.4 var(--f-body)}
+.screen{width:1180px;margin:24px auto;background:var(--pod-solid);border:1px solid var(--rule);border-radius:12px;padding:20px 24px}
+.eyebrow{font:600 11px var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{margin:2px 0 12px;font:600 26px var(--f-inst);letter-spacing:.04em}
+.head{display:flex;justify-content:space-between;align-items:flex-end}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule);margin:8px 0 16px}
+.tabs b{padding:8px 16px;font:600 13px var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid transparent}
+.tabs b.on{color:var(--text);border-color:var(--accent)} .tabs b.later{opacity:.45}
+.seg{display:inline-flex;background:var(--btn);border-radius:8px;padding:3px}.seg span{padding:5px 12px;border-radius:6px;color:var(--muted);font-size:13px}.seg span.on{background:var(--btn-hi);color:var(--text)}
+.cta{background:var(--accent);color:#1a1205;border-radius:8px;padding:8px 14px;font:700 13px var(--f-inst);letter-spacing:.08em;text-transform:uppercase}
+.ghost{border:1px solid var(--rule);border-radius:8px;padding:6px 12px;color:var(--text);font-size:13px;background:var(--btn)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{background:var(--btn);border:1px solid var(--rule);border-radius:10px;padding:12px}
+.card .nm{font:600 16px var(--f-inst);letter-spacing:.03em}.card .sub{color:var(--muted);font-size:12px;margin:2px 0 8px}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;margin-right:4px;background:#0f2130;border:1px solid var(--rule);color:var(--muted)}
+.tag.yours{color:var(--accent);border-color:rgba(255,182,39,.5)}
+.bars{display:grid;grid-template-columns:96px 1fr 30px;gap:3px 8px;font-size:12px;color:var(--muted);align-items:center}
+.bar{height:6px;border-radius:3px;background:#0b1a26;position:relative}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#6fb6d9}
+.hidden{color:var(--muted);font-size:12px;font-style:italic}
+.rec{font-size:12px;color:var(--muted);margin-top:6px} .gossip{font-size:12px;color:var(--text);margin-top:6px;font-style:italic}
+.two{display:grid;grid-template-columns:1.1fr 1fr;gap:20px}
+.sl{display:grid;grid-template-columns:120px 1fr 44px;gap:8px;align-items:center;margin:6px 0;font-size:13px;color:var(--muted)}
+.track{height:6px;background:#0b1a26;border-radius:3px;position:relative}.track i{position:absolute;top:-5px;width:16px;height:16px;border-radius:50%;background:#9fd3ee}
+.val{color:var(--text);text-align:right}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 8px;border-bottom:1px solid var(--rule);text-align:left}th{color:var(--muted);font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--btn);border:1px solid var(--rule);border-radius:16px;padding:3px 10px;margin-right:6px;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%}
+.note{color:var(--muted);font-size:12px;margin-top:10px}
+.crewline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--btn);border:1px solid var(--rule);border-radius:10px;padding:10px 12px}
+.crewline .who{font:600 15px var(--f-inst)}
+.link{color:var(--accent);font-size:13px}
+</style></head><body>
+
+<!-- 1. Members -->
+<div class="screen" id="members">
+  <div class="head"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div>
+    <div style="display:flex;gap:10px;align-items:center"><div class="seg"><span class="on">Everyone</span><span>Skippers</span><span>Crew</span><span>Yours</span></div><span class="cta">New member</span></div></div>
+  <div class="tabs"><b>Boats</b><b class="on">Members</b><b>Club</b><b class="later">Seasons (later)</b></div>
+  <div class="grid">
+    <div class="card"><div class="nm">You</div><div class="sub">Skipper of Josephine · 5'10" · 176 lb</div><span class="tag yours">yours</span><span class="tag">skipper</span>
+      <div class="rec">12 races · mean place 3.4 · best 1st</div></div>
+    <div class="card"><div class="nm">Sam Okafor</div><div class="sub">Crew on Josephine · middle: main</div><span class="tag yours">yours</span><span class="tag">crew</span>
+      <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:70%"></i></div><span>70</span><span>Eyes</span><div class="bar"><i style="width:55%"></i></div><span>55</span><span>Fitness</span><div class="bar"><i style="width:80%"></i></div><span>80</span><span>Composure</span><div class="bar"><i style="width:45%"></i></div><span>45</span></div></div>
+    <div class="card"><div class="nm">Alex Varga</div><div class="sub">Crew on Josephine · forward: jib, pole</div><span class="tag yours">yours</span><span class="tag">crew</span>
+      <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:60%"></i></div><span>60</span><span>Eyes</span><div class="bar"><i style="width:90%"></i></div><span>90</span><span>Fitness</span><div class="bar"><i style="width:65%"></i></div><span>65</span><span>Composure</span><div class="bar"><i style="width:60%"></i></div><span>60</span></div></div>
+    <div class="card"><div class="nm">Maren Holt</div><div class="sub">Skipper of Red · USA 87 · StFYC</div><span class="tag">club</span><span class="tag">skipper</span>
+      <div class="hidden" style="margin-top:8px">Ratings: found out by racing her</div><div class="gossip">"Never misses a start. Watch her at the pin."</div><div class="rec">Against you: 7 races · mean 2.1 · best 1st · 1 OCS</div></div>
+    <div class="card"><div class="nm">Jules Prentice</div><div class="sub">Skipper of Blue · USA 104 · GGYC</div><span class="tag">club</span><span class="tag">skipper</span>
+      <div class="hidden" style="margin-top:8px">Ratings: found out by racing him</div><div class="gossip">"Loves the Cityfront. Overstands the weather mark."</div><div class="rec">Against you: 7 races · mean 4.0 · best 2nd</div></div>
+    <div class="card"><div class="nm">Ines Carvalho</div><div class="sub">Crew on Red · forward hand</div><span class="tag">club</span><span class="tag">crew</span>
+      <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:85%"></i></div><span>85</span><span>Eyes</span><div class="bar"><i style="width:80%"></i></div><span>80</span><span>Fitness</span><div class="bar"><i style="width:75%"></i></div><span>75</span><span>Composure</span><div class="bar"><i style="width:90%"></i></div><span>90</span></div></div>
+    <div class="card"><div class="nm">Tom Reyes</div><div class="sub">Free · sails on any boat</div><span class="tag">club</span><span class="tag">crew</span>
+      <div class="bars" style="margin-top:8px"><span>Trim</span><div class="bar"><i style="width:30%"></i></div><span>30</span><span>Eyes</span><div class="bar"><i style="width:40%"></i></div><span>40</span><span>Fitness</span><div class="bar"><i style="width:85%"></i></div><span>85</span><span>Composure</span><div class="bar"><i style="width:35%"></i></div><span>35</span></div></div>
+    <div class="card"><div class="nm">Rae Lindqvist</div><div class="sub">Skipper of Green · USA 92 · SFYC</div><span class="tag">club</span><span class="tag">skipper</span>
+      <div class="hidden" style="margin-top:8px">Ratings: found out by racing her</div><div class="gossip">"Fast in a breeze, nervous at marks."</div><div class="rec">Against you: 5 races · mean 3.6</div></div>
+  </div>
+  <div class="note">Your members are yours to set. The club's are made by the Club tab's sliders; skippers' ratings stay hidden (a switch in Settings shows them).</div>
+</div>
+
+<!-- 2. A member's card, opened (yours, as crew) -->
+<div class="screen" id="member">
+  <div class="head"><div><div class="eyebrow">Members · yours · crew</div><h1>Sam Okafor</h1></div><span class="ghost">‹ Members</span></div>
+  <div class="two">
+    <div>
+      <div class="sl"><span>Height</span><span class="ghost" style="width:70px">5'9"</span><span></span></div>
+      <div class="sl"><span>Weight</span><span class="ghost" style="width:70px">172 lb</span><span></span></div>
+      <div class="sl"><span>Skill</span><span class="ghost" style="width:120px">Club racer ▾</span><span></span></div>
+      <div class="eyebrow" style="margin:14px 0 4px">As crew</div>
+      <div class="sl"><span>Trim</span><div class="track"><i style="left:68%"></i></div><span class="val">70</span></div>
+      <div class="sl"><span>Reactions</span><div class="track"><i style="left:58%"></i></div><span class="val">as skill</span></div>
+      <div class="sl"><span>Eyes</span><div class="track"><i style="left:53%"></i></div><span class="val">55</span></div>
+      <div class="sl"><span>Boat handling</span><div class="track"><i style="left:58%"></i></div><span class="val">as skill</span></div>
+      <div class="sl"><span>Fitness</span><div class="track"><i style="left:78%"></i></div><span class="val">80</span></div>
+      <div class="sl"><span>Composure</span><div class="track"><i style="left:43%"></i></div><span class="val">45</span></div>
+      <div style="margin-top:8px"><span class="ghost">All as skill</span></div>
+    </div>
+    <div>
+      <div class="eyebrow">Sails on</div><p>Josephine · USA 110 · middle crew: the main and (often) the traveller</p>
+      <div class="eyebrow">Record</div><p style="color:var(--muted)">9 races with you · 2 fumbles under pressure · the boat's mean place 3.2</p>
+      <div class="eyebrow">Also a skipper?</div><p><span class="ghost">Make Sam a skipper too</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Boats: assigning -->
+<div class="screen" id="boats">
+  <div class="head"><div><div class="eyebrow">The Yacht Club</div><h1>Boats</h1></div><span class="cta">New boat</span></div>
+  <div class="tabs"><b class="on">Boats</b><b>Members</b><b>Club</b><b class="later">Seasons (later)</b></div>
+  <table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Middle crew</th><th>Forward hand</th><th>Club</th></tr></thead><tbody>
+    <tr><td>USA 110</td><td>Josephine</td><td>You</td><td><span class="chip">Sam Okafor ▾</span></td><td><span class="chip">Alex Varga ▾</span></td><td>StFYC</td></tr>
+    <tr><td>USA 87</td><td>Red</td><td><span class="chip">Maren Holt ▾</span></td><td><span class="chip">Pat Sørensen ▾</span></td><td><span class="chip">Ines Carvalho ▾</span></td><td>StFYC</td></tr>
+    <tr><td>USA 104</td><td>Blue</td><td><span class="chip">Jules Prentice ▾</span></td><td><span class="chip">Kai Moreno ▾</span></td><td><span class="chip">— none ▾</span></td><td>GGYC</td></tr>
+    <tr><td>USA 92</td><td>Green</td><td><span class="chip">Rae Lindqvist ▾</span></td><td><span class="chip">Tom Reyes ▾</span></td><td><span class="chip">Dee Achebe ▾</span></td><td>SFYC</td></tr>
+  </tbody></table>
+  <div class="note">Each pick is from the roster; someone already aboard another boat for the next race is greyed out. A boat with no one assigned sails as today.</div>
+</div>
+
+<!-- 4. Club: the generator -->
+<div class="screen" id="club">
+  <div class="head"><div><div class="eyebrow">The Yacht Club</div><h1>Club</h1></div></div>
+  <div class="tabs"><b>Boats</b><b>Members</b><b class="on">Club</b><b class="later">Seasons (later)</b></div>
+  <div class="two"><div>
+    <div class="eyebrow">How good the club's own skippers and crews are</div>
+    <div class="sl"><span>Skippers: level</span><div class="track"><i style="left:22%"></i></div><span class="val">Club night</span></div>
+    <div class="sl"><span>Skippers: mix</span><div class="seg"><span>Even</span><span class="on">Typical</span><span>Mixed</span></div><span></span></div>
+    <div class="sl"><span>Crews: level</span><div class="track"><i style="left:30%"></i></div><span class="val">Club night</span></div>
+    <div class="sl"><span>Crews: mix</span><div class="seg"><span>Even</span><span class="on">Typical</span><span>Mixed</span></div><span></span></div>
+    <div style="margin-top:12px"><span class="ghost">Regenerate the club's members</span></div>
+  </div><div>
+    <p style="color:var(--muted)">"Club night, Typical" is fitted to the real San Francisco Folkboat fleet: one star boat, a few good ones, a long tail. A boat's crew follows her skipper's level (good skippers sail with good crews).</p>
+    <p style="color:var(--muted)">Your members are never changed by these.</p>
+  </div></div>
+</div>
+
+<!-- 5. The race setup -->
+<div class="screen" id="setup">
+  <div class="eyebrow">4 · Your boat and crew</div>
+  <div class="crewline" style="margin-top:8px"><span class="who">Josephine · USA 110</span>
+    <span class="chip">You · helm</span><span class="chip">Sam Okafor · middle: main</span><span class="chip">Alex Varga · forward: jib, pole</span>
+    <span class="ghost">Swap…</span><span class="ghost">Seats ⇅</span><span class="link">Edit in the Yacht Club</span></div>
+  <div style="margin-top:10px;font-size:13px;color:var(--muted)"><input type="checkbox" checked> Your crew fumble now and then under pressure</div>
+  <div class="eyebrow" style="margin-top:16px">3 · Competitors</div>
+  <div style="margin-top:6px"><span class="chip"><i class="dot" style="background:#e04a4a"></i>Red · Maren Holt</span><span class="chip"><i class="dot" style="background:#4a7fe0"></i>Blue · Jules Prentice</span><span class="chip"><i class="dot" style="background:#3fbf6a"></i>Green · Rae Lindqvist</span></div>
+  <div class="note">People are set up in the Yacht Club; here you only choose who's aboard.</div>
+</div>
+</body></html>
