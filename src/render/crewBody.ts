@@ -255,10 +255,11 @@ const SEAT_P = profile([
 ]);
 /** A trouser leg (salopettes), centred on the hip joint: thigh to an ankle cuff wide enough to go over a sea boot. */
 const LEG_P = profile([
-  [0.0, 0.082, 0.088, 0.098, 0.006, 2, -0.002], // (under the jacket's hem, merging into the seat)
-  [-0.08, 0.087, 0.094, 0.098, 0.002, 2, 0.0],
-  [-0.18, 0.09, 0.093, 0.09, -0.004, 2, 0.004], // the thigh, fuller in front (the quadriceps), angling in to the knee
-  [-0.28, 0.08, 0.084, 0.078, -0.006, 2, -0.001],
+  [0.0, 0.076, 0.086, 0.096, 0.006, 2, -0.008], // (under the jacket's hem, merging into the seat)
+  [-0.08, 0.079, 0.092, 0.097, 0.002, 2, -0.008],
+  [-0.18, 0.081, 0.092, 0.089, -0.004, 2, -0.006], // the thigh, fuller in front (the quadriceps), angling in to the knee;
+  // (its outside, below the jacket's hem, kept a little inside the hem's line: the hips don't stand out past the jacket)
+  [-0.28, 0.075, 0.083, 0.077, -0.006, 2, -0.006],
   [-0.36, 0.068, 0.073, 0.066, -0.004, 2, -0.005],
   [-0.43, 0.062, 0.072, 0.061, -0.002, 2.2, -0.007], // the knee, the kneecap in front (salopettes: room to bend)
   [-0.48, 0.061, 0.064, 0.067, 0.003, 2, -0.006],
