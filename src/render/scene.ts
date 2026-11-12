@@ -417,6 +417,11 @@ export class SceneView {
 
   /** The course or destination changed (a new destination picked on the chart): build its marks again. */
   refreshCourse(w: World): void { this.buildCourse(w); }
+  /** New conditions mid-sail (World.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
+  conditionsChanged(w: World): void {
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
+  }
 
   private buildCourse(w: World): void {
     const old = this.courseObjs;
