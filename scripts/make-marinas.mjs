@@ -10,8 +10,8 @@
  * - Gashouse Cove (San Francisco Marina's East Harbor, by Fort Mason): basin, walkways and fingers all mapped. The
  *   harbor's own dock letters and slip numbers aren't published anywhere we could reach: lettered here north to south.
  * - South Beach Harbor (by Oracle Park): basin, breakwater, walkways and fingers mapped, and the docks carry their real
- *   names in OSM (Dock A … Dock G, north to south). Slip numbers aren't published where we could reach: numbered here
- *   along each dock from its shore (west) end.
+ *   names in OSM (Dock A … Dock G, north to south). Slip numbers from the harbor's plan: from each dock's gate at
+ *   the shore (west) end, odd on the north side, even on the south.
  * - Corinthian Yacht Club, Tiburon: the breakwater and three dock lines are mapped, but not the fingers. The club's
  *   visitor notes put A dock on the southernmost line (along the breakwater, "on the extreme left as you enter") with the
  *   guest dock aft of A-14 at the end of A dock (bbyc.org/corinthian-1; Modern Sailing's CYC visitor sheet); B and C
@@ -20,6 +20,7 @@
  * Output: src/geo/data/<id>.json
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { SF_DOCKS, SOURCE_NOTE, sfNumbers, writeRenames } from './sf-marina-numbers.mjs';
 
 const HARBORS = {
   'gashouse-cove': {
@@ -41,6 +42,10 @@ const HARBORS = {
   'south-beach': {
     name: 'South Beach Harbor', bbox: [-122.3945, 37.7755, -122.3820, 37.7850],
     basin: { marina: 'South Beach Harbor' }, letter: 'named',
+    // the harbor's own plan (Port of San Francisco, South Beach Harbor map, sfport.com/files/2023-06/Harbor%20Map.pdf):
+    // each dock's slips numbered from its gate at the shore (west) end, odd on the north side, even on the south; the top
+    // numbers there (A84 B92 C92 D104 E104 F108 G92) are the slips mapped here, side for side
+    odd: 'left',
     // two ways in, each between a pair of lateral beacons (OSM seamarks, from NOAA's chart): north by Pier 40, and south by the fishing pier
     exits: [[37.78194, -122.38469], [37.77830, -122.38524]]
   },
@@ -82,7 +87,21 @@ const HARBORS = {
   },
   'richmond-yc': {
     name: 'Richmond Yacht Club, Brickyard Cove', bbox: [-122.3880, 37.9060, -122.3790, 37.9125],
-    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
+    noSlips: true, // (no fingers mapped in OSM: the slips are laid out from the club's own plan, below)
+    // the club's harbor plan ("Richmond Yacht Club Harbor Layout", richmondyc.org/files/RYC Harbor Layout.pdf, 1" = 30',
+    // north to the right; 250 slips, the club's harbor page): docks A to F run out east-south-east from the headwalk by the
+    // shore road to the pierhead line, A the shortest by the clubhouse and the launching area, F along the Potrero Reach
+    // breakwater. Matched to OSM's dock lines by their order and lengths. Slip lengths: the sizes printed on the plan
+    // (A and F 36 ft; B 44 ft on its odd side, 36 ft on its even; C 40–50 ft, drawn 44; D 32–50, drawn 40; E 32–50,
+    // drawn 36). G (eleven 28 ft slips by the harbormaster's office) isn't mapped in OSM: left out.
+    plan: [
+      { way: '27419293', letter: 'A', sides: [{ side: 'right', count: 11, len: 11.0, numbers: 'run' }] },
+      { way: '23618133', letter: 'B', rootAtEnd: true, sides: [{ side: 'right', count: 13, len: 13.4 }, { side: 'left', count: 11, len: 11.0 }] },
+      { way: '23618131', letter: 'C', rootAtEnd: true, from: 22, sides: [{ side: 'right', count: 19, len: 13.4 }, { side: 'left', count: 18, len: 13.4 }] },
+      { way: '23618129', letter: 'D', rootAtEnd: true, from: 22, sides: [{ side: 'right', count: 31, len: 12.2 }, { side: 'left', count: 25, len: 12.2 }] },
+      { way: '23618128', letter: 'E', rootAtEnd: true, sides: [{ side: 'right', count: 42, len: 11.0 }, { side: 'left', count: 42, len: 11.0 }] },
+      { way: '583333847', letter: 'F', from: 22, sides: [{ side: 'right', count: 21, len: 11.0 }, { side: 'left', count: 20, len: 11.0 }] }
+    ],
     basin: { marina: 'Richmond Yacht Club' }, letter: 'north-south',
     // the harbor's two breakwater arms aren't in OSM: NOAA's chart (ENC US5OAKGH, SLCONS) has them, ending at Brickyard
     // Cove Harbor Lights 1 (green, F G, 2.4 m) and 2 (red, F R) either side of the way in, which faces south-east
@@ -236,9 +255,45 @@ async function make(id, H) {
   if (!H.noSlips) for (const [w, letter] of [...letterOf].sort((a, b) => a[1].localeCompare(b[1]))) {
     const q = w.pts.map(xy); let a = q[0], b = q.at(-1); if (b.x < a.x) [a, b] = [b, a];
     const d = { x: b.x - a.x, y: b.y - a.y }, along = s => (s.c.x - a.x) * d.x + (s.c.y - a.y) * d.y;
-    slips.filter(s => s.dock === w).sort((s, t) => along(s) - along(t))
-      .forEach((s, i) => out.push({ id: `${letter}${i + 1}`, dock: letter, at: toLL(s.c), heading: Math.round(s.heading), finger: s.len }));
+    const mine = slips.filter(s => s.dock === w).sort((s, t) => along(s) - along(t));
+    // (odd numbers on one side, looking out along the dock from its shore end, even on the other, where the harbor numbers
+    // them so; otherwise one run along the dock)
+    const left = s => d.x * (s.c.y - a.y) - d.y * (s.c.x - a.x) > 0;
+    const num = H.odd ? (s => { const odd = left(s) === (H.odd === 'left'), k = mine.filter(t => left(t) === left(s)).indexOf(s); return odd ? 2 * k + 1 : 2 * k + 2; }) : (s => mine.indexOf(s) + 1);
+    mine.map(s => ({ s, n: num(s) })).sort((p, q) => p.n - q.n)
+      .forEach(({ s, n }) => out.push({ id: `${letter}${n}`, dock: letter, at: toLL(s.c), heading: Math.round(s.heading), finger: s.len }));
   }
+  // slips laid out from the harbor's own plan, where it publishes one (Richmond YC): per dock, its letter, which end is the
+  // shore's (the root), and per side the number of slips and their length; numbered from the root, odd on the right
+  // (looking out along the dock), even on the left, or one run 1, 2, 3 … on one side. Each slip a finger's width plus a
+  // share of the dock between root and tip; a slip that wouldn't be clear of the basin's edge, the breakwaters or another
+  // dock is left out (its number skipped, as on the plan)
+  const planned = [];
+  for (const D of H.plan ?? []) {
+    const w = walkways.find(d => d.id === D.way) ?? fail(`no dock ${D.way}`);
+    let q = w.pts.map(xy); if (D.rootAtEnd) q = q.reverse();
+    // the dock's straight run: from the root, the segments within 30° of the root-to-tip line
+    const tipAll = q.at(-1), dir0 = Math.atan2(tipAll.x - q[0].x, tipAll.y - q[0].y);
+    const segs = []; for (let i = 1; i < q.length; i++) { const a = q[i - 1], b = q[i], L = Math.hypot(b.x - a.x, b.y - a.y); const d = Math.atan2(b.x - a.x, b.y - a.y); if (L > 1 && Math.abs(((d - dir0 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < Math.PI / 6) segs.push({ a, b, L }); }
+    const total = segs.reduce((t, g) => t + g.L, 0), at = s => { for (const g of segs) { if (s <= g.L) { const t = s / g.L; return { p: { x: g.a.x + (g.b.x - g.a.x) * t, y: g.a.y + (g.b.y - g.a.y) * t }, u: { x: (g.b.x - g.a.x) / g.L, y: (g.b.y - g.a.y) / g.L } }; } s -= g.L; } const g = segs.at(-1); return { p: g.b, u: { x: (g.b.x - g.a.x) / g.L, y: (g.b.y - g.a.y) / g.L } }; };
+    const others = [...breakwaters, ...docks.filter(d => d !== w)];
+    for (const S of D.sides) {
+      // (from 12 m out from the headwalk (22 m on C, D and F, where OSM's docks close in on each other there), clear of its corner, to 9 m short of the dock's end, left for its end tie)
+      const side = S.side === 'right' ? -1 : 1, pitch = (total - (D.from ?? 12) - 9) / S.count, flen = S.len; // (n = left of the way out: −1 the right)
+      for (let k = 0; k < S.count; k++) {
+        const s = (D.from ?? 12) + pitch * (k + 0.5), { p, u } = at(s), n = { x: -u.y * side, y: u.x * side };
+        const root = { x: p.x + n.x * 1.2, y: p.y + n.y * 1.2 }, c = { x: root.x + n.x * flen * 0.55, y: root.y + n.y * flen * 0.55 };
+        const num = S.numbers === 'run' ? k + 1 : S.side === 'right' ? 2 * k + 1 : 2 * k + 2;
+        const clear = [0.15, 0.55, 0.95].every(f => { const r = { x: root.x + n.x * flen * f, y: root.y + n.y * flen * f }; return inBasin(r) && edgeDist(r) > 1.5 && minDist(r, others) > 1.8; });
+        if (!clear) continue;
+        // the finger on the far side of the slip (looking out along the dock), as long as the slip
+        const f0 = { x: root.x + u.x * pitch / 2, y: root.y + u.y * pitch / 2 };
+        planned.push({ dock: D.letter, root, n, flen, c, finger: { id: `${D.letter}${num}f`, name: '', pts: [toLL(f0), toLL({ x: f0.x + n.x * flen, y: f0.y + n.y * flen })], made: true },
+          slip: { id: `${D.letter}${num}`, dock: D.letter, at: toLL(c), heading: Math.round((Math.atan2(-n.x, -n.y) * 180 / Math.PI + 360) % 360), finger: Math.round(flen * 10) / 10 } });
+      }
+    }
+  }
+  for (const a of planned) { fingers.push(a.finger); out.push(a.slip); }
   // berths alongside a dock (a club's guest dock): along each side of it, a Folkboat's length and a bit apart, bow along
   // the dock, where she lies clear of everything else in the basin
   for (const { way, label, every = 9 } of H.alongside ?? []) {
@@ -283,12 +338,14 @@ async function make(id, H) {
   const beacons = [...nodes.values()].filter(n => n.tags['seamark:type'] === 'beacon_lateral' && near(xy([n.lat, n.lon]), 80))
     .map(n => ({ at: [r7(n.lat), r7(n.lon)], colour: n.tags['seamark:beacon_lateral:colour'] === 'green' ? 'green' : 'red' })).concat(H.beaconsExtra ?? []);
 
+  // the SF Marina's own numbers (Gashouse Cove: scripts/sf-marina-numbers.mjs), in place of the letters; old ids kept for saves
+  const sf = SF_DOCKS[id] ? sfNumbers(id, out) : null; if (sf) await writeRenames(id, sf.renames);
   await writeFile(new URL(`../src/geo/data/${id}.json`, import.meta.url), JSON.stringify({
-    source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? 'Dock letters are the docks\' names in OSM; slip numbers are this sim\'s.' : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}`,
+    source: `OpenStreetMap contributors (ODbL), via api.openstreetmap.org (scripts/make-marinas.mjs); slips worked out from the fingers (3.0 m wide). ${H.letter === 'named' ? `Dock letters are the docks' names in OSM; slip numbers ${H.odd ? 'as on the harbor\'s own map' : 'are this sim\'s'}.` : typeof H.letter === 'object' ? 'A dock (the southernmost line) per the club\'s visitor notes; B, C, the fingers and the slip numbers are inferred.' : sf ? '' : 'Dock letters and slip numbers are this sim\'s, not the harbor\'s.'}${sf ? 'S' + SOURCE_NOTE.slice(3) : ''}`,
     fetched: new Date().toISOString().slice(0, 10), name: H.name,
     basin, breakwaters, walkways: walkways.map(w => w.pts), fingers: fingers.map(f => f.pts), areas,
     beacons, exits: H.exits, ...(H.shore ? { shore: [basin.slice(...H.shore)] } : basinFile?.shore ? { shore: basinFile.shore } : {}), ...(H.piles ? { piles: H.piles } : {}),
-    ...(H.pathIds ? { paths: ways.filter(w => H.pathIds.includes(w.id)).map(pts) } : {}), slips: out
+    ...(H.pathIds ? { paths: ways.filter(w => H.pathIds.includes(w.id)).map(pts) } : {}), slips: sf ? sf.slips : out
   }) + '\n');
   const docksUsed = [...new Set(out.map(s => s.dock))].join('');
   console.log(`${id}: basin ${basin.length} pts, ${breakwaters.length} breakwaters, ${walkways.length} walkways (docks ${docksUsed}), ${fingers.length} fingers (${fingers.filter(f => f.made).length} inferred), ${areas.length} pier areas, ${beacons.length} beacons, ${out.length} slips`);

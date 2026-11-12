@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import data from '../src/environment/data/sf-currents.json';
+import fitted from '../src/environment/data/fitted-currents.json';
 import fx from './fixtures/noaa-currents.json';
 import { predict, type Constituents } from '../src/environment/harmonics';
 import { sfClock, sfLocalToUtcMin, stationSpeed, stationsFor } from '../src/environment/tide';
@@ -67,5 +68,19 @@ describe('real tide in the sim', () => {
 
   it('the summary reads like a sailor would say it', () => {
     expect(world('2026-11-14', '18:00').cur.label).toMatch(/^(Ebb|Flood|Slack)/);
+  });
+});
+
+describe('every current station has its axis', () => {
+  it('a flood and an ebb direction at every station in the field (NOAA leaves some out: the major axis stands in)', () => {
+    const t0 = sfLocalToUtcMin('2026-11-14', '06:00');
+    for (const s of stationsFor(t0, t0 + 60)) { expect(Number.isFinite(s.flood), s.id).toBe(true); expect(Number.isFinite(s.ebb), s.id).toBe(true); }
+  });
+  it('Richardson Bay (fitted by the sim to NOAA\'s 2012 record): weak, as measured, and with a flood and an ebb a day', () => {
+    const t0 = Date.UTC(2012, 7, 1), times = Array.from({ length: 24 * 14 * 10 }, (_, i) => t0 + i * 6 * 60000);
+    const st = (fitted as unknown as { stations: { id: string; z0: number; hc: Constituents }[] }).stations.find(s => s.id === 'SFB1219')!;
+    const v = predict(st.z0, st.hc, times), max = Math.max(...v), min = Math.min(...v);
+    // the record (55 days, near-surface bin): peaks to +0.88 and −0.94 kt, median daily peaks about 0.7–0.8 kt
+    expect(max).toBeGreaterThan(0.3); expect(max).toBeLessThan(1.0); expect(min).toBeLessThan(-0.3); expect(min).toBeGreaterThan(-1.0);
   });
 });

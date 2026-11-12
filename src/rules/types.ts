@@ -25,6 +25,8 @@ export interface RulesBoat {
   backing?: boolean;
   /** She has finished, so she is no longer racing (Rule 23.1). */
   finished?: boolean;
+  /** She has retired (RET): no longer racing either (the definition of Racing; Rule 23.1). */
+  retired?: boolean;
 }
 
 export interface RulesMark {

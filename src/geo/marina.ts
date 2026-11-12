@@ -13,14 +13,18 @@ import marinaVillage from './data/marina-village.json';
 import fortmann from './data/fortmann.json';
 import grandMarina from './data/grand-marina.json';
 import alamedaMarina from './data/alameda-marina.json';
+import slipRenames from './data/slip-renames.json';
 
 /**
  * The marinas your boats can call home, from OpenStreetMap (scripts/make-west-harbor.mjs, scripts/make-marinas.mjs): each
  * basin is water you can sail in; its breakwaters, docks and piers are solid.
- * - West Harbor, San Francisco Marina (by the St. Francis and Golden Gate yacht clubs). Dock letters and slip numbers are
- *   this sim's: the harbor's own aren't published anywhere we could reach.
- * - Gashouse Cove, the Marina's East Harbor (by Fort Mason). Dock letters (north to south) and slip numbers are this sim's.
- * - South Beach Harbor (by Oracle Park). Docks A to G are the harbor's own (their names in OSM); slip numbers are this sim's.
+ * - West Harbor, San Francisco Marina (by the St. Francis and Golden Gate yacht clubs), and Gashouse Cove, its East Harbor
+ *   (by Fort Mason): the marina's own slip numbers, bare numbers as the marina uses them (West Harbor's odd, Gashouse
+ *   Cove's even), each dock's range from SF Recreation and Parks' maps, and West Harbor's Docks E, F and G by name. Their
+ *   order within a dock is the map's where it shows it, and inferred where it doesn't (all of Gashouse Cove's): see
+ *   scripts/sf-marina-numbers.mjs.
+ * - South Beach Harbor (by Oracle Park). Docks A to G are the harbor's own (their names in OSM), and so are the slip numbers (the harbor's map, sfport.com: from
+ *   each dock's gate at the shore, odd on the north side, even on the south).
  * - Corinthian Yacht Club, Tiburon. A dock is the southernmost line, along the breakwater, as the club's visitor notes say;
  *   B and C, the fingers (not mapped) and the slip numbers are inferred.
  * Slips are worked out from the docks' fingers.
@@ -38,9 +42,9 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
   { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
-  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Few fingers
-  // are mapped and the slips aren't published where we could reach, so no slips of their own yet; Berkeley has a berth
-  // alongside Berkeley Yacht Club's guest dock
+  // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
+  // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
+  // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
   { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
   { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
@@ -178,7 +182,7 @@ export function hitsWall(p: Vec): boolean {
   return false;
 }
 
-const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: s.kind ?? 'bow-in' as const })));
+const ALL_SLIPS: Slip[] = SOURCES.flatMap(({ id, data }) => data.slips.map(s => ({ id: `${id}:${s.id}`, label: /^\d+$/.test(s.id) ? `Slip ${s.id}` : s.id, dock: s.dock, marina: id, p: LL(s.at[0], s.at[1]), heading: s.heading, finger: s.finger, kind: s.kind ?? 'bow-in' as const })));
 
 /** The slips a Folkboat fits in: her length (7.6 m) along it and her beam (2.2 m) across it, clear of every dock. */
 export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
@@ -205,7 +209,7 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
     for (const side of [1, -1]) {
       const n = { x: u.y * side, y: -u.x * side }, c = { x: e.x - u.x * 4.6 + n.x * (WALKWAY_W / 2 + 1.1 + 0.3), y: e.y - u.y * 4.6 + n.y * (WALKWAY_W / 2 + 1.1 + 0.3) };
       const h = (Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360;
-      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
+      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 9) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
       let run = 0; while (run < 12 && hullClear({ x: c.x + u.x * (run + 2), y: c.y + u.y * (run + 2) }, h)) run += 2;
       if (run < 12) continue; // no open water ahead to leave by
       const k = (count.get(near.dock) ?? 0) + 1; count.set(near.dock, k);
@@ -217,11 +221,22 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
 SLIPS.push(...END_TIES);
 const BY_ID = new Map(SLIPS.map(s => [s.id, s]));
 /** A slip by its id (a bare label is one of West Harbor's: saves from before the other marinas). */
-export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(id.includes(':') ? id : `west-harbor:${id}`) ?? null;
+export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(currentSlipId(id)) ?? null;
+/**
+ * A slip's id as it is now: West Harbor's and Gashouse Cove's slips were the sim's lettered ones (A12) before they took the
+ * marina's own numbers (651), and a save from then follows its berth to its number (data/slip-renames.json, written by
+ * scripts/sf-marina-numbers.mjs); a bare label is one of West Harbor's.
+ */
+export function currentSlipId(id: string): string {
+  const full = id.includes(':') ? id : `west-harbor:${id}`;
+  return (slipRenames as Record<string, string>)[full] ?? full;
+}
+/** How a dock's named: 'dock E' (by its letter), or 'slips 651–685' (the SF Marina's docks go by their numbers). */
+export const dockName = (dock: string) => dock.includes('–') ? `slips ${dock}` : `dock ${dock}`;
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
-/** The marinas a boat can call home: those with berths (Richmond YC and Encinal YC have none yet: water and docks only). */
+/** The marinas a boat can call home: those with berths (Encinal YC and the Estuary's other harbors have none yet: water and docks only). */
 export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.filter(({ data }) => data.slips.length).map(({ id, name, short }) => ({ id, name, short }));
 export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
 /** Where a slip is, for people: "A12, West Harbor". */
@@ -340,7 +355,29 @@ const headUp = (h: number, windFrom: number | undefined) => windFrom != null && 
  * rounds up a few degrees more in the seconds it takes to gather way. The clear water ahead she's let go into has to be
  * there that much nearer the wind than she's pointed, not just dead ahead.
  */
-const WANDER = 8;
+const WANDER = 16; // (measured: let go 60° off a 14 kt westerly with the main alone she rounds up about 15° in the 17 s it takes to gather way; 8 let her bump the dock on main too, though the test caught it only after leeway)
+/**
+ * And she sags to leeward as she gathers way: slow, her keel holds her little (physics.ts leeway: about 6° of slip at
+ * 1.5 m/s with the main alone, 0.15 m/s sideways), so the water she's let go into has to be clear that much off the wind
+ * of where she's pointed too.
+ */
+const LEE_SAG = 8;
+/** How far she runs, let go with the main alone, before she has the way on to steer clear of anything (m: Marinas' case,
+ * West Harbor 125 in 14 kt, ran 13 m into the dock rounding up; she needs about 18). */
+const GATHER = 20; // (with a margin: the test holds her to 18)
+/**
+ * Is her path clear for `len` m from her middle at `c` on heading `h`, her heading turning by `turn` degrees over it
+ * (rounding up as she gathers way) and her track `crab` degrees off her heading (her leeway, sagging to leeward)?
+ */
+function pathClear(c: Vec, h: number, s: Slip, turn: number, crab: number, len = GATHER): boolean {
+  let p = { ...c };
+  for (let d = 2; d <= len; d += 2) {
+    const hd = h + turn * d / len, v = dirOf(hd + crab);
+    p = { x: p.x + v.x * 2, y: p.y + v.y * 2 };
+    if (!berthClear(p, hd, s)) return false;
+  }
+  return true;
+}
 /** How much clear fairway lies ahead of her middle at `c` on heading `h`, m (up to 14: enough to know there's the 12 m she needs). */
 function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
@@ -447,9 +484,10 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
           turn = sign * toWind;
           // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
           // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
-          // and she falls back; and with the room ahead to gather way, allowing for her rounding up a little, WANDER)
+          // and she falls back; and with the room ahead to gather way (GATHER), along her path as she rounds up (WANDER) and as
+          // she sags to leeward (LEE_SAG))
           const c0 = about(at(back), s.heading, BOW, turn);
-          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && runAhead(e.c, e.h - Math.sign(o) * WANDER, s) >= 8; });
+          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(o) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(o) * LEE_SAG); });
           if (!offs.length) continue;
           const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
           hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
@@ -492,7 +530,7 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
  * Cove's docks, by the seawall and the shore; two by Horseshoe Bay's L dock): with no engine there's no getting out. Kept
  * up to date by tests/pushoff-all.test.ts.
  */
-export const NO_WAY_OUT = ['gashouse-cove:D1', 'gashouse-cove:E1', 'gashouse-cove:F1', 'gashouse-cove:F2', 'gashouse-cove:G1', 'horseshoe-bay:B1', 'horseshoe-bay:B2'];
+export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-cove:82', 'gashouse-cove:2', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();

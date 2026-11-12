@@ -11,6 +11,7 @@
  * Output: src/geo/data/west-harbor.json
  */
 import { writeFile } from 'node:fs/promises';
+import { SOURCE_NOTE, sfNumbers, writeRenames } from './sf-marina-numbers.mjs';
 
 const BBOX = [-122.4500, 37.8040, -122.4370, 37.8110]; // W S E N
 const res = await fetch(`https://api.openstreetmap.org/api/0.6/map?bbox=${BBOX.join(',')}`, { headers: { 'User-Agent': 'folkboat-racing-sim (personal project)' } });
@@ -72,11 +73,13 @@ walkways.forEach((w, k) => {
   slips.filter(s => s.dock === k).sort((s, t) => (s.c.x - a.x) * d.x + (s.c.y - a.y) * d.y - ((t.c.x - a.x) * d.x + (t.c.y - a.y) * d.y))
     .forEach((s, i) => out.push({ id: `${letters[k]}${i + 1}`, dock: letters[k], at: toLL(s.c), heading: Math.round(s.heading), finger: s.len }));
 });
+// the marina's own numbers (scripts/sf-marina-numbers.mjs), in place of the letters above; old ids recorded for saves
+const numbered = sfNumbers('west-harbor', out); await writeRenames('west-harbor', numbered.renames);
 const beacon = [...nodes.values()].find(n => n.tags['seamark:type'] === 'beacon_lateral');
 await writeFile(new URL('../src/geo/data/west-harbor.json', import.meta.url), JSON.stringify({
-  source: 'OpenStreetMap contributors (ODbL), via api.openstreetmap.org; slips worked out from the fingers (3.0 m wide); dock letters and slip numbers are this sim\'s, not the harbor\'s.',
+  source: 'OpenStreetMap contributors (ODbL), via api.openstreetmap.org; slips worked out from the fingers (3.0 m wide)' + SOURCE_NOTE,
   fetched: new Date().toISOString().slice(0, 10),
   basin, breakwaters, walkways: walkways.map(w => w.pts), fingers: fingers.map(f => f.pts), areas: areas.map(a => a.pts),
-  beacon: beacon ? [beacon.lat, beacon.lon] : null, slips: out
+  beacon: beacon ? [beacon.lat, beacon.lon] : null, slips: numbered.slips
 }) + '\n');
 console.log(`basin ${basin.length} pts, ${breakwaters.length} breakwaters, ${walkways.length} walkways (docks ${letters.slice(0, walkways.length)}), ${fingers.length} fingers, ${areas.length} pier areas, ${out.length} slips`);

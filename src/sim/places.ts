@@ -1,4 +1,4 @@
-import { LL } from '../geo/geo';
+import { LL, toLL } from '../geo/geo';
 import type { Vec } from '../core/math';
 import type { CourseMark, MarkShape } from '../courses/course';
 
@@ -42,12 +42,19 @@ export const PLACES: Place[] = [
   P('m-7', '7 · North Channel R "2"', 37.83332, -122.39644, { shape: 'lighted', look: 'R' }),
   P('m-8', '8 · North Channel R "4"', 37.84704, -122.39647, { shape: 'lighted', look: 'R' }),
 
-  // the East Bay and the north reach (November 2026). Spots: off the harbors and landmarks. Marks: the clubs' and the
-  // YRA's, at the positions in nkiesel's YRA-Marks list (github.com/nkiesel/YRA-Marks, from the official YRA mark list of
-  // 2024-12-23; the same source as the courses), checked against the Richmond YC's 2025 intraclub SIs (Race 2,
-  // Attachment A) where they appear there; the government buoys and lights at NOAA's ENC positions (src/geo/data/
-  // enc-chart.json), which agree with the list within 5 m. The clubs' inflatables are set near their positions (RYC:
-  // "or a temporary set within .25 nm").
+  // the East Bay and the north reach (November 2026). Spots: off the harbors and landmarks. Marks: the YRA's and the
+  // clubs', at the positions in nkiesel's YRA-Marks list (github.com/nkiesel/YRA-Marks, from the official YRA mark list of
+  // 2024-12-23; the same source as the courses). Checked: XOC and FOC against the YRA's own Central Bay list (yra.org,
+  // "CentralBay.pdf" of 6 May 2025: the same to the digit; it lists GOC as off station, so it's left out); BK, KG and the
+  // Richmond Harbor buoys against Richmond YC's 2025 intraclub SIs ("Description of Marks"), within 25 m. RYC A comes
+  // only from the YRA-Marks list ("former Olympic Circle A"): none of the club's 2025 documents has it. The Estuary's
+  // Oakland YC and Island YC balls come only from the YRA-Marks list too: the clubs publish no positions. Berkeley YC's
+  // Friday night and Chowder marks are on its 2026–27 course sheet (below, with its start mark); its Midwinters use the
+  // YRA's marks and temporary buoys near XOC, with no positions published; Encinal YC sails
+  // its Midwinters off YRA mark 10 (a temporary buoy, no published position) and its twilight series in the Estuary.
+  // The government buoys and lights are at NOAA's ENC positions (src/geo/data/enc-chart.json), within 5 m of the list
+  // (DOC, the Berkeley Marina channel's light 3, within 100 m of the YRA's 0.1′-rounded figure). The clubs' inflatables
+  // are set near their positions (RYC: "or a temporary set within .25 nm").
   P('berkeley', 'Off the Berkeley Marina', 37.8640, -122.3330),
   P('circle', 'The Berkeley Circle', 37.8700, -122.3600),
   P('emeryville', 'Off Emeryville', 37.8380, -122.3220),
@@ -56,6 +63,11 @@ export const PLACES: Place[] = [
   P('richmond', 'Off Point Richmond', 37.9050, -122.4120),
   P('redrock', 'Off Red Rock', 37.9260, -122.4380),
   P('brothers', 'Off the Brothers', 37.9590, -122.4300),
+  // Berkeley YC's starting mark for its Friday nights and Chowders, "approximately 1/4 mile outside the Berkeley
+  // breakwater" (BYC's 2026–27 Friday Night / Chowder courses, Attachment 1: 37°52.07′ N 122°19.56′ W, "for guidance
+  // only"). Its sheet also gives D (the Berkeley Marina light "3", the sim's DOC, within 6 m), and X and F about 220 m
+  // from the YRA's XOC and FOC: derived from D on a nominal circle, so the YRA's own positions are kept.
+  P('m-BYC', 'BYC · Berkeley YC start mark', 37.86783, -122.32600, { shape: 'column', look: 'Y' }),
   P('m-XOC', 'XOC · Berkeley Circle "Bobbi Tosse"', 37.873333, -122.358333, { shape: 'cylinder' }),
   P('m-FOC', 'FOC · Berkeley Circle', 37.865, -122.376667, { shape: 'cylinder' }),
   P('m-DOC', 'DOC · Berkeley Marina G "3"', 37.85767, -122.34943, { shape: 'beacon', look: 'G' }),
@@ -93,7 +105,22 @@ export const PLACES: Place[] = [
   P('m-IYC3', 'Island YC 3', 37.783585, -122.257527, { shape: 'sphere', look: 'O' })
 ];
 
-export const place = (id: string | undefined): Place | null => PLACES.find(p => p.id === id) ?? null;
+/**
+ * A place by its id: one of the PLACES, or a spot picked on the chart, 'at:<lat>,<lon>' (named by its latitude and
+ * longitude, as on a chart).
+ */
+export const place = (id: string | undefined): Place | null => {
+  const m = id ? /^at:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(id) : null;
+  if (m) { const lat = Number(m[1]), lon = Number(m[2]); return { id: id!, name: latLon(LL(lat, lon)), group: 'Spots', p: LL(lat, lon) }; }
+  return PLACES.find(p => p.id === id) ?? null;
+};
+/** A spot picked on the chart, as a place id (to about a metre). */
+export const spotId = (p: Vec): string => { const { lat, lon } = toLL(p); return `at:${lat.toFixed(5)},${lon.toFixed(5)}`; };
+/** A spot by its latitude and longitude, as on a chart (degrees and decimal minutes). */
+export function latLon(q: Vec): string {
+  const { lat, lon } = toLL(q), dm = (v: number) => `${Math.floor(Math.abs(v))}°${((Math.abs(v) % 1) * 60).toFixed(2)}′`;
+  return `${dm(lat)}N ${dm(lon)}W`;
+}
 
 /** A place as the thing you're sailing to: the dials (compass bearing, laylines, range) treat it like a mark. */
 export function destMark(pl: Place | null): CourseMark | null {

@@ -3,7 +3,7 @@ import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ens
 import { CLUBS, burgeeCanvas } from '../render/burgees';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
-import { harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
+import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 
 /**
@@ -133,7 +133,7 @@ export class Fleet {
         ${row('Yacht club', esc(clubName(b.club) || 'None'))}
         ${row('Skipper', skipperName(b))}
         ${row('Home marina', esc(marinaName(b.marina) || 'None'))}
-        ${row('Slip', slip ? `${slip.label} (dock ${slip.dock}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
+        ${row('Slip', slip ? `${slip.label.replace(/^Slip /, '')} (${dockName(slip.dock)}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
       </table></section>
       <section><h3>The boat</h3><table class="ftab">
         ${row('Hull', b.hull.material === 'wood' ? 'Wood' : 'Fiberglass')}

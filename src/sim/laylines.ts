@@ -15,7 +15,7 @@ export interface Laylines {
 
 /** The mark a boat should be thinking about: before her start, the first mark. */
 export function targetMark(w: World, b: Boat): CourseMark | null {
-  if (b.finished) return null;
+  if (b.finished || b.retired) return null;
   if (!b.started && !w.freeSail) return w.C.marks[0] ?? null;
   return w.nextMark(b);
 }

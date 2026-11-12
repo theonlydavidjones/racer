@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { segPt } from '../src/core/math';
-import { HARBORS, SLIPS, berthClear, WIND_SWINGS, harborAt, harborOf, hitsHarbor, inBasin, pushOffPlan, pushOffPoses, slipById, slipsIn } from '../src/geo/marina';
+import { HARBORS, SLIPS, dockName, berthClear, WIND_SWINGS, harborAt, harborOf, hitsHarbor, inBasin, pushOffPlan, pushOffPoses, slipById, slipsIn } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
 import { SeaField, fetchAt } from '../src/environment/sea';
 import type { Wind } from '../src/environment/wind';
@@ -8,6 +8,10 @@ import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT, fixSpec } from '../src/boat/spec';
+import sbData from '../src/geo/data/south-beach.json';
+import slipRenames from '../src/geo/data/slip-renames.json';
+// @ts-expect-error (a plain .mjs script, no types)
+import { SF_DOCKS } from '../scripts/sf-marina-numbers.mjs';
 import { DT, World, slipLeadTime } from '../src/sim/world';
 
 /** Open water off each harbor's entrance. */
@@ -152,7 +156,10 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     }
     expect(n).toBeGreaterThan(40); expect(held).toBeGreaterThan(10); // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead)
     // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
-    const slip = SLIPS.find(s => { const p = s.kind === 'bow-in' && s.marina === 'west-harbor' ? pushOffPlan(s, 270, 14) : null; return p?.kind === 'swing' && !!p.hold; })!;
+    // (West Harbor's 135: the first of its berths still held head to wind now the let-go needs 20 m of clear water along her
+    // path as she rounds up and sags (pushoff-letgo.test.ts); 677, old A7, is shoved off astern instead)
+    const slip = slipById('west-harbor:135')!, p0 = pushOffPlan(slip, 270, 14);
+    expect(slip.kind === 'bow-in' && p0.kind === 'swing' && !!p0.hold).toBe(true);
     expect(slip).toBeTruthy();
     const boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 14, windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
@@ -180,8 +187,8 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
-    expect(n).toBeGreaterThan(20);
-  }, 60000);
+    expect(n).toBeGreaterThan(8); // (was 20: since she must have 20 m clear along her path as she gathers way, main alone and hands off (pushoff-letgo.test.ts), many narrow berths shove her off astern instead)
+  }, 120000); // (every fourth berth of all the marinas': about 35 s alone, since Richmond YC's 214 joined)
   it('her flags and windex show the wind while she\'s made fast and while the crew has her', () => {
     const slip = slipsIn('west-harbor')[30], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
@@ -213,6 +220,49 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     expect(k.signed).toBeGreaterThan(2); expect(Math.sign(k.turned)).toBe(Math.sign(a.turned)); // (a key held, the same as the tiller)
     expect(Math.sign(a.turned)).toBe(-Math.sign(b.turned)); expect(Math.abs(a.turned)).toBeGreaterThan(3); // (let go, with way on, she turns as the tiller says)
   }, 120000);
+  it('South Beach: the harbor\'s own slip numbers (its map, sfport.com): from each dock\'s gate at the shore, odd on the north side, even on the south', () => {
+    const top: Record<string, number> = { A: 84, B: 92, C: 92, D: 104, E: 104, F: 108, G: 92 }; // (the map's highest on each dock)
+    const sb = slipsIn('south-beach');
+    for (const [dock, n] of Object.entries(top)) {
+      const mine = sb.filter(s => s.dock === dock && s.kind === 'bow-in'); // (the end ties, alongside the docks' ends, aren't numbered on the map)
+      // every number on the map, once, as mapped (a few she couldn't be got out of are dropped when the harbor's loaded)
+      const mapped = sbData.slips.filter(s => s.dock === dock).map(s => Number(s.id.slice(1))).sort((a, b) => a - b);
+      expect(mapped).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+      expect(mine.length).toBeGreaterThan(n - 4); expect(mine.every(s => Number(s.id.split(':')[1].slice(1)) <= n)).toBe(true);
+      for (const s of mine) { const k = Number(s.id.split(':')[1].slice(1)), bowSouth = Math.abs(((s.heading - 180 + 540) % 360) - 180) < 30; expect(bowSouth).toBe(k % 2 === 1); } // (odd: on the north side, bow in toward the dock to the south)
+      const at = (k: number) => sbData.slips.find(s => s.id === `${dock}${k}`)!.at, one = at(1), last = at(n - 1);
+      expect(one[1]).toBeLessThan(last[1]); // (1 at the gate, the west end)
+    }
+  });
+  it('the SF Marina: its own slip numbers, bare, within each dock\'s range on its maps (West Harbor odd, Gashouse Cove even); old saves follow their berth', () => {
+    for (const [h, odd] of [['west-harbor', true], ['gashouse-cove', false]] as const) {
+      const D = SF_DOCKS[h], mine = slipsIn(h).filter(s => s.kind === 'bow-in');
+      expect(mine.length).toBeGreaterThan(250);
+      const seen = new Set<string>();
+      for (const s of mine) {
+        const n = Number(s.id.split(':')[1]); expect(Number.isInteger(n)).toBe(true); expect(s.label).toBe(`Slip ${n}`);
+        expect(n % 2).toBe(odd ? 1 : 0); expect(seen.has(s.id)).toBe(false); seen.add(s.id);
+        const d = D.find((x: { name: string }) => x.name === s.dock)!; expect(d).toBeTruthy(); expect(n).toBeGreaterThanOrEqual(d.lo); expect(n).toBeLessThanOrEqual(d.hi);
+      }
+    }
+    // West Harbor's Docks E, F and G go by their letters; the rest by their numbers
+    expect(new Set(slipsIn('west-harbor').map(s => s.dock))).toEqual(new Set(SF_DOCKS['west-harbor'].map((d: { name: string }) => d.name)));
+    expect(dockName('E')).toBe('dock E'); expect(dockName('651–685')).toBe('slips 651–685');
+    // Dock F along Marina Boulevard, numbered from 505 at its east end; the west dock from 651 at its south end
+    const at = (id: string) => slipById(id)!.p;
+    expect(at('west-harbor:505').x).toBeGreaterThan(at('west-harbor:601').x); expect(at('west-harbor:651').y).toBeLessThan(at('west-harbor:671').y);
+    // a save from before: its lettered slip (bare, or with the marina) is the same berth, now numbered; dropped ones go next door
+    const renames = slipRenames as Record<string, string>;
+    expect(Object.keys(renames).length).toBeGreaterThan(600);
+    for (const [old, now] of Object.entries(renames)) {
+      if (old.includes(' end ')) continue; // (an end tie: its dock's new name, worked out at load)
+      expect(now).toMatch(/^(west-harbor|gashouse-cove):\d+$/);
+      if (slipById(now)) expect(slipById(old)?.id).toBe(now); // (unless she couldn't be got out of it: those are dropped at load)
+    }
+    expect(fixSpec({ ...DEFAULT_BOAT, slip: 'A20' })).toMatchObject({ marina: 'west-harbor', slip: 'west-harbor:651' });
+    expect(fixSpec({ ...DEFAULT_BOAT, slip: 'gashouse-cove:B10' }).slip).toMatch(/^gashouse-cove:\d+$/);
+    const g = slipById('gashouse-cove:B10')!; expect(g.dock).toBe('448–594');
+  });
   it('end ties: berths alongside the free ends of the docks, bow out, which push off forward', () => {
     const ends = SLIPS.filter(s => s.kind === 'alongside');
     expect(ends.length).toBeGreaterThan(10);
@@ -268,9 +318,9 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     }
   });
   it('older saves: a bare slip is one of West Harbor\'s, and her marina follows her slip', () => {
-    const wh = slipsIn('west-harbor')[0];
-    expect(slipById(wh.label)?.id).toBe(wh.id);
-    expect(fixSpec({ ...DEFAULT_BOAT, slip: wh.label, marina: undefined })).toMatchObject({ marina: 'west-harbor', slip: wh.id });
+    const wh = slipsIn('west-harbor')[0], bare = wh.id.split(':')[1]; // (e.g. 101: shown as "Slip 101")
+    expect(slipById(bare)?.id).toBe(wh.id);
+    expect(fixSpec({ ...DEFAULT_BOAT, slip: bare, marina: undefined })).toMatchObject({ marina: 'west-harbor', slip: wh.id });
     expect(fixSpec({ ...DEFAULT_BOAT, slip: 'south-beach:C12' })).toMatchObject({ marina: 'south-beach', slip: 'south-beach:C12' });
     expect(HARBORS.map(h => h.id)).toEqual(['west-harbor', 'gashouse-cove', 'south-beach', 'corinthian', 'horseshoe-bay', 'berkeley', 'richmond-yc', 'encinal', 'oakland-yc', 'marina-village', 'fortmann', 'grand-marina', 'alameda-marina']);
   });
