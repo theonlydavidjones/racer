@@ -126,25 +126,28 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
  * The companionway's doors (washboards) and sliding hatch (boat/spec.ts companionway, and the owner): when someone is
  * to stand there (crewPhys.ts standInHatch) and it's shut, they open it first, in two motions: the doors out and
  * stowed below, then the hatch slid forward over the cabin top. Each at their pace from the cockpit's forward end
- * (`doors`, `slide`: s for a club crew, estimates). It stays open until someone shuts it.
+ * (`doors`, `slide`: s for a club crew, estimates), the progress of each kept on the boat for the drawing (doorsT,
+ * hatchT). It stays open until someone shuts it.
  */
 export const HATCH = { doors: 6, slide: 2 };
 function crewHatch(b: Boat, dt: number): void {
   const c = b.crew; if (!c) return;
-  const cw = b.companionway ??= b.spec?.companionway === 'closed' ? { doors: 'in', hatch: 'closed' } : { doors: 'out', hatch: 'open' };
+  const cw = b.companionway ??= b.spec?.companionway === 'closed' ? { doors: 'in', hatch: 'closed', doorsT: 0, hatchT: 0 } : { doors: 'out', hatch: 'open', doorsT: 1, hatchT: 1 };
   const who = c.stander ?? null, a = who != null ? c.people[who] : null;
   const shut = cw.doors === 'in' || cw.hatch === 'closed';
-  // (no one wants it open, or it is: nobody at it)
-  if (!a || !shut) { for (const q of c.people) if (q.job?.line === 'doors' || q.job?.line === 'hatch') q.job = null; cw.t = undefined; return; }
+  // (no one wants it open, or it is: nobody at it; a motion left half done stays where it was)
+  if (!a || !shut) { for (const q of c.people) if (q.job?.line === 'doors' || q.job?.line === 'hatch') q.job = null; return; }
   const line = cw.doors === 'in' ? 'doors' : 'hatch';
   // (through a tack or a hard turn the sheets come first: they leave the doors for it, and come back to them after)
-  if ((b.tacking || Math.abs(b.yawRate ?? 0) > 6) && (a.job?.line === 'doors' || a.job?.line === 'hatch')) { a.job = null; cw.t = undefined; return; }
+  if ((b.tacking || Math.abs(b.yawRate ?? 0) > 6) && (a.job?.line === 'doors' || a.job?.line === 'hatch')) { a.job = null; return; }
   if (a.job && a.job.line !== line) return; // (busy with something else first)
   if (b.tacking || Math.abs(b.yawRate ?? 0) > 6) return;
-  if (a.job?.line !== line) { a.job = { line, reach: 0, work: 1, station: { arm: 0, z: Z.hatchWork, pose: 'companionway' } }; cw.t = (line === 'doors' ? HATCH.doors : HATCH.slide) / workPace(b, who!); }
+  if (a.job?.line !== line) a.job = { line, reach: 0, work: 1, station: { arm: 0, z: Z.hatchWork, pose: 'companionway' } };
   if (Math.abs(a.z - Z.hatchWork) > 0.3 || Math.abs(a.x) > 0.35) return; // (on their way there)
-  cw.t = (cw.t ?? 0) - dt;
-  if (cw.t <= 0) { if (line === 'doors') cw.doors = 'out'; else cw.hatch = 'open'; a.job = null; cw.t = undefined; }
+  // (each motion's progress, 0 … 1, for the drawing and the figure's hands to follow)
+  const rate = workPace(b, who!) * dt / (line === 'doors' ? HATCH.doors : HATCH.slide);
+  if (line === 'doors') { cw.doorsT = Math.min(1, cw.doorsT + rate); if (cw.doorsT >= 1) { cw.doors = 'out'; a.job = null; } }
+  else { cw.hatchT = Math.min(1, cw.hatchT + rate); if (cw.hatchT >= 1) { cw.hatch = 'open'; a.job = null; } }
 }
 
 /** Penalty turns count only in one direction, so each full turn includes a tack and a gybe (Rule 44.2). The direction
