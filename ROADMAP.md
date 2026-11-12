@@ -24,7 +24,9 @@ What's planned, roughly in order. Done work is described in the README.
 2. Finish the crew figures: the crew's stations onto the real benches. Owner chose option 2: the benches plus the side
    deck alongside them and aft of the thwart beside the after shelf (hips 1.35–2.5 m), where crews really sit; about
    today's fore-and-aft range, shifted aft; the trim calibration re-tied, physics review done. Crew Figures, one PR
-   (in progress).
+   (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
+   a 20 kt hiking tack (around z 2.55, x 0.6; on main too): fix the crossing path, then sample every 2 cm along each
+   bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h).
 3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
    on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
    needs the room". Three horizontal layers in the band, top to bottom:
@@ -39,6 +41,9 @@ What's planned, roughly in order. Done work is described in the README.
    before the build. 6–10 h; replaces the trim-panel review.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
+   leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
+   crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
