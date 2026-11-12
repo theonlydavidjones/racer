@@ -62,7 +62,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
   luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
-  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], flowView: ['6'],
+  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
   log: ['l'], pause: ['p'], keys: ['k'],
