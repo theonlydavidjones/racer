@@ -244,7 +244,6 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(mergeGeometries(seams.map(q => q.toNonIndexed()), false)!, BLACK));
     grp.add(new THREE.Mesh(mergeGeometries(hinges.map(q => q.toNonIndexed()), false)!, CHROME)); }
-  const strakes: THREE.BufferGeometry[] = [];
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
@@ -258,17 +257,14 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
     // starboard side at the dock)
     const sl = sheerLine(s, 0.03, 160), aft = sheerLine(s, HIKE_RAIL.inset, 160).filter(p => p.z >= HIKE_RAIL.z0 && p.z <= HIKE_RAIL.z1);
-    for (const part of [sl.filter(p => p.z <= HIKE_RAIL.z0 + 0.03), sl.filter(p => p.z >= HIKE_RAIL.z1 - 0.03)]) grp.add(new THREE.Mesh(rail(part, 0.035, 0.03), MAT.wood));
-    grp.add(new THREE.Mesh(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t), MAT.wood));
+    for (const part of [sl.filter(p => p.z <= HIKE_RAIL.z0 + 0.03), sl.filter(p => p.z >= HIKE_RAIL.z1 - 0.03)]) grp.add(new THREE.Mesh(rail(part, 0.035, 0.03), TEAK_WEATHERED));
+    grp.add(new THREE.Mesh(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t), TEAK_WEATHERED));
     const blocks: THREE.BufferGeometry[] = [];
     for (let z = HIKE_RAIL.z0 + 0.05; z < HIKE_RAIL.z1; z += 0.38) { const u = uAtZ(z), x = s * (halfBeam(u) - HIKE_RAIL.inset); blocks.push(new THREE.BoxGeometry(HIKE_RAIL.w * 0.75, HIKE_RAIL.gap + 0.004, 0.05).translate(x, sheer(u) + HIKE_RAIL.gap / 2, z)); }
-    grp.add(new THREE.Mesh(mergeGeometries(blocks), MAT.wood));
-    // and the rubbing strake just under the sheer, a half-round of the same wood standing proud of the topsides (CR 2.218:
-    // 13 × 26 to 14 × 28 mm, round the sheer)
-    // (ending just short of the stem and of the transom's corner, where the strake is cut off)
-    strakes.push(rail(sheerLine(s, -0.007, 200).slice(3, -2).map(p => p.setY(p.y - 0.045)), 0.027, 0.014).toNonIndexed());
+    grp.add(new THREE.Mesh(mergeGeometries(blocks), TEAK_WEATHERED));
+    // (no separate rubbing strake on the topsides: Josephine, a GRP boat, has only the one wooden rail capping the sheer
+    // (the owner's photos from the bow and the dock); the class's half-round strake, CR 2.218, is a wooden boat's)
   }
-  grp.add(new THREE.Mesh(mergeGeometries(strakes, false)!, MAT.wood));
   deckFittings(grp);
   // the raised lip across the after end of the cockpit, moulded in with the side coamings and turning into them round
   // its corners (at least 80 mm high at station 3, CR 3.22), so water on the after deck stays out of the cockpit
@@ -369,6 +365,8 @@ interface Lines {
 const CABIN_Z0 = -L / 2 + CABIN.u0 * L, CABIN_Z1 = -L / 2 + CABIN.u1 * L;
 /** The jib winch's height, base to the top of its drum's cap. */
 const WINCH_H = 0.123;
+/** Bare teak weathered silver-tan, as Josephine's toerail and hiking rail are (the owner's photos): not varnished. */
+const TEAK_WEATHERED = new THREE.MeshPhongMaterial({ color: 0xb8a284, specular: 0x222222, shininess: 8 });
 const HIKE_RAIL = { z0: CABIN_Z0 + 0.15, z1: CABIN_Z1 + 0.05, inset: 0.045, w: 0.08, t: 0.028, gap: 0.014 };
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
