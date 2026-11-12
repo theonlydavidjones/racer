@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { D2R, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
 import { P3 } from './coords';
@@ -10,17 +11,81 @@ import { P3 } from './coords';
  * - **Harbor porpoises** came back to the Bay around 2008 and feed in the tidal flow by the Golden Gate, along the
  *   Marin side (Lime Point, Horseshoe Bay, Yellow Bluff) and in Raccoon Strait: pairs and small groups. Shy: a few
  *   quick rolls showing a small dark triangular fin, then a dive of a minute or two. They keep away from boats.
- * - **Harbor seals:** a mottled head at the surface near the shores and Alcatraz, watching you; it sinks out of sight
- *   when you come close.
- * - **California sea lions:** the colony on the floats at Pier 39 (most in autumn and winter; fewest in early summer,
- *   when most have gone south to the Channel Islands to breed), and the odd one swimming, porpoising now and then.
+ * - **Harbor seals:** a mottled head at the surface near the shores and Alcatraz ("bottling": the head and a little
+ *   of the neck straight up, eyes just clear), watching you; it sinks out of sight, without a splash, when you come close.
+ * - **California sea lions:** the colony on the floats at Pier 39 (K-dock), most in spring and in autumn, fewest in
+ *   June and July when the males are away at the breeding rookeries in the Channel Islands; and a few swimming off the
+ *   Wharf, porpoising now and then (low leaps clear of the water).
  * - **Birds:** western gulls overhead and sitting on the water (they lift off as you sail up); lines of brown pelicans
  *   gliding just above the waves, plunging now and then (summer to late autumn, after they've bred in the south);
- *   double-crested cormorants flying fast and low.
+ *   double-crested cormorants flying fast and low, beating all the way.
+ *
+ * Sizes and colours: Wikipedia's species pages (California sea lion, Harbor seal, Harbour porpoise, Brown pelican,
+ * Western gull, Double-crested cormorant), November 2026; flight and diving manners from the field guides, as typical
+ * figures (wingbeat rates in particular are estimates). Each animal is one lofted body, its sections drawn along a
+ * curved spine so the head, neck and body run into one another, coloured by vertex; a bird's wings are four panels (arm
+ * and hand, each side) with their own upper and under colours.
  */
 
 const rng = (seed: number) => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-const lam = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+const C = (h: number) => new THREE.Color(h);
+const VC = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+/* ---------- shapes ---------- */
+
+/** A section of a lofted body: its centre on the spine (y up, z back), half-width w and half-height h. */
+interface Station { y: number; z: number; w: number; h: number; x?: number }
+/**
+ * A body lofted through its stations (head first): elliptical sections at right angles to the spine, which may bend
+ * up and down (a sea lion's neck, a cormorant's kinked neck), capped at both ends. `paint(i, a)`: the colour at
+ * station i, angle a round the section (0 = right side, π/2 = top).
+ */
+function loft(st: Station[], sides: number, paint: (i: number, a: number, s: Station) => THREE.Color): THREE.BufferGeometry {
+  const pos: number[] = [], col: number[] = [], idx: number[] = [];
+  const n = st.length;
+  for (let i = 0; i < n; i++) {
+    const a0 = st[Math.max(0, i - 1)], a1 = st[Math.min(n - 1, i + 1)], ty = a1.y - a0.y, tz = a1.z - a0.z, tl = Math.hypot(ty, tz) || 1;
+    const ny = tz / tl, nz = -ty / tl; // (the section's "up", at right angles to the spine in its own plane)
+    for (let k = 0; k < sides; k++) {
+      const a = (k / sides) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), S = st[i];
+      pos.push((S.x ?? 0) + S.w * c, S.y + ny * S.h * s, S.z + nz * S.h * s);
+      const k3 = paint(i, a, S); col.push(k3.r, k3.g, k3.b);
+    }
+  }
+  for (let i = 0; i < n - 1; i++) for (let k = 0; k < sides; k++) {
+    const a = i * sides + k, b = i * sides + (k + 1) % sides, c = a + sides, d = b + sides;
+    idx.push(a, c, b, b, c, d);
+  }
+  // the end caps, to a point a little beyond each end section
+  for (const [i, dir] of [[0, -1], [n - 1, 1]] as const) {
+    const S = st[i], O = st[i - dir] ?? S, ty = S.y - O.y, tz = S.z - O.z, tl = Math.hypot(ty, tz) || 1, e = Math.min(S.w, S.h) * 0.6;
+    const ci = pos.length / 3; pos.push(S.x ?? 0, S.y + ty / tl * e, S.z + tz / tl * e);
+    const k3 = paint(i, Math.PI / 2, S); col.push(k3.r, k3.g, k3.b);
+    for (let k = 0; k < sides; k++) { const a = i * sides + k, b = i * sides + (k + 1) % sides; if (dir < 0) idx.push(ci, b, a); else idx.push(ci, a, b); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+/** A flat shape (a flipper, a fin, a fluke) as a thin double-faced plate, its outline in (x, z) at height y, one colour. */
+function plate(outline: [number, number][], y: number, color: THREE.Color, t = 0.008): THREE.BufferGeometry {
+  const pos: number[] = [], col: number[] = [], idx: number[] = [], n = outline.length;
+  for (const dy of [t / 2, -t / 2]) for (const [x, z] of outline) { pos.push(x, y + dy, z); col.push(color.r, color.g, color.b); }
+  for (let k = 1; k < n - 1; k++) { idx.push(0, k + 1, k); idx.push(n, n + k, n + k + 1); } // (a fan: the outlines are convex enough)
+  for (let k = 0; k < n; k++) { const a = k, b = (k + 1) % n; idx.push(a, b, n + a, b, n + b, n + a); } // (the edge)
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+/** A small ball (an eye), coloured. */
+function ball(r: number, x: number, y: number, z: number, color: THREE.Color): THREE.BufferGeometry {
+  const g = new THREE.SphereGeometry(r, 6, 4); g.deleteAttribute('uv'); g.translate(x, y, z);
+  g.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: g.attributes.position.count }, () => [color.r, color.g, color.b]).flat(), 3));
+  return g;
+}
+const merge = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs, false)!;
 
 /* ---------- porpoises ---------- */
 
@@ -28,30 +93,32 @@ interface Porpoise { g: THREE.Group; home: Vec; p: Vec; h: number; t: number; ro
 const POD_ZONES: [number, number, number][] = [[37.8285, -122.4745, 350], [37.8320, -122.4640, 400], [37.8395, -122.4650, 350], [37.8655, -122.4420, 300], [37.8170, -122.4760, 300]];
 
 /**
- * A harbor porpoise: a small, stocky, torpedo-shaped body about 1.5 m long, dark grey above, with a low triangular fin
- * a little behind the middle of the back. Head toward −z. Only the back ever shows as it rolls through the surface.
+ * A harbor porpoise, 1.5 m: small and stocky, a blunt rounded head with no beak, greatest girth just ahead of the
+ * fin; the fin low and triangular (about 13 cm), a little behind the middle; small flippers; the tail stock flattened
+ * side to side before the flukes. Dark grey back, the flanks paler grey, the belly white, a dark stripe from the chin
+ * to the flipper. Head toward −z.
  */
 function porpoiseMesh(): THREE.Group {
-  const g = new THREE.Group(), dark = lam(0x2f343a);
-  // the body, turned on a lathe: blunt head, deepest a third of the way back, tapering to the tail stock
-  const prof: THREE.Vector2[] = [];
-  for (let i = 0; i <= 16; i++) {
-    const f = i / 16, y = 0.75 - 1.5 * f; // head (+0.75) → tail (−0.75)
-    const r = f < 0.08 ? 0.12 + 0.9 * f : f < 0.35 ? 0.19 + 0.06 * Math.sin((f - 0.08) / 0.27 * Math.PI / 2) : 0.25 * Math.pow(1 - (f - 0.35) / 0.65, 0.9) + 0.025;
-    prof.push(new THREE.Vector2(i === 0 ? 0.001 : r, y));
-  }
-  prof.push(new THREE.Vector2(0.001, -0.76));
-  const geo = new THREE.LatheGeometry(prof, 12); geo.rotateX(-Math.PI / 2); geo.scale(1, 0.85, 1); // a little flatter than round
-  // dark grey back, paler speckled grey flanks, white belly (Wikipedia, "Harbour porpoise")
-  const nrm = geo.attributes.normal, cols: number[] = [], back = new THREE.Color(0x2c3137), side = new THREE.Color(0x7d848a), belly = new THREE.Color(0xd9dbd8), c = new THREE.Color();
-  for (let i = 0; i < nrm.count; i++) { const ny = nrm.getY(i); c.copy(ny > 0.25 ? back : ny > -0.45 ? side.clone().lerp(back, Math.max(0, ny + 0.2) * 1.6) : belly); cols.push(c.r, c.g, c.b); }
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-  const body = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true })); g.add(body);
-  // the dorsal fin: low and triangular, just behind the middle
-  const fg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.17, -0.12), new THREE.Vector3(0, 0.33, 0.1), new THREE.Vector3(0, 0.17, 0.2)]);
-  fg.computeVertexNormals(); g.add(new THREE.Mesh(fg, new THREE.MeshLambertMaterial({ color: 0x262a2f, side: THREE.DoubleSide })));
-  // the flukes (they rarely show; the tail stock arches as it goes down)
-  const fl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.14), dark); fl.position.set(0, 0, 0.78); g.add(fl);
+  const back = C(0x3f444a), flank = C(0x8a9196), belly = C(0xe1e3e1), stripe = C(0x4a4f55);
+  const st: Station[] = [
+    { y: 0, z: -0.75, w: 0.04, h: 0.045 }, { y: 0.0, z: -0.70, w: 0.10, h: 0.10 }, { y: 0.01, z: -0.58, w: 0.17, h: 0.16 },
+    { y: 0.01, z: -0.38, w: 0.22, h: 0.20 }, { y: 0.01, z: -0.12, w: 0.235, h: 0.215 }, { y: 0.01, z: 0.14, w: 0.20, h: 0.18 },
+    { y: 0.02, z: 0.36, w: 0.12, h: 0.12 }, { y: 0.03, z: 0.54, w: 0.05, h: 0.075 }, { y: 0.03, z: 0.66, w: 0.03, h: 0.045 }
+  ];
+  const body = loft(st, 12, (i, a) => {
+    const up = Math.sin(a);
+    if (up > 0.35) return back;
+    if (up < -0.55) return belly;
+    if (i <= 2 && up < 0 && up > -0.5) return stripe; // (the chin-to-flipper stripe)
+    return flank.clone().lerp(back, Math.max(0, up) / 0.35 * 0.6);
+  });
+  // the fin: a low triangle standing on the back, swept back a little
+  const fg = new THREE.BufferGeometry(), fp = [0, 0.2, -0.16, 0, 0.36, 0.04, 0, 0.2, 0.16], fc = Array(9).fill(0).map((_, i) => [back.r, back.g, back.b][i % 3]);
+  fg.setAttribute('position', new THREE.Float32BufferAttribute([...fp, ...fp.map((v, i) => i % 3 === 0 ? v + 0.012 : v)], 3));
+  fg.setAttribute('color', new THREE.Float32BufferAttribute([...fc, ...fc], 3)); fg.setIndex([0, 1, 2, 3, 5, 4, 0, 3, 1, 1, 3, 4, 1, 4, 2, 2, 4, 5, 2, 5, 0, 0, 5, 3]); fg.translate(-0.006, 0, 0); fg.computeVertexNormals();
+  const flukes = plate([[0, 0.64], [0.24, 0.8], [0.2, 0.86], [0, 0.78], [-0.2, 0.86], [-0.24, 0.8]], 0.03, back, 0.012);
+  const flippers = [-1, 1].map(sx => { const g = plate([[0, -0.42], [sx * 0.2, -0.3], [sx * 0.2, -0.24], [0, -0.32]], -0.1, back, 0.012); g.rotateZ(sx * -0.5); return g; });
+  const g = new THREE.Group(); g.add(new THREE.Mesh(merge([body, fg, flukes, ...flippers]), VC));
   return g;
 }
 
@@ -61,37 +128,93 @@ interface Seal { g: THREE.Group; p: Vec; up: number; down: number; t: number }
 const SEAL_SPOTS: [number, number][] = [[37.8085, -122.4515], [37.8105, -122.4330], [37.8250, -122.4185], [37.8290, -122.4255], [37.8135, -122.3655], [37.8570, -122.4795], [37.8285, -122.4720]];
 
 /**
- * A harbor seal at the surface: a round head about 22 cm across with a short dog-like muzzle and no ear flaps, grey
- * mottled with dark spots, and the top of the neck. It floats upright ("bottling"), nose tipped up, watching you.
+ * A harbor seal at the surface, "bottling": the head and a little of the neck held up out of the water, the nose tipped
+ * up. A round head with no ear flaps, a short dog-like muzzle with V-set nostrils, big dark eyes; silver-grey or
+ * darker, densely spotted (some Bay seals are rusty). Faces −z.
  */
 function sealHead(r: () => number): THREE.Group {
+  const base = C([0x9a9a94, 0x7c7870, 0x8a8178, 0xa0643c][Math.floor(r() * 3.25)]), spot = C(0x3b3a37), pale = base.clone().lerp(C(0xd8d4cc), 0.35);
+  // the neck rising from the water to the head, the muzzle forward (−z)
+  const st: Station[] = [
+    { y: -0.32, z: 0.05, w: 0.15, h: 0.15 }, { y: -0.12, z: 0.03, w: 0.13, h: 0.13 }, { y: 0.03, z: 0.0, w: 0.115, h: 0.12 },
+    { y: 0.1, z: -0.06, w: 0.11, h: 0.1 }, { y: 0.11, z: -0.13, w: 0.08, h: 0.075 }, { y: 0.09, z: -0.19, w: 0.05, h: 0.045 }, { y: 0.075, z: -0.22, w: 0.03, h: 0.028 }
+  ];
+  const spots = Array.from({ length: 40 }, () => [r() * (st.length - 2), r() * Math.PI * 2] as [number, number]);
+  const g0 = loft(st, 14, (i, a) => {
+    if (i >= 6) return C(0x2e2a26); // (the dark nose at the muzzle's tip)
+    const near = spots.some(([si, sa]) => Math.abs(si - i) < 0.6 && Math.abs(((a - sa + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < 0.4);
+    return near ? spot : Math.sin(a) < -0.6 && i >= 2 ? pale : base;
+  });
+  const eyes = [-1, 1].map(sx => ball(0.013, sx * 0.072, 0.13, -0.115, C(0x0b0b0b)));
   const g = new THREE.Group(), tilt = new THREE.Group(); g.add(tilt); g.userData.tilt = tilt;
-  const geo = new THREE.SphereGeometry(0.11, 14, 10), cols: number[] = [], base = new THREE.Color([0x8a857c, 0x6f6a62, 0x9a958b][Math.floor(r() * 3)]), spot = new THREE.Color(0x3e3a35);
-  const p = geo.attributes.position, spots = Array.from({ length: 9 }, () => new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize());
-  for (let i = 0; i < p.count; i++) { const v = new THREE.Vector3(p.getX(i), p.getY(i), p.getZ(i)).normalize(); const d = Math.max(...spots.map(sp => sp.dot(v))); const c = base.clone().lerp(spot, d > 0.93 ? 0.75 : 0); cols.push(c.r, c.g, c.b); }
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-  const skin = new THREE.MeshLambertMaterial({ vertexColors: true });
-  const head = new THREE.Mesh(geo, skin); head.scale.set(1, 0.95, 1.1); tilt.add(head);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.25, 10), new THREE.MeshLambertMaterial({ color: base })); neck.position.y = -0.14; tilt.add(neck);
-  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), lam(0x5d5850)); snout.scale.set(1, 0.8, 1.2); snout.position.set(0, -0.02, -0.11); tilt.add(snout);
-  for (const sx of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 4), lam(0x0d0d0d)); eye.position.set(sx * 0.055, 0.035, -0.075); tilt.add(eye); }
+  tilt.add(new THREE.Mesh(merge([g0, ...eyes]), VC));
   return g;
 }
 
 /* ---------- sea lions ---------- */
 
-/** A sea lion hauled out: a long brown body, head up or down. */
-function seaLion(r: () => number): THREE.Group {
-  const g = new THREE.Group(), c = [0x5a4632, 0x6b5338, 0x4a3a2a, 0x7a6146][Math.floor(r() * 4)];
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), lam(c)); body.scale.set(0.9, 0.7, 2.6); body.position.y = 0.2; g.add(body);
-  const neck = new THREE.Group(); neck.position.set(0, 0.28, -0.62); g.add(neck);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), lam(c)); head.scale.set(1, 1, 1.4); head.position.set(0, 0.12, -0.08); neck.add(head);
-  g.userData.neck = neck; neck.rotation.x = r() < 0.4 ? -0.7 : 0.3;
-  return g;
+/**
+ * A California sea lion, about 2.1 m (a female; a bull 2.5 m and far bulkier): a dog-like head with a long pointed
+ * snout and small ear flaps, a long neck, the body carried on long foreflippers, the hind flippers turned forward
+ * under it on land. Lying (sprawled flat, the head down or resting) or sitting up (propped on the foreflippers, the
+ * neck craned and the nose up). Females and young tawny brown (dry: paler, almost silver), bulls dark brown to near
+ * black with a pale crest on the forehead. Vertex colours carry the pattern (flippers darker, crest paler); each
+ * animal's coat is its instance colour.
+ */
+function seaLionGeo(sitting: boolean, bull: boolean, swimming = false): THREE.BufferGeometry {
+  const k = bull ? 1.2 : 1, fat = bull ? 1.25 : 1, coat = C(0xffffff), flip = C(0x8a8a8a), crest = C(0xffffff).multiplyScalar(bull ? 2.4 : 1);
+  const st: Station[] = swimming ? [
+    // swimming at the surface: the head held up clear of the water, the back just awash, the hips and tail below
+    { y: 0.42, z: -0.86, w: 0.035, h: 0.035 }, { y: 0.43, z: -0.78, w: 0.07, h: 0.06 }, { y: 0.42, z: -0.68, w: 0.1, h: 0.1 },
+    { y: 0.3, z: -0.6, w: 0.11, h: 0.11 }, { y: 0.12, z: -0.5, w: 0.15, h: 0.14 }, { y: -0.02, z: -0.3, w: 0.22, h: 0.18 },
+    { y: -0.04, z: -0.02, w: 0.25, h: 0.2 }, { y: -0.1, z: 0.3, w: 0.22, h: 0.17 }, { y: -0.16, z: 0.6, w: 0.14, h: 0.11 },
+    { y: -0.21, z: 0.82, w: 0.08, h: 0.065 }, { y: -0.24, z: 0.94, w: 0.04, h: 0.035 }
+  ] : sitting ? [
+    // nose up, the neck nearly upright, the chest raised on the foreflippers, the hips on the float
+    { y: 1.0, z: -0.55, w: 0.035, h: 0.035 }, { y: 0.96, z: -0.46, w: 0.07, h: 0.06 }, { y: 0.92, z: -0.36, w: 0.1, h: 0.1 },
+    { y: 0.80, z: -0.30, w: 0.11, h: 0.11 }, { y: 0.62, z: -0.26, w: 0.15, h: 0.15 }, { y: 0.44, z: -0.18, w: 0.21, h: 0.2 },
+    { y: 0.3, z: 0.02, w: 0.25, h: 0.22 }, { y: 0.22, z: 0.32, w: 0.22, h: 0.18 }, { y: 0.17, z: 0.62, w: 0.15, h: 0.12 },
+    { y: 0.13, z: 0.86, w: 0.08, h: 0.07 }, { y: 0.11, z: 1.0, w: 0.04, h: 0.04 }
+  ] : [
+    // sprawled: the head forward and low, the body flat on the float
+    { y: 0.16, z: -1.1, w: 0.035, h: 0.035 }, { y: 0.18, z: -1.02, w: 0.07, h: 0.06 }, { y: 0.21, z: -0.92, w: 0.1, h: 0.1 },
+    { y: 0.21, z: -0.8, w: 0.11, h: 0.11 }, { y: 0.21, z: -0.62, w: 0.15, h: 0.14 }, { y: 0.21, z: -0.38, w: 0.22, h: 0.18 },
+    { y: 0.2, z: -0.08, w: 0.26, h: 0.2 }, { y: 0.18, z: 0.25, w: 0.23, h: 0.17 }, { y: 0.15, z: 0.55, w: 0.15, h: 0.11 },
+    { y: 0.12, z: 0.78, w: 0.08, h: 0.065 }, { y: 0.1, z: 0.9, w: 0.04, h: 0.035 }
+  ];
+  for (const s of st) { s.w *= k * (s.w > 0.12 ? fat : 1); s.h *= k * (s.h > 0.12 ? fat : 1); s.y *= k; s.z *= k; }
+  // (a bull's crest: the forehead swells, pale)
+  if (bull) { st[2].h *= 1.35; st[3].h *= 1.25; }
+  const body = loft(st, 12, (i, a) => (bull && (i === 2 || i === 3) && Math.sin(a) > 0.2 ? crest : i === 0 ? C(0x555555) : coat));
+  // (the eyes on the head between the snout and the crown; the small ear flaps just behind them)
+  const mid = (a: Station, b: Station, f: number) => ({ y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f });
+  const ey = mid(st[1], st[2], 0.6), ea = mid(st[2], st[3], 0.6);
+  const ears = [-1, 1].map(sx => ball(0.012 * k, sx * 0.08 * k, ea.y + 0.05 * k, ea.z, C(0xb0b0b0)));
+  const eyes = [-1, 1].map(sx => ball(0.012 * k, sx * 0.07 * k, ey.y + 0.03 * k, ey.z, C(0x181818)));
+  // the foreflippers: long paddles out from the chest, flat on the float (sitting: planted ahead, the body on them)
+  const chest = st[5];
+  const fore = [-1, 1].map(sx => {
+    // (a quarter of the body's length; swimming, laid back along the flanks)
+    const g = plate([[0, 0], [sx * 0.34, 0.14], [sx * 0.38, 0.24], [sx * 0.06, 0.14]].map(([x, z]) => [x * k, z * k] as [number, number]), 0.02, flip, 0.02);
+    g.rotateY(sx * (swimming ? -1.4 : sitting ? 0.4 : -0.55)); g.translate(sx * chest.w * (swimming ? 0.5 : 0.8), swimming ? chest.y - chest.h * 1.1 : 0, chest.z + (sitting ? -0.05 : 0.05)); // (swimming: laid back under the flanks)
+    return g;
+  });
+  // the hind flippers: two broad lobes at the tail, turned forward under the body
+  const tail = st[st.length - 1];
+  const hind = [-1, 1].map(sx => { const g = plate([[0, 0], [sx * 0.2, -0.05], [sx * 0.28, 0.18], [sx * 0.08, 0.12]].map(([x, z]) => [x * k, z * k] as [number, number]), 0.02, flip, 0.02); g.translate(sx * 0.04, 0, tail.z - 0.12 * k); return g; });
+  return merge([body, ...ears, ...eyes, ...fore, ...hind]);
 }
+/** The coats: females and young tawny brown, some dry and pale, some wet and dark; bulls dark brown. */
+const COATS = { cow: [0x8a6a4a, 0x9a7d5c, 0x6e5238, 0xa8977f, 0x4a3828], bull: [0x3a2c22, 0x2b211b, 0x45352a] };
 const PIER39 = LL(37.80945, -122.41145); // the floats on the west side of Pier 39 (K-dock)
-/** How many sea lions are on the Pier 39 floats, by month: most from autumn to spring, fewest in June and July. */
-const PIER39_COUNT = [28, 26, 22, 18, 12, 6, 5, 9, 14, 20, 26, 30];
+/**
+ * How many sea lions are drawn on the Pier 39 floats, by month. The colony's own counts run to hundreds (900–1,000 in
+ * late April 2024; a record 1,701 in November 2009: press reports of Pier 39's figures, which publishes no monthly
+ * table): most from March to May and from August to November, fewest in June and July when the males are at the
+ * breeding rookeries. The shape is theirs; the numbers drawn are what the floats here hold.
+ */
+const PIER39_COUNT = [70, 75, 95, 110, 100, 35, 25, 60, 90, 105, 110, 85];
+const FLOATS = 12, PER_FLOAT = 10;
 
 /* ---------- birds ---------- */
 
@@ -103,65 +226,120 @@ interface Bird {
   dive: number; t: number; bank: number; glide: number; neck?: THREE.Object3D;
 }
 /**
- * Sizes, colours, cruising speed (m/s) and wingbeat (Hz). Western gull: wingspan 1.30–1.44 m (Wikipedia), white with a
- * slate-grey back and wings, black wingtips with white spots, yellow bill; beats about 3 Hz, glides and soars a lot,
- * 10–13 m/s. Brown pelican: wingspan 2.0–2.3 m (Wikipedia), grey-brown with dark flight feathers, the head white
- * (non-breeding, as most are on the Bay in summer and autumn) with a yellowish crown, held back on the shoulders in
- * flight; a few slow beats (about 2 Hz) then a long glide, in lines, low over the waves. Double-crested cormorant:
- * wingspan about 1.2 m, all black with an orange throat, neck stretched out, fast steady beats (about 4–5 Hz), low and
- * straight. (Wingbeat rates are typical figures for these birds, not measured here.)
+ * Sizes, colours, cruising speed (m/s) and wingbeat (Hz). Western gull: 55–68 cm long, wingspan 1.30–1.44 m; white
+ * with a dark slate-grey back and wings, black wingtips with small white spots, a white trailing edge, a big yellow
+ * bill with a red spot, pink legs; flaps easily (about 2.5 Hz), glides and soars a lot, 8–12 m/s. Brown pelican: 1.0–1.5
+ * m long, wingspan 2.0–2.3 m; grey-brown, the upper wing silvery, the flight feathers dark, the head and neck white
+ * (non-breeding, as most are on the Bay in late summer and autumn) with a yellowish crown; the head drawn back on the
+ * shoulders, the bill resting on the neck; three to five slow beats (about 1.7 Hz) then a long glide, in lines, just
+ * above the waves. Double-crested cormorant: 70–90 cm long, wingspan 1.14–1.23 m; black, an orange-yellow face and
+ * throat, a hooked bill tilted up, the neck stretched out with a slight crook; fast steady beats (about 4 Hz), low and
+ * straight. (Wikipedia's species pages for the sizes and colours; the wingbeats and speeds are typical figures.)
  */
 const BIRD = {
-  gull: { body: 0xf4f4f0, back: 0x8a939c, tip: 0x1d1f22, bill: 0xe8c33a, span: 1.37, len: 0.6, speed: 11, hz: 3 },
-  pelican: { body: 0x8d857a, back: 0x7b7266, tip: 0x2b2824, bill: 0xb89466, span: 2.15, len: 1.15, speed: 11, hz: 2 },
-  cormorant: { body: 0x1f2023, back: 0x2b2c2e, tip: 0x17181a, bill: 0x3a3530, span: 1.2, len: 0.8, speed: 15, hz: 4.5 }
+  gull: { speed: 10, hz: 2.5, span: 1.37 },
+  pelican: { speed: 11, hz: 1.7, span: 2.15 },
+  cormorant: { speed: 15, hz: 4, span: 1.2 }
 };
-function birdMesh(kind: BirdKind): { g: THREE.Group; wings: [Wing, Wing]; neck?: THREE.Object3D } {
-  const k = BIRD[kind], g = new THREE.Group(), L = k.len;
-  // the body: a spindle, deepest at the breast (head toward −z)
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 7), lam(k.body)); body.scale.set(L * 0.27, L * 0.25, L); g.add(body);
-  const back = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.4), lam(k.back)); back.scale.set(L * 0.26, L * 0.2, L * 0.85); back.position.y = 0.01; g.add(back);
-  // the tail: a short fan
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(L * 0.12, L * 0.32, 4), lam(kind === 'gull' ? k.body : k.back)); tail.rotation.x = -Math.PI / 2; tail.scale.set(1, 1, 0.25); // the fan at the back tail.position.z = L * 0.58; g.add(tail);
-  // the head and bill (a pelican's head rests back on its shoulders; a cormorant's neck reaches forward)
-  let neck: THREE.Object3D | undefined;
-  if (kind === 'pelican') {
-    const head = new THREE.Mesh(new THREE.SphereGeometry(L * 0.1, 8, 6), lam(0xf1ece0)); head.position.set(0, L * 0.16, -L * 0.36); g.add(head);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(L * 0.075, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), lam(0xe9d58a)); crown.position.set(0, L * 0.19, -L * 0.36); g.add(crown);
-    const bill = new THREE.Mesh(new THREE.ConeGeometry(L * 0.045, L * 0.5, 5), lam(k.bill)); bill.rotation.x = -Math.PI / 2 - 0.12; bill.position.set(0, L * 0.12, -L * 0.62); g.add(bill);
-    const pouch = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 4), lam(0x6f6252)); pouch.scale.set(L * 0.06, L * 0.06, L * 0.36); pouch.position.set(0, L * 0.07, -L * 0.56); g.add(pouch);
-  } else {
-    neck = new THREE.Group(); neck.position.set(0, L * 0.05, -L * 0.42); g.add(neck);
-    const nl = kind === 'cormorant' ? L * 0.34 : L * 0.12;
-    const nk = new THREE.Mesh(new THREE.CylinderGeometry(L * 0.06, L * 0.09, nl, 6), lam(k.body)); nk.rotation.x = Math.PI / 2; nk.position.z = -nl / 2; neck.add(nk);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(L * (kind === 'gull' ? 0.12 : 0.08), 8, 6), lam(k.body)); head.scale.z = 1.25; head.position.set(0, L * 0.02, -nl); neck.add(head);
-    const bill = new THREE.Mesh(new THREE.ConeGeometry(L * 0.025, L * (kind === 'gull' ? 0.15 : 0.13), 4), lam(k.bill)); bill.rotation.x = -Math.PI / 2; bill.position.set(0, L * 0.01, -nl - L * 0.16); neck.add(bill);
-    if (kind === 'cormorant') { const thr = new THREE.Mesh(new THREE.SphereGeometry(L * 0.04, 6, 4), lam(0xd9822b)); thr.position.set(0, -L * 0.03, -nl - L * 0.05); neck.add(thr); }
+/** One wing panel, arm or hand: a grid along the span, cambered over the chord, with its own upper and under colours. */
+function wingPanel(sx: number, len: number, le: (u: number) => number, te: (u: number) => number, top: (u: number, v: number) => THREE.Color, under: (u: number, v: number) => THREE.Color, camber: number): THREE.BufferGeometry {
+  const N = 6, M = 4, pos: number[] = [], col: number[] = [], idx: number[] = [];
+  for (const [face, f] of [[0, top], [1, under]] as const) for (let i = 0; i <= N; i++) for (let j = 0; j <= M; j++) {
+    const u = i / N, v = j / M, z = le(u) + (te(u) - le(u)) * v, c = te(u) - le(u);
+    pos.push(sx * u * len, camber * c * 4 * v * (1 - v) + (face ? -0.003 : 0.003), z);
+    const k = f(u, v); col.push(k.r, k.g, k.b);
   }
-  // the wings: arm and hand, each a flat panel; the hand is narrower and pointed, the gull's tip black with a spot
-  const half = k.span / 2 - L * 0.12, armL = half * 0.45, handL = half * 0.55, chord = k.span * (kind === 'pelican' ? 0.17 : 0.14);
-  const panel = (len: number, c0: number, c1: number, color: number, sweep: number) => {
-    const sh = new THREE.Shape(); sh.moveTo(0, -c0 * 0.35); sh.lineTo(len, -c1 * 0.35 + sweep); sh.lineTo(len, c1 * 0.65 + sweep); sh.lineTo(0, c0 * 0.65); sh.closePath();
-    const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })); m.rotation.x = Math.PI / 2; return m;
-  };
+  const W = M + 1, F = (N + 1) * W;
+  for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
+    const a = i * W + j, b = a + W, c = a + 1, d = b + 1;
+    // (top faces up, under faces down, whichever side the wing is on)
+    if (sx > 0) { idx.push(a, c, b, b, c, d); idx.push(F + a, F + b, F + c, F + b, F + d, F + c); }
+    else { idx.push(a, b, c, b, d, c); idx.push(F + a, F + c, F + b, F + b, F + c, F + d); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+function birdMesh(kind: BirdKind): { g: THREE.Group; wings: [Wing, Wing]; neck?: THREE.Object3D } {
+  const g = new THREE.Group(), parts: THREE.BufferGeometry[] = [];
+  let neck: THREE.Object3D | undefined, shoulder = { x: 0.06, y: 0.03, z: -0.06 }, arm = 0.26, hand = 0.34;
+  let wingTop: (u: number, v: number, isHand: boolean) => THREE.Color, wingUnder: (u: number, v: number, isHand: boolean) => THREE.Color;
+  let armLe = (_u: number) => -0.07, armTe = (u: number) => 0.13 - 0.02 * u, handLe = (u: number) => -0.07 + 0.08 * u * u, handTe = (u: number) => 0.11 - 0.12 * u;
+  if (kind === 'gull') {
+    const white = C(0xf5f5f2), mantle = C(0x5b6670), bill = C(0xe9c23a), red = C(0xc8352a), black = C(0x16171a);
+    const st: Station[] = [
+      { y: 0.035, z: -0.345, w: 0.006, h: 0.008 }, { y: 0.035, z: -0.32, w: 0.011, h: 0.014 }, { y: 0.038, z: -0.295, w: 0.015, h: 0.02 },
+      { y: 0.045, z: -0.27, w: 0.034, h: 0.036 }, { y: 0.047, z: -0.235, w: 0.045, h: 0.044 }, { y: 0.035, z: -0.2, w: 0.042, h: 0.042 },
+      { y: 0.012, z: -0.155, w: 0.05, h: 0.052 }, { y: 0.0, z: -0.09, w: 0.07, h: 0.068 }, { y: 0.0, z: -0.01, w: 0.075, h: 0.07 },
+      { y: 0.006, z: 0.07, w: 0.062, h: 0.056 }, { y: 0.014, z: 0.14, w: 0.042, h: 0.035 }, { y: 0.018, z: 0.2, w: 0.05, h: 0.012 }, { y: 0.018, z: 0.25, w: 0.055, h: 0.007 }
+    ];
+    parts.push(loft(st, 10, (i, a) => i <= 2 ? (i === 1 && Math.sin(a) < -0.3 ? red : bill) : Math.sin(a) > 0.4 && i >= 6 && i <= 10 ? mantle : white));
+    parts.push(...[-1, 1].map(sx => ball(0.008, sx * 0.03, 0.06, -0.255, C(0x111111))));
+    wingTop = (u, v, h) => h && u > 0.52 ? (u > 0.9 && v > 0.25 && v < 0.6 ? white : black) : v > 0.82 ? white : mantle;
+    wingUnder = (u, v, h) => h && u > 0.62 ? black : v > 0.7 ? C(0xd8dcdf) : white;
+  } else if (kind === 'pelican') {
+    const body = C(0x6d6657), silver = C(0x9a948a), white = C(0xf2eee6), crown = C(0xe8d48a), billC = C(0xb8986e), pouch = C(0x5c5444), dark = C(0x2a2622);
+    shoulder = { x: 0.12, y: 0.06, z: -0.12 }; arm = 0.42; hand = 0.52;
+    armLe = u => -0.1 + 0.01 * u; armTe = u => 0.24 - 0.02 * u; handLe = u => -0.09 + 0.03 * u * u; handTe = u => 0.22 - 0.1 * u * u; // (broad, blunt tips: the pelican's fingered primaries)
+    // the body; the neck drawn back in an S, the head resting on the shoulders
+    const st: Station[] = [
+      { y: 0.14, z: -0.46, w: 0.03, h: 0.035 }, { y: 0.16, z: -0.42, w: 0.055, h: 0.06 }, { y: 0.16, z: -0.36, w: 0.06, h: 0.065 },
+      { y: 0.12, z: -0.32, w: 0.08, h: 0.08 }, { y: 0.06, z: -0.27, w: 0.12, h: 0.11 }, { y: 0.0, z: -0.15, w: 0.165, h: 0.15 },
+      { y: 0.0, z: 0.05, w: 0.175, h: 0.15 }, { y: 0.02, z: 0.24, w: 0.125, h: 0.1 }, { y: 0.04, z: 0.38, w: 0.075, h: 0.05 },
+      { y: 0.05, z: 0.47, w: 0.08, h: 0.016 }, { y: 0.05, z: 0.53, w: 0.07, h: 0.01 }
+    ];
+    parts.push(loft(st, 12, (i, a) => i <= 2 ? (Math.sin(a) > 0.5 && i >= 1 ? crown : white) : i === 3 ? white : i >= 8 ? dark : Math.sin(a) > 0.35 ? silver : body));
+    // the long bill lying forward along the neck, the pouch slung under it
+    const bl: Station[] = [{ y: 0.15, z: -0.45, w: 0.03, h: 0.016 }, { y: 0.13, z: -0.6, w: 0.026, h: 0.013 }, { y: 0.1, z: -0.74, w: 0.02, h: 0.01 }, { y: 0.085, z: -0.79, w: 0.012, h: 0.009 }];
+    parts.push(loft(bl, 6, () => billC));
+    const pc: Station[] = [{ y: 0.11, z: -0.44, w: 0.035, h: 0.035 }, { y: 0.09, z: -0.56, w: 0.03, h: 0.04 }, { y: 0.085, z: -0.68, w: 0.02, h: 0.02 }];
+    parts.push(loft(pc, 6, () => pouch));
+    parts.push(...[-1, 1].map(sx => ball(0.01, sx * 0.05, 0.18, -0.4, C(0x111111))));
+    wingTop = (u, v, h) => h ? (u > 0.25 || v > 0.55 ? dark : silver) : v > 0.62 ? dark : silver;
+    wingUnder = (_u, v, h) => h ? dark : v > 0.6 ? dark : body;
+  } else {
+    const black = C(0x1b1c1f), sheen = C(0x2c3034), face = C(0xe39a32), bill = C(0x3a3a36);
+    shoulder = { x: 0.06, y: 0.03, z: -0.1 }; arm = 0.22; hand = 0.3;
+    armLe = () => -0.06; armTe = () => 0.12; handLe = u => -0.06 + 0.04 * u * u; handTe = u => 0.12 - 0.1 * u * u;
+    // a slender body; the neck stretched out ahead with a slight crook, the bill tilted up; a long tail
+    const st: Station[] = [
+      { y: 0.07, z: -0.53, w: 0.006, h: 0.007 }, { y: 0.06, z: -0.5, w: 0.01, h: 0.012 }, { y: 0.05, z: -0.46, w: 0.022, h: 0.026 },
+      { y: 0.045, z: -0.42, w: 0.03, h: 0.03 }, { y: 0.03, z: -0.36, w: 0.025, h: 0.028 }, { y: 0.03, z: -0.28, w: 0.028, h: 0.03 },
+      { y: 0.02, z: -0.2, w: 0.04, h: 0.042 }, { y: 0.0, z: -0.12, w: 0.065, h: 0.06 }, { y: 0.0, z: 0.0, w: 0.07, h: 0.063 },
+      { y: 0.01, z: 0.12, w: 0.05, h: 0.042 }, { y: 0.02, z: 0.2, w: 0.04, h: 0.014 }, { y: 0.025, z: 0.32, w: 0.045, h: 0.008 }
+    ];
+    parts.push(loft(st, 10, (i, a) => i <= 1 ? bill : i === 2 && Math.sin(a) < 0.3 ? face : Math.sin(a) > 0.4 ? sheen : black));
+    parts.push(...[-1, 1].map(sx => ball(0.006, sx * 0.024, 0.06, -0.425, C(0x2a6a4a))));
+    wingTop = (_u, v) => v > 0.5 ? black : sheen;
+    wingUnder = () => black;
+  }
+  g.add(new THREE.Mesh(merge(parts), VC));
   const wings = [-1, 1].map(sx => {
-    const arm = new THREE.Group(); arm.position.set(sx * L * 0.1, L * 0.06, -L * 0.08); g.add(arm);
-    const am = panel(armL, chord, chord * 0.95, k.back, 0); am.scale.x = sx; arm.add(am);
-    const hand = new THREE.Group(); hand.position.x = sx * armL; arm.add(hand);
-    const hm = panel(handL, chord * 0.95, chord * 0.35, k.back, chord * 0.25); hm.scale.x = sx; hand.add(hm);
-    const tip = panel(handL * 0.4, chord * 0.62, chord * 0.33, k.tip, chord * 0.12); tip.scale.x = sx; tip.position.set(sx * handL * 0.6, 0.002, chord * 0.06); hand.add(tip);
-    if (kind === 'gull') { const spot = new THREE.Mesh(new THREE.CircleGeometry(chord * 0.08, 6), lam(0xffffff)); spot.rotation.x = -Math.PI / 2; spot.position.set(sx * handL * 0.9, 0.004, chord * 0.2); hand.add(spot); }
-    return { arm, hand };
+    const a = new THREE.Group(); a.position.set(sx * shoulder.x, shoulder.y, shoulder.z); g.add(a);
+    a.add(new THREE.Mesh(wingPanel(sx, arm, armLe, armTe, (u, v) => wingTop(u, v, false), (u, v) => wingUnder(u, v, false), 0.05), VC));
+    const h = new THREE.Group(); h.position.x = sx * arm; a.add(h);
+    h.add(new THREE.Mesh(wingPanel(sx, hand, handLe, handTe, (u, v) => wingTop(u, v, true), (u, v) => wingUnder(u, v, true), 0.04), VC));
+    return { arm: a, hand: h };
   }) as unknown as [Wing, Wing];
   return { g, wings, neck };
 }
+
+/* ---------- sea lions swimming ---------- */
+
+interface Swimmer { g: THREE.Group; home: Vec; p: Vec; h: number; t: number; leap: number }
+/** Where sea lions are often seen swimming: off the Wharf and Pier 39, along the Cityfront, off Alcatraz. */
+const SWIM_ZONES: [number, number][] = [[37.8115, -122.4140], [37.8105, -122.4200], [37.8145, -122.4060], [37.8235, -122.4210]];
 
 export class Wildlife {
   private root = new THREE.Group();
   private porpoises: Porpoise[] = [];
   private seals: Seal[] = [];
   private lions = new THREE.Group();
-  private lionBodies: THREE.Group[] = [];
+  /** The colony: each place on the floats (a posture, a coat, where), and the instanced bodies by kind. */
+  private spots: { kind: number; m: THREE.Matrix4; c: THREE.Color; up: boolean }[] = [];
+  private kinds: THREE.InstancedMesh[] = [];
+  private swimmers: Swimmer[] = [];
   private birds: Bird[] = [];
   private r = rng(2718);
   private month = 0;
@@ -179,24 +357,59 @@ export class Wildlife {
     });
     // a minute or so at the surface, then a dive of 3–7 minutes (typical harbor seal dives)
     for (const [la, lo] of SEAL_SPOTS) { const g = sealHead(r); g.visible = false; this.root.add(g); this.seals.push({ g, p: LL(la, lo), up: 40 + r() * 60, down: 180 + r() * 240, t: r() * 300 }); }
-    // the Pier 39 floats, and the sea lions on them
-    for (let i = 0; i < 4; i++) {
-      const f = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.35, 6.5), lam(0x6d6a62)); f.position.set(i * 4.2 - 6, 0.15, 0); this.lions.add(f);
-      for (let j = 0; j < 9; j++) { const s = seaLion(r); s.position.set(i * 4.2 - 6 + (r() - 0.5) * 2.6, 0.32, (r() - 0.5) * 5.6); s.rotation.y = r() * 6.28; this.lions.add(s); this.lionBodies.push(s); }
+    // the Pier 39 floats (K-dock: low, weathered timber floats in two rows), and the sea lions on them
+    const floats: THREE.BufferGeometry[] = [], fw = 3.2, fl = 6.2, wood = C(0x5e5a52);
+    for (let i = 0; i < FLOATS; i++) {
+      const fx = (i % 6) * (fw + 0.7) - 9, fz = Math.floor(i / 6) * (fl + 1.2) - 3.7, b = new THREE.BoxGeometry(fw, 0.3, fl); b.deleteAttribute('uv'); b.translate(fx, 0.12, fz);
+      const shade = wood.clone().multiplyScalar(0.85 + r() * 0.3);
+      b.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: b.attributes.position.count }, () => [shade.r, shade.g, shade.b]).flat(), 3));
+      floats.push(b);
+      // up to ten on each, lying every way, some sitting up, a few lying across others
+      for (let j = 0; j < PER_FLOAT; j++) {
+        const bull = r() < 0.55, sit = r() < 0.3, kind = (bull ? 2 : 0) + (sit ? 1 : 0), coat = C((bull ? COATS.bull : COATS.cow)[Math.floor(r() * (bull ? 3 : 5))]);
+        const x = fx + (r() - 0.5) * (fw - 0.8), z = fz + (r() - 0.5) * (fl - 1.6), y = 0.27 + (j >= 7 ? 0.22 : 0);
+        const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.28), new THREE.Vector3(1, 1, 1));
+        this.spots.push({ kind, m, c: coat, up: sit });
+      }
+    }
+    this.lions.add(new THREE.Mesh(merge(floats), VC));
+    for (let k = 0; k < 4; k++) {
+      const im = new THREE.InstancedMesh(seaLionGeo(k % 2 === 1, k >= 2), VC, FLOATS * PER_FLOAT); im.count = 0; im.frustumCulled = false;
+      this.lions.add(im); this.kinds.push(im);
     }
     this.lions.position.copy(P3(PIER39.x, PIER39.y, 0)); this.lions.rotation.y = 12 * D2R; this.root.add(this.lions);
+    // a few swimming off the Wharf
+    for (const [la, lo] of SWIM_ZONES) {
+      const g = new THREE.Group(); g.add(new THREE.Mesh(seaLionGeo(false, r() < 0.5, true), new THREE.MeshLambertMaterial({ vertexColors: true, color: COATS.cow[4] })));
+      g.visible = false; this.root.add(g); const home = LL(la, lo);
+      this.swimmers.push({ g, home, p: { ...home }, h: r() * 360, t: r() * 30, leap: -1 });
+    }
     // birds: gulls (some sitting on the water), a line of pelicans, a couple of cormorants
     const add = (kind: BirdKind, sit = false) => { const m = birdMesh(kind); this.root.add(m.g); this.birds.push({ kind, g: m.g, wings: m.wings, neck: m.neck, p: new THREE.Vector3(), v: new THREE.Vector3(), flap: r() * 6, sit, dive: 0, t: 0, bank: 0, glide: 0 }); };
     for (let i = 0; i < 5; i++) add('gull'); for (let i = 0; i < 4; i++) add('gull', true);
-    for (let i = 0; i < 5; i++) add('pelican'); for (let i = 0; i < 2; i++) add('cormorant');
+    for (let i = 0; i < 6; i++) add('pelican'); for (let i = 0; i < 2; i++) add('cormorant');
+    this.fillFloats(0);
+  }
+
+  /** Put `n` sea lions on the floats, the instanced bodies of each kind. */
+  private fillFloats(n: number): void {
+    const counts = [0, 0, 0, 0];
+    this.spots.forEach((s, i) => {
+      if (i >= n) return;
+      const im = this.kinds[s.kind], k = counts[s.kind]++;
+      im.setMatrixAt(k, s.m); im.setColorAt(k, s.c);
+    });
+    this.kinds.forEach((im, k) => { im.count = counts[k]; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; });
   }
 
   /** The month (1–12) sets the season: pelicans and sea lions come and go. */
   setMonth(month: number): void {
     if (month === this.month) return;
     this.month = month;
-    const n = PIER39_COUNT[(month - 1 + 12) % 12];
-    this.lionBodies.forEach((s, i) => { s.visible = i < n; });
+    // (the places are dealt round the floats, so a thinner colony is spread across them, not packed on the first)
+    const n = PIER39_COUNT[(month - 1 + 12) % 12], order = this.spots.map((_, i) => i).sort((a, b) => (a % PER_FLOAT) - (b % PER_FLOAT) || a - b);
+    this.spots = order.map(i => this.spots[i]);
+    this.fillFloats(n);
     // brown pelicans are on the Bay from about June to November, after nesting in the south; a few linger into winter
     this.pelicans = month >= 6 && month <= 11 || (month === 5 || month === 12) && this.r() < 0.4;
   }
@@ -223,8 +436,8 @@ export class Wildlife {
       a.g.visible = rolling;
       if (rolling) {
         // the roll: the body runs along an arc in the vertical plane, like a wheel turning over through the surface:
-        // the head breaks first, the back and fin turn over, the tail stock slips under
-        const ph = cyc / T, ang = (ph - 0.5) * 1.75, Rc = 1.15, depth = 1.15;
+        // the head breaks first, the back and fin turn over, the tail stock slips under; no leap, no splash
+        const ph = cyc / T, ang = (ph - 0.5) * 1.75, Rc = 1.15, depth = 1.2;
         const x = a.p.x + a.off.x * u.y + u.x * Rc * Math.sin(ang), y = a.p.y - a.off.x * u.x + u.y * Rc * Math.sin(ang);
         a.g.position.copy(P3(x, y, sea(x, y) - depth + Rc * Math.cos(ang)));
         a.g.rotation.set(0, -a.h * D2R, 0); a.g.rotateX(-ang); // nose up as it rises, down as it goes under
@@ -235,20 +448,44 @@ export class Wildlife {
     for (const s of this.seals) {
       s.t += dt; const cyc = s.t % (s.up + s.down);
       if (cyc < s.up && near(s.p, 25)) s.t += s.up - cyc; // into the dive
-      const up = (s.t % (s.up + s.down)) < s.up;
+      const ph = s.t % (s.up + s.down), up = ph < s.up + 3;
       s.g.visible = up;
       if (up) {
-        // bobbing with the waves, the nose tipped up, turning slowly to look about (toward the nearest boat, when one's about)
-        const bob = Math.sin(t * 1.3 + s.p.x) * 0.03; s.g.position.copy(P3(s.p.x, s.p.y, sea(s.p.x, s.p.y) + 0.06 + bob));
+        // rising and sinking slowly (no splash), bobbing with the waves, the nose tipped up, turning slowly to look
+        // about (toward the nearest boat, when one's about)
+        const sink = ph < 3 ? 1 - ph / 3 : ph > s.up ? (ph - s.up) / 3 : 0, bob = Math.sin(t * 1.3 + s.p.x) * 0.02;
+        s.g.position.copy(P3(s.p.x, s.p.y, sea(s.p.x, s.p.y) + 0.02 + bob - sink * 0.5));
         const b0 = boats.reduce((m, b) => (b.x - s.p.x) ** 2 + (b.y - s.p.y) ** 2 < (m.x - s.p.x) ** 2 + (m.y - s.p.y) ** 2 ? b : m, boats[0] ?? s.p);
         const look = (b0.x - s.p.x) ** 2 + (b0.y - s.p.y) ** 2 < 150 * 150 ? Math.atan2(b0.x - s.p.x, b0.y - s.p.y) : Math.sin(t * 0.15 + s.p.y) * 2;
         s.g.rotation.y += ((((-look - s.g.rotation.y) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI) * Math.min(1, dt * 0.5);
-        (s.g.userData.tilt as THREE.Group).rotation.x = 0.45 + Math.sin(t * 0.3 + s.p.x) * 0.15;
+        (s.g.userData.tilt as THREE.Group).rotation.x = 0.1 + Math.sin(t * 0.3 + s.p.x) * 0.1;
       }
     }
-    // sea lions on the floats: heads up and down now and then
-    for (const s of this.lionBodies) if (s.visible && r() < dt * 0.05) (s.userData.neck as THREE.Group).rotation.x = r() < 0.5 ? -0.7 : 0.3;
+    // sea lions on the floats: now and then one sits up or lies back down
+    if (r() < dt * 0.15 && this.spots.length) {
+      const s = this.spots[Math.floor(r() * this.spots.length)]; s.up = !s.up; s.kind = (s.kind & 2) + (s.up ? 1 : 0);
+      this.fillFloats(PIER39_COUNT[(this.month - 1 + 12) % 12]);
+    }
     this.lions.position.y = sea(PIER39.x, PIER39.y) * 0.4;
+    // sea lions swimming: cruising at the surface, the head and the top of the back showing, about 3 m/s; now and then
+    // a low leap clear of the water and back in (porpoising)
+    for (const s of this.swimmers) {
+      s.t += dt;
+      const u = { x: Math.sin(s.h * D2R), y: Math.cos(s.h * D2R) }, sp = s.leap >= 0 ? 4.5 : 2.2;
+      s.p.x += u.x * sp * dt; s.p.y += u.y * sp * dt;
+      if ((s.p.x - s.home.x) ** 2 + (s.p.y - s.home.y) ** 2 > 200 * 200) s.h = Math.atan2(s.home.x - s.p.x, s.home.y - s.p.y) / D2R;
+      else if (r() < dt * 0.1) s.h += (r() - 0.5) * 60;
+      if (s.leap < 0 && r() < dt * 0.06) s.leap = 0;
+      const water = this.isWater(s.p); s.g.visible = water && (s.leap >= 0 || (s.t % 40) < 25); // (and under for a spell)
+      if (!s.g.visible) continue;
+      let lift = -0.06, pitch = 0; // (cruising: only the head and the top of the back above the water)
+      if (s.leap >= 0) {
+        // a leap: 1.2 s, half a metre clear at the top, nose up going out, down going in
+        s.leap += dt; const f = s.leap / 1.2; lift = -0.06 + Math.sin(Math.PI * f) * 0.75; pitch = (0.5 - f) * 1.4;
+        if (f >= 1) s.leap = -1;
+      }
+      s.g.position.copy(P3(s.p.x, s.p.y, sea(s.p.x, s.p.y) + lift)); s.g.rotation.set(0, -s.h * D2R, 0); s.g.rotateX(pitch);
+    }
     // birds, around the boat you're watching
     const F = P3(focus.x, focus.y, 0), sea3 = (v: THREE.Vector3) => sea(v.x, -v.z);
     let pel = 0;
@@ -256,7 +493,8 @@ export class Wildlife {
     for (const b of this.birds) {
       const k = BIRD[b.kind], w0 = b.v.clone();
       if (b.kind === 'pelican') {
-        // a line of pelicans: in season, low over the waves (about a metre: ground effect) on a long straight pass
+        // a line of pelicans: in season, just above the waves (the wingtips a few tens of centimetres up: ground
+        // effect, which carries the long glides), following the swell, on a long straight pass
         b.g.visible = this.pelicans; if (!this.pelicans) continue;
         const i = pel++;
         if (i === 0) {
@@ -264,29 +502,30 @@ export class Wildlife {
             const a = r() * 6.28, d = 450; b.p.set(F.x + Math.cos(a) * d, 1.2, F.z + Math.sin(a) * d);
             const aim = new THREE.Vector3(F.x + (r() - 0.5) * 120, 0, F.z + (r() - 0.5) * 120); b.v.copy(aim.sub(b.p).setY(0).normalize().multiplyScalar(k.speed)); b.t = 90;
           }
-          b.t -= dt; b.p.addScaledVector(b.v, dt); b.p.y = sea3(b.p) + 1.1 + Math.sin(t * 0.5) * 0.25;
+          b.t -= dt; b.p.addScaledVector(b.v, dt); b.p.y = sea3(b.p) + 0.7 + Math.sin(t * 0.5) * 0.12;
         } else if (b.dive > 0) {
           // a plunge for a fish: up to 10–15 m, a twisting fall bill-first into the water, a few seconds sitting on the
           // surface swallowing, then a run back up to the line
           b.dive -= dt; const T = 9 - b.dive;
-          if (T < 2.5) { b.p.addScaledVector(b.v, dt * 0.6); b.p.y += (12 - b.p.y) * dt * 1.2; }
+          if (T < 2.5) { b.p.addScaledVector(b.v, dt * 0.6); b.p.y += (13 - b.p.y) * dt * 1.2; }
           else if (T < 3.6) { b.p.addScaledVector(b.v, dt * 0.3); b.p.y = Math.max(sea3(b.p) - 0.3, b.p.y - 16 * dt); }
-          else if (T < 7) { b.p.y = sea3(b.p) + 0.15; }
-          else { b.p.y += (sea3(b.p) + 1.1 - b.p.y) * dt * 2; b.p.addScaledVector(b.v, dt * 1.2); }
+          else if (T < 7) { b.p.y = sea3(b.p) + 0.12; }
+          else { b.p.y += (sea3(b.p) + 0.7 - b.p.y) * dt * 2; b.p.addScaledVector(b.v, dt * 1.2); }
           if (b.dive <= 0) b.t = -1; // rejoin
         } else {
           const back = lead.v.clone().normalize(), slot = lead.p.clone().addScaledVector(back, -3.4 * i).add(new THREE.Vector3(back.z, 0, -back.x).multiplyScalar(1.1 * i));
           // fly to its place in the line (a bird that has just been fishing catches up)
           const to = slot.sub(b.p).setY(0); b.v.copy(lead.v).addScaledVector(to, Math.min(1.5, b.t < 0 ? 0.6 : 2));
           if (to.length() < 2) b.t = 1;
-          b.p.addScaledVector(b.v, dt); b.p.y = sea3(b.p) + 1.1 + Math.sin(t * 0.7 + i) * 0.2;
+          b.p.addScaledVector(b.v, dt); b.p.y = sea3(b.p) + 0.7 + Math.sin(t * 0.7 + i) * 0.1;
           if (r() < dt * 0.008) b.dive = 9;
         }
-        // a few slow beats, then a long glide (followers take the rhythm from the leader, a beat behind each)
+        // three to five slow beats, then a long glide (followers take the rhythm from the leader, a beat behind each)
         const diving = b.dive > 0 && 9 - b.dive < 3.6 && 9 - b.dive > 2.5, sitting = b.dive > 0 && 9 - b.dive >= 3.6 && 9 - b.dive < 7;
-        b.glide = (t - i * 0.4) % 7; const beating = b.glide < 1.6 || (b.dive > 0 && !sitting && !diving);
+        b.glide = (t - i * 0.45) % 8; const beating = b.glide < 2.2 || (b.dive > 0 && !sitting && !diving);
         if (beating) b.flap += dt * k.hz * Math.PI * 2;
-        this.pose(b, w0, dt, sitting ? 'sit' : diving ? 'dive' : beating ? Math.sin(b.flap) * 0.5 : 0.02);
+        else b.flap = 0; // (gliding: the wings held level)
+        this.pose(b, w0, dt, sitting ? 'sit' : diving ? 'dive' : beating ? Math.sin(b.flap) * 0.45 : -0.03);
         continue;
       }
       if (b.sit) {
@@ -294,7 +533,7 @@ export class Wildlife {
         if (b.t <= 0 || b.p.distanceTo(F) > 450) { const a = r() * 6.28, d = 60 + r() * 220; b.p.set(F.x + Math.cos(a) * d, 0, F.z + Math.sin(a) * d); b.t = 1; b.v.set(Math.cos(a), 0, Math.sin(a)).multiplyScalar(0.01); }
         const wp = { x: b.p.x, y: -b.p.z };
         if (!this.isWater(wp)) { b.t = 0; b.g.visible = false; continue; }
-        b.g.visible = true; b.p.y = sea(wp.x, wp.y) + 0.05;
+        b.g.visible = true; b.p.y = sea(wp.x, wp.y) + 0.02;
         if (near(wp, 22)) { b.sit = false; b.v.set((r() - 0.5) * 8, 3, (r() - 0.5) * 8); b.t = 20; }
         this.pose(b, w0, dt, 'sit');
         continue;
@@ -318,10 +557,10 @@ export class Wildlife {
         // spells of flapping (a few seconds) between glides, more when climbing
         b.glide += dt; const flapping = (b.glide % 9) < 2.5 + Math.max(0, b.v.y) * 2;
         if (flapping) b.flap += dt * k.hz * Math.PI * 2;
-        wing = flapping ? Math.sin(b.flap) * 0.55 : 0.12 + 0.04 * Math.sin(t * 2 + b.p.z); // gliding: wings level, a slight lift
+        wing = flapping ? Math.sin(b.flap) * 0.6 : 0.1 + 0.04 * Math.sin(t * 2 + b.p.z); // gliding: the wings a little raised
       } else {
-        b.v.y = (sea3(b.p) + 1.6 - b.p.y) * 0.8;
-        b.flap += dt * k.hz * Math.PI * 2; wing = Math.sin(b.flap) * 0.6;
+        b.v.y = (sea3(b.p) + 1.4 - b.p.y) * 0.8;
+        b.flap += dt * k.hz * Math.PI * 2; wing = Math.sin(b.flap) * 0.55;
       }
       b.p.addScaledVector(b.v, dt);
       this.pose(b, w0, dt, wing);
@@ -346,18 +585,21 @@ export class Wildlife {
     const [L, R] = b.wings;
     if (wing === 'sit') { b.bank = 0; b.g.rotation.x = 0; b.g.rotation.z = 0; } // sitting level on the water
     if (wing === 'sit' || wing === 'dive') {
-      // folded: the arm back along the body, the hand tucked over it (in a plunge, swept right back)
-      for (const [w, sx] of [[L, -1], [R, 1]] as const) { w.arm.rotation.set(0, -sx * 1.4, -sx * 0.12); w.hand.rotation.set(0, -sx * 0.15, 0); }
-      if (b.neck) b.neck.rotation.x = wing === 'sit' ? 0.5 : 0;
+      // folded: the arm back along the body, the hand tucked under it alongside (in a plunge, swept right back)
+      // (a turn of + about y swings a right wing forward: back is −)
+      // (the hand folded back over the arm, so the wing lies along the body: the tips at the tail, not beyond it)
+      for (const [w, sx] of [[L, -1], [R, 1]] as const) { w.arm.rotation.set(0, -sx * 1.48, -sx * 0.04); w.hand.rotation.set(0, sx * 2.95, 0); }
       return;
     }
-    // the beat: the arm swings through the angle, the hand follows a moment later (it lags, and flexes up on the
-    // upstroke), the wing sweeping back a little at the top
-    const lag = Math.sin(b.flap - 0.6) * 0.35 * Math.min(1, Math.abs(wing) * 3);
+    // the beat: the arm swings through the angle, the hand follows a moment later (it lags, and flexes on the upstroke,
+    // folding a little in toward the body), the wing sweeping back a little at the top
+    const lag = Math.sin(b.flap - 0.7) * 0.35 * Math.min(1, Math.abs(wing) * 3);
+    const up = Math.max(0, Math.sin(b.flap + 1.2)) * Math.min(1, Math.abs(wing) * 3); // (the upstroke: the hand partly folds)
     for (const [w, sx] of [[L, -1], [R, 1]] as const) {
-      w.arm.rotation.set(0, -sx * 0.08 * Math.max(0, wing), sx * wing); // (+ about z lifts the right wing)
-      w.hand.rotation.set(0, 0, sx * (lag + (b.kind === 'gull' ? -0.12 : 0))); // a gull's hand droops a little: the gull-wing bend
+      w.arm.rotation.set(0, sx * (0.06 * Math.max(0, wing) + 0.15 * up), sx * wing); // (+ about z lifts the right wing)
+      // a gull's hand droops in the glide (the gull-wing bend); a pelican's tips droop a little
+      const droop = b.kind === 'gull' ? -0.18 : b.kind === 'pelican' ? -0.06 : 0;
+      w.hand.rotation.set(0, sx * 0.35 * up, sx * (lag + droop));
     }
-    if (b.neck) b.neck.rotation.x = 0;
   }
 }
