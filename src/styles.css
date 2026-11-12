@@ -978,3 +978,4 @@ body.showroom #crewPop{visibility:hidden}
 .fi-more{color:var(--muted);font-size:11.5px;margin-top:3px}
 .fi-race{background:var(--row)!important}
 .fi-intro{color:var(--muted);font-size:11.5px;margin:0 0 4px}
+#sigFlags .sig-over{display:flex;flex-direction:column;gap:2px}

@@ -14,7 +14,7 @@ import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
 import { pennantCanvas, signalCanvas } from '../render/flags';
-import { FLAG_NAME } from '../sim/signals';
+import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
 import { transitOffset } from '../sim/transits';
 import { targetShape, type Shape } from '../boat/controls';
@@ -177,9 +177,13 @@ export class Hud {
       this.sigKey = key;
       if (!$('flagIndex').hidden) this.flagIndex(w); // (open: what's flying changes under you)
       const box = $('sigFlags'); box.innerHTML = '';
-      for (const f of w.flags) { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(signalCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; box.appendChild(c); }
+      const flagPic = (f: Flag) => { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(signalCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; return c; };
+      // a flag flown over A (AP over A, N over A) is one hoist, one above the other, as it's flown
+      const over = w.flags.includes('A') ? w.flags.filter(f => f !== 'A') : [];
+      if (over.length) { const col = document.createElement('span'); col.className = 'sig-over'; col.title = `${over.map(f => FLAG_NAME[f]).join(', ')} over A`; col.append(...over.map(flagPic), flagPic('A')); box.appendChild(col); }
+      else for (const f of w.flags) box.appendChild(flagPic(f));
       if (!w.flags.length) box.textContent = 'none';
-      if (w.courseSignal) { // the course number, in numeral pennants, top to bottom
+      if (w.courseSignal && !w.cancelled) { // (once racing's called off, there's no course to sail) // the course number, in numeral pennants, top to bottom
         const col = document.createElement('span'); col.className = 'pennants'; col.title = `Course ${w.courseSignal.no}`;
         for (const d of String(w.courseSignal.no)) { const c = document.createElement('canvas'); c.width = 56; c.height = 28; c.getContext('2d')!.drawImage(pennantCanvas(d), 0, 0, 56, 28); col.appendChild(c); }
         // (flags and pennants only on the tile, the owner: the index says what they mean)
