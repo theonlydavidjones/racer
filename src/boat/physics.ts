@@ -192,7 +192,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
   b.helm = clamp(bladeFlip ? -rudder : rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
-  b.turnRate = r0 + (rate - r0) * (1 - Math.exp(-dt / tau)); rate = b.turnRate;
+  // (penalty turns aren't the rudder's: the crew backs the sails to spin her, at their own rate, PENALTY_TURN_RATE)
+  b.turnRate = b.penalty > 0 && !b.isUser && !b.ai?.clearing ? rate : r0 + (rate - r0) * (1 - Math.exp(-dt / tau)); rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
   const dh = rate * dt;
   b.h = n360(b.h + dh); b.yawRate = rate;
