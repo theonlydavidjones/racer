@@ -216,4 +216,11 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     expect(Math.abs(shut.js[shut.js.length - 1] - open.js[open.js.length - 1])).toBeLessThan(0.03);
     sail(shut.b, 40); expect(shut.b.companionway).toEqual({ doors: 'out', hatch: 'open', doorsT: 1, hatchT: 1 }); // (and they open it afterwards)
   }, 30_000);
+  it('after "Made!" the cabin crew trims the jib to the pole before it draws (the owner\'s sequence)', () => {
+    const b = testBoat({ heading: 195, kt: 4, windKt: 10 }); b.crew = newCrew(crewOf(0.6), 'S'); b.poleWant = true;
+    let setAt = -1, drawsAt = -1;
+    sail(b, 60, t => { b.h = 195; if (setAt < 0 && b.pole === 'set') setAt = t; if (drawsAt < 0 && sailPlan(b) === 'wing') drawsAt = t; });
+    expect(setAt).toBeGreaterThan(0);
+    expect(drawsAt - setAt).toBeGreaterThan(POLE.trim * 0.8); expect(drawsAt - setAt).toBeLessThan(POLE.trim * 2);
+  }, 30_000);
 });

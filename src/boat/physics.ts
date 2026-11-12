@@ -39,9 +39,11 @@ export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c
  * foredeck, setting the pole and calling 'made' … 20 seconds would be about the absolute fastest". So an expert takes
  * 10 s to set it and 10 s to get forward, a club crew 13 and 13 (`forward`: out of the cockpit and up to the mast, on
  * top of their reaction time). Stowing it and gybing it end-for-end are scaled the same way from the sim's earlier
- * times (5 and 8 s against 8 to set): estimates.
+ * times (5 and 8 s against 8 to set): estimates. While it's set the jib is released for the setter to reach the clew
+ * (the owner's sequence), and after "Made!" the cabin crew trims the sheet to the pole (`trim`, s: an estimate) before
+ * the jib draws.
  */
-export const POLE = { set: 13, stow: 8, gybe: 13, forward: 13 };
+export const POLE = { set: 13, stow: 8, gybe: 13, forward: 13, trim: 3 };
 /** About how long (s) your crew will take to set the pole from where they are now, and to stow it. */
 export function poleEta(b: Boat): { set: number; stow: number } {
   const hands = b.crew ? workPace(b, ownerFor(b.crew, 'pole')) : 1;
@@ -50,7 +52,8 @@ export function poleEta(b: Boat): { set: number; stow: number } {
 
 /** How the jib is working right now, from the pole state. */
 export function sailPlan(b: Boat): SailPlan {
-  if (b.pole === 'set') return b.poleTack === b.tack ? 'wing' : 'main';
+  // (set and "made", the cabin crew trims the jib to the pole: it draws once that's done, poleTrimT)
+  if (b.pole === 'set') return b.poleTack === b.tack && !((b.poleTrimT ?? 0) > 0) ? 'wing' : 'main';
   if (b.pole === 'down') return 'jib';
   return 'main'; // crew busy with the pole: jib not drawing
 }
@@ -119,12 +122,17 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
       else { b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack; say('Gybing the pole end-for-end. The jib is down while it goes across.'); }
     }
   } else b.poleWalk = undefined;
+  if ((b.poleTrimT ?? 0) > 0) b.poleTrimT = b.pole === 'set' ? b.poleTrimT! - dt : 0;
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
     b.poleT -= dt;
     if (b.poleT <= 0) {
       // ("made": the forward hand's call once it's on, so the aft crew or the helm can trim the jib sheet to it)
-      if (b.pole === 'setting') { b.pole = 'set'; say('“Made!” Pole set: jib out to windward, wing-on-wing.'); }
+      // (then the cabin crew, or the helm with one crew, trims the jib sheet to it: the owner's sequence; POLE.trim)
+      if (b.pole === 'setting') {
+        b.pole = 'set'; say('“Made!” Pole set: jib out to windward, wing-on-wing.');
+        const c = b.crew; b.poleTrimT = POLE.trim / (c ? workPace(b, ownerFor(c, 'jibsheet')) : 1);
+      }
       else { b.pole = 'down'; say('Pole stowed: jib back to leeward.'); }
       bodyJob(b, 'pole', false);
     }
