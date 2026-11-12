@@ -30,7 +30,7 @@ const CASES = [
   for (const [name, setup] of [['tack', { windKt: 10 }], ['tackhike', { windKt: 20 }], ['gybe', { windKt: 12, twa: 160 }]]) {
     await p.evaluate(([s, nt]) => { lab.setup(s); lab.night(nt); lab.sail(25); lab.tack(); }, [setup, night]);
     for (let i = 0; i < 12; i++) {
-      await p.evaluate(() => { lab.frames(0.6); lab.cam(-15, 35, 4.4, [0, 0.6, 1.9]); });
+      await p.evaluate((fine) => { lab.frames(fine ? 0.2 : 0.6); lab.cam(-15, 35, 4.4, [0, 0.6, 1.9]); }, name === 'tackhike');
       await p.screenshot({ path: `${out}/${name}_${String(i).padStart(2, '0')}.png` });
     }
   }

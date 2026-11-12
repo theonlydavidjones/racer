@@ -57,7 +57,10 @@ describe('Where the weight goes, and what she does', () => {
     expect(novice.b.crew!.arm).toBeGreaterThan(good.b.crew!.arm + 0.15);
   });
   it('in a drifter, heeling her to leeward lets gravity hold the sails in shape: no slower than sitting up to windward', () => {
-    const lee = steady(3, beatAngle(3), { place: { across: 'lee', fore: null } }), up = steady(3, beatAngle(3), { place: { across: 'up', fore: null } });
+    // (an expert crew, so both set her up alike: a club crew's backstay steps a little differently between the two, which
+    // is worth more than the sails' shape here; physics review. Why sitting near upright does about as well as heeling her
+    // in a drifter is a question for the model on its own)
+    const lee = steady(3, beatAngle(3), { place: { across: 'lee', fore: null }, skill: 0.9 }), up = steady(3, beatAngle(3), { place: { across: 'up', fore: null }, skill: 0.9 });
     expect(lee.b.heelMag!).toBeGreaterThan(up.b.heelMag! + 3);
     expect(lee.v).toBeGreaterThan(up.v);
   });

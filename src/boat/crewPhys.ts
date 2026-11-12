@@ -194,10 +194,13 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, cockpitAft: 2.5, piano: 0.85, c
 export const EDGE = deckHalf(1.3);
 /** The deck's half-breadth where crew member `i` is now (within the cockpit's length: forward of it, as at the mast, the
  * cockpit's forward end). */
-const crewEdge = (c: CrewState, i: number) => deckHalf(clamp(c.people[i]?.z ?? 1.5, Z.cockpitFwd, Z.cockpitAft));
+export const crewEdgeAt = (z: number) => deckHalf(clamp(z, Z.cockpitFwd, Z.cockpitAft));
+const crewEdge = (c: CrewState, i: number) => crewEdgeAt(c.people[i]?.z ?? 1.5);
 /** Where the person moving a jib car kneels: on the side deck beside the cabin, reaching in to the track (58 cm out). */
 export const CAR_ARM = 0.8;
-/** The reference places (m) the polar is sailed from: the crew in the middle of the cockpit, the helm at the tiller. */
+/** The reference places (m) for the hull's trim: where the crew's weight trims her to her lines (trim 0), the helm at the
+ * tiller. Only differences from it count for speed (hullTrim.ts TRIM.reach is reckoned from it), so it isn't moved with
+ * the cockpit's stations: the crew can't all sit there now, but it's the hull's reference, not a seat. */
 const zRef = (i: number, n: number) => (i === 0 ? Z.helm : n === 1 ? 1.5 : i === 1 ? 1.2 : 1.8);
 
 /** Arms (m from the centreline, + to windward) for a person: sitting up on the side deck, hiking flat out (by the deck's
@@ -225,7 +228,7 @@ const ENDURE = (p: Person) => 300 + 210 * skillOf(p), RECOVER = 60;
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
-    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: zRef(i, n), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
+    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
   }));
   const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0 };
   summarise(c, w);
@@ -586,7 +589,7 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   // her stiffness (k.rmPerDeg) and its cost in speed (balance.ts heelFactor, hullTrim.ts heelWettedFactor). Sitting up
   // short of flat out it costs no speed, only more lean for the same moment: where the trim's all but even (upwind
   // in 8 to 10 kt the whole range is worth under 0.1%) they sit where the deck's wider rather than lean out harder for
-  // nothing (1% a metre of half-breadth, about 0.12% over the range: the crew's preference, an estimate).
+  // nothing (1% a metre of half-breadth, about 0.08% over the range: the crew's preference, an estimate).
   const cr = c.spec.crew, W = cr.reduce((a, p) => a + p.w, 0);
   const zOf = (j: number, x: number) => { const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (n - 1 - j) * Z.gap; return za + (zf - za) * x; };
   const out = cr.map((_, j) => c.people[j + 1] ? c.people[j + 1].x * w : 0), windwardOut = out.every((a, j) => a > sitArm(cr[j], deckHalf(c.people[j + 1]?.z ?? 1.5)) - 0.05);
@@ -669,12 +672,13 @@ export function bestFore(twa: number, tws: number, pole: boolean): number {
  * per person, helm first). The polar's crew: the ORC certificates the polar comes from declare 240–300 kg of crew; the
  * sim's standard three (DEFAULT_CREW, 230 kg) at a club crew's reach, fresh.
  */
-export function hikingMoment(s: CrewSpec, fatigue: number[] = []): number {
-  return 9.81 * (s.helm.w * helmArms(s.helm, fatigue[0] ?? 0).max + s.crew.reduce((a, p, i) => a + p.w * hikeArm(p, leanCap(p, fatigue[i + 1] ?? 0)), 0));
+export function hikingMoment(s: CrewSpec, fatigue: number[] = [], edges: number[] = []): number {
+  // (`edges`: the deck's half-breadth where each one is, crewEdgeAt: narrower aft. Without them, the reference place.)
+  return 9.81 * (s.helm.w * helmArms(s.helm, fatigue[0] ?? 0).max + s.crew.reduce((a, p, i) => a + p.w * hikeArm(p, leanCap(p, fatigue[i + 1] ?? 0), edges[i + 1] ?? EDGE), 0));
 }
 export const standardCrewMoment = () => hikingMoment(DEFAULT_CREW);
 /** The righting moment (N·m, upright) of a crew sitting out on the windward deck, not hiking: the least a crew that's
  * sitting up to windward gives her (placeCrew). */
-export function sittingMoment(s: CrewSpec): number {
-  return 9.81 * (s.helm.w * helmArms(s.helm).sit + s.crew.reduce((a, p) => a + p.w * sitArm(p), 0));
+export function sittingMoment(s: CrewSpec, edges: number[] = []): number {
+  return 9.81 * (s.helm.w * helmArms(s.helm).sit + s.crew.reduce((a, p, i) => a + p.w * sitArm(p, edges[i + 1] ?? EDGE), 0));
 }
