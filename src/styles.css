@@ -967,3 +967,7 @@ body.showroom #crewPop{visibility:hidden}
 #nextCard #transit{display:none}
 /* the flag index stops above the band (its tab row included), scrolling inside, so the band stays usable */
 #flagIndex{max-height:calc(100vh - 76px - 250px)}
+/* one line a message (the owner, 12 Nov 2026): the headline, the whole text in the log; ▸ when there's more */
+#msgRecent li{display:block!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+#msgRecent li:nth-child(n+3){display:none!important}
+#msgRecent li.cut::after{content:' ▸';color:var(--accent)}
