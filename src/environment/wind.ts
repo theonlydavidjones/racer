@@ -1,7 +1,7 @@
 import { KT, V, clamp, n360, type Vec } from '../core/math';
 import type { Rng } from '../core/rng';
 import { LL } from '../geo/geo';
-import { anyShoreDist } from '../geo/shore';
+import { anyShoreDist, anyShoreDistNear } from '../geo/shore';
 import { terrainLee } from './shadows';
 import clim from './data/sf-wind-climate.json';
 
@@ -126,9 +126,11 @@ export function landLee(p: Vec, from: number): number {
 /** How much the wind comes in through the Gate (the slot): all of a westerly, none of a northerly or southerly. */
 export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 255) * Math.PI / 180)) ** 2;
 
-export function windTerrain(p: Vec, from = 255): number {
+export function windTerrain(p: Vec, from = 255, lattice = false): number {
   const slot = slotWeight(p) * slotFlow(from);
-  const shore = 0.8 + 0.2 * clamp(anyShoreDist(p) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
+  // (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear, a few metres out at most, so
+  // under 0.05% of the wind here: for a boat's own wind every step, as for her current; the map keeps the exact one)
+  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
   return (1 + SLOT_BOOST * slot) * shore;
 }
 

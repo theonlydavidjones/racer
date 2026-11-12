@@ -160,6 +160,8 @@ export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'cho
 export const AI_EVERY = 3;
 /** Close quarters (m): four of her lengths (LOA 7.64 m), a length beyond the zone's three (RRS Definitions, Zone). */
 export const CLOSE_M = 4 * LOA;
+/** Within this (m), two lengths, another boat is close quarters whether closing or not. */
+export const CLOSE_IN = 2 * LOA;
 
 export class World {
   readonly C: Course;
@@ -533,7 +535,7 @@ export class World {
   windHere(p: Vec, self?: Boat, gusts = true): Wind {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
-    const f = this.fieldAt(p);
+    const f = this.fieldAt(p, !!self); // (a boat's own wind: the shore's distance off the lattice, as for her current)
     // (the shifts here against the course's centre: the boat to windward has the header first)
     const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
     // and the gusts, the turbulence of the seconds-to-a-minute, sized for the wind here (environment/gusts.ts)
@@ -595,7 +597,7 @@ export class World {
     return (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
   }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
-  fieldAt(p: Vec): { k: number; turn: number; extra: number } {
+  fieldAt(p: Vec, lattice = false): { k: number; turn: number; extra: number } {
     const g = this.field;
     if (!g) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
     const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
@@ -604,7 +606,7 @@ export class World {
     const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
     // the day's pattern (smooth over kilometres) from the grid; the shore and the slot exactly, here
     const extra = bl(g.extra);
-    return { k: windTerrain(p, this.wind.from) * extra, turn: bl(g.turn), extra };
+    return { k: windTerrain(p, this.wind.from, lattice) * extra, turn: bl(g.turn), extra }; // (`lattice`: for a boat's own wind, windHere)
   }
 
   /**
@@ -987,8 +989,14 @@ export class World {
   private closeQuarters(b: Boat): boolean {
     if (b.ai?.urgent || b.penalty > 0) return true;
     const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
-    for (const o of this.boats) if (o !== b && near(o)) return true;
-    for (const m of this.C.marks) if (near(m.p)) return true;
+    // another boat within two lengths; or within four and closing on her (two boats parting, or holding their distance
+    // side by side, need no quicker eye than ten times a second's: there's nothing about to happen between them)
+    for (const o of this.boats) {
+      if (o === b) continue;
+      const dx = o.x - b.x, dy = o.y - b.y, d2 = dx * dx + dy * dy;
+      if (d2 < CLOSE_IN * CLOSE_IN || d2 < r2 && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0) return true;
+    }
+    for (const m of this.C.marks) if (near(m.p)) return true; // (a mark: the rounding's timing is close work, coming or going)
     const cb = this.committeeHull; // (the committee boat by her whole hull, as avoidMarks steers round it)
     return near(this.C.pin) || (!!cb && (cb.q ? segPt(b, cb.p, cb.q) : dist(b, cb.p)) < CLOSE_M);
   }
