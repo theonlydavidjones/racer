@@ -399,9 +399,10 @@ export function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: TH
 /**
  * The cockpit, to the plan (COCKPIT_FIT): the sole; the side benches (their fronts, tops, ends, and the backs under the
  * side decks); in the footwell the hull's own inside up to the deck; the after shelf (its front and top) and above it the after
- * wall up to the deck. Surfaces only, all one varnished teak.
+ * wall up to the deck. Surfaces only: the sole, benches and shelf varnished teak (`teak`), the hull's inside and the
+ * after wall the smooth moulded lining (`lining`).
  */
-export function cockpitGeometry(): THREE.BufferGeometry[] {
+export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE.BufferGeometry[] } {
   const { u0, u1, sole } = COCKPIT, { seat, soleHalf, benchAft, shelfFwd } = COCKPIT_FIT, V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
   const strip = (pts: [THREE.Vector3, THREE.Vector3][]) => {
     const pos: number[] = [], idx: number[] = [];
@@ -411,18 +412,18 @@ export function cockpitGeometry(): THREE.BufferGeometry[] {
   };
   const span = (za: number, zb: number, n = 12) => Array.from({ length: n + 1 }, (_, i) => zU(za + (zb - za) * i / n));
   const sh = (u: number) => Math.min(soleHalf, hullInnerHalf(u, sole) - 0.03);
-  const zA = zAt(u1), z0 = zAt(u0), out: THREE.BufferGeometry[] = [];
+  const zA = zAt(u1), z0 = zAt(u0), out: THREE.BufferGeometry[] = [], lining: THREE.BufferGeometry[] = [];
   out.push(strip(span(z0, zA, 16).map(u => [V(-sh(u), sole, zAt(u)), V(sh(u), sole, zAt(u))]))); // the sole
   for (const s of [1, -1]) {
     const bench = span(z0, benchAft), well = span(benchAft, shelfFwd, 4), shelf = span(shelfFwd, zA, 6);
     out.push(strip(bench.map(u => [V(s * sh(u), sole, zAt(u)), V(s * sh(u), seat, zAt(u))]))); // the bench's front
     out.push(strip(bench.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // its top
-    for (const segs of [bench, shelf]) out.push(strip(segs.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
+    for (const segs of [bench, shelf]) lining.push(strip(segs.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
     // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
     const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
       for (let k = 0; k <= 5; k++) { const y = sole + (top - sole) * k / 5; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
       return pts; };
-    for (let k = 0; k < 6; k++) out.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
+    for (let k = 0; k < 6; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
     out.push(strip(shelf.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the shelf's top, outboard
     const ub = zU(benchAft); out.push(quad(V(s * sh(ub), sole, benchAft), V(s * benchOut(ub), sole, benchAft), V(s * benchOut(ub), seat, benchAft), V(s * sh(ub), seat, benchAft))); // the bench's end
   }
@@ -430,8 +431,8 @@ export function cockpitGeometry(): THREE.BufferGeometry[] {
   out.push(strip(span(shelfFwd, zA, 6).map(u => [V(-sh(u), seat, zAt(u)), V(sh(u), seat, zAt(u))]))); // the after shelf's top
   out.push(quad(V(-benchOut(us), sole, shelfFwd), V(benchOut(us), sole, shelfFwd), V(benchOut(us), seat, shelfFwd), V(-benchOut(us), seat, shelfFwd))); void wsh; // its front
   const w1 = benchOut(u1), ya = deckY(u1, 0);
-  out.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
-  return out;
+  lining.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
+  return { teak: out, lining };
 }
 
 /** The thwart: a beam across the cockpit between the coamings, its top flat and its underside curved (boat's frame). */
