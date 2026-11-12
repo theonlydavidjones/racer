@@ -504,10 +504,12 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
-  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); San Rafael Bay and San Leandro Bay have no measurement
-  inside them, so their current is the nearest stations' in sight, very likely too strong for such shallow water (USGS's
-  San Pablo Bay surveys, WRI 84-4339's speed-against-depth relation, and SFEI's San Leandro Bay model are the leads,
-  but pubs.usgs.gov and sfei.org aren't reachable here); BYC's and Encinal YC's own racing marks aren't published where we could
+  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: the stations' stream
+  carried to the chart's depth by USGS's speed-against-depth relation for San Pablo Bay, WRI 84-4339, easing in over the
+  first kilometre inside the San Quentin–San Pedro line: peak about 0.7 kt in the bay against 1.7 kt at its mouth); San
+  Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong
+  (SFEI's San Leandro Bay model is the lead, but sfei.org sits behind a browser check that a fetch can't pass; USGS's
+  South Bay relation gives a slope but no intercept to use); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

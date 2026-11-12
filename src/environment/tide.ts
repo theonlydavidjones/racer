@@ -1,6 +1,7 @@
 import { shoreRelief } from './current';
 import { KT, V, type Vec } from '../core/math';
-import { LL } from '../geo/geo';
+import { LAT0, LL, LON0 } from '../geo/geo';
+import depthGrid from './data/depth-grid.json';
 import { landBetween, onGround } from '../geo/shore';
 import { predict, type Constituents } from './harmonics';
 import raw from './data/sf-currents.json';
@@ -86,12 +87,34 @@ export function stationVector(s: TideStation, tMin: number): Vec {
   return { x: u.x * m, y: u.y * m };
 }
 
+/* ---------- the water's depth, and San Rafael Bay ---------- */
+
+const DG = depthGrid as { south: number; north: number; west: number; east: number; nx: number; ny: number; step: number; data: string };
+const DGRID = (() => { const s = atob(DG.data), g = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) g[i] = s.charCodeAt(i); return g; })();
+const D_MLAT = 111320, D_MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
+/** The water's depth below MLLW (m) at a point, from NOAA's chart on a 100 m grid (0 on land; deep off the map). */
+export function depthAt(p: Vec): number {
+  const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
+  const i = Math.floor((lon - DG.west) / (DG.east - DG.west) * DG.nx), j = Math.floor((DG.north - lat) / (DG.north - DG.south) * DG.ny);
+  if (i < 0 || j < 0 || i >= DG.nx || j >= DG.ny) return 30;
+  return DGRID[j * DG.nx + i] * DG.step;
+}
+/** San Rafael Bay: west of the line from Point San Quentin to Point San Pedro (its mouth on San Pablo Strait). */
+const SRB = [LL(37.9445, -122.4870), LL(37.9930, -122.4520), LL(38.0200, -122.5000), LL(37.9700, -122.5400)];
+/** How far into San Rafael Bay, 0 at its mouth to 1 a kilometre in: the easing grows in over that, not in a step at the line. */
+const srbInside = (p: Vec): number => {
+  const a = SRB[0], b = SRB[1], ex = b.x - a.x, ey = b.y - a.y, L = Math.hypot(ex, ey);
+  return Math.min(1, Math.abs((p.x - a.x) * ey - (p.y - a.y) * ex) / L / 1000);
+};
+const inSanRafaelBay = (p: Vec): boolean => { let c = false; for (let i = 0, j = SRB.length - 1; i < SRB.length; j = i++) { const a = SRB[i], b = SRB[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+
 /** The current field at one moment: station currents blended across the water by inverse-distance weighting. */
 export class CurrentField {
   /** Each station's current at the field's time, worked out only when a point near it is asked about (stamp: which time). */
   private vecs: Vec[] = [];
   private stamp: Int32Array;
   private sx: Float64Array;
+  private depth: Float64Array;
   private sy: Float64Array;
   private tMin = 0;
   private epoch = 0;
@@ -104,6 +127,7 @@ export class CurrentField {
   constructor(readonly stations: TideStation[]) {
     this.stamp = new Int32Array(stations.length).fill(-1);
     this.sx = Float64Array.from(stations, s => s.p.x); this.sy = Float64Array.from(stations, s => s.p.y);
+    this.depth = Float64Array.from(stations, s => depthAt(s.p));
     this.vecs = stations.map(() => ({ x: 0, y: 0 }));
     this.soft2 = Float64Array.from(stations, (s, i) => {
       let dn = Infinity;
@@ -165,7 +189,26 @@ export class CurrentField {
       const v = stamp[i] === epoch ? this.vecs[i] : this.stationVec(i);
       wx += v.x * w; wy += v.y * w; ws += w;
     }
-    return ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
+    if (ws <= 0) return { x: 0, y: 0 };
+    const s = inSanRafaelBay(p) ? srbInside(p) : 0, k = s > 0 ? 1 - s * (1 - this.shoalFactor(p, list)) : 1;
+    return { x: k * wx / ws, y: k * wy / ws };
+  }
+  /**
+   * Over San Rafael Bay's shoals, where no current has been measured: the stations' stream carried to the water's depth
+   * here by USGS's relation for San Pablo Bay (Cheng & Gartner 1984, WRI 84-4339, Part III pp. 20–21 and Fig. III.6: the
+   * RMS current speed rises 2.71 cm/s for each metre of depth below MLLW, r² 0.91, from 1.8 to 21.8 m; the line's
+   * intercept, about 20 cm/s, read off the figure, and its shoal meter, 32 cm/s at 3.4 m, sits on it). The depths are
+   * NOAA's chart's (depth-grid.json); the ratio of the speeds at the two depths, weighted as the stations are, and never
+   * more than 1. The bay is about a metre deep at low water, so its stream is a third to two-thirds of theirs.
+   */
+  private shoalFactor(p: Vec, list: Int32Array): number {
+    const rms = (d: number) => 20 + 2.71 * Math.min(21.8, Math.max(1.8, d)), here = rms(depthAt(p));
+    let num = 0, den = 0;
+    for (let k = 0; k < list.length; k++) {
+      const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i], q = dx * dx + dy * dy + this.soft2[i], w = 1 / (q * Math.sqrt(q));
+      num += w * Math.min(1, here / rms(this.depth[i])); den += w;
+    }
+    return den > 0 ? num / den : 1;
   }
   /**
    * The current at a point, with the slack water along the Cityfront beach: the shore relief (current.ts) applies

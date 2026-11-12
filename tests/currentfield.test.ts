@@ -13,3 +13,17 @@ describe('the current field across the race area', () => {
     expect(worst).toBeLessThan(0.05);
   });
 });
+
+describe('San Rafael Bay', () => {
+  it('its shoals carry a weaker stream than San Pablo Strait outside, and it eases in without a step at the mouth', async () => {
+    const { LL } = await import('../src/geo/geo');
+    const t0 = sfLocalToUtcMin('2026-11-14', '00:00'), f = new CurrentField(stationsFor(t0, t0 + 1440));
+    const peak = (lat: number, lon: number) => { let m = 0; for (let h = 0; h < 25; h += 0.25) { f.setTime(t0 + h * 60); const c = f.at(LL(lat, lon)); m = Math.max(m, Math.hypot(c.x, c.y) / 0.5144); } return m; };
+    const strait = peak(37.962, -122.465), bay = peak(37.962, -122.505);
+    expect(bay).toBeLessThan(0.6 * strait); // (USGS WRI 84-4339: a metre of water runs at about half a 7 m channel's speed)
+    // across the mouth (here at 122.4744 W), 50 m steps from 300 m outside it: no jump bigger than a tenth of a knot
+    let prev = peak(37.962, -122.4715), worst = 0;
+    for (let lon = -122.472; lon > -122.49; lon -= 0.0005) { const v = peak(37.962, lon); worst = Math.max(worst, Math.abs(v - prev)); prev = v; }
+    expect(worst).toBeLessThan(0.1);
+  });
+});
