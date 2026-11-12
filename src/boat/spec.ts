@@ -40,6 +40,9 @@ export interface BoatSpec {
   /** Her home marina (geo/marina.ts MARINAS), and her slip in it. */
   marina?: string;
   slip?: string;
+  /** Each line's colour in the sail controls band (and on the 3D lines once they're drawn): the owner, 12 Nov 2026.
+   * Absent: the band's defaults (LINE_COLORS). */
+  lineColors?: Partial<Record<LineColorKey, string>>;
   perf: {
     cleanedWeeks: number; // weeks since the bottom was last cleaned (0 = just cleaned)
     finish: 'race' | 'antifouling'; // the bottom paint's finish when clean: wet-sanded and burnished, or as rolled on
@@ -50,6 +53,22 @@ export interface BoatSpec {
     gearKg: number; // gear and stores beyond the racing minimum
   };
 }
+
+/** The lines you can colour (both jib sheets share one colour, as one rope usually does both). */
+export type LineColorKey = 'jibsheet' | 'jibCunningham' | 'jibHalyard' | 'mainsheet' | 'outhaul' | 'vang' | 'cunningham' | 'downhaul' | 'backstay';
+/** The band's defaults (the owner: for usability, jib lines warm, main lines cool, the backstay white; none port red or
+ * starboard green, so they're never mistaken for the sides). */
+export const LINE_COLORS: Record<LineColorKey, string> = {
+  jibsheet: '#ff8a3d', jibCunningham: '#f2c230', jibHalyard: '#c0652a', mainsheet: '#3d8bff', outhaul: '#2ec4d6',
+  vang: '#9b6bff', cunningham: '#ec6aae', downhaul: '#8fa3b8', backstay: '#e8edf0'
+};
+/** Rope colours to choose from: the usual braided-line colours. */
+export const ROPE_COLORS: [string, string][] = [
+  ['Orange', '#ff8a3d'], ['Yellow', '#f2c230'], ['Rust', '#c0652a'], ['Red', '#d8343a'], ['Pink', '#ec6aae'], ['Purple', '#9b6bff'],
+  ['Blue', '#3d8bff'], ['Teal', '#2ec4d6'], ['Green', '#3fae5a'], ['Grey', '#8fa3b8'], ['White', '#e8edf0'], ['Black', '#2a2d33']
+];
+/** A line's colour on this boat. */
+export const lineColor = (b: Pick<BoatSpec, 'lineColors'> | null | undefined, k: LineColorKey): string => b?.lineColors?.[k] ?? LINE_COLORS[k];
 
 export const DEFAULT_BOAT: BoatSpec = {
   id: 'josephine', name: 'JOSEPHINE',
@@ -104,6 +123,9 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
     companionway: x.companionway === 'closed' ? 'closed' : 'open',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
+    // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
+    ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
+      .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
@@ -148,3 +170,4 @@ const ENSIGN_OF: Record<string, string> = {
   NOR: 'nor', FRA: 'fra', NZL: 'nzl', JPN: 'jpn'
 };
 export const ensignFor = (country: string): string | undefined => ENSIGN_OF[country];
+

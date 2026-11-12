@@ -58,12 +58,27 @@ describe('Where the weight goes, and what she does', () => {
   });
   it('in a drifter, heeling her to leeward lets gravity hold the sails in shape: no slower than sitting up to windward', () => {
     // (an expert crew, so both set her up alike: a club crew's backstay steps a little differently between the two, which
-    // is worth more than the sails' shape here; physics review. Why sitting near upright does about as well as heeling her
-    // in a drifter is a question for the model on its own)
+    // is worth more than the sails' shape here; physics review. Why the gain is small: the Delft series' heeled wetted
+    // surface (hullTrim.ts heelWetted) barely changes for her round sections by 5–10°, so heeling her saves no skin
+    // friction to speak of; what it buys is the sails held in shape by their own weight (balance.ts clothFill), worth
+    // about 0.7% at 3 kt and nothing once the wind's pressure across them beats the cloth's weight, by about 4 kt)
     const lee = steady(3, beatAngle(3), { place: { across: 'lee', fore: null }, skill: 0.9 }), up = steady(3, beatAngle(3), { place: { across: 'up', fore: null }, skill: 0.9 });
     expect(lee.b.heelMag!).toBeGreaterThan(up.b.heelMag! + 3);
     expect(lee.v).toBeGreaterThan(up.v);
   });
+  it('in light air, left to themselves, a good crew heels her about 6° to leeward, as fast as any place they could sit', () => {
+    // (2 to 5 kt: about 6° (crewBestHeel), the light-air guides' heel. In 2–3 kt that's the fastest place; by 4–5 kt the
+    // sails hold their shape anyway and near upright is 0.1–0.2% quicker, inside what the model can tell apart)
+    for (const W of [2, 3, 4]) {
+      const free = steady(W, beatAngle(W), { skill: 0.9, secs: 90 });
+      expect(free.b.crew!.mode, `${W} kt`).toBe('leeward');
+      expect(free.b.heelMag!, `${W} kt`).toBeGreaterThan(4); expect(free.b.heelMag!, `${W} kt`).toBeLessThan(8);
+      for (const across of ['lee', 'mid', 'up'] as const) {
+        const placed = steady(W, beatAngle(W), { place: { across, fore: null }, skill: 0.9, secs: 90 });
+        expect(free.v, `${W} kt against ${across}`).toBeGreaterThan(placed.v * 0.995);
+      }
+    }
+  }, 60000);
   it('fore and aft: forward pays in light air (the transom clear), and trims her by the bow', () => {
     const fwd = steady(6, beatAngle(6), { place: { across: null, fore: 'fwd' } }), aft = steady(6, beatAngle(6), { place: { across: null, fore: 'aft' } });
     expect(fwd.b.crew!.trim).toBeGreaterThan(aft.b.crew!.trim + 0.02);
