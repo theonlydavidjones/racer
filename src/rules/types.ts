@@ -23,8 +23,14 @@ export interface RulesBoat {
   aboveProper?: boolean;
   /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
   backing?: boolean;
-  /** She has finished, so she is no longer racing (Rule 23.1). */
+  /** She has finished (crossed the finishing line). */
   finished?: boolean;
+  /**
+   * She has finished and cleared the finishing line and marks, so she is no longer racing (Definitions, Racing: a boat
+   * is racing "until she finishes and clears the finishing line and marks"), for rule 23.1. Omitted: as soon as she
+   * has finished.
+   */
+  cleared?: boolean;
   /** She has retired (RET): no longer racing either (the definition of Racing; Rule 23.1). */
   retired?: boolean;
 }
@@ -52,6 +58,14 @@ export interface RulesContext {
    * a unit vector pointing from it toward the water, or null if none is near. `committee`: include the committee boat.
    */
   obstacle?: (p: Vec, committee: boolean) => { d: number; n: Vec; continuing: boolean } | null;
+  /**
+   * Other boats that can be an obstruction to a pair (Definitions, Obstruction: "a boat racing is not an obstruction to
+   * other boats unless they are required to keep clear of her"). The caller passes the fleet and who keeps clear of
+   * whom (its own pair records); omitted, only the shore and the committee boat are obstructions.
+   */
+  fleet?: RulesBoat[];
+  /** Must `a` keep clear of `c` (or, under rule 22, avoid her)? From the caller's per-pair verdicts. */
+  keepsClearOf?: (a: RulesBoat, c: RulesBoat) => boolean;
 }
 
 export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23';
@@ -96,6 +110,19 @@ export interface PairRecord {
    * obstruction and whether the outside boat could give room there (Rule 19.2(b), and 19.2(c) at a continuing one).
    */
   ovStart: { t: number; astern: number | null; tacker: number | null; insideMark: number | null; markUnable: boolean; insideObst: number | null; obstUnable: boolean } | null;
+  /**
+   * Rule 20.2(e): from the time a boat hails for room to tack until she has tacked and avoided the hailed boat, rule
+   * 18.2 does not apply between them. Kept apart from `hail` because it outlasts it: a hail can lapse (a breach is
+   * called, or it goes stale) before the hailing boat has tacked and got clear.
+   */
+  r202e: { hailer: number; at: number } | null;
+  /** No new rule 23 blanketing call for this pair until this time (its own, so it doesn't stop contact or a hail being judged). */
+  blanketCool: number;
+  /**
+   * Rule 23, interference by taking a boat's wind: how long (s) each boat has been blanketing the other (keyed by the
+   * id of the boat doing it), and how the blanketing began (her turn just before, for 23.2's proper course).
+   */
+  blanket: Record<number, { since: number; turned: number }>;
 }
 
 /** "Room to tack!" (Rule 20, approaching an obstruction) or "Starboard!" (a courtesy that helps the other boat react). */
@@ -105,14 +132,23 @@ export interface Hail {
   replyAt?: number;
   /** When the hailed boat responded (tacked, or replied "You tack"). Rule 20.2(d): the hailing boat must then tack as soon as possible. */
   respondedAt?: number;
+  /**
+   * Rule 20.3: the hailed boat, meaning to respond by tacking, passed the hail on to a boat on the same tack that stops
+   * her tacking: that boat's id, when, and (kept up to date by the caller from that pair's record) when that boat
+   * responded, or that she failed to. Until then the hailed boat can't tack, so she isn't late responding.
+   */
+  passedOn?: { to: number; at: number; respondedAt?: number; failed?: boolean };
+  /** Rule 20.3: this hail is one passed on (she may hail even if it doesn't meet the conditions of rule 20.1). */
+  relayed?: boolean;
 }
 
 // Timers start at −Infinity: race time is negative before the start signal, and incidents then must count too.
-export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null });
+export const newPairRecord = (): PairRecord => ({ kc: null, rule: null, grace: -Infinity, by: null, byWhy: null, cool: -Infinity, mark: null, r17: null, hail: null, r183: null, seenTack: {}, stbdInZone: {}, wasOverlapped: false, ovStart: null, r202e: null, blanketCool: -Infinity, blanket: {} });
 
 export interface Verdict<B> { kc: B; rule: RuleId; mr?: MarkRoomState }
 
-export type IncidentKind = 'contact' | 'swerve' | 'hail';
+/** 'blanket': she took the other boat's wind (Rule 23's interference without contact). */
+export type IncidentKind = 'contact' | 'swerve' | 'hail' | 'blanket';
 export interface Incident<B> {
   kind: IncidentKind;
   fouler: B;
