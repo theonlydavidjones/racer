@@ -43,6 +43,15 @@ const BOTH_SIDES = new Set<string>(['vang', 'outhaul', 'jibCunningham']);
  * a new wind that has come to stay, is seen to as before.
  */
 export const LINE_TAU = 20;
+/**
+ * And once a cabin-top line is set, it's left for at least a gust-lull cycle (about a minute, Bethwaite), unless it's
+ * knocked off; and after any trip to the cabin top, the forward hand settles back for LINE_TRIP s before the next.
+ * Without these, the middle of the boat saw a trip every 20 s in steady sailing for changes of a few per cent (the
+ * owner, v146: "just generally fussing about"). (Estimates: no published timings for Folkboat crew work.)
+ */
+export const LINE_GAP = 60, LINE_TRIP = 60;
+/** A change of a cabin-top line this big (of its range), wanted now and lately, is seen to at once, waits or no: a new point of sail (bearing away, the vang on). A puff swings the outhaul's wish by about as much, but it doesn't last (LINE_TAU). An estimate. */
+export const LINE_URGENT = 0.25;
 
 /**
  * The crew's own lines that wait while you've placed them across the boat: the ones they'd have to leave their place
@@ -175,13 +184,23 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const who = ownerOf(k, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who]; if (!a) continue;
     const skill = skillOf(ppl[who]), e = err(k);
     if (a.job?.line === k) continue;
+    let urgentTo = false;
     if (PIANO.has(k)) {
       // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
       const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
       if (Math.abs(dl) < th || Math.abs(dn) < th || dl * dn <= 0) continue;
       // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
-      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9);
-      if (since < LINE_TAU && Math.abs(dl) < 0.5) continue;
+      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
+      // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
+      const there = a.job?.station?.pose === 'piano' || a.pose === 'piano';
+      // (the waits are for the walk: a line they reach from where they sit, placed by you, they work when it's off)
+      // (and none of it for a line knocked off, or wanted well away from where it is, now and lately both: a new point of
+      // sail as she bears away, which has come to stay, not a puff's swing of the outhaul)
+      // (placed by you, they have their own rule for a trip, PLACED_TRIP's big change: these waits are for the crew on auto)
+      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && Math.abs(dl) >= LINE_URGENT);
+      if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there))) continue;
+      urgentTo = urgent && walk;
+      if (!walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
     }
     else if (e < startThreshold(k, skill, want[k])) continue;
     const sheet = sheetOf(k);
@@ -197,6 +216,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
       const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
       if (!sheet || committed || onSheet) continue;
+      // (and not from a cabin-top line they're at, or on their way to, for a sheet's tweak: they finish it first, unless
+      // the sheet is well off. A small jib trim called them back to the seat and out again, the owner's "fussing")
+      if (a.job.station && PIANO.has(a.job.line) && e < 0.05 && !placed) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
     const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);
@@ -205,8 +227,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
-    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far ? lw[k] : want[k], ...(big ? { big } : {}) };
-    if (PIANO.has(k)) (c.lineSet ??= {})[k] = c.clock ?? 0;
+    // (an urgent one is set right through to where they want it now: set to the lagging wish it was still well off after,
+    // and they were back for it seconds later)
+    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo ? lw[k] : want[k], ...(big ? { big } : {}) };
+    if (PIANO.has(k)) { (c.lineSet ??= {})[k] = c.clock ?? 0; c.pianoT = c.clock ?? 0; }
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {

@@ -140,7 +140,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>;
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number;
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -395,8 +395,12 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const tgt: Target[] = new Array(ppl.length);
     let fixedM = 0, freeW = 0;
     const free: number[] = [];
+    // (the cockpit's places are for everyone whose place is in it, those away at a job for a moment too: one going to the
+    // cabin top or the winch doesn't move the others to new seats, half a metre aft and back again when they return)
+    const seats: number[] = [];
     c.people.forEach((a, i) => {
       const st = a.job?.station;
+      if (i > 0 && !(i === n && (forward || atMast)) && !(i === n - 1 && forward)) seats.push(i);
       if (st) { tgt[i] = { ...st }; fixedM += W[i] * st.arm; }
       else if (i === 0) { /* the helm: below */ }
       else if (i === n && forward) { tgt[i] = { arm: 0, z: Z.bow, pose: 'bow' }; }
@@ -423,10 +427,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // the free crew, front to back in the cockpit, sharing the moment (each within their own reach)
     // (where you've put them: each of them there, not just their average)
     const placed = pl?.across ? { lee: -Infinity, mid: 0.1, up: NaN, hike: Infinity }[pl.across] : null;
-    free.forEach((i, j) => {
+    free.forEach(i => {
       const lo = leeArm(ppl[i], edges[i]);
       const arm = placed == null ? (crewFull ? maxOf(i) : clamp(crewArm, lo, maxOf(i))) : clamp(Number.isNaN(placed) ? sitOf(i) : placed, lo, maxOf(i));
-      tgt[i] = { arm, z: stationZ(j, free.length, foreF, Math.abs(arm) > DECK_ARM), pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
+      tgt[i] = { arm, z: stationZ(seats.indexOf(i), seats.length, foreF, Math.abs(arm) > DECK_ARM), pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
     });
     // the roll tack: as she luffs up they're out on the windward side (in light air, from sitting to leeward), so she rolls
     // to windward through the wind and comes out heeled on the new tack; they hold there, then everyone out hard
@@ -470,7 +474,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     a.lean = clamp((arm - sitArm(p, he)) / Math.max(0.05, hikeArm(p, 1, he) - sitArm(p, he)), 0, 1);
     // (sitting, hiking or to leeward: by where they actually are, so the figure matches the weight)
     const free = t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
-    const settled: Pose = free ? (arm < -0.05 ? 'lee' : a.lean > 0.05 ? 'hike' : 'sit') : t.pose;
+    // (with a dead band: someone sat on the edge of hiking, their weight going out and in a little with each puff, is
+    // still sitting there, not drawn flicking from sitting to hiking and back several times a second)
+    const was = a.pose, hikeAt = was === 'hike' ? 0.02 : 0.08, leeAt = was === 'lee' ? -0.02 : -0.08;
+    const settled: Pose = free ? (arm < leeAt ? 'lee' : a.lean > hikeAt ? 'hike' : 'sit') : t.pose;
     a.pose = Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5 ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
@@ -660,6 +667,12 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const sk = smoothSkill(skill), want = 0.5 + (f - 0.5) * sk;
   // (a move along the cockpit for a real gain only, 0.05%: near the crossover it isn't worth the move. An estimate.)
   if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && score(want) - score(c.fore01) < 0.0005) return c.fore01;
+  // (and having just moved, they stay a while: a gust-lull cycle's worth, about 20 s, unless it's worth 0.3% now. Their
+  // weight out on the rail and in again in each puff changes the reckoning, and they were along the cockpit and back
+  // with each one: the owner's "fussing". Estimates)
+  const t = c.clock ?? 0;
+  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && t - (c.foreSetT ?? -1e9) < 20 && score(want) - score(c.fore01) < 0.003) return c.fore01;
+  if (c.fore01 == null || Math.abs(want - c.fore01) > 1e-6) c.foreSetT = t;
   c.fore01 = want;
   return c.fore01;
 }
