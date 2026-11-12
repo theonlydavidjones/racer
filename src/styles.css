@@ -733,3 +733,77 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 #whereField .pins{margin:8px 0 4px;font:500 13px/1.4 var(--f-body)}
 #whereField .pinbtns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #whereField .pinbtns small{flex:1 1 200px;color:var(--muted)}
+
+/* ---------- the sail controls band (ui/sailBand.ts; the owner's design, 12 Nov 2026) ---------- */
+/* a compact console docked at the bottom, as you face forward from the helm: port on the left */
+.sailband{position:fixed;bottom:0;left:max(calc(max(16px,env(safe-area-inset-left,0px)) + 452px + 16px),calc(50% - 300px));width:600px;box-sizing:border-box;
+  padding:8px 12px calc(env(safe-area-inset-bottom,0px) + 8px);background:rgba(9,22,33,.86);border:1px solid var(--rule);border-bottom:0;border-radius:12px 12px 0 0;
+  display:flex;flex-direction:column;gap:6px;color:var(--text);pointer-events:auto;user-select:none;-webkit-user-select:none;touch-action:none;cursor:default}
+.sailband[hidden]{display:none}
+.sailband.off{opacity:.55}
+.sailband button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.sailband button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
+.sb-all{position:absolute;right:10px;top:-22px;height:22px;padding:0 9px!important;font:700 10px/22px var(--f-inst)!important;letter-spacing:.08em;
+  background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important}
+.sb-all:hover{color:var(--text)!important}
+.sb-top{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
+.sb-div{width:1px;align-self:stretch;background:var(--rule);margin:4px 2px}
+.sb-gap{width:22px;align-self:stretch}
+.sb-slot{width:30px}
+/* a vertical line: name, ▲ (eases), the cleat, the rope below it (how much is on), ▼ (pulls on) */
+.sb-v{display:flex;flex-direction:column;align-items:center;gap:2px;width:32px;border-radius:5px;padding:1px 0}
+.sb-v.sel,.sb-h.sel,.sb-trk.sel{background:rgba(255,255,255,.07)}
+.sb-nm{font:700 8.5px/1.05 var(--f-inst)!important;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)!important;text-align:center;min-height:18px}
+.mine > .sb-nm,.mine .sb-nm{color:var(--accent)!important}
+.sb-a{display:block;width:16px;height:12px;color:var(--muted)!important}
+.sb-a svg{width:12px;height:12px;display:block;margin:0 auto;fill:currentColor}
+.sb-a:hover,.sb-a:active{color:var(--text)!important}
+.sb-cleat{width:18px;height:6px;border-radius:2px;background:#2fae6c;position:relative}
+.sb-cleat.clam,.sb-cleat.block,.sb-cleat.winch{background:#8b98a3}
+.sb-cleat.block{width:10px;height:8px;border-radius:3px}
+.ww .sb-cleat{box-shadow:0 0 0 2px #fff}
+.sb-well{position:relative;width:12px;height:46px;background:#0a141c;border:1px solid #22384a;border-radius:3px;overflow:hidden}
+.sb-rope{position:absolute;left:1px;right:1px;top:0;height:0;border-radius:2px;
+  background:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px)}
+.mine .sb-rope{box-shadow:0 0 0 1.5px var(--accent)}
+.sb-mark{position:absolute;left:-1px;right:-1px;height:2px;background:#fff;opacity:.9;pointer-events:none}
+/* the backstay's ends: pulled outboard */
+.sb-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--rule);padding-top:5px}
+.sb-h{display:flex;flex-direction:column;gap:2px;align-items:center;border-radius:5px;padding:1px 2px}
+.sb-hrow{display:flex;align-items:center;gap:2px}
+.sb-h .sb-well{width:52px;height:12px}
+.sb-h .sb-rope{top:1px;bottom:1px;height:auto;width:0}
+.sb-h .sb-mark{top:-1px;bottom:-1px;width:2px;height:auto;left:auto}
+.sb-h .sb-cleat{display:none}
+.sb-h.ww .sb-well{box-shadow:0 0 0 2px #fff}
+/* the thwart: the mainsheet's boom marker over the traveller's car, port end left */
+.sb-thwart{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.sb-trk{display:grid;grid-template-columns:70px 10px 16px 1fr 16px 10px;align-items:center;gap:3px;border-radius:5px}
+.sb-trk .sb-nm{text-align:right;min-height:0}
+.sb-end{font:700 9px/1 var(--f-inst);color:var(--muted)}
+.sb-end.p{color:#ff6b6b}.sb-end.s{color:#3fd197}
+.sb-rail{position:relative;height:10px;background:#0a141c;border:1px solid #22384a;border-radius:5px}
+.sb-mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:#3b5163}
+.sb-boom{position:absolute;top:1px;bottom:1px;width:26px;margin-left:-13px;border-radius:3px;
+  background:repeating-linear-gradient(135deg,#3d8bff 0 4px,#2a62b5 4px 5px)}
+.sb-car{position:absolute;top:-3px;bottom:-3px;width:18px;margin-left:-9px;border-radius:3px;background:#c7d3db;box-shadow:0 1px 2px rgba(0,0,0,.5)}
+.sb-trk.mine .sb-boom,.sb-trk.mine .sb-car{box-shadow:0 0 0 1.5px var(--accent)}
+.sb-trk .sb-mark{top:-3px;bottom:-3px;width:0;height:auto;border-left:2px dashed #fff;background:none}
+/* the jib car's H: two fore-and-aft legs, the crossbar on its row, the car on its pin (forward up, inboard toward the middle) */
+.sb-jc{display:flex;flex-direction:column;align-items:center;gap:2px;width:44px}
+.sb-h-grid{position:relative;display:grid;grid-template-columns:repeat(5,7px);grid-template-rows:repeat(7,7px);gap:1px;padding:2px 3px;
+  border-left:2px solid #4a6072;border-right:2px solid #4a6072}
+.sb-hole{width:7px;height:7px;border-radius:50%;opacity:0}
+.sb-hole[data-c="0"],.sb-hole[data-c="4"],.sb-hole.row{opacity:1;background:#1c2e3c!important;box-shadow:inset 0 0 0 1px #3b5163}
+.sb-hole:hover{opacity:1;background:#3b5163!important}
+.sb-xbar{grid-column:1 / -1;height:3px;align-self:center;background:#6a8094;pointer-events:none;z-index:0}
+.sb-jcar{width:9px;height:9px;margin:-1px;border-radius:2px;background:#c7d3db;pointer-events:none;z-index:1}
+.sb-jc.mine .sb-jcar{box-shadow:0 0 0 1.5px var(--accent)}
+.sb-tag{font:700 8px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-height:8px}
+body.showroom .sailband{visibility:hidden}
+.sb-jwant,.sb-jideal{width:9px;height:9px;margin:-1px;border-radius:2px;pointer-events:none;z-index:2;box-sizing:border-box}
+.sb-jwant{border:1.5px dashed var(--accent)}
+.sb-jideal{border:1.5px dashed #fff}
+.sb-jwant[hidden],.sb-jideal[hidden]{display:none}
+/* (the messages stop above the band while it is open) */
+body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}

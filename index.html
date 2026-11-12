@@ -51,13 +51,8 @@
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
   <div class="tp-head"><span class="tp-lab">Sail trim</span><span id="tpWho">Crew trims every line</span></div>
-  <div class="tp-row" id="tpMainRow"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span>
-    <button class="tp-btn two" id="bMainIn" type="button" aria-label="Trim the main in">Trim<small>boom in</small></button><button class="tp-btn two" id="bMainOut" type="button" aria-label="Ease the main">Ease<small>boom out</small></button>
-    <span class="who" id="whoMain" data-line="mainsheet" role="group" aria-label="Who works the mainsheet"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
-  <div class="tp-row" id="tpJibRow"><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span>
-    <button class="tp-btn two" id="bJibIn" type="button" aria-label="Trim the jib in">Trim<small>sheet in</small></button><button class="tp-btn two" id="bJibOut" type="button" aria-label="Ease the jib">Ease<small>sheet out</small></button>
-    <button class="tp-btn two tp-back" id="bJibBack" type="button"><span class="w">Back</span><small>jib to windward</small></button>
-    <span class="who" id="whoJib" data-line="jibsheet" role="group" aria-label="Who works the jib sheet"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
+  <!-- how each sail is drawing (its lines are in the sail controls band) -->
+  <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
   <div class="tp-row" id="tpPoleRow"><span class="tp-lab">Pole</span><span class="tp-state" id="tpPole"></span>
     <button class="tp-btn tp-pole" id="bPole" type="button" aria-label="Whisker pole: pole out the jib to go wing-on-wing">Pole out</button></div>
   <!-- the crew's weight: one line while they place themselves (tap it to open); open while you've placed them -->
@@ -77,8 +72,7 @@
   <div class="tp-hint" id="tpHint"></div>
   <div class="tp-shape" id="tpShape"></div>
   <div class="tp-balance" id="tpBalance"></div>
-  <div class="tp-btnrow"><button class="tp-more" id="tpMore" type="button" aria-expanded="false">Lines ▸</button><button class="tp-more" id="bCoach" type="button">Trim coach</button></div>
-  <div class="ctl-list" id="ctlList" hidden></div>
+  <div class="tp-btnrow"><button class="tp-more" id="tpMore" type="button" aria-expanded="true">Sail controls ▾</button><button class="tp-more" id="bCoach" type="button">Trim coach</button></div>
 </div>
 
 <div id="controls">
@@ -124,6 +118,7 @@
 </div>
 <!-- the view: bottom right, with the keys line over it on hover -->
 <div class="ibar" id="viewBar">
+  <button class="ib on" id="bBand" type="button" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
   <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
 </div>
