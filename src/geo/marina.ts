@@ -20,7 +20,8 @@ import alamedaMarina from './data/alameda-marina.json';
  * - West Harbor, San Francisco Marina (by the St. Francis and Golden Gate yacht clubs). Dock letters and slip numbers are
  *   this sim's: the harbor's own aren't published anywhere we could reach.
  * - Gashouse Cove, the Marina's East Harbor (by Fort Mason). Dock letters (north to south) and slip numbers are this sim's.
- * - South Beach Harbor (by Oracle Park). Docks A to G are the harbor's own (their names in OSM); slip numbers are this sim's.
+ * - South Beach Harbor (by Oracle Park). Docks A to G are the harbor's own (their names in OSM), and so are the slip numbers (the harbor's map, sfport.com: from
+ *   each dock's gate at the shore, odd on the north side, even on the south).
  * - Corinthian Yacht Club, Tiburon. A dock is the southernmost line, along the breakwater, as the club's visitor notes say;
  *   B and C, the fingers (not mapped) and the slip numbers are inferred.
  * Slips are worked out from the docks' fingers.
