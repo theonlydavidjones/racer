@@ -484,7 +484,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // more, so she holds on while the chain answers; if it never does, the boat she hailed can't tack, nor can she)
     const chain = pinned ? w.pairRecord(b, pinned)?.hail : null, relay = chain?.kind === 'room' && chain.by === b.id && chain.passedOn && chain.respondedAt == null ? chain.passedOn : null;
     const waiting = pinned && (relay ? !relay.failed : may ? w.t - ai.lastHail < HAIL_RESPONSE + 1 : obstructionAhead(b, b.h, b.tack, 45) !== null && !w.roomBlockedByMark(b));
+    // pinned, but bearing away about SUBSTANTIAL_TURN clears it (so she may not hail: rule 20.1(a)): she bears away round
+    // it, rather than tack into the boat to windward (rule 13)
+    const bearAway = pinned && !may && !relay && obstructionAhead(b, b.h, b.tack, 45) === null
+      ? [8, 12, 16, 22, 30].map(k => n360(b.h + (b.tack === 'S' ? -k : k))).find(h => !blocked(w, b, h, 45)) : undefined;
     if (waiting && !blocked(w, b, desired, 12)) holdForHail = true;
+    else if (bearAway != null) desired = bearAway;
     else if (beating && w.t - b.lastTackT > 4 && !(pinned && w.roomBlockedByMark(b)) && !relay) desired = b.tack === 'S' ? csP : csS;
     else for (const k of [25, -25, 45, -45, 70, -70, 100, -100]) { const cand = sailable(b, desired + k); if (!blocked(w, b, cand, 45)) { desired = cand; break; } }
   } else if (beating && b.started && b.twa <= beatFor(b) + 8 && !b.tacking && w.t - ai.lastHail > 40) {

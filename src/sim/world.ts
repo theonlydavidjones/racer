@@ -18,7 +18,7 @@ import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNe
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, blanketRule, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
-import { aimPoint, sailable } from '../ai/ai';
+import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink, crewPoleCall } from '../ai/ai';
 import type { SimEvent } from './events';
@@ -925,7 +925,7 @@ export class World {
       const h = this.hHist[i] ??= [];
       if (this.steps % RECORD_EVERY_STEPS === 0) { h.push(b.h); if (h.length > keep) h.shift(); }
       b.headingAgo = h.length ? h[0] : b.h;
-      const racing = this.t > 0 && b.started && !b.finished && !b.retired, pt = racing ? properTwa(this, b) : 0;
+      const pt = this.t > 0 && b.started && !b.finished && !b.retired ? properTwa(this, b) : null, racing = pt != null; // (null: undetermined)
       b.aboveProper = racing && b.twa < pt - 10;
       // (well below it: farther off the wind than her course to the mark, by more than footing for speed or a duck would
       // take her for long; Rule 23.2 also asks that she bore away onto the other boat's wind: see rules/pairs.ts)
@@ -1473,6 +1473,9 @@ export class World {
     const beat = beatAngle(o.ww.kt), u = V(o.tack === 'S' ? o.ww.from - beat : o.ww.from + beat), r = sub(m.p, o), along = dot(r, u), far = Math.max(...(m.reach ?? [0]));
     if (along + far <= 0) return false; // she's past all of it
     if ((cross(u, r) > 0) !== (m.side === 'p')) return false; // (cross > 0: the island lies to port of her course)
+    // "in a position to pass to windward of it": the island on her leeward side (to port on starboard tack, to starboard
+    // on port); a boat leaving it on her windward side passes to leeward of it, and isn't fetching it
+    if ((m.side === 'p') !== (o.tack === 'S')) return false;
     const L = Math.max(0, along) + far + 200;
     return landAlong(o, { x: o.x + u.x * L, y: o.y + u.y * L }) === Infinity;
   }
@@ -1615,10 +1618,26 @@ export const BELOW_PROPER = 20;
 /**
  * True wind angle of a boat's proper course: roughly, the course she'd sail to finish as soon as
  * possible with no other boats around. Straight at her next mark if she can lay it; close-hauled
- * if it's upwind; no deeper than the best downwind angle if it's dead downwind. (It doesn't allow for the current: a
- * boat crabbing across a strong tide sails her proper course some degrees off this.)
+ * if it's upwind; no deeper than the best downwind angle if it's dead downwind. Allowing for the current: across a
+ * strong tide her proper course to the mark is the crab that makes good the straight line, not the bearing of it.
  */
-export function properTwa(w: World, b: Boat): number {
-  const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), twa = Math.abs(wrap(b.ww.from - toMark));
-  return Math.min(Math.max(twa, beatAngle(b.ww.kt)), Math.max(runAngle(b.ww.kt), 150));
+export function properTwa(w: World, b: Boat): number | null {
+  const P = aimPoint(w, b), toMark = brg(P.x - b.x, P.y - b.y), beat = beatAngle(b.ww.kt), run = Math.max(runAngle(b.ww.kt), 150);
+  const clampT = (t: number) => Math.min(Math.max(t, beat), run);
+  // allowing for the current: the heading that makes good the straight line to the mark, up-tide of it by as much as
+  // the current across her track would set her down (as the AI, the tiller pilot and the planner steer: crabFor), at
+  // the speed she'd make on that crab (her polar speed there, found by one step of iteration from the line's bearing)
+  const cur = b.cur ?? { x: 0, y: 0 }, n = V(toMark + 90), u = V(toMark), across = cur.x * n.x + cur.y * n.y;
+  let twa = clampT(Math.abs(wrap(b.ww.from - toMark)));
+  for (let i = 0; i < 2; i++) {
+    const vs = polar(b.ww.kt, twa);
+    // a cross-current as fast as she sails (crabFor's clamp) or one that leaves her no way along the line: no heading makes
+    // good the line, so her proper course can't be worked out from it: give her the benefit of the doubt
+    if (Math.abs(across) >= 0.9 * vs) return null;
+    const h = crabFor(toMark, vs, cur), sog = vs * (V(h).x * u.x + V(h).y * u.y) + cur.x * u.x + cur.y * u.y;
+    if (sog <= 0) return null;
+    twa = clampT(Math.abs(wrap(b.ww.from - h)));
+  }
+  // (unsigned, as her own twa is: a crab carrying her through dead downwind onto the other gybe is compared by size only)
+  return twa;
 }
