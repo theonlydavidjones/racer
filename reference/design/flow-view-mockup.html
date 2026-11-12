@@ -1,0 +1,157 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Flow view mock-up</title>
+<style>
+  :root { --bg:#0e1a26; --panel:#13212f; --ink:#e8eef3; --muted:#9fb0bf; --accent:#ffb627; --good:#3fd0a0; --luff:#ffd34d; --stall:#ff6a5c; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.35 "Helvetica Neue",Arial,sans-serif; }
+  .wrap { display:grid; grid-template-columns: 860px 380px; gap:14px; padding:14px; width:1254px; box-sizing:border-box; }
+  .card { background:var(--panel); border:1px solid #1f3346; border-radius:10px; padding:12px 14px; }
+  h1 { font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin:0 0 6px; }
+  h2 { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:12px 0 6px; }
+  .tag { display:inline-block; font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:8px; border:1px solid #3a5268; color:var(--muted); margin-left:6px; }
+  .tag.sim { border-color:#2b6a58; color:var(--good); }
+  ul { margin:4px 0 0 18px; padding:0; } li { margin:3px 0; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .row { display:flex; gap:10px; }
+  .mini { flex:1; text-align:center; font-size:12px; color:var(--muted); }
+  .mini b { display:block; color:var(--ink); font-size:12px; margin-bottom:2px; }
+  svg text { font-family:"Helvetica Neue",Arial,sans-serif; }
+</style></head>
+<body><div class="wrap">
+  <div class="card">
+    <h1>Flow view · mid-height section <span class="tag sim">angles, camber &amp; flow state: the sim</span><span class="tag">streamline shapes: illustrative</span></h1>
+    <svg id="main" width="830" height="560" viewBox="0 0 830 560"></svg>
+    <div class="row" style="margin-top:8px">
+      <div class="mini"><b>Jib · attached</b><svg id="m1" width="250" height="150"></svg></div>
+      <div class="mini"><b>Jib · luffing (bear away or trim)</b><svg id="m2" width="250" height="150"></svg></div>
+      <div class="mini"><b>Jib · stalled (ease or head up)</b><svg id="m3" width="250" height="150"></svg></div>
+    </div>
+  </div>
+  <div class="card">
+    <h1>What the flow is telling you</h1>
+    <div style="color:var(--muted);font-size:12px">Close-hauled, starboard tack · 12 kt true · apparent 17.6 kt at 28°</div>
+    <h2>Jib <span class="tag sim">trim.ts</span></h2>
+    <ul>
+      <li><span class="dot" style="background:var(--good)"></span>Angle of attack 18.5° (best 18°): flow attached on both faces.</li>
+      <li>Both luff telltales streaming; the top ones lift first as you point, because the head is twisted 9° open.</li>
+    </ul>
+    <h2>The slot <span class="tag">illustrative</span></h2>
+    <ul>
+      <li>Air squeezed between the jib's leech and the main's lee side speeds up and is turned along the main: the jib's leech sets where the main's luff flow comes from.</li>
+      <li>Over-trim the jib (car forward, sheet hard) and the slot chokes: the main's luff backs (its windward telltales lift) before it's luffing.</li>
+    </ul>
+    <h2>Main <span class="tag sim">trim.ts</span></h2>
+    <ul>
+      <li><span class="dot" style="background:var(--stall)"></span>Angle of attack 30° (best 22°): stalling at the leech, 30%.</li>
+      <li>Leech telltales hiding behind the sail: ease the sheet (or traveller down) about 6°.</li>
+    </ul>
+    <h2>Under water <span class="tag sim">physics.ts leeway</span></h2>
+    <ul>
+      <li>Leeway 3.8°: the keel meets the water at that angle and makes the side force that balances the sails' heel.</li>
+      <li>Pinching (too slow): leeway grows, the keel stalls sooner.</li>
+    </ul>
+    <h2>How it's drawn</h2>
+    <ul style="color:var(--muted);font-size:12px">
+      <li>Each sail's section at the chosen height, from the sim's sheet angle, twist, camber and draft.</li>
+      <li>Streamlines: 2D potential flow (vortex panels with the Kutta condition) around those sections in the sim's apparent wind; speed shading from the same flow.</li>
+      <li>Separation: drawn from the sim's own luff/stall amount, not computed (potential flow can't stall).</li>
+      <li>Heights: foot, middle, head; the twist and the wind's gradient change the angles up the sail.</li>
+    </ul>
+  </div>
+</div>
+<script>
+// ---------- a 2D vortex-panel solve around thin cambered sections (illustrative flow, the sim's angles) ----------
+function section(lx, ly, chord, angleDeg, camber, draft, n) { // from luff (lx,ly) along angleDeg (screen deg, 0 = +x), camber +left of chord dir
+  const a = angleDeg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux, k = Math.log(0.5) / Math.log(draft), pts = [];
+  for (let i = 0; i <= n; i++) { const s = i / n, h = camber * chord * Math.sin(Math.PI * Math.pow(s, k)); pts.push([lx + ux * chord * s + nx * h, ly + uy * chord * s + ny * h]); }
+  return pts;
+}
+function solve(sails, Uinf) {
+  // panels: vortex at 1/4, collocation at 3/4 of each panel; Kutta implied by the lumped-vortex scheme
+  const P = []; for (const s of sails) for (let i = 0; i < s.length - 1; i++) {
+    const [x0, y0] = s[i], [x1, y1] = s[i + 1], dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
+    P.push({ vx: x0 + 0.25 * dx, vy: y0 + 0.25 * dy, cx: x0 + 0.75 * dx, cy: y0 + 0.75 * dy, nx: -dy / L, ny: dx / L });
+  }
+  const N = P.length, A = [], b = [];
+  const ind = (px, py, vx, vy) => { const rx = px - vx, ry = py - vy, r2 = rx * rx + ry * ry + 1e-6; return [-ry / (2 * Math.PI * r2), rx / (2 * Math.PI * r2)]; };
+  for (let i = 0; i < N; i++) { A.push([]); for (let j = 0; j < N; j++) { const [u, v] = ind(P[i].cx, P[i].cy, P[j].vx, P[j].vy); A[i].push(u * P[i].nx + v * P[i].ny); } b.push(-(Uinf[0] * P[i].nx + Uinf[1] * P[i].ny)); }
+  // Gaussian elimination
+  for (let c = 0; c < N; c++) { let p = c; for (let r = c + 1; r < N; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r; [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+    for (let r = c + 1; r < N; r++) { const f = A[r][c] / A[c][c]; for (let k = c; k < N; k++) A[r][k] -= f * A[c][k]; b[r] -= f * b[c]; } }
+  const g = new Array(N).fill(0); for (let r = N - 1; r >= 0; r--) { let s = b[r]; for (let k = r + 1; k < N; k++) s -= A[r][k] * g[k]; g[r] = s / A[r][r]; }
+  return (x, y) => { let u = Uinf[0], v = Uinf[1]; for (let j = 0; j < N; j++) { const [a1, a2] = ind(x, y, P[j].vx, P[j].vy); u += g[j] * a1; v += g[j] * a2; } return [u, v]; };
+}
+function stream(vel, x, y, steps, h, bounds) {
+  const pts = [[x, y]];
+  for (let i = 0; i < steps; i++) { const [u, v] = vel(x, y), s = Math.hypot(u, v) || 1, [u2, v2] = vel(x + u / s * h / 2, y + v / s * h / 2), s2 = Math.hypot(u2, v2) || 1;
+    x += u2 / s2 * h; y += v2 / s2 * h; if (i > 60 && (x < bounds[0] || x > bounds[2] || y < bounds[1] || y > bounds[3])) break; pts.push([x, y, s2]); }
+  return pts;
+}
+const NS = 'http://www.w3.org/2000/svg';
+const el = (svg, tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
+const path = pts => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+function speedCol(s) { const t = Math.max(0, Math.min(1, (s - 0.7) / 0.9)); const c0 = [80, 140, 200], c1 = [120, 240, 210]; return `rgb(${c0.map((c, i) => Math.round(c + (c1[i] - c) * t)).join(',')})`; }
+
+function draw(svgId, W, H, opts) {
+  const svg = document.getElementById(svgId);
+  // the boat: bow up-left... keep simple: bow toward the top, wind from 28° off the bow to starboard (screen: from upper right)
+  const cx = W * 0.5, sc = opts.scale;
+  const awa = opts.awa * Math.PI / 180;
+  // flow direction: coming from the bow, rotated by awa (wind from starboard bow → flows toward port-aft)
+  const U = [-Math.sin(awa), Math.cos(awa)];
+  const toS = (x, y) => [cx + x * sc, opts.top + y * sc]; // boat frame: x starboard, y aft (m)
+  // hull outline (Folkboat-ish plan)
+  if (opts.hull) { const hp = []; for (let i = 0; i <= 40; i++) { const t = i / 40, y = -3.8 + 7.6 * t, hw = 1.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (t + 0.06) / 1.0)), 0.55) * (t > 0.92 ? 0.85 : 1); hp.push(toS(hw, y)); } for (let i = 40; i >= 0; i--) { const t = i / 40, y = -3.8 + 7.6 * t, hw = 1.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (t + 0.06) / 1.0)), 0.55) * (t > 0.92 ? 0.85 : 1); hp.push(toS(-hw, y)); } el(svg, 'path', { d: path(hp) + 'Z', fill: '#1d3042', stroke: '#3f5a72', 'stroke-width': 1.5 }); }
+  // sails in the boat frame (m): jib from the stay's luff point, main from the mast; leeward = port (x<0) on starboard tack
+  const jibLuff = [0, -2.6 + opts.jibLuffAft], mastAft = [0, -0.85];
+  const jibAng = 90 + opts.jibSheet, mainAng = 90 + opts.mainSheet; // screen angle: 90 = straight aft (+y); positive sheet angles swing to port (x<0) → use 90+sheet with x mirrored
+  const sec = (L, chord, ang, cam, dr) => section(L[0], L[1], chord, ang, cam, dr, 14).map(([x, y]) => [x, y]);
+  // build in boat frame then mirror x so leeward is port (-x): angle 90+sheet points aft and to +x; mirror after
+  const jib = sec(jibLuff, opts.jibChord, jibAng, opts.jibCam, 0.42);
+  const main = sec(mastAft, opts.mainChord, mainAng, opts.mainCam, 0.47);
+  const sails = opts.jibOnly ? [jib] : [jib, main];
+  const vel = solve(sails, U);
+  // streamlines, seeded upstream on a line across the flow
+  const bounds = [-W / 2 / sc, (0 - opts.top) / sc, W / 2 / sc, (H - opts.top) / sc];
+  const n = opts.lines, perp = [U[1], -U[0]], c0 = opts.seedC;
+  for (let i = 0; i < n; i++) {
+    const o = (i - (n - 1) / 2) * opts.spacing, x0 = c0[0] - U[0] * opts.back + perp[0] * o, y0 = c0[1] - U[1] * opts.back + perp[1] * o;
+    const pts = stream(vel, x0, y0, 1100, 0.02, bounds).filter(p => p[1] > bounds[1] && p[1] < bounds[3] && p[0] > bounds[0] && p[0] < bounds[2]);
+    for (let k = 1; k < pts.length; k += 3) { const a = toS(pts[k - 1][0], pts[k - 1][1]), b = toS(pts[Math.min(pts.length - 1, k + 2)][0], pts[Math.min(pts.length - 1, k + 2)][1]); el(svg, 'line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: speedCol(pts[k][2] || 1), 'stroke-width': 1.4, 'stroke-opacity': 0.85 }); }
+  }
+  // separation (from the sim's stall amount): eddies behind the stalled leech
+  const sep = (s, amt, col) => { if (amt <= 0) return; const n2 = s.length - 1, start = Math.floor(n2 * (1 - amt)), lee = s.slice(start); for (let k = 0; k < 5; k++) { const p = lee[Math.min(lee.length - 1, Math.floor(k * lee.length / 5))], [sx, sy] = toS(p[0] - 0.12 - 0.05 * k, p[1] + 0.05 * k); el(svg, 'circle', { cx: sx, cy: sy, r: 4 + 2.5 * k, fill: 'none', stroke: col, 'stroke-width': 1.3, 'stroke-dasharray': '3 3' }); } };
+  // luffing: the front of the sail backs (bubble) — shown as a dashed reversed curve on the windward face at the luff
+  const sailCol = s => s === 'luff' ? 'var(--luff)' : s === 'stall' ? 'var(--stall)' : '#f4f1e8';
+  for (const [s, st] of [[jib, opts.jibState], ...(opts.jibOnly ? [] : [[main, opts.mainState]])]) el(svg, 'path', { d: path(s.map(([x, y]) => toS(x, y))), fill: 'none', stroke: sailCol(st), 'stroke-width': 4, 'stroke-linecap': 'round' });
+  if (opts.jibState === 'stall') sep(jib, 0.45, 'var(--stall)');
+  if (!opts.jibOnly && opts.mainState === 'stall') sep(main, 0.3, 'var(--stall)');
+  if (opts.jibState === 'luff') { const [a, b2] = [toS(jib[1][0] + 0.12, jib[1][1]), toS(jib[4][0] + 0.18, jib[4][1])]; el(svg, 'path', { d: `M${a[0]} ${a[1]} Q ${a[0] + 14} ${(a[1] + b2[1]) / 2} ${b2[0]} ${b2[1]}`, stroke: 'var(--luff)', fill: 'none', 'stroke-width': 2, 'stroke-dasharray': '4 3' }); }
+  // telltales on the jib's luff: windward (starboard, +x) and leeward (port)
+  const tl = (side, state) => { const p = jib[2], [sx, sy] = toS(p[0] + side * 0.05, p[1]); const col = side > 0 ? '#18a14a' : '#e0281e'; let dx = -U[0], dy = U[1];
+    const ang = state === 'lift' ? -1.1 : state === 'droop' ? 1.0 : 0; const d = [U[0] * Math.cos(ang) - U[1] * Math.sin(ang), U[0] * Math.sin(ang) + U[1] * Math.cos(ang)];
+    el(svg, 'line', { x1: sx, y1: sy, x2: sx + d[0] * 26 * (side > 0 ? 1 : 1), y2: sy + d[1] * 26, stroke: col, 'stroke-width': 3, 'stroke-linecap': 'round' }); };
+  const tls = { good: ['stream', 'stream'], luff: ['lift', 'stream'], stall: ['stream', 'droop'] }[opts.jibState];
+  if (opts.telltales) { tl(1, tls[0]); tl(-1, tls[1]); }
+  // apparent wind arrow
+  if (opts.arrow) { const a0 = toS(3.6, -4.2), a1 = [a0[0] + U[0] * 70, a0[1] + U[1] * 70]; el(svg, 'line', { x1: a0[0], y1: a0[1], x2: a1[0], y2: a1[1], stroke: 'var(--accent)', 'stroke-width': 3 }); el(svg, 'path', { d: `M${a1[0]} ${a1[1]} l ${(-U[0]*12 + U[1]*6).toFixed(1)} ${(-U[1]*12 - U[0]*6).toFixed(1)} l ${(-U[1]*12).toFixed(1)} ${(U[0]*12).toFixed(1)} Z`, fill: 'var(--accent)' }); el(svg, 'text', { x: a0[0] + 10, y: a0[1] - 6, fill: 'var(--accent)', 'font-size': 13 }).textContent = 'apparent wind 28°'; }
+  return { toS, jib, main };
+}
+const big = draw('main', 830, 560, { scale: 52, top: 300, awa: 28, jibSheet: 10, mainSheet: 3, jibChord: 2.2, mainChord: 3.0, jibCam: 0.12, mainCam: 0.13, jibLuffAft: 0, jibState: 'good', mainState: 'stall', hull: true, lines: 34, spacing: 0.28, back: 6.5, seedC: [-0.6, -0.4], telltales: true, arrow: true });
+// labels on the big view
+const svg = document.getElementById('main');
+const lab = (x, y, t, col = '#cfe0ee') => { const e = el(svg, 'text', { x, y, fill: col, 'font-size': 13 }); e.textContent = t; };
+lab(470, 118, 'jib: attached', 'var(--good)'); lab(470, 136, 'both telltales streaming', '#9fb0bf');
+el(svg,'line',{x1:345,y1:318,x2:418,y2:318,stroke:'#9fe8d6','stroke-width':1}); lab(180, 314, 'the slot: faster air along', '#9fe8d6'); lab(180, 331, "the main's lee side", '#9fe8d6');
+lab(70, 455, 'main leech: stalled 30%', 'var(--stall)'); lab(70, 472, 'ease ~6° · leech telltales hiding', '#9fb0bf');
+// underwater inset: keel at leeway
+{ const g = el(svg, 'g', {}); el(g, 'rect', { x: 640, y: 380, width: 175, height: 165, rx: 8, fill: '#0b1520', stroke: '#2a4258' }); el(g, 'text', { x: 652, y: 400, fill: '#9fb0bf', 'font-size': 12 }).textContent = 'Under water · leeway 3.8°';
+  const kx = 727, ky = 470, lw = 3.8 * Math.PI / 180; el(g, 'ellipse', { cx: kx, cy: ky, rx: 7, ry: 50, fill: '#33495e', transform: `rotate(0 ${kx} ${ky})` });
+  for (let i = -3; i <= 3; i++) { const x0 = kx + i * 18 - 80 * Math.sin(lw) , y0 = ky - 80; el(g, 'line', { x1: x0, y1: y0, x2: x0 + 160 * Math.sin(lw) * 1, y2: y0 + 160, stroke: '#5fa8d8', 'stroke-width': 1.2, 'stroke-opacity': 0.8 }); }
+  el(g, 'text', { x: 652, y: 538, fill: '#9fb0bf', 'font-size': 11 }).textContent = 'water meets the keel at leeway'; }
+// legend
+lab(18, 30, 'Flow speed:', '#9fb0bf'); for (let i = 0; i < 6; i++) el(svg, 'rect', { x: 100 + i * 22, y: 20, width: 22, height: 12, fill: speedCol(0.7 + i * 0.18) }); lab(240, 30, 'faster', '#9fb0bf');
+lab(18, 52, 'Sail colour: white attached · yellow luffing · red stalled', '#9fb0bf'); lab(18, 74, 'Telltales on the jib luff: green starboard · red port', '#9fb0bf');
+// the three jib states
+for (const [id, st, ang] of [['m1', 'good', 10], ['m2', 'luff', 22], ['m3', 'stall', 2]]) draw(id, 250, 150, { scale: 40, top: 22, awa: 28, jibSheet: ang, mainSheet: 3, jibChord: 2.2, mainChord: 3, jibCam: 0.12, mainCam: 0.13, jibLuffAft: 2.3, jibState: st, mainState: 'good', jibOnly: true, lines: 15, spacing: 0.2, back: 3, seedC: [-0.5, 0.6], telltales: true, arrow: false });
+</script>
+</body></html>
