@@ -385,9 +385,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // running) course, deciding nothing else until she's there (re-deciding each moment, mid-tack, she'd stall head to
     // wind or wheel round and run off). Dropped once she's round, if it hasn't happened in 20 s (something stopped her),
     // or if she's on another leg or point of sail than the one she decided it for.
-    // (upwind or not, with some hysteresis as for running below: rounding a leeward mark her aim point, 12 m off it,
-    // can sit right on the 44° line as she comes to it, and deciding afresh each time she thought, she flipped between
-    // close-hauled and the run every half second and sailed into the mark)
+    // (upwind or not, with some hysteresis as for running below: decided afresh each time she thought, her aim point on
+    // the 44° line flipped her between beating and reaching every half second, 10 to 16 times a race, the wind's own
+    // short swing of 2–3° carrying it back and forth. The 4° between in and out is a little more than that swing. Each
+    // leg decides afresh: carried over a rounding, a close reach at 44–48° would have been sailed as a beat)
+    if (ai.upwindLeg !== b.leg) { ai.upwind = undefined; ai.upwindLeg = b.leg; }
     const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt);
     const upwind = (ai.upwind = ai.upwind ? rel < 48 : rel < 44) && !b.ocs;
     // the course she'd steer to make good the straight line to it, up-current of it by as much as the current across
