@@ -1421,6 +1421,9 @@ export class World {
     const beat = beatAngle(o.ww.kt), u = V(o.tack === 'S' ? o.ww.from - beat : o.ww.from + beat), r = sub(m.p, o), along = dot(r, u), far = Math.max(...(m.reach ?? [0]));
     if (along + far <= 0) return false; // she's past all of it
     if ((cross(u, r) > 0) !== (m.side === 'p')) return false; // (cross > 0: the island lies to port of her course)
+    // "in a position to pass to windward of it": the island on her leeward side (to port on starboard tack, to starboard
+    // on port); a boat leaving it on her windward side passes to leeward of it, and isn't fetching it
+    if ((m.side === 'p') !== (o.tack === 'S')) return false;
     const L = Math.max(0, along) + far + 200;
     return landAlong(o, { x: o.x + u.x * L, y: o.y + u.y * L }) === Infinity;
   }

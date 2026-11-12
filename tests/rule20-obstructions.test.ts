@@ -15,7 +15,7 @@ import ss41 from '../src/courses/data/seaweed-soup-2026-course41.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { V, n360, type Vec } from '../src/core/math';
+import { V, brg, n360, wrap, type Vec } from '../src/core/math';
 import { LL } from '../src/geo/geo';
 import { WHARF, onLand } from '../src/geo/shore';
 import { inBasin } from '../src/geo/marina';
@@ -155,6 +155,35 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
       }
     }
     expect(found).toBeGreaterThan(0);
+  });
+
+  it('an AI boat pinned at a pier head she can clear by bearing away 10°, with a boat to windward, bears away round it: she does not tack into that boat', () => {
+    const beat0 = 42;
+    let tried = 0;
+    for (const L of WHARF.lines) {
+      if (tried >= 3) break;
+      const tip = L.pts[L.pts.length - 1];
+      for (const tack of ['S', 'P'] as const) {
+        const { w, red } = race(); const blue = w.boats[0]; // you sit to windward of Red, holding your course
+        // (a regression check: in the scenes found here the AI also bore away before this fix, by its other paths)
+        const beat = beatAngle(w.wind.kt) || beat0, h = tack === 'S' ? w.wind.from - beat : w.wind.from + beat, u = V(h), away = V(h + (tack === 'S' ? -SUBSTANTIAL_TURN : SUBSTANTIAL_TURN));
+        const p = { x: tip.x - u.x * 18, y: tip.y - u.y * 18 }, wv = V(w.wind.from), bp = { x: p.x + wv.x * 8, y: p.y + wv.y * 8 };
+        const clear = (v: Vec, len: number, side: number) => { const n = { x: v.y, y: -v.x }; for (let s = 0; s <= len; s += 0.25) if (onLand({ x: p.x + v.x * s + n.x * side, y: p.y + v.y * s + n.y * side })) return false; return true; };
+        if (onLand(p) || onLand(bp) || clear(u, 40, 0)) continue;
+        if (![-1.8, 0, 1.8].every(k => clear(away, 4 * hailRange(2.4), k))) continue;
+        if (!clear(V(h), 0, 8) || inBasin(p)) continue;
+        // a leg whose mark is upwind of here, so she's beating
+        const leg = w.C.marks.findIndex(m => Math.abs(wrap(brg(m.p.x - p.x, m.p.y - p.y) - w.wind.from)) < 35);
+        if (leg < 0) continue;
+        red.leg = blue.leg = leg;
+        tried++;
+        sail(w, red, p, tack); sail(w, blue, bp, tack);
+        const t0 = w.t;
+        for (let t = 0; t < 8; t += DT) { blue.h = h; blue.desired = h; w.step(DT); }
+        expect(red.lastTackT < t0 || red.tack === tack, `${L.name ?? L.kind}: tacked into the boat to windward`).toBe(true);
+      }
+    }
+    expect(tried).toBeGreaterThan(0);
   });
 
   it('Alcatraz as the mark (course 41): she may not hail a boat that is fetching it (20.1, last sentence), but may one that is not', () => {
