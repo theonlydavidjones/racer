@@ -3555,6 +3555,7 @@
   },
   {
    "id": "SFB1305",
+   "refOnly": true,
    "kind": "harmonic",
    "name": "San Mateo Bridge",
    "note": "reference for subordinate stations",

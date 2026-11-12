@@ -70,13 +70,15 @@ console.log(`${HARMONIC.length} harmonic, ${SUBORDINATE.length} subordinate stat
 const stations = [], fixtures = {};
 // A station NOAA publishes near the surface as offsets from its own deeper bin (Richmond, PCT0666: bin 1 from bin 2):
 // the deeper bin is kept only as the reference, under its own key (id@bin), and isn't one of the field's stations.
+const inWorld = m => m.lat > 37.735 && m.lat < 37.986 && m.lng > -122.61 && m.lng < -122.213; // (the sim's world: the terrain's box)
 const key = s => SUBORDINATE.some(x => x.id === s.id) ? `${s.id}@${s.bin}` : s.id;
 for (const s of HARMONIC) {
   const m = await meta(s.id);
   const hc = (await get(`/mdapi/prod/webapi/stations/${s.id}/harcon.json?bin=${s.bin}&units=english`)).HarmonicConstituents.filter(c => c.binNbr === s.bin);
   const cp = await series(s.id, s.bin, 6);
   stations.push({
-    id: key(s), ...(key(s) !== s.id ? { refOnly: true } : {}), kind: 'harmonic', name: m.name, note: s.note, lat: round(m.lat, 5), lon: round(m.lng, 5), bin: s.bin, depthM: round(hc[0].binDepth * 0.3048, 1),
+    // (a reference outside the world, San Mateo Bridge's, is only a reference too: its stream is a different water's)
+    id: key(s), ...(key(s) !== s.id || !inWorld(m) ? { refOnly: true } : {}), kind: 'harmonic', name: m.name, note: s.note, lat: round(m.lat, 5), lon: round(m.lng, 5), bin: s.bin, depthM: round(hc[0].binDepth * 0.3048, 1),
     flood: cp[0].meanFloodDir, ebb: cp[0].meanEbbDir,
     z0: round(hc[0].majorMeanSpeed),
     hc: hc.map(c => [c.constituentName, round(c.majorAmplitude, 4), round(c.majorPhaseGMT, 2)])

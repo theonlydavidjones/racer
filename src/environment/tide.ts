@@ -1,6 +1,7 @@
 import { shoreRelief } from './current';
 import { KT, V, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
+import { landBetween, onGround } from '../geo/shore';
 import { predict, type Constituents } from './harmonics';
 import raw from './data/sf-currents.json';
 
@@ -115,7 +116,7 @@ export class CurrentField {
   }
   /**
    * The stations that count in each 400 m cell, worked out the first time the cell is asked about (the weights don't
-   * change with time). The weakest are left out for as long as the most they could all weigh together, anywhere in the
+   * change with time): those in sight over the water, less the weakest. The weakest are left out for as long as the most they could all weigh together, anywhere in the
    * cell, is under 0.1% of the least the weights add up to there: the current changes by under 0.2% of the strongest
    * station's (under 0.01 kt).
    */
@@ -128,15 +129,23 @@ export class CurrentField {
     let l = this.cells.get(key);
     if (!l) {
       const cx = (ci + 0.5) * C, cy = (cj + 0.5) * C, R = C * Math.SQRT1_2, n = this.stations.length, hi = new Float64Array(n);
+      // only the stations in sight over the water: a station's stream doesn't reach through an island or a point of land
+      // (Clipper Cove isn't driven by the stream west of Treasure Island). Seen from the cell's middle, or the first spot
+      // in the cell that's water; a cell that sees none of them (a basin's corner) takes them all, eased by the shore.
+      const from = [[0, 0], [150, 0], [-150, 0], [0, 150], [0, -150], [150, 150], [-150, 150], [150, -150], [-150, -150]].map(([dx, dy]) => ({ x: cx + dx, y: cy + dy })).find(q => !onGround(q));
+      const sees = (i: number) => !from || !landBetween(from, this.stations[i].p);
+      let seen = Array.from({ length: n }, (_, i) => sees(i));
+      if (!seen.some(Boolean)) seen = seen.map(() => true);
       let low = 0;
       for (let i = 0; i < n; i++) {
+        if (!seen[i]) continue;
         const s = this.stations[i].p, d = Math.hypot(cx - s.x, cy - s.y), dmin = Math.max(0, d - R), dmax = d + R;
         hi[i] = 1 / (dmin * dmin + this.soft2[i]) ** 1.5; low += 1 / (dmax * dmax + this.soft2[i]) ** 1.5;
       }
       // the weakest go, for as long as all that's gone could weigh no more than 0.1% of the rest
-      const order = [...hi.keys()].sort((a, b) => hi[a] - hi[b]);
+      const order = [...hi.keys()].filter(i => seen[i]).sort((a, b) => hi[a] - hi[b]), m = order.length;
       let gone = 0, k = 0;
-      while (k < n - 1 && gone + hi[order[k]] <= 1e-3 * low) gone += hi[order[k++]];
+      while (k < m - 1 && gone + hi[order[k]] <= 1e-3 * low) gone += hi[order[k++]];
       l = Int32Array.from(order.slice(k).sort((a, b) => a - b));
       if (!(Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(ci) < 512 && Math.abs(cj) < 512)) return l; // (far off: not filed)
       this.cells.set(key, l);
@@ -161,7 +170,7 @@ export class CurrentField {
    */
   atShore(p: Vec): Vec {
     let dn = Infinity;
-    { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest is always among them)
+    { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest in sight is always among them)
     dn = Math.sqrt(dn);
     const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600), c = this.at(p);
     return { x: c.x * k, y: c.y * k };

@@ -1,7 +1,7 @@
 import { KT, V, clamp, n360, type Vec } from '../core/math';
 import type { Rng } from '../core/rng';
 import { LL } from '../geo/geo';
-import { shoreDist } from '../geo/shore';
+import { anyShoreDist } from '../geo/shore';
 import { terrainLee } from './shadows';
 import clim from './data/sf-wind-climate.json';
 
@@ -125,7 +125,7 @@ export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 2
 
 export function windTerrain(p: Vec, from = 255): number {
   const slot = slotWeight(p) * slotFlow(from);
-  const shore = 0.8 + 0.2 * clamp(shoreDist(p) / 400, 0, 1);
+  const shore = 0.8 + 0.2 * clamp(anyShoreDist(p) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
   return (1 + SLOT_BOOST * slot) * shore;
 }
 

@@ -1,6 +1,6 @@
 import { clamp, n360, wrap, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
-import { shoreDist } from '../geo/shore';
+import { anyShoreDist, onGround } from '../geo/shore';
 import real from './data/sf-real-days.json';
 import { swellFor, type Swell, type SwellDay } from './sea';
 import { OPEN_WATER, breezeAt, windKindFor, windTerrain, type Breeze, type WindDay, type WindKind } from './wind';
@@ -99,7 +99,7 @@ function interp(samples: Sample[], min: number): { kt: number; from: number; gus
 /* ---------- the wind across the course ---------- */
 
 /** The shore's own slowdown (wind.ts), without the slot: for the forecast grid, which has the Gate's channelling in it. */
-const shoreFactor = (p: Vec) => 0.8 + 0.2 * clamp(shoreDist(p) / 400, 0, 1);
+const shoreFactor = (p: Vec) => 0.8 + 0.2 * clamp(anyShoreDist(p) / 400, 0, 1);
 const FORT_POINT = LL(37.8063, -122.4659);
 /** The forecast's reference cell (MTR 84,107), whose hourly wind is the course-wide wind on a forecast day. */
 const REF = LL(37.8118, -122.4488);
@@ -184,9 +184,17 @@ function observedField(date: string, kind: WindKind) {
   };
 }
 
+/**
+ * How much of each forecast cell (2.5 km) is water: its weight in the wind over the water. The model's cells over the
+ * land (the East Bay's flats, Marin) forecast the wind over the land, a fifth to a third lighter; near the shore the
+ * water's own cells say what it does on the water.
+ */
+let WATER: number[] | null = null;
+const waterShare = (cells: Vec[]) => WATER ??= cells.map(c => { let n = 0; for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) if (!onGround({ x: c.x + i * 500, y: c.y + j * 500 })) n++; return n / 25; });
+
 /** A forecast day: the NWS grid's wind across the race area (2.5 km cells), relative to the reference cell, plus the shore. */
 function forecastField(date: string) {
-  const g = R.grid.days[date], cells = R.grid.cells.map(([la, lo]) => LL(la, lo));
+  const g = R.grid.days[date], cells = R.grid.cells.map(([la, lo]) => LL(la, lo)), water = waterShare(cells);
   return (p: Vec, tMin: number) => {
     const hf = clamp(localMin(tMin) / 60 - R.grid.hours[0], 0, R.grid.hours.length - 1), h0 = Math.floor(hf), h1 = Math.min(R.grid.hours.length - 1, h0 + 1), f = hf - h0;
     const uv = (q: Vec) => {
@@ -194,14 +202,17 @@ function forecastField(date: string) {
       cells.forEach((c, i) => {
         const k0 = g.kt[i]?.[h0], k1 = g.kt[i]?.[h1], d0 = g.from[i]?.[h0], d1 = g.from[i]?.[h1];
         if (k0 == null || k1 == null || d0 == null || d1 == null) return;
-        const kt = k0 + (k1 - k0) * f, d = (d0 + wrap(d1 - d0) * f) * Math.PI / 180, wt = 1 / ((q.x - c.x) ** 2 + (q.y - c.y) ** 2 + 1200 * 1200) ** 1.5;
+        if (water[i] === 0) return;
+        const kt = k0 + (k1 - k0) * f, d = (d0 + wrap(d1 - d0) * f) * Math.PI / 180, wt = water[i] / ((q.x - c.x) ** 2 + (q.y - c.y) ** 2 + 1200 * 1200) ** 1.5;
         u += Math.sin(d) * kt * wt; v += Math.cos(d) * kt * wt; w += wt;
       });
       return w > 0 ? { kt: Math.hypot(u, v) / w, from: (Math.atan2(u, v) * 180 / Math.PI + 360) % 360 } : null;
     };
     const a = uv(p), r = uv(REF);
     if (!a || !r || r.kt < 0.5) return { k: shoreFactor(p), turn: 0 };
-    return { k: shoreFactor(p) * clamp(a.kt / r.kt, 0.3, 2), turn: clamp(wrap(a.from - r.from), -40, 40) };
+    // (the limits only guard against a broken forecast: across the whole world the water's cells turn up to about 75°
+    // from the reference cell's wind along the Berkeley flats, and blow from a fifth to twice as hard)
+    return { k: shoreFactor(p) * clamp(a.kt / r.kt, 0.15, 3), turn: clamp(wrap(a.from - r.from), -100, 100) };
   };
 }
 

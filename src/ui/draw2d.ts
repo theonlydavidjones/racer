@@ -22,7 +22,7 @@ function bayLand(): HTMLCanvasElement {
   const L = landGrid(), cf = L.cityfront, small = document.createElement('canvas'); small.width = L.nx; small.height = L.ny;
   const sg = small.getContext('2d')!, id = sg.createImageData(L.nx, L.ny);
   for (let j = 0; j < L.ny; j++) for (let i = 0; i < L.nx; i++) {
-    const lat = L.north - (j + 0.5) / L.ny * (L.north - L.south), lon = L.west + (i + 0.5) / L.nx * (L.east - L.west);
+    const lat = L.north - j / (L.ny - 1) * (L.north - L.south), lon = L.west + i / (L.nx - 1) * (L.east - L.west); // (each cell centred on its terrain sample, at a grid node)
     const inCf = lat > cf.south && lat < cf.north && lon > cf.west && lon < cf.east; // drawn from the Cityfront shore instead
     if (L.grid[j * L.nx + i] && !inCf) id.data[(j * L.nx + i) * 4 + 3] = 255;
   }
@@ -38,7 +38,9 @@ function bayLand(): HTMLCanvasElement {
 export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
   { // the rest of the bay: an image placed with the map's own transform
     const L = landGrid(), img = bayLand(), at = (lat: number, lon: number) => { const p = LL(lat, lon); return tf(p.x, p.y); };
-    const p0 = at(L.north, L.west), p1 = at(L.north, L.east), p2 = at(L.south, L.west);
+    // (the cells are centred on the grid's nodes: the image reaches half a cell past the outer ones)
+    const hx = (L.east - L.west) / (L.nx - 1) / 2, hy = (L.north - L.south) / (L.ny - 1) / 2;
+    const p0 = at(L.north + hy, L.west - hx), p1 = at(L.north + hy, L.east + hx), p2 = at(L.south - hy, L.west - hx);
     ctx.save(); ctx.transform((p1[0] - p0[0]) / img.width, (p1[1] - p0[1]) / img.width, (p2[0] - p0[0]) / img.height, (p2[1] - p0[1]) / img.height, p0[0], p0[1]);
     ctx.drawImage(img, 0, 0); ctx.restore();
   }

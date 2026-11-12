@@ -3,6 +3,7 @@ import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
 import wharf from './data/wharf.json';
+import eastPiers from './data/east-piers.json';
 import { HARBORS, harborIndex, hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); from the Gate to Pier 27
@@ -96,9 +97,16 @@ const GRID = (() => {
 })();
 const MLAT = 111320, MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
 const CF = { x0: LL(0, -122.4800).x, x1: LL(0, -122.4000).x, y0: LL(37.780, 0).y, y1: LL(37.8150, 0).y };
+/*
+ * The mask's samples are the terrain's, taken at grid nodes (lon = west + i·(east − west)/(nx − 1)), so cell i is the
+ * half-cell either side of its node: the same land the terrain mesh draws (render/terrain.ts). In continuous cell
+ * coordinates (cell i spans [i, i + 1)):
+ */
+const CW = (M.east - M.west) / (M.nx - 1), CH = (M.north - M.south) / (M.ny - 1); // degrees per cell
+const cellX = (lon: number) => (lon - M.west) / CW + 0.5, cellY = (lat: number) => (M.north - lat) / CH + 0.5;
 function inTerrain(p: Vec): boolean {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
-  const i = Math.floor((lon - M.west) / (M.east - M.west) * M.nx), j = Math.floor((M.north - lat) / (M.north - M.south) * M.ny);
+  const i = Math.floor(cellX(lon)), j = Math.floor(cellY(lat));
   return i >= 0 && j >= 0 && i < M.nx && j < M.ny && GRID[j * M.nx + i] === 1;
 }
 
@@ -116,16 +124,27 @@ export const onGround = (p: Vec): boolean =>
  */
 export interface WharfPart { name?: string; kind: string; pts: Vec[]; width?: number; box: { x0: number; x1: number; y0: number; y1: number } }
 const boxOf = (pts: Vec[], pad: number) => ({ x0: Math.min(...pts.map(q => q.x)) - pad, x1: Math.max(...pts.map(q => q.x)) + pad, y0: Math.min(...pts.map(q => q.y)) - pad, y1: Math.max(...pts.map(q => q.y)) + pad });
-export const WHARF: { areas: WharfPart[]; lines: WharfPart[] } = {
-  areas: W.piers.map(a => { const pts = a.pts.map(q => LL(q[0], q[1])); return { name: a.name, kind: a.kind, pts, box: boxOf(pts, 0) }; }),
-  lines: W.lines.map(l => { const pts = l.pts.map(q => LL(q[0], q[1])); return { name: l.name, kind: l.kind, width: l.width, pts, box: boxOf(pts, l.width / 2) }; })
+export interface PierGroup { areas: WharfPart[]; lines: WharfPart[]; box: WharfPart['box'] }
+const group = (D: WharfData): PierGroup => {
+  const areas = D.piers.map(a => { const pts = a.pts.map(q => LL(q[0], q[1])); return { name: a.name, kind: a.kind, pts, box: boxOf(pts, 0) }; });
+  const lines = D.lines.map(l => { const pts = l.pts.map(q => LL(q[0], q[1])); return { name: l.name, kind: l.kind, width: l.width, pts, box: boxOf(pts, l.width / 2) }; });
+  return { areas, lines, box: boxOf([...areas, ...lines].flatMap(a => [{ x: a.box.x0, y: a.box.y0 }, { x: a.box.x1, y: a.box.y1 }]), 0) };
 };
-const WHARF_BOX = boxOf([...WHARF.areas, ...WHARF.lines].flatMap(a => [{ x: a.box.x0, y: a.box.y0 }, { x: a.box.x1, y: a.box.y1 }]), 0);
+export const WHARF: PierGroup = group(W);
+/**
+ * The piers out in the East Bay and the north reach (OpenStreetMap, scripts/make-east-piers.mjs): the Berkeley Pier, its
+ * abandoned outer part, and Chevron's Long Wharf at Richmond. Solid, like the Wharf's; kept as a group of their own, so a
+ * question about a point (or a line) far from either group doesn't look at the other's parts.
+ */
+export const EAST_PIERS: PierGroup = group(eastPiers as unknown as WharfData);
+const GROUPS = [WHARF, EAST_PIERS];
 const inB = (p: Vec, b: WharfPart['box']) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1;
 export function hitsWharf(p: Vec): boolean {
-  if (!inB(p, WHARF_BOX)) return false;
-  for (const a of WHARF.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return true;
-  for (const l of WHARF.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return true;
+  for (const G of GROUPS) {
+    if (!inB(p, G.box)) continue;
+    for (const a of G.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return true;
+    for (const l of G.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return true;
+  }
   return false;
 }
 
@@ -151,7 +170,6 @@ export function alongside(pts: Vec[], closed: boolean, k: number, q: Vec, n: Vec
  */
 export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; along: number } | null {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
-  if (p.x < WHARF_BOX.x0 - max || p.x > WHARF_BOX.x1 + max || p.y < WHARF_BOX.y0 - max || p.y > WHARF_BOX.y1 + max) return null;
   type Best = { d: number; q: Vec; part: WharfPart; closed: boolean; k: number };
   let best: Best | null = null;
   const near = (b: WharfPart['box']) => p.x >= b.x0 - max && p.x <= b.x1 + max && p.y >= b.y0 - max && p.y <= b.y1 + max;
@@ -161,8 +179,11 @@ export function wharfNearest(p: Vec, max = 60): { d: number; n: Vec; along: numb
     if (!best || d < best.d) best = { d, q, part, closed, k };
   };
   let inside = false;
-  for (const a of WHARF.areas) if (near(a.box)) { const n = a.pts.length; for (let i = 0; i < n; i++) seg(a, true, i + 1, a.pts[i], a.pts[(i + 1) % n], 0); if (inPoly(p, a.pts)) inside = true; }
-  for (const l of WHARF.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l, false, i, l.pts[i - 1], l.pts[i], l.width! / 2);
+  for (const G of GROUPS) {
+    if (!near(G.box)) continue;
+    for (const a of G.areas) if (near(a.box)) { const n = a.pts.length; for (let i = 0; i < n; i++) seg(a, true, i + 1, a.pts[i], a.pts[(i + 1) % n], 0); if (inPoly(p, a.pts)) inside = true; }
+    for (const l of G.lines) if (near(l.box)) for (let i = 1; i < l.pts.length; i++) seg(l, false, i, l.pts[i - 1], l.pts[i], l.width! / 2);
+  }
   const b = best as Best | null;
   if (!b || b.d > max) return null;
   const dx = p.x - b.q.x, dy = p.y - b.q.y, L = Math.hypot(dx, dy) || 1, n = { x: dx / L, y: dy / L };
@@ -198,16 +219,18 @@ export function wharfShelter(p: Vec): number {
 /** Does the straight line from a to b touch any of the Wharf's piers, breakwaters or docks? (Exact: they're 1–10 m wide.) */
 export function wharfCrossed(a: Vec, b: Vec): boolean {
   const bx0 = Math.min(a.x, b.x), bx1 = Math.max(a.x, b.x), by0 = Math.min(a.y, b.y), by1 = Math.max(a.y, b.y);
-  if (bx1 < WHARF_BOX.x0 || bx0 > WHARF_BOX.x1 || by1 < WHARF_BOX.y0 || by0 > WHARF_BOX.y1) return false;
   const hit = (bb: WharfPart['box']) => !(bx1 < bb.x0 || bx0 > bb.x1 || by1 < bb.y0 || by0 > bb.y1);
   const cr = (o: Vec, p: Vec, q: Vec) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
   const crosses = (p: Vec, q: Vec, r: Vec, s: Vec) => (cr(p, q, r) > 0) !== (cr(p, q, s) > 0) && (cr(r, s, p) > 0) !== (cr(r, s, q) > 0);
   const segSeg = (p: Vec, q: Vec, r: Vec, s: Vec) => crosses(p, q, r, s) ? 0 : Math.min(segPt(p, r, s), segPt(q, r, s), segPt(r, p, q), segPt(s, p, q));
-  for (const A of WHARF.areas) if (hit(A.box)) {
-    if (inPoly(a, A.pts) || inPoly(b, A.pts)) return true;
-    for (let i = 0; i < A.pts.length; i++) if (crosses(a, b, A.pts[i], A.pts[(i + 1) % A.pts.length])) return true;
+  for (const G of GROUPS) {
+    if (!hit(G.box)) continue;
+    for (const A of G.areas) if (hit(A.box)) {
+      if (inPoly(a, A.pts) || inPoly(b, A.pts)) return true;
+      for (let i = 0; i < A.pts.length; i++) if (crosses(a, b, A.pts[i], A.pts[(i + 1) % A.pts.length])) return true;
+    }
+    for (const L of G.lines) if (hit(L.box)) for (let i = 1; i < L.pts.length; i++) if (segSeg(a, b, L.pts[i - 1], L.pts[i]) <= L.width! / 2) return true;
   }
-  for (const L of WHARF.lines) if (hit(L.box)) for (let i = 1; i < L.pts.length; i++) if (segSeg(a, b, L.pts[i - 1], L.pts[i]) <= L.width! / 2) return true;
   return false;
 }
 
@@ -315,9 +338,9 @@ export function landAlong(a: Vec, b: Vec): number {
   const line = (pts: Vec[], half: number) => { for (let i = 1; i < pts.length; i++) { const t = lineHit(a, b, pts[i - 1], pts[i], half); if (t < best) solid(t); } };
   const dock = (pts: Vec[], half: number) => { const t = dockHit(a, b, pts, half); if (t < best) solid(t); };
   // the Wharf's piers, breakwaters and docks, and the marinas' (always solid, in a basin or out of it)
-  if (overlaps(bb, WHARF_BOX)) {
-    for (const A of WHARF.areas) if (overlaps(bb, A.box)) poly(A.pts, solid);
-    for (const W of WHARF.lines) if (overlaps(bb, W.box)) line(W.pts, W.width! / 2);
+  for (const G of GROUPS) if (overlaps(bb, G.box)) {
+    for (const A of G.areas) if (overlaps(bb, A.box)) poly(A.pts, solid);
+    for (const W of G.lines) if (overlaps(bb, W.box)) line(W.pts, W.width! / 2);
   }
   for (const { H, basinBox } of HARBOR_BASINS) {
     if (!overlaps(bb, H.reach)) continue;
@@ -346,7 +369,7 @@ export function landAlong(a: Vec, b: Vec): number {
     const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
   }
   // the terrain's land cells (lat and lon are linear in x and y, so the line is straight on the grid too)
-  const gx = (p: Vec) => ((LON0 + p.x / MLON) - M.west) / (M.east - M.west) * M.nx, gy = (p: Vec) => (M.north - (LAT0 + p.y / MLAT)) / (M.north - M.south) * M.ny;
+  const gx = (p: Vec) => cellX(LON0 + p.x / MLON), gy = (p: Vec) => cellY(LAT0 + p.y / MLAT);
   gridWalk(gx(a), gy(a), gx(b), gy(b), M.nx, M.ny, (i, j, t) => {
     if (t > best) return true;
     if (GRID[j * M.nx + i] === 1) maybe(t);
@@ -362,14 +385,14 @@ export function landAlong(a: Vec, b: Vec): number {
  */
 export function terrainNearest(p: Vec, max = 30): { d: number; n: Vec } | null {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
-  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON, cw = (M.east - M.west) / M.nx, ch = (M.north - M.south) / M.ny;
-  const i0 = Math.floor((lon - M.west) / cw), j0 = Math.floor((M.north - lat) / ch);
+  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON, cw = CW, ch = CH;
+  const i0 = Math.floor(cellX(lon)), j0 = Math.floor(cellY(lat));
   const ri = Math.ceil(max / (cw * MLON)) + 1, rj = Math.ceil(max / (ch * MLAT)) + 1;
   let best: { d: number; q: Vec; c: Vec } | null = null;
   for (let j = j0 - rj; j <= j0 + rj; j++) for (let i = i0 - ri; i <= i0 + ri; i++) {
     if (i < 0 || j < 0 || i >= M.nx || j >= M.ny || GRID[j * M.nx + i] !== 1) continue;
     // the cell, in course metres; inside onGround's Cityfront box the terrain doesn't count (the Cityfront shore does)
-    const x0 = (M.west + i * cw - LON0) * MLON, x1 = x0 + cw * MLON, y1 = (M.north - j * ch - LAT0) * MLAT, y0 = y1 - ch * MLAT;
+    const x0 = (M.west + (i - 0.5) * cw - LON0) * MLON, x1 = x0 + cw * MLON, y1 = (M.north - (j - 0.5) * ch - LAT0) * MLAT, y0 = y1 - ch * MLAT;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     if (cx > CF.x0 && cx < CF.x1 && cy > CF.y0 && cy < CF.y1) continue;
     const q = { x: Math.max(x0, Math.min(x1, p.x)), y: Math.max(y0, Math.min(y1, p.y)) }, d = Math.hypot(p.x - q.x, p.y - q.y);
@@ -402,6 +425,66 @@ const SG = (() => {
   return { x0, y0, nx, ny, cells };
 })();
 export const shoreDist = (p: Vec): number => shoreNearest(p).d;
+
+/*
+ * The distance to any shore, not just the Cityfront's: the nearer of the Cityfront shore (shoreDist, exact) and the
+ * terrain's land beyond it (the 50 m cells, from NOAA's chart: Marin, the islands, the East Bay, Richmond), for the
+ * wind's slowing near the shore and the current's easing there. The terrain's part is an exact Euclidean distance
+ * transform of the cells (Felzenszwalb & Huttenlocher 2012), worked out once, between cell centres, then interpolated
+ * and taken back half a cell to the cell's edge: within about 15 m of the true distance to the cells.
+ */
+let DT: Float32Array | null = null;
+function landDistGrid(): Float32Array {
+  if (DT) return DT;
+  const nx = M.nx, ny = M.ny, BIG = 1e12, f = new Float64Array(nx * ny), sx = CW * MLON, sy = CH * MLAT; // (cell size, m)
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i, lat = M.north - j * CH, lon = M.west + i * CW, x = (lon - LON0) * MLON, y = (lat - LAT0) * MLAT;
+    f[k] = GRID[k] === 1 && !(x > CF.x0 && x < CF.x1 && y > CF.y0 && y < CF.y1) ? 0 : BIG; // (inside the Cityfront box, the Cityfront shore counts instead)
+  }
+  // squared distance along one line of samples, spacing h (the lower envelope of parabolas)
+  const line = (get: (q: number) => number, set: (q: number, v: number) => void, n: number, h: number) => {
+    const v = new Int32Array(n), z = new Float64Array(n + 1), g = new Float64Array(n); for (let q = 0; q < n; q++) g[q] = get(q);
+    let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+    for (let q = 1; q < n; q++) {
+      if (g[q] >= BIG) continue;
+      if (g[v[0]] >= BIG) { v[0] = q; continue; }
+      let sP: number;
+      for (;;) { const r = v[k]; sP = ((g[q] + (q * h) ** 2) - (g[r] + (r * h) ** 2)) / (2 * h * (q - r)); if (sP <= z[k] && k > 0) k--; else break; }
+      k++; v[k] = q; z[k] = sP; z[k + 1] = Infinity;
+    }
+    if (g[v[0]] >= BIG) return; // (no land on this line)
+    k = 0;
+    for (let q = 0; q < n; q++) { while (z[k + 1] < q * h) k++; set(q, (q * h - v[k] * h) ** 2 + g[v[k]]); }
+  };
+  for (let j = 0; j < ny; j++) line(q => f[j * nx + q], (q, v) => { f[j * nx + q] = v; }, nx, sx);
+  for (let i = 0; i < nx; i++) line(q => f[q * nx + i], (q, v) => { f[q * nx + i] = v; }, ny, sy);
+  DT = Float32Array.from(f, v => Math.sqrt(v));
+  return DT;
+}
+/** The distance to the terrain's land beyond the Cityfront (m; Infinity off the map's edge where there's none). */
+export function landDist(p: Vec): number {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return NaN;
+  const g = landDistGrid(), fx = cellX(LON0 + p.x / MLON) - 0.5, fy = cellY(LAT0 + p.y / MLAT) - 0.5; // (in samples)
+  const i = Math.max(0, Math.min(M.nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(M.ny - 2, Math.floor(fy))), u = fx - i, v = fy - j;
+  const at = (a: number, b: number) => g[b * M.nx + a];
+  const d = (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+  const off = Math.max(0, -fx, fx - (M.nx - 1)) * CW * MLON + Math.max(0, -fy, fy - (M.ny - 1)) * CH * MLAT; // (beyond the map: at least this much more)
+  return Math.max(0, d - 25) + off;
+}
+/**
+ * Does the straight line from a to b cross land? By the 50 m land cells alone (the Cityfront's city included, as the
+ * terrain has it; no piers or docks): a quick test of whether two places see each other over the water, for the current
+ * field. (For where a boat runs aground, landAlong.)
+ */
+export function landBetween(a: Vec, b: Vec): boolean {
+  let hit = false;
+  const ax = cellX(LON0 + a.x / MLON), ay = cellY(LAT0 + a.y / MLAT), bx = cellX(LON0 + b.x / MLON), by = cellY(LAT0 + b.y / MLAT);
+  const ends = [Math.floor(ay) * M.nx + Math.floor(ax), Math.floor(by) * M.nx + Math.floor(bx)]; // (the ends' own cells don't count: a place on the water just off a shore can share its cell)
+  gridWalk(ax, ay, bx, by, M.nx, M.ny, (i, j) => { const k = j * M.nx + i; return (hit = GRID[k] === 1 && k !== ends[0] && k !== ends[1]); });
+  return hit;
+}
+/** The distance to the nearest shore anywhere (the Cityfront's exactly, elsewhere the chart's land to about 15 m). */
+export const anyShoreDist = (p: Vec): number => Math.min(shoreDist(p), landDist(p));
 /*
  * Which segments can be nearest anywhere in a 25 m cell, worked out the first time a point in the cell is asked about.
  * Exact: the distance to the shore changes by at most the distance moved, so nowhere in the cell is the shore further

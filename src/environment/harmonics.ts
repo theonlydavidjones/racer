@@ -46,9 +46,9 @@ function nodal(N: number) {
 
 const mul = (...xs: [Nodal, number][]): Nodal => xs.reduce<Nodal>((a, [n, k]) => ({ f: a.f * Math.pow(n.f, Math.abs(k)), u: a.u + n.u * k }), one);
 
-/** Equilibrium argument V (deg) and nodal correction for a constituent at a time. */
 /** The longitude of the solar perigee (deg; it moves about 1.7° a century: 282.9° in 2000, 283.3° by 2026). */
 const P1 = 283.2;
+/** Equilibrium argument V (deg) and nodal correction for a constituent at a time. */
 function constituent(name: string, a: ReturnType<typeof astro>, nd: ReturnType<typeof nodal>): { V: number; n: Nodal } | null {
   const { T, s, h, p } = a, M2 = 2 * T - 2 * s + 2 * h, S2 = 2 * T, N2 = 2 * T - 3 * s + 2 * h + p, K1 = T + h - 90, O1 = T - 2 * s + h + 90;
   switch (name) {

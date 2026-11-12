@@ -31,16 +31,19 @@ export const MAX_FETCH = 20000;
 
 /* ---------- the coastline, for fetch ---------- */
 
-const M = mask as { south: number; north: number; west: number; east: number; nx: number; ny: number; rows: number[][] };
+const M = mask as { south: number; north: number; west: number; east: number; nx: number; ny: number; samples: number[]; block: number; rows: number[][] };
 const LAND = (() => {
   const g = new Uint8Array(M.nx * M.ny);
   M.rows.forEach((runs, j) => { let i = 0, v = 0; for (const n of runs) { if (v) g.fill(1, j * M.nx + i, j * M.nx + i + n); i += n; v ^= 1; } });
   return g;
 })();
-/** Is there land here? `null` off the edge of the map (open ocean to the west, more bay to the east). */
+/**
+ * Is there land here? `null` off the edge of the map (open ocean to the west; San Pablo Bay to the north and the South
+ * Bay to the south, both open water). Each ~100 m cell is 2 × 2 of the terrain's samples, which sit at grid nodes.
+ */
 export function landAt(p: Vec): boolean | null {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
-  const i = Math.floor((lon - M.west) / (M.east - M.west) * M.nx), j = Math.floor((M.north - lat) / (M.north - M.south) * M.ny);
+  const i = Math.floor(((lon - M.west) / (M.east - M.west) * (M.samples[0] - 1) + 0.5) / M.block), j = Math.floor(((M.north - lat) / (M.north - M.south) * (M.samples[1] - 1) + 0.5) / M.block);
   if (i < 0 || j < 0 || i >= M.nx || j >= M.ny) return null;
   return LAND[j * M.nx + i] === 1 || onLandNear(p);
 }
