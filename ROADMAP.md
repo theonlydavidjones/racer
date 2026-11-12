@@ -52,6 +52,25 @@ What's planned, roughly in order. Done work is described in the README.
    - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
    Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
    (starboard, jib luff tension), with a physics review.
+   **With the band: the chase-view layout** (owner approved 12 November; handed to Crew Controls with the band). Mock-up
+   https://claude.ai/artifact/S2ZAPSy3CPsptyFWidxh8N (design/chase-layout.html on ui/sail-controls-band-mockup):
+   - the middle ~40% of the screen kept clear for the rig;
+   - the dials in the top corners: a rectangular heading pod in place of the compass tape, and a circular inset chart;
+   - one "where next" card (start line, over early, next mark, finish, or the navigator) in place of the start-line
+     and transit banners;
+   - a flags-only tile that opens a flag index, for learning the flags;
+   - the Coach card bottom left, the Messages card bottom right;
+   - Hail as a tab on the band, only when a hail applies; the old trim panel removed;
+   - the chase camera framing the whole boat above the band by default (zooming past it allowed);
+   - on the band: an AUTO-TRIM tab (was "All"), a POLE OUT / POLE IN tab only on a run, a round windex between the
+     vangs.
+   Also queued (owner, 12 November: "yes"): the rest of the RRS race signals in the flag index (AP, N, first
+   substitute, S… from the RRS 2025–2028 "Race Signals" page, checked by the researcher; 1–2 h); and one-line
+   on-screen messages with the full text in the log (1–2 h). Not queued: renaming the "Crew · Auto" button.
+   After the band (owner, 12 November; not urgent; 1–2 h): line colours chosen in the boat editor, one per line (jib
+   sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
+   band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
+   the starting set; saved with the boat.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
