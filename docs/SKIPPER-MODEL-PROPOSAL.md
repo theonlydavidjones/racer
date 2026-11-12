@@ -1,0 +1,322 @@
+# The skipper model: proposal (Skipper Model session, 12 November 2026)
+
+Phase 1 of the ROADMAP's "skipper/crew model": research and a design. Nothing is built yet. The crew side (trim,
+pole, puff calls, crew work) belongs to the Crew Model session. This document covers the skipper.
+
+## 1. Calibration data: what the real fleets do
+
+### What we have
+
+`src/boat/data/sf-folkboat-results.json` was fetched on 11 November. `scripts/analyse-folkboat-results.mjs` adds
+Fort Point's observed wind (NOAA 9414290) for each race.
+
+- **Timed races.** Only 5 races have every finisher's elapsed time: the GGYC Seaweed Soup on Jibeset, 5–6 Folkboats
+  each, on courses of 3.4–8.9 nm.
+- **Places only.** 50 more races give places but no times: the SYC Classic Boat Invitational and the SFYC Resin
+  Regatta, on Regatta Network.
+
+| Date | Wind at Fort Point | Gaps behind the winner, % of the winner's elapsed time |
+|---|---|---|
+| 2025-11-01 | 7.3 kt | 0, 2.9, 7.3, 10.5, 11.9 |
+| 2025-12-06 | 11.1 kt | 0, 1.1, 1.4, 2.1, 5.5 |
+| 2026-02-07 | 5.2 kt | 0, 9.0, 10.5, 12.5, 19.8 |
+| 2026-03-07 | 8.5 kt | 0, 1.8, 2.9, 5.8, 8.0, 14.7 |
+| 2026-11-07 | 7.4 kt | 0, 0.6, 1.2, 1.8, 6.7 |
+
+The targets these give:
+
+- **Last finisher.** A median of **12%** behind the winner (IQR 6.7–14.7%, range 5.5–19.8%), about 121 s per nm.
+- **Median boat.** **5.8%** behind (1.5–11.5%).
+- **By quarter of the fleet behind the winner.** The median gaps are **1.8, 2.9, 5.8 and 10%**. Most of the spread
+  is at the back.
+- **Wind.** Light air spreads the fleet. The last finisher's gap is about 27.7 − 2.0 × wind (kt) %, with r = −0.74.
+  That rests on only 5 races.
+- **Consistency.** Kendall's tau between two races' finishing orders averages **0.43**. The skipper accounts for
+  about **47%** of the variance in relative place (55 races, places only). So about half of a result is the
+  skipper and half is the day.
+- **Order and wind.** The order is less settled in light air: tau with the fleet's usual order is 0.35 under 8 kt,
+  0.55 at 8–14 kt and 0.60 at 14 kt and over.
+- **One star.** The real fleet has one boat that wins 29 of 40 races (mean relative place 0.08). The next best has
+  13 wins in 36 races. A realistic club fleet has a star, a few good boats and a long tail. Its abilities are not
+  spread evenly.
+
+**A cross-check from other SF Bay one-designs.** These are YRA Great Vallejo 2026 results on Jibeset, about 22 nm
+each way. The Express 27s (8 boats) finished 10.4% and 17.9% last-behind-winner, with the median boat 2.5–5.5% and
+8.6% behind. The J/105s and Express 37s were 3–4 boats each and gave 0.6–10%. This matches the Folkboats' order of
+magnitude.
+
+**What isn't there.**
+
+- Five older Seaweed Soup seasons (2019–2024) are marked "gated" in the data file. I won't try to get past a gate.
+- I found no timed Folkboat results from other clubs. StFYC, CYC Midwinters and the Woodies are not yet searched on
+  Jibeset.
+
+Proposed Phase 0 step (about 1 h): fetch those other clubs' Jibeset pages with WebFetch, add them to the data file,
+and rerun the analysis. The aim is 10 or more timed races, so the wind slope rests on more than five.
+
+### What the science says about skill (the researcher's findings)
+
+- **Direction by feel.** Pluijms et al. 2015 (Attention, Perception & Psychophysics 77(6), PMC4521093) tested
+  blindfolded sailors. At about 3 kt, experts judged wind direction to a mean signed error of **3.2°** and
+  non-sailors to **11.1°**. The gap closed by about 5 kt. Their figures give the intermediate group graphically
+  only.
+- **Speed.** In 63 Laser World Cup and Olympic races (Heliyon 2022, PMC9719898, Table 2), the top 10 made good
+  **about 3–8% more VMG upwind** than the rest (8% in light air, 3% at 8–12 kt and over 12 kt). The gap was **5–7%
+  on reaches** and **0–3% downwind**. That is among elites, so club fleets differ more. Manoeuvre counts didn't
+  differ by rank. Speed and position decided it, not the number of tacks.
+- **Decisions.** Araújo, Davids & Serpa 2005 (Psych. Sport & Exercise 6(6)) compared skill levels in a simulated
+  regatta. Sailors of different levels used the same information (the wind and the opponents), and the better
+  ones used it better. Pluijms et al. 2015 (J Sports Sci 33(4)) found that better sailors look at the tangent
+  point when rounding a mark.
+- **Laylines.** Coaching sources say overstanding is the most common windward-mark mistake, and that a call made
+  far away misses by more (Dellenbaugh, Windcheck; Ed Adams' "no more than 10 lengths out", Sailing World). No
+  measured error in degrees was found.
+- **Not found** (any figure here will be a labelled estimate, tuned against the fleet results above):
+  - the threshold and delay for seeing a shift;
+  - how far off a puff can be read on the water;
+  - OCS rates, or the distance behind the line at the gun;
+  - how much rules knowledge club racers have.
+
+### Where the sim is now
+
+A baseline of today's AI fleet is in §6. ROADMAP 4a records the last boat about 12% behind once the AI's tacks were
+held. But that spread comes from the dice (each boat's random `aggr`, `width`, `aware`, `f` and `depth`, drawn per
+race), not from who the skipper is. Nobody is consistently good, so the race-to-race tau is about 0, where the real
+fleet's is 0.43.
+
+## 2. The skipper
+
+Each AI skipper has seven attributes on 0 (novice) … 1 (expert), as the crew's skill is (boat/crewPhys.ts). Each one
+changes things the AI already decides, so no new behaviour is invented.
+
+| Attribute | What it changes in the AI (src/ai/ai.ts) | Expert … novice (estimates unless cited) |
+|---|---|---|
+| **Starting** | `plan.tReach`, the error in judging her time to the line, which is a lasting bias plus noise. `aggr`, her margin. Which end she judges favoured. Her depth and where she sets up. | Time-on-distance error σ about 1.5 s … 6 s. A line-bias judging error of 2° … 8°. |
+| **Boat speed** (the helm) | How well she holds the groove: the error in her steered angle to the wind upwind (pinching and footing) and how much it wanders, and how far her steering lags in waves. Trim stays the crew's (Crew Model). | Upwind VMG lost about 0–1% … 5–8% at 6–12 kt, more in light air (Laser data: 3–8% among elites). |
+| **Strategy** (the wind and the water) | When she sees a shift: its size and how long she waits (now fixed at 4° and 15 s). How far ahead she reads puffs. How much current she allows for (now `aware`, 60% or 100%). The favoured side she believes in from the pre-start (the strategist's plan, with an error). | Shift seen at 3°/8 s … 8°/30 s (Pluijms: 3° vs 11° by feel). Far "wind over there" read at 400 m … 100 m. The imminent calls (≈45 m, ≈10 s; the owner) come mainly from the crew. Current allowed 95% … 40%. |
+| **Tactics** (boat on boat) | Laylines judged by eye (below). When she tacks out of dirty air. When she covers or splits. When she ducks or tacks at a crossing. When she hails. | Layline bias 1–2° … 6–8° (overstanding more often), growing with distance. |
+| **Rules knowledge** | Whether she reads an encounter right: who has right of way, mark-room, room to tack. A skipper who reads it wrong keeps clear late or not at all. The safety net (rule 14, contact) stays exact for everyone. Later: whether she knows she fouled. | Encounter read right 99% … 85%. |
+| **Consistency** | Her form on the day: a draw per race for each attribute. Her lapses: per leg, a chance of one real blunder (a shift missed, the wrong side, a bad rounding). | Day-to-day σ 0.05 … 0.2. A lapse in about 2% … 15% of legs. |
+| **Nerve in traffic** | The clearances she keeps (now 14 m and 12 s fixed for keep-clear, 10 m in the pre-start). How close to others she starts. Whether she holds a lane or bails out. Whether she'll lee-bow or come in on port. | Margins 0.7× … 1.5× today's. More nerve means more distance gained, and more fouls. |
+
+**Errors are mostly lasting, not jitter.** A skipper who misjudges a layline misjudges it by the same few degrees
+until she gets closer and sees better. A skipper who believes the left pays goes left. Fresh noise every step would
+average away, and it would make her dither, which real skippers don't. So each error is a bias drawn when the
+judgement is made (each leg, each approach, each crossing), and it shrinks as she gets closer or as time passes,
+with a small noise on top. All of it is drawn from the world's seeded `w.rng`, so races and replays repeat.
+
+## 3. Acting on what she believes
+
+Each AI boat gets a **mind**. It is updated on the same slow clock the AI already staggers its heavy work on (the
+`refresh` tick, every 6 steps), and parts of it only every 1–2 s. The AI reads the mind instead of the true state.
+These are the places that change:
+
+1. **The wind she's in.** She knows her own wind through her compass average (`avgFrom`, already there) and her
+   telltales. She sees a shift only when it exceeds her threshold for her hold time. A novice sails a 6° header for
+   half a minute.
+2. **The wind ahead (the owner, 12 November).** Every crew member calls puffs on a Folkboat. The skipper can't
+   watch the water all the time, and she can't see past the sails. Two kinds of reading:
+   - **Imminent calls.** A puff or lull about 50 yards (≈45 m) out, arriving within about 10 s. These come mostly
+     from the crew's calls (Crew Model's `b.calls`), and from her own view, which is open to windward and ahead but
+     blocked to leeward by the main and jib. She uses them to foot in the puff and head up in the lull.
+   - **"Wind over there".** Dark water far off, read for strategy, to steer toward pressure and to choose a tack.
+     Its range and accuracy grow with her strategy attribute (estimates: about 100 m for a novice to 400 m for an
+     expert). Any crew member's far call counts too. The position error grows with range, and it is refreshed only
+     on a 1–2 s tick.
+
+   Puffs aren't read in fog or at night (the dark patches need light). She acts only on what was seen or called,
+   never on the true puff field.
+3. **Laylines by eye.** `fetch()` and `lays()` use her judged layline: the true one (wind and current) turned by
+   her bias. The bias is drawn as she comes to the layline, with σ ∝ distance (Dellenbaugh), and is re-judged
+   inside about 10 lengths, where an expert gets it nearly right.
+4. **The current.** She allows for part of the tide's set, by strategy. This replaces the `aware` coin with a share
+   from 40% to 95%.
+5. **Other boats.** Within about 60 m she sees exactly where they are. What she misjudges is the crossing: their
+   speed and heading carry an error, so her "can I cross?" (the cpa) carries one too. Rule-reading errors are
+   applied to the `rights()` answer she acts on, not to the rules engine.
+6. **The start.** Her time to the line carries her starting error. She believes the line is biased the way her
+   pre-start check said.
+
+**What stays exact for everyone:**
+
+- the rules engine (src/rules), which judges what happened;
+- contact avoidance (the rule 14 move);
+- the shore and the marks;
+- hails being answered.
+
+So a weak skipper loses distance and fouls more, but never sails into the land, a mark or a boat. She makes a
+novice's mistakes, not a bug's.
+
+**The cost.** The heavy parts are the puff scan (about 170 cells against a range check, per boat, once a second,
+so about 25 checks a step for 8 boats) and a few extra subtractions on the refresh tick. That is well under 1% of a
+step. perf.test sits at 54.7, near its limit. I'll measure before and after each phase and keep it flat.
+
+## 4. The Yacht Club sliders
+
+**Agreed with Crew Model:** one panel with two rows, **Skippers** and **Crews**. Each row has a Level and a Mix.
+
+- **Same people each race.** Each AI boat's people are drawn from a fixed seed from her name, so a boat has the same
+  people race to race.
+- **Crew follows skipper.** A boat's crew level is correlated with her skipper's (r ≈ 0.5), because good skippers
+  sail with good crews.
+- **The crew's puff calls.** Their `b.calls` (kind, seconds away, strength, veer, where) feed the skipper's
+  `mind.puffs`, along with what she sees herself.
+- **Calibration is joint.** The real results measure boat, skipper and crew together, so the default pair is
+  fitted with both models plugged in.
+- **Who builds it.** I build the panel, with the crew row as a plug-in. The layout goes to the owner first.
+
+The Race setup gets a **Fleet** section beside "competitors". The owner chooses the layout before I build it. Each
+row has:
+
+- **Level.** Club night … Club championship … Regional … Nationals … Worlds. This sets the fleet's mean ability.
+- **Mix.** Even … Typical … Mixed. This sets how far apart the skippers are. "Typical" gives the real shape: one
+  star, a few good boats and a tail.
+
+Under the sliders, each skipper has one hidden **ability**, drawn as level + mix × a skewed draw. Their seven
+attributes are drawn around it, correlated at about 0.6. Real sailors have profiles (a good starter and poor
+tactician, a fast helm who misses shifts), not one number.
+
+Later, with the Yacht Club proper, each club boat gets a lasting skipper: a made-up name, never a real one (ROADMAP
+line 842); her attributes; her form; and in time her seasons and awards.
+
+The **default fleet** ("Club night, Typical") is calibrated to the real SF fleet, the GGYC Seaweed Soup.
+
+**Calibration** is a slow test, outside test:fast. It runs about 20 races on real days (sf-real-days.json: real
+wind and tide), 5–7 boats each, with the same skippers each time. The level and mix scale are fitted so that:
+
+- the last finisher's median gap is about 12% (band 8–16%);
+- the quarters fall at about 2, 3, 6 and 10%;
+- light days spread wider than fresh ones (a negative wind slope);
+- race-to-race tau is 0.3–0.55;
+- the most able skipper wins about half the races or more.
+
+Today's baseline gives a tau of about 0, because there are no skippers yet.
+
+## 5. How it plugs in
+
+- **New code.** A new `src/ai/skipper.ts` holds the attributes, the fleet's generation from the sliders, and the
+  mind and its updates. `AiState` gains `sk` (attributes) and `mind`.
+- **The legacy profile.** Until the sliders exist, each boat's attributes come from the same dice as now (`aggr`,
+  `width`, `aware`). The existing tests (sim-starts, sim-fleet, sim-ai, ai-avoid, the rules tests and perf) should
+  then pass unchanged in Phase 1. Each later phase moves one decision onto the mind, with its own test, and reruns
+  them.
+- **Ownership.** `src/ai/ai.ts` is Deep Physics' file, so the edits there are small and named. I'd make them in
+  small PRs that Deep Physics reviews, or hand Deep Physics a hook if they prefer.
+- **Crew Model.** Their crew skill drives trim, the pole and the puff calls. A crew's puff call is one source of
+  what's in the skipper's `mind.puffs`, so a good crew gives a weak skipper eyes. We agree that interface before
+  either of us builds it.
+- **Rules.** Rules owns what a foul is. The skipper's "rules knowledge" only changes what she believes.
+- **Your own boat.** You are its skipper. Your crew's skill stays the Crew Model's.
+
+### Room for cheating, protests and hearings (a later phase, 8–12 h)
+
+The mind keeps an **incident memory**: each close encounter, with who she believed had right of way, whether she
+believes she fouled, and how sure she is. That leads to:
+
+- **Taking a penalty.** She does her turns if she believes she fouled. That depends on her rules knowledge, and on
+  a later eighth attribute, **sportsmanship**. Sportsmanship opens the door to cheating: not taking a penalty she
+  knows she owes, or pushing a luff she knows is marginal.
+- **Protests.** The other boat's memory of the same incident, and her own temperament, decide whether she hails
+  "Protest" and flies the red flag (RRS 60–61).
+- **Hearings.** The World already logs every pair's record (`pairRecord`), so the truth is there. Witnesses are
+  other boats whose minds saw the incident, each with their own view. A hearing compares them, as the RRS Part 5
+  hearing does, and can find against the true state when the testimony is poor, as real ones sometimes do.
+
+**From Rules (12 November):**
+
+- **One rules model.** A skipper's beliefs reuse the pure `rightOfWay(A, B, ctx, rec)`, called on her own view: the
+  boats as she sees them, with what she doesn't know taken out of `ctx`/`rec`. That way there is no second rules
+  model to drift from the real one.
+- **Incident memory.** It keeps the World's `Incident`, and a copy of the pair record at that moment, because pair
+  records are mutable.
+- **Penalties.** A boat not racing can't take turns (Rule 44.1). Rule 23.1 can only be protested.
+- **Blanketing.** It is no foul (the owner, 12 November), so protests about wind shadow are found against.
+
+## 6. Today's baseline (sim, no skippers)
+
+Measured on 12 November at origin/main 18010c1. The setup:
+
+- the training windward-return course;
+- 5 stock AI boats, slack tide;
+- a westerly of 6, 12 and 18 kt, with seeds 3, 7 and 11;
+- a race lasting 40 minutes at most.
+
+| Wind | Winner | Gaps behind the winner, % | Order |
+|---|---|---|---|
+| 6 kt | 18.1 min | 0, 3.2, 14.3, 28.7, 69.4 | Varnish, Green, Black, Blue, Red |
+| 6 kt | 15.6 min | 0, 16.1, 27.2, 72.3, 79.6 | Black, Green, Red, Varnish, Blue |
+| 6 kt | 19.1 min | 0, 8.0, 21.4, 22.7, 27.9 | Blue, Green, Red, Black, Varnish |
+| 12 kt | 11.0 min | 0, 10.9, 13.7, 28.8, 32.2 | Red, Green, Black, Varnish, Blue |
+| 12 kt | 12.4 min | 0, 0.6, 12.0, 14.7, 24.0 | Varnish, Black, Blue, Red, Green |
+| 12 kt | 10.6 min | 0, 5.2, 10.3, 22.0, 24.6 | Varnish, Blue, Green, Red, Black |
+| 18 kt | 10.6 min | 0, 9.3, 12.5, 21.8, 40.7 | Varnish, Blue, Green, Black, Red |
+| 18 kt | 12.5 min | 0, 1.4, 8.8, 13.7, 22.1 | Green, Blue, Black, Red, Varnish |
+| 18 kt (seed 11) | — | **no boat finished in 40 min** | (needs looking into: Deep Physics) |
+
+What it shows:
+
+- **Spread.** The last finisher is a median **about 30%** behind, against the real 12%. The median boat is **about
+  13%** behind, against 5.8%. Part of that is the course: a 10–19 minute race magnifies the start's crush, where
+  real races run 45–100 minutes. Phase 0's harness will measure on full Seaweed Soup courses instead.
+- **Order.** There is no skill in it. Varnish has the weakest crew (0.45), yet won 4 of the 8 races. Every boat
+  wins sometimes, so the race-to-race tau is about 0, where the real fleet's is 0.43. That is what the skipper
+  model is for.
+- **Wind.** As in the real fleet, the spread is widest in light air.
+
+### The calibration harness on the real days (Phase 0, `npm run calibrate`, 12 November)
+
+The set-up:
+
+- the same 5 stock boats;
+- the five real Seaweed Soup days, two seeds each;
+- the real wind and tide, from the real start time;
+- the course the committee would choose for a race as long as the real one.
+
+It takes about 12 minutes on 4 cores.
+
+| Measure | Real | Sim, today's AI |
+|---|---|---|
+| Last finisher, % behind (median, IQR) | 11.9 (6.7–14.7) | 14.8 (7.6–24.2) |
+| Median boat, % behind | 5.8 | 7.7 |
+| By quarter after the winner, % | 1.8 / 2.9 / 5.8 / 10 | 0.7 / 5.1 / 9.5 / 14.8 |
+| Race-to-race Kendall's tau | 0.42 (all 55 races, places) | 0.09 |
+| Last % against wind (slope %/kt) | −2.0 (r −0.74) | −1.3 (r −0.27) |
+
+What it shows:
+
+- **Spread.** On full-length races on the real days, today's AI fleet spreads out about as much as the real one,
+  a little more. The short training course above exaggerated it.
+- **Order.** What's missing is skill. Who wins is nearly random race to race (tau 0.09 against 0.42).
+- **The first quarter.** The sim's leaders finish closer together than the real ones (0.7% against 1.8%). The real
+  fleet has a star, and the sim's has none.
+
+So the skipper model has to give the order its consistency and the front its star. It must do that while keeping
+the overall spread about where it is, or tightening it a little.
+
+## 7. Phases and hours
+
+| Phase | What | Hours |
+|---|---|---|
+| 0 | Calibration data: other clubs' timed Folkboat results; a baseline harness (spread, quarters, wind slope, tau) as a slow test | 2–3 |
+| 1 | `skipper.ts`: attributes, the legacy profile, `AiState.sk` and `mind`. No change in behaviour, all tests green | 2 |
+| 2 | Beliefs about the water: shifts, puffs read ahead, laylines by eye, current share, start timing and line bias | 6–8 |
+| 3 | Traffic: nerve margins, crossing misjudgement, rules reading (safety net exact) | 3–4 |
+| 4 | The Yacht Club sliders (layout to the owner first) and the fleet's generation | 3–4 |
+| 5 | Calibration: fit level and mix to the real fleet; bands in the slow test | 3–5 |
+| — | Reviews: physics-reviewer for each phase that touches src/ai | 1–2 |
+| **Total** | | **20–28 h** (ROADMAP estimate: 15–25 h for skipper and crew together) |
+
+Later: cheating, protests and hearings (8–12 h, as the ROADMAP has it).
+
+## The owner's answers (12 November, via the Coordinator)
+
+1. **Sliders.** Two per row, Level and Mix, for now. Setting each opponent's skipper by hand can come later if it's
+   missed.
+2. **Showing skill.** Skippers' attributes are discovered by racing, not shown. A short note on the boat card may come
+   later.
+   - Note: the strategist's "the competition" already describes each AI boat's start dice ("pushes the line hard",
+     "underrates the current": sim/strategist.ts). That is close to showing attributes. Should it stay as "what
+     you'd hear about her at the club"? Raised with the Coordinator.
+3. **Lasting skippers.** Club boats keep the same seeded skippers from race to race.
+
+Phase 4's panel layout still goes to the owner before it's built.

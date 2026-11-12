@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "calibrate": "vitest run -c vitest.calib.config.ts && CALIB_SUMMARY=1 vitest run -c vitest.calib.config.ts",
     "data:polar": "node scripts/fetch-orc-polar.mjs",
     "data:currents": "node scripts/fetch-currents.mjs",
     "data:wind": "node scripts/fetch-wind-climate.mjs",
