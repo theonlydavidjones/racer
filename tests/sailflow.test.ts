@@ -82,6 +82,14 @@ describe('the flow view: what it says', () => {
     expect(flowState(over).sails.find(s => s.sail === 'main')!.trim.flow).toBe('luffing');
     expect(words(over)).not.toMatch(/on purpose/); expect(words(over)).toMatch(/Main<\/b>[^]*Trim in/);
   });
+  it('you trimming the main yourself in a blow: no "on purpose"', () => {
+    const b = sailing(318, 24, b => { b.manualTrim = true; b.trimAll = true; takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = Math.min(1, b.ctl.mainsheet + 0.05); });
+    expect(words(b)).not.toMatch(/on purpose/);
+  });
+  it('luffing on purpose: says so', () => {
+    const b = sailing(318, 12); b.luff = true;
+    expect(words(b)).toMatch(/both sails let go/);
+  });
   it('a jib eased right out: trim in, with no bear away into a reach', () => {
     const b = sailing(318, 12, b => { takeLine(b, 'jibsheet'); (b.ctlTarget ??= {}).jibsheet = 0.75; });
     const w = words(b), jib = w.slice(w.indexOf('<b>Jib</b>'), w.indexOf('<b>Main</b>') > w.indexOf('<b>Jib</b>') ? w.indexOf('<b>Main</b>') : undefined);

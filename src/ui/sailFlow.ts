@@ -1,6 +1,6 @@
 import { CE_ABOVE_WL, RIG } from '../boat/balance';
 import type { Boat } from '../boat/boat';
-import { crewEaseBoom, sailFrame } from '../boat/physics';
+import { byHand, crewEaseBoom, sailFrame } from '../boat/physics';
 import { SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
 import { boatTells, type TellState } from '../render/sails';
@@ -151,6 +151,8 @@ export function flowWords(st: FlowState, b: Boat): [string, string][] {
   const keel = () => p('fp-keel', `<b>Under water</b> leeway ${st.leeway.toFixed(1)}°: the keel's angle to the water, which makes its lift against the sails' side force. Pinch and it grows.`);
   if (st.hove) { p('fp-sail', `<b>Hove to</b>: the jib backed on purpose, both sails meant to be stalled or luffing. With the main eased and the helm down she lies quiet, forereaching slowly.`); keel(); return out; }
   if (!st.sails.length) { p('fp-sail', 'No sails drawing.'); return out; }
+  // (luffing on purpose, both sheets let go: the sim takes their drive away, and the telltales show it)
+  if (b.luff) { p('fp-sail', `<b>Luffing</b>: both sails let go, flogging, with no drive; the jib's windward telltales lifting. Let go of the luff to sail again.`); keel(); return out; }
   for (const s of st.sails) {
     const t = s.trim, by = Math.abs(t.err), main = s.sail === 'main';
     if (st.running) {
@@ -160,17 +162,22 @@ export function flowWords(st: FlowState, b: Boat): [string, string][] {
     }
     // (luffing because the crew's eased the boom down the traveller to depower, as far as that and no further, with
     // nobody else holding the sheet or the traveller: the price of keeping her on her feet, not a mistake)
-    const ease = crewEaseBoom(b), eased = main && ease > 1 && !b.hand?.mainsheet && !b.hand?.traveller && -t.err <= ease + 3;
+    const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
     const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
     const stallTell = main ? (t.amount > 0.12 ? 'the leech telltale hiding' : 'the flow breaking away before the leech') : 'leeward telltales drooping';
-    const what = t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
+    // (at its sheet's stop and well past its best angle: the sim's trim blends to downwind from 105° apparent and counts
+    // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
+    const pastStop = s.atMax && t.err > 4;
+    const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
+      : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
       : t.flow === 'luffing' ? (eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveller on purpose to keep her on her feet; the lifting luff is the price`
         : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
         : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': windward telltales lifting'}. Trim in about ${deg(by)}${turn}`)
       : s.atMax ? `<em class="stall">stalled</em> ${pct(t.amount)}, ${stallTell}, with the sheet all the way out: the wind's too far aft for it. Head up`
       : `<em class="stall">stalled</em> ${pct(t.amount)}: ${stallTell}. Ease about ${deg(by)}, or head up`;
-    p('fp-sail', `<b>${name[s.sail]}</b> the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)}): ${what}.`);
+    const across = s.across >= 0 ? `the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)})` : `${foot[s.sail]} ${deg(-s.across)} outside the wind, flogging`;
+    p('fp-sail', `<b>${name[s.sail]}</b> ${across}: ${what}.`);
   }
   // twist, as facts (no verdict: the sim's best twist is the crew's whole-boat choice, which the coach judges): how open
   // each head is set against its foot, and the wind's own twist up the sail
