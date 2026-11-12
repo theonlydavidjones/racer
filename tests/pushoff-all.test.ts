@@ -10,6 +10,7 @@ describe('push off, every berth in every marina (the slow one: npm test, not tes
   it('push off, from every berth in every marina: in the fairway, clear of the docks and the boats, pointed at a way out, free to steer out', () => {
     let allToward = 0, all = 0, allSwung = 0, allBowIn = 0; const trapped: string[] = [];
     for (const H of HARBORS) {
+      if (!slipsIn(H.id).length) continue; // (a harbor with no berths yet: the East Bay's, water and docks only)
       // where a Folkboat can steer to the way out from: a flood from the harbor's exits over water with room for her beam
       const step = 1.5, key = (p: { x: number; y: number }) => `${Math.round(p.x / step)},${Math.round(p.y / step)}`;
       const roomy = (q: { x: number; y: number }) => [[0, 0], [1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].every(([dx, dy]) => !onLand({ x: q.x + dx, y: q.y + dy }));

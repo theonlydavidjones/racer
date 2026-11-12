@@ -57,6 +57,7 @@ const HARBORS = {
   },
   berkeley: {
     name: 'Berkeley Marina', bbox: [-122.3235, 37.8615, -122.3100, 37.8705],
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
     basin: { marina: 'Berkeley Marina' }, letter: 'named',
     // the breakwaters (OSM 23617828, 23617829; NOAA's chart has the same two lines) and the three ways in: south of
     // Berkeley Breakwater Light 1 (the deepest, the one the guides use), the middle gap between Lights 2 and 3, and north
@@ -67,6 +68,7 @@ const HARBORS = {
   },
   'richmond-yc': {
     name: 'Richmond Yacht Club, Brickyard Cove', bbox: [-122.3880, 37.9060, -122.3790, 37.9125],
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
     basin: { marina: 'Richmond Yacht Club' }, letter: 'north-south',
     // the harbor's two breakwater arms aren't in OSM: NOAA's chart (ENC US5OAKGH, SLCONS) has them, ending at Brickyard
     // Cove Harbor Lights 1 (green, F G, 2.4 m) and 2 (red, F R) either side of the way in, which faces south-east
@@ -76,6 +78,7 @@ const HARBORS = {
   },
   encinal: {
     name: 'Encinal Yacht Club, Alameda', bbox: [-122.2655, 37.7810, -122.2605, 37.7845],
+    noSlips: true, // (few of its fingers are mapped and its slips aren't published: no berths yet, only the water and the docks)
     basin: { marina: 'Encinal Yacht Club' }, letter: 'north-south',
     // no breakwater: the club's docks open straight onto the Oakland Estuary, across the basin's north-east side
     exits: [[37.78320, -122.26195]]
@@ -208,7 +211,7 @@ async function make(id, H) {
   }
   // numbered along each dock from its shore (west) end
   const out = [];
-  for (const [w, letter] of [...letterOf].sort((a, b) => a[1].localeCompare(b[1]))) {
+  if (!H.noSlips) for (const [w, letter] of [...letterOf].sort((a, b) => a[1].localeCompare(b[1]))) {
     const q = w.pts.map(xy); let a = q[0], b = q.at(-1); if (b.x < a.x) [a, b] = [b, a];
     const d = { x: b.x - a.x, y: b.y - a.y }, along = s => (s.c.x - a.x) * d.x + (s.c.y - a.y) * d.y;
     slips.filter(s => s.dock === w).sort((s, t) => along(s) - along(t))

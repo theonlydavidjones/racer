@@ -211,8 +211,8 @@ export const slipById = (id: string | undefined): Slip | null => !id ? null : BY
 /** The slips in this marina. */
 export const slipsIn = (marina: string | undefined): Slip[] => SLIPS.filter(s => s.marina === marina);
 
-/** The marinas your boats can call home. */
-export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.map(({ id, name, short }) => ({ id, name, short }));
+/** The marinas a boat can call home: those with slips (the East Bay's harbors have none yet: water and docks only). */
+export const MARINAS: { id: string; name: string; short: string }[] = SOURCES.filter(({ data }) => data.slips.length).map(({ id, name, short }) => ({ id, name, short }));
 export const marinaName = (id: string | undefined) => MARINAS.find(m => m.id === id)?.name ?? '';
 /** Where a slip is, for people: "A12, West Harbor". */
 export const slipPlace = (s: Slip) => `${s.label}, ${harborOf(s.marina)?.short ?? ''}`;

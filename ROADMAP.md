@@ -470,8 +470,13 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   chart and inset map), the currents (75 NOAA stations, every one within 0.04 kt of NOAA's predictions) and the NWS grid
   over the new water, every shore slowing the wind and easing the stream, the East Bay's and Richmond's marks, the
   Richmond–San Rafael Bridge, the Brothers, the Berkeley Pier and Long Wharf (solid), the Port's cranes, the Bay
-  Bridge's East Span on its real line~~ (done). Next: the marinas (Berkeley with BYC's guest dock, Brickyard Cove for
-  Richmond YC, Encinal and the Estuary's harbors; only Berkeley's dock letters are published where we could reach).
+  Bridge's East Span on its real line, the Berkeley Marina, Richmond YC's Brickyard Cove and Encinal YC as harbors you
+  can sail into, docks and breakwaters solid~~ (done). Next: their slips (only a few fingers are mapped in OSM: Berkeley's
+  B–E are combs, F–O lines; the other harbors' dock letters and slip numbers aren't published where we could reach;
+  berkeleyyc.org, richmondyc.org, encinal.org need allowing), BYC's guest dock, and the Estuary's other harbors (Oakland
+  YC, Marina Village, Grand Marina, Alameda Marina with Island YC, Ballena Bay). Polish: the land's 50 m cells make a
+  stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
+  37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: the current in the embayments with no NOAA station (San Rafael Bay, Richardson Bay, San
   Leandro Bay) is the nearest stations' in sight, very likely too strong for such shallow water (a depth- or
   tidal-prism-based easing needs a source); BYC's and Encinal YC's own racing marks aren't published where we could
