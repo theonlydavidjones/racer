@@ -112,7 +112,7 @@ function speedFactor(b: Boat, c: Controls): number {
   if (clew < 0) return 0; // backed: not sailing
   const jib = clamp(clew, SAILS.jib.min, SAILS.jib.max);
   const tm = sailTrim('main', awa, main), tj = plan === 'jib' ? sailTrim('jib', awa, jib) : null;
-  const ms = mainShape(c, tws, cond?.main, aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws) : null;
+  const ms = mainShape(c, tws, cond?.main, aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws, cond?.main.tune) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
   // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,

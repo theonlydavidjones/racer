@@ -2,6 +2,7 @@ import { SAIL_WEAR, type SailRig, type SailWear } from './controls';
 import type { BoatSpec } from './spec';
 import { HULL } from './dynamics';
 import { dCfAt, fouling, type Fouling } from './fouling';
+import { fixTune, tuneEffect } from './rigTune';
 
 /**
  * Your boat's condition, in physical terms: what each setting in the Boat panel does to her.
@@ -61,7 +62,10 @@ export function condition(s: BoatSpec, month = 9): Condition {
   const wood = s.perf.mast === 'wood';
   return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
-    main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1 },
+    main: ((bend: number) => {
+      // the rig's tune (rigTune.ts): worked out once here; none set, she's on the guide's tune for the wind (no change)
+      return { wear: SAIL_WEAR[s.perf.mainAge], bend, ...(s.perf.tune ? { tune: tuneEffect(fixTune(s.perf.tune), bend) } : {}) };
+    })(wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1),
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
