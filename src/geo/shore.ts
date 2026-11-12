@@ -4,6 +4,7 @@ import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
 import wharf from './data/wharf.json';
 import bridgePiers from './data/bridge-piers.json';
+import limePoint from './data/lime-point.json';
 import { HARBORS, harborIndex, hitsHarbor, inBasin } from './marina';
 
 // Stylized Cityfront shoreline from Fort Point to North Beach (approximate, not for navigation); from the Gate to Pier 27
@@ -106,9 +107,23 @@ function inTerrain(p: Vec): boolean {
 /** The terrain land grid, for drawing maps: cells, bounds, and whether a cell is inside the hand-drawn Cityfront area. */
 export const landGrid = () => ({ ...M, grid: GRID, cityfront: { south: 37.79, north: 37.815, west: -122.48, east: -122.40 } });
 
+/**
+ * Lime Point, the Marin foot of the Golden Gate Bridge: OpenStreetMap's coastline (scripts/make-lime-point.mjs) in
+ * place of the terrain's 50 m cells, which put its shore 60–80 m too far north. The north tower's base stands at its
+ * edge and the Lime Point light on its spit.
+ */
+const LP = (() => {
+  const d = limePoint as unknown as { box: { south: number; north: number; west: number; east: number }; land: [number, number][] };
+  const a = LL(d.box.south, d.box.west), b = LL(d.box.north, d.box.east);
+  return { x0: a.x, x1: b.x, y0: a.y, y1: b.y, land: d.land.map(q => LL(q[0], q[1])) };
+})();
+const inLimePoint = (p: Vec): boolean | null => p.x >= LP.x0 && p.x <= LP.x1 && p.y >= LP.y0 && p.y <= LP.y1 ? inPoly(p, LP.land) : null;
+
 /** The ground: the land itself and the marinas' docks, without the Wharf's piers and docks (for the terrain, which can't show them). */
 export const onGround = (p: Vec): boolean =>
-  inBasin(p) ? hitsHarbor(p) : hitsHarbor(p) || (p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : inTerrain(p) || inCityfront(p));
+  inBasin(p) ? hitsHarbor(p) : hitsHarbor(p) || (p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 ? inCityfront(p) : (inLimePoint(p) ?? inTerrain(p)) || inCityfront(p));
+/** The box OpenStreetMap's Lime Point coastline governs (render/terrain.ts fits the hills to it there). */
+export const limePointBox = (): { x0: number; x1: number; y0: number; y1: number } => ({ x0: LP.x0, x1: LP.x1, y0: LP.y0, y1: LP.y1 });
 
 /**
  * The Wharf's piers, breakwaters and floating docks beyond the coastline (OpenStreetMap, scripts/make-wharf.mjs):
@@ -153,6 +168,12 @@ export const pierAt = (p: Vec): Pier | null => {
   return null;
 };
 export const hitsPier = (p: Vec): boolean => pierAt(p) !== null;
+/** The bridge pier or tower within r metres of p (the north tower's base is part of Lime Point's coastline: what she hits there is the tower). */
+export const pierNear = (p: Vec, r: number): Pier | null => {
+  for (const G of PIER_GROUPS) if (p.x >= G.box.x0 - r && p.x <= G.box.x1 + r && p.y >= G.box.y0 - r && p.y <= G.box.y1 + r)
+    for (const a of G.piers) if (inPoly(p, a.pts) || a.pts.some((v, k) => segPt(p, v, a.pts[(k + 1) % a.pts.length]) < r)) return a;
+  return null;
+};
 
 /*
  * The terrain's 50 m land grid (from elevation data) has some of the bigger piers in it as blocks of land: the Bay
@@ -423,6 +444,13 @@ export function landAlong(a: Vec, b: Vec): number {
   // where the terrain takes over from the Cityfront shore (onGround's box)
   for (const [p, q] of [[{ x: CF.x0, y: CF.y0 }, { x: CF.x1, y: CF.y0 }], [{ x: CF.x1, y: CF.y0 }, { x: CF.x1, y: CF.y1 }], [{ x: CF.x1, y: CF.y1 }, { x: CF.x0, y: CF.y1 }], [{ x: CF.x0, y: CF.y1 }, { x: CF.x0, y: CF.y0 }]] as const) {
     const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
+  }
+  // Lime Point's coastline, and the edges of its box, where the terrain takes over again
+  if (overlaps(bb, LP)) {
+    poly(LP.land, maybe);
+    for (const [p, q] of [[{ x: LP.x0, y: LP.y0 }, { x: LP.x1, y: LP.y0 }], [{ x: LP.x1, y: LP.y0 }, { x: LP.x1, y: LP.y1 }], [{ x: LP.x1, y: LP.y1 }, { x: LP.x0, y: LP.y1 }], [{ x: LP.x0, y: LP.y1 }, { x: LP.x0, y: LP.y0 }]] as const) {
+      const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
+    }
   }
   // the terrain's land cells (lat and lon are linear in x and y, so the line is straight on the grid too)
   const gx = (p: Vec) => ((LON0 + p.x / MLON) - M.west) / (M.east - M.west) * M.nx, gy = (p: Vec) => (M.north - (LAT0 + p.y / MLAT)) / (M.north - M.south) * M.ny;

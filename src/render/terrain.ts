@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
-import { onGround } from '../geo/shore';
+import { limePointBox, onGround } from '../geo/shore';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -89,6 +89,15 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     if (!cityShore(lat, lon)) continue;
     const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
     H[k] = onGround(p) ? Math.max(H[k], 2.5) : -30; // (the Wharf's open piers and docks are drawn as structures: render/wharf.ts)
+  }
+  // and Lime Point's to OpenStreetMap's coastline (geo/shore.ts), so the north tower's base and the light stand at its edge
+  {
+    const b = limePointBox();
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, p = { x: corner.x + i * dx, y: corner.y + j * dy };
+      if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue;
+      H[k] = onGround(p) ? Math.max(H[k], 2.5) : -30;
+    }
   }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
