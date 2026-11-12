@@ -175,12 +175,23 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (Math.abs(to - b.ctl[j.line as Ctl]) < DONE) {
         // (a cabin-top line counts as set when it's done, not when someone set off for it: one taken over half way, by a
         // sheet or the pole, is still to do, and isn't left wrong for LINE_GAP)
-        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; }
+        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; (c.lineTwa ??= {})[j.line] = b.twa ?? 0; }
         a.job = null;
       }
     }
     else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
   });
+  // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
+  // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
+  const fwdL = (c.layout ?? 'cockpit') !== 'cockpit';
+  const worker = (k: string) => {
+    const o = ownerOf(k, n, c.spec, fwdL);
+    if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
+      const j = c.people[o]?.job;
+      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
+    }
+    return o;
+  };
   // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
   // times a second: quicker than anyone reacts)
   c.jobT = (c.jobT ?? 0) - dt; c.lineT = (c.lineT ?? 0) + dt;
@@ -193,7 +204,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; delete ls[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); ls[k] = ls[k] == null ? w : ls[k] + (w - ls[k]) * Math.min(1, c.lineT / LINE_GAP); } c.lineT = 0; }
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
-    const who = ownerOf(k, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who]; if (!a) continue;
+    const who = worker(k), a = c.people[who]; if (!a) continue;
     const skill = attrOf(ppl[who], 'trim'), e = err(k);
     if (a.job?.line === k) continue;
     let urgentTo = false;
@@ -209,7 +220,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (and none of it for a line knocked off, or wanted well away from where it is, now and lately both: a new point of
       // sail as she bears away, which has come to stay, not a puff's swing of the outhaul)
       // (placed by you, they have their own rule for a trip, PLACED_TRIP's big change: these waits are for the crew on auto)
-      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT);
+      // (a new point of sail since this line was last set, more than 20° of the wind's angle: rounding a mark, bearing
+      // away, coming up: the trim wanted is new, so it's seen to now, not after the waits)
+      const newCourse = Math.abs((b.twa ?? 0) - (c.lineTwa?.[k] ?? -999)) > 20;
+      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there))) continue;
       urgentTo = urgent && walk;
       if (!walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
@@ -248,7 +262,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {
-    const who = ownerOf(k, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
+    const who = worker(k), a = c.people[who];
     if (k === 'jibsheetW') { out[k] = { pace: workPace(b, who), to: want[k]! }; continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {

@@ -22,12 +22,14 @@ describe('Settled crew stay settled (render/crew.ts, boat/crewWork.ts)', () => {
     const lastTurn = ai.map(() => -99), side = ai.map(b => Math.sign(b.rel));
     type Watch = { secs: number; poses: number; trips: number; knee: number; spin: number; turned: number; hist: number[]; prev?: { pose: string; gx: number; gz: number; yaw: number; knee: number[] } };
     const watch: Watch[][] = ai.map(b => b.crew!.people.slice(1).map(() => ({ secs: 0, poses: 0, trips: 0, knee: 0, spin: 0, turned: 0, hist: [] })));
-    while (w.t < 600) { // (long enough for minutes of steady sailing each: a boat that tacks often has few)
+    while (w.t < 800) { // (long enough for minutes of steady sailing each: a boat that tacks often, or was over the line early, has few)
       w.step(DT);
       ai.forEach((b, k) => {
         syncCrew(crs[k], b.rel >= 0 ? 1 : -1, b.crew, DT, false, undefined, b.heel, b.tacking);
         if (Math.sign(b.rel) !== side[k] || b.tacking || b.crew!.roll) { lastTurn[k] = w.t; side[k] = Math.sign(b.rel); }
-        const steady = w.t > 0 && b.started && !b.finished && w.t - lastTurn[k] > 10;
+        // (upwind and reaching, as the owner saw it: downwind, with the pole going out and in, is a busier time, and its
+        // own work: ROADMAP)
+        const steady = w.t > 0 && b.started && !b.finished && b.twa < 125 && w.t - lastTurn[k] > 10;
         crs[k].crew.forEach((f, i) => {
           const a = b.crew!.people[i + 1], s = watch[k][i], p = s.prev;
           const now = { pose: a.pose, gx: a.goal?.x ?? a.x, gz: a.goal?.z ?? a.z, yaw: f.cur!.yaw, knee: f.leg.map(l => l.mid.rotation.x) };
