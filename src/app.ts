@@ -29,7 +29,7 @@ import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { poleEta, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
-import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
+import { DEFAULT_SKILL, attrOf, type Attr, type Person, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { SailBand } from './ui/sailBand';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, callShort, callWords, showCrewRow, toggleCrewOpen } from './ui/crewWords';
@@ -1098,20 +1098,46 @@ const parseHeight = (s: string): number | null => {
   const ft = s.match(/^\s*(\d)\s*['’ ]\s*(\d{1,2})?\s*("|”)?\s*$/), cm = s.match(/^\s*(\d{3})\s*cm\s*$/i), inches = s.match(/^\s*(\d{2})\s*(in|")?\s*$/);
   if (ft) return (Number(ft[1]) * 12 + Number(ft[2] ?? 0)) * IN; if (cm) return Number(cm[1]) / 100; if (inches) return Number(inches[1]) * IN; return null;
 };
+/** Each person's attributes (boat/crewPhys.ts Attr), for "More": each follows their skill until you set it. */
+const ATTR_UI: [Attr, string, string][] = [
+  ['trim', 'Trim', 'How close to the best they keep the sails and the boat: heel, weight, the lines'],
+  ['react', 'Reactions', 'How quickly they start on a change: a puff, a call, a tack'],
+  ['eyes', 'Eyes', 'How far off they see puffs and lulls coming, and how few they miss'],
+  ['handling', 'Boat handling', 'The pace of their work: tacks, gybes, the pole, the doors'],
+  ['fitness', 'Fitness', 'How far out they hike and how long they last'],
+  ['composure', 'Composure', 'How well they hold up under pressure: the start, the marks, close crosses'],
+];
 function crewRows(): void {
   const c = S.crew ??= { ...DEFAULT_SETTINGS.crew }, rows = $('crewRows');
-  const people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, c.n).map((p, i) => ({ who: `Crew ${i + 1}`, p }))];
+  const n = c.n, people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, n).map((p, i) => ({ who: n === 2 ? (i === 0 ? 'Middle crew' : 'Forward hand') : 'Crew', p }))];
   const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
-  rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}`).join('');
+  // (with two crew, who sits where: the middle crew has the main, the forward hand the jib, the cabin top and the pole)
+  const seat = (i: number) => n === 2 && i > 0 ? `<label title="Where they sit and what they do">Seat <select data-i="${i}" data-f="seat"><option value="1"${i === 1 ? ' selected' : ''}>Middle: main</option><option value="2"${i === 2 ? ' selected' : ''}>Forward: jib, pole</option></select></label>` : '';
+  const more = (i: number, p: Person) => `<details class="crewmore"><summary>More</summary>${ATTR_UI.map(([a, l, t]) => {
+    const v = attrOf(p, a), own = p.attr?.[a] != null;
+    return `<label title="${t}">${l} <input type="range" min="0" max="1" step="0.05" value="${v}" data-i="${i}" data-a="${a}"><output>${own ? Math.round(v * 100) : 'as skill'}</output></label>`;
+  }).join('')}<button type="button" class="crewreset" data-i="${i}">All as skill</button></details>`;
+  rows.innerHTML = people.map((x, i) => `<div class="crewperson"><span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}${seat(i)}${more(i, x.p)}</div>`).join('')
+    + `<label class="crewfumble" title="Under pressure every crew fumbles now and then: a riding turn on the winch, the pole caught on the shrouds"><input type="checkbox" id="crewFumbles"${S.crewFumbles === false ? '' : ' checked'}> Your crew fumble now and then under pressure</label>`;
+  const who = (i: number) => (i === 0 ? c.helm : c.people[i - 1]);
   rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {
-    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); saveSettings(S); newGame();
+    const i = Number(sel.dataset.i);
+    if (sel.dataset.f === 'seat') { if (Number(sel.value) !== i) [c.people[0], c.people[1]] = [c.people[1], c.people[0]]; }
+    else who(i).skill = Number(sel.value);
+    saveSettings(S); newGame(); crewRows();
   });
-  rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
-    const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
+  rows.querySelectorAll<HTMLInputElement>('input[data-f]').forEach(inp => inp.onchange = () => {
+    const i = Number(inp.dataset.i), p = who(i);
     if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
     else { const lb = Number(inp.value); if (lb > 70 && lb < 400) p.w = lb * LB; inp.value = String(Math.round(p.w / LB)); }
     saveSettings(S); newGame(); courseCard();
   });
+  rows.querySelectorAll<HTMLInputElement>('input[data-a]').forEach(inp => {
+    inp.oninput = () => { (inp.nextElementSibling as HTMLOutputElement).value = String(Math.round(Number(inp.value) * 100)); };
+    inp.onchange = () => { const p = who(Number(inp.dataset.i)); (p.attr ??= {})[inp.dataset.a as Attr] = Number(inp.value); saveSettings(S); newGame(); };
+  });
+  rows.querySelectorAll<HTMLButtonElement>('.crewreset').forEach(btn => btn.onclick = () => { delete who(Number(btn.dataset.i)).attr; saveSettings(S); newGame(); crewRows(); });
+  ($('crewFumbles') as HTMLInputElement).onchange = e => { S.crewFumbles = (e.target as HTMLInputElement).checked; saveSettings(S); newGame(); };
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {

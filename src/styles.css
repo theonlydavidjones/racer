@@ -603,6 +603,17 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 details summary u{color:var(--accent);text-decoration:none;font-weight:700;margin-left:4px}
 .sibody{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--rule);border-radius:8px}
 .crewbox .crewrows{margin-top:6px}
+/* each person's row (app.ts crewRows): their measurements, skill and seat; their attributes under More */
+.crewperson{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.crewperson>span{min-width:96px;color:var(--text)}
+.crewmore{flex:1 0 100%;margin:0 0 4px 96px}
+.crewmore summary{cursor:pointer;color:var(--muted);font-size:12px}
+.crewmore label{display:inline-flex;width:250px;justify-content:space-between;margin:3px 12px 0 0}
+.crewmore input[type=range]{width:110px;padding:0}
+.crewmore output{width:44px;text-align:right;color:var(--text);font-size:12px}
+.crewreset{margin-top:6px;font:inherit;font-size:12px;background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:3px 8px;cursor:pointer}
+.crewfumble{grid-column:1/-1;margin-top:4px}
+.crewfumble input{width:auto}
 .boatsum .ghost.sm{white-space:nowrap}
 .step .coursecard{padding:8px 10px;gap:4px}
 .step .coursecard .rcpick{margin-bottom:4px}
