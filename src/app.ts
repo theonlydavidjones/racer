@@ -48,7 +48,8 @@ import { NavView } from './ui/navView';
 import { onSaveTrouble } from './store/cloud';
 import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
-import { SetupChart } from './ui/setupChart';
+import { SetupChart, type SetupPicks } from './ui/setupChart';
+import { PlanChart } from './ui/planChart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
@@ -668,11 +669,15 @@ $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
 /** Cruise setup: the start and the destination, picked on the chart (ui/setupChart.ts); each pick rebuilds the world. */
-setupChart = new SetupChart(hud, {
+const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
   set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); }
-});
+};
+setupChart = new SetupChart(hud, cruisePicks);
+/** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
+const planChart = new PlanChart(hud, cruisePicks, () => setupChart?.sync(true));
+$('bPlanOpen').onclick = () => { planChart.open(); openChartHook(); };
 let openChartHook = () => {}; // (the field picker, set to the layers in force when the chart opens)
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
   pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
@@ -680,9 +685,9 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
   const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); };
-  const redraw = () => { if (chart.isOpen) chart.draw(); };
+  const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
-  const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button')];
+  const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button, #planField button')];
   const syncField = () => { const f = fieldLayer(w?.settings ?? S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
   for (const b of fieldBtns) b.addEventListener('click', () => {
     const f = b.dataset.field!;
@@ -1530,4 +1535,4 @@ newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRo
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __hud: hud, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
