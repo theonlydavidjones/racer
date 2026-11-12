@@ -177,6 +177,7 @@ function deckWalk(s: number, z: number, dir: number, k: number): PoseT {
  */
 function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
   const c = f.cur?.hip; if (!c) return null;
+  if (dt <= 0 || dt > 0.5) { f.route = undefined; return null; } // (a jump, as on a new start: everyone's straight where they're going)
   const inLen = (z: number) => z > COCK0 && z < COCK1 + 0.2;
   const tAft = inLen(want.hip.z) && want.hip.z > THWART.z + 0.05, cAft = inLen(c.z) && c.z > THWART.z + 0.05; // (aft of the thwart's line)
   const r = f.route;
@@ -225,8 +226,8 @@ function kneelOne(x: number, z: number, yaw: number, front: number, hands: [THRE
 /** Up in a crouch, a slight bend at the waist and the knees, under the boom (the middle crew tacking the main). */
 function crouch(x: number, z: number, yaw: number, hands: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
   // (the head well under the boom, about 1.66 m above the waterline over the cockpit)
-  const g = groundNear(x, z, 0.15), f = fwd(yaw), r = right(yaw), hip = V(x, g + 0.55 * k, z);
-  const feet = [0, 1].map(j => onGround(hip.clone().addScaledVector(f, (j ? 0.08 : -0.05) * k).addScaledVector(r, (j ? 1 : -1) * 0.15 * k))) as [THREE.Vector3, THREE.Vector3];
+  const g = ground(x, z), f = fwd(yaw), r = right(yaw), hip = V(x, g + 0.55 * k, z); // (from the sole under them, not the thwart beside them)
+  const feet = [0, 1].map(j => onGround(keepOnSole(hip.clone().addScaledVector(f, (j ? 0.08 : -0.05) * k).addScaledVector(r, (j ? 1 : -1) * 0.15 * k)))) as [THREE.Vector3, THREE.Vector3];
   return { hip, yaw, pitch: -0.6, roll: 0, feet, hands, look: lookAt.clone() };
 }
 /** In the middle, low: on one knee on the sole, facing forward, a hand on the forward knee and one on the seat's edge. */

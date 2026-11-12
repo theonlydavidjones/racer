@@ -27,7 +27,7 @@ const CASES = [
     }
     console.log(name, tack, (await p.evaluate(() => lab.info())).replace(/\n/g, ' | '));
   }
-  for (const [name, setup] of [['tack', { windKt: 10 }], ['gybe', { windKt: 12, twa: 160 }]]) {
+  for (const [name, setup] of [['tack', { windKt: 10 }], ['tackhike', { windKt: 20 }], ['gybe', { windKt: 12, twa: 160 }]]) {
     await p.evaluate(([s, nt]) => { lab.setup(s); lab.night(nt); lab.sail(25); lab.tack(); }, [setup, night]);
     for (let i = 0; i < 12; i++) {
       await p.evaluate(() => { lab.frames(0.6); lab.cam(-15, 35, 4.4, [0, 0.6, 1.9]); });
