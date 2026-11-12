@@ -42,6 +42,12 @@ What's planned, roughly in order. Done work is described in the README.
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
+8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
+   building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
+   southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
+   way to set the direction.
+   HUD note (Deep Physics, in progress): the inset map shows the boat's own visibility, and is north-up in Just sail,
+   with an N arrow.
 9. The flags' original motion back, and "Strike ensign" (1–2 h).
 10. P0 phase 4: deck hardware and lines, with the rigging detail (4–8 h).
 Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
