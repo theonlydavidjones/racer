@@ -709,7 +709,7 @@ function applyHeld(): void {
   u.ctlCmd = cmd; u.sheetCmd.main = cmd.mainsheet ?? 0; u.sheetCmd.jib = cmd.jibsheet ?? 0;
 }
 function setView(i: number): void {
-  viewMode = i; lookAhead();
+  viewMode = i; lookAhead(); look.chase = undefined; // (the chase view starts framed: design/chase-layout.html)
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }

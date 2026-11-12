@@ -194,9 +194,11 @@ export class SceneView {
    */
   private chaseFit(dir: number, ratio: number): { dist: number; near: number; tBot: number } {
     const H = this.renderer.domElement.clientHeight || 1, f = this.chaseFrame;
-    return fitChase(this.camera.fov, (f.bottom > 0 ? f.bottom : 0.82 * H) / H, (this.userHeading - dir) * D2R, ratio);
+    // (with the band closed the frame's bottom is the window's: she sits above the row of buttons along it, ~8% of the height)
+    const bottom = f.bottom > 0 ? Math.min(f.bottom, 0.92 * H) : 0.82 * H;
+    return fitChase(this.camera.fov, bottom / H, (this.userHeading - dir) * D2R, ratio, this.userHeel);
   }
-  private userHeading = 0;
+  private userHeading = 0; private userHeel = 0;
   private laylines: THREE.Line[] = [];
   /* Wind on the water: a map of the wind strength around the camera, refreshed several times a second, that
    * the water shader turns into darker, rougher patches in the puffs and paler, smoother ones in the lulls. */
@@ -774,7 +776,7 @@ export class SceneView {
     this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
-    this.userHeading = u.h;
+    this.userHeading = u.h; this.userHeel = u.heel;
     camera.up.set(0, 1, 0);
     const fov = viewMode === 0 ? 72 : this.baseFov;
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -869,10 +871,10 @@ function markBody(shape: string, look: string): THREE.Group {
 /**
  * The chase camera's framed distance (design/chase-layout.html): seen from `rel` (rad, from astern) with the camera
  * `ratio` × its distance up, the distance at which her masthead (RIG.MAST_TOP up, at the mast) sits an eighth of the way
- * down and the hull nearest the camera (at the water) just above `bandTop` (a fraction of the height down). Also how far
+ * down (heeled, it stands lower) and the hull nearest the camera (at the water) just above `bandTop` (a fraction of the height down). Also how far
  * that hull point is toward the camera (m), and the band's line as the tangent of its angle below the view's middle.
  */
-export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: number): { dist: number; near: number; tBot: number } {
+export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: number, heelDeg = 0): { dist: number; near: number; tBot: number } {
   const tf = Math.tan(fovDeg * D2R / 2), yTop = 1 / 8, yBot = Math.min(0.98, bandTop - 0.02);
   const tTop = tf * (1 - 2 * yTop), tBot = tf * (1 - 2 * yBot), span = Math.atan(tTop) - Math.atan(tBot);
   const along = Math.abs(Math.cos(rel)) * HULL_L / 2 + Math.abs(Math.sin(rel)) * 1.1; // (her half-length, or her half-beam, toward the camera)
@@ -880,7 +882,7 @@ export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: nu
   let lo = 4, hi = 400;
   for (let k = 0; k < 40; k++) {
     const d = (lo + hi) / 2, h = Math.max(1.2, ratio * d);
-    const aM = Math.atan2(RIG.MAST_TOP - h, d + mastOff), aT = Math.atan2(0 - h, Math.max(0.5, d - along));
+    const aM = Math.atan2(RIG.MAST_TOP * Math.cos(heelDeg * D2R) - h, d + mastOff), aT = Math.atan2(0 - h, Math.max(0.5, d - along));
     if (aM - aT > span) lo = d; else hi = d;
   }
   return { dist: (lo + hi) / 2, near: along, tBot };
