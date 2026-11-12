@@ -1,11 +1,11 @@
 # Build plan
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and the Corinthian's A dock are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); the real slip numbers (South Beach's dock letters and slip numbers, and the Corinthian's A dock, are real; West Harbor's and Gashouse Cove's letters, and every harbor's slip numbers, aren't published where we could reach: the harbor maps on sfport.com, sfrecpark.org and cyc.org need those hosts allowed); boats in neighbouring slips drawn as real boats; docking lines and an outboard for getting in and out.
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
-  (the sails' own side force), but the AI's sailing doesn't reckon with either yet (an AI boat luffing by the committee
-  boat drifts onto it), so with sails up she still stops dead and the keel holds her. Also: heaveTo still clamps
+  (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
+  yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
   sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
 - **The sea inside the marinas** (from review of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
   through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
@@ -315,9 +315,18 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
 6. ~~**The swell's yaw is wrong in kind**~~ (done: a slender hull's Froude–Krylov moment) (seaway.ts waveYaw): it doesn't fall with wavelength (a slender hull's
    Froude–Krylov yaw goes as k²), and peaks abeam not on the quarter: up to 16° heading swings and 3% speed lost in a
    2 m 13 s swell outside the Gate, where it should be next to nothing.
-7. **No leeway** (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
+7. ~~**No leeway**~~ (done, owner's yes) (hull 1): she slides along her heading. At speed the polar's VMG is right (its angles are course
    angles), but slow she should slip: 0.3–0.7 kt to leeward at 1.5 kt close-hauled in 12 kt, so a boat parked on the
-   line sags onto the one below her and each tack costs 0.2–0.4 boat lengths more. A design change: ask the owner.
+   line sags onto the one below her and each tack costs 0.2–0.4 boat lengths more. Now: the sails' side force against
+   the keel's lift (slender wing, Newman §5.12) and the hull's broadside drag, as a sideways motion; close-hauled 2.9°,
+   4.3° and 6.0° in 6, 12 and 20 kt; slow, 0.36 kt at 1.5 kt in 12 kt. The polar's speed is her course's; the sails
+   are trimmed and their forces read in the wind across her course (turned from her heading by her steady leeway), the
+   frame the sail model was calibrated in before leeway: a calibration choice, not shown from ORC's documentation (its
+   VPP PDF isn't reachable from here). A real windex reads her leeway less; recalibrating trim.ts's angles (the jib's
+   8° sheeting limit and 18° angle of attack, both unsourced) in the hull's frame belongs with item 9. She, the AI and
+   Nav steer her leeway above the beat. The compass's "tack" marker and its mean close-hauled
+   heading allow for it too (ui/hud.ts); the laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
+   in and she rounds up and tacks; it was before leeway too).
 8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
@@ -507,10 +516,18 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
   Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
-  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); San Rafael Bay and San Leandro Bay have no measurement
-  inside them, so their current is the nearest stations' in sight, very likely too strong for such shallow water (USGS's
-  San Pablo Bay surveys, WRI 84-4339's speed-against-depth relation, and SFEI's San Leandro Bay model are the leads,
-  but pubs.usgs.gov and sfei.org aren't reachable here); BYC's and Encinal YC's own racing marks aren't published where we could
+  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: a dead end, so by continuity: Point
+  San Quentin's tide, NOAA 9414873 from San Francisco's constants by NOAA's offsets, fills and empties the water beyond
+  each line across the bay, NOAA chart depths; peak about 0.1–0.3 kt over the open bay against 1.7 kt at the mouth,
+  handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
+  water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
+  as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
+  behind it); San
+  Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong;
+  the same continuity would serve (Alameda's tide, NOAA 9414750), but the world, its terrain and the chart extracts
+  stop at 122.213 W, through the middle of the bay, so the water it fills (east to Arrowhead Marsh) isn't in the sim
+  yet: it needs the world taken a kilometre or two further east first (SFEI's San Leandro Bay model, the other lead,
+  sits behind a browser check that a fetch can't pass); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

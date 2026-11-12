@@ -1,7 +1,7 @@
 import { FLAT_SEA } from '../../src/environment/sea';
 import type { Boat } from '../../src/boat/boat';
 import { moveBoat, tackTarget } from '../../src/boat/physics';
-import { V, KT, wrap } from '../../src/core/math';
+import { V, KT, n360, wrap } from '../../src/core/math';
 import { FULL_RUDDER } from '../../src/boat/balance';
 import { defaultControls } from '../../src/boat/controls';
 
@@ -36,5 +36,7 @@ export function sail(b: Boat, seconds: number, each?: (t: number) => boolean | v
   return seconds;
 }
 export const kt = (b: Boat) => b.v / KT;
+/** The heading that makes good `course` through the water: her leeway higher, toward the wind (physics.ts b.leeway). */
+export const courseHeading = (b: Boat, course: number) => { const r = wrap(b.ww.from - course); return Math.abs(r) < 150 ? n360(course + Math.sign(r) * (b.leeway ?? 0)) : course; };
 export const upwindProgress = (b: Boat, windFrom = 0) => { const n = V(windFrom); return b.x * n.x + b.y * n.y; };
 export function startTack(b: Boat) { const t = tackTarget(b); b.turnDir = t.dir; b.turnTarget = t.target; }

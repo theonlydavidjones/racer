@@ -71,7 +71,8 @@ describe('handling: acceleration and slowing', () => {
   it('settles at the polar target speed on a beam reach', () => {
     const b = testBoat({ heading: 270, kt: 3 });
     sail(b, 120);
-    expect(kt(b)).toBeCloseTo(FOLKBOAT.speedKt(12, 90), 1);
+    // (her speed through the water, at her course's angle: the polar's angles are the course's, her leeway included)
+    expect(Math.hypot(b.v, b.sway ?? 0) / KT).toBeCloseTo(FOLKBOAT.speedKt(12, 90 + (b.leeway ?? 0)), 1);
   });
 
   it('accelerating from 1 kt on a close reach to 90% of target takes 8–20 s (heavy, long-keeled boat)', () => {
