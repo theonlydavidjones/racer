@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * The rig as drawn against the rig as tuned (render/boatMesh.ts syncRig, boat/rigTune.ts rigDrawn): on both tacks, the
- * backstay off and full on, a soft tune (North Sails' light setting) in the showroom's breeze. Reads the meshes from the
- * scene (dev build): the forestay's sag at mid-stay, how far the jib's luff lies off the stay (should be under ~1 cm),
+ * backstay off and full on, and close to head to wind (the jib luffing: the stay unloads), a soft tune (North Sails' light setting) in the showroom's breeze. Reads the meshes from the
+ * scene (dev build): the forestay's sag (drawn, and the loaded sag it eases toward over about a quarter second: headless
+ * Chromium draws a frame or two a second, so allow for the lag) at mid-stay (drawn aft and to leeward, about 40° off the fore-and-aft line, so its sideways part is about 0.64 of it), how far the jib's luff lies off the stay (should be under ~1 cm),
  * the mast's drawn bow, and how evenly the main's luff keeps to the bent mast (the spread of its distance from the mast's
  * centreline, should be a few mm). The sag a few centimetres can't be judged by eye at any useful camera distance.
  * Needs the dev server (npm run dev) on :5173.   node scripts/check/rig-bend.cjs
@@ -14,10 +15,14 @@ const { chromium } = require('playwright');
   await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="fleet"]').click()); await p.waitForTimeout(800); await p.evaluate(() => document.querySelector('.fcard').click()); await p.waitForTimeout(1500);
   const res = [];
-  for (const twa of [55, -55]) for (const bs of [0, 1]) {
+  for (const [twa, bs] of [[55, 0], [55, 1], [-55, 0], [-55, 1], [22, 0]]) {
     await p.evaluate(a => window.__twa(a), twa); await p.waitForTimeout(1200);
-    await p.evaluate(bs => { const u = window.sim().user; u.tune = { forestayMark: 1.31, footAft: 22, shroudTurns: 0, jumperTurns: 0 }; u.rigMain = undefined; u.ctl.backstay = bs; u.ctlCmd = {}; }, bs);
-    await p.waitForTimeout(200);
+    // (the showroom doesn't trim her sails: the jib's trim is held drawing each frame here, except close to head to wind,
+    // where it's left luffing and the stay should unload)
+    await p.evaluate(([bs, draw]) => { const u = window.sim().user; u.tune = { forestayMark: 1.31, footAft: 22, shroudTurns: 0, jumperTurns: 0 }; u.rigMain = undefined; u.ctl.backstay = bs; u.ctlCmd = {};
+      window.__drawJib = draw; if (!window.__drawHook) { window.__drawHook = true; let real = u.trim.jib;
+        Object.defineProperty(u.trim, 'jib', { configurable: true, get: () => window.__drawJib ? { eff: 1, err: 0, flow: 'good', amount: 0 } : real, set: v => { real = v; } }); } }, [bs, Math.abs(twa) > 30]);
+    await p.waitForTimeout(1200);
     res.push(await p.evaluate(() => {
       const m = window.__view.boatMeshes[0], V = m.grp.position.constructor, u = window.sim().user;
       m.grp.updateMatrixWorld(true);
@@ -34,7 +39,7 @@ const { chromium } = require('playwright');
       const Cm = m.main.sVals.length, ml = pts(m.main.mesh, m.main.tVals.map((_, i) => i * Cm));
       const md = ml.map(q => distToPoly(q, axis)), mainSpread = Math.max(...md) - Math.min(...md);
       const axisStraight = [axis[0], axis[axis.length - 1]], bowDrawn = Math.max(...axis.map(q => distToPoly(q, axisStraight)));
-      return { tack: u.tack, bs: u.ctl.backstay, aws: +u.aws.toFixed(2), sagModel: +m.rigDrawn.forestay.geometry.attributes.position.getX(6).toFixed(3), stayMid: +stayMid.toFixed(3), jibGap: +jibGap.toFixed(4), bow: m.rigDrawn.bow, topAft: m.rigDrawn.topAft, bowDrawn: +bowDrawn.toFixed(3), mainLuffSpread: +mainSpread.toFixed(4) };
+      return { tack: u.tack, bs: u.ctl.backstay, aws: +u.aws.toFixed(2), twa: +u.twa.toFixed(0), sagDrawn: +m.rigDrawn.sag.toFixed(3), sagWanted: +m.rigDrawn.want.toFixed(3), load: m.rigDrawn.load, jibFlow: u.trim.jib.flow, plan: u.pole, stayLee: +m.rigDrawn.forestay.geometry.attributes.position.getX(6).toFixed(3), stayMid: +stayMid.toFixed(3), jibGap: +jibGap.toFixed(4), bow: m.rigDrawn.bow, topAft: m.rigDrawn.topAft, bowDrawn: +bowDrawn.toFixed(3), mainLuffSpread: +mainSpread.toFixed(4) };
     }));
   }
   console.log(JSON.stringify(res, null, 1), errs);
