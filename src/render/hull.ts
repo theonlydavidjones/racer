@@ -71,13 +71,19 @@ export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - 
 /**
  * Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. The stem meets the
  * water about 1.02 m aft of the bow at deck level, so with the raked transom's crossing (aftLineZ(0), 0.62 m forward
- * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem's curve itself
- * is estimated.
+ * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem is straight
+ * and raked, as the class drawing shows it, rounding into the forefoot below the water.
  */
-const BOW = 0.144; // where the stem's curve meets the forefoot (fraction of L)
+const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
+/** The stem's slope (m of height per unit of u): a straight, raked stem from the stemhead down to the forefoot. */
+const STEM_SLOPE = -1.06 / BOW;
+/** From y0 to y1 over s 0..1, leaving at `m` (dy/ds) and arriving level: the forefoot's round, picking up the stem's slope. */
+const turn = (y0: number, y1: number, m: number, s: number) => { const k = Math.max(1, m / (y1 - y0)); return y0 + (y1 - y0) * (1 - Math.pow(1 - Math.min(1, Math.max(0, s)), k)); };
 function canoe(u: number): number {
-  if (u < BOW) return 0.96 - 1.06 * Math.pow(u / BOW, 1.34);
-  if (u < 0.45) return -0.1 - 0.52 * ease((u - BOW) / (0.45 - BOW));
+  // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then
+  // rounding into the hull's bottom without a knuckle
+  if (u < BOW) return 0.96 + STEM_SLOPE * u;
+  if (u < 0.45) return turn(-0.1, -0.62, STEM_SLOPE * (0.45 - BOW), (u - BOW) / (0.45 - BOW));
   if (u < 0.62) return -0.62; // where the hollow garboards meet the keel amidships (the plan's main section at St. 8)
   return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
 }
@@ -85,7 +91,7 @@ function canoe(u: number): number {
 const U_HEEL = (HEEL.z + L / 2) / L;
 function keel(u: number): number {
   if (u <= BOW) return canoe(u);
-  if (u < 0.33) return -0.1 + (-0.95 + 0.1) * ease((u - BOW) / (0.33 - BOW));
+  if (u < 0.33) return turn(-0.1, -0.95, STEM_SLOPE * (0.33 - BOW), (u - BOW) / (0.33 - BOW)); // the cutaway forefoot, rounding down from the stem
   return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / (U_HEEL - 0.33));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
