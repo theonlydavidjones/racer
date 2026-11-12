@@ -67,8 +67,19 @@ export function mainsheetFor(angle: number, traveller: number): number {
 }
 /** Where the traveller puts the boom at `angle` with the mainsheet at `sheet` (inverse of boomAngle), within [floor, 1]. */
 export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.min(1, Math.max(floor, (angle - 80 * Math.pow(sheet, 1.5)) / 9.5));
-/** The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins`. */
-export const carLead = (ins: number) => 8 + 1.25 * ins;
+/**
+ * The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins`.
+ *
+ * North Sails' Nordic Folkboat tuning guide (Theis Palm; northsails.com/sailing/en/resources/nordic-folkboat-tuning-guide):
+ * "The jib-lead track is placed with its center 58 cm from the boat's centerline", and the lead "2.65 m from the pin in
+ * the forestay to the center of the block": atan(0.58 / 2.65) = 12.3°. The guide moves the lead only fore and aft, by
+ * holes. Across, the car moves on a short bar on the cabin top: Josephine's is about 5 in (127 mm) long (the owner), so
+ * CAR_IN_PINS holes 25 mm apart centred on the guide's 58 cm (the number and spacing of the holes an estimate: the owner
+ * couldn't check), 53–63 cm out: 11.3°–13.4°. (It was 8°–13°, with no source for the inboard end.) The class leaves the
+ * lead free (CR 8.40: only nothing outboard of the sheer line).
+ */
+export const CAR_TRACK = { aft: 2.65, centre: 0.58, pin: 0.025 };
+export const carLead = (ins: number) => Math.atan((CAR_TRACK.centre + CAR_TRACK.pin * (ins - (CAR_IN_PINS - 1) / 2)) / CAR_TRACK.aft) * 180 / Math.PI;
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). */
 export function jibAngle(c: Controls, tack: Tack): number {
   const lead = carLead(c.car[tack === 'S' ? 'P' : 'S'].ins); // the loaded car is the leeward one
