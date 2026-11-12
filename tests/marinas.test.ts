@@ -125,7 +125,10 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const one = [s1.fetch(a, 300), s1.fetch(b, 300)], two = [s2.fetch(b, 300), s2.fetch(a, 300)];
       expect(one).toEqual([two[1], two[0]]);
     }
-    expect(new SeaField({ hs: 1, tp: 12, from: 270 } as never).fetch(p, 315)).toBe(fetchAt(p, 316, false)); // (worked out where she is, not at the node in the basin)
+    // (by the harbor, traced finely and blended between the 10 m nodes round her, none of them in the basin: close to the
+    // fine fetch worked out where she is)
+    const here = fetchAt(p, 316), got = new SeaField({ hs: 1, tp: 12, from: 270 } as never).fetch(p, 315);
+    expect(Math.abs(got - here) / here).toBeLessThan(0.1);
   });
   it('the way out from every slip to the open Bay (a fine path search from offshore)', () => {
     for (const id of NEW) {

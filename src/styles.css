@@ -473,6 +473,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .rrCaption .ghost{margin-left:auto;flex:0 0 auto}
 .rrNo{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;margin-right:8px;
   color:#0c2534;font:700 12px/1 var(--f-inst);flex:0 0 auto}
+.rrNo.hollow{background:#0c2534;border:2px solid;box-sizing:border-box}
 .rrList{max-height:calc(62vh + 120px);overflow-y:auto;border-top:0;padding-top:0}
 .rrList li{border:1px solid transparent;border-radius:8px;padding:6px 8px}
 .rrList li.rrPick{cursor:pointer}
@@ -844,6 +845,9 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-jc.mine .sb-jcar{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-tag{font:700 8px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-height:8px}
 body.showroom .sailband{visibility:hidden}
+/* (the band is added after the overlays, so it would sit on top of an open one and catch its clicks: the incident's
+   "Continue racing" at 1280×800, the pause and results buttons. It stays put away while any overlay is up) */
+body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 .sb-jwant,.sb-jideal{width:9px;height:9px;margin:-1px;border-radius:2px;pointer-events:none;z-index:2;box-sizing:border-box}
 .sb-jwant{border:1.5px dashed var(--accent)}
 .sb-jideal{border:1.5px dashed #fff}
