@@ -53,6 +53,8 @@ Member {
   - **Skippers' ratings are hidden**: the owner chose discovery by racing. A club skipper's card shows what you'd really
     know: name, club and boat, the club gossip line, and her record against you (races, mean place, best, OCS,
     penalties). Later, tendencies seen in her record ("often first off the line").
+  - **A skipper also has her form on the day:** each attribute swings a little race to race, less for the consistent
+    ones. So a club's star doesn't win every time, but most (the real fleet's top boat won 29 of 40).
   - **Crews' ratings are shown.** You can watch a crew work, and knowing them is part of picking yours. (Owner to
     decide.)
   - A **"Show skippers' ratings"** switch in Settings, off by default, for learning and testing. (Owner to decide.)
@@ -96,7 +98,10 @@ The crew rows (today's "Edit crew") become a read-only line per boat:
   branches).
 - **Skipper attributes** drive the AI's decisions, but in Skipper Model's calibration results don't yet track skill
   (race-to-race tau about 0.05, against the real fleet's 0.42). The noise is the AI's own fouls, about one penalty per
-  boat per race, which Skipper Model is fixing. So a "great" skipper can't yet show it reliably. The Yacht Club can be
+  boat per race, which Skipper Model is fixing.
+- **Progress since:** holding a keep-clear move for 3 s (the trigger flickered at the edge of the 12 s look-ahead) cut
+  AI-vs-AI fouls from 23 to 14 in the same six races, and rule 10 fouls from 12 to 5. Next are the fouls right after
+  contact (rule 21.2, with Rules) and the windward-leeward ones near marks. So a "great" skipper can't yet show it reliably. The Yacht Club can be
   built now; the claim that skill decides races waits on that fix.
 
 ## Phases (hours ±50%)
