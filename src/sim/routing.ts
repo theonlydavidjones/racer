@@ -31,6 +31,8 @@ export interface SailResult {
   /** Track over the ground, one point every 30 s: position and minute (since epoch UTC). */
   path: { p: Vec; t: number }[];
   tacks: number;
+  /** Where she tacked or gybed (the points on her track where she turned through the wind). */
+  turns: Vec[];
   /** Average true wind along the way (kt), and the average current along the straight course (kt, + helping). */
   meanKt: number; meanCurAlong: number;
   /** How far she went from the straight course (m): the farthest point left (+) or right (−) of it, looking from start to mark. */
@@ -99,6 +101,7 @@ function crabTo(u: Vec, c: Vec, v: number): number {
 export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
+  const turns: Vec[] = [];
   const path = [{ p: { ...p }, t }];
   let sumKt = 0, sumCur = 0, n = 0, maxLeft = 0, maxRight = 0, minShore = Infinity;
   const w0 = windFor(o, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, t0, sc), off0 = Math.abs(wrap(brg(legU.x, legU.y) - w0.from));
@@ -140,7 +143,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         const xt = cross(legU, sub(p, a)); // + left of the straight course
         if ((tack === 'S' && xt > lim) || (tack === 'P' && xt < -lim)) flip = true;
       }
-      if (flip) { tack = tack === 'S' ? 'P' : 'S'; tacks++; t += MANOEUVRE_S / 60; p = { x: p.x + c.x * MANOEUVRE_S, y: p.y + c.y * MANOEUVRE_S }; }
+      if (flip) { tack = tack === 'S' ? 'P' : 'S'; tacks++; turns.push({ ...p }); t += MANOEUVRE_S / 60; p = { x: p.x + c.x * MANOEUVRE_S, y: p.y + c.y * MANOEUVRE_S }; }
       h = hd(tack); v = vb;
       if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
         const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
@@ -161,7 +164,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   return result(dist(p, b) <= arrive);
 
   function result(ok: boolean): SailResult {
-    return { ok, minutes: t - t0, kind, path, tacks, meanKt: n ? sumKt / n : 0, meanCurAlong: n ? sumCur / n : 0, maxLeft, maxRight, minShore };
+    return { ok, minutes: t - t0, kind, path, tacks, turns, meanKt: n ? sumKt / n : 0, meanCurAlong: n ? sumCur / n : 0, maxLeft, maxRight, minShore };
   }
 }
 

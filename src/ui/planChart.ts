@@ -8,6 +8,9 @@ import { chartPoint } from './chart';
 import { brg, dist, wrap, type Vec } from '../core/math';
 import type { SetupPicks } from './setupChart';
 import type { World } from '../sim/world';
+import { passageNow } from '../sim/navigator';
+import { clockOf } from '../sim/outlook';
+import { mins } from '../sim/brief';
 
 type Pin = 'from' | 'to';
 /** Where a tap or a drop at a spot puts a pin: a place by its name, her slip, a spot on the water; or why it can't go there. */
@@ -170,6 +173,14 @@ export class PlanChart {
       const a = { x: w.user.x, y: w.user.y }, r = navRoute(a, w.dest), L = r.slice(1).reduce((s2, p, i) => s2 + dist(r[i], p), 0), b = brg(w.dest.p.x - a.x, w.dest.p.y - a.y);
       const twa = Math.abs(wrap(w.wind.from - b)), kind = twa < 45 ? 'a beat' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'a run';
       way = `<p>${(L / 1852).toFixed(1)} nm by the navigator's route${r.length > 2 ? ` round the land (${(dist(a, w.dest.p) / 1852).toFixed(1)} nm straight)` : ''}; bearing ${String(Math.round(b) % 360).padStart(3, '0')}°, ${kind} in the wind as it is now.</p>`;
+      // the course she'd sail leaving now (sim/navigator.ts passageNow): over the ground, tacks and gybes, and when she'd get there
+      const pn = passageNow(w);
+      if (pn) {
+        const turns = [pn.tacks.length ? `${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : '', pn.gybes.length ? `${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ');
+        way += pn.ok
+          ? `<p><b>Sailing it:</b> about ${(pn.sailedM / 1852).toFixed(1)} nm over the ground${turns ? `, ${turns}` : ''}; ${mins(pn.minutes)}, leaving ${clockOf(pn.leave)} and arriving about <b>${clockOf(pn.eta!)}</b> (the Folkboat's polar speeds in the forecast wind and NOAA's current).</p>`
+          : `<p class="warn">Leaving at ${clockOf(pn.leave)} she can't get there: becalmed against the tide on the way. Try another time in the setup.</p>`;
+      }
     }
     $('planInfo').innerHTML = `<p><b>Start:</b> ${name(from)}</p><p><b>Destination:</b> ${name(to)}</p>${way}${this.msg ? `<p class="warn">${this.msg}</p>` : ''}`;
     this.draw();

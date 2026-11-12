@@ -56,12 +56,42 @@ const placeName = (o: Outlook, p: Vec): string => {
   return nearFeature(p, 3000) ?? 'open water';
 };
 
+/**
+ * The passage leaving now, as she'd sail it: the navigator's way round the land, each stretch sailed at the Folkboat's
+ * polar speeds through the forecast wind and NOAA's current as they change on the way (sailLeg: the best VMG angles
+ * upwind and down, tacking or gybing on the layline the current makes, crabbing across it on a reach; the polar's
+ * angles are her course through the water, so her leeway is in them). The same passage the passage plan, the chart
+ * and the setup's tide graph show: worked out once for where she is, where she's going and the minute.
+ */
+export interface PassageNow {
+  route: Vec[]; track: { p: Vec; t: number }[]; ok: boolean; minutes: number; legs: SailResult[];
+  /** distance over the ground along her track (m), and where she tacks and gybes */
+  sailedM: number; tacks: Vec[]; gybes: Vec[];
+  /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
+  leave: number; eta: number | null;
+}
+const nowMemo = new WeakMap<World, { key: string; v: PassageNow }>();
+export function passageNow(w: World): PassageNow | null {
+  const dest = w.dest; if (!dest) return null;
+  const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
+  const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
+  const m = nowMemo.get(w); if (m && m.key === key) return m.v;
+  const o = outlookFor(w), route = routeAround(from, dest.p), r = passage(o, route, t0);
+  const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
+  const v: PassageNow = { route, track: r.track, ok: r.ok, minutes: r.minutes, legs: r.legs, sailedM,
+    tacks: r.legs.filter(l => l.kind !== 'run').flatMap(l => l.turns), gybes: r.legs.filter(l => l.kind === 'run').flatMap(l => l.turns),
+    leave: t0, eta: r.ok ? t0 + r.minutes : null };
+  nowMemo.set(w, { key, v });
+  return v;
+}
+
 export function passagePlan(w: World): PassagePlan | null {
   const dest = w.dest; if (!dest) return null;
   const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
-  const from = { x: u.x, y: u.y }, to = dest.p, route = routeAround(from, to);
+  const from = { x: u.x, y: u.y }, to = dest.p;
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
-  const now = passage(o, route, t0);
+  // (the same passage the chart and the setup show: passageNow)
+  const pn = passageNow(w)!, route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
   const straight = dist(from, to), routeLen = route.slice(1).reduce((a, p, i) => a + dist(route[i], p), 0);
   const fromName = w.fromSlip && !w.running ? `her slip (${w.homeSlip?.id})` : place(w.settings.sailFrom)?.name.replace(/^Off /, 'off ') ?? 'here';
 

@@ -8,7 +8,7 @@ import { CURRENT_RAMP, WIND_RAMP, rampColor } from './flow';
  * and pens (encChart.ts INK and areaPen, draw2d.ts PEN), so the key can't drift from the map.
  */
 
-export type SimKey = 'you' | 'boats' | 'start' | 'marks' | 'next' | 'dest' | 'destline' | 'laylines' | 'ships' | 'current' | 'wind' | 'puffs' | 'sea' | 'fog' | 'shadows';
+export type SimKey = 'you' | 'boats' | 'start' | 'marks' | 'next' | 'dest' | 'destline' | 'track' | 'laylines' | 'ships' | 'current' | 'wind' | 'puffs' | 'sea' | 'fog' | 'shadows';
 type Draw = (g: CanvasRenderingContext2D, I: Ink, w: number, h: number) => void;
 
 const line = (g: CanvasRenderingContext2D, w: number, h: number, pen: { w: number; dash: number[]; halo?: number }, color: string, halo?: string) => {
@@ -42,6 +42,7 @@ const SIM: { key: SimKey; name: string; draw: Draw }[] = [
   { key: 'next', name: 'Your next mark', draw: (g, I, w, h) => dot(g, w / 2, h / 2, 5, I.markHi, I) },
   { key: 'dest', name: 'Where you\'re heading', draw: (g, I, w, h) => { const x = w / 2, y = h / 2; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x + 5, y); g.lineTo(x, y + 6); g.lineTo(x - 5, y); g.closePath(); g.lineJoin = 'round'; g.strokeStyle = I.halo; g.lineWidth = 4; g.stroke(); g.fillStyle = I.mark; g.fill(); g.strokeStyle = I.edge; g.lineWidth = 1.2; g.stroke(); } },
   { key: 'destline', name: 'The navigator\'s route there', draw: (g, I, w, h) => line(g, w, h, PEN.dest, I.line, I.halo) },
+  { key: 'track', name: 'The course she\'d sail leaving now (tacks ▲, gybes ○)', draw: (g, I, w, h) => { const y = h / 2; g.lineJoin = 'round'; const z = () => { g.beginPath(); g.moveTo(3, y + 3); g.lineTo(w * 0.35, y - 4); g.lineTo(w * 0.65, y + 4); g.lineTo(w - 3, y - 3); }; g.strokeStyle = I.halo; g.lineWidth = PEN.track.halo; z(); g.stroke(); g.strokeStyle = I.you; g.lineWidth = PEN.track.w; z(); g.stroke(); } },
   { key: 'laylines', name: 'Laylines: starboard tack (green), port tack (red)', draw: (g, I, w, h) => { line(g, w / 2 - 1, h, PEN.layline, I.starboard, I.halo); g.save(); g.translate(w / 2 + 1, 0); line(g, w / 2 - 1, h, PEN.layline, I.port, I.halo); g.restore(); } },
   { key: 'ships', name: 'Ship, and where she\'ll be in a minute', draw: (g, I, w, h) => { const y = h / 2; g.lineCap = 'round'; g.strokeStyle = I.shipHalo; g.lineWidth = 6.5; g.beginPath(); g.moveTo(4, y); g.lineTo(16, y); g.stroke(); g.strokeStyle = I.ship; g.lineWidth = 3.5; g.stroke(); g.lineCap = 'butt'; g.globalAlpha = PEN.ahead.alpha; g.lineWidth = PEN.ahead.w; g.setLineDash(PEN.ahead.dash); g.beginPath(); g.moveTo(16, y); g.lineTo(w - 3, y); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; } },
   { key: 'current', name: 'Current: its speed in colour (kt: the scale on the chart), streaks the way it sets', draw: (g, _I, w, h) => flowSample(g, w, h, CURRENT_RAMP, 3) },
