@@ -63,7 +63,8 @@ describe('Where the weight goes, and what she does', () => {
   it('fore and aft: forward pays in light air (the transom clear), and trims her by the bow', () => {
     const fwd = steady(6, beatAngle(6), { place: { across: null, fore: 'fwd' } }), aft = steady(6, beatAngle(6), { place: { across: null, fore: 'aft' } });
     expect(fwd.b.crew!.trim).toBeGreaterThan(aft.b.crew!.trim + 0.02);
-    expect(fwd.v).toBeGreaterThan(aft.v * 1.003);
+    // (a little: the wetted surface from the hull's sections falls about 0.04% a centimetre by the bow, hullTrim.ts)
+    expect(fwd.v).toBeGreaterThan(aft.v);
   });
   it('heeling her 5–10° hardly changes her wetted area (the Delft series regression, for a narrow deep hull): the low side in light air pays through the sails', () => {
     expect(Math.abs(heelWetted(5))).toBeLessThan(0.01); expect(Math.abs(heelWetted(10))).toBeLessThan(0.01);

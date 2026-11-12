@@ -1,7 +1,7 @@
 import { D2R, clamp } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import { HULL } from './dynamics';
-import { bestTrim, trimFromMoment } from './hullTrim';
+import { bestTrim, trimDrag, trimFromMoment } from './hullTrim';
 import { polar } from './polar';
 
 /**
@@ -127,8 +127,10 @@ export interface CrewState {
   /** The fore-and-aft place they've chosen (0 aft … 1 forward), and seconds until they think about it again. */
   fore01?: number; foreT?: number;
   /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
-   * whether, with the pole out, both crew right forward on the foredeck pays more. */
-  mastPays?: boolean; foredeck?: boolean;
+   * whether, with the pole out, both crew right forward on the foredeck pays more: `layout`, and seconds since it changed. */
+  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number;
+  /** (true while both crew are right forward on the foredeck: the helm has the main then, crewWork.ts mainHand) */
+  foredeck?: boolean;
   /** Where each wants to be (re-thought 20 times a second), and seconds until they think again. */
   tgt?: Target[]; decideT?: number;
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
@@ -330,12 +332,15 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     if (c.fore01 == null || c.foreT <= 0) { chooseFore(c, k, skill); c.foreT = 1; }
     const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0 }[pl.fore] : c.fore01!;
     // the bow hand goes forward to the mast downwind when the bow-down trim pays (light air: hullTrim.ts), if they know to
-    if (c.foreT === 1) c.mastPays = downwind && bestTrim(Math.max(0.5, k.v), k.sea ?? 0) > 0.03;
-    const atMast = n > 0 && downwind && !pl?.fore && skill > 0.5 && !!c.mastPays;
-    // with the pole out and two crew, right up on the foredeck if that trims her nearer her best than the bow hand at the
-    // mast and the other in the cockpit (thought about with the fore-and-aft place, once a second)
-    if (c.foreT === 1) c.foredeck = atMast && k.pole && n >= 2 && foredeckPays(c, k, foreF);
-    const forward = atMast && !!c.foredeck;
+    // downwind, a good crew goes forward when the hull's trim says it pays (hullTrim.ts: in light air the transom lifts
+    // clear): the bow hand to the mast, or, with the pole out and two crew, both right up on the foredeck. The least drag
+    // of the three, re-thought once a second, but moved only for a real gain (0.3%) and not within LAYOUT_STAY of the
+    // last move, so they don't shuttle along the deck as she speeds up and slows; through a pole gybe they stay forward
+    c.layoutT = (c.layoutT ?? 1e9) + Math.max(dt, 0.05);
+    const canGo = n > 0 && downwind && !pl?.fore && skill > 0.5;
+    if (c.foreT === 1) c.layout = canGo ? chooseLayout(c, k, foreF) : 'cockpit';
+    else if (!canGo) c.layout = 'cockpit';
+    const atMast = c.layout === 'mast' || c.layout === 'foredeck', forward = c.layout === 'foredeck';
     // targets for each person: jobs first, then the helm, then the free crew share what's left of the wanted moment
     const tgt: Target[] = new Array(ppl.length);
     let fixedM = 0, freeW = 0;
@@ -436,7 +441,8 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
     if (!t || a.job?.station || t.pose === 'mast' || t.pose === 'bow' || t.pose === 'fore') { held[i] = null; return; }
-    if (reset || !h) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; return; }
+    // (and back from forward of the cockpit, the mast or the foredeck, they come all the way back, not stop on the way)
+    if (reset || !h || a.z < Z.cockpitFwd - 0.5 || h.z < Z.cockpitFwd - 0.5) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; return; }
     h.since += step;
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
     // again, is the body, not a move)
@@ -466,18 +472,28 @@ const reachLean = (p: Person, fatigue: number, edge = EDGE) => {
 const setGoal = (a: Aboard, x: number, z: number) => { if (a.goal) { a.goal.x = x; a.goal.z = z; } else a.goal = { x, z }; };
 const smoothSkill = (s: number) => { const t = clamp((s - 0.2) / 0.4, 0, 1); return t * t * (3 - 2 * t); };
 
-/** Whether both crew right forward (one astride the bow, one on the foredeck) trims her nearer her best (hullTrim.ts) than
- * the bow hand at the mast with the rest in the cockpit at `foreF`. */
-function foredeckPays(c: CrewState, k: CrewCall, foreF: number): boolean {
-  const cr = c.spec.crew, n = cr.length, best = bestTrim(Math.max(0.5, k.v), k.sea ?? 0), m0 = k.extraMoment ?? 0;
+/** The least time a crew stays in a fore-and-aft layout once they've moved to it (s): a trip to the foredeck is a few
+ * metres along the deck, not undone on the next lull. An estimate. */
+export const LAYOUT_STAY = 25;
+/**
+ * Where the crew go downwind: in the cockpit (at `foreF`), the bow hand at the mast, or (the pole out, two crew) one astride
+ * the bow and one on the foredeck: the least resistance by the hull's trim (hullTrim.ts trimDrag), with hysteresis.
+ */
+function chooseLayout(c: CrewState, k: CrewCall, foreF: number): 'cockpit' | 'mast' | 'foredeck' {
+  const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, v = Math.max(0.5, k.v), sea = k.sea ?? 0;
   const cockpitZ = (j: number, count: number) => { const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (count - 1 - j) * Z.gap; return za + (zf - za) * foreF; };
-  let mastM = 0, foreM = 0;
-  cr.forEach((p, j) => {
-    const ref = zRef(j + 1, n);
-    mastM += p.w * (ref - (j === n - 1 ? Z.mast : cockpitZ(j, n - 1)));
-    foreM += p.w * (ref - (j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2)));
-  });
-  return Math.abs(trimFromMoment(m0 + foreM) - best) < Math.abs(trimFromMoment(m0 + mastM) - best);
+  const drag = (zOf: (j: number) => number) => {
+    let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
+    return trimDrag(v, trimFromMoment(m0 + m), sea);
+  };
+  const opts: ['cockpit' | 'mast' | 'foredeck', number][] = [['cockpit', drag(j => cockpitZ(j, n))], ['mast', drag(j => j === n - 1 ? Z.mast : cockpitZ(j, n - 1))]];
+  const now = c.layout ?? 'cockpit';
+  if (n >= 2 && (k.pole || now === 'foredeck')) opts.push(['foredeck', drag(j => j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2))]);
+  const cur = opts.find(o => o[0] === now)?.[1] ?? Infinity;
+  const [bestL, bestD] = opts.reduce((a, o) => (o[1] < a[1] ? o : a));
+  if (bestL !== now && cur - bestD > 0.003 && (c.layoutT ?? 1e9) >= LAYOUT_STAY) { c.layoutT = 0; c.foredeck = bestL === 'foredeck'; return bestL; }
+  c.foredeck = now === 'foredeck';
+  return now;
 }
 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a skilled crew. */

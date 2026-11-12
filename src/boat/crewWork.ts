@@ -68,15 +68,17 @@ const JIB_HAUL = 0.25;
  * experienced than the helm or a novice; with one, the more experienced of the two (the other has the jib).
  */
 export const NOVICE = 0.3;
-export function mainHand(nCrew: number, spec?: CrewSpec): number {
+export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): number {
+  // (both crew right forward on a light-air run with the pole out: the helm has the main, as on any boat)
+  if (forward) return 0;
   if (nCrew === 0 || !spec) return nCrew >= 2 ? 1 : 0;
   const helm = skillOf(spec.helm), mid = skillOf(spec.crew[0]);
   return mid >= helm && mid >= NOVICE ? 1 : 0;
 }
 /** Who works a line (an index into [helm, crew…]): by the number of crew, and who has the main (mainHand). */
-export function ownerOf(line: string, nCrew: number, spec?: CrewSpec): number {
+export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = false): number {
   if (nCrew === 0) return 0;
-  const main = mainHand(nCrew, spec);
+  const main = mainHand(nCrew, spec, forward);
   if (line === 'mainsheet' || line === 'traveller') return main;
   if (line === 'backstay') return 0;
   // the jib: the forward crew (with one crew, whichever of the two hasn't the main)
@@ -161,7 +163,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); } c.lineT = 0; }
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
-    const who = ownerOf(k, n, c.spec), a = c.people[who]; if (!a) continue;
+    const who = ownerOf(k, n, c.spec, !!c.foredeck), a = c.people[who]; if (!a) continue;
     const skill = skillOf(ppl[who]), e = err(k);
     if (a.job?.line === k) continue;
     if (PIANO.has(k)) {
@@ -199,7 +201,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   }
   // work: whoever's at their line works it
   for (const k of Object.keys(want) as Ctl[]) {
-    const who = ownerOf(k, n, c.spec), a = c.people[who];
+    const who = ownerOf(k, n, c.spec, !!c.foredeck), a = c.people[who];
     if (k === 'jibsheetW') { out[k] = { pace: workPace(b, who), to: want[k]! }; continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {
@@ -220,7 +222,7 @@ export const CAR = {
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
 function carJob(b: Boat, dt: number): void {
-  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec), a = c.people[who], p = allAboard(c.spec)[who];
+  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, !!c.foredeck), a = c.people[who], p = allAboard(c.spec)[who];
   const lazy = b.ctl.car[b.tack];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
   // a job under way: on the car the boat has tacked onto, it's loaded now and can't be moved
@@ -250,7 +252,7 @@ function carJob(b: Boat, dt: number): void {
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;
-  const n = c.spec.crew.length, who = ownerOf(line, n, c.spec), a = c.people[who];
+  const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, !!c.foredeck), a = c.people[who];
   if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);

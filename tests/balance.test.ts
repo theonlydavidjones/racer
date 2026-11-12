@@ -125,13 +125,13 @@ describe('The crew', () => {
     expect(['windward', 'centre']).toContain(beat(10).crew!.mode);
     expect(beat(20).crew!.mode).toBe('hike');
   });
-  it('go forward downwind with the pole out (the pole hand at the mast, the other crew at the front of the cockpit)', () => {
+  it('go forward downwind with the pole out (in light air both right up on the foredeck: one astride the bow, one between the mast and the forestay)', () => {
     const b = testBoat({ heading: 195, kt: 4, windKt: 10 }); b.poleWant = true;
     sail(b, 30, () => { b.h = 195; });
     expect(b.crew!.mode).toBe('foredeck');
     const [, mid, bow] = b.crew!.people;
-    expect(bow.pose).toBe('mast'); expect(bow.z).toBeLessThan(-0.5);
-    expect(mid.z).toBeLessThan(1.4); // forward in the cockpit: the transom clear in light air
+    expect(bow.pose).toBe('bow'); expect(bow.z).toBeLessThan(-3);
+    expect(mid.pose).toBe('fore'); expect(mid.z).toBeLessThan(-1.5); // the transom clear in light air
     expect(b.crew!.trim).toBeGreaterThan(0); // trimmed by the bow
   });
   it('sailing alone in a breeze she goes slower than with two crew: she heels more, or has to be depowered more', () => {

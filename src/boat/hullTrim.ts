@@ -17,9 +17,15 @@ import { HULL, resistanceParts } from './dynamics';
  * upwind in heavy weather to get the bow out, forward downwind in light to moderate air; sailmakers' guides say forward
  * in light air to lift the transom clear and cut wetted area; the magnitudes are estimates, none measured for a
  * Folkboat):
- * - Skin friction goes with the wetted surface. Bow-down a few centimetres lifts the transom and the after run clear
- *   (less wetted area); much more immerses the long bow overhang (more again); stern-down drags the transom. Modelled
- *   as a parabola: −2% wetted surface at its best, 5 cm by the bow, +6% at 5 cm by the stern (estimate).
+ * - Skin friction goes with the wetted surface. Trimmed by the bow, the fuller after sections come out of the water
+ *   as the fine bow goes in, and with both ends raked at about 45–50° her waterline length hardly changes: clipping the
+ *   hull's own sections (render/hull.ts) at a trimmed waterplane, at constant displacement, gives a wetted surface that
+ *   falls nearly linearly, about 0.037% per centimetre by the bow (−0.19% at 5 cm, −0.74% at 20 cm, +0.42% at 10 cm by
+ *   the stern), with no minimum within what weight can do (physics review, November 2026). The trend is the geometry's;
+ *   the magnitude is an estimate, the hull's sections being estimated. This is what long-overhang keelboat crews do:
+ *   "In light to moderate wind, keeping the bow down and the stern up is pretty fast … Whoever is the tactician moves
+ *   to the bow or by the mast downwind … When it's breezy, we bring the forward person back" (North Sails Dragon
+ *   Speed Guide); on a Folkboat's light-air run, one crew astride the bow and one on the foredeck (the owner).
  * - Wave-making grows with bow-down trim once she's making waves (Froude number past about 0.25): the bow ploughs
  *   into her own bow wave. ±6% of the wave resistance per 10 cm of trim at Fn ≥ 0.4 (estimate).
  * - In a seaway upwind, bow-down trim makes her plough into the chop and pitch: the waves' added resistance grows with it
@@ -39,8 +45,8 @@ export const TRIM = {
   bwl: 1.85,
   /** Waterplane longitudinal inertia coefficient (I_L = c·B·L³), an estimate. */
   cIL: 0.04,
-  /** Wetted-surface change: its best (fraction) and where (m bow-down), and the parabola it follows (estimates). */
-  wsBest: 0.02, wsAt: 0.05,
+  /** Wetted-surface change per metre of bow-down trim (fraction): from the hull's sections, above. */
+  wsK: -0.037,
   /** Wave-resistance change per metre of bow-down trim, at full effect (Fn ≥ 0.4), an estimate. */
   waveK: 0.6,
   /** The keel's profile for the centre of lateral resistance: length and depth (m), from the ORC draft and the profile. */
@@ -64,12 +70,13 @@ const smooth = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 
  * `sea`: the waves' added resistance as a share of the calm-water resistance. */
 export function trimDrag(v: number, t: number, sea = 0): number {
   const p = resistanceParts(Math.max(0.3, v)), tot = p.friction + p.residuary;
-  const ws = TRIM.wsBest * ((t - TRIM.wsAt) ** 2 - TRIM.wsAt ** 2) / TRIM.wsAt ** 2;
+  const ws = TRIM.wsK * t;
   const fn = Math.max(0.3, v) / Math.sqrt(9.81 * HULL.length);
   const wave = TRIM.waveK * smooth((fn - 0.25) / 0.15) * t;
   return (p.friction * ws + p.residuary * wave) / tot + sea * TRIM.seaK * t;
 }
-/** The trim (m) with the least resistance at speed v, within what weight can do (±15 cm). (Cached by 0.02 m/s.) */
+/** The trim (m) with the least resistance at speed v, within what weight can do (10 cm by the stern to 35 cm by the bow:
+ * the crew right aft, or right up on the foredeck). (Cached by 0.02 m/s.) */
 interface Best { t: number; d: number; n: number; fF: number; wR: number }
 const bestCache = new Map<number, Best>();
 function best(v: number, sea = 0): Best {
@@ -78,9 +85,9 @@ function best(v: number, sea = 0): Best {
   // (trimDrag's sum, with the hull's resistance at this speed worked out once)
   const r1 = resistanceParts(u), r2 = resistanceParts(u * 1.02), tot = r1.friction + r1.residuary;
   const fn0 = u / Math.sqrt(9.81 * HULL.length), wave0 = TRIM.waveK * smooth((fn0 - 0.25) / 0.15);
-  const drag = (t: number) => (r1.friction * TRIM.wsBest * ((t - TRIM.wsAt) ** 2 - TRIM.wsAt ** 2) / TRIM.wsAt ** 2 + r1.residuary * wave0 * t) / tot + sq * TRIM.seaK * t;
+  const drag = (t: number) => (r1.friction * TRIM.wsK * t + r1.residuary * wave0 * t) / tot + sq * TRIM.seaK * t;
   let t0 = 0, lo = Infinity;
-  for (let t = -0.15; t <= 0.1501; t += 0.005) { const d = drag(t); if (d < lo) { lo = d; t0 = t; } }
+  for (let t = -0.1; t <= 0.3501; t += 0.005) { const d = drag(t); if (d < lo - 1e-12) { lo = d; t0 = t; } }
   // the least resistance a standard crew can reach from the cockpit: the polar's reference
   let reachD = Infinity; for (let t = TRIM.reach[0]; t <= TRIM.reach[1] + 1e-9; t += 0.0025) reachD = Math.min(reachD, drag(t));
   // the local exponent of resistance with speed (R ∝ vⁿ)
@@ -98,7 +105,7 @@ export const bestTrim = (v: number, sea = 0) => best(v, sea).t;
  */
 export function trimSpeedFactor(vt: number, t: number, sea = 0): number {
   const v = Math.max(0.5, vt), bt = best(v, sea);
-  const d = bt.fF * TRIM.wsBest * ((t - TRIM.wsAt) ** 2 - TRIM.wsAt ** 2) / TRIM.wsAt ** 2 + bt.wR * t - bt.d; // (trimDrag, at the cached speed)
+  const d = bt.fF * TRIM.wsK * t + bt.wR * t - bt.d; // (trimDrag, at the cached speed)
   return 1 / (1 + Math.max(0, d)) ** (1 / Math.max(1.5, bt.n));
 }
 /** How far forward (m) the centre of lateral resistance moves with trim t (m, + bow down). */
