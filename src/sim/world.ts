@@ -1,5 +1,5 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, apparent, asternCoast, crewRig, moveBoat } from '../boat/physics';
+import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
@@ -306,6 +306,8 @@ export class World {
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
+    for (const b of this.boats) if (!b.docked && !b.handled) settleTrim(b, b.ww.from, b.ww.kt);
     if (!this.freeSail) this.log = new RaceLog(this);
   }
 

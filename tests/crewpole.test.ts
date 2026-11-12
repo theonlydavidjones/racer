@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { crewPoleCall } from '../src/ai/ai';
+import { optimalSheet } from '../src/boat/trim';
 import { allToCrew } from '../src/boat/physics';
 import { World } from '../src/sim/world';
 import { DEFAULT_SETTINGS } from '../src/settings';
@@ -38,5 +39,16 @@ describe('The crew calls the whisker pole', () => {
   it('Auto-trim hands the pole back to the crew', () => {
     const b = testBoat({ heading: 0, kt: 4 });
     b.poleMine = true; allToCrew(b); expect(b.poleMine).toBe(false);
+  });
+});
+
+describe('Boats start trimmed for their heading (UI session, 12 Nov 2026)', () => {
+  it('on a broad reach the main is out from the first frame, not sheeted in and easing as the sequence starts', () => {
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS }, 1);
+    for (const b of w.boats) {
+      const want = Math.min(optimalSheet('main', b.awa), 80 + 9.5 * b.ctl.traveller); // (as far as the sheet lets it out: controls.ts boomAngle)
+      expect(Math.abs(b.sheets.main - want)).toBeLessThan(3); // (the boom where the crew would have it, within the sheet's limits)
+      expect(Math.sign(b.boom) || -1).toBe(b.tack === 'S' ? -1 : 1); // (to leeward)
+    }
   });
 });

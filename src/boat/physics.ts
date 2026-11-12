@@ -940,3 +940,19 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
   if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatFor(b) - (b.leeway ?? 0), Math.min(twa, 60))) };
   return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
 }
+
+/**
+ * A boat as she's placed on the water, before the first step: on the tack the wind gives her heading, with her crew's
+ * sheets already trimmed for the apparent wind there, as a crew sailing about before a start would have them (not
+ * sheeted hard in on a broad reach, easing out as the sequence begins). The rest of the lines stay at their defaults:
+ * the crew's plan sets them over the first second or two, which the eye doesn't catch.
+ */
+export function settleTrim(b: Boat, from: number, windKt: number): void {
+  const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), c = b.ctl;
+  b.rel = rel; b.twa = Math.abs(rel); b.tack = rel >= 0 ? 'S' : 'P';
+  b.arel = ap.arel; b.awa = ap.awa; b.awaSlow = ap.awa;
+  const main = optimalSheet('main', ap.awa), jib = optimalSheet('jib', ap.awa), side = b.tack === 'S' ? -1 : 1;
+  c.mainsheet = mainsheetFor(main, c.traveller); c.jibsheet = jibsheetFor(jib, c, b.tack);
+  b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);
+  b.boom = side * b.sheets.main; b.jib = side * jib;
+}
