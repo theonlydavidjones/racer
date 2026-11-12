@@ -3,7 +3,7 @@ import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../b
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
@@ -949,12 +949,33 @@ export class World {
     });
   }
 
+  /** Assess every pair in full every step (for the tests): otherwise pairs far apart are let be (apart()). */
+  exactPairs = false;
+  /**
+   * Two boats with nothing between them: over 150 m apart, not coming within 60 m of each other in the next 12 s at the
+   * speeds they're going (Rule 14's and every right-of-way rule's business starts a few lengths off), neither near her
+   * mark's zone, and no hail, mark-room, rule 17 or rule 15 grace on their record. Their record is set to "nothing
+   * between them" (as when two boats first meet) and their full assessment skipped this step: it's the most of the
+   * step's rules work (28 pairs in a fleet of eight), and the most of it is for boats a long way apart.
+   */
+  private apart(A: Boat, B: Boat, rec: PairRecord, ctx: RulesContext): boolean {
+    const dx = A.x - B.x, dy = A.y - B.y;
+    if (dx * dx + dy * dy < 150 * 150) return false;
+    if (rec.hail || rec.r202e || rec.mark || rec.r183 || rec.r17 != null || rec.grace > ctx.t || A.forced14 === B.id || B.forced14 === A.id) return false;
+    const n = ctx.marks.length, nearZone = (X: Boat) => X.leg < n && markDist(X, ctx.marks[X.leg]) < ZONE * 2.5;
+    if (nearZone(A) || nearZone(B) || cpa(A, B).d < 60) return false;
+    rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null; rec.blanket = {};
+    rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT; // (rule 18.3: tacks seen as they happen)
+    return true;
+  }
+
   private checkPairs(): void {
     this.kcMemo = { t: this.t, m: new Map() }; // after the boats have moved this step
     const bs = this.boats, ctx = this.rulesCtx(), found: { A: Boat; B: Boat; incident: Incident<Boat> }[] = [];
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
+      if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
       const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
       const po = rec.hail?.kind === 'room' ? rec.hail.passedOn : undefined;

@@ -593,6 +593,33 @@ export function landBetween(a: Vec, b: Vec): boolean {
 }
 /** The distance to the nearest shore anywhere (the Cityfront's exactly, elsewhere the chart's land to about 15 m). */
 export const anyShoreDist = (p: Vec): number => Math.min(shoreDist(p), landDist(p));
+/**
+ * The same, read off a 10 m lattice of the exact values, bilinearly: for what asks near the same places again and again
+ * (the current's easing near the shore, environment/current.ts shoreRelief: every boat, every step), where the exact one
+ * searches the shore's segments each time. (Not for what samples the whole Bay once in a while, as the wind's field
+ * does: each such look would fill a tile for one use.) The
+ * distance to a shore changes by no more than the distance moved, so between lattice points it is off by a few metres
+ * at most, where two shores are equally near (tests/shore-grid.test.ts measures it). Filled in tiles of 32 × 32
+ * spaces (320 m) as boats first come near them, each in a few milliseconds. setShoreGrid(false): the exact one.
+ */
+export function anyShoreDistNear(p: Vec): number {
+  if (!shoreGridOn || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return anyShoreDist(p);
+  const fx = p.x / SG_STEP, fy = p.y / SG_STEP, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+  const ti = Math.floor(i / SG_TILE), tj = Math.floor(j / SG_TILE), key = ti * 65536 + tj;
+  let t = sgTiles.get(key);
+  if (!t) { t = shoreTile(ti, tj); sgTiles.set(key, t); }
+  const a = i - ti * SG_TILE, b = j - tj * SG_TILE, k = b * (SG_TILE + 1) + a, n = SG_TILE + 1;
+  return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
+}
+const SG_STEP = 10, SG_TILE = 32, sgTiles = new Map<number, Float64Array>();
+let shoreGridOn = true;
+/** Read the shore distance off the lattice (the default) or work it out exactly every time (for the tests). */
+export function setShoreGrid(on: boolean): void { shoreGridOn = on; }
+function shoreTile(ti: number, tj: number): Float64Array {
+  const n = SG_TILE + 1, t = new Float64Array(n * n);
+  for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) t[b * n + a] = anyShoreDist({ x: (ti * SG_TILE + a) * SG_STEP, y: (tj * SG_TILE + b) * SG_STEP });
+  return t;
+}
 /*
  * Which segments can be nearest anywhere in a 25 m cell, worked out the first time a point in the cell is asked about.
  * Exact: the distance to the shore changes by at most the distance moved, so nowhere in the cell is the shore further
