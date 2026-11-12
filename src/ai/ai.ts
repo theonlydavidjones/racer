@@ -461,23 +461,25 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     desired = ok;
   }
   // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
+  let avoiding = false;
   for (const { o, dx, dy, r, cp } of near) {
     // keep clear early: slow, heavy boats need time to respond
     // hailed "Starboard!" by this boat: duck early and generously
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
-    if (ducking && cp.t < 16 && cp.d < 22) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); continue; }
+    if (ducking && cp.t < 16 && cp.d < 22) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); if (o.id !== ai.hailTack?.with) avoiding = true; continue; }
     if (r.kc === b && cp.t < 12 && cp.d < 14) {
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
       if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') { desired = sailable(b, b.tack === 'P' ? b.h - 20 : b.h + 20); luff = !running; }
       else if (running) { desired = startArea ? clearestHeading(w, b, b.h) : away; luff = false; } // easing barely slows her on a run: steer round instead
       else { luff = true; desired = away; }
+      if (o.id !== ai.hailTack?.with) avoiding = true; // (the boat of the hail: rule 20.2 has their room in hand)
       // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
       // heading that opens the most room, nearest what she wanted
       if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && cp.t < 2.4 && cp.d < 4.5) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
-      desired = sailable(b, brg(-dx, -dy)); luff = true;
+      desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
       if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
     }
   }
@@ -491,17 +493,18 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (!h.passedOn) w.passOnHail(b, o);
       const po = h.passedOn, waiting = !!po && po.respondedAt == null && !po.failed;
       if (po?.failed) continue; // the boat she hailed never responded: she still can't tack into her
-      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t }; }
+      if (!waiting) { desired = b.tack === 'S' ? csP : csS; luff = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t, with: o.id }; }
       else holdForHail = true;
     }
     // She hailed and the other boat responded (is through the wind, or replied "You tack"): tack now (Rule 20.2(d)).
-    if (h.by === b.id && h.clearAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t }; }
+    if (h.by === b.id && h.clearAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t, with: o.id }; }
   }
   // a tack begun for a hail is finished: past head to wind (where the hail no longer asks it of her) she carries on
-  // until she's close-hauled on the new tack
+  // until she's close-hauled on the new tack (unless she has a boat to keep clear of: rule 13 makes her the keep-clear
+  // boat from head to wind until she's close-hauled)
   const ht = ai.hailTack;
   if (ht && ((b.tack === ht.to && !b.tacking) || w.t - ht.at > 30)) ai.hailTack = null;
-  else if (ht && !tackNow && !holdForHail) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
+  else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired));

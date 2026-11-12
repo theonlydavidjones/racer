@@ -21,7 +21,7 @@ import { inBasin } from '../src/geo/marina';
 import { beatAngle } from '../src/boat/polar';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from '../src/sim/obstruction';
 import { begunTack } from '../src/rules/pairs';
-import { rightOfWay, newPairRecord, hailBreach } from '../src/rules';
+import { rightOfWay, newPairRecord, hailBreach, assessPair } from '../src/rules';
 import { boat, WIND } from './diagram';
 
 const SS2 = ss2 as unknown as CourseFile, SS41 = ss41 as unknown as CourseFile;
@@ -242,6 +242,25 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
     L.h = 335; expect(hailBreach(rec, L, M, 54, 0)).toBeNull(); // she luffs within the 5 s
     expect(hailBreach(rec, L, M, 68, 0)).toBeNull();
     expect(hailBreach(rec, L, M, 69.5, 0)).toMatchObject({ boat: L, role: 'hailer' }); // and holds it, never tacking
+  });
+  it('a shift that frees her mid-luff does not undo her start', () => {
+    const L = mk(0, 315), M = mk(1, 333), rec = hail();
+    expect(hailBreach(rec, L, M, 52, 0)).toBeNull(); // begun (TWA 27)
+    M.h = 339; M.ww.from = 14; // still turning up, but a 14° veer puts her TWA at 35
+    expect(hailBreach(rec, L, M, 57, 14)).toBeNull();
+    expect(rec.hail!.respondedAt).toBe(52);
+  });
+  it('a late hailing boat is still judged after the hail is half a minute old', () => {
+    const L = mk(0, 315), M = mk(1, 315), rec = hail();
+    rec.hail!.respondedAt = 52; rec.hail!.clearAt = 65; // a slow hailed boat, through the wind at 65
+    M.lastTackT = 65; M.tacking = true;
+    L.h = 337; // the hailing boat luffs at 69.5 and holds it
+    expect(hailBreach(rec, L, M, 69.5, 0)).toBeNull();
+    // (through assessPair, which also retires stale hails: 30 s after the hail itself would have dropped it at 80)
+    M.x = 40; const cx = (t: number) => ({ t, windFrom: 0, marks: [] });
+    for (let t = 70; t <= 84; t += 0.5) expect(assessPair(rec, L, M, cx(t), { swerve: false }).incident).toBeNull();
+    expect(rec.hail).not.toBeNull();
+    expect(assessPair(rec, L, M, cx(84.6), { swerve: false }).incident).toMatchObject({ kind: 'hail', fouler: L, hailRole: 'hailer' });
   });
   it('the hailed boat that luffs and bears away again has not responded', () => {
     const L = mk(0, 315), M = mk(1, 335), rec = hail();

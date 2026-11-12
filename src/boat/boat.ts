@@ -30,7 +30,7 @@ export interface AiState {
   tackNow?: boolean;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
    * wind and slow, a passing change of plan mustn't turn her back. */
-  hailTack?: { to: 'S' | 'P'; at: number } | null;
+  hailTack?: { to: 'S' | 'P'; at: number; with: number } | null;
   /** The turn committed to (turnCommit) is that tack. */
   commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */

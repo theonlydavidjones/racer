@@ -44,9 +44,9 @@ export const THROUGH_WIND = 15;
 /**
  * Is `b` tacking (in the act of it) since the hail `h`: through head to wind, or turned TACK_BEGUN° up from her heading
  * at the hail (in the wind she had then) and now pinching above close-hauled (in the wind she has now)?
- * Not latched: bear away again and she's no longer tacking.
+ * Not latched: bear away again and she's no longer tacking. `started`: she'd begun (the clock is running).
  */
-export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number, { h: number; wind: number }> }, windFrom: number): boolean {
+export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number, { h: number; wind: number }> }, windFrom: number, started = false): boolean {
   if (b.lastTackT >= h.at || b.tacking) return true;
   const at = h.headAt?.[b.id];
   if (!at) return false;
@@ -56,7 +56,8 @@ export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number,
   // she nears head to wind doesn't throw her back out of it)
   const now = b.ww?.from ?? windFrom, then = Number.isFinite(at.wind) ? at.wind : now;
   const up = Math.sign(wrap(then - at.h)) * wrap(b.h - at.h);
-  return up >= TACK_BEGUN && Math.abs(wrap(now - b.h)) <= BEGUN_TWA;
+  // (once started, she's still at it while she stays turned up: a shift that frees her mid-luff doesn't undo it)
+  return up >= TACK_BEGUN && (started || Math.abs(wrap(now - b.h)) <= BEGUN_TWA);
 }
 
 /**
@@ -73,7 +74,7 @@ export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: 
   const hailer = h.by === A.id ? A : B, hailed = hailer === A ? B : A;
   if (h.clearAt == null && (h.replyAt != null || hailed.lastTackT >= h.at || hailed.tacking)) h.clearAt = h.replyAt ?? t;
   if (h.replyAt != null) h.respondedAt ??= h.replyAt;
-  else if (h.clearAt == null) h.respondedAt = begunTack(hailed, h, windFrom) ? h.respondedAt ?? t : undefined;
+  else if (h.clearAt == null) h.respondedAt = begunTack(hailed, h, windFrom, h.respondedAt != null) ? h.respondedAt ?? t : undefined;
   if (h.clearAt == null) {
     // Rule 20.3: she passed the hail on to a boat to windward of her that stops her tacking. She can't tack until that
     // boat is through the wind, so her own "as soon as possible" runs from then; and if that boat never responds (her
@@ -85,7 +86,7 @@ export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: 
     return late ? { boat: hailed, role: 'hailed' } : null;
   }
   if (hailer.lastTackT >= h.at || hailer.tacking) return null; // she's tacked
-  h.hailerBegunAt = begunTack(hailer, h, windFrom) ? h.hailerBegunAt ?? t : undefined;
+  h.hailerBegunAt = begunTack(hailer, h, windFrom, h.hailerBegunAt != null) ? h.hailerBegunAt ?? t : undefined;
   const late = h.hailerBegunAt == null ? t >= h.clearAt + HAIL_RESPONSE : t >= Math.max(h.hailerBegunAt, h.clearAt) + THROUGH_WIND;
   return late ? { boat: hailer, role: 'hailer' } : null;
 }
@@ -299,7 +300,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     const hailer = hl.by === A.id ? A : B, hailed = hailer === A ? B : A;
     const hailerDone = hailer.lastTackT >= hl.at && !hailer.tacking && ctx.t - hailer.lastTackT > 4;
     if (hl.replyAt != null) { if (ctx.t > hl.replyAt + REPLY_ROOM || hailerDone) rec.hail = null; }
-    else if (ctx.t > hl.at + 30 || (hailerDone && hailed.lastTackT >= hl.at && !hailed.tacking)) rec.hail = null;
+    // (stale half a minute after the last thing that started a clock: the hail, the hailed boat through the wind, or
+    // the boat a 20.3 relay went to through it; every deadline falls within 20 s of one of those)
+    else if (ctx.t > Math.max(hl.at, hl.clearAt ?? -Infinity, hl.passedOn?.respondedAt ?? -Infinity) + 30 || (hailerDone && hailed.lastTackT >= hl.at && !hailed.tacking)) rec.hail = null;
   }
 
   let kind: 'contact' | 'swerve' | null = null;
