@@ -182,7 +182,8 @@ describe('Crew work: one job at a time, at their pace (2d)', () => {
   it('no one starts on a control line in the middle of a tack', () => {
     const twa = beatAngle(14), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 14 }); sail(b, 30); startTack(b);
     let bad = false;
-    sail(b, 8, () => { if (b.tacking) for (const p of b.crew!.people) if (p.job && !['jibsheet', 'mainsheet', 'jibsheetW'].includes(p.job.line) && p.job.reach > 0) bad = true; });
+    // (the sheets, and the traveller car re-set across: the owner, "including re-setting the car after a tack")
+    sail(b, 8, () => { if (b.tacking) for (const p of b.crew!.people) if (p.job && !['jibsheet', 'mainsheet', 'jibsheetW', 'traveller'].includes(p.job.line) && p.job.reach > 0) bad = true; });
     expect(bad).toBe(false);
   });
 });

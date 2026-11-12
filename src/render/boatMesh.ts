@@ -975,7 +975,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     const leech: TellState = b.awa > 115 || b.luff ? 'hang' : tm.flow === 'stalled' && tm.amount > 0.12 ? 'curl' : 'stream';
     m.leechTells.forEach(tt => tt.update(mainShape, leech, tm.amount, m.main.mesh.scale.x < 0));
   }
-  syncPole(m, plan === 'wing');
+  syncPole(m, b.pole === 'set' && b.poleTack === b.tack); // (on as soon as it's made, while the jib's trimmed to it)
   syncLines(m, b);
   for (const r of m.ribbons) syncRibbon(r, b, t);
   // her lights: none in her slip or when switched off, the anchor light at anchor, else under way's (navLights.ts)

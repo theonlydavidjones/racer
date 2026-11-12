@@ -45,9 +45,11 @@ export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c
  */
 export const POLE = { set: 13, stow: 8, gybe: 13, forward: 13, trim: 3 };
 /** About how long (s) your crew will take to set the pole from where they are now, and to stow it. */
-export function poleEta(b: Boat): { set: number; stow: number } {
+export function poleEta(b: Boat): { set: number; draws: number; stow: number } {
   const hands = b.crew ? workPace(b, ownerFor(b.crew, 'pole')) : 1;
-  return { set: poleTrip(b, POLE.forward) + POLE.set / hands, stow: POLE.stow / hands };
+  // (`set`: to "Made!", the owner's figures; `draws`: the jib trimmed to it as well)
+  const trim = POLE.trim / (b.crew ? workPace(b, b.crew.spec.crew.length >= 2 ? 1 : 0) : 1), set = poleTrip(b, POLE.forward) + POLE.set / hands;
+  return { set, draws: set + trim, stow: POLE.stow / hands };
 }
 
 /** How the jib is working right now, from the pole state. */
@@ -122,7 +124,7 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
       else { b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack; say('Gybing the pole end-for-end. The jib is down while it goes across.'); }
     }
   } else b.poleWalk = undefined;
-  if ((b.poleTrimT ?? 0) > 0) b.poleTrimT = b.pole === 'set' ? b.poleTrimT! - dt : 0;
+  if ((b.poleTrimT ?? 0) > 0) { b.poleTrimT = b.pole === 'set' ? b.poleTrimT! - dt : 0; if (b.poleTrimT <= 0 && b.pole === 'set') say('Jib poled out to windward: wing-on-wing.'); }
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
     b.poleT -= dt;
@@ -130,7 +132,7 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
       // ("made": the forward hand's call once it's on, so the aft crew or the helm can trim the jib sheet to it)
       // (then the cabin crew, or the helm with one crew, trims the jib sheet to it: the owner's sequence; POLE.trim)
       if (b.pole === 'setting') {
-        b.pole = 'set'; say('“Made!” Pole set: jib out to windward, wing-on-wing.');
+        b.pole = 'set'; say('“Made!” The pole is on: the jib being trimmed out to it.');
         const c = b.crew; b.poleTrimT = POLE.trim / (c ? workPace(b, ownerFor(c, 'jibsheet')) : 1);
       }
       else { b.pole = 'down'; say('Pole stowed: jib back to leeward.'); }
@@ -174,7 +176,7 @@ function crewHatch(b: Boat, dt: number): void {
  * (Crew Controls, from the physics review of #156: before, it jumped to the mirror position with nobody moving it).
  * Then whoever has it hauls it back up to where they want it (crewWork.ts travellerHand), at the car's own rate.
  */
-function travellerAtTack(b: Boat): void {
+export function travellerAtTack(b: Boat): void {
   b.ctl.traveller = -b.ctl.traveller;
   if (b.ctlTarget?.traveller != null) b.ctlTarget.traveller = -b.ctlTarget.traveller;
 }
@@ -896,9 +898,11 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   const boomT = b.luff ? SAILS.main.max : b.sheets.main;
   // Jib: to leeward normally (to windward when backed); poled out square to windward when wing-on-wing; hanging
   // centred while the crew works the pole.
-  const jibT = plan === 'wing' ? -side * 82 : plan === 'main' ? side * 10 : side * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
+  // (made and being trimmed to the pole: coming round to windward on the sheet)
+  const poled = plan === 'wing' || (b.pole === 'set' && b.poleTack === b.tack);
+  const jibT = poled ? -side * 82 : plan === 'main' ? side * 10 : side * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
   b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4);
-  b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
+  b.jib += (jibT - b.jib) * Math.min(1, dt * (poled ? 1.2 : 3));
 }
 
 /** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step: up to about 7°). */

@@ -610,7 +610,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
  * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
  * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
  * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 10–25 s, by the crew, plus the
- * trip forward (physics.ts POLE, the owner's timings), so the gap keeps them
+ * trip forward and the trim to the pole once it's made (physics.ts POLE, the owner's timings), so the gap keeps them
  * from doing it over and over as she wanders about a deep run. The AI boats' crews, and yours while the pole is theirs
  * (the band's Auto-trim).
  */

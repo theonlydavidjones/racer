@@ -239,4 +239,23 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     expect(after).toBeCloseTo(-was, 2); // (now as far to leeward as it was to windward)
     sail(b, 20); expect(b.ctl.traveller).toBeLessThan(-0.1); // (hauled back up to windward on the new tack)
   }, 30_000);
+  it('the traveller habit only grows with the middle crew\'s skill (the review: it flipped back and forth)', () => {
+    for (let i = 0; i < 20; i++) {
+      let had = 0;
+      for (let k = 0; k <= 40; k++) {
+        const sk = 0.2 + k * 0.02, sp = { helm: { ...DEFAULT_CREW.helm, h: 1.6 + i * 0.015 }, crew: DEFAULT_CREW.crew.map((p, j) => ({ ...p, skill: j === 0 ? sk : 0.6 })) };
+        const has = travellerHand(2, sp); expect(has).toBeGreaterThanOrEqual(had); had = has;
+      }
+    }
+  });
+  it('overpowered, whoever has the traveller drops it before easing the sheet', () => {
+    const twa = beatAngle(18), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt: 18 }); b.crew = newCrew(crewOf(0.9), 'S');
+    sail(b, 0.5); b.ctl.traveller = -1; b.ctl.mainsheet = 0; // (all in, the car hard up: she's heeling over)
+    let moved = -1; sail(b, 15, t => { b.h = 360 - twa; if (moved < 0 && b.ctl.traveller > -0.95) moved = t; });
+    expect(moved).toBeGreaterThan(0); expect(moved).toBeLessThan(3);
+  }, 30_000);
+  it('your pole eta: to "Made!" (the owner\'s figures), and the jib drawing after the trim', () => {
+    const b = testBoat({ heading: 195, kt: 4, windKt: 10 }); b.crew = newCrew(crewOf(0.6), 'S'); b.crew.people[2].z = Z.mast;
+    expect(poleEta(b).set).toBeCloseTo(POLE.set, 1); expect(poleEta(b).draws).toBeCloseTo(POLE.set + POLE.trim, 1);
+  });
 });

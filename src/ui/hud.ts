@@ -263,7 +263,7 @@ export class Hud {
     const plan = sailPlan(u);
     const [mw, mc] = u.luff ? ['Eased', 'off'] : word(u.trim.main, '');
     const backed = (u.jibBacked ?? 0) > 0.3;
-    const [jw, jc] = backed ? ['Aback', 'backed'] : u.luff ? ['Eased', 'off'] : word(u.trim.jib, plan === 'wing' ? 'Poled out' : 'Down');
+    const [jw, jc] = backed ? ['Aback', 'backed'] : u.luff ? ['Eased', 'off'] : word(u.trim.jib, plan === 'wing' || (u.pole === 'set' && u.poleTack === u.tack) ? 'Poled out' : 'Down');
     { const call = callWords(u), el = $('tpCrew'), t = call || crewWords(u); el.textContent = t; if (el.title !== t) el.title = t; el.classList.toggle('calling', !!call); } showCrewRow(u);
     const tm = $('tpMain'), tj = $('tpJib');
     tm.textContent = mw; tm.className = 'tp-state ' + mc;

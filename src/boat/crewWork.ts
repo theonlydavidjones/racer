@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, STRESS, Z, allAboard, attrOf, crewDraw, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, STRESS, Z, allAboard, attrOf, crewAttr, crewBestHeel, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -9,11 +9,12 @@ import { CAR_ARM, STRESS, Z, allAboard, attrOf, crewDraw, pace, stressOf, reactT
  * them at the job's station, and the boat heels and trims to it). So the order and the pace of every adjustment
  * depend on how many hands there are and how good they are:
  *
- * - Three aboard (the usual Folkboat crew): the helm steers and has the backstay; the middle crew trims the main and
- *   the traveller (the helm keeps them if the middle crew is less experienced: mainHand); the forward hand has the jib
- *   sheets and the control lines on the cabin top (vang, outhaul, Cunninghams, downhaul), the jib cars and the pole.
- * - Two aboard: the more experienced of the two has the main and the traveller, the other the jib; the crew has the
- *   rest, one job after another.
+ * - Three aboard (the usual Folkboat crew): the helm steers and has the backstay; the middle crew trims the main (the
+ *   helm keeps it if the middle crew is less experienced: mainHand), and the traveller as their skill makes it their
+ *   habit, else the helm (travellerHand); the forward hand has the jib sheets and the control lines on the cabin top
+ *   (vang, outhaul, Cunninghams, downhaul), the jib cars and the pole.
+ * - Two aboard: the more experienced of the two has the main, the other the jib; the traveller the crew's or the helm's
+ *   as above; the crew has the rest, one job after another.
  * - Alone: the helm does it all, with one hand, and has to leave the tiller's end to reach the cabin top.
  *
  * Sheets come first: a trimmer drops a control line to trim the jib after a tack (not a job already under way
@@ -31,6 +32,8 @@ import { CAR_ARM, STRESS, Z, allAboard, attrOf, crewDraw, pace, stressOf, reactT
 type Ctl = Exclude<keyof Controls, 'car'>;
 /** The lines in the order they're seen to: sheets first, then the main's power, then shape. */
 export const PRIORITY: readonly Ctl[] = ['jibsheet', 'mainsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'];
+/** Overpowered (heeled well past her best), the traveller comes down before the sheet's eased: the car first in a breeze. */
+const PRIORITY_BREEZE: readonly Ctl[] = ['jibsheet', 'traveller', 'mainsheet', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'];
 const PIANO = new Set<string>(['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard']);
 /** The cabin-top lines led to both sides (controls.ts: vang, outhaul and jib Cunningham are dual-ended): worked from the windward side deck. */
 const BOTH_SIDES = new Set<string>(['vang', 'outhaul', 'jibCunningham']);
@@ -101,8 +104,12 @@ export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = 
  */
 export function travellerHand(nCrew: number, spec?: CrewSpec, forward = false): number {
   if (nCrew === 0 || forward || !spec) return nCrew === 0 || forward ? 0 : 1;
+  // (the habit's draw from who they are, not their skill, so a better middle crew is only ever likelier to have it: the
+  // physics review found a draw that hashed skill too flipped it back and forth as skill rose)
   const mid = spec.crew[0], k = clamp((skillOf(mid) - 0.2) / 0.6, 0, 1);
-  return crewDraw(spec, 30) < k ? 1 : 0;
+  let h = 0x9e3779b9; for (const p of [spec.helm, ...spec.crew]) for (const x of [p.h, p.w]) { h ^= Math.round(x * 1000); h = Math.imul(h, 16777619); }
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
+  return (h >>> 0) / 4294967296 < k ? 1 : 0;
 }
 /** The forward hand is up at the mast for the pole (going to set it, setting, stowing or gybing it, or ready for it). */
 const poleUp = (c: CrewState) => c.spec.crew.length > 0 && c.people[c.spec.crew.length]?.job?.line === 'pole';
@@ -144,7 +151,7 @@ export function startThreshold(line: string, skill: number, to?: number): number
   // every 0.3 of trim either side (an expert's 0.4×, a novice's at 0.25 2.2×): an estimate, no study measures a trimmer's error)
   const band = Math.pow(2, (0.6 - skill) / 0.3);
   if (line === 'jibsheet' || line === 'mainsheet') return 0.006 * band;
-  // (the traveller is in the main trimmer's other hand on the thwart, played with the sheet: as fine, over its range of 2)
+  // (the traveller is in its trimmer's hand on the thwart, played with the sheet: as fine, over its range of 2)
   if (line === 'traveller') return 0.012 * band;
   const range = line === 'traveller' ? 2 : 1;
   // a line wanted right on (or off) to its stop is pulled all the way: "backstay bar tight" is one clear action
@@ -197,7 +204,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // (where they've wanted each cabin-top line lately: the wish smoothed over LINE_TAU, kept up whoever is busy)
   const lw = c.lineWant ??= {};
   if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); } c.lineT = 0; }
-  if (look) for (const k of PRIORITY) {
+  const over = (b.heelMag ?? 0) > crewBestHeel(Math.abs(b.twa), b.ww.kt, crewAttr(c, 'trim')) + 3;
+  if (look) for (const k of over ? PRIORITY_BREEZE : PRIORITY) {
     if (!(k in want)) continue;
     const who = ownerFor(c, k), a = c.people[who]; if (!a) continue;
     const skill = attrOf(ppl[who], 'trim'), e = err(k);
@@ -223,10 +231,13 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (a.job) {
       // (the doors and the hatch wait for a sheet: physics.ts crewHatch sends them back to it after, where they left off)
       const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
-      const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
+      // (the traveller's a sheet too: the main doesn't take a trimmer off it, or they'd swap back and forth)
+      const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet' || a.job.line === 'traveller';
       // (from the doors or the hatch only for a sheet well off, several degrees: a tack's or a big puff's, not a tweak)
       const atHatch = a.job.line === 'doors' || a.job.line === 'hatch';
-      if (!sheet || committed || onSheet || (atHatch && e < 0.05)) continue;
+      // (overpowered, the traveller's dropped even mid-trim of the main: then back to the sheet)
+      const dropCar = over && k === 'traveller' && a.job.line === 'mainsheet';
+      if (!sheet || committed || (onSheet && !dropCar) || (atHatch && e < 0.05)) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
     const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);
