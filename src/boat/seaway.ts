@@ -57,14 +57,22 @@ export function steadySpeed(vt: number, drag: (v: number) => number): number {
 export function speedInChop(kt: number, twa: number, hs: number, tp: number): number {
   const vt = polar(kt, twa);
   if (hs < 0.01) return vt;
+  // (the AI asks again with the same numbers several times a step: the last few answers kept, exactly as worked out)
+  for (let i = 0; i < CHOP_MEMO; i++) { const m = chopMemo[i]; if (m.kt === kt && m.twa === twa && m.hs === hs && m.tp === tp) return m.v; }
   const k = awAt(hs, tp, twa);
-  return steadySpeed(vt, v => k * awSpeed(v)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once)
+  const v = steadySpeed(vt, u => k * awSpeed(u)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once)
+  const m = chopMemo[chopNext]; chopNext = (chopNext + 1) % CHOP_MEMO;
+  m.kt = kt; m.twa = twa; m.hs = hs; m.tp = tp; m.v = v;
+  return v;
 }
+const CHOP_MEMO = 16, chopMemo = Array.from({ length: CHOP_MEMO }, () => ({ kt: NaN, twa: NaN, hs: NaN, tp: NaN, v: 0 }));
+let chopNext = 0;
 
-const beatCache = new Map<string, number>();
+const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
 export function beatInChop(kt: number, hs: number, tp: number): number {
-  const key = `${Math.round(kt * 4)}:${Math.round(hs * 50)}:${Math.round(tp * 10)}`;
+  // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)
+  const key = (Math.round(kt * 4) * 1048576 + Math.round(hs * 50)) * 1048576 + Math.round(tp * 10);
   let a = beatCache.get(key);
   if (a === undefined) {
     let best = 40, bestV = -1;
