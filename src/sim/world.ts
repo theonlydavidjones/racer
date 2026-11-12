@@ -12,6 +12,7 @@ import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
 import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
 import { ShiftField, shiftStats } from '../environment/shifts';
+import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
@@ -297,6 +298,7 @@ export class World {
     // rest of the race draws what it did)
     this.windModel.shifted = true;
     if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
+    this.gusts = new GustField(makeRng((seed ^ 0x6a57) >>> 0), this.windModel.base);
     this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
@@ -448,8 +450,13 @@ export class World {
     const f = this.fieldAt(p);
     // (the shifts here against the course's centre: the boat to windward has the header first)
     const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
-    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn), kt: this.wind.kt * f.k * q.k * sh.k * sk };
+    // and the gusts, the turbulence of the seconds-to-a-minute, sized for the wind here (environment/gusts.ts)
+    const kt = this.wind.kt * f.k * q.k * sh.k * sk, U = kt * KT, g = this.gusts.at(p), sg = sigmaU(U);
+    const gu = Math.max(-0.9 * U, g.u * sg), gt = Math.atan2(g.v * GUSTS.vOverU * sg, Math.max(0.3, U + gu)) / D2R;
+    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn + gt), kt: (U + gu) / KT };
   }
+  /** The gusts (environment/gusts.ts): their own random numbers, so the rest of the race draws what it did. */
+  readonly gusts: GustField;
   /** The wind's shifts (environment/shifts.ts), off on a past day (the record has its own). */
   shifts: ShiftField | null = null;
   /** The shift at the course's centre now, which the course-wide wind carries. */
@@ -604,6 +611,7 @@ export class World {
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
     this.shifts?.step(dt, this.windModel.kt * KT, this.wind.from); // (the air, and its shifts, move on downwind)
+    this.gusts.step(dt, this.wind.kt * KT, this.wind.from);
     this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
