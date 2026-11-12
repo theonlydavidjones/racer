@@ -78,34 +78,27 @@ const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
 /** The stem's slope (m of height per unit of u): a straight, raked stem from the stemhead down to the forefoot. */
 const STEM_SLOPE = -1.06 / BOW;
 /**
- * The line below the stem, from where it meets the water at (BOW, y0) to (u1, y1): one long, gentle curve, leaving with
- * the stem's own rake and flattening steadily until it runs on at slope m1 (a cubic Hermite), as the lines plan draws the
- * bow (Sunden's lines, redrawn by Theo Rye, and the class's): no knee, no deep round forefoot.
+ * The underwater profile forward, below the stem, as one fair batten (a monotone cubic through the points): the stem's
+ * rake rounding gently, just under the water, into a long, nearly straight raked forefoot that runs down to the keel's
+ * bottom about 4.6 m aft of the stemhead at 1.1 m draft, and the bottom on, nearly level, to the heel at 1.2 m. Read off
+ * Josephine hauled out (the owner's photos from port and from the starboard bow: about 0.3 m deep 2 m aft of the
+ * stemhead, 0.6 m at 3 m; measured against her mast and transom). The canoe body, the hull's bottom above the keel,
+ * leaves it about a third of the way down and rounds into its depth amidships, 0.62 m (the plan's main section at St. 8).
  */
-function entry(y0: number, y1: number, u: number, u1: number, m1: number): number {
-  const h = u1 - BOW, t = Math.min(1, Math.max(0, (u - BOW) / h)), t2 = t * t, t3 = t2 * t;
-  // (leaving no steeper than three times its mean slope, so it never dips below y1 and comes back: a fair batten)
-  const m0h = Math.max(STEM_SLOPE * h, 3 * (y1 - y0));
-  return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * m0h + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h * m1;
-}
+const U_HEEL = (HEEL.z + L / 2) / L, U_STEM = 0.125;
+const KEEL_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.46], [0.4, -0.68], [0.5, -0.9], [0.56, -1.04], [0.6, -1.1], [0.64, -1.13], [U_HEEL, -1.2]]);
+const CANOE_LINE = fairCurve([[U_STEM, 0.96 + STEM_SLOPE * U_STEM], [0.15, -0.1], [0.18, -0.19], [0.22, -0.28], [0.3, -0.44], [0.4, -0.56], [0.5, -0.61], [0.56, -0.62], [0.62, -0.62]]);
 export function canoe(u: number): number {
-  // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then
-  // rounding into the hull's bottom without a knuckle
-  if (u < BOW) return 0.96 + STEM_SLOPE * u;
-  if (u < 0.45) return entry(-0.1, -0.62, u, 0.45, 0);
-  if (u < 0.62) return -0.62; // where the hollow garboards meet the keel amidships (the plan's main section at St. 8)
+  // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then the
+  // forefoot's long raked run, and round into the hull's bottom amidships without a knuckle
+  if (u < U_STEM) return 0.96 + STEM_SLOPE * u;
+  if (u < 0.62) return CANOE_LINE(u);
   return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
 }
-/** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band), where the sternpost rises. */
-const U_HEEL = (HEEL.z + L / 2) / L;
-/** Where the keel's leading edge meets its bottom (fraction of L from the bow). */
-const U_KEEL = 0.43;
+/** Keel bottom: the forefoot, then the ballast keel's bottom, deepest at the heel (1.2 m with the keel band). */
 export function keel(u: number): number {
-  if (u <= BOW) return canoe(u);
-  // the keel's leading edge: on from the stem in one long, gentle curve down to the keel's bottom about 3.3 m aft of the
-  // stemhead at 1.12 m draft (the lines plan), then the bottom, nearly level, to the heel at 1.2 m
-  const slope = -0.08 / (U_HEEL - U_KEEL);
-  return u < U_KEEL ? entry(-0.1, -1.12, u, U_KEEL, slope) : Math.max(-1.2, -1.12 + slope * (u - U_KEEL));
+  if (u <= U_STEM) return canoe(u);
+  return Math.max(-1.2, Math.min(KEEL_LINE(Math.min(u, U_HEEL)), canoe(u)));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
