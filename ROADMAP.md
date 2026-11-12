@@ -64,9 +64,9 @@ What's planned, roughly in order. Done work is described in the README.
    - the chase camera framing the whole boat above the band by default (zooming past it allowed);
    - on the band: an AUTO-TRIM tab (was "All"), a POLE OUT / POLE IN tab only on a run, a round windex between the
      vangs.
-   Possible follow-ons, not queued unless the owner asks: the rest of the RRS race signals in the flag index (AP, N,
-   first substitute, S…), checked by the researcher; one-line on-screen messages with the full text in the log;
-   renaming the "Crew · Auto" button.
+   Also queued (owner, 12 November: "yes"): the rest of the RRS race signals in the flag index (AP, N, first
+   substitute, S… from the RRS 2025–2028 "Race Signals" page, checked by the researcher; 1–2 h); and one-line
+   on-screen messages with the full text in the log (1–2 h). Not queued: renaming the "Crew · Auto" button.
    After the band (owner, 12 November; not urgent; 1–2 h): line colours chosen in the boat editor, one per line (jib
    sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
    band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
