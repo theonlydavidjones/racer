@@ -265,11 +265,11 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
   cruise, and in both modes I would like a 'Send her home' feature (copy TBD) that auto-sets her home slip as the
   destination. In race mode, send her home would essentially be withdrawing from the race, if actioned before race is
-  complete." (1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns (2–3 h).
+  complete." ~~(1) Cruise setup: tap the start and the destination on the chart, in place of the dropdowns~~ (done).
   (2) Change the conditions mid-cruise and mid-race (wind, tide, sea, the day's real data or your own), without a
-  restart (2–4 h). (3) "Send her home" (wording to be settled), in both modes: sets her home slip as the destination for
+  restart (2–4 h). ~~(3) "Send her home"~~ (done: the *Home* button, "Send her back to her home slip") (wording to be settled), in both modes: sets her home slip as the destination for
   the navigator or tiller pilot; before she finishes a race it retires her (scored RET under RRS A5.1 and A11) (1–3 h).
-  (4) After "cast off", change where she starts without ending the cruise (owner, "once I tap 'cast off' in cruise
+  ~~(4)~~ (done: "Move her here" on the chart) After "cast off", change where she starts without ending the cruise (owner, "once I tap 'cast off' in cruise
   mode, I'd like to be able to edit the starting location without having to end the cruise altogether"): pick a new
   start on the chart and she's moved there, the cruise and its log carrying on (1–2 h).
   Layout to the owner first.

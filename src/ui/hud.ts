@@ -163,7 +163,7 @@ export class Hud {
    */
   private transit(w: World, u: Boat): void {
     const el = $('transit');
-    if (w.freeSail || u.finished || !w.settings.aids) { el.hidden = true; return; }
+    if (w.freeSail || u.finished || u.retired || !w.settings.aids) { el.hidden = true; return; }
     const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
     if (w.t < 0 || !u.started) {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
@@ -236,7 +236,7 @@ export class Hud {
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
     $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? 'Cruising' : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+      u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
     this.windex(u);
@@ -324,7 +324,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: World, u: Boat): void {
-    if (w.t < 0 || u.finished) return;
+    if (w.t < 0 || u.finished || u.retired) return;
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
@@ -390,7 +390,7 @@ export class Hud {
   private lineBox(w: World, u: Boat): void {
     const el = $('linebox'), C = w.C;
     if (u.finished) { el.hidden = true; return; }
-    if (w.freeSail) {
+    if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
