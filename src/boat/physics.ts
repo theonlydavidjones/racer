@@ -998,10 +998,12 @@ function puffEase(b: Boat, dt: number): number {
   // eddies, which a trimmer doesn't chase)
   b.twsFast = b.twsFast == null ? b.ww.kt : b.twsFast + (b.ww.kt - b.twsFast) * Math.min(1, dt / 3);
   const r = b.twsFast / Math.max(1, b.twsSlow), trim = attrOf(p, 'trim');
-  if (r <= 1) { b.puffEase = (b.puffEase ?? 0) * (1 - Math.min(1, dt / trimmerLag(b, 'mainsheet'))); return b.puffEase; }
+  // (back to nothing once it's negligible: an ease that never quite ends would move the main's target every step)
+  if (r <= 1) { const e = (b.puffEase ?? 0) * (1 - Math.min(1, dt / trimmerLag(b, 'mainsheet'))); b.puffEase = e < 0.05 ? 0 : e; return b.puffEase; }
   const heelIn = Math.max(0, b.heelSlow) * r * r;
   const want = clamp(1.5 * (heelIn - crewBestHeel(Math.abs(b.twa), b.ww.kt, trim) - (1.5 + 3 * (1 - trim))), 0, 10);
-  b.puffEase = (b.puffEase ?? 0) + (want - (b.puffEase ?? 0)) * Math.min(1, dt / trimmerLag(b, 'mainsheet'));
+  const e = (b.puffEase ?? 0) + (want - (b.puffEase ?? 0)) * Math.min(1, dt / trimmerLag(b, 'mainsheet'));
+  b.puffEase = e < 0.05 && want === 0 ? 0 : e;
   return b.puffEase;
 }
 // (the lines the crew works, as constants: trimSails runs every step for every boat)
