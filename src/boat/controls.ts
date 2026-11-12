@@ -54,10 +54,13 @@ export const defaultControls = (): Controls => ({
 
 /* ---------- from controls to sheet angles ---------- */
 
+/** How far aft of the mast the mainsheet's blocks hang from the boom (m): about a sixth of E (3.38 m) in from its end,
+ *  right above the thwart's traveller (the owner's photo of Josephine hauled out; render/hull.ts COCKPIT_FIT.thwart). */
+export const SHEET_ON_BOOM = 2.96;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
-  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:
-  // the car's ±0.5 m of travel swings the boom about ±9.5°; centred, the boom is on the centreline
+  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the sheet's blocks on the
+  // boom (SHEET_ON_BOOM): the car's ±0.5 m of travel swings the boom about ±9.5° (atan(0.5/2.96)); centred, on the centreline
   const car = 9.5 * c.traveller;
   return Math.min(85, Math.max(-2, car + 80 * Math.pow(c.mainsheet, 1.5)));
 }
@@ -153,12 +156,15 @@ export function mainShape(c: Controls, tws: number, rig: SailRig = STD_RIG, aws 
   // leech tension: the sheet's pull down on the boom end, and the vang (more effective as the sheet is eased). The sheet
   // is taut whenever the sail is drawing, and holds the leech by its vertical part: steep while the boom end is over the
   // traveller car, slanting away as the boom swings outboard of it (why North Sails' Folkboat guide sails medium air with
-  // the cars in the middle and the sheet "sheeted tight": the leech closes). The boom end 3.38 m out (E), the car ±0.5 m
-  // on the thwart (boomAngle), and the boom about 1.25 m above the car (BAS 1.0 m above the sheer, the thwart a little
-  // below it: an estimate). With the sheet nearly straight down the crew can haul the leech closed; once it slants about
-  // 25° (the boom end half a metre outboard of the car) the sail lifts the boom and the leech opens: the guide's light
-  // air, cars to windward and the sheet eased "so that the top tell-tale flies straight". (The curve between, an estimate.)
-  const out = 3.38 * Math.sin(boomAngle(c) * Math.PI / 180) - 0.5 * c.traveller, vf = 1.25 / Math.hypot(1.25, out);
+  // the cars in the middle and the sheet "sheeted tight": the leech closes). The sheet's blocks hang from the boom about
+  // a sixth of its length from the end, right above the thwart's car: 2.96 m aft of the mast (the owner's photo of
+  // Josephine hauled out, reference/photos/josephine-hauled-out-starboard-boom.jpg; the thwart's place, render/hull.ts
+  // COCKPIT_FIT, as Rigging draws the sheet). The car ±0.5 m on the thwart (boomAngle), and the boom about 1.25 m above
+  // it (BAS 1.0 m above the sheer, the thwart a little below it: an estimate). With the sheet nearly straight down the
+  // crew can haul the leech closed; once it slants about 25° (its blocks half a metre outboard of the car) the sail lifts
+  // the boom and the leech opens: the guide's light air, cars to windward and the sheet eased "so that the top tell-tale
+  // flies straight". (The curve between, an estimate.)
+  const out = SHEET_ON_BOOM * Math.sin(boomAngle(c) * Math.PI / 180) - 0.5 * c.traveller, vf = 1.25 / Math.hypot(1.25, out);
   const sheetT = smooth((vf - 0.9) / 0.09), vangT = c.vang * (0.12 + 0.88 * smooth(c.mainsheet / 0.4));
   const leech = Math.min(1.15, sheetT + 0.9 * vangT);
   // a mast that bends more or less than the average (rig.bend: 1 for aluminium and an average wooden mast) has more
