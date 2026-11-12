@@ -11,7 +11,7 @@ import { camberLine, flowField, flowState, gridField, streamline, turnFor, type 
  */
 
 const W = 200, H = 200; // each cut's drawing (CSS px)
-const COL = { attached: '#f4f1e8', luffing: '#ffd34d', stalled: '#ff6a5c', hull: 'rgba(36,56,75,0.55)', hullEdge: 'rgba(63,90,114,0.6)', wind: '#ffb627', port: '#e0281e', stbd: '#18a14a' };
+const COL = { running: '#9aa7b3', attached: '#f4f1e8', luffing: '#ffd34d', stalled: '#ff6a5c', hull: 'rgba(36,56,75,0.55)', hullEdge: 'rgba(63,90,114,0.6)', wind: '#ffb627', port: '#e0281e', stbd: '#18a14a' };
 
 /** The flow's colour for its speed (share of the apparent wind): slow blue to fast mint. */
 function speedCol(s: number): string {
@@ -59,7 +59,7 @@ export class FlowPanel {
       const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption');
       cv.style.width = `${W}px`; cv.style.height = `${H}px`; fig.append(cv, cap); row.append(fig); this.cuts.push({ cv, cap });
     }
-    el.querySelector('.fp-key')!.innerHTML = `<span><i style="background:${COL.attached}"></i>attached</span><span><i style="background:${COL.luffing}"></i>luffing</span><span><i style="background:${COL.stalled}"></i>stalled</span>`
+    el.querySelector('.fp-key')!.innerHTML = `<span><i style="background:${COL.attached}"></i>attached</span><span><i style="background:${COL.luffing}"></i>luffing</span><span><i style="background:${COL.stalled}"></i>stalled</span><span><i style="background:${COL.running}"></i>working stalled (off the wind)</span>`
       + `<span><i style="background:${COL.stbd}"></i>starboard telltale</span><span><i style="background:${COL.port}"></i>port</span><span class="fp-speed">air: <i style="background:linear-gradient(90deg,${speedCol(0.6)},${speedCol(1.5)})"></i> slower · faster</span>`;
     this.story = el.querySelector('.fp-story')!;
     el.querySelector<HTMLButtonElement>('.fp-x')!.onclick = () => this.onClose();
@@ -117,7 +117,7 @@ export class FlowPanel {
     // the sails: coloured by the sim's flow state; a luffing sail's front lifting (waved over as much as it luffs)
     for (const s of c.sections) {
       const p = camberLine(s, 24), lift = s.trim.flow === 'luffing' ? 0.15 + 0.5 * s.trim.amount : 0;
-      g.strokeStyle = flowCol(s); g.lineWidth = 3.5; g.lineCap = 'round'; g.beginPath();
+      g.strokeStyle = running ? COL.running : flowCol(s); g.lineWidth = 3.5; g.lineCap = 'round'; g.beginPath();
       p.forEach(([x, y], k) => {
         const t = k / 24, w = t < lift ? Math.sin(t * 60) * 0.06 * (1 - t / lift) : 0; // (the luff backing: a wave across it)
         const px = x + w * Math.cos(s.angle * Math.PI / 180), py = y - w * Math.sin(s.angle * Math.PI / 180);
