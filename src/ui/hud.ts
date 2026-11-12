@@ -68,6 +68,10 @@ export function pointOfSail(u: Boat): { short: string; long: string } {
   return { short, long };
 }
 
+/** Which way north points on a map turned so that `W` (deg, the wind's direction) is at the top: the angle (rad) to
+ * turn an up-pointing arrow by, clockwise on the canvas (makeTf: a bearing b is drawn at b − W from up). */
+export const northOnMap = (W: number) => -W * Math.PI / 180;
+
 export class Hud {
   private acc = 0;
   mapZoom = false;
@@ -472,6 +476,12 @@ export class Hud {
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
     say('WIND ↓', 34, 12, 'left'); // (right of the layers button on the map's corner)
+    // north, as the map's turned (wind up): a small arrow by the label, so a westerly's map isn't read as north-up
+    { const a = northOnMap(W), nx = 34 + ctx.measureText('WIND ↓').width + 16, ny = 9;
+      ctx.save(); ctx.translate(nx, ny); ctx.rotate(a); ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4, 4); ctx.lineTo(0, 2); ctx.lineTo(-4, 4); ctx.closePath();
+      ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = I.text; ctx.fill(); ctx.restore();
+      const t = (k: number) => [nx + Math.sin(a) * k, ny - Math.cos(a) * k]; const [lx, ly] = t(13); say('N', lx, ly + 3, 'center'); }
     const fog = this.fogNote(wd, true);
     if (fog) say(fog, 6, h - 6, 'left');
     const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
