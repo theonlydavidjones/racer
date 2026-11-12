@@ -34,7 +34,7 @@ What's planned, roughly in order. Done work is described in the README.
    (in progress). Follow-ups from Crew Figures: the helm's shin cuts up to 9 cm into the aft coaming as she crosses in
    a 20 kt hiking tack (around z 2.55, x 0.6; on main too): fix the crossing path, then sample every 2 cm along each
    bone in tests/crewfig.test.ts's "never pass through the boat" check (1–2 h). (Fixed in its own PR, Crew Figures.)
-   Next follow-up (Crew Figures, 12 November; 2–3 h): the crew's legs graze 3–8 cm into the coaming while moving along
+   ~~Next follow-up~~ (done, #126, v136; Crew Figures, 12 November; 2–3 h): the crew's legs graze 3–8 cm into the coaming while moving along
    the side deck (climbing out, passing the thwart, sitting down on the deck), mostly on the route planner from #110.
    One cause found: in render/crew.ts route(), a goal aft of the thwart isn't updated when the physics target moves
    forward of it mid-route, so the figure sits and stands at the old spot for a second or more (20 kt tack: crew 1 at
@@ -99,10 +99,10 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
+   Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
-6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
+6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
    Built on branch rules-finish (PR pending, not yet published): 20.2(e) holds until the hailer has tacked and kept
    clear; 20.3 (the hailed boat passes the hail on, by AI or the Hail key); a boat as the obstruction for rules 19 and
    20.1 (WS Case 11); blanketing as rule 23 interference (12% of the wind speed for 8 s; "interfere" isn't defined in
@@ -131,7 +131,7 @@ What's planned, roughly in order. Done work is described in the README.
    with an N arrow.
 9. ~~The flags' original motion back, and "Strike ensign"~~ (done: the committee boat's signal flags have their
    original motion back; the boats' flags keep the measured physics; the strike animates).
-10. P0 phase 4: deck hardware and lines, with the rigging detail (4–8 h).
+10. ~~P0 phase 4: deck hardware and lines, with the rigging detail~~ (done, v128–v134).
 Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
 rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Building, aluminium spars, the boat cards, the
 showroom's time and conditions, the swinging lantern); Sam's; accounts for other players; real slip numbers and nicer
@@ -194,7 +194,7 @@ is now "much better" (owner).
 2. The interior true to a real Folkboat, from the construction plan and reference photos (6–10 h).
 3. ~~The cockpit to the plan~~ (done: benches as lazarettes, footwell, thwart, after shelf, winches on pedestals from Josephine's photos), with the seats and positions exported for the crew (4–6 h; takes in "the thwart, the
    cockpit's proportions and where the skipper sits", below, and reference/photos).
-4. Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines (not urgent; 4–8 h).
+4. ~~Deck hardware and lines: hatch, fairleads, blocks, sheets and control lines~~ (done, v128–v134).
 5. Later: the cabin lantern swings with the boat's motion (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
