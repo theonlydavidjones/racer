@@ -262,7 +262,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));
     grp.add(new THREE.Mesh(rail(caps, 0.02, 0.04), MAT.wood));
-    // the toerail along the sheer; alongside the cabin it becomes the hiking rail, a broad varnished plank laid flat along
+    // the toerail along the sheer; alongside the cockpit it becomes the hiking rail, a broad varnished plank laid flat along
     // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
     // starboard side at the dock)
     const sl = sheerLine(s, 0.03, 160), aft = sheerLine(s, HIKE_RAIL.inset, 160).filter(p => p.z >= HIKE_RAIL.z0 && p.z <= HIKE_RAIL.z1);
@@ -368,10 +368,11 @@ interface Lines {
 }
 /**
  * The hiking rail (as on Josephine, the owner's photo): a varnished plank about 80 × 28 mm laid flat along the deck's edge
- * on spacer blocks, alongside the cabin, from near its front to its after end (the owner). The size is read off the photo
+ * on spacer blocks, alongside the cockpit, from its forward end to the after end of the coaming: where the crew sit to hike
+ * out (the owner). The size is read off the photo
  * against the deck's and coaming's known widths: an estimate, within a centimetre.
  */
-const CABIN_Z0 = -L / 2 + CABIN.u0 * L, CABIN_Z1 = -L / 2 + CABIN.u1 * L;
+const CABIN_Z1 = -L / 2 + CABIN.u1 * L;
 /** The jib car's H track: the cross-bar's and the tracks' lengths (m: about 5 in and 7 in, the owner, of Josephine). */
 const TRACK = { bar: 0.127, leg: 0.178 };
 /** The cabin-top grab rails: their middle station, and how far out (m), halfway between the hatch's runner and the roof's edge there. */
@@ -384,7 +385,7 @@ const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 const WINCH_H = 0.123;
 /** Bare teak weathered silver-tan, as Josephine's toerail and hiking rail are (the owner's photos): not varnished. */
 const TEAK_WEATHERED = new THREE.MeshPhongMaterial({ color: 0xb8a284, specular: 0x222222, shininess: 8 });
-const HIKE_RAIL = { z0: CABIN_Z0 + 0.15, z1: CABIN_Z1 + 0.05, inset: 0.045, w: 0.08, t: 0.028, gap: 0.014 };
+const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.045, w: 0.08, t: 0.028, gap: 0.014 };
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [], n = pts.length;
