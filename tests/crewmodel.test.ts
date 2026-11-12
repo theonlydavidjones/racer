@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
-import { ATTRS, DEFAULT_CREW, DEFAULT_SKILL, attrOf, crewAttr, hikingMoment, newCrew, pace, reactTime, specAttr, type Attr, type CrewSpec } from '../src/boat/crewPhys';
+import { ATTRS, DEFAULT_CREW, DEFAULT_SKILL, ENDURE, attrOf, crewAttr, hikingMoment, newCrew, pace, reactTime, specAttr, type Attr, type CrewSpec } from '../src/boat/crewPhys';
 
 // The crew model (ROADMAP, the skipper and crew model): each person's skill split into attributes (crewPhys.ts Attr),
 // each falling back to their skill, so a crew given only a skill sails exactly as before the split.
@@ -45,6 +45,17 @@ describe('the crew model: attributes', () => {
     }
   });
 
+  it('each of the crew\'s own functions moves with its one attribute and no other', () => {
+    // (the refactor's mapping: reactTime ← react, pace ← handling, hiking reach and endurance ← fitness)
+    const base = { h: 1.75, w: 75, skill: 0.6 }, F: Record<string, (p: typeof base & { attr?: Partial<Record<Attr, number>> }) => number> = {
+      react: reactTime, handling: pace, fitness: p => ENDURE(p) + hikingMoment({ helm: p, crew: [] }, [0])
+    };
+    for (const [owner, f] of Object.entries(F)) for (const a of ATTRS) {
+      const moved = f({ ...base, attr: { [a]: 0.95 } }) !== f(base);
+      expect(moved, `${owner} function against ${a}`).toBe(a === owner);
+    }
+  });
+
   it('react sets the reaction time and handling the pace, each on its own', () => {
     const p = { h: 1.75, w: 75, skill: 0.6 };
     expect(reactTime({ ...p, attr: { react: 1 } })).toBeCloseTo(0.4, 9);
@@ -54,11 +65,11 @@ describe('the crew model: attributes', () => {
     expect(pace({ ...p, attr: { react: 1 } })).toBeCloseTo(pace(p), 12);
   });
 
-  it('fitness alone decides how far out they hike (and how long they last: Vogiatzis 1995)', () => {
+  it('fitness decides how far out they hike and how long they last (Vogiatzis 1995: 5 min untrained, 8.5 trained)', () => {
     // (the same crew in every other way: the unfit reach out less; tired, both lose the same share of their reach)
     const U = crewOf(0.8, { fitness: 0.1 }), F = crewOf(0.8, { fitness: 0.95 });
     expect(hikingMoment(U, [0, 0, 0])).toBeLessThan(hikingMoment(F, [0, 0, 0]) * 0.97);
-    expect(hikingMoment(U, [0.5, 0.5, 0.5]) / hikingMoment(U, [0, 0, 0])).toBeCloseTo(hikingMoment(F, [0.5, 0.5, 0.5]) / hikingMoment(F, [0, 0, 0]), 1);
+    expect(ENDURE(U.crew[0])).toBeCloseTo(300 + 210 * 0.1, 9); expect(ENDURE(F.crew[0])).toBeCloseTo(300 + 210 * 0.95, 9);
     // and on the rail, a few minutes into a 22 kt beat, the unfit are leaning out less
     const unfit = beat(U, 22, 150), fit = beat(F, 22, 150), lean = (b: ReturnType<typeof beat>) => b.crew!.people[1].lean;
     expect(lean(unfit)).toBeLessThan(lean(fit));

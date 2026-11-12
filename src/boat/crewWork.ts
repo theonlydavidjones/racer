@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -136,7 +136,7 @@ export function workPace(b: Boat, who: number): number {
 }
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
-function reachTime(a: Aboard, st: Station | null, windward: number, p: { skill?: number; h: number; w: number }): number {
+function reachTime(a: Aboard, st: Station | null, windward: number, p: Person): number {
   if (!st) return reactTime(p) * 0.5;
   const dx = Math.abs(st.arm * windward - a.x), dz = Math.abs(st.z - a.z), forward = st.z < Z.cockpitFwd - 0.2;
   return reactTime(p) + (dx + dz) / ((forward ? 0.5 : 0.9) * pace(p));

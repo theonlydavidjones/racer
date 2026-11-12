@@ -68,7 +68,8 @@ export const DEFAULT_CREW: CrewSpec = { helm: { h: 1.78, w: 80 }, crew: [{ h: 1.
 export const skillOf = (p: Person) => clamp(p.skill ?? DEFAULT_SKILL, 0, 1);
 /** One of a person's attributes (their skill unless it's set on its own). */
 export const attrOf = (p: Person, a: Attr) => clamp(p.attr?.[a] ?? p.skill ?? DEFAULT_SKILL, 0, 1);
-/** The crew's attribute: the average of the crew (alone: the helm's). Cached per crew (it runs every step). */
+/** The crew's attribute: the average of the crew (alone: the helm's). Cached per crew (it runs every step): a crew's people
+ * don't change while she sails (a new game builds a new CrewSpec), and newCrew clears it to be sure. */
 const attrCache = new WeakMap<CrewSpec, Partial<Record<Attr, number>>>();
 export const specAttr = (s: CrewSpec, a: Attr): number => {
   let m = attrCache.get(s); if (!m) attrCache.set(s, m = {});
@@ -140,7 +141,7 @@ export interface CrewState {
   mode: CrewMode;
   /** 0..1: how hard the crew are hiking (the hardest of them). */
   hike: number;
-  /** Everyone free is hiking as far as they can now (their own reach, by skill and how tired they are). */
+  /** Everyone free is hiking as far as they can now (their own reach, by their fitness and how tired they are). */
   allOut?: boolean;
   /** The tack they were set up for. */
   side: 'S' | 'P';
@@ -260,16 +261,17 @@ export const helmArms = (p: Person, fatigue = 0) => {
   return { sit: sitArm(p, e), max: hikeArm(p, leanCap(p, fatigue), e), lee: leeArm(p, e) };
 };
 
-/** How far out a person will lean (0..1) for their skill and how tired they are. */
+/** How far out a person will lean (0..1) for their fitness and how tired they are. */
 const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * attrOf(p, 'fitness')) * (1 - 0.6 * fatigue);
 /** Reaction time (s) to a new call: an expert ~0.4 s, a novice ~1.6 s (simple visual reaction is 0.2–0.3 s; choosing what to do takes longer). Estimates. */
 export const reactTime = (p: Person) => 1.6 - 1.2 * attrOf(p, 'react');
-/** Pace of a person's work and movement against a club crew (1 at skill 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
+/** Pace of a person's work and movement against a club crew (1 at handling 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
 export const pace = (p: Person) => 0.55 + 0.75 * attrOf(p, 'handling');
-/** Hiking endurance (s at a full hike) and recovery time constant (s): Vogiatzis 1995 (above). */
-const ENDURE = (p: Person) => 300 + 210 * attrOf(p, 'fitness'), RECOVER = 60;
+/** Hiking endurance (s at a full hike, by fitness) and recovery time constant (s): Vogiatzis 1995 (above). */
+export const ENDURE = (p: Person) => 300 + 210 * attrOf(p, 'fitness'), RECOVER = 60;
 
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
+  attrCache.delete(spec);
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
     x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
@@ -389,7 +391,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       : clamp(Math.max(needArm, sit * breeze), minArm, maxArm);
     const pl = c.place;
     if (pl?.across) want = pl.across === 'lee' ? minArm : pl.across === 'mid' ? 0.1 : pl.across === 'up' ? sit : maxArm;
-    // fore and aft: the trim with least resistance (hullTrim.ts) for a skilled crew; a novice stays in the middle
+    // fore and aft: the trim with least resistance (hullTrim.ts) for a crew good at trim; a novice stays in the middle
     // (they think about it every second or so, not every moment)
     c.foreT = (c.foreT ?? 0) - Math.max(dt, 0.05); // (this runs 20 times a second)
     if (c.fore01 == null || c.foreT <= 0) { chooseFore(c, k, skill); c.foreT = 1; }
@@ -564,7 +566,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
 }
 
 /** How far out a person can lean now, as a fraction of the span from sitting to a full hike (the scale `lean` is on):
- * their reach (skill, fatigue: leanCap) through the hiking geometry (hikeArm). */
+ * their reach (fitness, fatigue: leanCap) through the hiking geometry (hikeArm). */
 const reachLean = (p: Person, fatigue: number, edge = EDGE) => {
   const sit = sitArm(p, edge); return clamp((hikeArm(p, leanCap(p, fatigue), edge) - sit) / Math.max(0.05, hikeArm(p, 1, edge) - sit), 0, 1);
 };
@@ -623,7 +625,7 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
     //   of those that go misjudge it further.
     // (How crews sail, as the owner describes it: the numbers are estimates, not from a source.)
     const r1 = crewDraw(c.spec, 1), r2 = crewDraw(c.spec, 2), r3 = crewDraw(c.spec, 3);
-    const judge = (attrOf(c.spec.helm, 'trim') + skill) / 2, tier = judge >= 0.8 ? 2 : judge >= 0.45 ? 1 : 0;
+    const judge = (skillOf(c.spec.helm) + skill) / 2, tier = judge >= 0.8 ? 2 : judge >= 0.45 ? 1 : 0;
     const err = tier === 2 ? 0 : tier === 1 ? (r3 < 0.35 ? 0.006 + 0.012 * r1 : 0) : (r3 < 0.5 ? 0.02 : 0);
     const theirs = call(cost - err);
     if (theirs !== c.poleFwd) { c.poleFwd = theirs; c.poleFwdT = 0; } else c.poleFwdT = (c.poleFwdT ?? 0) + 1; // (once a second)
@@ -650,7 +652,7 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
   return go(now);
 }
 
-/** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a skilled crew. */
+/** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a crew good at trim. */
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const n = c.spec.crew.length; if (!n) return 0.5;
   const v = Math.max(0.5, k.v), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
@@ -738,7 +740,7 @@ export function bestFore(twa: number, tws: number, pole: boolean): number {
 }
 
 /**
- * The righting moment (N·m, upright) of a crew all hiking as far as they reach (their skill, and how tired: `fatigue`
+ * The righting moment (N·m, upright) of a crew all hiking as far as they reach (their fitness, and how tired: `fatigue`
  * per person, helm first). The polar's crew: the ORC certificates the polar comes from declare 240–300 kg of crew; the
  * sim's standard three (DEFAULT_CREW, 230 kg) at a club crew's reach, fresh.
  */
