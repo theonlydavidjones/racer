@@ -16,7 +16,7 @@ export interface Coast {
   rocks: { x: number; y: number }[][];
 }
 /** A piece of the chart's land smaller than this across (m) is a rock: the mesh leaves it out. */
-export const ROCK = 60;
+export const ROCK = 100; // (the 50 m mesh can't draw anything this small: at best a sliver)
 
 let built: Coast | null = null;
 export function chartCoast(): Coast {
