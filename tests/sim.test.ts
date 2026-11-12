@@ -104,6 +104,18 @@ describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
     expect(u.returning).toBe(true);
   });
 
+  it('Definitions, Start: dipping only her bow below the line after the gun and coming back up is not a start; whole hull below, then across, is', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y), u = w.user;
+    // (moves her without forgetting where she was, so the line crossing is seen; her centre is half a length behind her bow)
+    const to = (dBow: number, down = false) => { const k = down ? 1 : -1; u.x = w.center.x + w.N.x * (dBow + k * 3.8); u.y = w.center.y + w.N.y * (dBow + k * 3.8); u.h = down ? toCourse + 180 : toCourse; u.v = 0; u.luff = true; w.step(DT); };
+    w.t = 30; place(w, 6, toCourse); w.step(DT); // on the course side after the gun (not OCS: she wasn't there at the gun)
+    to(2, true); to(-1, true); to(2); // heading down, her bow dips just below (stern still above); she turns and comes up again
+    expect(u.started).toBe(false);
+    to(-1); to(-6); to(-1); to(2); // whole hull below, then across
+    expect(u.started).toBe(true);
+  });
+
   it('behind the line at the gun → not OCS', () => {
     const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
     w.t = -0.5; place(w, -20, brg(w.N.x, w.N.y));

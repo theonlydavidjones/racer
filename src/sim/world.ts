@@ -581,6 +581,8 @@ export class World {
     return { k: r.k * lee, shift: r.shift };
   }
 
+  /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
+  private belowSinceGun = new Set<number>();
   /** Rule 21.1: how long (s) each returning boat has been sailing clearly away from the line (to release the latch). */
   private awayFromLine = new Map<number, number>();
   /**
@@ -735,7 +737,7 @@ export class World {
   private checkLines(prevT: number): void {
     if (this.cancelled && this.cancelled.t < 0) return; // (postponed before the gun, AP over A: no start, nobody over early, nobody starts)
     const gun = prevT < 0 && this.t >= 0, C = this.C, n = C.marks.length;
-    if (gun) this.snapGun();
+    if (gun) { this.snapGun(); this.belowSinceGun.clear(); }
     for (const b of this.boats) {
       const wasReturning = !!b.returning;
       b.returning = false;
@@ -745,6 +747,9 @@ export class World {
       // course side), with her hull not completely on the pre-start side of the line or its extensions, and sailing back
       // toward it to start, she is returning and keeps clear of boats that aren't, until her hull is completely below it
       b.returning = this.returningNow(b, d, wasReturning);
+      // Definitions, Start: she starts when, "her hull having been entirely on the pre-start side of the starting line at
+      // or after her starting signal", any part of her hull crosses it toward the first mark. So: has it been, since the gun?
+      if (this.t >= 0 && d <= 0 && this.lineD(stern(b)) <= 0) this.belowSinceGun.add(b.id);
       const within = Math.abs(a) <= this.lineLen / 2 + 2;
       if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
         b.ocs = true;
@@ -758,7 +763,10 @@ export class World {
       if (this.t >= 0 && b.prevD != null) {
         if (b.ocs && !b.roundEnd && d < 0 && this.lineD(stern(b)) < 0) { b.ocs = false; if (b.isUser) this.emit({ type: 'toast', msg: 'Cleared. Now start properly.' }); }
         const crossedFwd = b.prevD <= 0 && d > 0 && within, crossedBack = b.prevD > 0 && d <= 0 && within;
-        if (!b.started && !b.ocs && crossedFwd) {
+        if (!b.started && !b.ocs && crossedFwd && !this.belowSinceGun.has(b.id) && b.isUser) {
+          this.emit({ type: 'toast', ms: 4500, msg: 'Not started: your whole hull has to be below the line after the gun before you cross it to start. Go back below it, then start.' });
+        }
+        if (!b.started && !b.ocs && crossedFwd && this.belowSinceGun.has(b.id)) {
           b.started = true; this.startTimes[b.id] = this.t;
           if (b.isUser) {
             const frac = (a + this.lineLen / 2) / this.lineLen;
