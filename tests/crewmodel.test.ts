@@ -157,9 +157,9 @@ describe('the crew model, B2: standing in the companionway (the owner, 12 Nov 20
     const at = b.crew!.people.findIndex(p => p.pose === 'companionway' && p.z < Z.companionway + 0.15);
     return { b, at, seen };
   }
-  it('cruising in light air, a crew member opens the doors, then slides the hatch forward, then stands there', () => {
+  it('cruising in light air, a crew member slides the hatch forward, then lifts out the washboards, then stands there (the owner)', () => {
     const r = go(crewOf(0.6), 6, 60, { cruising: true, shut: true });
-    expect(r.seen).toEqual(['in/closed', 'out/closed', 'out/open']); // (two motions, in order, and it stays open)
+    expect(r.seen).toEqual(['in/closed', 'in/open', 'out/open']); // (the hatch, then the boards, and it stays open)
     expect(r.at).toBeGreaterThan(0);
     const p = r.b.crew!.people[r.at];
     expect(Math.abs(p.x)).toBeLessThan(0.1); // (on the centreline: no moment across)
