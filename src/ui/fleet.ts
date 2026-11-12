@@ -168,11 +168,12 @@ export class Fleet {
 
   /**
    * Her crew, by seat (the Yacht Club, phase 3): the middle crew (the main) and the forward hand (the jib, the cabin top,
-   * the pole), each picked from the club's members who crew, or none. A boat races with one or two (one rarely).
+   * the pole), each picked from the club's members who crew, or none: both left at None is single-handed (the owner: a
+   * practice option, and it sails that way in a race too). A boat always has her skipper.
    */
   private crewRows(b: BoatSpec): string {
     const ms = this.hooks.members().filter(m => m.id !== YOU && m.roles.includes('crew')), ids = b.crewIds ?? [];
-    const pick = (i: number) => `<select data-f="seat" data-v="${i}">${i === 1 || ids.length > 1 ? '<option value="">None</option>' : ''}${ms.map(m => `<option value="${esc(m.id)}"${ids[i] === m.id ? ' selected' : ''}${ids.includes(m.id) && ids[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
+    const pick = (i: number) => `<select data-f="seat" data-v="${i}"><option value="">None</option>${ms.map(m => `<option value="${esc(m.id)}"${ids[i] === m.id ? ' selected' : ''}${ids.includes(m.id) && ids[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
     return `<tr><td>Middle crew</td><td>${pick(0)}</td></tr><tr><td>Forward hand</td><td>${pick(1)}</td></tr>`;
   }
 

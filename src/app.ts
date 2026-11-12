@@ -30,7 +30,7 @@ import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
-import { YOU, ensureMembers, loadMembers, pullCrew, pushCrew, saveMembers, type Member } from './club/members';
+import { YOU, ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
 installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said of her, her record)
 import { SailBand } from './ui/sailBand';
@@ -59,8 +59,6 @@ const S: Settings = loadSettings();
 const MEMBERS: Member[] = loadMembers();
 /** Your boat's crew from her seats (after choosing a boat, or at the start); saves what changed. */
 function crewFromClub(): void { if (ensureMembers(S, MEMBERS)) { saveMembers(MEMBERS); saveSettings(S); } pullCrew(S, MEMBERS); }
-/** The setup's crew rows or count changed: back to the members and her seats, and saved. */
-function crewToClub(): void { pushCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); }
 crewFromClub();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
 S.raceLength ??= 'medium';
@@ -985,7 +983,7 @@ function courseCard(): void {
   $('setupBack').textContent = cruise ? '‹ Start page' : '‹ Race'; $('setupBack').dataset.home = cruise ? 'home' : 'race';
   $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
   { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
-    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Just you'}, ${Math.round(kg / 0.4536)} lb aboard`; }
+    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Single-handed'}, ${Math.round(kg / 0.4536)} lb aboard`; }
   adjustUi();
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
@@ -1078,7 +1076,7 @@ $<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
     const k = seg.dataset.k as keyof Settings;
-    const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
+    const cur = String(S[k]);
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
   });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (S[c.dataset.t as 'aids' | 'windDial' | 'camRide'] ?? 0) === 1; });
 }
@@ -1090,7 +1088,6 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewToClub(); crewRows(); paintSeg(); newGame(); courseCard(); return; }
   if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
@@ -1099,21 +1096,26 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
  * Your crew in the race setup (the Yacht Club, phase 3; the owner: the race setup "isn't where crew are configured",
  * but you may swap people in and out there): you at the helm, then a pick for each seat from the club's members (the
  * middle crew: the main; the forward hand: the jib, the cabin top, the pole), the seats swapped, and the members
- * themselves set up in the Yacht Club. The count (Just you, You + 1, You + 2) sets how many seats.
+ * themselves set up in the Yacht Club. There's no crew count (the owner): both seats left at None is single-handed, for
+ * practice or a race, and a seat left empty moves the forward hand up to the middle (one crew does both jobs).
  */
 function crewRows(): void {
   const rows = $('crewRows'), boat = S.boats.find(b => b.id === S.boatId) ?? S.boat, seats = boat.crewIds ?? [];
   const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
   // (anyone who crews, and isn't on another seat of hers; someone on another of your boats can still be brought aboard)
   const crewers = MEMBERS.filter(m => m.id !== YOU && m.roles.includes('crew'));
-  const seatName = (i: number) => (seats.length === 1 ? 'Crew' : i === 0 ? 'Middle: main' : 'Forward: jib, pole');
-  const pick = (i: number) => `<label>${seatName(i)} <select data-seat="${i}">${crewers.map(m => `<option value="${esc(m.id)}"${seats[i] === m.id ? ' selected' : ''}${seats.includes(m.id) && seats[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select></label>`;
+  const seatName = (i: number) => (i === 0 ? 'Middle: main' : 'Forward: jib, pole');
+  const pick = (i: number) => `<label>${seatName(i)} <select data-seat="${i}"><option value="">None</option>${crewers.map(m => `<option value="${esc(m.id)}"${seats[i] === m.id ? ' selected' : ''}${seats.includes(m.id) && seats[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select></label>`;
   const you = MEMBERS.find(m => m.id === YOU);
-  rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${seats.map((_, i) => pick(i)).join('')}`
+  rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${pick(0)}${pick(1)}`
     + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
     + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
   const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); newGame(); courseCard(); crewRows(); };
-  rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => { const ids = [...(boat.crewIds ?? [])]; ids[Number(sel.dataset.seat)] = sel.value; boat.crewIds = ids; changed(); });
+  rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => {
+    const ids = [...(boat.crewIds ?? [])], i = Number(sel.dataset.seat);
+    if (sel.value) ids[i] = sel.value; else ids.splice(i, 1);
+    boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
+  });
   rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
   rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openMembers(); });
 }
