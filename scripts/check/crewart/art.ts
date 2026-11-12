@@ -60,8 +60,8 @@ const art = {
       { x: 600, y: 0, w: 600, h: 600, eye: orbit(-40, 6, 0.75, head), at: head, fov: 30, label: 'head, three-quarter' },
       { x: 1200, y: 0, w: 600, h: 600, eye: orbit(-100, 4, 0.75, head), at: head, fov: 30, label: 'head, side' },
       { x: 0, y: 600, w: 600, h: 600, eye: orbit(-35, 8, 2.3, [0, 0.42, 0]), at: [0, 0.42, 0], fov: 30, label: 'upper body, three-quarter' },
-      { x: 600, y: 600, w: 600, h: 600, eye: orbit(-30, 8, 4.6, full), at: full, fov: 30, label: `full body (${(figures[0] as any).tris} triangles)` },
-      { x: 1200, y: 600, w: 600, h: 600, eye: orbit(150, 10, 4.6, full), at: full, fov: 30, label: 'full body, behind' }
+      { x: 600, y: 600, w: 600, h: 600, eye: orbit(-30, 6, 3.85, full), at: full, fov: 30, label: `full body (${(figures[0] as any).tris} triangles)` },
+      { x: 1200, y: 600, w: 600, h: 600, eye: orbit(150, 6, 3.85, full), at: full, fov: 30, label: 'full body, behind' }
     ]);
   },
   lineup() {

@@ -98,16 +98,16 @@ function orient(M: Mesh, i0: number, t0: number): void {
 
 /** A row of a cross-section profile: at height y, half-width rx, the front's depth (toward −z) and the back's, its
  * centre's z, and how square it is (2 an ellipse, higher squarer). */
-type Row = [y: number, rx: number, rzF: number, rzB: number, cz?: number, p?: number];
+type Row = [y: number, rx: number, rzF: number, rzB: number, cz?: number, p?: number, ox?: number];
 /** A profile's row at any height: Catmull-Rom through the rows (smooth silhouettes from a few numbers). */
 function profile(rows: Row[]): (y: number) => Row {
-  const R = rows.map(r => [r[0], r[1], r[2], r[3], r[4] ?? 0, r[5] ?? 2] as number[]);
+  const R = rows.map(r => [r[0], r[1], r[2], r[3], r[4] ?? 0, r[5] ?? 2, r[6] ?? 0] as number[]).sort((p, q) => p[0] - q[0]); // (by height, whichever way written)
   return (y: number) => {
     let k = 0; while (k < R.length - 2 && R[k + 1][0] < y) k++;
     const a = R[Math.max(0, k - 1)], b = R[k], c = R[k + 1], d = R[Math.min(R.length - 1, k + 2)];
     const t = Math.min(1, Math.max(0, (y - b[0]) / (c[0] - b[0] || 1)));
     const cr = (i: number) => { const p0 = a[i], p1 = b[i], p2 = c[i], p3 = d[i]; return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t); };
-    return [y, cr(1), cr(2), cr(3), cr(4), cr(5)];
+    return [y, cr(1), cr(2), cr(3), cr(4), cr(5), cr(6)];
   };
 }
 /** A point on a profile's cross-section at angle th (0 → +x, −π/2 → the front, −z), pushed out by d, then moved by
@@ -221,17 +221,19 @@ const FRONT = -Math.PI / 2;
 /** The jacket's body, waist to collar: a long offshore cut to below the seat, squared off across the chest and
  * shoulders, the shoulders' width taking in the deltoids (the sleeves set in below them). */
 const JACKET_P = profile([
-  [-0.1, 0.166, 0.125, 0.14, 0.012, 2.4],
-  [-0.05, 0.162, 0.122, 0.136, 0.01, 2.5],
-  [0.0, 0.158, 0.118, 0.13, 0.008, 2.6],
-  [0.1, 0.152, 0.113, 0.12, 0.006, 2.7],
-  [0.2, 0.157, 0.12, 0.116, 0.004, 2.7],
-  [0.3, 0.167, 0.128, 0.115, 0.0, 2.8],
-  [0.38, 0.178, 0.126, 0.112, 0.0, 2.9],
-  [0.44, 0.186, 0.114, 0.104, 0.002, 3.0],
-  [0.48, 0.172, 0.098, 0.094, 0.004, 2.8],
-  [0.505, 0.145, 0.088, 0.086, 0.004, 2.4],
-  [0.525, 0.1, 0.08, 0.078, 0.004, 2.2],
+  [-0.1, 0.18, 0.13, 0.146, 0.012, 2.3], // (the hem, hanging loose over the seat and the tops of the thighs)
+  [-0.05, 0.17, 0.124, 0.138, 0.01, 2.4],
+  [0.0, 0.159, 0.118, 0.13, 0.008, 2.5], // the hips
+  [0.08, 0.152, 0.112, 0.12, 0.006, 2.5], // the waist
+  [0.16, 0.153, 0.117, 0.116, 0.004, 2.5],
+  [0.25, 0.162, 0.127, 0.115, 0.0, 2.5],
+  [0.32, 0.17, 0.132, 0.117, -0.002, 2.5], // the chest
+  [0.38, 0.177, 0.127, 0.118, 0.0, 2.5], // the armpits; the shoulder blades behind
+  [0.425, 0.184, 0.115, 0.108, 0.002, 2.4],
+  [0.455, 0.178, 0.104, 0.1, 0.004, 2.3], // the point of the shoulder
+  [0.48, 0.16, 0.095, 0.092, 0.004, 2.2], // (the shoulders slope up to the neck, about 30°, as the trapezius does)
+  [0.503, 0.13, 0.087, 0.085, 0.004, 2.1],
+  [0.523, 0.102, 0.08, 0.078, 0.004, 2.05],
   [0.54, 0.084, 0.078, 0.074, 0.004, 2.0]
 ]);
 /** The salopettes' seat (under the jacket's hem), to the crotch. */
@@ -246,29 +248,39 @@ const SEAT_P = profile([
 ]);
 /** A trouser leg (salopettes), centred on the hip joint: thigh to an ankle cuff wide enough to go over a sea boot. */
 const LEG_P = profile([
-  [0.0, 0.094, 0.096, 0.1, 0.004],
-  [-0.12, 0.09, 0.094, 0.096, 0.004],
-  [-0.25, 0.08, 0.084, 0.084, 0.002],
-  [-0.36, 0.068, 0.072, 0.07, 0.0],
-  [-0.43, 0.064, 0.074, 0.064, -0.002], // the knee, the kneecap's bulge in front
-  [-0.52, 0.064, 0.066, 0.07, 0.004], // the calf
-  [-0.62, 0.062, 0.063, 0.066, 0.004],
-  [-0.7, 0.065, 0.066, 0.068, 0.004],
-  [-0.74, 0.067, 0.068, 0.07, 0.004]
+  [0.0, 0.082, 0.088, 0.098, 0.006, 2, -0.002], // (under the jacket's hem, merging into the seat)
+  [-0.08, 0.087, 0.094, 0.098, 0.002, 2, 0.0],
+  [-0.18, 0.09, 0.093, 0.09, -0.004, 2, 0.004], // the thigh, fuller in front (the quadriceps), angling in to the knee
+  [-0.28, 0.08, 0.084, 0.078, -0.006, 2, -0.001],
+  [-0.36, 0.068, 0.073, 0.066, -0.004, 2, -0.005],
+  [-0.43, 0.062, 0.072, 0.061, -0.002, 2.2, -0.007], // the knee, the kneecap in front (salopettes: room to bend)
+  [-0.48, 0.061, 0.064, 0.067, 0.003, 2, -0.006],
+  [-0.54, 0.065, 0.061, 0.075, 0.008, 2, -0.004], // the calf, swelling behind and outward
+  [-0.61, 0.06, 0.059, 0.066, 0.006, 2, -0.002], // narrowing toward the ankle
+  [-0.67, 0.058, 0.06, 0.064, 0.005, 2, -0.001], // (over the boot's shaft, the cloth bunching a little)
+  [-0.72, 0.061, 0.063, 0.067, 0.004, 2, 0.0],
+  [-0.745, 0.064, 0.066, 0.07, 0.004, 2, 0.0]
 ]);
 /** A sleeve, centred on the shoulder joint, from inside the jacket's shoulder to a cuff at the wrist. */
 const SLEEVE_P = profile([
-  [0.52, 0.058, 0.062, 0.062],
-  [0.47, 0.066, 0.068, 0.068],
-  [0.4, 0.064, 0.064, 0.066],
-  [0.3, 0.059, 0.058, 0.06],
-  [0.22, 0.055, 0.054, 0.058],
-  [0.17, 0.053, 0.053, 0.06, 0.003], // the elbow (its point behind)
-  [0.08, 0.051, 0.05, 0.052],
-  [0.0, 0.048, 0.047, 0.048],
-  [-0.05, 0.046, 0.045, 0.046],
-  [-0.075, 0.047, 0.046, 0.047]
+  [0.47, 0.066, 0.066, 0.068, 0, 2, 0],
+  [0.42, 0.067, 0.065, 0.066, 0, 2, 0.005], // the deltoid, round over the shoulder's point
+  [0.36, 0.061, 0.061, 0.062, -0.002, 2, 0.003],
+  [0.29, 0.057, 0.06, 0.058, -0.004, 2, 0.0], // the biceps, in front
+  [0.22, 0.053, 0.054, 0.056, 0.0, 2, -0.001],
+  [0.17, 0.05, 0.051, 0.059, 0.004, 2, -0.002], // the elbow, its point behind
+  [0.12, 0.054, 0.055, 0.054, -0.002, 2, -0.001], // the forearm's swell below it
+  [0.05, 0.051, 0.051, 0.05, -0.003, 2, 0],
+  [-0.02, 0.046, 0.047, 0.046, -0.004, 2, 0], // narrowing to the wrist (the sleeve still loose)
+  [-0.06, 0.045, 0.046, 0.045, -0.004, 2, 0],
+  [-0.075, 0.048, 0.049, 0.048, -0.004, 2, 0] // the cuff, over the glove
 ]);
+/** Cloth hanging loose: a ring's points pushed out in a few soft folds (amplitude `a`, `k` folds round). */
+const drape = (r: V3[], a: number, k: number, ph: number) => {
+  if (a <= 0) return r;
+  const c = r.reduce((s2, q) => s2.add(q), V(0, 0, 0)).multiplyScalar(1 / r.length);
+  return r.map((q, j) => { const th = (j / r.length) * Math.PI * 2, d = V(q.x - c.x, 0, q.z - c.z).normalize(); return q.addScaledVector(d, a * (0.5 + 0.5 * Math.sin(k * th + ph)) * (0.7 + 0.3 * Math.sin(2.3 * k * th + 2 * ph))); });
+};
 
 /** Skin weights. The torso: the hips' bone below the waist, the spine's above, blended over the waist. */
 const wTorso = (p: V3): W => blend(HIPS, SPINE, ss(0.02, 0.22, p.y));
@@ -294,37 +306,38 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
   const HY = BONE.headY; // the head bone's height on the spine
   const TAU = Math.PI * 2;
   const rings = (P: (y: number) => Row, ys: number[], n: number, d = 0, ox = 0, oz = 0, th0 = 0, th1 = TAU, open = false) =>
-    ys.map(y => around(n, th0, th1, open).map(th => onRow(P(y), th, d, ox, oz, g, g)));
-  const ring = (r: Row, n: number, d = 0, ox = 0) => around(n).map(th => onRow(r, th, d, ox, 0, g, g));
+    ys.map(y => { const r = P(y); return around(n, th0, th1, open).map(th => onRow(r, th, d, ox + Math.sign(ox) * (r[6] ?? 0) * g, oz, g, g)); });
+  // (a limb's section centre moves out or in a little from its bone, by the profile's 7th number: + away from the body)
+  const ring = (r: Row, n: number, d = 0, ox = 0) => around(n).map(th => onRow(r, th, d, ox + Math.sign(ox) * (r[6] ?? 0) * g, 0, g, g));
 
   // ——— the salopettes: seat, legs (reinforced at the knees and seat), ankle cuffs over the boots
   loft(M, rings(SEAT_P, [0.12, 0.04, -0.02, -0.05, -0.08, -0.1, -0.115, -0.128, -0.137], 20), { mat: kit.pants, w: () => [[HIPS, 1]], capEnd: true });
   for (const i of [0, 1]) {
     const xs = i ? 1 : -1, cx = xs * hx;
-    const ys = [0.0, -0.1, -0.2, -0.3, -0.37, -0.43, -0.49, -0.56, -0.64, -0.71, -0.74];
-    const leg = rings(LEG_P, ys, 14, 0, cx);
+    const ys = [0.0, -0.08, -0.18, -0.28, -0.36, -0.43, -0.48, -0.54, -0.6, -0.64, -0.675, -0.705, -0.73, -0.745];
+    const leg = rings(LEG_P, ys, 14, 0, cx).map((r, k) => drape(r, 0.0035 * ss(-0.58, -0.745, ys[k]) * (0.6 + 0.4 * Math.sin(ys[k] * 95)), 4, 1.3 + i + 3 * ys[k])); // (bunched folds above the boot)
     // (the cuff turns in: its inside, in shade)
-    leg.push(ring(LEG_P(-0.74), 14, -0.008, cx).map(q => q.setY(-0.745)), ring(LEG_P(-0.7), 14, -0.012, cx));
+    leg.push(drape(ring(LEG_P(-0.745), 14, -0.008, cx), 0.004, 4, 1.3 + i).map(q => q.setY(-0.75)), ring(LEG_P(-0.7), 14, -0.012, cx));
     loft(M, leg, { mat: kit.pants, w: wLeg(i), shade: (_q, r) => r >= ys.length ? 0.4 : 1 });
     loft(M, rings(LEG_P, [-0.35, -0.39, -0.43, -0.47, -0.51], 7, 0.004, cx, 0, FRONT - 0.95, FRONT + 0.95, true), { mat: kit.patch, w: wLeg(i), wrap: false }); // the knee's patch
     // ——— the sea boots: a shaft up under the trousers, the foot, a sole with a little lip
-    loft(M, [-0.66, -0.76, -0.84, -0.875].map(y => ring([y, 0.05, 0.056, 0.058, 0.006, 2.2], 12, 0, cx)), { mat: kit.boots, w: () => [[KN[i], 1]] });
+    loft(M, [-0.66, -0.76, -0.84, -0.875].map(y => ring([y, 0.046, 0.051, 0.054, 0.006, 2.2], 12, 0, cx)), { mat: kit.boots, w: () => [[KN[i], 1]] });
     const foot: [z: number, rx: number, yt: number, yb: number, yc: number][] = [
       [0.078, 0.03, 0.028, 0.028, -0.886], [0.064, 0.044, 0.052, 0.036, -0.884], [0.02, 0.049, 0.06, 0.04, -0.882], [-0.05, 0.052, 0.042, 0.034, -0.89],
       [-0.12, 0.052, 0.03, 0.031, -0.894], [-0.175, 0.046, 0.023, 0.028, -0.897], [-0.205, 0.033, 0.017, 0.024, -0.899], [-0.215, 0.014, 0.01, 0.016, -0.9]
     ];
     const fx = cx + xs * 0.006;
-    loft(M, foot.map(f => around(12).map(th => { const c = Math.cos(th), sn = Math.sin(th); return V(fx + f[1] * spow(c, 0.8), f[4] + (sn > 0 ? f[2] : f[3]) * spow(sn, 0.8), f[0]); })), { mat: kit.boots, w: () => [[KN[i], 1]], capStart: true, capEnd: true });
+    loft(M, foot.map(f => around(10).map(th => { const c = Math.cos(th), sn = Math.sin(th); return V(fx + f[1] * spow(c, 0.8), f[4] + (sn > 0 ? f[2] : f[3]) * spow(sn, 0.8), f[0]); })), { mat: kit.boots, w: () => [[KN[i], 1]], capStart: true, capEnd: true });
     const sole = [[0.082, 0.032], [0.06, 0.05], [0.0, 0.054], [-0.1, 0.058], [-0.17, 0.052], [-0.205, 0.038], [-0.219, 0.018]];
-    loft(M, sole.map(([z, rx]) => around(12).map(th => V(fx + rx * spow(Math.cos(th), 0.6), -0.917 + 0.011 * spow(Math.sin(th), 0.6), z))), { mat: kit.sole, w: () => [[KN[i], 1]], capStart: true, capEnd: true });
+    loft(M, sole.map(([z, rx]) => around(10).map(th => V(fx + rx * spow(Math.cos(th), 0.6), -0.917 + 0.011 * spow(Math.sin(th), 0.6), z))), { mat: kit.sole, w: () => [[KN[i], 1]], capStart: true, capEnd: true });
   }
 
   // ——— the jacket: a drawcord band at the hem, the body, the shoulders in a darker reinforcement, a collar zipped to
   // the chin with a reflective band, sleeves, cuffs, the zip's storm flap
   {
-    const ys = [-0.105, -0.095, -0.075, -0.03, 0.02, 0.08, 0.16, 0.24, 0.31, 0.37, 0.4, 0.43, 0.455, 0.48, 0.5, 0.52, 0.54];
-    const body = rings(JACKET_P, ys, 24);
-    body.unshift(ring(JACKET_P(-0.1), 24, -0.01).map(q => q.setY(-0.08))); // (the hem turned up inside)
+    const ys = [-0.105, -0.095, -0.075, -0.03, 0.02, 0.08, 0.16, 0.25, 0.32, 0.38, 0.4, 0.425, 0.455, 0.48, 0.503, 0.523, 0.54];
+    const body = rings(JACKET_P, ys, 24).map((r, k) => drape(r, 0.006 * ss(0.03, -0.1, ys[k]), 5, 0.7));
+    body.unshift(drape(ring(JACKET_P(-0.1), 24, -0.01), 0.006, 5, 0.7).map(q => q.setY(-0.08))); // (the hem turned up inside)
     loftParts(M, body, [[0, kit.trim], [3, kit.jacket], [11, kit.yoke]], { w: wTorso, shade: (_q, r) => r === 0 ? 0.45 : 1 });
   }
   const collarTop = (th: number) => 0.62 + 0.026 * Math.max(0, Math.sin(th)) + 0.012 * (1 - Math.abs(Math.sin(th))); // (front .612, sides .624, back .646)
@@ -344,10 +357,10 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
   for (const i of [0, 1]) {
     const xs = i ? 1 : -1, cx = xs * sx;
     // the sleeve: its head a dome set in under the jacket's shoulder, leaning in toward the neck
-    const sy = [0.4, 0.34, 0.27, 0.21, 0.17, 0.13, 0.06, -0.01, -0.06, -0.078];
-    const top: [y: number, shift: number, k: number][] = [[0.487, 0.05, 0.4], [0.475, 0.026, 0.74], [0.455, 0.008, 0.94], [0.43, 0, 1]];
-    const sl = [...top.map(([y, sh, k]) => around(14).map(th => onRow(SLEEVE_P(Math.min(0.47, y)), th, 0, cx - xs * sh * g, 0, g * k, g * k).setY(y))), ...rings(SLEEVE_P, sy, 14, 0, cx)];
-    sl.push(ring(SLEEVE_P(-0.075), 14, -0.01, cx).map(q => q.setY(-0.08)));
+    const sy = [0.4, 0.36, 0.29, 0.22, 0.17, 0.12, 0.05, -0.02, -0.06, -0.078];
+    const top: [y: number, shift: number, k: number][] = [[0.478, 0.052, 0.4], [0.466, 0.027, 0.74], [0.448, 0.008, 0.94], [0.425, 0, 1]];
+    const sl = [...top.map(([y, sh, k]) => around(14).map(th => onRow(SLEEVE_P(Math.min(0.47, y)), th, 0, cx - xs * sh * g, 0, g * k, g * k).setY(y))), ...rings(SLEEVE_P, sy, 14, 0, cx).map((r, k) => drape(r, 0.003 * ss(0.05, -0.078, sy[k]), 3, 0.4 + i))];
+    sl.push(drape(ring(SLEEVE_P(-0.075), 14, -0.01, cx), 0.003, 3, 0.4 + i).map(q => q.setY(-0.08)));
     loftParts(M, sl, [[0, kit.yoke], [3, kit.jacket]], { w: wArm(i), capStart: true, shade: (_q, r) => r >= sl.length - 1 ? 0.4 : 1 });
     loft(M, rings(SLEEVE_P, [0.25, 0.21, 0.17, 0.13, 0.09], 7, 0.003, cx, 0, Math.PI / 2 - 0.9, Math.PI / 2 + 0.9, true), { mat: kit.yoke, w: wArm(i), wrap: false }); // the elbow's patch
     // the inner cuff (neoprene, at the wrist) and the outer cuff's tab
@@ -378,7 +391,7 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
       box(M, V(xs * 0.084 * g, 0.39, -0.143 * g), V(0.012, 0.02, 0.004), kit.pfdTrim, [[SPINE, 1]], xs * -0.5); // the cover's tab
     }
     // the harness's waist belt and its buckle
-    sweep(M, around(28).map(th => onRow(JACKET_P(0.19), th, 0.003, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.02, b: () => 0.004, out: q => V(q.x, 0, q.z), closed: true, n: 4, sq: 4 });
+    sweep(M, around(20).map(th => onRow(JACKET_P(0.19), th, 0.003, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.02, b: () => 0.004, out: q => V(q.x, 0, q.z), closed: true, n: 4, sq: 4 });
     box(M, V(0, 0.19, (JACKET_P(0.19)[4]! - JACKET_P(0.19)[2]) * g - 0.009), V(0.022, 0.018, 0.006), { c: 0x6c7076, r: 0.3 }, [[SPINE, 1]]);
   } else {
     // a foam vest: front and back panels over the jacket, narrowed to straps over the shoulders and round the arms
@@ -393,7 +406,7 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
     for (const xs of [-1, 1]) loft(M, [0.11, 0.18, 0.26, 0.33].map(y => around(6, xs > 0 ? -0.55 : Math.PI - 0.55, xs > 0 ? 0.55 : Math.PI + 0.55, true).map(th => onRow(vrow(y), th, 0.003, 0, 0, g, g))), { mat: kit.pfdTrim, w: wTorso, wrap: false });
     sweep(M, range(0.1, 0.5, 8).map(y => onRow(vrow(y), FRONT, 0, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.008, b: () => 0.003, out: () => V(0, 0, -1), n: 4, sq: 4 });
     const yb = 0.15;
-    sweep(M, around(28).map(th => onRow(vrow(yb), th, 0.003, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.013, b: () => 0.003, out: q => V(q.x, 0, q.z), closed: true, n: 4, sq: 4 });
+    sweep(M, around(20).map(th => onRow(vrow(yb), th, 0.003, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.013, b: () => 0.003, out: q => V(q.x, 0, q.z), closed: true, n: 4, sq: 4 });
     box(M, V(0, yb, (vrow(yb)[4]! - vrow(yb)[2]) * g - 0.008), V(0.02, 0.014, 0.006), { c: 0x6c7076, r: 0.3 }, [[SPINE, 1]]);
     for (const xs of [-1, 1]) box(M, V(xs * 0.075 * g, 0.4, (vrow(0.4)[4]! - vrow(0.4)[2]) * g - 0.003), V(0.022, 0.009, 0.003), kit.tape, [[SPINE, 1]], xs * -0.4);
   }
@@ -412,7 +425,7 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
   const hth = Array.from({ length: 26 }, (_, k) => FRONT + Math.PI * spow(2 * k / 26 - 1, 1.7));
   loft(M, hy.map(y => hth.map(th => { const q = headAt(y, th), n = nose(y, th); q.x += n * Math.cos(th); q.z += n * Math.sin(th); return up(q); })), { mat: skin, w: wHead, capEnd: true });
   // the ears
-  for (const xs of [-1, 1]) blob(M, V(xs * 0.076, HY + 0.124, 0.006), V(0.01, 0.027, 0.017), skin, [[HEAD, 1]], 8, 5, new THREE.Euler(0, xs * 0.3, 0));
+  if (kit.head !== 'hood') for (const xs of [-1, 1]) blob(M, V(xs * 0.076, HY + 0.124, 0.006), V(0.01, 0.027, 0.017), skin, [[HEAD, 1]], 8, 5, new THREE.Euler(0, xs * 0.3, 0));
   // the sunglasses: a wraparound lens standing off the face, a frame along its top, arms back over the ears
   {
     const half = 1.02, cols = around(17, FRONT - half, FRONT + half, true);
@@ -423,7 +436,7 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
     // (one closed strip: the front face bottom to top, over the top edge, down the back; the front lighter where it
     // reflects the sky)
     loft(M, [...front, ...back.reverse()], { mat: kit.lens, w: () => [[HEAD, 1]], wrap: false, shade: (_q, r) => r < 3 ? 0.55 + 0.75 * r / 2 : 0.35 });
-    sweep(M, cols.map(th => lensPt(th, 1.05, 0.0155)), { mat: kit.frame, w: () => [[HEAD, 1]], a: () => 0.0035, b: () => 0.0028, out: q => V(q.x, 0, q.z), n: 6, lift: 0 });
+    sweep(M, cols.map(th => lensPt(th, 1.05, 0.0155)), { mat: kit.frame, w: () => [[HEAD, 1]], a: () => 0.0035, b: () => 0.0028, out: q => V(q.x, 0, q.z), n: 4, lift: 0 });
     for (const xs of [-1, 1]) {
       const arm = [lensPt(FRONT + xs * half, 0.85, 0.0155), up(headAt(0.15, FRONT + xs * 1.3, 0.008)), up(headAt(0.146, FRONT + xs * 1.62, 0.006)), up(headAt(0.142, FRONT + xs * 1.95, 0.008))];
       sweep(M, arm, { mat: kit.frame, w: () => [[HEAD, 1]], a: () => 0.0025, b: () => 0.004, out: () => V(0, 1, 0), n: 4, lift: 0 });
@@ -435,7 +448,7 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
     const band = (th: number) => 0.168 + 0.022 * Math.max(0, -Math.sin(th)) - 0.01 * Math.max(0, Math.sin(th));
     if (hair) loft(M, [0, 0.35, 0.7, 1].map(f => around(14, FRONT + 1.42, FRONT + TAU - 1.42, true).map(th => { const y = lowY(th) + (band(th) + 0.01 - lowY(th)) * f; const q = headAt(y, th, 0.0035 + 0.003 * ss(0, 0.5, f)); q.y = y; return up(q); })), { mat: kit.hair, w: () => [[HEAD, 1]], wrap: false });
     // the crown: fuller than the head, six panels' shape, its band lower behind than in front; a button on top
-    const crown = [0, 0.3, 0.58, 0.8, 0.93, 1].map(f => around(24).map(th => { const y0 = band(th), y = y0 + (0.258 - y0) * f; const q = headAt(Math.min(0.249, y), th, 0.008 + 0.006 * Math.sin(Math.PI * f)); q.y = y + 0.004 * f; if (f === 1) { q.x *= 0.15; q.z *= 0.15; } return up(q); }));
+    const crown = [0, 0.3, 0.58, 0.8, 0.93, 1].map(f => around(hair ? 24 : 16).map(th => { const y0 = band(th), y = y0 + (0.258 - y0) * f; const q = headAt(Math.min(0.249, y), th, 0.008 + 0.006 * Math.sin(Math.PI * f)); q.y = y + 0.004 * f; if (f === 1) { q.x *= 0.15; q.z *= 0.15; } return up(q); }));
     loft(M, crown, { mat: kit.hat, w: () => [[HEAD, 1]], capEnd: true });
     blob(M, up(V(0, 0.263, 0.0)), V(0.009, 0.004, 0.009), kit.hat, [[HEAD, 1]], 6, 4);
     // the peak: 7 cm forward of the band, curved down at its sides, a few mm thick, darker beneath
@@ -455,7 +468,7 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
     const crown = [0, 0.22, 0.44, 0.62, 0.76, 0.87, 0.94, 0.98].map(f => around(24).map(th => { const y0 = band(th) + 0.042, y = y0 + (0.264 - y0) * f; const slouch = 0.007 * Math.max(0, Math.sin(th)) * Math.sin(Math.PI * Math.min(1, f * 1.1)); const q = headAt(Math.min(0.24, y), th, 0.009 + slouch + 0.003 * Math.sin(Math.PI * f)); q.y = y; const k = 1 - 0.75 * ss(0.8, 1, f); q.x *= k; q.z *= k; return up(q); }));
     loft(M, crown, { mat: kit.hat, w: () => [[HEAD, 1]], capEnd: true });
     // the cuff: ribbed knit (in the geometry), a little thicker, its fold rounded over at the top
-    const cuffRing = (f: number, d: number, rib = 1) => around(48).map(th => { const y = band(th) + 0.044 * f; const q = headAt(y, th, d + rib * 0.0012 * Math.cos(24 * th)); q.y = y; return up(q); });
+    const cuffRing = (f: number, d: number, rib = 1) => around(40).map(th => { const y = band(th) + 0.044 * f; const q = headAt(y, th, d + rib * 0.0012 * Math.cos(20 * th)); q.y = y; return up(q); });
     loft(M, [cuffRing(0, 0.004, 0), cuffRing(0.08, 0.011), cuffRing(0.5, 0.0125), cuffRing(0.92, 0.012), cuffRing(1.0, 0.008, 0)], { mat: kit.hat, w: () => [[HEAD, 1]], shade: (_q, r) => r === 0 ? 0.75 : 1 });
     { const q = up(headAt(band(FRONT) + 0.022, FRONT, 0.0135)); q.y = HY + band(FRONT) + 0.022; box(M, q, V(0.01, 0.0055, 0.0015), { c: 0x6a665f, r: 0.9 }, [[HEAD, 1]]); } // a small woven label
     loft(M, [0.07, 0.09, 0.12].map(y => around(10, FRONT + 2.1, FRONT + TAU - 2.1, true).map(th => up(headAt(y, th, 0.0035)))), { mat: kit.hair, w: () => [[HEAD, 1]], wrap: false }); // hair at the nape
@@ -464,15 +477,18 @@ export function buildArtBody(p: Person, kit: Kit, _seed = 1): Body & { tris: num
     // slices across the hood front to back, each an arch over the head from inside the collar on one side round to
     // inside it on the other; its lip turned in, the inside in shade
     cap(false);
-    const C = 0.13; // (its centre's height in the head's frame)
-    const sl: [z: number, rx: number, ry: number, yc: number][] = [
-      [-0.07, 0.088, 0.096, C - 0.004], [-0.086, 0.098, 0.11, C], [-0.066, 0.108, 0.13, C + 0.002], [-0.015, 0.114, 0.143, C + 0.002], [0.045, 0.112, 0.143, C - 0.002],
-      [0.095, 0.1, 0.13, C - 0.01], [0.135, 0.08, 0.106, C - 0.022], [0.16, 0.05, 0.07, C - 0.034], [0.172, 0.014, 0.024, C - 0.04]
-    ];
-    const BOT = 0.05, PH = 2.62; // (the hood's lower edge inside the collar all round)
-    const arch = (q: number[]) => range(-PH, PH, 21).map(ph => { const c = Math.cos(ph), ry = c > 0 ? q[2] : Math.max(0.01, q[3] - BOT) / -Math.cos(PH); const lo = c > 0 ? 0 : Math.pow(-c / -Math.cos(PH), 1.3), rx = q[1] + (0.085 - q[1]) * lo, z = q[0] > 0.05 ? q[0] - (q[0] - 0.05) * Math.pow(lo, 1.2) : q[0]; return up(V(rx * Math.sin(ph) * g, q[3] + ry * c, z - 0.004)); });
-    // (below the head, the back of the hood curls under to its seam at the collar's back)
-    loft(M, sl.map(arch), { mat: kit.jacket, w: (q: V3) => blend(SPINE, HEAD, ss(HY + 0.03, HY + 0.09, q.y)), wrap: false, capEnd: true, shade: (_q, r) => r === 0 ? 0.4 : 1 });
+    // the hood: rings round the head 2 cm out (fuller behind, where it's cut for the head's back and a cap), from inside
+    // the collar (zipped up over it, so no edge of the hood shows below) up over the crown; the face's opening an oval
+    // from the chin to the brow, its edge rolled over the drawcord
+    const hood = (y: number, th: number) => { const back = Math.max(0, Math.sin(th)); const q = headAt(Math.min(0.245, Math.max(-0.03, y)), th, 0.02 + 0.012 * back * ss(0.02, 0.15, y)); q.y = y; return q; };
+    const OY = 0.132, OH = 0.083, OA = 0.98; // (the opening: its middle's height, half its height, half its width round the head)
+    const open = (y: number) => { const t = (y - OY) / OH; return Math.abs(t) >= 1 ? 0 : OA * Math.sqrt(1 - t * t); };
+    const hy2 = [-0.015, 0.02, 0.04, 0.052, 0.065, 0.085, 0.11, 0.135, 0.16, 0.185, 0.205, 0.22, 0.235, 0.25, 0.262, 0.27];
+    const hr = hy2.map(y => { const a = open(y), r = around(21, FRONT + a, FRONT + Math.PI * 2 - a, true).map(th => { const q = hood(y, th); if (y > 0.25) { const k = 1 - 0.8 * ss(0.25, 0.272, y); q.x *= k; q.z *= k; } return up(q); }); return r; });
+    loft(M, hr, { mat: kit.jacket, w: (q: V3) => blend(SPINE, HEAD, ss(HY + 0.03, HY + 0.09, q.y)), wrap: false, capEnd: true });
+    // the rolled edge round the opening
+    const edge = range(0, 1, 23).map(t => { const ang = Math.PI * 2 * t - Math.PI / 2, y = OY + OH * Math.sin(ang) * 0.985, side = Math.cos(ang) >= 0 ? 1 : -1, a = Math.max(0.04, open(y)); return up(hood(y, FRONT + side * a)); });
+    sweep(M, edge, { mat: kit.jacket, w: () => [[HEAD, 1]], a: () => 0.008, b: () => 0.006, out: q => V(q.x, 0, q.z - 0.02), closed: true, n: 4, lift: 0.3 });
     for (const xs of [-1, 1]) blob(M, up(V(xs * 0.05, 0.048, -0.106)), V(0.006, 0.011, 0.006), kit.trim, [[SPINE, 1]], 6, 4); // the drawcord's toggles
   }
 
