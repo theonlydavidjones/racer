@@ -166,7 +166,7 @@ function kneelOne(x: number, z: number, yaw: number, front: number, hands: [THRE
   const hip = V(x, g + 0.47 * k, z);
   const feet = [0, 1].map(j => j === front
     ? onGround(hip.clone().addScaledVector(f, 0.36 * k).addScaledVector(r, (j ? 1 : -1) * 0.13 * k))
-    : keepOnSole(hip.clone().addScaledVector(f, -0.4 * k).addScaledVector(r, (j ? 1 : -1) * 0.1 * k)).setY(g + 0.07)) as [THREE.Vector3, THREE.Vector3];
+    : (g < SEAT_Y - 0.05 ? keepOnSole : (q: THREE.Vector3) => q)(hip.clone().addScaledVector(f, -0.4 * k).addScaledVector(r, (j ? 1 : -1) * 0.1 * k)).setY(g + 0.07)) as [THREE.Vector3, THREE.Vector3]; // (kneeling on the sole, the knee stays on it; on a lid, on the lid)
   return { hip, yaw, pitch: -0.2, roll: 0, feet, hands, look: lookAt.clone() };
 }
 /** Up in a crouch, a slight bend at the waist and the knees, under the boom (the middle crew tacking the main). */
@@ -233,9 +233,11 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // (the jib hand forward by the winches, the main hand aft by the thwart, clear of each other)
     const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.1, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
-      const ws = -windward, w = winchAt(ws);
-      const yaw = ws * 0.5, hold = V(px + ws * 0.15, ground(px, zz) + 0.75 * k, zz - 0.3);
-      return kneelOne(px, zz, yaw, ws > 0 ? 1 : 0, ws > 0 ? [hold, w] : [w, hold], k, w);
+      // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
+      // within arm's reach of it, the sheet in the inboard hand)
+      const ws = -windward, w = winchAt(ws), wz = w.z + 0.1, bx = ws * (chz(wz) - 0.15);
+      const yaw = -ws * 0.15, hold = V(bx - ws * 0.12, SEAT_Y + 0.6 * k, wz - 0.25);
+      return kneelOne(bx, wz, yaw, ws > 0 ? 1 : 0, ws > 0 ? [hold, w] : [w, hold], k, w);
     }
     const sheet = V(px * 0.4, 0.9, THWART.z - 0.08);
     return crouch(px, zz, 0, [sheet.clone().add(V(-0.07, 0.05, 0)), sheet.clone().add(V(0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, -1)));
