@@ -363,6 +363,8 @@ interface Lines {
  * against the deck's and coaming's known widths: an estimate, within a centimetre.
  */
 const CABIN_Z0 = -L / 2 + CABIN.u0 * L, CABIN_Z1 = -L / 2 + CABIN.u1 * L;
+/** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
+const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 /** The jib winch's height, base to the top of its drum's cap. */
 const WINCH_H = 0.123;
 /** Bare teak weathered silver-tan, as Josephine's toerail and hiking rail are (the owner's photos): not varnished. */
@@ -546,10 +548,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const legX = [a.x - side * 0.03, b2.x + side * 0.03];
     for (const x of legX) {
       const u = uAtZ(zm), y = cabinTopAt(u, x), slope = (cabinTopAt(u, x + 0.01) - cabinTopAt(u, x - 0.01)) / 0.02;
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.01, len), STEEL); m.rotation.z = Math.atan(slope); m.position.set(x, y + 0.004, zm); grp.add(m);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.007, len), TRACK_ALU); m.rotation.z = Math.atan(slope); m.position.set(x, y + 0.004, zm); grp.add(m);
     }
     { const yi = cabinTopAt(uAtZ(zm), legX[0]), yo = cabinTopAt(uAtZ(zm), legX[1]), dx = legX[1] - legX[0], dy = yo - yi;
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx, dy) + 0.03, 0.012, 0.02), STEEL); bar.rotation.z = Math.atan2(dy, dx);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx, dy) + 0.02, 0.008, 0.014), TRACK_ALU); bar.rotation.z = Math.atan2(dy, dx);
       bar.position.set((legX[0] + legX[1]) / 2, (yi + yo) / 2 + 0.022, zm); grp.add(bar); carBars[tk] = bar; }
     const car = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.035, 0.07), BLACK); grp.add(car); cars[tk] = car; // (the car, low on its track, the sheet's block on it)
     const js = line(Array.from({ length: 5 }, () => new THREE.Vector3()), 'jib'); grp.add(js); jibSheets[tk] = js;
