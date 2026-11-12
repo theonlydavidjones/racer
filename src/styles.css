@@ -691,6 +691,7 @@ body.lashed .tg-lash{display:block}
 .tp-crewline:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tp-crewstat{font:600 12px/1.3 var(--f-body);color:var(--text);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tp-crewline.open .tp-crewstat{white-space:normal}
+.tp-crewstat.calling{color:var(--accent)} /* a crew call (ui/crewWords.ts callWords): said aloud, so it stands out */
 .tp-fold{color:var(--muted);transition:transform .15s}
 .tp-crewline.open .tp-fold{transform:rotate(90deg)}
 .tp-wind{font:600 11px/1.2 var(--f-inst);letter-spacing:.04em;color:#7cc4ff}

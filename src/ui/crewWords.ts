@@ -1,4 +1,5 @@
 import type { Boat } from '../boat/boat';
+import { LOA, wrap } from '../core/math';
 
 /** What the crew are doing, in a line for the trim panel: where the weight is, who's away on a job, how they're holding up. */
 const JOB: Record<string, string> = {
@@ -108,4 +109,31 @@ export function setWho(id: string | HTMLElement, yours: boolean, title?: string)
   el.classList.toggle('yours', yours);
   el.querySelectorAll<HTMLButtonElement>('[data-who]').forEach(b => { const on = (b.dataset.who === 'you') === yours; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
   if (title != null) el.title = title;
+}
+
+/**
+ * Your crew's call, as they'd say it (the HUD's crew line shows it while it's live, in place of what they're doing): the
+ * countdown to a puff or lull within the owner's 10 s ("puff in 3, 2, 1", then "puff on!", Sailing World's form, with
+ * Puff Talk's lift or header, how much and how long), or a far call, "wind over there", for where to go (the owner).
+ * Your own sightings aren't called to you: you're the helm. Empty when there's nothing called.
+ */
+export function callWords(u: Boat): string {
+  const c = u.crew, cs = u.calls; if (!c || !cs?.length) return '';
+  const n = c.spec.crew.length, names = n === 2 ? ['Helm', 'Trimmer', 'Bow hand'] : ['Helm', 'Crew'];
+  const age = u.callsAge ?? 0, upwind = Math.abs(u.twa) < 100;
+  const near = cs.find(k => !k.far && k.who > 0 && k.in - age > -2);
+  if (near) {
+    const t = near.in - age, pct = Math.round(Math.abs(near.strength - 1) * 100), puff = near.kind === 'puff';
+    const shift = !upwind || Math.abs(near.lift) < 2 ? [] : [near.lift > 0 ? 'lifting' : 'heading'];
+    const say = t <= 0.5 ? `${puff ? 'Puff' : 'Lull'} on!` : `${puff ? 'Puff' : 'Lull'} in ${Math.ceil(t)}…`;
+    const rest = [...shift, `${pct}% ${puff ? 'more' : 'less'}`, `about ${Math.max(1, Math.round(near.lasts / 5) * 5)} s`];
+    return `${names[near.who]}: “${say} ${rest.join(', ')}”`;
+  }
+  const far = cs.find(k => k.far && k.kind === 'puff' && k.who > 0);
+  if (far) {
+    const rel = wrap(far.bearing - u.h), side = (u.tack === 'S' ? 1 : -1) * rel;
+    const where = Math.abs(rel) < 25 ? 'ahead' : Math.abs(rel) > 150 ? 'astern' : side > 0 ? 'to windward' : 'to leeward';
+    return `${names[far.who]}: “Wind over there, ${where}, ${Math.max(2, Math.round(far.dist / LOA))} lengths”`;
+  }
+  return '';
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { DEFAULT_CREW, newCrew, type Attr, type CrewSpec } from '../src/boat/crewPhys';
 import { CALL_WINDOW, crewLook, sailsHide, spotRange } from '../src/boat/crewEyes';
+import { callWords } from '../src/ui/crewWords';
 import { Puffs } from '../src/environment/wind';
 import { makeRng } from '../src/core/rng';
 import { KT } from '../src/core/math';
@@ -110,4 +111,24 @@ describe('the crew\'s answer to a puff (phase C2)', () => {
       expect(most).toBeGreaterThan(2); // (and it does ease)
     }
   }, 60_000);
+});
+
+describe('your crew\'s calls, in words (the HUD\'s crew line)', () => {
+  const call = (o: Partial<import('../src/boat/crewEyes').PuffCall>) => ({ kind: 'puff', in: 3.2, lasts: 14, strength: 1.2, veer: 5, lift: 5, bearing: 0, dist: 60, who: 2, far: false, id: 1, ...o }) as import('../src/boat/crewEyes').PuffCall;
+  const boat = () => { const b = testBoat({ heading: 315, kt: 5, windFrom: 0, windKt: 12 }); b.crew = newCrew(crewOf({}), 'S'); b.twa = 45; b.callsAge = 0; return b; };
+  it('counts down: "Puff in 4… lifting, 20% more, about 15 s", then "Puff on!"', () => {
+    const b = boat(); b.calls = [call({})];
+    expect(callWords(b)).toBe('Bow hand: “Puff in 4… lifting, 20% more, about 15 s”');
+    b.callsAge = 3; expect(callWords(b)).toMatch(/^Bow hand: “Puff on!/);
+  });
+  it('a lull, a header, and a far call for where the wind is', () => {
+    const b = boat(); b.calls = [call({ kind: 'lull', strength: 0.85, lift: -4 })];
+    expect(callWords(b)).toBe('Bow hand: “Lull in 4… heading, 15% less, about 15 s”');
+    b.calls = [call({ far: true, in: 40, bearing: 330, dist: 300, who: 1 })];
+    expect(callWords(b)).toBe('Trimmer: “Wind over there, ahead, 39 lengths”');
+  });
+  it('your own sightings aren\'t called to you: you\'re the helm', () => {
+    const b = boat(); b.calls = [call({ who: 0 })];
+    expect(callWords(b)).toBe('');
+  });
 });
