@@ -488,9 +488,6 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   for (const z of [0.5, 1.2, 1.9, 2.6]) { const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 4, 10), MAT.dark); tie.rotation.x = Math.PI / 2; tie.position.y = z - 1.55; mainFurl.add(tie); } // (along the cylinder's own axis)
   const jibBag = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshLambertMaterial({ color: 0x2c3e66 })); jibBag.scale.set(0.2, 0.12, 0.45);
   jibBag.position.set(-0.05, deckY(uAtZ(-2.9), 0.05) + 0.1, -2.9); jibBag.visible = false; grp.add(jibBag);
-  // a narrow tag in her colour on the main's leech, to tell the boats apart (a sim marker, not a fitting): lit like the
-  // sail, so it goes dark with it at night rather than glowing
-  const band = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.5), new THREE.MeshLambertMaterial({ color: b.color, side: THREE.DoubleSide })); band.position.set(0, BOOM_TOP + 0.79 * P, 0.6); boomPivot.add(band);
   const mainsheet = line([TRAVELLER, TRAVELLER]); grp.add(mainsheet);
   const lines = buildLines(grp, boomPivot);
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
