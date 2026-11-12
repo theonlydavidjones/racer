@@ -1005,12 +1005,33 @@ export function apparent(from: number, windKt: number, h: number, v: number, swa
  * VT(10 m)·ln(z/z0)/ln(10/z0) with z0 = 0.005 m (eq. 7.1): 4.3 m up, 89% of it. And heeled, the mast plane leans
  * away from the wind across the boat: only that component is reduced, by cos φ (eqs. 7.2–7.3). `heelDeg` signed, either way.
  */
-const GRADIENT = Math.log(CE_ABOVE_WL / 0.005) / Math.log(10 / 0.005);
+/** The true wind at `z` m over the water as a share of the 10 m wind: the log profile, z0 = 0.005 m (eq. 7.1). */
+export const gradientAt = (z: number) => Math.log(Math.max(z, 0.05) / 0.005) / Math.log(10 / 0.005);
+const GRADIENT = gradientAt(CE_ABOVE_WL);
 export function sailWind(from: number, windKt: number, h: number, v: number, sway = 0, heelDeg = 0): { aws: number; arel: number; awa: number } {
-  const vt = windKt * KT * GRADIENT, rel = wrap(from - h) * D2R, c = Math.cos(heelDeg * D2R);
+  return windAtZ(from, windKt, h, v, GRADIENT, sway, heelDeg);
+}
+/** The apparent wind where the true wind is `g` of the 10 m wind (sailWind's working, at any height). */
+function windAtZ(from: number, windKt: number, h: number, v: number, g: number, sway = 0, heelDeg = 0): { aws: number; arel: number; awa: number } {
+  const vt = windKt * KT * g, rel = wrap(from - h) * D2R, c = Math.cos(heelDeg * D2R);
   const along = vt * Math.cos(rel) + v, across = vt * Math.sin(rel) * c + sway; // (+: air coming from ahead / from starboard)
   const arel = Math.atan2(across, along) / D2R;
   return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
+}
+/**
+ * The wind she feels at `z` m above the water (the midair wind indicator, render/windLadder.ts):
+ * - tw: the true wind there (the wind over the water, as instruments call true: kt, from the log profile);
+ * - air: the apparent wind there as the air actually moves past her, level: true wind less her own motion (her speed
+ *   and slip, and the rig's sway at that height: the roll moves the mast faster higher up). True minus her velocity is
+ *   this, so the indicator's arrows close the wind triangle;
+ * - aw: the apparent wind's speed and angle as the sim measures it for the sails (sailWind in her course's frame, the
+ *   heeled mast's plane), so the label's angle is the one on the HUD and the windex.
+ * `from`: the bearing each comes from (deg).
+ */
+export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; air: { kt: number; from: number }; aw: { kt: number; awa: number } } {
+  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0), across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
+  const level = windAtZ(ww.from, ww.kt, h, along, g, across, 0), plane = windAtZ(ww.from, ww.kt, h, along, g, across, b.heel ?? 0);
+  return { tw: { kt: ww.kt * g, from: ww.from }, air: { kt: level.aws / KT, from: n360(h + level.arel) }, aw: { kt: plane.aws / KT, awa: plane.awa } };
 }
 
 /** Her slip to leeward on the tack she's on (deg; her course is that much further off the wind than her heading). Just

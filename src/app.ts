@@ -31,6 +31,7 @@ import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { SailBand } from './ui/sailBand';
+import { WindLadder } from './render/windLadder';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
@@ -427,6 +428,20 @@ function chaseFrame(): void {
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
+/* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
+ * beside her at three heights, off unless you turn it on (the Wind button, or its key), and remembered. */
+const ladder = new WindLadder(); ladder.grp.visible = false; view.scene.add(ladder.grp);
+function windShow(on: boolean): void {
+  S.windLadder = on; saveSettings(S);
+  $('bWind').classList.toggle('on', on); $('bWind').setAttribute('aria-pressed', String(on));
+}
+$('bWind').onclick = () => windShow(!S.windLadder);
+windShow(!!S.windLadder);
+/** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
+function windTick(): void {
+  const on = !!S.windLadder && w.running && !w.user.docked;
+  ladder.grp.visible = on; if (on) ladder.update(w.user);
+}
 openLines((S.band ?? 1) === 1);
 /* The trim coach, as a teacher (boat/coach.ts): the one thing that matters now, why, and what to look at on the boat;
  * when you fix it, it says so. Its headline sits in the trim panel and, when there's something new to say, shows on
@@ -755,7 +770,7 @@ function keysHint(): void {
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
-    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
+    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot'], ['bWind', 'Wind indicator: the true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' centre and the masthead', 'windLadder']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
   $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off';
 }
@@ -840,6 +855,7 @@ addEventListener('keydown', e => {
     case 'viewChase': setView(1); break;
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
+    case 'windLadder': windShow(!S.windLadder); break;
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
     case 'recentre': recentre(); break;
@@ -1388,7 +1404,7 @@ function frame(now: number): void {
   }
   for (const e of w.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
