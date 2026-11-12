@@ -5,6 +5,7 @@
  *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n? })  then lab.sail(seconds)
  *   lab.tack()  (starts a tack; then lab.sail(s) in small steps to see the crossing)
  *   lab.cam(yawDeg, pitchDeg, dist, [x, y, z] boat-frame target)  (yaw 0: from dead astern; 90: from starboard)
+ *   lab.mesh()  (the boat's mesh, its crew figures in .crew: for finding which part of whom is where)
  */
 import '../../../src/render/three-setup';
 import * as THREE from 'three';
@@ -71,7 +72,7 @@ const lab = {
   cam(yaw: number, pitch: number, dist: number, at?: number[]) { cam = { yaw, pitch, dist, at: at ?? cam.at }; render(); },
   /** Night (a moonless sky's faint light, as the game's night: render/scene.ts) or day. */
   night(on: boolean) { hemi.intensity = (on ? 0.12 : 0.85) * Math.PI; sun.intensity = (on ? 0.05 : 0.75) * Math.PI; scene.background = new THREE.Color(on ? 0x0b1220 : 0x9cc3dc); (sea.material as THREE.MeshLambertMaterial).color.set(on ? 0x0a1a24 : 0x2f6f8f); render(); },
-  boat: () => b,
+  boat: () => b, mesh: () => m,
   info: () => (document.getElementById('i') as HTMLElement).textContent,
   calls: () => renderer.info.render.calls
 };

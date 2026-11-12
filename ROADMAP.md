@@ -6,7 +6,7 @@
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
   (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
   yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
-  sternway; the end tie's push-off doesn't allow for the wind setting her back onto the dock (2–4 h).
+  sternway; ~~the end tie's push-off doesn't allow for the wind setting her back onto the dock~~ (done: her bow's pushed off to close-hauled, away from the dock; a boat set sideways now stops against a dock or the shore instead of passing through).
 - ~~**The sea inside the marinas**~~ (done, bay-east-7: the swell diffracts through each entrance by the exact gap solution, scripts/make-gap-diffraction.py, the Penney & Price problem the Shore Protection Manual draws for B/L 0.5–5; the fetch is traced finely just outside a marina as well as inside, every 2° by one, and blended between its 10 m nodes;
   swell running past an entrance bends round its breakwater head by Sommerfeld's half-plane solution; over a swell's
   spread of directions, Mitsuyasu/Goda s 75. Left out, from review: the basin's own walls reflecting the waves (Gashouse
@@ -92,6 +92,9 @@ What's planned, roughly in order. Done work is described in the README.
    the RRS, so this is the owner's reading); a finished boat races on until she has cleared the line (Definitions, Racing).
    Follow-ups: AI boats don't yet hail at a boat obstruction (only the user can); 23.2 can't yet tell a boat that bore
    away below her proper course to blanket.
+   Rule 21.1 widened (branch rules-21-1): any boat sailing back to start, latched until her hull is below the line;
+   Rule 15 grace when she gets back. Noticed in review, not fixed: a not-started AI boat beyond an end of the line at the
+   gun (not OCS) aims for a point on the course side and never starts (ai.ts, the !b.started branch).
 7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
    far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
    a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
@@ -102,8 +105,7 @@ What's planned, roughly in order. Done work is described in the README.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by; 23.2
    catches a boat that bore away well below her proper course (20°+) onto the wind of a boat on another leg.
-   Later (from review): properTwa (world.ts) ignores the current, so a boat crabbing across a strong tide can read as
-   above or below her proper course (Rule 17, 23.2); make it current-aware.
+   ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
 7. The debrief shown on the replay (3–5 h).
 8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
@@ -156,8 +158,12 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
    slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
    chart data; the crew-trim model's traveller (boat/controls.ts puts it to leeward in medium air: found in review).
-   Also from review: check the brief's leg times against the sim's own fleet sailing the same legs (an observed day's
-   long beat was planned at 38 min, the AI took 47–71); list a max flood or ebb already under way at the window's edges;
+   Also from review: ~~check the brief's leg times against the sim's own fleet sailing the same legs~~ (done, PR #111:
+   with four AI boats on Seaweed Soup course 2 and the training course, the 38 vs 47–71 gap is gone since the AI's held
+   tacks; runs and reaches match the plan or the fleet is a little faster; beats take 5–20% longer, the plan being a
+   perfect sail at 8 s a tack; the first beat and the leg after the first mark are slowest, from traffic and penalties
+   at the first rounding; the whole race 47 min planned, about 50 sailed; tests/sim-fleet.test.ts holds the brief to
+   the fleet, and the brief will say upwind times are for a perfect sail); list a max flood or ebb already under way at the window's edges;
    the tide predictions stop about 6 h after the gun (tide.ts stationsFor), so later passages see it frozen; and the
    gusts: Fort Point's records show peak gusts of 2–5 × the 6-minute mean on light, puffy days, while the sim's puffs
    stop near +45%, so the brief states the sim's gusts. Whether the puffs should reach the records' peaks is for the

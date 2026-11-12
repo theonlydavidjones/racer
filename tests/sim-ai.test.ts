@@ -32,13 +32,15 @@ describe('the AI sails the boat as a sailor does', () => {
         // head to wind (within 10°) for more than 6 s
         const h2w = b.twa < 10 ? (stuck.get(b.id) ?? 0) + DT : 0; stuck.set(b.id, h2w);
         if (h2w > 6 && h2w - DT <= 6) stalls.push(`${b.name} t${w.t.toFixed(0)}`);
-        // on the run (leg 1, the mark well downwind), her mean angle
+        // on the run (leg 1, the mark well downwind), her mean angle: all of it, so a boat held on the wrong gybe, or
+        // reaching in from 30° past the layline, shows (physics review)
         if (b.leg === 1 && b.twa > 120) { const r = run.get(b.id) ?? { s: 0, n: 0 }; r.s += b.twa; r.n++; run.set(b.id, r); }
       }
     }
     expect(late).toEqual([]);
     expect(stalls).toEqual([]);
-    for (const [, r] of run) expect(Math.abs(r.s / r.n - runAngle(12))).toBeLessThan(6);
+    // (every boat: one that never ran at all is a fault too)
+    for (const b of ai) { const r = run.get(b.id) ?? { s: 0, n: 0 }; expect(r.n, b.name).toBeGreaterThan(3000); expect(Math.abs(r.s / r.n - runAngle(12)), b.name).toBeLessThan(6); }
   }, 120000);
   it('she keeps clear of the committee boat and the pin: no touches of a starting mark before she has started (two minutes after the gun)', () => {
     for (const kt of [8, 12]) {
@@ -50,6 +52,28 @@ describe('the AI sails the boat as a sailor does', () => {
       expect([...touches]).toEqual([]);
     }
   }, 120000);
+  it('running across a current she gybes when the other gybe lays the mark, not back and forth across dead downwind', async () => {
+    // (a 1.5 kt current setting 350° across the run home, about 080: steered up-current, her course through the water is
+    // within a few degrees of dead downwind. Decided by the bearing she steered it as a reach and gybed every few
+    // seconds, 51 times in the fleet at this seed: physics review. Uniform presets added here only, for the test)
+    const { CURRENTS } = await import('../src/environment/current');
+    CURRENTS.testCross = { id: 'testCross', set: 350, kt: 1.5, label: '', button: '' };
+    const w = race(12, 'testCross', 72), ai = w.boats.filter(b => !b.isUser), last = new Map<number, { tack: string; t: number }>();
+    let quick = 0;
+    while (w.t < 1500 && !ai.every(b => b.finished)) {
+      w.step(DT);
+      if (w.t < 0) continue;
+      for (const b of ai) {
+        if (!b.started || b.finished || b.penalty > 0) continue;
+        const L = last.get(b.id);
+        if (L && L.tack !== b.tack && b.twa > 100 && w.t - L.t < 15) quick++;
+        if (!L || L.tack !== b.tack) last.set(b.id, { tack: b.tack, t: w.t });
+      }
+    }
+    delete CURRENTS.testCross;
+    expect(ai.every(b => b.finished)).toBe(true);
+    expect(quick).toBeLessThanOrEqual(10); // (5 as it stands, the five boats over the race)
+  }, 180000);
   it("close-hauled she steers her leeway above the beat angle, so her course through the water is the polar's beat", () => {
     const w = race(12), beat = beatAngle(12);
     let s = 0, n = 0;

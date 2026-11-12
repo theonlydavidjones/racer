@@ -68,12 +68,6 @@ body{
 #situ .rule{font:700 12px/1 var(--f-inst);letter-spacing:.08em;color:var(--muted);white-space:nowrap;text-transform:uppercase}
 #situ.alarm{animation:pulse .7s ease-in-out infinite alternate}
 @keyframes pulse{to{background:rgba(120,24,18,.9)}}
-#linebox{position:fixed;top:calc(env(safe-area-inset-top,0px) + 236px);left:50%;transform:translateX(-50%);
-  font:600 13px/1.2 var(--f-inst);letter-spacing:.04em;font-variant-numeric:tabular-nums;color:var(--text);
-  background:var(--pod);border:1px solid var(--rule);border-radius:999px;padding:5px 12px;white-space:nowrap;pointer-events:none;
-  max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
-#linebox.over{color:#fff;background:rgba(160,30,20,.9);border-color:var(--giveway)}
-#linebox .fav{color:var(--accent)}
 
 /* messages: in the left column (under the signals, above the trim panel), clear of the boat; all of them stay in the log */
 #toast{position:fixed;left:16px;top:calc(env(safe-area-inset-top,0px) + 300px);background:var(--pod-solid);border:1px solid var(--accent);
@@ -298,7 +292,6 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
   #map{width:200px;height:250px;top:calc(env(safe-area-inset-top,0px) + 82px)}
   #mapHint{width:200px;top:calc(env(safe-area-inset-top,0px) + 338px)}
   #situ{top:calc(env(safe-area-inset-top,0px) + 126px)}
-  #linebox{top:calc(env(safe-area-inset-top,0px) + 184px)}
 }
 @media (max-width:759px){ .keys{display:none} }
 @media (prefers-reduced-motion:reduce){ #situ.alarm{animation:none;background:rgba(120,24,18,.9)} #toast{transition:none} }
@@ -371,10 +364,6 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
   background:var(--pod);border:1px solid var(--rule);border-radius:6px;pointer-events:none}
 
 /* the transit hint, under the line box */
-#transit{position:fixed;top:calc(env(safe-area-inset-top,0px) + 266px);left:50%;transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));
-  background:var(--pod);border:1px solid var(--rule);border-radius:14px;padding:3px 12px;font-size:11.5px;color:var(--muted);pointer-events:none;text-align:center}
-#transit b{color:var(--text);font-weight:600}
-#transit .on{color:#3fd197}
 
 .coach-acts{margin:4px 0 6px;padding:0;list-style:none}
 .coach-acts li{display:flex;align-items:baseline;gap:8px;font-size:15px;font-weight:600;padding:4px 0;border-bottom:1px solid var(--rule)}
@@ -772,7 +761,21 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sailband.off{opacity:.55}
 .sailband button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 .sailband button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
-.sb-tabs{position:absolute;right:10px;top:-22px;display:flex;gap:4px}
+.sb-edge{position:absolute;left:10px;right:10px;top:-22px;height:22px;display:flex;align-items:flex-end;gap:6px;pointer-events:none}
+.sb-ltabs,.sb-tabs{display:flex;gap:4px;flex:none;pointer-events:auto}
+.sb-tabs{margin-left:auto}
+.sb-tillerslot{flex:0 1 360px;min-width:0;margin:0 auto;display:flex;gap:4px;height:22px;pointer-events:auto}
+.sb-tillerslot:empty{display:none}
+/* the tiller strip on the band's top edge (the UI session, 12 Nov): drag it, or hold it with the keys */
+.sb-tillerslot .tiller{flex:1 1 auto;height:22px;border-radius:7px 7px 0 0;border-bottom:0;background:rgba(9,22,33,.86)}
+.sb-tillerslot .tiller-track{height:2px;margin-top:-1px}
+.sb-tillerslot .tiller-mid{top:4px;bottom:4px}
+.sb-tillerslot .tiller-handle{top:3px;bottom:3px;width:12px;margin-left:-6px;border-radius:4px}
+.sb-tillerslot .tiller-lab{left:50%;bottom:auto;top:6px;transform:translateX(-50%);font-size:8.5px;opacity:.75}
+.sb-tillerslot #bPilot{height:22px;min-width:0;padding:0 8px;border-radius:7px 7px 0 0;flex-direction:row;gap:5px;font:700 10px/1 var(--f-inst)}
+.sb-tillerslot #bPilot svg{width:12px;height:12px}
+.sb-tillerslot #pilot{position:absolute;right:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3}
+.sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
 .sb-tab[hidden]{display:none}
@@ -780,10 +783,10 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-pole{color:var(--text)!important}
 .sb-pole.mine{color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
-.sb-hail{position:absolute;left:10px;top:-22px;background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
+.sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
 .sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}
 .sb-hail .k{font-size:9.5px;border:1px solid rgba(26,18,5,.5);border-radius:3px;padding:1px 3px}
-.sb-pen{position:absolute;left:50%;top:-22px;transform:translateX(-50%);color:var(--accent)!important;cursor:default}
+.sb-pen{color:var(--accent)!important;cursor:default}
 /* the windex between the two vangs: looking up at the masthead */
 .sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}
 .sb-wx svg{width:100%;height:100%;display:block}
@@ -851,3 +854,127 @@ body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 .sb-jwant[hidden],.sb-jideal[hidden]{display:none}
 /* (the messages stop above the band while it is open) */
 body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
+
+/* ---------- the chase-view layout (the owner, 12 Nov 2026; design/chase-layout.html): the dials in the top corners,
+   the middle ~40% of the screen kept clear for the rig ---------- */
+#hud{right:auto;max-width:none;margin:0;display:flex;gap:6px;align-items:flex-start}
+#hud .pod{width:96px}
+#hud .pod.clock{width:104px}
+#hudRight{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:6px;align-items:flex-start;pointer-events:none}
+#hudRight .pod{width:96px}
+#hudRight #appBar{position:static;pointer-events:auto}
+/* the heading pod: her heading over a tape 50° either side (true wind blue, the next mark yellow) */
+#hud .pod.hdg{width:206px;height:auto;min-height:58px}
+.pod.hdg .val{text-align:left;font-size:20px!important;line-height:1.05}
+#hdgLift{letter-spacing:.06em}
+#hdgLift.lift{color:var(--row)} #hdgLift.head{color:var(--giveway)}
+#compassTape{position:static;transform:none;width:100%;height:26px;background:none;border:0;border-radius:0;display:block;margin-top:1px}
+/* the inset chart: a circle, top right under the pods */
+#map{width:210px!important;height:210px!important;top:calc(env(safe-area-inset-top,0px) + 76px)!important;border-radius:50%;border:0;box-shadow:0 0 0 2px rgba(150,196,218,.35)}
+#mapHint{width:210px!important;top:calc(env(safe-area-inset-top,0px) + 292px)!important}
+.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 178px)!important}
+#mapBar{top:calc(env(safe-area-inset-top,0px) + 76px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 222px)}
+/* the flags tile: the flags flying now; click for the flag index */
+#sigPanel{top:calc(env(safe-area-inset-top,0px) + 172px);width:auto;min-width:120px;max-width:240px;pointer-events:auto;cursor:pointer;text-align:left;font:inherit;font-size:11px;color:var(--muted);display:block}
+#sigPanel:hover,#sigPanel:focus-visible{border-color:var(--accent)}
+#sigPanel .sig-lab,#sigPanel #sigText{display:block}
+#sigPanel #sigFlags{display:flex}
+#sigFlags canvas{width:54px;height:36px}
+#flagIndex{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 76px);transform:translateX(-50%);width:min(500px,calc(100vw - 32px));max-height:calc(100vh - 120px);overflow:auto;z-index:20;
+  background:#0f2130;border:1px solid var(--rule);border-radius:10px;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.5);color:var(--text);font-size:12.5px;line-height:1.4}
+#flagIndex h3{font:700 13px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+#flagIndex h4{font:600 10px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+#flagIndex .fi-x{position:absolute;right:10px;top:8px;background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer}
+.fi-row{display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:start;padding:6px 0;border-top:1px solid var(--rule)}
+.fi-row canvas{width:54px;height:36px;display:block;border-radius:1px}
+.fi-row b{font-family:var(--f-inst);letter-spacing:.04em}
+.fi-row.now{background:rgba(255,182,39,.08);border-radius:6px;padding:6px}
+.fi-now{display:inline-block;margin-left:6px;font:700 9px/1 var(--f-inst);letter-spacing:.1em;color:#1a1205;background:var(--accent);padding:2px 4px;border-radius:3px}
+.fi-pens{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.fi-pens div{display:flex;flex-direction:column;align-items:center;gap:3px;font:700 11px/1 var(--f-inst)}
+.fi-pens canvas{width:44px;height:22px}
+body.showroom #hudRight,body.showroom #flagIndex{visibility:hidden}
+/* top left, under the pods: the "where next" card, the flags tile, the wind-angle dial (a training aid) */
+#leftCol{position:fixed;top:calc(env(safe-area-inset-top,0px) + 84px);left:max(16px,env(safe-area-inset-left,0px));width:240px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;pointer-events:none}
+#leftCol #sigPanel,#leftCol #dial{position:static}
+#nextCard{width:240px;box-sizing:border-box;background:var(--pod);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;line-height:1.35}
+#nextCard[hidden]{display:none}
+.nc-h{font:600 9.5px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.nc-row{display:flex;align-items:center;gap:8px}
+.nc-num{font:700 26px/1 var(--f-inst);font-variant-numeric:tabular-nums;min-width:60px}
+.nc-num span{font-size:11px;color:var(--muted);margin-left:2px}
+#ncSketch{width:150px;height:46px;flex:none;display:block}
+.nc-sub{font:600 10px/1.3 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.nc-sub .fav{color:var(--accent)} .nc-sub small{font-size:10px;text-transform:none;letter-spacing:0}
+.nc-tr{text-transform:none;letter-spacing:0;font:12px/1.3 var(--f-body)}
+.nc-tr b{color:var(--text);font-weight:600} .nc-tr .on{color:#3fd197}
+#nextCard.ocs{border-color:#ff5d4c;box-shadow:inset 0 0 0 1px #ff5d4c}
+#nextCard.ocs .nc-h,#nextCard.ocs .nc-num{color:#ff5d4c}
+body.showroom #leftCol{visibility:hidden}
+/* the situation (who keeps clear, under which rule): in the left column, under the card */
+#leftCol #situ{position:static;transform:none;width:240px;box-sizing:border-box;flex-wrap:wrap;gap:4px 8px;pointer-events:none}
+#leftCol #situ .msg{font-size:13px}
+/* bottom left: the Coach card (the trim panel, now: what the coach says, how the sails are drawing, heel and helm) */
+#trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)!important;width:240px;box-sizing:border-box;padding:8px 10px;border-left:3px solid var(--accent);gap:3px}
+#trimPanel .tp-head{display:flex;justify-content:space-between;gap:8px}
+#trimPanel .tp-head .tp-lab{width:auto}
+#trimPanel #tpWho{font:600 10px/1.2 var(--f-inst);letter-spacing:.04em;color:var(--muted);text-align:right}
+#trimPanel .tp-row{min-height:0}
+#trimPanel .tp-states .tp-lab{width:auto}
+#trimPanel .tp-states .tp-state{min-width:0;margin-right:8px}
+#trimPanel .tp-hint{max-width:none}
+#trimPanel #tpShape,#trimPanel #tpMore{display:none}
+#trimPanel .tp-btnrow .tp-more{font-size:11px}
+#coachPanel{left:calc(max(16px,env(safe-area-inset-left,0px)) + 252px);bottom:calc(env(safe-area-inset-bottom,0px) + 72px)}
+#coachTip{left:max(16px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 250px);transform:translate(0,8px);max-width:240px;font-size:13px;box-sizing:border-box}
+#coachTip.on{transform:none}
+/* bottom right: the Messages card (the latest two; All opens the log), the Crew and View buttons under it */
+#msgLog{top:auto!important;bottom:calc(env(safe-area-inset-bottom,0px) + 72px);width:240px;max-height:none!important;box-sizing:border-box}
+#msgRecent li:nth-child(n+3){display:none}
+#toast{left:auto;right:max(16px,env(safe-area-inset-right,0px));top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 250px);max-width:240px;box-sizing:border-box}
+#crewPop{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 72px);width:min(440px,calc(100vw - 32px));box-sizing:border-box;
+  background:var(--pod);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;z-index:8;pointer-events:auto}
+#crewPop[hidden]{display:none}
+body.showroom #crewPop{visibility:hidden}
+.ib.mine .w{color:var(--accent)}
+#msgRecent li{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+#msgRecent li:nth-child(n+3){display:none}
+#toast{bottom:calc(env(safe-area-inset-bottom,0px) + 200px)}
+#crewPop{background:var(--pod-solid);box-shadow:0 8px 30px rgba(0,0,0,.45)}
+/* a new message, lit for a moment as it arrives (toast(): the Messages card's newest line) */
+#toast{display:none!important}
+@keyframes msgflash{0%,60%{background:rgba(255,182,39,.28);box-shadow:0 0 0 4px rgba(255,182,39,.28)}100%{background:transparent;box-shadow:none}}
+#msgRecent li.flash{animation:msgflash 2s ease-out;border-radius:3px}
+#coachTip{display:none!important}
+#trimPanel .tp-hint.flash{animation:msgflash 2s ease-out}
+/* the Coach card: the sails' states join the second line (good plain; luffing amber, stalled or aback red) */
+#trimPanel .tp-states{display:none}
+#trimPanel .tp-balance{font-size:11px;line-height:1.35}
+.tp-st.good{color:var(--text)} .tp-st.luffing{color:var(--caution)} .tp-st.stalled{color:var(--giveway)} .tp-st.backed{color:var(--giveway)} .tp-st.off{color:var(--muted)}
+/* the situation: a strip on top of the Coach card (the UI session, 12 Nov) */
+#trimPanel #situ{position:static;transform:none;width:auto;margin:-8px -10px 4px -10px;border-radius:7px 7px 0 0;box-sizing:border-box;flex-wrap:wrap;gap:4px 8px}
+#trimPanel #situ .msg{font-size:13px}
+/* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
+.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
+#mapHint{display:none}
+/* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
+#sigPanel #sigText{display:none}
+/* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */
+.sailband{left:calc(50% - 330px)!important}
+/* the Coach card: no header text (the Auto-trim tab says who trims) */
+#trimPanel #tpWho{display:none}
+/* the where-next card: the big number, the sketch and one short line; the transit is its hover text */
+#nextCard #transit{display:none}
+/* the flag index stops above the band (its tab row included), scrolling inside, so the band stays usable */
+#flagIndex{max-height:calc(100vh - 76px - 250px)}
+/* one line a message (the owner, 12 Nov 2026): the headline, the whole text in the log; ▸ when there's more */
+#msgRecent li{display:block!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+#msgRecent li:nth-child(n+3){display:none!important}
+#msgRecent li.cut::after{content:' ▸';color:var(--accent)}
+/* the flag index, the Race Signals page: "over" signals stacked, the sounds, the rule in plain words under the meaning */
+.fi-pic{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.fi-pic canvas{width:54px;height:auto;display:block}
+.fi-snd{font:700 11px/1 var(--f-inst);letter-spacing:.06em;color:var(--muted);margin-left:6px;white-space:nowrap}
+.fi-more{color:var(--muted);font-size:11.5px;margin-top:3px}
+.fi-race{background:var(--row)!important}
+.fi-intro{color:var(--muted);font-size:11.5px;margin:0 0 4px}

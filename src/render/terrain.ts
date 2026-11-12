@@ -4,7 +4,7 @@ import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
 import { limePointBox, limePointLand, onGround } from '../geo/shore';
-import { chartCoast } from './shoreFit';
+import { CHART_PIERS, chartCoast } from './shoreFit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { inBasin } from '../geo/marina';
 
@@ -196,6 +196,13 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       const g = new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -2, 0); rk.push(g);
     }
     if (rk.length) scene.add(new THREE.Mesh(mergeGeometries(rk), new THREE.MeshLambertMaterial({ color: 0x6f675c }))); // (dark wet rock)
+    // the piers on piles the chart draws as land (render/shoreFit.ts CHART_PIERS): a deck 3 m up, as the Wharf's
+    const pd: THREE.BufferGeometry[] = [];
+    for (const P of CHART_PIERS) {
+      const sh = new THREE.Shape(); P.pts.forEach((q, i) => i ? sh.lineTo(q.x, q.y) : sh.moveTo(q.x, q.y));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -1, 0); pd.push(g);
+    }
+    if (pd.length) scene.add(new THREE.Mesh(mergeGeometries(pd), new THREE.MeshLambertMaterial({ color: 0x9c958a }))); // (weathered concrete and timber, render/wharf.ts)
   }
   // a marina's basin is water, whatever the 50 m grid says (South Beach and the Corinthian are outside the fitted shore)
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {

@@ -67,6 +67,70 @@ describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
     expect(w.startReport).not.toBeNull();
   });
 
+  it('Rule 21.1: after the gun, not started and on the course side, sailing back toward the line she is returning; sailing away she is not', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y);
+    w.t = 30; place(w, 15, toCourse + 180); w.user.v = 2; w.user.luff = false; // above the line, heading back down to it
+    w.step(DT); w.step(DT);
+    expect(w.user.started).toBe(false);
+    expect(w.user.returning).toBe(true);
+    const w2 = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    w2.t = 30; place(w2, 15, toCourse); w2.user.v = 2; w2.user.luff = false; w2.step(DT); w2.step(DT); // above it, sailing away
+    expect(w2.user.returning).toBe(false);
+    place(w, -10, toCourse + 180); w.user.v = 2; w.step(DT); // hull completely below the line: done
+    expect(w.user.returning).toBe(false);
+  });
+
+  it('Rule 21.1 holds once she is coming back: slowing or luffing on the way gives her no rights back; sailing away for 2 s does', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y), u = w.user;
+    w.t = 30; place(w, 20, toCourse + 180); u.v = 2; u.luff = false;
+    w.step(DT); w.step(DT);
+    expect(u.returning).toBe(true);
+    u.h = toCourse + 95; u.v = 0.1; w.step(DT); // luffed head to wind, nearly stopped, still above the line
+    expect(u.returning).toBe(true);
+    u.h = toCourse; u.v = 2;
+    for (let i = 0; i < 60; i++) { u.h = toCourse; u.v = 2; w.step(DT); } // a second sailing away: still latched
+    expect(u.returning).toBe(true);
+    for (let i = 0; i < 90; i++) { u.h = toCourse; u.v = 2; w.step(DT); } // clearly away for over 2 s: released
+    expect(u.returning).toBe(false);
+  });
+
+  it('Rule 21.1 with the I flag (30.1): sailing along the line to round an end, she is returning', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const u = w.user, toPin = brg(w.C.pin.x - w.center.x, w.C.pin.y - w.center.y);
+    w.t = 30; place(w, 6, toPin); u.v = 2; u.luff = false; u.ocs = true; u.roundEnd = true;
+    w.step(DT); w.step(DT);
+    expect(u.returning).toBe(true);
+  });
+
+  it('Definitions, Start: dipping only her bow below the line after the gun and coming back up is not a start; whole hull below, then across, is', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y), u = w.user;
+    // (moves her without forgetting where she was, so the line crossing is seen; her centre is half a length behind her bow)
+    const to = (dBow: number, down = false) => { const k = down ? 1 : -1; u.x = w.center.x + w.N.x * (dBow + k * 3.8); u.y = w.center.y + w.N.y * (dBow + k * 3.8); u.h = down ? toCourse + 180 : toCourse; u.v = 0; u.luff = true; w.step(DT); };
+    w.t = 30; place(w, 6, toCourse); w.step(DT); // on the course side after the gun (not OCS: she wasn't there at the gun)
+    to(2, true); to(-1, true); to(2); // heading down, her bow dips just below (stern still above); she turns and comes up again
+    expect(u.started).toBe(false);
+    to(-1); to(-6); to(-1); to(2); // whole hull below, then across
+    expect(u.started).toBe(true);
+  });
+
+  it('at the gun: bow below but stern still over is OCS (rule 29.1, "any part of her hull"); whole hull below, then across, starts', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y), u = w.user;
+    // heading down to the line, bow 1 m below it and stern 6.6 m above, at the gun
+    w.t = -0.5; u.x = w.center.x + w.N.x * 2.8; u.y = w.center.y + w.N.y * 2.8; u.h = toCourse + 180; u.v = 0; u.luff = true; u.prevD = null;
+    for (let i = 0; i < 60; i++) w.step(DT);
+    expect(u.ocs).toBe(true);
+    const w2 = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1), u2 = w2.user;
+    w2.t = -0.5; u2.x = w2.center.x - w2.N.x * 4.8; u2.y = w2.center.y - w2.N.y * 4.8; u2.h = toCourse; u2.v = 0; u2.luff = true; u2.prevD = null; // bow 1 m below
+    for (let i = 0; i < 60; i++) w2.step(DT);
+    expect(u2.ocs).toBe(false);
+    u2.x += w2.N.x * 3; u2.y += w2.N.y * 3; w2.step(DT); // across
+    expect(u2.started).toBe(true);
+  });
+
   it('behind the line at the gun → not OCS', () => {
     const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
     w.t = -0.5; place(w, -20, brg(w.N.x, w.N.y));

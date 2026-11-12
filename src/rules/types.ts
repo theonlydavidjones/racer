@@ -12,6 +12,12 @@ export interface RulesBoat {
   lastTackT: number; // race time she last passed head to wind
   penalty: number; // degrees of penalty turn still to do
   ocs: boolean; // over early and not yet returned
+  /**
+   * Rule 21.1: after her starting signal, sailing towards the pre-start side of the starting line or one of its
+   * extensions to start (over early, or not yet started: round an end, or above the line at the gun) or to comply with
+   * rule 30.1, with her hull not yet completely on the pre-start side. Omitted: taken as `ocs`.
+   */
+  returning?: boolean;
   started: boolean;
   leg: number; // index of her next mark
   /** The wind she's sailing in (the true wind over the water where she is: her tack is judged from it). Omitted: the
@@ -90,7 +96,7 @@ export interface PairRecord {
   rule: RuleId | null;
   grace: number; // Rule 15 grace lasts until this time
   by: number | null; // id of the boat that just acquired right of way
-  byWhy: 'tack' | 'overlap' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | null;
   cool: number; // no new incident for this pair until this time
   mark: MarkRoomState | null;
   /** Rule 17: id of the boat that became overlapped to leeward from clear astern within two lengths. */
@@ -155,7 +161,7 @@ export interface Incident<B> {
   kind: IncidentKind;
   fouler: B;
   rule: RuleId;
-  byWhy: 'tack' | 'overlap' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | null;
   /** Rule 16.1: how far (deg) the right-of-way boat turned toward the other boat just before. */
   turned?: number;
   /** Rule 20 hail incidents: whether the fouler was the hailed boat (didn't respond) or the hailing boat (didn't tack after the response). */
