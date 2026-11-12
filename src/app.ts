@@ -335,7 +335,19 @@ function openLines(open = !band.open): void {
   document.body.classList.toggle('band-open', open);
   $('tpMore').textContent = open ? 'Sail controls ▾' : 'Sail controls ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
   $('bBand').classList.toggle('on', open); $('bBand').setAttribute('aria-pressed', String(open));
+  requestAnimationFrame(() => chaseFrame());
 }
+/**
+ * The chase camera's frame (render/scene.ts setChaseFrame, design/chase-layout.html): where the sail controls band's top
+ * edge is over the 3D view (its tabs included), or the view's bottom when it's put away. On a change of size, when the
+ * band opens or shuts, and once a second for anything else that moves it.
+ */
+function chaseFrame(): void {
+  const gl = $('gl').getBoundingClientRect(), b = document.getElementById('sailBand'), r = b && !b.hidden ? b.getBoundingClientRect() : null;
+  const tabs = b?.querySelector<HTMLElement>('.sb-tabs')?.getBoundingClientRect();
+  view.setChaseFrame({ top: 0, bottom: r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
+}
+addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 openLines((S.band ?? 1) === 1);
