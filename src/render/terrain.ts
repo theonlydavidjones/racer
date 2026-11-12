@@ -315,6 +315,8 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
     fGeo.setIndex(null);
   }
   const fNrm = fGeo.attributes.normal as THREE.BufferAttribute;
+  // (the build's working lists, let go: the season's colouring keeps this scope alive)
+  fIndex.clear(); fPos.length = 0; fG.length = 0; fPinned.length = 0; fQuads.length = 0;
 
   const C = (h: string) => new THREE.Color(h);
   const PAL = {
