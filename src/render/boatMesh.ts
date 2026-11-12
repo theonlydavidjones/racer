@@ -44,17 +44,24 @@ const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
  *   below the struts (CR 7.60).
  * The mast section is the timber mast's; an aluminium one may be 100–112 mm at the deck and tapers above 5.5–7.0 m
  * (CR 6.2.1, 6.2.3), so its after side, the origin for E, is up to about 1 cm further forward than drawn.
- * Heights "above the deck" are taken from the sheer at the mast. (CR 6.1.7's 2.00 m is a distance, CR 7.21's 0.80 m
+ * Heights "above the deck" are taken from the deck at the mast (DECK_AT_MAST). (CR 6.1.7's 2.00 m is a distance, CR 7.21's 0.80 m
  * horizontal: with the sheer 0.21 m higher at the stay, 2.00 m horizontally is 2.011 m in a straight line, as ORC's J
  * measures it horizontally.)
  */
 const MAST_FRONT_Z = -L / 2 + 0.80 + 2.00, MAST_FA = 0.133, MAST_ATH = 0.110;
 const MAST_Z = MAST_FRONT_Z + MAST_FA / 2, MAST_AFT_Z = MAST_FRONT_Z + MAST_FA;
-const DECK_AT_MAST = sheer(uAtZ(MAST_Z));
+/**
+ * The deck at the mast, on the centreline where the mast goes through it: CR 6.1.11 measures the Lower Mast Point "1000mm
+ * ± 10mm above deck ... taken along the aft side of the mast", so the rig's heights are from here, not from the sheer at
+ * the side (the deck's camber puts it about 4.5 cm higher), at the mast's after side as the rule measures. (The physics'
+ * heights, balance.ts RIG, are ORC's, from its datum, the sheer at the mast: HBI, BAS and IG, ORC VPP Documentation
+ * 2026. The drawing and the physics differ by the deck's camber at the mast.)
+ */
+const DECK_AT_MAST = deckY(uAtZ(MAST_AFT_Z), 0);
 const BAS = 1.0, P = 8.75, E = 3.38, IG = 6.5;
 /** The boom's top (the main's tack and foot), and the masthead. */
 const BOOM_TOP = DECK_AT_MAST + BAS, MAST_TOP = BOOM_TOP + P + 0.28, BOOM_R = 0.045;
-const FORESTAY_DECK = V3(0, sheer(uAtZ(-L / 2 + 0.80)), -L / 2 + 0.80);
+const FORESTAY_DECK = V3(0, deckY(uAtZ(-L / 2 + 0.80), 0), -L / 2 + 0.80); // (on the deck's crown, as the mast)
 /** Where the forestay meets the mast's front (the hounds), and the shrouds its sides. */
 const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
 /**
@@ -648,7 +655,7 @@ const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
 /** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
 const MS_GAP = 0.15;
 /** The vang's lower block: on its fitting at the foot of the mast, abaft it (fixed to the mast: the tackle swings to the boom's block). */
-const VANG_FOOT = new THREE.Vector3(0, sheer(uAtZ(MAST_Z)) + 0.045 + 0.07 + 0.05, MAST_AFT_Z + 0.05);
+const VANG_FOOT = new THREE.Vector3(0, DECK_AT_MAST + 0.07 + 0.05, MAST_AFT_Z + 0.05);
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
