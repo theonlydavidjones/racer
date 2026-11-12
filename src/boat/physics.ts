@@ -10,7 +10,7 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, reactTime, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, attrOf, reactTime, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -547,7 +547,10 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   void rel;
   const skill = specAttr(cs.spec, 'trim'); // (the heel they sail at: their trim)
   const bh = bestHeel ?? crewBestHeel(twa, tws, skill);
-  const need = heelingMoment(F, ceh, bh) - hullRighting(bh, disp, crewMass(cs.spec)) - rmExtra(bh);
+  // (on the call of a puff about to hit, the hikers go out for the wind that's coming, not the wind there is: the sail
+  // force grows as the apparent wind's square)
+  const ahead = calledPuffForce(b);
+  const need = heelingMoment(F * ahead, ceh, bh) - hullRighting(bh, disp, crewMass(cs.spec)) - rmExtra(bh);
   // (the windward side by her tack, which holds through a moment by the lee until the boom crosses)
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
@@ -860,14 +863,60 @@ function trimmerLag(b: Boat, line: 'mainsheet' | 'jibsheet'): number {
   const p = trimmerOf(b, line);
   return p ? CREW_LAG * (reactTime(p) / CLUB_REACT) : CREW_LAG;
 }
+/**
+ * The apparent wind angle a trimmer trims to ahead of a called puff or lull (b.calls, crewEyes.ts): once it's about
+ * their own lag away (and a moment to move the sheet), the wind they'll have in it, from its called strength and turn
+ * on her present speed: a puff draws the apparent wind aft (and a lift frees her), so they ease as it hits, not after;
+ * a lull the other way. Only an imminent call, and only on the wind and reaching; null when there's none.
+ */
+function calledAwa(b: Boat, awa: number, lag: number): number | null {
+  const cs = b.calls; if (!cs || !cs.length || Math.abs(awa) > 120) return null;
+  const age = b.callsAge ?? 0;
+  for (const c of cs) {
+    if (c.far) continue;
+    const inNow = c.in - age;
+    if (inNow <= 0 || inNow > lag + 0.5) continue;
+    const tws = b.ww.kt * KT * c.strength, twa = clamp(Math.abs(b.twa) + c.lift, 0, 180) * D2R, v = b.v;
+    return Math.sign(awa || 1) * Math.atan2(tws * Math.sin(twa), tws * Math.cos(twa) + v) / D2R;
+  }
+  return null;
+}
+/** How much more the sails will push in a puff called to hit in the next two seconds (1: none called, or a lull). */
+function calledPuffForce(b: Boat): number {
+  const cs = b.calls; if (!cs || !cs.length || Math.abs(b.twa) > 120) return 1;
+  const age = b.callsAge ?? 0;
+  for (const c of cs) { const t = c.in - age; if (!c.far && c.kind === 'puff' && t > 0 && t < 2) return c.strength * c.strength; }
+  return 1;
+}
+/**
+ * The main played in a puff: as a gust comes on (the wind on the water above its own last 20 s, b.twsSlow) and heels her
+ * past her best, the main trimmer eases the boom to hold her down, and trims it back as it passes (North Sails' Folkboat
+ * guide: the kicker "keeps the boom down when easing in the gusts"; the usual coaching order: ease as it hits, hike,
+ * trim back as she accelerates). On the wind only. A good trimmer answers within a degree or two of heel, a novice
+ * later and less (margin), at their own lag; about 1.5° of boom a degree of heel, up to 10°, in full once the gust is
+ * a tenth over the average (estimates). The rest follows from the sail forces: less heel and helm, less drive while
+ * it's eased. A steady breeze is the depowering's (depower), not this.
+ */
+function puffEase(b: Boat, dt: number): number {
+  const p = trimmerOf(b, 'mainsheet');
+  if (!p || byHand(b, 'mainsheet') || Math.abs(b.awaSlow) > 70 || b.twsSlow == null) { b.puffEase = 0; return 0; }
+  const gust = clamp((b.ww.kt / Math.max(1, b.twsSlow) - 1) / 0.1, 0, 1), trim = attrOf(p, 'trim');
+  const want = gust * clamp(1.5 * ((b.heelMag ?? 0) - crewBestHeel(Math.abs(b.twa), b.ww.kt, trim) - (1.5 + 3 * (1 - trim))), 0, 10);
+  b.puffEase = (b.puffEase ?? 0) + (want - (b.puffEase ?? 0)) * Math.min(1, dt / trimmerLag(b, 'mainsheet'));
+  return b.puffEase;
+}
 // (the lines the crew works, as constants: trimSails runs every step for every boat)
 const CREW_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const, CREW_LINES_T = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const, FIXABLE_LINES = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
 function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   if (!b.crewReady) b.awaSlow = b.awaMain = b.awaJib = awa; // (set up before she sails: for the wind she has)
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
-  // each sheet's trimmer sees the wind change after their own lag (trimmerLag: a club crew's is CREW_LAG)
-  b.awaMain = (b.awaMain ?? b.awaSlow) + (awa - (b.awaMain ?? b.awaSlow)) * Math.min(1, dt / trimmerLag(b, 'mainsheet'));
-  b.awaJib = (b.awaJib ?? b.awaSlow) + (awa - (b.awaJib ?? b.awaSlow)) * Math.min(1, dt / trimmerLag(b, 'jibsheet'));
+  // each sheet's trimmer sees the wind change after their own lag (trimmerLag: a club crew's is CREW_LAG); on a call of
+  // a puff or a lull about to reach her, they trim ahead of it, to the wind they'll have in it (calledAwa)
+  b.callsAge = (b.callsAge ?? 0) + dt;
+  const lagM = trimmerLag(b, 'mainsheet'), lagJ = trimmerLag(b, 'jibsheet');
+  const toM = calledAwa(b, awa, lagM) ?? awa, toJ = calledAwa(b, awa, lagJ) ?? awa;
+  b.awaMain = (b.awaMain ?? b.awaSlow) + (toM - (b.awaMain ?? b.awaSlow)) * Math.min(1, dt / lagM);
+  b.awaJib = (b.awaJib ?? b.awaSlow) + (toJ - (b.awaJib ?? b.awaSlow)) * Math.min(1, dt / lagJ);
   const c = b.ctl, tws = b.ww.kt;
   // working a line takes that line, and only that line, off the crew
   if (b.isUser) for (const k of [...Object.keys(b.ctlCmd), ...Object.keys(b.ctlTarget ?? {})] as Ctl[]) if (b.ctlCmd[k] || b.ctlTarget?.[k] != null) takeLine(b, k);
@@ -905,7 +954,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const over = !up ? -1 : (b.depower < goal - slack || helmLoad > 6) && maxed ? 1 : b.depower > goal + slack && helmLoad < 6 ? -1 : 0;
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
-  const easeBoom = crewEaseBoom(b);
+  const easeBoom = crewEaseBoom(b) + puffEase(b, dt);
   const wantMain = optimalSheet('main', b.awaMain!) + easeBoom, wantJib = optimalSheet('jib', b.awaJib!);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast

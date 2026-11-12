@@ -13,14 +13,22 @@ const crewOf = (attr: Partial<Record<Attr, number>>): CrewSpec => ({ helm: { ...
 
 /** A boat beating on starboard in 12 kt from the north, and one puff (or lull: amp < 0) `ahead` m upwind of her and
  * `across` m to the west, in her path as she beats north-west. */
-function scene(spec: CrewSpec, amp = 0.25, ahead = 260, across = -70) {
-  const b = testBoat({ heading: 315, kt: 5, windFrom: 0, windKt: 12 }); b.crew = newCrew(spec, 'S');
+function scene(spec: CrewSpec, amp = 0.25, ahead = 260, across = -70, W = 12, look = true) {
+  const b = testBoat({ heading: 315, kt: 5, windFrom: 0, windKt: W }); b.crew = newCrew(spec, 'S');
   const puffs = new Puffs(makeRng(1), { x: b.x, y: b.y }, 3000, 0);
   puffs.cells.push({ x: b.x + across, y: b.y + ahead, r: 90, amp, age: 100, life: 400 });
-  const wind = { from: 0, kt: 12 };
+  const wind = { from: 0, kt: W };
   let t = 0;
-  const log: { t: number; calls: NonNullable<typeof b.calls>; k: number }[] = [];
-  const run = (secs: number) => { for (let s = 0; s < secs; s++) { puffs.step(1, wind); sail(b, 1, () => { b.h = 315; }); t++; crewLook(b, puffs, t); log.push({ t, calls: [...(b.calls ?? [])], k: puffs.at(b).k }); } };
+  const log: { t: number; calls: NonNullable<typeof b.calls>; k: number; boom: number; heel: number }[] = [];
+  // (the puff's wind on her, as the World gives it: windHere's puff factor and veer on the mean)
+  const run = (secs: number) => {
+    for (let s = 0; s < secs; s++) {
+      puffs.step(1, wind);
+      sail(b, 1, () => { b.h = 315; const q = puffs.at(b); b.ww = { from: wind.from + q.veer, kt: wind.kt * q.k }; });
+      t++; if (look) crewLook(b, puffs, t);
+      log.push({ t, calls: [...(b.calls ?? [])], k: puffs.at(b).k, boom: b.sheets.main, heel: b.heelMag ?? 0 });
+    }
+  };
   return { b, puffs, run, log };
 }
 
@@ -71,5 +79,20 @@ describe('the crew\'s eyes and their calls', () => {
     expect(sailsHide(b, 0, -45)).toBe(true); expect(sailsHide(b, 0, 45)).toBe(false);
     b.crew.people[2].x = -0.5; expect(sailsHide(b, 2, -45)).toBe(false);
     void KT;
+  });
+});
+
+describe('the crew\'s answer to a puff (phase C2)', () => {
+  it('on the call, the main is eased as the puff hits, not after: ahead of a crew that didn\'t see it', () => {
+    const saw = scene(crewOf({ eyes: 0.9 })), blind = scene(crewOf({ eyes: 0.9 }), 0.25, 260, -70, 12, false);
+    saw.run(70); blind.run(70);
+    const hit = saw.log.findIndex(e => e.k > 1.05);
+    expect(hit).toBeGreaterThan(5);
+    // (in the second it reaches her, the main that was called is already out further)
+    expect(saw.log[hit].boom).toBeGreaterThan(blind.log[hit].boom + 0.5);
+  });
+  it('in a gust in a breeze a good main trimmer eases to hold her down; a novice lets her heel more', () => {
+    const peak = (trim: number) => { const s = scene(crewOf({ trim, eyes: 0.6 }), 0.3, 260, -70, 17, false); s.run(80); return Math.max(...s.log.map(e => e.heel)); };
+    expect(peak(0.95)).toBeLessThan(peak(0.15) - 0.5);
   });
 });

@@ -145,5 +145,5 @@ export function crewLook(b: Boat, puffs: Puffs, clock: number): void {
   }
   for (const id of seen.keys()) if (!live.has(id)) seen.delete(id);
   calls.sort((p, q) => p.in - q.in);
-  b.calls = calls.slice(0, 6);
+  b.calls = calls.slice(0, 6); b.callsAge = 0;
 }

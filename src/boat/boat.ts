@@ -205,6 +205,10 @@ export interface Boat {
   calls?: PuffCall[];
   /** Puffs someone aboard has seen, and when (for the call's delay). */
   seenPuffs?: Map<number, { t0: number; who: number }>;
+  /** Seconds since the calls were made (physics.ts counts down each call's `in` by it). */
+  callsAge?: number;
+  /** The main's ease for a puff (deg: physics.ts puffEase). */
+  puffEase?: number;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
