@@ -346,7 +346,7 @@ Later: cheating, protests and hearings (8–12 h, as the ROADMAP has it).
 
 1. **Sliders.** Two per row, Level and Mix, for now. Setting each opponent's skipper by hand can come later if it's
    missed.
-2. **Showing skill.** Skippers' attributes are discovered by racing, not shown. A short note on the boat card may come
+2. **Showing skill.** *Changed later the same day:* skippers' ratings are **shown** ("Skippers have reputations that precede them. Make them known."), with no reveal switch, and the gossip stays alongside. *First answer, superseded:* skippers' attributes are discovered by racing, not shown. A short note on the boat card may come
    later.
    - Note: the strategist's "the competition" already describes each AI boat's start dice ("pushes the line hard",
      "underrates the current": sim/strategist.ts). That is close to showing attributes. Should it stay as "what
