@@ -29,6 +29,13 @@ import { NIGHT } from './night';
  * light toward the viewer, long when the light and the eye are low, wider with the wind.
  */
 
+/** The stencil value a boat's surfaces leave where they're drawn, so the lights' reflections on the water stay off her. */
+const BOAT_STENCIL = 1;
+export function markBoat(m: THREE.Material): void {
+  m.stencilWrite = true; m.stencilRef = BOAT_STENCIL; m.stencilFunc = THREE.AlwaysStencilFunc;
+  m.stencilFail = THREE.KeepStencilOp; m.stencilZFail = THREE.KeepStencilOp; m.stencilZPass = THREE.ReplaceStencilOp;
+}
+
 /** How dark it is, whether lights are on (sunset to sunrise) and the sea's slope: shared with the city's lights (night.ts). */
 const DARK = () => NIGHT.uNight.value, ON = () => NIGHT.uOn.value;
 
@@ -56,8 +63,12 @@ export function arcIntensity(arc: Arc | null, b: number): number {
 /** Illuminance at the eye over the night-time threshold, for a light rated for `range` nm seen from `d` m (Annex I §8). */
 export const overThreshold = (range: number, d: number) => { const D = Math.max(0.005, d / NM); return (range / D) ** 2 * Math.pow(0.8, D - range); };
 
-interface Lamp { pos: THREE.Vector3; color: THREE.Color; arc: Arc | null; range: number; glow: THREE.Sprite; streak: THREE.Mesh; seen: number }
-export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: THREE.MeshPhongMaterial[]; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial }
+/** Which of her lights: the sidelights and sternlight (or the tricolour) under way, the all-round white at anchor. */
+type Role = 'underway' | 'anchor';
+/** What she shows (Rules 25 and 30): nothing (in her slip or made fast to a dock, or switched off), under way, at anchor or on a mooring. */
+export type LightsMode = 'off' | 'underway' | 'anchor';
+interface Lamp { pos: THREE.Vector3; color: THREE.Color; arc: Arc | null; range: number; glow: THREE.Sprite; streak: THREE.Mesh; seen: number; role: Role; split: number; spread: number }
+export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: { m: THREE.MeshPhongMaterial; role: Role }[]; fittings: Record<Role, THREE.Group>; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; ports: THREE.MeshPhongMaterial; below?: THREE.MeshLambertMaterial; hatch?: THREE.MeshPhongMaterial }
 
 /** Colours of the lights as the eye sees them (inside Annex I §7's chromaticity areas: a deep red, a blue-green, a warm white). */
 const RED = new THREE.Color(1.0, 0.13, 0.08), GREEN = new THREE.Color(0.1, 1.0, 0.55), WHITE = new THREE.Color(1.0, 0.93, 0.8);
@@ -100,16 +111,20 @@ const X = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vec
 export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; stern: THREE.Vector3; masthead: THREE.Vector3 }, kind: 'deck' | 'tricolour', ports: THREE.MeshPhongMaterial): NavLights {
   const group = new THREE.Group(); group.name = 'navLights'; grp.add(group);
   const housing = new THREE.MeshPhongMaterial({ color: 0x15171a, specular: 0x666666, shininess: 60 });
-  const nl: NavLights = { group, lamps: [], lenses: [], kind, sigma: 0.15, sigmaC: 0.1, ports };
-  const lens = (c: THREE.Color) => { const m = new THREE.MeshPhongMaterial({ color: c.clone().multiplyScalar(0.55), emissive: c.clone(), emissiveIntensity: 0, transparent: true, opacity: 0.9, shininess: 100 }); nl.lenses.push(m); return m; };
-  const lamp = (pos: THREE.Vector3, color: THREE.Color, arc: Arc | null, range: number) => {
+  // the lanterns themselves, a group for each set, always on her: only the light goes on and off
+  const fittings = { underway: new THREE.Group(), anchor: new THREE.Group() }; group.add(fittings.underway, fittings.anchor);
+  const nl: NavLights = { group, lamps: [], lenses: [], fittings, kind, sigma: 0.15, sigmaC: 0.1, ports };
+  let role: Role = 'underway';
+  const lens = (c: THREE.Color) => { const m = new THREE.MeshPhongMaterial({ color: c.clone().multiplyScalar(0.55), emissive: c.clone(), emissiveIntensity: 0, transparent: true, opacity: 0.9, shininess: 100 }); nl.lenses.push({ m, role }); return m; };
+  const lamp = (pos: THREE.Vector3, color: THREE.Color, arc: Arc | null, range: number, split = 0) => {
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, sizeAttenuation: false, fog: false }));
     glow.visible = false; glow.renderOrder = 5; glow.frustumCulled = false;
-    const streak = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: streakTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, side: THREE.DoubleSide }));
-    // (drawn over the sea, whose waves would hide a quad at its mean level; it lies between the light and the eye, so
-    // nothing of hers stands in front of it)
+    const streak = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: streakTexture(), color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, side: THREE.DoubleSide,
+      stencilWrite: true, stencilRef: BOAT_STENCIL, stencilFunc: THREE.NotEqualStencilFunc, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.KeepStencilOp }));
+    // (drawn over the sea, whose waves would hide a quad at its mean level, but not over a boat: the water under her
+    // hull, her cockpit and her deck is out of sight, so where a boat has marked the stencil the streak isn't drawn)
     streak.visible = false; streak.matrixAutoUpdate = false; streak.matrixWorldAutoUpdate = false; streak.renderOrder = 10; streak.frustumCulled = false;
-    const L: Lamp = { pos, color, arc, range, glow, streak, seen: 0 };
+    const L: Lamp = { pos, color, arc, range, glow, streak, seen: 0, role, split, spread: 0 };
     // what the eye sees of the light, worked out for each camera as it draws: the arc, the range, how dark it is
     glow.onBeforeRender = (r, _s, cam) => {
       tmpW.copy(pos).applyMatrix4(grp.matrixWorld); cam.getWorldPosition(tmpE);
@@ -124,13 +139,18 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
       // far off, the depth buffer can't tell a light 1 m up from the waves its line of sight grazes; out there her own
       // hull and sails are smaller than the light's point, so it's drawn over them
       (glow.material as THREE.SpriteMaterial).depthTest = d < 150;
+      // the bicolour's two lenses are 6 cm apart, far less than the points drawn for them: from ahead, where both show,
+      // they'd merge into one yellow-white light. The eye sees a red point and a green one side by side (each lens
+      // screened from the other's side), so each is set out to its own side by most of its point's width on the screen
+      // (one pixel at d is 2d / (p11 · height) m), and its reflection with it
+      L.spread = split ? 0.6 * px * 2 * d / (p11 * size.y) : 0;
       // just in front of the lantern, so its own housing doesn't hide it
-      glow.position.copy(pos).addScaledVector(tmpL.normalize(), 0.08);
+      glow.position.copy(pos).addScaledVector(tmpL.normalize(), 0.08); glow.position.x += split * L.spread;
       glow.updateMatrixWorld();
     };
     // the reflection: the stretch of water whose waves can tilt within ±2σ to mirror the light to the eye
     streak.onBeforeRender = (_r, _s, cam) => {
-      cam.getWorldPosition(tmpE); tmpW.copy(pos).applyMatrix4(grp.matrixWorld);
+      cam.getWorldPosition(tmpE); tmpW.copy(pos); tmpW.x += L.split * L.spread; tmpW.applyMatrix4(grp.matrixWorld);
       const e = L.seen; if (e < 0.02) { (streak.material as THREE.MeshBasicMaterial).opacity = 0; return; }
       const h = Math.max(0.05, tmpW.y), Hc = Math.max(0.3, tmpE.y), dx = tmpE.x - tmpW.x, dz = tmpE.z - tmpW.z, D = Math.hypot(dx, dz);
       // the slope a facet x m from the light toward the eye needs: half the difference of the two depression angles
@@ -149,36 +169,65 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
   };
   if (kind === 'deck') {
     // the bicolour on the stemhead: a small lantern, green lens to starboard, red to port, split by a black screen
-    const b = new THREE.Group(); b.position.copy(at.stem); group.add(b);
+    const b = new THREE.Group(); b.position.copy(at.stem); fittings.underway.add(b);
     b.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.06), housing));
     const g = lens(GREEN), r = lens(RED);
     const lg = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.035, 0.05), g); lg.position.set(0.037, 0, -0.005); b.add(lg);
     const lr = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.035, 0.05), r); lr.position.set(-0.037, 0, -0.005); b.add(lr);
-    lamp(at.stem.clone().add(new THREE.Vector3(0.03, 0, -0.02)), GREEN, ARC.stbd, 1);
-    lamp(at.stem.clone().add(new THREE.Vector3(-0.03, 0, -0.02)), RED, ARC.port, 1);
+    lamp(at.stem.clone().add(new THREE.Vector3(0.03, 0, -0.02)), GREEN, ARC.stbd, 1, 1);
+    lamp(at.stem.clone().add(new THREE.Vector3(-0.03, 0, -0.02)), RED, ARC.port, 1, -1);
     // the sternlight on the transom, a little to port of the rudder head
-    const s = new THREE.Group(); s.position.copy(at.stern); group.add(s);
+    const s = new THREE.Group(); s.position.copy(at.stern); fittings.underway.add(s);
     s.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.035), housing));
     const w = lens(WHITE), lw = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.035, 0.004), w); lw.position.z = 0.019; s.add(lw);
     lamp(at.stern.clone().add(new THREE.Vector3(0, 0, 0.03)), WHITE, ARC.stern, 2);
   } else {
     // the tricolour: one lantern at the masthead, its three sectors from one bulb
-    const t = new THREE.Group(); t.position.copy(at.masthead); group.add(t);
+    const t = new THREE.Group(); t.position.copy(at.masthead); fittings.underway.add(t);
     t.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.08, 12), housing));
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.04, 12), lens(WHITE)); ring.position.y = 0.01; t.add(ring);
     for (const [c, arc] of [[GREEN, ARC.stbd], [RED, ARC.port], [WHITE, ARC.stern]] as const) lamp(at.masthead.clone().add(new THREE.Vector3(0, 0.01, 0)), c, arc, 2);
   }
+  // at anchor or on a mooring: one all-round white light where it can best be seen (Rule 30(b), a vessel under 50 m;
+  // Inland Rule 30 reads alike), seen 2 nm (Rule 22(c), under 12 m): a small all-round lantern at the masthead. (In a
+  // special anchorage such as Richardson Bay, Inland Rule 30(g) excuses a boat under 20 m from it; showing it is allowed.)
+  role = 'anchor';
+  // (on a short bracket aft of the masthead, clear of the windex's post and arrow and of the tricolour)
+  { const a = new THREE.Group(), ap = at.masthead.clone().add(new THREE.Vector3(0, -0.03, 0.1)); a.position.copy(ap); fittings.anchor.add(a);
+    a.add(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.03, 10), housing));
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.04, 10), lens(WHITE)); ring.position.y = 0.035; a.add(ring);
+    lamp(ap.clone().add(new THREE.Vector3(0, 0.035, 0)), WHITE, null, 2); }
   return nl;
 }
 
-/** Each frame: on or off by the clock (and off under engine for the tricolour), the reflections' spread from the sea. */
-export function syncNavLights(nl: NavLights, motoring = false): void {
-  const on = ON() > 0 && !(motoring && nl.kind === 'tricolour');
+/**
+ * Restricted visibility (the conditions set to fog, or heavy rain): the lights are shown by day too (Rule 20(c)).
+ * The summer fog bank at the Gate, which comes and goes by place, isn't counted.
+ */
+let restricted = false;
+export function setRestrictedVisibility(on: boolean): void { restricted = on; }
+
+/**
+ * Each frame: which set is lit, by what she's doing (`mode`), the clock (sunset to sunrise, Rule 20(b)) and the visibility (Rule 20(c)), and the
+ * reflections' spread from the sea. In her slip or made fast to a dock she shows none (the Rules light vessels under
+ * way or at anchor, not ones made fast to the shore), under way the sidelights and sternlight or the tricolour
+ * (Rule 25), at anchor the all-round white (Rule 30). The lanterns stay on her, dark when not lit.
+ */
+export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): void {
+  const dark = ON() > 0 || restricted, lit = (r: Role) => dark && mode === r;
+  // (the lanterns themselves stay on her, lit or not, as on any boat: the owner's call)
+  nl.fittings.underway.visible = nl.fittings.anchor.visible = true;
   // the sea's slopes (Cox & Munk 1954): all directions σ² = 0.003 + 0.00512·U (night.ts, from the true wind); across the
   // wind σ_c² = 0.003 + 0.00192·U (the streak is taken as if seen across the wind)
   nl.sigma = NIGHT.uSlope.value; const U = Math.max(0, (nl.sigma ** 2 - 0.003) / 0.00512); nl.sigmaC = Math.sqrt(0.003 + 0.00192 * U);
-  for (const L of nl.lamps) { L.glow.visible = on; L.streak.visible = on; }
-  for (const m of nl.lenses) m.emissiveIntensity = on ? 1.6 : 0;
+  for (const L of nl.lamps) L.glow.visible = L.streak.visible = lit(L.role);
+  for (const { m, role } of nl.lenses) m.emissiveIntensity = lit(role) ? 1.6 : 0;
+  // (the cabin's lamps are hers to light whatever she's doing: on after dark)
+  const on = dark;
   // the cabin's lamps: a warm 2700 K glow through the ports, brighter as the dusk deepens
-  nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.25 + 0.75 * DARK() : 0;
+  nl.ports.emissive.setRGB(1.0, 0.62, 0.3); nl.ports.emissiveIntensity = on ? 0.15 + 0.55 * DARK() : 0;
+  // and below, seen through the open companionway: the cabin's lamplight on its own woodwork
+  // and dimly through the smoked acrylic of the forehatch, when she has one
+  if (nl.hatch) { nl.hatch.emissive.setRGB(1.0, 0.62, 0.3); nl.hatch.emissiveIntensity = on ? 0.03 + 0.1 * DARK() : 0; }
+  if (nl.below) { nl.below.emissive.setRGB(1.0, 0.62, 0.3); nl.below.emissiveIntensity = on ? 0.15 + 0.55 * DARK() : 0; }
 }

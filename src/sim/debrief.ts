@@ -96,7 +96,7 @@ export class RaceLog {
     this.heel.lost += dt * (1 - heelFactor(u.heelMag ?? 0)); if ((u.heelMag ?? 0) > 22) this.heel.t += dt;
     if ((byHand(u, 'mainsheet') || byHand(u, 'jibsheet')) && !u.luff && !u.hove) this.trim.lost += dt * (1 - Math.sqrt(clamp(trimDrive(u.trim.main, u.trim.jib) * u.shape.eff, 0, 1)));
     // shifts, on a beat: on a header (against the mean wind), the other tack would be lifted
-    const dev = wrap(ww.from - w.avgFrom), headed = u.tack === 'S' ? -dev : dev; // + headed
+    const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), headed = u.tack === 'S' ? -dev : dev; // + headed
     this.liftedAtTack = -headed;
     if (leg === 'beat' && u.twa < 65 && !u.tacking) {
       if (headed > 4) {

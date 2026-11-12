@@ -185,7 +185,7 @@ export class BoatPanel {
         <div class="field"><span>Her flags</span><small id="bpFlagNote">${flagNote(b)}</small></div>
       </section>
       <section><h3>Hull</h3>
-        <div class="field"><span>Built in</span>${seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood (clinker)']], b.hull.material)}
+        <div class="field"><span>Hull</span>${seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood']], b.hull.material)}
           <small>The class weighs wooden and fiberglass Folkboats to the same minimum, so they race as equals.</small></div>
         <div class="field"><span>Topsides · ${name(upperList, b.hull.upper)}</span>${sw('upper', upperList, b.hull.upper)}</div>
         <div class="field"><span>Boot stripe · ${b.hull.stripe ? name(HULL_COLORS, b.hull.stripe) : 'none'}</span>${sw('stripe', HULL_COLORS, b.hull.stripe, 'None')}</div>

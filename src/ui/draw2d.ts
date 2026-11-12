@@ -50,13 +50,21 @@ export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
 }
 
 /** Overlay colours for a light chart (ui/encChart.ts INK.day); left out, the colours for a dark map. */
+/** The sim's overlay lines, px: the maps and the legend (ui/legend.ts) both draw from these. */
+export const PEN = {
+  start: { w: 2, halo: 4.5, dash: [5, 5] },        // the start line
+  layline: { w: 1.8, halo: 4.2, dash: [4, 4] },    // laylines (the maps' width 1.2, + 0.6 over the halo)
+  dest: { w: 1.8, halo: 4, dash: [5, 4] },         // the line to where you're heading
+  ahead: { w: 1.2, dash: [3, 3], alpha: 0.6 }      // where a ship will be in a minute
+};
+
 /** `halo`: a band drawn under each overlay line and round each symbol, so it stands clear of the chart's own print. */
 export interface OverlayInk { mark?: string; markPass?: string; markHi?: string; line?: string; current?: string; lull?: (a: number) => string; lullHatch?: boolean; puff?: (a: number) => string; windTick?: string; halo?: string; edge?: string; starboard?: string; port?: string }
 
 export function drawCourse(ctx: CanvasRenderingContext2D, C: Course, aids: boolean, tf: Tf, scale: number, highlight: number, ink: OverlayInk = {}): void {
   const p1 = tf(C.pin.x, C.pin.y), p2 = tf(C.committee.x, C.committee.y);
-  if (ink.halo) { ctx.strokeStyle = ink.halo; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); } // the start line, clear of the chart
-  ctx.setLineDash([5, 5]); ctx.strokeStyle = ink.line ?? 'rgba(255,216,74,.75)'; ctx.lineWidth = ink.halo ? 2 : 1.5;
+  if (ink.halo) { ctx.strokeStyle = ink.halo; ctx.lineWidth = PEN.start.halo; ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); } // the start line, clear of the chart
+  ctx.setLineDash(PEN.start.dash); ctx.strokeStyle = ink.line ?? 'rgba(255,216,74,.75)'; ctx.lineWidth = ink.halo ? PEN.start.w : 1.5;
   ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); ctx.setLineDash([]);
   const seen = new Set<string>();
   C.marks.forEach((m, i) => {
@@ -103,7 +111,7 @@ export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines 
   const m = L.mark.p, mk = tf(m.x, m.y);
   ctx.save();
   if (ink.halo) { ctx.strokeStyle = ink.halo; ctx.lineWidth = width + 3; L.tracks.forEach(g => { const e = tf(m.x - g.x * len, m.y - g.y * len); ctx.beginPath(); ctx.moveTo(mk[0], mk[1]); ctx.lineTo(e[0], e[1]); ctx.stroke(); }); }
-  ctx.setLineDash([4, 4]); ctx.lineWidth = ink.halo ? width + 0.6 : width;
+  ctx.setLineDash(PEN.layline.dash); ctx.lineWidth = ink.halo ? width + 0.6 : width;
   L.tracks.forEach((g, i) => {
     const e = tf(m.x - g.x * len, m.y - g.y * len);
     ctx.strokeStyle = i === 0 ? ink.starboard ?? 'rgba(63,209,151,.75)' : ink.port ?? 'rgba(255,106,92,.75)';

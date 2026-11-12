@@ -19,6 +19,7 @@ import { REFLECTIVE } from './boatMesh';
 import type { Terrain } from './terrain';
 import { SignalMast } from './flags';
 import { Wakes } from './wake';
+import { setRestrictedVisibility } from './navLights';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
 import { Harbor } from './marina';
@@ -211,13 +212,13 @@ export class SceneView {
   private landMonth = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off
+    const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, stencil: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off; the boats mark the stencil (navLights.ts)
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;
     const SKY = new THREE.Color('#aecbdb');
     scene.background = SKY;
-    scene.fog = new THREE.Fog(SKY, 1500, 70000); // a clear day on the bay: Tamalpais hazy but plain at 25 km
+    scene.fog = new THREE.Fog(SKY, 1500, 57000); // a clear day on the bay: Tamalpais hazy but plain at 25 km
     this.camera.rotation.order = 'YXZ';
     // light intensities ×π: r155+ dropped the legacy light units the prototype was tuned for
     scene.add(this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
@@ -395,7 +396,7 @@ export class SceneView {
     const float = markBody(shape, look);
     float.position.copy(P3(p.x, p.y, 0)); add(float);
     const big = shape === 'lighted' ? 1.6 : 1;
-    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshBasicMaterial({ map: this.wakeTex, transparent: true, depthWrite: false }));
+    const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshLambertMaterial({ map: this.wakeTex, transparent: true, depthWrite: false })); // lit, so it dims after dark like the sea
     wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(p.x, p.y, 0.12)); add(wake);
     this.markObjs.push({ p, float, wake, fixed: shape === 'beacon' });
   }
@@ -540,6 +541,16 @@ export class SceneView {
       g.addColorStop(0, `rgba(${shade},${shade},${shade + 6},0.55)`); g.addColorStop(1, `rgba(${shade},${shade},${shade + 6},0)`);
       c.fillStyle = g; c.fillRect(0, 0, 256, 128);
     }
+    // no edges anywhere: the cloud thins to nothing at the sides, the top and the foot, so wherever the sprite meets the
+    // water or the land, or the edge of the picture, it has already faded out (a hard line across the sea otherwise)
+    c.globalCompositeOperation = 'destination-in';
+    const fx = c.createLinearGradient(0, 0, 256, 0);
+    fx.addColorStop(0, 'rgba(0,0,0,0)'); fx.addColorStop(0.18, 'rgba(0,0,0,1)'); fx.addColorStop(0.82, 'rgba(0,0,0,1)'); fx.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = fx; c.fillRect(0, 0, 256, 128);
+    const fy = c.createLinearGradient(0, 0, 0, 128);
+    fy.addColorStop(0, 'rgba(0,0,0,0)'); fy.addColorStop(0.2, 'rgba(0,0,0,1)'); fy.addColorStop(0.8, 'rgba(0,0,0,1)'); fy.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = fy; c.fillRect(0, 0, 256, 128);
+    c.globalCompositeOperation = 'source-over';
     const tex = new THREE.CanvasTexture(cv);
     // along the Gate, from Point Bonita and Lands End to the bridge, banked up over the Marin Headlands and the Presidio
     const spots: [number, number, number, number][] = [
@@ -550,7 +561,10 @@ export class SceneView {
     ];
     for (const [lat, lon, size, h] of spots) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, opacity: 0 }));
-      const p = LL(lat, lon); sp.position.set(p.x, h, -p.y); sp.scale.set(size * 1.7, size * 0.75, 1); sp.visible = false;
+      // from the water (its faded foot) up to the bank's top: the sprite always faces the camera, so from any height its
+      // foot stays at or above the water
+      const top = h + size * 0.375, p = LL(lat, lon);
+      sp.position.set(p.x, top / 2, -p.y); sp.scale.set(size * 1.7, top, 1); sp.visible = false;
       this.scene.add(sp); this.fogBank.push(sp);
     }
   }
@@ -584,8 +598,9 @@ export class SceneView {
     // rain and fog (the conditions adjuster): overcast light, grey haze, and you see less far
     const murk = Math.max(rain === 2 ? 0.75 : rain === 1 ? 0.45 : 0, fog === 2 ? 0.85 : fog === 1 ? 0.5 : 0);
     if (murk > 0) { haze.lerp(new THREE.Color('#9aa3aa').multiplyScalar(0.35 + 0.65 * day), murk); this.sun.intensity *= 1 - 0.85 * murk; this.hemi.intensity *= 1 - 0.35 * murk; }
-    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3500 : rain === 1 ? 12000 : 70000;
+    const fogN = fog === 2 ? 15 : fog === 1 ? 120 : rain === 2 ? 60 : rain === 1 ? 300 : 1500, fogF = fog === 2 ? 450 : fog === 1 ? 3000 : rain === 2 ? 3500 : rain === 1 ? 12000 : 57000; // (all haze by the water's far edge, 60 km out: waves.ts GRID_R)
     Object.assign(this.scene.fog as THREE.Fog, { near: fogN, far: fogF });
+    setRestrictedVisibility(fog === 1 || fog === 2 || rain === 2); // the boats' lights by day too (navLights.ts)
     (this.scene.fog as THREE.Fog).color.copy(haze);
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
     (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up);
@@ -596,7 +611,7 @@ export class SceneView {
     for (const sprite of this.fogBank) {
       sprite.visible = fogAmt > 0.05;
       const m = sprite.material as THREE.SpriteMaterial;
-      m.opacity = Math.min(1, fogAmt * 1.25) * (0.35 + 0.65 * day);
+      sprite.userData.opacity = Math.min(1, fogAmt * 1.25) * (0.35 + 0.65 * day); // (faded near the camera in render)
       m.color.setRGB(0.55 + 0.45 * day, 0.55 + 0.45 * day - 0.06 * warm * up, 0.6 + 0.4 * day - 0.15 * warm * up);
     }
   }
@@ -648,6 +663,12 @@ export class SceneView {
     this.curUni.uCurMean.value.set(w.cvec.x, w.cvec.y);
     this.skyAcc += dt;
     if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user, w.settings.rain ?? 0, w.settings.fog ?? 'real'); }
+    // the fog bank thins as you sail into it, rather than a flat picture of cloud that's suddenly gone as you pass it
+    for (const sp of this.fogBank) if (sp.visible) {
+      const cp = this.camera.position, d = Math.hypot(sp.position.x - cp.x, sp.position.z - cp.z), wd = sp.scale.x / 2;
+      const u = Math.min(1, Math.max(0, (d - 0.4 * wd) / (1.2 * wd))), m = sp.material as THREE.SpriteMaterial;
+      m.opacity = (sp.userData.opacity ?? 0) * u * u * (3 - 2 * u);
+    }
     updateNight(this.sunEl, w.clockUtc, w.wind.kt * 0.5144, t); // the Bay Bridge's and the city's lights after dark (night.ts)
     this.envAcc += dt;
     if (this.envAcc > 30) {
@@ -715,7 +736,8 @@ export class SceneView {
       // chase: orbit the boat with the look direction
       const dist = look.chase ?? 24, hv = V(u.h - look.yaw / D2R), height = Math.max(1.2, (9 + look.pitch * 25) * dist / 24);
       camera.position.lerp(P3(u.x - hv.x * dist, u.y - hv.y * dist, height), Math.min(1, dt * 3));
-      camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 1.5));
+      // aimed up the rig rather than at the waterline: she sits lower in the frame, her masthead clear of the dials
+      camera.lookAt(P3(u.x + hv.x * 10, u.y + hv.y * 10, 4.5));
     } else if (viewMode === 3) {
       // the showroom (setting up your boat): a slow circle round her, from a little above the deck
       if (look.spin !== false) this.showroomA += dt * 0.11; // a slow turn (paused from the panel)

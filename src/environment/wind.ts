@@ -9,12 +9,15 @@ import clim from './data/sf-wind-climate.json';
 export interface Wind { from: number; kt: number }
 
 /**
- * The course-wide wind: a mean direction and speed with oscillating shifts on top (a 120 s and a 41 s direction
- * oscillation and a 63 s pressure pulse). With the sea breeze, `base` and `kt` follow the time of day.
+ * The course-wide wind: a mean direction and speed. With the sea breeze, `base` and `kt` follow the time of day. Its
+ * shifts come from the shift field (shifts.ts, from Fort Point's record) or, on a past day, from the record itself
+ * (`shifted`); without either (a bare model, as in tests) a 120 s and a 41 s direction oscillation and a 63 s pressure
+ * pulse stand in for them.
  */
-export interface WindModel { base: number; kt: number; phase: [number, number, number]; steady?: number }
+export interface WindModel { base: number; kt: number; phase: [number, number, number]; steady?: number; shifted?: boolean }
 
 export function windAt(m: WindModel, t: number): Wind {
+  if (m.shifted) return { from: n360(m.base), kt: m.kt };
   const p = m.phase;
   // an unsteady wind (light and variable: steady ~0.3) swings further, and wanders over ten minutes or so
   const swing = clamp(0.75 / (m.steady ?? 1), 1, 2.5), wander = (swing - 1) * 22 * Math.sin(2 * Math.PI * t / 640 + p[0] * 1.7);

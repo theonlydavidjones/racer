@@ -1,5 +1,6 @@
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { asternCoast, crewRig, moveBoat } from '../boat/physics';
+import { HOVE, apparent, asternCoast, crewRig, moveBoat } from '../boat/physics';
+import orc from '../boat/data/nordic-folkboat-orc.json';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -8,7 +9,8 @@ import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } f
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { dayWeather, type DayWeather } from '../environment/weather';
-import { Puffs, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
+import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
+import { ShiftField, shiftStats } from '../environment/shifts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, snapshot, type Frame } from '../replay/recorder';
@@ -21,8 +23,9 @@ import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
+import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { harborOf, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
@@ -89,17 +92,24 @@ export interface WorldOptions {
   courseSignal?: { no: number; why: string };
 }
 
+/** Her middle and heading turned by `a` deg about a point on her centreline `pivot` m ahead of her middle (bow 3.8, stern −3.8). */
+function swingAbout(c0: Vec, h0: number, pivot: number, a: number): { c: Vec; h: number } {
+  const u0 = V(h0), P = { x: c0.x + u0.x * pivot, y: c0.y + u0.y * pivot }, u = V(h0 + a);
+  return { c: { x: P.x - u.x * pivot, y: P.y - u.y * pivot }, h: h0 + a };
+}
+/** The shove the crew gives her as they step aboard, m/s: about a slow walk. From then on her own way carries her (physics.ts). */
+export const SHOVE = 0.5;
+/** How fast the crew walks her back by hand, m/s; and the slowest they swing her round about her bow, deg/s, in no wind. */
+const WALK = 0.45, CREW_TURN = 2;
 /**
- * How far astern a boat in this slip goes to lie in the middle of the fairway behind it: halfway between the ends of the
- * fingers (0.45 of the finger's length astern of her middle) and the docks on the far side (8 m out, if open water),
- * and at least far enough that her bow is clear of her own finger.
+ * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
+ * ½·ρ·Cd·∫r³dA along her length (the lateral area spread evenly over it: A·L³/4). About 1×10⁵: at 3°/s about 300 N·m.
  */
-export function midFairway(slip: Slip): number {
-  const u = V(slip.heading), tip = 0.45 * slip.finger;
-  let far = tip + 1;
-  while (far < tip + 24) { const q = { x: slip.p.x - u.x * far, y: slip.p.y - u.y * far }; if (!inBasin(q) || hitsHarbor(q)) break; far += 0.5; }
-  const mid = far >= tip + 24 ? tip + 8 : (tip + far) / 2; // (no dock across within a fairway's width: open water, so where a fairway's middle would be)
-  return Math.max(mid, pushOffPlan(slip).back + 0.5);
+const SWING_DRAG = 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3 / 4;
+/** How fast the wind on her side swings her about her bow, deg/s: its turning force (side windage, acting at her middle, 3.8 m from the bow) against the water's. */
+function windSwing(kt: number, rel: number): number {
+  const vSide = kt * KT * Math.sin(rel * D2R), torque = 0.5 * 1.225 * HOVE.windSide * vSide * vSide * 3.8;
+  return Math.sqrt(torque / SWING_DRAG) / D2R;
 }
 
 /** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
@@ -114,9 +124,19 @@ export function slipLeadTime(slip: Slip, line: Vec): number {
  * Your own saved boats raced against you have a club-level crew.
  */
 const AI_CREW_SKILL: Record<string, number> = { Red: 0.75, Blue: 0.6, Green: 0.5, Black: 0.85, Varnish: 0.45 };
-function aiCrew(name: string): CrewSpec {
+function aiCrew(name: string, who = name): CrewSpec {
   const skill = AI_CREW_SKILL[name] ?? DEFAULT_SKILL;
-  return { helm: { ...DEFAULT_CREW.helm, skill }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill })) };
+  // real people, not three of the same: heights across about the adult range (1.60–1.92 m: US adults average about
+  // 1.75 m for men and 1.62 m for women, CDC NHANES) and builds from slight to solid (about BMI 21–28; estimates), from
+  // the boat's name so a crew is the same race to race. Their weights are scaled so each boat carries the standard
+  // crew's total (230 kg): the same weight aboard; a taller crew reaches slightly further out (about ±1% of the
+  // righting moment, inside the speed target's rounding)
+  let h = 2166136261; for (const ch of who) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
+  const ppl = [DEFAULT_CREW.helm, ...DEFAULT_CREW.crew].map(() => { const ht = 1.6 + 0.32 * (rnd() + rnd()) / 2; return { h: Math.round(ht * 100) / 100, w: (21 + 7 * rnd()) * ht * ht }; });
+  const total = [DEFAULT_CREW.helm, ...DEFAULT_CREW.crew].reduce((a, p) => a + p.w, 0), k = total / ppl.reduce((a, p) => a + p.w, 0);
+  const [helm, ...crew] = ppl.map(p => ({ h: p.h, w: Math.round(p.w * k * 10) / 10, skill }));
+  return { helm, crew };
 }
 
 /** Your crew from the settings (0–2 crew besides you at the helm). */
@@ -166,7 +186,7 @@ export class World {
   running = false;
   paused = false;
   speed = 1;
-  wind: Wind;
+  wind: Wind = { from: 0, kt: 0 };
   avgFrom: number; // ~1 min running mean of the wind direction, for lift/header calls
   boats: Boat[] = [];
   pairs: Record<string, PairRecord> = {};
@@ -253,6 +273,7 @@ export class World {
     { // the sea: the day's swell (or the adjuster's), and its chop × the adjuster's
       const sw = this.weather.swell(settings.swellDay ?? 1);
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs } : sw, settings.chop ?? 1);
+      this.sea.duration = this.seaDurationAt(this.clockUtc);
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -270,7 +291,12 @@ export class World {
       this.fieldArea = { c, half: half + 600 };
     }
     this.updateBreeze();
-    this.wind = windAt(this.windModel, this.t);
+    // the wind's shifts: on a past day, the record's own; otherwise a field with Fort Point's statistics for this kind of
+    // day and strength, carried down the course with the wind (environment/shifts.ts; its own random numbers, so the
+    // rest of the race draws what it did)
+    this.windModel.shifted = true;
+    if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
+    this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
@@ -337,7 +363,7 @@ export class World {
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S',
-      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name), 'S'),
+      heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
@@ -394,10 +420,23 @@ export class World {
   nextMark(b: Boat): CourseMark | null { return this.freeSail ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
+  /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec): Vec {
-    if (!this.tide) return currentAt(p, this.cvec);
-    return this.tide.atShore(p);
+    return withPierWakes(p, this.streamAt(p), this.pierFlows(), this.t);
   }
+  private streamAt(p: Vec): Vec { return this.tide ? this.tide.atShore(p) : currentAt(p, this.cvec); }
+  /**
+   * The stream meeting each pier, refreshed every half minute (the tide turns over hours): the open water's (the
+   * stations' current there, or the preset), not eased by the shore relief, which would read the pier itself as shore.
+   */
+  private flowsT = NaN; private flows: Vec[] = [];
+  private pierFlows(): Vec[] {
+    if (!(Math.abs(this.t - this.flowsT) < 30) || (!this.tide && this.flowsC !== this.cvec)) {
+      this.flowsT = this.t; this.flowsC = this.cvec; this.flows = WAKE_PIERS.map(w => this.tide ? this.tide.at(w.c) : this.cvec);
+    }
+    return this.flows;
+  }
+  private flowsC: Vec | null = null;
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
@@ -406,7 +445,19 @@ export class World {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
     const f = this.fieldAt(p);
-    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift), kt: this.wind.kt * f.k * q.k * sh.k };
+    // (the shifts here against the course's centre: the boat to windward has the header first)
+    const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
+    return { from: n360(this.wind.from + f.turn + q.veer + sh.shift + turn), kt: this.wind.kt * f.k * q.k * sh.k * sk };
+  }
+  /** The wind's shifts (environment/shifts.ts), off on a past day (the record has its own). */
+  shifts: ShiftField | null = null;
+  /** The shift at the course's centre now, which the course-wide wind carries. */
+  private shiftRef = { turn: 0, k: 1 };
+  /** The course-wide wind now: the day's mean, with the shift at the course's centre. */
+  private courseWind(): void {
+    const w = windAt(this.windModel, this.t);
+    if (this.shifts) { this.shiftRef = this.shifts.at(this.fieldArea.c); w.from = n360(w.from + this.shiftRef.turn); w.kt *= this.shiftRef.k; }
+    this.wind = w;
   }
 
   /* ---------- the wind across the course (environment/weather.ts), cached on a grid ---------- */
@@ -480,6 +531,7 @@ export class World {
       addShipWake(sum, from, kt, v, SHIP_AIR[v.kind], ty.len, ty.beam, p);
     }
     if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
+    addPierWakes(sum, from, p);
     const r = sum.result(from);
     return { k: r.k * lee, shift: r.shift };
   }
@@ -487,8 +539,36 @@ export class World {
   /** The sea at any point, for the wind and current there. */
   seaHere(p: Vec): SeaHere {
     const c = this.currentAt(p);
-    return this.sea.at(p, windOnWater(this.windHere(p), c), c, q => this.currentAt(q));
+    return this.sea.at(p, windOnWater(this.seaWind(p), c), c, q => this.currentAt(q));
   }
+  /**
+   * The wind the sea is made by at p: the wind over the water around it (the day's field, the land's lee), not the
+   * puff passing or the sails a few lengths upwind. The chop is grown by the wind over kilometres of fetch over an
+   * hour or more (sea.ts), so a 30-second puff, a lull or another boat's dirty air doesn't change the sea she's in.
+   * `lee`: the land's lee here, if it's known (a boat's, refreshed twice a second).
+   */
+  seaWind(p: Vec, lee?: number): Wind {
+    // (the day's mean wind, not its shifts and pulses of a minute or two: the fetch is looked up by direction)
+    const f = this.fieldAt(p), m = this.windModel;
+    return { from: n360(m.base + f.turn), kt: m.kt * f.k * (lee ?? landLee(p, m.base)) };
+  }
+  /**
+   * How long the wind has been making the sea at time tMin (minutes since epoch, UTC; sea.ts SeaField.duration). When
+   * the wind follows the clock: grown from flat 8 hours before she sets out (the Bay's mornings are mostly calm) through
+   * the day's own wind, 10 minutes at a time (before a past day's record starts at 10:00, the records' wind for that kind
+   * of day); worked out once for each 10 minutes and kept, so the boats and the outlook see the same sea whenever they
+   * ask. A set strength has been blowing for hours: fully grown for its fetch.
+   */
+  seaDurationAt(tMin: number): number {
+    if (!this.seaBreeze) return Infinity;
+    const t0 = this.gunUtc - this.startAt / 60 - 8 * 60, U = (t: number) => (this.weather.covers(t) ? this.weather.at(t) : breezeAt(t, this.windDay, this.windKind)).kt * KT;
+    const nodes = this.seaNodes ??= [{ d: 0, u: 0 }], i = Math.max(0, Math.floor((tMin - t0) / 10));
+    if (nodes.length <= i) { const g = new SeaField(null); g.duration = nodes[nodes.length - 1].d; g.restore(nodes[nodes.length - 1].u); while (nodes.length <= i) { g.develop(U(t0 + (nodes.length - 1) * 10 + 5), 600); nodes.push({ d: g.duration, u: g.reckonedIn }); } }
+    const g = new SeaField(null), n = nodes[i]; g.duration = n.d; g.restore(n.u);
+    g.develop(U(t0 + i * 10 + 5), Math.max(0, (tMin - t0 - i * 10) * 60));
+    return g.duration;
+  }
+  private seaNodes?: { d: number; u: number }[];
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
@@ -511,7 +591,7 @@ export class World {
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
     f.setTime(now);
-    this.cvec = this.currentAt(this.C.center);
+    this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
 
@@ -522,21 +602,27 @@ export class World {
     this.steps++;
     if (this.steps % 60 === 0) this.updateBreeze();
     if (this.steps % 1800 === 0) this.buildField();
-    this.wind = windAt(this.windModel, this.t);
+    this.shifts?.step(dt, this.windModel.kt * KT, this.wind.from); // (the air, and its shifts, move on downwind)
+    this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
-    for (const b of this.boats) { b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur); }
+    for (const b of this.boats) {
+      b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur);
+      b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
+    }
     this.vessels = this.traffic.vessels(this.trafficT);
+    if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     if (this.steps % 30 === 1) for (const b of this.boats) {
-      b.sea = this.sea.at(b, b.ww, b.cur, q => this.currentAt(q));
+      b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q));
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     for (const b of this.boats) if (!b.isUser) { aiThink(this, b, dt); this.keepClearOfShips(b); }
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); continue; }
+      if (b.handled) { this.handStep(b, dt); continue; }
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.freeSail && this.pilot.mode !== 'off';
       if (b.isUser && this.freeSail && this.pilot.mode !== 'off') {
@@ -877,7 +963,7 @@ export class World {
     if (!u.docked && dist(u, slip.p) > 8) this.leftSlip = true;
     if (u.docked || !this.leftSlip || dist(u, slip.p) > 2.5 || u.v > 0.6 || (u.astern ?? 0) > 0.05) return false;
     if (Math.abs(wrap(u.h - slip.heading)) > 35) {
-      if (this.t - this.bowInTold > 20) { this.bowInTold = this.t; this.emit({ type: 'toast', msg: 'Boats lie bow in here: come into the slip bow first, toward the dock.', ms: 4000 }); }
+      if (this.t - this.bowInTold > 20) { this.bowInTold = this.t; this.emit({ type: 'toast', msg: slip.kind === 'alongside' ? 'At an end tie she lies bow out: come alongside heading out along the dock, toward its end.' : 'Boats lie bow in here: come into the slip bow first, toward the dock.', ms: 4000 }); }
       return false;
     }
     Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, v: 0, vx: 0, vy: 0, astern: 0, steer: 0, turnTarget: null });
@@ -886,31 +972,103 @@ export class World {
   }
 
   /**
-   * Push off: the crew shoves her astern off the dock, hard enough that she coasts back out to the middle of the fairway
-   * (about walking pace, slowing as she goes). From then on she's under way: steer her with the tiller (going astern, the bow
-   * goes the way you push it), and get sail on her.
+   * Push off, as it's done with no engine (geo/marina.ts pushOffPlan, for the wind where she lies). From a slip she lies in
+   * bow first: a crew member walks her back along the finger by the shroud and steps aboard at its end with a bow line led
+   * round the cleat there and back aboard, which holds the bow just off the finger's end while her stern swings out across
+   * the fairway (the wind swings it, downwind, if there's a breeze
+   * across her; in light air the crew walks the bow round toward the way out). Brought head to wind, they hold her there
+   * for you to hoist the main: push off again and they push her bow off and let her go. Otherwise they slip the line and push
+   * her off forward with the boathook against the finger's end. Where the fairway's too narrow to swing her, they shove her off astern into it (steer her stern first).
+   * From an end tie they push her off the dock and forward. Then she's under her own way (a slow walk, slowing on the
+   * water's drag) and answers the tiller.
    */
   pushOff(): boolean {
-    const u = this.user, d = u.docked; if (!d) return false;
-    const slip = slipById(d.slip), clear = slip ? midFairway(slip) : 8;
-    // the shove that coasts her just that far with the drag in physics.ts (a firm push: up to a brisk walk)
-    let lo = 0.1, hi = 1.5;
-    for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < clear) lo = m; else hi = m; }
-    u.docked = undefined; u.astern = lo; u.v = 0;
-    // the finger she lay against: the nearest one, and which side of her it's on
-    if (slip && (u.crew?.spec.crew.length ?? 0) > 0) {
+    const u = this.user, H = u.handled;
+    // held head to wind on the bow line: let her go now, her bow pushed off
+    if (H?.plan.kind === 'swing' && H.plan.hold && H.held) { H.held = false; H.releasing = 0; return true; }
+    const d = u.docked; if (!d) return false;
+    const slip = slipById(d.slip);
+    u.docked = undefined; u.astern = 0; u.v = 0;
+    if (!slip) { u.v = SHOVE; return true; }
+    const wind = this.windHere(u, u), plan = pushOffPlan(slip, wind.from, wind.kt);
+    u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0 };
+    // the finger she lay against: the nearest one, and which side of her it's on (a crew member walks her out along it)
+    if (plan.kind !== 'off' && (u.crew?.spec.crew.length ?? 0) > 0) {
       const f = V(slip.heading), r = { x: f.y, y: -f.x }; // forward, and to starboard
       let best = { d: Infinity, lat: 2, side: 1 };
       for (const fg of harborOf(slip.marina)?.fingers ?? []) for (let k = 1; k < fg.length; k++) {
         const d = segPt(slip.p, fg[k - 1], fg[k]);
         if (d < best.d) { const m = { x: (fg[k - 1].x + fg[k].x) / 2 - slip.p.x, y: (fg[k - 1].y + fg[k].y) / 2 - slip.p.y }; const along = m.x * r.x + m.y * r.y; best = { d, lat: Math.min(2.6, d), side: along >= 0 ? 1 : -1 }; }
       }
-      // the crew member walks her back by the shroud (about half a metre forward of her middle) and has to jump aboard
-      // before the finger runs out under them: her middle lies 0.55 of the finger's length out from the walkway
+      // the crew member walks her back by the shroud and steps aboard as the finger runs out under them (her shroud, half a
+      // metre ahead of her middle, at the finger's end), a bow line led round the cleat on its end and back aboard
       u.pushing = { side: best.side, lat: best.lat, moved: 0, clear: 0.45 * slip.finger + 0.25, jump: 0 };
     }
-    this.emit({ type: 'toast', msg: 'Pushed off: your crew walks her back off the dock and jumps aboard. She\'s going astern: steer with the tiller (going astern the bow goes the way you push it). Hoist the sails when you\'re clear.', ms: 5000 });
+    const hoist = plan.headToWind ? ' She\'ll be head to wind: get the main up first (U), or she\'ll soon stop.' : '';
+    this.emit({ type: 'toast', ms: 7000, msg: plan.kind === 'swing'
+      ? plan.hold
+        ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
+        : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
+      : plan.kind === 'astern'
+        ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. She's going astern: steer with the tiller (the bow goes the way you push it), then get sail on her.${hoist}`
+        : `Pushing off: your crew shoves her off the dock and forward. Steer her out (she has a little way on).${hoist}` });
     return true;
+  }
+
+  /** The crew handling her off her berth by hand (pushOff), then letting her go: kinematic, while they hold her the physics waits. */
+  private handStep(b: Boat, dt: number): void {
+    const H = b.handled!, P = H.plan, x0 = b.x, y0 = b.y;
+    this.dockStep(b, dt); // (sails weathervane, hoisting goes on)
+    if (P.kind === 'off') {
+      // pushed out over about three seconds; then, if need be, her bow pushed off about her stern quarter
+      if (H.s < 1) { H.s = Math.min(1, H.s + dt / 3); b.x = H.from.x + (P.out.x - H.from.x) * H.s; b.y = H.from.y + (P.out.y - H.from.y) * H.s; }
+      else {
+        const a = wrap(P.h - H.h0);
+        if (Math.abs(H.a) < Math.abs(a)) { H.a = Math.sign(a) * Math.min(Math.abs(a), Math.abs(H.a) + 4 * dt); const q = swingAbout(P.out, H.h0, -3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); }
+        else this.letGo(b, P.h, SHOVE, 0);
+      }
+    } else {
+      const u = V(H.h0), back = P.back;
+      if (H.s < back) {
+        // walked back by the shroud, a crew member on the finger
+        const step = Math.min(WALK * dt, back - H.s); H.s += step;
+        b.x = H.from.x - u.x * H.s; b.y = H.from.y - u.y * H.s; b.astern = WALK; // (going astern at a walk: as the log shows)
+        const p = b.pushing; if (p) { p.moved += step; if (p.jump === 0 && p.moved >= p.clear) p.jump = 1e-3; } // (aboard at the finger's end)
+      } else if (P.kind === 'swing') {
+        const start = { x: H.from.x - u.x * back, y: H.from.y - u.y * back }, ww = this.windHere(b, b);
+        if (Math.abs(H.a) < Math.abs(P.turn)) {
+          // the bow held at the finger's end, the stern swinging out across the fairway: as fast as the wind on her side
+          // swings her against the water's resistance (if it's helping), or the crew walks the bow round
+          const rel = wrap(ww.from - n360(H.h0 + H.a)), helps = Math.sign(rel) === Math.sign(P.turn);
+          const rate = Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
+          H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + rate * dt);
+          const q = swingAbout(start, H.h0, 3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); b.astern = 0;
+        } else if (P.hold && H.held !== false) {
+          // head to wind, held on the bow line: waiting for the main to go up and the word to let go; she lies to the wind as
+          // it shifts (a boat on a bow line follows it), within 20 degrees of where she came to
+          if (H.held == null) { H.held = true; this.emit({ type: 'toast', msg: 'She\'s lying head to wind, held on the bow line. Hoist the main (U), then push off (G) to let her go.', ms: 6000 }); }
+          const want = clamp(wrap(ww.from - n360(H.h0 + P.turn)), -20, 20), cur = H.follow ?? 0;
+          H.follow = cur + clamp(want - cur, -CREW_TURN * dt, CREW_TURN * dt);
+          const q = swingAbout(start, H.h0, 3.8, P.turn + H.follow); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
+        } else if (P.hold && (H.releasing ?? 0) < 1) {
+          // her bow pushed off the wind, about the bow, toward the way out
+          H.releasing = Math.min(1, (H.releasing ?? 0) + dt * CREW_TURN * 2 / Math.abs(P.hold.off));
+          const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, 3.8, P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
+        } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
+      } else {
+        // shoved off astern: enough to coast her into the fairway on the water's drag
+        let lo = 0, hi = 1.5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
+        this.letGo(b, P.h, 0, lo);
+      }
+    }
+    if (b.pushing && b.pushing.jump > 0) { b.pushing.jump += dt / 0.7; if (b.pushing.jump >= 1) b.pushing = undefined; }
+    if (b.handled) { b.vx = (b.x - x0) / dt; b.vy = (b.y - y0) / dt; }
+  }
+  /** The crew lets her go with a shove as they step aboard (ahead, or astern): from here she's under her own way. */
+  private letGo(b: Boat, h: number, ahead: number, astern: number): void {
+    b.handled = undefined; b.h = n360(h); b.v = ahead; b.astern = astern; b.turnTarget = null; b.steer = 0;
+    const u = V(h); b.vx = u.x * (ahead - astern); b.vy = u.y * (ahead - astern);
+    if (b.pushing && b.pushing.jump === 0) b.pushing.jump = 1e-3;
   }
 
   /** The crew member walking her out: jumps aboard as her bow comes level with the end of the finger (or she stops). */
@@ -932,7 +1090,7 @@ export class World {
     const h = twa != null ? n360(this.wind.from + twa) : u.h;
     u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.luff = false;
     u.cur = this.currentAt(u); u.ww = windOnWater(this.windHere(u, u), u.cur);
-    if (this.steps % 30 === 0) u.sea = this.sea.at(u, u.ww, u.cur, q => this.currentAt(q));
+    if (this.steps % 30 === 0) u.sea = this.sea.at(u, windOnWater(this.seaWind(u, u.leeK), u.cur), u.cur, q => this.currentAt(q));
     this.steps++;
     moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
     u.h = h; // held there
@@ -950,6 +1108,7 @@ export class World {
   private dockStep(b: Boat, dt: number): void {
     b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
     b.boom += (side * 75 - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
     crewRig(b, dt, this.emit);

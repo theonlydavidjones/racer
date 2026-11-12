@@ -52,8 +52,13 @@ function gapTo(b: RulesBoat, p: Vec): number {
   return segPt(p, { x: b.x + u.x * h, y: b.y + u.y * h }, { x: b.x - u.x * h, y: b.y - u.y * h });
 }
 
-/** True wind angle, deg (0..180). */
-const twaOf = (b: RulesBoat, windFrom: number) => Math.abs(wrap(windFrom - b.h));
+/**
+ * The wind she's in (deg): her own, where she is, as her tack is judged from it (the wind shifts across the course, so
+ * two boats a few hundred metres apart can be in winds degrees apart); the course's wind if it isn't known.
+ */
+const windOf = (b: RulesBoat, ctx: RulesContext) => b.ww?.from ?? ctx.windFrom;
+/** True wind angle, deg (0..180), in the wind she's in. */
+const twaOf = (b: RulesBoat, ctx: RulesContext) => Math.abs(wrap(windOf(b, ctx) - b.h));
 /** The tack she'd be on sailing `course`. */
 const tackFor = (course: number, windFrom: number) => (wrap(windFrom - course) >= 0 ? 'S' : 'P');
 
@@ -65,7 +70,7 @@ export function wideOfGybe(b: RulesBoat, idx: number, ctx: RulesContext): boolea
   const mk = ctx.marks[idx], next = ctx.marks[idx + 1];
   if (!next || mk.type !== 'round') return false;
   const course = brg(next.p.x - mk.p.x, next.p.y - mk.p.y);
-  const mustGybe = twaOf(b, ctx.windFrom) > 90 && Math.abs(wrap(ctx.windFrom - course)) > 60 && tackFor(course, ctx.windFrom) !== b.tack;
+  const wf = windOf(b, ctx), mustGybe = twaOf(b, ctx) > 90 && Math.abs(wrap(wf - course)) > 60 && tackFor(course, wf) !== b.tack;
   if (!mustGybe) return false;
   const d = markDist(b, mk), away = d > 0 ? ((b.x - mk.p.x) * b.vx + (b.y - mk.p.y) * b.vy) / d : 0;
   return d > 1.2 * LOA && away > 0.3;
@@ -80,8 +85,8 @@ export const REPLY_ROOM = 25;
  * point a few metres to windward of the mark without sailing above close-hauled.
  */
 export function fetching(b: RulesBoat, mk: RulesMark, ctx: RulesContext): boolean {
-  const n = V(ctx.windFrom), P = { x: mk.p.x + n.x * 3, y: mk.p.y + n.y * 3 };
-  const twa = wrap(ctx.windFrom - brg(P.x - b.x, P.y - b.y)); // + = wind from her starboard side
+  const wf = windOf(b, ctx), n = V(wf), P = { x: mk.p.x + n.x * 3, y: mk.p.y + n.y * 3 };
+  const twa = wrap(wf - brg(P.x - b.x, P.y - b.y)); // + = wind from her starboard side
   return (b.tack === 'S' ? twa : -twa) >= (ctx.beat ?? 42) - 2;
 }
 
@@ -98,7 +103,7 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
 /** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
 function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
   if (b.headingAgo == null || b.tack !== 'S') return false;
-  const before = Math.abs(wrap(ctx.windFrom - b.headingAgo)), now = Math.abs(wrap(ctx.windFrom - b.h));
+  const wf = windOf(b, ctx), before = Math.abs(wrap(wf - b.headingAgo)), now = Math.abs(wrap(wf - b.h));
   return before < (ctx.beat ?? 42) + 15 && now > before;
 }
 
@@ -246,7 +251,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
  */
 function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord, ctx: RulesContext): { fouler: B; part: string } | null {
   if (!ctx.obstacle || !['10', '11', '12', '13'].includes(basic)) return null;
-  const sameTackOrDeep = A.tack === B.tack || (twaOf(A, ctx.windFrom) > 90 && twaOf(B, ctx.windFrom) > 90); // Definitions, Overlap
+  const sameTackOrDeep = A.tack === B.tack || (twaOf(A, ctx) > 90 && twaOf(B, ctx) > 90); // Definitions, Overlap (each in the wind she's in)
   if (!sameTackOrDeep || clearAstern(A, B) || clearAstern(B, A)) return null;
   const com = ctx.t > 0 && A.started && B.started, oA = ctx.obstacle(A, com), oB = ctx.obstacle(B, com);
   if (!oA || !oB) return null;

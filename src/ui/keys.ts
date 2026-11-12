@@ -1,7 +1,7 @@
 /** Keyboard bindings: every action, its keys, and saving your changes in this browser. */
 export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
-  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
+  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft'
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
@@ -32,7 +32,8 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'crewFwd', label: 'Crew weight forward a step', group: 'Crew' },
   { id: 'crewAft', label: 'Crew weight aft a step', group: 'Crew' },
   { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby (cruising only)', group: 'Helm' },
-  { id: 'pushOff', label: 'Push off from the slip (the crew shoves her off astern)', group: 'Helm' },
+  { id: 'navLights', label: 'Navigation lights on (lit after dark) / off', group: 'Helm' },
+  { id: 'pushOff', label: 'Push off from her berth (the crew walks her out by hand; held head to wind, let her go)', group: 'Helm' },
   { id: 'jibHalyard', label: 'Hoist or strike the jib', group: 'Sails' },
   { id: 'mainHalyard', label: 'Hoist or strike the main', group: 'Sails' },
   { id: 'hail', label: 'Hail ("Room to tack!", "Starboard!", or reply "You tack")', group: 'Racing' },
@@ -57,7 +58,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
-  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
+  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],

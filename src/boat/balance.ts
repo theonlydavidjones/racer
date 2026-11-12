@@ -268,15 +268,18 @@ export function rudderDrag(weather: number, v: number): number {
 
 /**
  * What pushes her along (N): the sails' drive less the hull and keel's induced drag for the side force they answer, at
- * boat speed v (m/s) and heel (deg). ORC VPP Documentation 2025, eq. 6.37: DI = FH² / (π·½ρV²·Te²), FH the side force
- * across the water (the sails' heeling force × cos heel). Te is ORC's effective draft, MHSD = 0.92 × the deepest
+ * boat speed v (m/s) and heel (deg). ORC VPP Documentation 2025, eq. 6.37: DI = FH² / (π·½ρV²·Te²), FH the heeling force,
+ * which ORC defines as "equal to hydrodynamic force normal to the yacht's centre plane" (VPP Documentation 2022, §3): the
+ * force square to the heeled mast and keel, as the sails' heeling force is here, not its part across the water. Te is ORC's effective draft, MHSD = 0.92 × the deepest
  * station's reduced draft (eq. 4.20); the Folkboat's reduced drafts aren't published (ORC works them from the hull's
  * offsets), so the full draft stands in for the deepest one: the largest Te, the least drag ORC's formula allows (an
  * estimate). And ORC's multiplier for a boat sailed nearly upright (Fig. 6.9: the keel and rudder sharing the lift
  * badly, even a little lee helm, at small heel), "fully active upwind", gone once the drive is more than 0.4 of the side
  * force: read off the figure, 1.57 upright, 1.31 at 5°, 1.08 at 10°, 1 from 15°. (A Folkboat's drive is 0.4–0.5 of
  * her side force even close-hauled, so by ORC's own rule the multiplier hardly applies to her.) Te is taken as fixed
- * with heel, as ORC prints MHSD; with FH the side force across the water, the drag falls as cos² of the heel.
+ * with heel, as ORC prints MHSD: it's measured along the keel's own span, which heels with her as the force does. So
+ * heeling her doesn't make the keel's work any lighter: the same push square to the mast costs the same drag at any heel
+ * (more, where the Delft series' effective span shrinks with heel: that needs the hull's offsets).
  */
 const DI_FACTOR = [1.57, 1.45, 1.31, 1.18, 1.08, 1.03, 1.0]; // every 2.5° of heel, ORC Fig. 6.9
 export function diFactor(heelDeg: number, drive: number, side: number): number {
@@ -287,7 +290,7 @@ export function diFactor(heelDeg: number, drive: number, side: number): number {
 }
 export function netDrive(f: { main: SailForce; jib: SailForce }, heelDeg: number, v: number): number {
   const q = 0.5 * RHO_W * Math.max(0.5, v) ** 2, side = f.main.heel + f.jib.heel, drive = f.main.drive + f.jib.drive;
-  const fh = side * Math.cos(Math.min(60, Math.abs(heelDeg)) * D2R), te = 0.92 * orc.boat.draft;
+  const fh = side, te = 0.92 * orc.boat.draft;
   return drive - diFactor(heelDeg, drive, Math.abs(side)) * fh * fh / (Math.PI * q * te * te);
 }
 

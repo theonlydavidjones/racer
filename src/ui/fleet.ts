@@ -136,7 +136,7 @@ export class Fleet {
         ${row('Slip', slip ? `${slip.label} (dock ${slip.dock}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
       </table></section>
       <section><h3>The boat</h3><table class="ftab">
-        ${row('Built', b.hull.material === 'wood' ? 'Wood, clinker' : 'Fiberglass')}
+        ${row('Hull', b.hull.material === 'wood' ? 'Wood' : 'Fiberglass')}
         ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
         ${row('Bottom', `${colour(BOTTOM_COLORS, b.hull.lower)}, ${p.cleanedWeeks ? `cleaned ${p.cleanedWeeks} wk ago` : 'just cleaned'}`)}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}

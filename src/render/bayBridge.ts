@@ -2,6 +2,7 @@ import './three-setup';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { LL } from '../geo/geo';
+import { PIERS } from '../geo/shore';
 import { P3 } from './coords';
 import { bayLightsMaterial, dayOnly, duskLights, nightDim, nightOnly, type Glint } from './night';
 
@@ -94,9 +95,11 @@ export function frustum(bw: number, bd: number, bx: number, tw: number, td: numb
 }
 
 /**
- * The San Francisco–Oakland Bay Bridge (Wikipedia, "San Francisco–Oakland Bay Bridge"; Caltrans and OpenStreetMap
- * weren't reachable to survey the piers, so the West Span runs on the alignment the scenery already had, Rincon Hill
- * to the Yerba Buena tunnel, with its published dimensions laid out along it).
+ * The San Francisco–Oakland Bay Bridge (Wikipedia, "San Francisco–Oakland Bay Bridge"). The West Span stands on its
+ * charted piers (NOAA ENC, Piers A–E: W2–W6; geo/data/bridge-piers.json, which also makes them solid): the line
+ * through them (bearing 40.2°, every pier within 3 m of it), the towers and the central anchorage where the chart has
+ * them. Their spacing agrees with the published spans: main spans 720 m and 703 m (704 m published), the anchorage
+ * 382 m and 379 m from the towers either side.
  *
  * The West Span (1936): two suspension bridges end to end, each with a 704 m (2,310 ft) main span and 354 m side
  * spans, joined at the concrete central anchorage (28 × 60 m in plan, 92 × 197 ft). Four steel towers 160 m (526 ft)
@@ -127,11 +130,13 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
   const TRUSS = new THREE.MeshLambertMaterial({ map: trussTex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide });
 
   /* ---------- the West Span ---------- */
-  const a = LL(37.7866, -122.3896), b = LL(37.8091, -122.3664); // the Rincon Hill anchorage → the tunnel on Yerba Buena Island
+  const a = LL(37.78685, -122.38998), b = LL(37.80901, -122.36627); // the Rincon Hill anchorage → the tunnel on Yerba Buena Island, on the piers' line
   const west = new Path([a, b]), K = new Kit(west), len = west.len;
   const ground = (s: number, dx = 0) => { const p = west.at(s); return Math.max(0, groundAt(p.x + dx * p.uy, p.y - dx * p.ux)); };
-  const SIDE = 354, MAIN = 704, TOP = 160, BOT = 66, DEPTH = 9, DECK = BOT + DEPTH, CW = 10; // truss bottom and top; cables ±10 m
-  const anch = [0, 2 * SIDE + MAIN, 4 * SIDE + 2 * MAIN], towers = [SIDE, SIDE + MAIN, 3 * SIDE + MAIN, 3 * SIDE + 2 * MAIN];
+  const SIDE = 354, TOP = 160, BOT = 66, DEPTH = 9, DECK = BOT + DEPTH, CW = 10; // truss bottom and top; cables ±10 m
+  // the towers (W2, W3, W5, W6) and the central anchorage (W4) where the chart has their piers, m along the line from a;
+  // the island's anchorage a side span beyond W6
+  const towers = [552.9, 1273.1, 2034.4, 2737.3], anch = [0, 1655.2, 2737.3 + SIDE];
   const CAB_END = DECK + 20; // the cables enter the anchorages about 20 m above the roadway
   // the deck: the upper and lower roadways and the truss sides, from the SF anchorage onto the island
   const sEnd = len - 30, yb = () => BOT, yt = () => DECK;
@@ -141,7 +146,7 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
   for (const sx of [-1, 1]) K.sweep(TRUSS, 0, sEnd, sx * CW, 0.01, yb, yt, 40, sx < 0 ? 'l' : 'r');
   // the towers: two legs, battered in toward the top where they carry the cables, on concrete piers
   for (const z of towers) {
-    K.box(CONC, 44, 10, 26, z, 0, 3);
+    // (each tower's pier is drawn from its charted outline: render/wharf.ts)
     for (const sx of [-1, 1]) K.put(STEEL, frustum(8, 11, sx * 15, 4.5, 7, sx * CW, TOP - 8), z, 0, 8);
     const legX = (y: number) => 15 - 5 * (y - 8) / (TOP - 8), legW = (y: number) => 8 - 3.5 * (y - 8) / (TOP - 8);
     const inner = (y: number) => legX(y) - legW(y) / 2;
@@ -165,9 +170,9 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
   // the main cables: a parabola in each span, the side spans sagging a little below the straight line
   const cableY = (s: number) => {
     const k = s < anch[1] ? 0 : 1, z0 = anch[k], t1 = towers[2 * k], t2 = towers[2 * k + 1], z1 = anch[k + 1];
-    if (s < t1) { const f = (s - z0) / SIDE; return CAB_END + (TOP - CAB_END) * f - 7 * 4 * f * (1 - f); }
-    if (s > t2) { const f = (z1 - s) / SIDE; return CAB_END + (TOP - CAB_END) * f - 7 * 4 * f * (1 - f); }
-    const mid = (t1 + t2) / 2, LOW = DECK + 2.5; return LOW + (TOP - LOW) * ((s - mid) / (MAIN / 2)) ** 2;
+    if (s < t1) { const f = (s - z0) / (t1 - z0); return CAB_END + (TOP - CAB_END) * f - 7 * 4 * f * (1 - f); }
+    if (s > t2) { const f = (z1 - s) / (z1 - t2); return CAB_END + (TOP - CAB_END) * f - 7 * 4 * f * (1 - f); }
+    const mid = (t1 + t2) / 2, LOW = DECK + 2.5; return LOW + (TOP - LOW) * ((s - mid) / ((t2 - t1) / 2)) ** 2;
   };
   for (const sx of [-1, 1]) for (const k of [0, 1]) {
     const pts: [number, number, number][] = [];
@@ -244,7 +249,15 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     const pier = (s: number, w: number) => { for (const sx of [-1, 1]) { const g0 = eg(s, sx * HALF), top = yD(s) - GIRDER; if (top - g0 > 2) E.box(CONC, w, top - g0, 5, s, sx * HALF, (top + g0) / 2); } };
     for (let s = 40; s < W2; s += 45) pier(s, 10);
     pier(W2, 22); pier(E2, 22);
-    for (let s = E2 + 160; s < eLen - 20; s += 160) pier(s, 9);
+    // the Skyway's piers where the chart has them (Piers H–M, geo/shore.ts PIERS, solid there too), then on toward Oakland
+    // at the same spacing, about 160 m
+    const charted = PIERS.filter(P => /^Bay Bridge, Pier [H-M]$/.test(P.name)).map(P => {
+      const c = { x: P.pts.reduce((a, q) => a + q.x, 0) / P.pts.length, y: P.pts.reduce((a, q) => a + q.y, 0) / P.pts.length };
+      let best = 0; for (let s = 0, d0 = Infinity; s < eLen; s += 2) { const q = east.at(s), d = Math.hypot(q.x - c.x, q.y - c.y); if (d < d0) { d0 = d; best = s; } }
+      return best;
+    }).filter(s => s > E2 + 20).sort((a, b) => a - b);
+    for (const s of charted) pier(s, 9);
+    for (let s = (charted.length ? charted[charted.length - 1] : E2) + 160; s < eLen - 20; s += 160) pier(s, 9);
     // the tower: four legs, tapering, tied by shear-link beams, between the two decks
     E.box(CONC, 30, 10, 30, T1, 0, 3);
     for (const [ix, iz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {

@@ -25,9 +25,9 @@ import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { DT, World, describeTide } from './sim/world';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
-import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
+import { POLE, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
-import { autoAcross, showCrewRow } from './ui/crewWords';
+import { autoAcross, setWho, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { PerfMeter } from './ui/perfMeter';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
@@ -39,7 +39,7 @@ import { horn, logMessage, messageLog, setLogClock, sound, toast } from './ui/fe
 import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
-import { onSaveTrouble, saveStatus } from './store/cloud';
+import { onSaveTrouble } from './store/cloud';
 import { layerMenu, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
@@ -107,7 +107,7 @@ function newGame(seed = randomSeed()): void {
     S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) });
   acc = 0; drillShown = false;
   showTrimOwner(); showLash(); showCrewPlace();
-  $('bCourse').textContent = w.freeSail ? 'Navigator' : 'Course';
+  word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint();
   view.setWorld(w);
   labels.build(w);
 }
@@ -171,11 +171,16 @@ function holdBtn(id: string, on: () => void, off: () => void): void {
   (['pointerup', 'pointercancel', 'lostpointercapture'] as const).forEach(ev => el.addEventListener(ev, end));
 }
 
+/** A cluster button's word (under its icon), set only when it changes. */
+function word(id: string, t: string): void { const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
+
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
 function setTiller(v: number): void { const u = w.user; u.tiller = Math.max(-1, Math.min(1, v)); if (u.lashed != null) u.lashed = u.tiller; }
-/* Lashing the tiller: a line from the tiller to a cleat holds it where you leave it, hands off (heaving to). Drag the
- * tiller bar to move the lashing; take the tiller (T, a click, A/D) and it comes off. */
+/* Lashing the tiller: a line from the tiller to a cleat holds it where you leave it, hands off (heaving to). It's done on
+ * the tiller itself: right-click (or double-click, or the key) to lash it where it is. The lashing shows on the tiller guide; a click
+ * or A/D takes the tiller and the lashing comes off; double-click again to lash it somewhere else. */
+const lashWhere = (t: number) => Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'}`;
 function lash(): void {
   if (!w.running || w.paused) return;
   const u = w.user;
@@ -185,21 +190,18 @@ function lash(): void {
   const t = u.tiller, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
   const fast = u.v > 2 / 1.944 && lee && Math.abs(t) > 0.15 && !((u.jibBacked ?? 0) > 0.5);
   toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack. To heave to, back the jib first and let her slow to a knot or two, then lash.`
-    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. Push it where you want it (◀ ▶ beside Unlash, or hold the tiller and lash again).'
-    : `Tiller lashed ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). ◀ ▶ move the lashing; take the tiller to undo it.`, fast ? 6000 : 4500);
+    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. To lash it elsewhere, take the tiller, move it, and right-click (or double-click).'
+    : `Tiller lashed ${lashWhere(t)} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Click or ${keymap.label('steerPort')}/${keymap.label('steerStbd')} takes the tiller; right-click or double-click lashes it again.`, fast ? 6000 : 4500);
 }
 function unlash(): void { const u = w.user; if (u.lashed == null) return; u.lashed = null; showLash(); toast('Lashing off: you have the tiller.', 2000); }
 function showLash(): void {
   const l = w.user.lashed, on = l != null;
-  const txt = !on ? 'Lash tiller' : `Lashed ${Math.abs(l) < 0.04 ? 'amidships' : `${Math.round(Math.abs(l) * 100)}% ${l > 0 ? 'stbd' : 'port'}`} · unlash`;
-  if ($('bLash').textContent !== txt) $('bLash').textContent = txt;
-  $('bLash').setAttribute('aria-pressed', String(on)); $('tiller').classList.toggle('lashed', on);
-  $('bLashP').hidden = $('bLashS').hidden = !on;
+  document.body.classList.toggle('lashed', on); $('tiller').classList.toggle('lashed', on);
+  if (on) {
+    $('tgCur').style.left = `${50 + l * TILLER_SPAN * 100}%`;
+    const txt = `Tiller lashed ${lashWhere(l)} · click to take it`; if ($('tgLash').textContent !== txt) $('tgLash').textContent = txt;
+  }
 }
-$('bLash').onclick = lash;
-// move the lashing a notch (a tenth of the way to hard over): ◀ pushes the tiller to port, ▶ to starboard
-$('bLashP').onclick = () => { if (w.user.lashed != null) setTiller(w.user.tiller - 0.1); };
-$('bLashS').onclick = () => { if (w.user.lashed != null) setTiller(w.user.tiller + 0.1); };
 function centreTiller(): void { setTiller(0); }
 function showTiller(): void {
   const t = w.user.tiller; showLash();
@@ -281,31 +283,85 @@ const CTL_UI: CtlItem[] = [
   { group: 'Cabin top: the lazy jib car', key: 'carFore', label: 'Car fore–aft' },
   { group: 'Cabin top: the lazy jib car', key: 'carIn', label: 'Car in–out' }
 ];
+/** What each line does, in a sentence (standard trim practice: controls.ts). */
+const LINE_WHAT: Record<CtlItem['key'], string> = {
+  mainsheet: 'Eased to spill a puff, and on a reach.',
+  traveller: 'Light air: up to windward, the sheet eased. Medium: the middle. A breeze or a puff: down to leeward.',
+  backstay: 'On in a breeze; its draft moves aft as it goes on, so the Cunningham follows.',
+  vang: 'On reaching and running, and upwind only in a real breeze (18 kt and more).',
+  outhaul: 'Eased in light air and reaching; on in a breeze upwind.',
+  cunningham: 'On as the wind builds and blows the draft aft.',
+  downhaul: 'Set for the wind range; the Cunningham fine-tunes it.',
+  jibCunningham: 'On as the wind builds.',
+  jibsheet: 'The working sheet, on the leeward winch.',
+  jibsheetW: 'The lazy sheet, on the windward winch: haul it with the other eased and the jib backs (heaving to).',
+  carFore: 'The lazy car, set ready for the next tack; after it:',
+  carIn: 'The lazy car, set ready for the next tack; after it:'
+};
+/**
+ * Each bar's two ends in sailors' words, and what each end does to the sail (left end first: the bars fill from the
+ * eased end to the on end; the sheets fill as they come in, the traveller toward windward, the cars aft and outboard).
+ * From the model in controls.ts: 0 off … 1 bar tight for the strings, the cars' pins 0 forward/inboard.
+ */
+const LINE_ENDS: Record<CtlItem['key'], [string, string, string, string]> = {
+  mainsheet: ['eased', 'boom out, the leech twisted open: less power', 'in', 'boom to the middle, the leech closed: power and pointing'],
+  traveller: ['leeward', 'boom off the centreline: depowers', 'windward', 'boom to the middle with the sheet eased, the leech open'],
+  backstay: ['eased', 'fuller main, more forestay sag', 'on', 'flatter main, tighter forestay, straighter jib luff'],
+  vang: ['off', 'once the sheet is eased, the boom free to rise and the leech twisting open', 'on', 'the boom held down, the leech closed on a reach or run'],
+  outhaul: ['eased', 'fuller foot, more power', 'on', 'flatter foot: less power and heel, less drag'],
+  cunningham: ['off', 'the luff slack, the draft further aft', 'on', 'the luff tight, the draft pulled forward'],
+  downhaul: ['off', 'the luff slack, the draft further aft', 'on', 'the luff tight, the draft forward'],
+  jibCunningham: ['off', 'the jib\'s draft further aft', 'on', 'the jib\'s draft held forward'],
+  jibsheet: ['eased', 'the clew out, the jib twisted open: speed and reaching', 'in', 'the clew in and down: pointing'],
+  jibsheetW: ['slack', 'as normal, the jib to leeward', 'hauled', 'the jib backed to windward'],
+  carFore: ['forward', 'the leech closed, a fuller foot: power', 'aft', 'the leech open, a flatter foot: depower'],
+  carIn: ['inboard', 'a narrow lead: pointing in flat water', 'outboard', 'a wider lead: speed in a chop or reaching']
+};
+const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+// (the car rows set the lazy car, for after the tack: say so first)
+const lineHelp = (k: CtlItem['key']) => { const [a, ae, b, be] = LINE_ENDS[k], car = k === 'carFore' || k === 'carIn'; return `${car ? LINE_WHAT[k] + ' ' : ''}${cap(a)}: ${ae}. ${cap(b)}: ${be}.${car ? '' : ' ' + LINE_WHAT[k]}`; };
 /** The line a control row works: the two car rows are one line, the lazy car. */
 const lineOf = (k: CtlItem['key']): LineKey => (k === 'carFore' || k === 'carIn' ? 'car' : k);
 let ctlSel = 0;
 const btnCmd: Partial<Record<CtlKey, number>> = {};
 /* Who has each line. Work any line (a button, a key, or drag its bar) and that line is yours; the crew keeps every
- * other. One tap on its Auto gives it back, and the Trim button gives them all back. */
+ * other. Each line, the sheets and the crew's weight have a Crew · You switch: tap Crew to give it back, You to take it
+ * where it is. */
+/** The lines in plain words, for the trim panel's line. */
+const LINE_NAME: Record<LineKey, string> = { mainsheet: 'mainsheet', traveller: 'traveller', backstay: 'backstay', vang: 'vang', outhaul: 'outhaul',
+  cunningham: 'Cunningham', downhaul: 'downhaul', jibCunningham: 'jib Cunningham', jibsheet: 'jib sheet', jibsheetW: 'windward jib sheet', car: 'jib cars' };
 function showTrimOwner(): void {
-  const mine = linesByHand(w.user), n = mine.length;
-  $('bTrim').textContent = n === 0 ? 'Trim · crew' : `Trim · you ×${n} · all to crew`;
-  $('bTrim').setAttribute('aria-pressed', String(n > 0));
-  $('bTrim').title = n === 0 ? 'The crew trims every line. Work any line to take it.' : `Yours: ${mine.join(', ')}. Click to hand them all back to the crew.`;
-  for (const [id, k] of [['bMainAuto', 'mainsheet'], ['bJibAuto', 'jibsheet']] as const) $(id).hidden = !byHand(w.user, k);
+  const mine = linesByHand(w.user), n = mine.length, names = mine.map(k => LINE_NAME[k]);
+  $('tpWho').textContent = n === 0 ? 'Crew trims every line' : n <= 2 ? `You have the ${names.join(' and the ')}` : `You have ${n} lines`;
+  $('tpWho').title = n === 0 ? 'The crew trims every line. Work a line (Trim/Ease, or in Lines) or tap its You, and that one is yours.' : `Yours: ${names.join(', ')}. The crew trims the rest. Tap Crew on a line to give it back.`;
+  $('tpWho').parentElement!.classList.toggle('mine', n > 0);
+  // the sheets' switches: Crew (green) while the crew trims, You (amber) once it's yours
+  for (const [id, k, name] of [['whoMain', 'mainsheet', 'mainsheet'], ['whoJib', 'jibsheet', 'jib sheet']] as const) {
+    const yours = byHand(w.user, k);
+    setWho(id, yours, yours ? `You have the ${name}: it stays where you put it. Tap Crew to give it back.` : `The crew trims the ${name}. Trim or Ease (or You) takes it.`);
+  }
   const backed = (w.user.jibBacked ?? 0) > 0.3;
-  $('bJibBack').textContent = backed ? 'Release' : 'Back';
-  $('bJibBack').title = backed ? 'Let the windward jib sheet go: the jib comes across to leeward' : 'Haul the windward jib sheet: the jib backs to windward (heaving to)';
+  word('bJibBack', backed ? 'Release' : 'Back'); $('bJibBack').querySelector('small')!.textContent = backed ? 'jib to leeward' : 'jib to windward';
+  $('bJibBack').title = backed ? 'Let the windward jib sheet go: the jib comes across to leeward' : 'Haul the windward jib sheet: the jib backs to windward. To heave to, also ease the main and lash the tiller to leeward';
 }
 function giveBack(k: LineKey): void { takeLine(w.user, k, false); showTrimOwner(); }
-$('bTrim').onclick = () => {
-  if (!w.running) return;
-  if (linesByHand(w.user).length === 0) { openLines(true); toast('The crew is trimming everything. Work any line (Trim/Ease, its −/+, or drag its bar) and that line is yours; the crew keeps the rest.', 4500); return; }
-  allToCrew(w.user); S.manualTrim = 0; saveSettings(S); showTrimOwner();
-  toast('Every line back to the crew.', 2500);
-};
-$('bMainAuto').onclick = () => giveBack('mainsheet');
-$('bJibAuto').onclick = () => giveBack('jibsheet');
+/** Every Crew · You switch in the trim panel: a line's (data-line), or the crew's weight ("crew"). */
+document.addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('.who [data-who]'); if (!b || !w.running) return;
+  e.stopPropagation();
+  const line = b.closest<HTMLElement>('.who')!.dataset.line!, you = b.dataset.who === 'you';
+  if (line === 'crew') {
+    const c = w.user.crew; if (!c) return;
+    if (you) { if (!c.place) setPlace('across', autoAcross(w.user)); }
+    else if (c.place) { c.place = undefined; showCrewPlace(); toast('Crew back on auto: they place their own weight again.', 2500); }
+    return;
+  }
+  const k = line as LineKey;
+  if (you === byHand(w.user, k)) return;
+  if (you) { takeLine(w.user, k); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
+  else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
+});
+$('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
 /** Back the jib (haul the windward sheet home), or let it go again. */
 $('bJibBack').onclick = () => {
   if (!w.running || w.paused) return;
@@ -372,9 +428,8 @@ const valOf = (k: CtlKey, fx: number) => (k === 'mainsheet' || k === 'jibsheet' 
   CTL_UI.forEach((it, i) => {
     if (it.group !== group) { group = it.group; const g = document.createElement('div'); g.className = 'ctl-group'; g.textContent = group; list.appendChild(g); }
     const row = document.createElement('div'); row.className = 'ctl-row'; row.dataset.i = String(i);
-    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar" title="Drag to set: the line is yours"><span class="ctl-fill"></span><span class="ctl-tgt"></span></span><span class="ctl-val"></span><span class="ctl-btns"><button type="button" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-d="1" aria-label="${it.label}: more">+</button></span><button type="button" class="ctl-own" aria-label="${it.label}: give it back to the crew">Auto</button>`;
+    row.innerHTML = `<span class="ctl-lab">${it.label}</span><span class="ctl-bar" title="Drag to set: the line is yours"><span class="ctl-fill"></span><span class="ctl-tgt"></span></span><span class="ctl-val"></span><span class="ctl-btns"><button type="button" data-d="-1" aria-label="${it.label}: less">−</button><button type="button" data-d="1" aria-label="${it.label}: more">+</button></span><span class="who" data-line="${lineOf(it.key)}" role="group" aria-label="Who works the ${it.label}"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span><span class="ctl-ends"><span>${LINE_ENDS[it.key][0]}</span><span>${LINE_ENDS[it.key][2]}</span></span><span class="ctl-what">${lineHelp(it.key)}</span>`;
     row.onclick = () => { ctlSel = i; };
-    (row.querySelector('.ctl-own') as HTMLButtonElement).onclick = e => { e.stopPropagation(); if (byHand(w.user, lineOf(it.key))) giveBack(lineOf(it.key)); };
     // drag the bar to where you want the line: it's hauled or eased there at the usual pace (winches, tackles, crew)
     const bar = row.querySelector('.ctl-bar') as HTMLElement;
     const setFrom = (e: PointerEvent) => {
@@ -431,9 +486,7 @@ function showLines(): void {
     if (tg != null) tgEl.style.left = `${Math.round(barOf(it.key as CtlKey, tg) * 100)}%`;
     const mine = byHand(u, lineOf(it.key));
     row.classList.toggle('mine', mine);
-    const own = row.querySelector('.ctl-own') as HTMLButtonElement;
-    own.textContent = mine ? 'Auto' : 'crew'; own.disabled = !mine;
-    own.title = mine ? 'Yours: tap to give it back to the crew' : 'The crew has this line: work it to take it';
+    setWho(row.querySelector<HTMLElement>('.who')!, mine, mine ? 'Yours: it stays where you put it. Tap Crew to give it back.' : 'The crew works this line. Work it, or tap You, to take it.');
     (row.querySelector('.ctl-val') as HTMLElement).textContent = txt;
     row.classList.toggle('sel', i === ctlSel);
   });
@@ -469,11 +522,6 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
   pl.fore = null; if (pl.across == null) c.place = undefined;
   showCrewPlace(); toast(c.place ? 'Fore and aft back to the crew; where they sit across stays yours.' : 'Crew back on auto: they place their own weight again.', 2500);
 });
-$('bCrewAuto').onclick = () => {
-  const c = w.user.crew; if (!c) return;
-  if (!c.place) { toast('The crew are on auto, placing their own weight (the outline shows where). Tap a place to put them there yourself.', 3500); return; }
-  c.place = undefined; showCrewPlace(); toast('Crew back on auto: they place their own weight again.', 2500);
-};
 function togglePole(): void {
   if (!w.running || w.paused) return;
   const u = w.user; u.poleWant = !u.poleWant;
@@ -542,7 +590,7 @@ function sailButtons(): void {
     const h = r ? r[k] : 1, up = r ? (k === 'main' ? r.mainUp : r.jibUp) : true, el = $(id);
     const hide = !w.running || (up && h >= 1 && !inMarina), txt = up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
     if (el.hidden !== hide) el.hidden = hide;
-    if (el.textContent !== txt) el.textContent = txt; // (only when it changes)
+    word(id, txt); // (only when it changes)
     el.classList.toggle('on', !up && h === 0);
   }
 }
@@ -554,8 +602,8 @@ $('bCourse').onclick = () => (w.freeSail ? navView.toggle(w) : courseView.toggle
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
-$('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1; $('bFast').textContent = 'Speed ' + w.speed + '×'; };
-$('bSound').onclick = () => { sound.on = !sound.on; $('bSound').textContent = sound.on ? 'Sound on' : 'Sound off'; };
+$('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1; word('bFast', 'Speed ' + w.speed + '×'); };
+$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 $('bPause').onclick = () => {
   if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false;
   const d = $('pauseDebrief'), html = w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
@@ -573,8 +621,8 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 {
   const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = { ...S.mapLayers, [k]: on }; w.settings.mapLayers = S.mapLayers; saveSettings(S); };
   const redraw = () => { if (chart.isOpen) chart.draw(); };
-  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw);
-  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw);
+  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f));
+  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f));
 }
 $('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
 
@@ -598,7 +646,14 @@ const keysView = new KeysView(keymap, () => keysHint());
 const held = new Set<Action>();
 function keysHint(): void {
   const k = (a: Action) => keymap.label(a);
-  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · scroll: eye fore/aft · ${k('keys')} keys`;
+  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · right-click, double-click or ${k('lashTiller')}: lash it · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} all keys`;
+  // each cluster button's name and key, on hover (the word under it is short)
+  const tip: [string, string, Action][] = [['bHail', 'Hail: "Room to tack!", "Starboard!", or reply "You tack"', 'hail'], ['bPause', 'Pause', 'pause'],
+    ['bCourse', w?.freeSail ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
+    ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
+    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
+  for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
+  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off';
 }
 keysHint();
 hud.hailKey = () => keymap.label('hail');
@@ -620,12 +675,15 @@ function applyHeld(): void {
 }
 function setView(i: number): void {
   viewMode = i; lookAhead();
-  $('bView').textContent = 'View · ' + VIEWS[viewMode];
+  word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
 const anyOverlay = () => !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
+  // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
+  const tgt = e.target as HTMLElement | null;
+  if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) && e.key !== 'Escape') return;
   if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
   if (!$('keepAsk').hidden) return; // save or discard first
   const a = keymap.actionFor(e.key);
@@ -663,6 +721,7 @@ addEventListener('keydown', e => {
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
     case 'pushOff': pushOff(); break;
+    case 'navLights': w.user.lightsOff = !w.user.lightsOff; toast(w.user.lightsOff ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break;
     case 'jibHalyard': halyard('jib'); break;
     case 'mainHalyard': halyard('main'); break;
     case 'viewCockpit': setView(0); break;
@@ -686,9 +745,9 @@ try { const o = localStorage.getItem('fbsim-orient'); if (o === 'north' || o ===
 function cycleOrient(): void {
   over.orient = over.orient === 'north' ? 'bow' : over.orient === 'bow' ? 'wind' : 'north';
   try { localStorage.setItem('fbsim-orient', over.orient); } catch { /* ignore */ }
-  $('bOrient').textContent = ORIENT_LABEL[over.orient];
+  word('bOrient', ORIENT_LABEL[over.orient]);
 }
-$('bOrient').textContent = ORIENT_LABEL[over.orient];
+word('bOrient', ORIENT_LABEL[over.orient]);
 $('bOrient').onclick = cycleOrient;
 function zoomOverhead(k: number): void { over.height = Math.max(40, Math.min(3000, over.height * k)); }
 function recentre(): void { over.off.x = 0; over.off.y = 0; }
@@ -705,10 +764,28 @@ function panOverhead(dx: number, dy: number): void {
 let drag: { x: number; y: number; yaw0: number; pitch0: number } | null = null, lastTap = 0;
 const touches = new Map<number, [number, number]>();
 let pinch: { d: number; h: number } | null = null;
+// The other ways to lash: a right-click (or a two-finger click) lashes the tiller where it is, with no browser menu; a
+// double-click lashes it at the angle of the first press (the second press would otherwise have moved it). Over the
+// panels the browser behaves as usual.
+let firstPress: number | null = null;
+gl.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!w.running || w.paused || viewMode === 2) return;
+  if (w.user.lashed != null) { unlash(); return; }
+  lash();
+});
+gl.addEventListener('dblclick', e => e.preventDefault()); // (no zoom or text selection on a double-click over the view)
 gl.addEventListener('pointerdown', e => {
-  const now = performance.now(); if (now - lastTap < 300) { if (viewMode === 2) recentre(); else lookAhead(); } lastTap = now;
+  if (e.pointerType === 'mouse' && e.button !== 0) return; // (the right button lashes: contextmenu above)
+  const now = performance.now(), dbl = now - lastTap < 300; lastTap = now;
+  // a double-click with the mouse lashes the tiller at the angle of the first press; on a touch screen a double tap looks ahead
+  if (dbl && e.pointerType === 'mouse' && viewMode !== 2 && w.running && !w.paused) {
+    lastTap = 0; if (firstPress != null) setTiller(firstPress); firstPress = null;
+    if (w.user.lashed == null) lash(); return;
+  }
+  if (dbl) { if (viewMode === 2) recentre(); else lookAhead(); }
   if (viewMode === 2) { gl.setPointerCapture?.(e.pointerId); touches.set(e.pointerId, [e.clientX, e.clientY]); pinch = null; panning = true; return; }
-  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); return; }
+  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); firstPress = w.user.tiller; return; }
   drag = { x: e.clientX, y: e.clientY, yaw0: look.yaw, pitch0: look.pitch };
 });
 gl.addEventListener('pointermove', e => {
@@ -740,7 +817,7 @@ function lookLabel(): void {
   const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
   const off = Math.abs(deg) > 8 || Math.abs(look.pitch) > 0.15;
   el.hidden = !off || viewMode === 2;
-  if (off) el.textContent = Math.abs(deg) <= 8 ? 'Look ahead' : `Looking ${Math.abs(deg)}° ${deg > 0 ? 'stbd' : 'port'} · ahead`;
+  if (off) el.title = `${Math.abs(deg) <= 8 ? 'Looking up or down' : `Looking ${Math.abs(deg)}° to ${deg > 0 ? 'starboard' : 'port'}`}: look ahead again (${keymap.label('lookAhead')})`;
   $('bRecentre').hidden = viewMode !== 2 || Math.hypot(over.off.x, over.off.y) < 5;
 }
 addEventListener('pointerup', () => { drag = null; });
@@ -810,7 +887,10 @@ function courseCard(): void {
     const slip = slipById(S.boat.slip), sl = slip ? slipPlace(slip) : null, f = $<HTMLOptionElement>('optSlipFrom'), t = $<HTMLOptionElement>('optSlipTo');
     f.textContent = sl ? `Her slip (${sl})` : 'Her slip (give her one in the Fleet)'; f.disabled = !sl;
     t.textContent = sl ? `Back to her slip (${sl})` : 'Back to her slip (give her one in the Fleet)'; t.disabled = !sl;
-    if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom; ($('sailToSel') as HTMLSelectElement).value = S.sailTo; }
+    if (!sl && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; }
+    // (the menus show where she'll really start and go: the Fleet's "Sail her" sets her start, and a menu showing anything
+    // else would start her in her slip with another place showing, and choosing that place again changes nothing)
+    ($('sailFromSel') as HTMLSelectElement).value = S.sailFrom ?? 'cityfront'; ($('sailToSel') as HTMLSelectElement).value = S.sailTo ?? '';
   }
   const cruise = S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
@@ -917,8 +997,12 @@ function paintSeg(): void {
     const k = seg.dataset.k as keyof Settings;
     const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
-  });
+  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = S[c.dataset.t as 'aids' | 'windDial'] === 1; });
 }
+// the on-screen training aids: a switch each (on = shown)
+document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => c.addEventListener('change', () => {
+  const k = c.dataset.t as 'aids' | 'windDial'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
+}));
 document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
@@ -961,12 +1045,12 @@ function beginRaceNow(seed?: number): void {
   newGame(seed);
   logMessage(`— ${S.mode === 'sail' ? `Cruise · ${PLACES.find(p => p.id === S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
   w.running = true; w.paused = false;
-  $('bFast').textContent = 'Speed 1×';
+  word('bFast', 'Speed 1×');
   horn(1.0);
   const m0 = w.C.marks[0];
   if (w.fromSlip) {
     const m = Math.round((w.startAt - S.seq * 60) / 60);
-    toast(`In her slip in ${harborOf(w.homeSlip!.marina)?.short ?? 'her marina'}, ${w.homeSlip!.label}, bow in and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to shove her out astern, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
+    toast(`In her ${w.homeSlip!.kind === 'alongside' ? 'berth' : 'slip'} in ${harborOf(w.homeSlip!.marina)?.short ?? 'her marina'}, ${w.homeSlip!.label}, ${w.homeSlip!.kind === 'alongside' ? 'alongside the end of the dock, bow out,' : 'bow in'} and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to have the crew walk her out by hand into the fairway, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
     return;
   }
   toast(S.mode === 'sail'
@@ -1099,7 +1183,6 @@ function settleLog(next: () => void): void {
   $('bKeep').onclick = () => done(true); $('bDiscard').onclick = () => done(false);
 }
 onSaveTrouble(msg => toast(msg, 6000));
-$('saveNote').textContent = saveStatus();
 
 function showResults(): void {
   w.finishShown = true;
@@ -1147,7 +1230,7 @@ function frame(now: number): void {
     acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
   }
   for (const e of w.drainEvents()) handle(e);
-  $('bPushOff').hidden = !(w.running && !!w.user.docked); sailButtons();
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt);
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1227,7 +1310,6 @@ const fleet: Fleet = new Fleet(S, {
 });
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
-  $('saveNote').textContent = saveStatus();
   courseView.close(); navView.close(); w.running = false; w.paused = false;
   for (const id of ['setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (boatPanel.open) boatPanel.hide();

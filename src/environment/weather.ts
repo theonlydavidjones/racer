@@ -21,6 +21,9 @@ export interface DayWeather {
   kind: WindKind;
   /** The wind at a time (minutes since epoch, UTC): open-water speed, direction, gust factor, steadiness. */
   at(tMin: number): Breeze;
+  /** Whether the source has the wind at this time (minutes since epoch, UTC): a past day's record runs 10:00–18:00, and
+   * outside it `at` holds the nearest sample. Always, for the others. */
+  covers(tMin: number): boolean;
   /** The swell outside the Gate (`day`: small/typical/big, for a day without a real one). */
   swell(day: SwellDay): Swell;
   /** Whether the swell is the real one (observed or forecast). */
@@ -64,7 +67,26 @@ function observedSamples(date: string): Sample[] | null {
     if (sp === 255 || d === 255) continue;
     out.push([R.slot0 + k * R.slotMin, sp / 4 * OPEN_WATER, d * 2, (g === 255 ? sp * 1.4 : g) / 4 * OPEN_WATER]);
   }
-  return out.length >= 10 ? out : null;
+  return out.length >= 10 ? smoothed(out) : null;
+}
+/**
+ * The record's samples, each a centred [1, 2, 1]/4 mean with its neighbours (18 minutes), as the course-wide wind. Each
+ * 2-minute mean carries the station's own quick turbulence and the shifts of a minute or two, which aren't the same a
+ * kilometre away (scripts/fit-wind-shifts.mjs: about 5–6° of white noise between samples on a 10–15 kt westerly, against
+ * the coherent shifts of several minutes, σ 6.5°, e^(−τ/8 min)); laid over the whole course they'd shift every boat at
+ * once, every 6 minutes. The mean keeps about 80% of the several-minute shifts and 60% of the noise. (Neighbours more than
+ * 6 minutes away, across a gap in the record, are left out.) The quick part is the puffs' (wind.ts).
+ */
+function smoothed(s: Sample[]): Sample[] {
+  return s.map((x, i) => {
+    let vx = 2 * x[1] * Math.sin(x[2] * Math.PI / 180), vy = 2 * x[1] * Math.cos(x[2] * Math.PI / 180), kt = 2 * x[1], w = 2;
+    for (const j of [i - 1, i + 1]) {
+      const y = s[j]; if (!y || Math.abs(y[0] - x[0]) > R.slotMin) continue;
+      vx += y[1] * Math.sin(y[2] * Math.PI / 180); vy += y[1] * Math.cos(y[2] * Math.PI / 180); kt += y[1]; w++;
+    }
+    // (the direction by the vector mean, so it averages the shorter way round; the speed by the plain mean)
+    return [x[0], kt / w, Math.hypot(vx, vy) > 1e-6 ? n360(Math.atan2(vx, vy) * 180 / Math.PI) : x[2], x[3]];
+  });
 }
 function forecastSamples(date: string): Sample[] | null {
   const f = R.forecast[date]; if (!f) return null;
@@ -233,6 +255,7 @@ export function dayWeather(date: string, kind: WindKind | 'auto' = 'auto', windD
       const field = obs ? observedField(date, k) : R.grid.days[date] ? forecastField(date) : (p: Vec, _t: number, from: number) => ({ k: windTerrain(p, from), turn: 0 });
       return {
         source, kind: k, realSwell: !!realSwell, swell, issued: obs ? undefined : R.forecastIssued, field,
+        covers: tMin => { const m = localMin(tMin); return m >= samples[0][0] && m <= samples[samples.length - 1][0]; },
         fieldSource: obs ? 'the lie of the land, set by what the stations around the Bay saw that day (Pier 1, Oakland, Point Potrero, Richmond)' : R.grid.days[date] ? 'the National Weather Service forecast grid (2.5 km cells)' : 'the lie of the land',
         at: tMin => { const w = interp(samples, localMin(tMin)); return { kind: k, from: w.from, kt: w.kt, gust: w.kt > 0.5 ? Math.max(1.05, w.gust / w.kt) : 1.4, steady: obs ? 1 : (k === 'light' ? 0.35 : 0.9), freq: 1 }; }
       };
@@ -240,7 +263,7 @@ export function dayWeather(date: string, kind: WindKind | 'auto' = 'auto', windD
   }
   const k = windKindFor(date, kind);
   return {
-    source: kind === 'auto' ? 'records' : 'chosen', kind: breezeAt(Date.parse(date + 'T20:00:00Z') / 60000, windDay, k).kind, realSwell: false, swell, at: tMin => breezeAt(tMin, windDay, k),
+    source: kind === 'auto' ? 'records' : 'chosen', kind: breezeAt(Date.parse(date + 'T20:00:00Z') / 60000, windDay, k).kind, realSwell: false, swell, at: tMin => breezeAt(tMin, windDay, k), covers: () => true,
     field: (p, _t, from) => ({ k: windTerrain(p, from), turn: 0 }), fieldSource: 'the lie of the land'
   };
 }

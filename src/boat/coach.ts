@@ -118,7 +118,7 @@ function speedFactor(b: Boat, c: Controls): number {
   const cs = b.crew;
   if (cs) {
     const disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
-    const heel = heelWithCrew(F, sf.ceh, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0), crewMass(cs.spec)) * (b.twa > 120 ? 0.6 : 1);
+    const heel = heelWithCrew(F, sf.ceh, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0), crewMass(cs.spec));
     f *= heelFactor(heel);
     const v = Math.max(0.8, b.v), hn = helmNeeded(sf, heel, main, v, sf.ceh);
     // the drive the sails make less the keel's drag for their side force (balance.ts netDrive): flatter sails push less,

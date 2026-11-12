@@ -32,6 +32,14 @@ export interface AiState {
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
+  /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
+  goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
+  /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
+  running?: boolean;
+  /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
+  avgFrom?: number;
+  /** How long she's been headed (s), by her compass. */
+  headedT?: number;
 }
 
 export interface Boat {
@@ -47,6 +55,10 @@ export interface Boat {
   x: number; y: number; h: number; // position (m) and heading (deg)
   /** In her slip, made fast, bow in (sim/world.ts pushOff casts her off). */
   docked?: { slip: string };
+  /** At anchor or on a mooring (she shows the all-round anchor light after dark; render/navLights.ts). */
+  atAnchor?: boolean;
+  /** Her navigation lights switched off by her skipper (the owner's switch: the lights key). */
+  lightsOff?: boolean;
   /** Sternway, m/s: pushed off astern, she coasts back, slowing, and steers backwards. */
   astern?: number;
   /**
@@ -55,6 +67,12 @@ export interface Boat {
    * `moved` how far she's gone back, `clear` how far before the finger ends; `jump` the jump's progress (0 not yet … 1 aboard).
    */
   pushing?: { side: number; lat: number; moved: number; clear: number; jump: number };
+  /**
+   * Being handled out of her berth by the crew (geo/marina.ts pushOffPlan): walked back out of a slip and swung about her
+   * bow (`s` m walked, `a` deg swung so far), or pushed off an end tie (`s` 0…1 of the way out), from her berth
+   * (`from`, heading `h0`). The crew moves her by hand, so the physics waits until they let her go with a shove.
+   */
+  handled?: { plan: import('../geo/marina').PushOff; from: { x: number; y: number }; h0: number; s: number; a: number; /** held head to wind on the bow line (true), or told to let go (false) */ held?: boolean; releasing?: number; /** deg she's followed the wind round while held */ follow?: number };
   /** Her sails: how far each is hoisted (0 down … 1 up) and whether the crew is hoisting (true) or striking (false) it. Absent: both up. */
   rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean };
   v: number; // speed through the water, m/s
@@ -186,6 +204,8 @@ export interface Boat {
   spec?: BoatSpec;
   /** Wind shadows on her (environment/shadows.ts): the lee of the land (cached) and everything together (1 = clear air). */
   leeK?: number; shadowK?: number;
+  /** About a minute's running mean of the wind she's in (deg): her compass's average, for lifts and headers. */
+  avgFrom?: number;
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
   cond?: Condition;
 }
