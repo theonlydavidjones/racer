@@ -17,6 +17,7 @@ describe('the current field across the race area', () => {
 });
 
 describe('San Rafael Bay', () => {
+  const t0n = sfLocalToUtcMin('2026-11-01', '00:00');
   it('the bays\' tides match NOAA\'s own predictions (within 3 minutes and 2 cm): Point San Quentin and San Leandro Channel', () => {
     // NOAA CO-OPS high and low water, 14–15 November 2026, m above MLLW, GMT (fetched 2026-11-12)
     const noaa: Record<string, [string, 'H' | 'L', number][]> = {
@@ -45,6 +46,12 @@ describe('San Rafael Bay', () => {
     for (let lon = -122.472; lon > -122.489; lon -= 0.0005) { const v = peak(37.962, lon); worst = Math.max(worst, Math.abs(v - prev)); prev = v; }
     expect(worst).toBeLessThan(0.1);
   }, 60_000); // (a day's peaks at forty points: slow when the whole suite runs at once)
+  it('over the flats, never faster than a long wave runs in that depth (a creek mouth in the flats, the first of the flood)', () => {
+    const f = new CurrentField(stationsFor(t0n, t0n + 3 * 1440));
+    let worst = 0;
+    for (let k = 0; k < 3 * 1440; k += 20) { f.setTime(t0n + k); const c = f.at(LL(37.969, -122.491)); worst = Math.max(worst, Math.hypot(c.x, c.y) / 0.5144); }
+    expect(worst).toBeLessThan(3);
+  }, 60_000);
   it('floods into the bay as the tide rises', () => {
     const t0 = sfLocalToUtcMin('2026-11-14', '00:00'), f = new CurrentField(stationsFor(t0, t0 + 1440)), p = LL(37.966, -122.485);
     for (let h = 0; h < 24; h += 1) {

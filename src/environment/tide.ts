@@ -166,7 +166,9 @@ export function depthBand(p: Vec): [number, number] {
     const i = Math.floor((lon - G.west) / (G.east - G.west) * G.nx), j = Math.floor((G.north - lat) / (G.north - G.south) * G.ny);
     if (i < 0 || j < 0 || i >= G.nx || j >= G.ny) continue;
     const b = G.g[j * G.nx + i], b2 = G.g2[j * G.nx + i];
-    return b ? [b * DGJ.step + DGJ.offset, b2 * DGJ.step + DGJ.offset] : [0, 0];
+    // (water in the sim where the chart has land: the margin of the flats, a creek's mouth; taken as the chart's highest
+    // drying band, from 1.8 m above the datum to it, not as a pool as deep as the tide)
+    return b ? [b * DGJ.step + DGJ.offset, b2 * DGJ.step + DGJ.offset] : [-1.8, 0];
   }
   return [0, 0];
 }
@@ -397,7 +399,11 @@ export class CurrentField {
       this.bayFlow.set(B, F);
     }
     const b = Math.min(F.u.length - 1, Math.max(0, Math.floor(bayIn(B, p) / BAY_BIN))), [d1, d2] = depthBand(p), c = wetBand(d1, d2, F.h);
-    return c.wet > 0 ? F.u[b] * c.depth ** (2 / 3) : 0;
+    // (never faster than a long wave runs in that depth, √(g·D): a flood over the flats that continuity would drive any
+    // faster, through a line nearly dry, comes in as a bore, its front at that speed; Froude number 1)
+    if (c.wet <= 0) return 0;
+    const v = F.u[b] * c.depth ** (2 / 3), lim = Math.sqrt(9.81 * c.depth);
+    return Math.max(-lim, Math.min(lim, v));
   }
   /**
    * The current at a point, with the slack water along the Cityfront beach: the shore relief (current.ts) applies

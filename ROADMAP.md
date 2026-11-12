@@ -653,7 +653,9 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   own bands (DRVAL1 to DRVAL2: they had sat near high water, in San Rafael Bay too); the canal carries much of the
   fill, the San Leandro Channel the rest, never against the slope (about 0.5 kt peak at its mouth); left out: the
   bay's water south of the world's edge (toward Oakland Airport) and its marsh, so the fill is a little short, and the
-  canal's jet into the bay, handed over to the bay's own stream within 500 m of the canal's mouth); BYC's and Encinal YC's own racing marks aren't published where we could
+  canal's jet into the bay, handed over to the bay's own stream within 500 m of the canal's mouth; over the flats the
+  stream is held to a long wave's speed in its depth, √(gD), where continuity through a nearly dry line would drive a
+  bore); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
