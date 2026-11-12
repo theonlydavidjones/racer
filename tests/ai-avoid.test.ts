@@ -70,5 +70,28 @@ describe('AI collision avoidance: two obligations at once', () => {
     const dev = wrap(withX - B.desired), held = wrap(withX - cs);
     expect(Math.abs(dev) < 3 || Math.abs(held) < 3, `with X ${withX.toFixed(0)}, her course ${B.desired.toFixed(0)}, heading ${cs.toFixed(0)}`).toBe(true);
   });
+  it('side by side and barely closing, she does the same however near or far their closest approach (no swapping between holding on and turning away)', () => {
+    // B running on starboard, X to leeward abeam, 5.9 m between them, drifting together at 5 cm/s. The time to their
+    // closest approach depends on how fast X draws ahead (0.3 s or 0.8 s here), but whether B is keeping clear doesn't:
+    // she should do the same both times. (Judged by that time, she swapped between holding on and turning away every few
+    // moments, owing a boat mark-room at Fort Mason, and sailed into the mark between turns.)
+    const w = new World(ss2 as unknown as CourseFile, settings({ fleet: 3 }), 1);
+    w.t = 300;
+    const [, B, X] = w.boats, F = w.wind.from, cs = n360(F - 150); // starboard, a run
+    const at = { x: w.center.x - w.N.x * 300, y: w.center.y - w.N.y * 300 };
+    const ahead = V(cs), right = V(cs + 90);
+    for (const b of w.boats) put(w, b, at, 5000, 5000, 0);
+    const moves: number[] = [];
+    for (const drawAhead of [1, 0.6]) {
+      put(w, B, at, 0, 0, cs); B.started = true;
+      put(w, X, at, -right.x * 5.9, -right.y * 5.9, cs); X.started = true;
+      X.vx += ahead.x * drawAhead + right.x * 0.05; X.vy += ahead.y * drawAhead + right.y * 0.05;
+      expect(w.rights(B, X).kc).toBe(B);
+      aiThink(w, B, DT);
+      expect(B.luff).toBe(false);
+      moves.push(wrap(B.desired - B.h));
+    }
+    expect(Math.abs(moves[0] - moves[1])).toBeLessThan(3);
+  });
 });
 
