@@ -6,7 +6,7 @@ import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
 import type { World } from './world';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
-import { landDist, routeAround, sailLeg, type SailResult } from './routing';
+import { groundLaylines, landDist, routeAround, sailLeg, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
@@ -40,11 +40,11 @@ function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'lan
   for (let i = 1; i < route.length; i++) {
     const r = sailLeg(o, at, route[i], tt, 'middle', undefined, i === route.length - 1 ? 30 : 120, 360);
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
+    if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
     // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
     at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
     if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
-    if (!r.ok) { ok = false; why = r.why; break; }
   }
   return { ok, why, minutes: tt - t, track, legs };
 }
@@ -77,6 +77,9 @@ export interface PassageNow {
   why?: 'land' | 'time';
   /** distance over the ground along her track (m), and where she tacks and gybes */
   sailedM: number; tacks: Vec[]; gybes: Vec[];
+  /** the laylines into the destination over the ground (routing.ts groundLaylines: the wind, the chop and the current
+   * where she made her last tack or gybe), if she beats or runs the last of the way in: her last board is on one */
+  laylines: { kind: 'beat' | 'run'; tracks: [Vec, Vec] } | null;
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
@@ -90,10 +93,15 @@ export function passageNow(w: World): PassageNow | null {
   const m = nowMemo.get(w); if (m && m.key === key && m.refs.every((r, i) => r === refs[i])) return m.v;
   const o = outlookFor(w), route = routeAround(from, dest.p), r = passage(o, route, t0);
   const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
-  const turns = r.legs.flatMap(l => l.turns);
+  const turns = r.legs.flatMap(l => l.turns), last = r.legs[r.legs.length - 1];
+  const lk: 'beat' | 'run' | null = !last ? null : last.turns.length ? (last.turns[last.turns.length - 1].kind === 'gybe' ? 'run' : 'beat') : last.kind === 'reach' ? null : last.kind;
+  // (the laylines she tacked or gybed onto: the wind and the current where and when she made her last turn, which is
+  // where she saw she'd lay the mark; with no turn on the last stretch, those at the mark when she gets there)
+  const lt = last?.turns[last.turns.length - 1], ltT = lt ? r.track.find(q => dist(q.p, lt.p) < 1)?.t : undefined;
+  const laylines = lk ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
   const v: PassageNow = { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
     tacks: turns.filter(q => q.kind === 'tack').map(q => q.p), gybes: turns.filter(q => q.kind === 'gybe').map(q => q.p),
-    leave: t0, eta: r.ok ? t0 + r.minutes : null };
+    laylines, leave: t0, eta: r.ok ? t0 + r.minutes : null };
   nowMemo.set(w, { key, refs, v });
   return v;
 }

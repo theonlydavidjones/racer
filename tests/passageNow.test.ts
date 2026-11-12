@@ -63,6 +63,10 @@ describe('sailLeg (the review of the course estimate)', () => {
     expect(onLand(a) || onLand(b)).toBe(false);
     const r = sailLeg(plain(8, 0, { kt: 1, to: 220 }), a, b, 0, 'middle');
     expect(r.ok).toBe(true); expect(r.turns.length).toBeGreaterThan(0); expect(r.turns.every(q => q.kind === 'tack')).toBe(true);
+    // and tacks as a boat would: a few on a 0.8 nm fetch, none a few seconds after the last (the review: bursts of them)
+    expect(r.turns.length).toBeLessThanOrEqual(3);
+    const tt = r.turns.map(q => r.path.find(x => dist(x.p, q.p) < 1)!.t);
+    for (let i = 1; i < tt.length; i++) expect((tt[i] - tt[i - 1]) * 60, `tack ${i}`).toBeGreaterThan(30);
     // and never closer to the wind, through the water, than she can sail (her polar's beat angle, less a little for the
     // wind's own bend by the current)
     const beat = beatAngle(8);
@@ -86,4 +90,20 @@ describe('sailLeg (the review of the course estimate)', () => {
     w.applyConditions({ ...w.settings, current: 'slack' });
     const b = passageNow(w)!; expect(b).not.toBe(a);
   });
+});
+
+describe('the laylines drawn with the passage', () => {
+  // the owner: "I don't understand how the laylines work, since the course plotting doesn't follow those laylines"
+  for (const [from, to, tt] of [['alcatraz', 'crissy', '15:00'], ['cityfront', 'crissy', '12:00'], ['pier39', 'gate', '15:00'], ['alcatraz', 'gate', '13:00']] as const)
+    it(`${from} to ${to} at ${tt}: her last board into the mark is on one of them (within 5°)`, () => {
+      const pn = passageNow(at({ sailFrom: from, sailTo: to, tideTime: tt }))!;
+      expect(pn.ok).toBe(true); expect(pn.laylines).not.toBe(null);
+      const tr = pn.track, end = tr[tr.length - 1].p, lastTurn = pn.tacks.concat(pn.gybes).reduce((a, q) => {
+        const i = tr.findIndex(r => dist(r.p, q) < 1); return i > a ? i : a; }, -1);
+      expect(lastTurn).toBeGreaterThan(0);
+      // the last board's track over the ground, from just after the turn (she's drifting in it) to the mark
+      const st = tr[Math.min(tr.length - 2, lastTurn + 1)].p, dir = Math.atan2(end.x - st.x, end.y - st.y) * 180 / Math.PI;
+      const off = Math.min(...pn.laylines!.tracks.map(g => Math.abs(wrap(dir - Math.atan2(g.x, g.y) * 180 / Math.PI))));
+      expect(off).toBeLessThan(5);
+    });
 });

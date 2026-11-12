@@ -6,8 +6,8 @@ import type { Tf } from './draw2d';
 /*
  * The wind and the current on the maps, as Windy draws them (the owner: "more prominent information from the condition
  * layers, similar to how the Windy app handles it"): the speed as colour over the water, and moving streaks the way it
- * flows. One of the two at a time. The colour is the mean (the wind without its puffs and gusts, which the map draws
- * separately; the current as the tide sets it); the readout under the cursor is what's there.
+ * flows. One of the two at a time. The colour is the wind with its puffs and lulls (not the gusts of the seconds), and
+ * the current as the tide sets it; the readout under the cursor is what's there.
  */
 
 export type FlowKind = 'wind' | 'current';
@@ -34,8 +34,9 @@ export function rampColor(r: Ramp, v: number): [number, number, number] {
 /** The flow at p for the map: its speed (kt) and the way it goes (a unit vector, x east, y north). */
 export function flowAt(w: World, kind: FlowKind, p: Vec): { kt: number; ux: number; uy: number } {
   if (kind === 'wind') {
-    // the mean wind here: the day's wind with the shore's lee and the slot (World.fieldAt), not the passing puffs
-    const f = w.fieldAt(p), kt = w.wind.kt * f.k, a = (w.wind.from + f.turn) * Math.PI / 180;
+    // the wind here: the day's wind with the shore's lee and the slot (World.fieldAt), and the puffs and lulls drifting
+    // over it (the owner: puffs in the field's own colours, not grey), without the gusts of the seconds
+    const f = w.fieldAt(p), q = w.puffs.at(p), kt = w.wind.kt * f.k * q.k, a = (w.wind.from + f.turn + q.veer) * Math.PI / 180;
     return { kt, ux: -Math.sin(a), uy: -Math.cos(a) };
   }
   const c = w.currentAt(p), s = Math.hypot(c.x, c.y);
@@ -77,13 +78,14 @@ export class FlowField {
   private kt = new Float32Array(0); private ux = new Float32Array(0); private uy = new Float32Array(0);
   /** samples worked out last time, and how long that took (ms): for the frame-cost check */
   lastSamples = 0; lastMs = 0;
-  draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, wd: World, kind: FlowKind, alpha: number, cellPx = 12): void {
+  draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, wd: World, kind: FlowKind, alpha: number, cellPx = 12, everyS = 60): void {
     if (!(w > 0 && h > 0 && scale > 0 && cellPx > 0)) return; // (a map not laid out yet, or hidden)
     const { m, inv } = affine(tf);
     const cs = [inv(0, 0), inv(w, 0), inv(0, h), inv(w, h)], xs = cs.map(p => p.x), ys = cs.map(p => p.y);
     const vx0 = Math.min(...xs), vx1 = Math.max(...xs), vy0 = Math.min(...ys), vy1 = Math.max(...ys);
-    const d = cellPx / scale, minute = Math.floor(wd.clockUtc);
-    const key = `${kind}|${minute}|${wd.seed}|${wd.wind.from.toFixed(0)}`;
+    // (worked out again every `everyS` seconds of the sim's clock: the puffs drift, the tide turns)
+    const d = cellPx / scale, bucket = Math.floor(wd.clockUtc * 60 / everyS);
+    const key = `${kind}|${bucket}|${wd.seed}|${wd.wind.from.toFixed(0)}`;
     const inside = this.img && vx0 >= this.x0 && vx1 <= this.x0 + (this.nx - 1) * this.d && vy1 <= this.y1 && vy0 >= this.y1 - (this.ny - 1) * this.d;
     if (![vx0, vx1, vy0, vy1, d].every(Number.isFinite)) return;
     if (!inside || key !== this.key || Math.abs(Math.log(d / this.d)) > 0.25) this.build(wd, kind, vx0, vx1, vy0, vy1, d, key);
@@ -128,8 +130,8 @@ export class FlowField {
 }
 
 /** Screen speed of the streaks (px/s per kt): the slot's run, the lee's crawl; the current's are scaled up, being slower. */
-const PX_PER_KT: Record<FlowKind, number> = { wind: 3, current: 22 };
-const HIST = 8, EVERY = 0.06; // a trail of 8 points, one every 0.06 s: about half a second behind each
+const PX_PER_KT: Record<FlowKind, number> = { wind: 6, current: 40 };
+const HIST = 20, EVERY = 0.08; // a trail of 20 points, one every 0.08 s: a second and a half behind each, long and smooth (the mock-up's)
 
 /**
  * The streaks: a pool of particles carried along the flow in the sim's metres, each with a short fading trail, put
@@ -156,7 +158,7 @@ export class Streaks {
       if (this.age[i] > this.life[i]) { // a new one, somewhere on the water in view
         let p = inv(this.rnd() * w, this.rnd() * h);
         for (let t = 0; t < 4 && !field.at(p); t++) p = inv(this.rnd() * w, this.rnd() * h);
-        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 1.5 + this.rnd() * 2.5;
+        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 3 + this.rnd() * 3;
         this.hx[i * HIST] = p.x; this.hy[i * HIST] = p.y; this.hn[i] = 1;
       }
       const p = { x: this.xs[i], y: this.ys[i] }, f = field.at(p);
@@ -176,7 +178,7 @@ export class Streaks {
     ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = lineW;
     const pt = (i: number, j: number, k: number): [number, number] => j === k ? tf(this.xs[i], this.ys[i]) : tf(this.hx[i * HIST + j], this.hy[i * HIST + j]);
     for (let a = 0; a < HIST; a++) {
-      ctx.strokeStyle = `rgba(${color},${(0.9 * (1 - a / HIST)).toFixed(2)})`; ctx.beginPath();
+      ctx.strokeStyle = `rgba(${color},${(0.85 * (1 - a / HIST)).toFixed(2)})`; ctx.beginPath();
       for (let i = 0; i < this.n; i++) {
         const k = this.hn[i]; if (!Number.isFinite(this.age[i]) || k < 1) continue;
         const j = k - 1 - a; if (j < 0) continue; // (points 0…k−1 recorded, then where it is now, as point k)
@@ -194,7 +196,7 @@ export function drawLegend(ctx: CanvasRenderingContext2D, kind: FlowKind, cx: nu
   ctx.save();
   ctx.fillStyle = 'rgba(9,22,33,.88)'; ctx.beginPath(); ctx.roundRect(x0 - 12, y - 30, W + 24, 58, 8); ctx.fill();
   ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillStyle = '#e9f2f5'; ctx.textAlign = 'left';
-  ctx.fillText(kind === 'wind' ? 'WIND SPEED · KT (mean; puffs drawn over it)' : 'CURRENT · KT (NOAA tide predictions)', x0, y - 14);
+  ctx.fillText(kind === 'wind' ? 'WIND SPEED · KT (with the puffs and lulls)' : 'CURRENT · KT (NOAA tide predictions)', x0, y - 14);
   for (let x = 0; x < W; x++) { const c = rampColor(R, x / W * max); ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.fillRect(x0 + x, y - 6, 1, 12); }
   ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#e9f2f5';
   for (const t of ticks) ctx.fillText(String(t), x0 + t / max * W, y + 20);

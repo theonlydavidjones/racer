@@ -41,7 +41,7 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { drawCourse, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
@@ -90,7 +90,7 @@ export class Hud {
   /** The wind or current as Windy draws it (ui/flow.ts): the colour field for each map, and its moving streaks (drawn
    * every frame on a canvas over each map: the maps themselves are drawn ten times a second, or when the chart moves). */
   private flowField = { inset: new FlowField(), chart: new FlowField() };
-  private streaks = { inset: new Streaks(150), chart: new Streaks(1500) };
+  private streaks = { inset: new Streaks(120), chart: new Streaks(900) };
   private mapFx = $<HTMLCanvasElement>('mapFx');
   /** how each map was drawn last (its transform), for the streaks */
   private drawn: Partial<Record<'inset' | 'chart', { tf: Tf; w: number; h: number; scale: number; kind: FlowKind | null }>> = {};
@@ -692,10 +692,12 @@ export class Hud {
     // streaks over it (drawn every frame on the map's overlay: insetStreaks, chartFx); the sea state; or the fog
     const field = fieldLayer(S), kind: FlowKind | null = field === 'wind' || field === 'current' ? field : null;
     if (field === 'sea') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
-    if (kind) this.flowField[detail].draw(ctx, tf, w, h, scale, wd, kind, detail === 'chart' ? 0.6 : 0.35, detail === 'chart' ? 16 : 8);
-    if (kind === 'wind') drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I); // (the puffs and lulls, drifting over the mean)
     this.drawn[detail] = { tf, w, h, scale, kind };
-    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null, L = laylinesFor(wd, u);
+    // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
+    // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
+    const plan = wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
+    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key
     const sim: SimKey[] = ['you'];
     if (wd.boats.length > 1) sim.push('boats');
@@ -711,9 +713,10 @@ export class Hud {
     this.keyState[detail] = { sim, pal, scale };
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
+    // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore);
+    // the inset's every 5 s of the clock (the puffs drift by), the chart's every 10 (it's paused)
+    if (kind) this.flowField[detail].draw(ctx, tf, w, h, scale, wd, kind, detail === 'chart' ? 0.6 : 0.35, detail === 'chart' ? 14 : 8, detail === 'chart' ? 10 : 5);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
-    // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all)
-    const plan = wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
     if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
     else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
