@@ -98,6 +98,8 @@ export interface Boat {
   ocs: boolean;
   leg: number; // index of the next mark
   finished: boolean;
+  /** retired from the race (RRS A5.1 RET): no longer racing, as if finished, but scored RET */
+  retired?: boolean;
   finishT: number | null;
   prevD: number | null;
   prevAng: number | null;

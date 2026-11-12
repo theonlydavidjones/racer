@@ -282,3 +282,14 @@ export function describeSea(s: SeaHere): string {
   const chop = s.hsW < 0.05 ? 'glassy' : `${ft(s.hsW)} chop${s.steep > 0.075 ? ', short and steep' : s.hsW > 0.3 && s.steep < 0.05 ? ', long and smooth' : ''}`;
   return s.hsS >= 0.05 ? `${chop} · ${ft(s.hsS)} swell, ${Math.round(s.tpS)} s` : chop;
 }
+
+/**
+ * How foam on the water drifts (m/s, east and north): with the surface water, the current plus the wind's drift of the
+ * top layer, about 3% of the wind (the drift factor oil-spill and search-and-rescue models use: NOAA's GNOME takes 1–4%
+ * windage for floating things). Not with the waves' crests, and nothing like the wind's own speed.
+ */
+export const FOAM_DRIFT = 0.03;
+export function foamDrift(windFrom: number, windKt: number, cur: Vec): Vec {
+  const d = V(windFrom + 180), u = windKt * KT * FOAM_DRIFT;
+  return { x: d.x * u + cur.x, y: d.y * u + cur.y };
+}

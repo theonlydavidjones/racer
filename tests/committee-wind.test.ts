@@ -40,6 +40,15 @@ describe(`the committee calls racing off over ${CANCEL_KT} kt (the SF Bay Folkbo
     expect(w.cancelled?.up).toEqual(['N', 'A']);
     expect(w.cancelled!.t).toBeGreaterThan(60);
   }, 60000);
+  it('conditions changed mid-race to 30 kt: the committee watches the new wind two minutes, then N over A', () => {
+    const w = race(14);
+    while (w.t < 60) w.step(DT);
+    w.applyConditions({ ...w.settings, windKt: 30 });
+    const t0 = w.t;
+    while (w.t < t0 + 300 && !w.cancelled) w.step(DT);
+    expect(w.cancelled?.up).toEqual(['N', 'A']);
+    expect(w.cancelled!.t - t0).toBeGreaterThan(119); expect(w.cancelled!.t - t0).toBeLessThan(130);
+  }, 60000);
   it("the strategist's briefing warns first when the forecast is over the limit, and not on an ordinary day", () => {
     expect(raceBrief(race(28)).sections[0].id).toBe('limit');
     expect(raceBrief(race(12)).sections.some(s => s.id === 'limit')).toBe(false);
