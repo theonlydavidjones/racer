@@ -212,6 +212,8 @@ export interface Boat {
    * its own length: each motion's progress). For the drawing to
    * read (render/boatMesh.ts still draws the spec's setting: Boat Detail's to switch). */
   companionway?: { doors: 'in' | 'out'; hatch: 'closed' | 'open'; doorsT: number; hatchT: number };
+  /** No crew fumbles on this boat (your setting: Settings.crewFumbles). */
+  noFumbles?: boolean;
   /** Out cruising, not racing: the crew sit for comfort (crewPhys.ts standInHatch). */
   cruising?: boolean;
   /** The crew's calls of the puffs and lulls coming (crewEyes.ts crewLook, once a second): what they believe, soonest first. */

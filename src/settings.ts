@@ -45,6 +45,8 @@ export interface Settings {
   boatId: string;
   boat: BoatSpec;
   /** Who's aboard your boat: you at the helm, and 0–2 crew. Heights in metres, weights in kg, skill 0 novice … 1 expert, and optionally each attribute on its own (boat/crewPhys.ts Person). */
+  /** Your crew fumble now and then under pressure, as every crew does (the owner: switchable off for your boat). */
+  crewFumbles?: boolean;
   crew: { n: 0 | 1 | 2; helm: Person; people: Person[] }; // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 

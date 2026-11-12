@@ -151,6 +151,11 @@ export interface CrewState {
   fore01?: number; foreT?: number;
   /** Who's standing in the companionway, or wants to (an index into people; null: no one), and since when (s, c.clock). */
   stander?: number | null; standerT?: number;
+  /** How much pressure they're under now, 0 … 1 (sim/pressure.ts), and how many of their manoeuvres have been drawn for
+   * a fumble (each its own fixed draw). */
+  pressure?: number; fumbleN?: number;
+  /** What just went wrong, to tell you (physics.ts says it, once). */
+  fumbled?: string;
   /** The free crew's wanted arm last time (m, + to windward): whether their weight is wanted on the rail. */
   crewArmLast?: number;
   /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
@@ -275,6 +280,28 @@ const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * attrOf(p, 'fitnes
 export const reactTime = (p: Person) => 1.6 - 1.2 * attrOf(p, 'react');
 /** Pace of a person's work and movement against a club crew (1 at handling 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
 export const pace = (p: Person) => 0.55 + 0.75 * attrOf(p, 'handling');
+/**
+ * How much the pressure gets to this person now, 0 … 1: the pressure, as far as their composure doesn't hold it off.
+ * It slows their reaction (up to 60% longer at full stress) and their hands (up to 20% slower), and makes a fumble
+ * likelier (FUMBLE). Estimates: the effect of pressure on a crew's work isn't measured anywhere the researchers found.
+ */
+export const stressOf = (c: { pressure?: number } | undefined, p: Person) => (c?.pressure ?? 0) * (1 - attrOf(p, 'composure'));
+export const STRESS = { react: 0.6, pace: 0.2 };
+/**
+ * A fumble under pressure: the chance at each manoeuvre (a tack's jib haul, a pole set) is `odds` × the person's stress
+ * (a novice at the gun, about one in four; a club crew, one in seven; an expert, rarely), and it costs `min` to `max` s
+ * (the sheet snags on the winch, a riding turn, the pole caught on the shrouds). A fixed draw for each crew and each of
+ * their manoeuvres, so a race is the same every time. Estimates.
+ */
+export const FUMBLE = { odds: 0.35, min: 2, max: 6 };
+/** Whether this manoeuvre goes wrong, and how long it costs (s; 0 if it doesn't). */
+export function fumble(c: CrewState, p: Person, on: boolean): number {
+  const n = c.fumbleN = (c.fumbleN ?? 0) + 1, s = stressOf(c, p);
+  if (!on || s <= 0) return 0;
+  if (crewDraw(c.spec, 100 + 2 * n) >= FUMBLE.odds * s) return 0;
+  return FUMBLE.min + (FUMBLE.max - FUMBLE.min) * crewDraw(c.spec, 101 + 2 * n);
+}
+
 /** Hiking endurance (s at a full hike, by fitness) and recovery time constant (s): Vogiatzis 1995 (above). */
 export const ENDURE = (p: Person) => 300 + 210 * attrOf(p, 'fitness'), RECOVER = 60;
 

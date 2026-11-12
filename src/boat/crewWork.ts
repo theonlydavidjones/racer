@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, STRESS, Z, allAboard, attrOf, fumble, pace, stressOf, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -145,14 +145,15 @@ const DONE = 1e-4;
 export function workPace(b: Boat, who: number): number {
   const c = b.crew; if (!c) return 1;
   const p = allAboard(c.spec)[who];
-  return pace(p) * (who === 0 && c.spec.crew.length === 0 ? 0.6 : 1);
+  return pace(p) * (who === 0 && c.spec.crew.length === 0 ? 0.6 : 1) * (1 - STRESS.pace * stressOf(c, p));
 }
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
-function reachTime(a: Aboard, st: Station | null, windward: number, p: Person): number {
-  if (!st) return reactTime(p) * 0.5;
+function reachTime(a: Aboard, st: Station | null, windward: number, p: Person, stress = 0): number {
+  const react = reactTime(p) * (1 + STRESS.react * stress);
+  if (!st) return react * 0.5;
   const dx = Math.abs(st.arm * windward - a.x), dz = Math.abs(st.z - a.z), forward = st.z < Z.cockpitFwd - 0.2;
-  return reactTime(p) + (dx + dz) / ((forward ? 0.5 : 0.9) * pace(p));
+  return react + (dx + dz) / ((forward ? 0.5 : 0.9) * pace(p));
 }
 
 /**
@@ -217,7 +218,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
     const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);
     // the sheets are in hand: no walk unless they're away from them
-    const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
+    let reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who], stressOf(c, ppl[who]));
+    // (the haul after a tack, under pressure: now and then it goes wrong, a riding turn or the sheet caught on the winch)
+    if (k === 'jibsheet' && st != null && hauling && e > JIB_HAUL) {
+      const lost = fumble(c, ppl[who], !b.noFumbles);
+      if (lost > 0) { reach += lost; c.fumbled = `A riding turn on the jib winch: the jib sheet's ${Math.round(lost)} s late coming in.`; }
+    }
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;

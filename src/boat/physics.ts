@@ -11,7 +11,7 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, attrOf, reactTime, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, attrOf, fumble, reactTime, STRESS, stressOf, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { puffAlong } from './crewEyes';
 import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
@@ -86,6 +86,8 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
 /** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
 function crewPole(b: Boat, dt: number, emit: Emit): void {
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg }); };
+  // (a fumble just now, anywhere aboard: said once)
+  if (b.crew?.fumbled) { say(b.crew.fumbled); b.crew.fumbled = undefined; }
   // a seasoned forward hand goes up before the bear-away, ready (ai.ts crewPoleCall renews b.polePrepUntil, a few
   // seconds ahead on the crew's clock, while it holds: so it lapses by itself once she's round, or when nothing renews it)
   const prep = (b.polePrepUntil ?? -1) > (b.crew?.clock ?? 0) && b.pole === 'down' && !b.poleWant && !(b.penalty > 0);
@@ -107,7 +109,12 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
     b.poleWalk -= dt;
     if (b.poleWalk <= 0 && (poleAt(b) || b.poleWalk < -15)) {
       b.poleWalk = undefined;
-      if (act === 'set') { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+      if (act === 'set') {
+        b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack;
+        // (under pressure, now and then the pole goes wrong: caught on the shrouds, the jaw won't open)
+        const c = b.crew, lost = c ? fumble(c, allAboard(c.spec)[ownerFor(c, 'pole')], !b.noFumbles) : 0;
+        if (lost > 0) { b.poleT += lost; c!.fumbled = `The pole caught on the shrouds: ${Math.round(lost)} s more to get it on.`; }
+      }
       else if (act === 'stow') { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
       else { b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack; say('Gybing the pole end-for-end. The jib is down while it goes across.'); }
     }
@@ -929,7 +936,7 @@ const CLUB_REACT = reactTime({ h: 1.75, w: 75 });
  */
 function trimmerLag(b: Boat, line: 'mainsheet' | 'jibsheet'): number {
   const p = trimmerOf(b, line);
-  return p ? CREW_LAG * (reactTime(p) / CLUB_REACT) : CREW_LAG;
+  return p ? CREW_LAG * (reactTime(p) / CLUB_REACT) * (1 + STRESS.react * stressOf(b.crew, p)) : CREW_LAG;
 }
 /**
  * The puff's change to her wind from now to `ahead` s on, along the track her crew judged (crewEyes.ts puffAlong): its
