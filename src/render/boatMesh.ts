@@ -114,7 +114,7 @@ const MAT = {
   deckGrp: new THREE.MeshLambertMaterial({ color: 0xb9b5ab, side: THREE.DoubleSide }), // matte non-skid reads darker than the glossy cabin top
   // clear (silver) anodised aluminium, the usual Folkboat extrusion (as CircleSea's boom, the owner's photo): a satin
   // mid-grey with soft, broad highlights, not a mirror (it read as white plastic, taking the bright sky)
-  sparAlu: reflect(new THREE.MeshPhongMaterial({ color: 0x9da3a9, specular: 0x5c6166, shininess: 28 }), 0.08),
+  sparAlu: reflect(new THREE.MeshPhongMaterial({ color: 0x8e959b, specular: 0x5c6166, shininess: 28 }), 0.08),
   wire: new THREE.LineBasicMaterial({ color: 0x333333 }),
   wood: reflect(new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40 }), 0.06), // varnished trim
   tiller: new THREE.MeshPhongMaterial({ color: 0xb07a44, specular: 0x664422, shininess: 50 }),
