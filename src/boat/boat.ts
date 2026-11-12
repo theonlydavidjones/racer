@@ -34,6 +34,8 @@ export interface AiState {
   lastHail: number; // when she last hailed for room to tack
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
   goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
+  /** A mark she's keeping clear of, and the side she's passing it on (+1: it to starboard), so she doesn't swap sides each second. */
+  passing?: { key: string; side: number } | null;
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
   /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
@@ -153,6 +155,10 @@ export interface Boat {
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
   trim: { main: SailTrim; jib: SailTrim | null };
   awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)
+  /** Her steady leeway (deg, a few seconds' mean, at her polar speed here): her course through the water is this much further off the wind than her heading. */
+  leeway?: number;
+  /** The sails' frame's turn from her heading (deg, + to starboard: physics.ts sailFrame). */
+  sailRot?: number;
   /** The true wind's speed (kt) over the last 20 s or so: the breeze the crew set their depowering for. */
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end

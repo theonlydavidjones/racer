@@ -26,6 +26,7 @@ const MARK_ROOM = 5;
 const HALF_BEAM = 1.1;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
+  let near: string | null = null;
   for (const m of w.touchableMarks(b)) {
     // (the nearest point of it: a buoy is a point, the committee boat a hull 12 m long, `p` to `q`)
     let np = m.p;
@@ -37,11 +38,16 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
     const need = Math.asin(Math.min(1, (MARK_ROOM + m.r + HALF_BEAM) / d)) / (Math.PI / 180);
     if (Math.abs(rel) < need && Math.abs(rel) < 90) {
       // pass it on the side it's already on; if that means heading up past close-hauled (sailable would undo it, and she'd
-      // sail on into it), pass it on the other side, bearing away
+      // sail on into it), pass it on the other side, bearing away. Once she's chosen a side she holds to it until she's
+      // clear (her course swinging as she turns would swap them back and forth, and she'd hold on into it)
       const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
-      desired = Math.abs(wrap(sailable(b, keep) - keep)) < 1 ? keep : other;
+      const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`, prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
+      const useKeep = prev ? Math.sign(rel || 1) === prev : Math.abs(wrap(sailable(b, keep) - keep)) < 1;
+      desired = useKeep ? keep : other;
+      near = key; if (b.ai && !prev) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
     }
   }
+  if (b.ai?.passing && b.ai.passing.key !== near && !w.touchableMarks(b).some(m => `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}` === b.ai!.passing!.key && dist(b, m.p) < 30)) b.ai.passing = null;
   return desired;
 }
 
@@ -481,6 +487,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   desired = sailable(b, avoidMarks(w, b, desired));
+  // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
+  // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
+  const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
+  if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
   b.desired = desired; b.luff = luff;
   // whisker pole: wing-on-wing when running deep, stowed before the next rounding mark
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
