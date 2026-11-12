@@ -261,15 +261,18 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
 
 describe('How often the crew move (crewPhys.ts HOLD)', () => {
   /** Ten minutes upwind in a puffy breeze (10 kt, ±2 kt over half a minute, flickering ±0.7 kt every few seconds): how many times each crew member sets off for a new place. */
-  function moves(windKt: number) {
+  let lastTrips: number[] = [];
+  function moves(windKt: number): number[] {
     const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4, windKt }); b.crew = newCrew(crewOf(0.6), 'S');
     sail(b, 30, () => { b.h = courseHeading(b, 360 - twa); });
-    const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0); // (then held: her leeway at the mean wind)
+    const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0), trips = last.map(() => 0); // (then held: her leeway at the mean wind)
     sail(b, 600, t => {
       b.h = h; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
-      // (moves to a seat: a trip to a line at the cabin top and back is the puff being trimmed for, not the flicker)
-      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (!p.job?.station) n[i]++; last[i] = { ...p.goal }; } });
+      // (setting off for a seat, or back to one from a job; a trip out to a line at the cabin top is the puff being
+      // trimmed for, not the flicker, and is counted on its own)
+      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (p.job?.station) trips[i]++; else n[i]++; last[i] = { ...p.goal }; } });
     });
+    lastTrips = trips.slice(1);
     return n.slice(1);
   }
   it('they sit still through the flicker and move on the real puffs and lulls', () => {
@@ -279,6 +282,8 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     // out on the puff and in on the lull (a step more at most), not every flicker (twenty cycles: under four moves a cycle; without the dead
     // band it was over 700)
     for (const m of moves(7)) expect(m).toBeLessThan(80);
+    // (and the lines aren't hunted: a trip out to them every forty seconds at most; 9 in the ten minutes as it stands)
+    for (const t of lastTrips) expect(t).toBeLessThan(15);
   }, 30000);
 });
 
@@ -324,10 +329,10 @@ describe('A puff with someone away at a job (physics review)', () => {
 describe('The crew\'s places fore and aft and the trim the polar is sailed within', () => {
   it('hullTrim.ts TRIM.reach is the trim a standard crew gives her from crewPhys.ts Z\'s forward and aft ends of the cockpit', async () => {
     const { TRIM, trimFromMoment } = await import('../src/boat/hullTrim');
-    const { Z, DEFAULT_CREW } = await import('../src/boat/crewPhys');
-    const ref = [1.2, 1.8], at = (f: number) => trimFromMoment(DEFAULT_CREW.crew.reduce((m, p, j) => {
-      const zf = Z.cockpitFwd + j * Z.gap, za = Z.cockpitAft - (1 - j) * Z.gap; return m + p.w * (ref[j] - (za + (zf - za) * f));
-    }, 0));
+    const { DEFAULT_CREW, stationZ } = await import('../src/boat/crewPhys');
+    const ref = [1.2, 1.8], at = (f: number, deck = false) => trimFromMoment(DEFAULT_CREW.crew.reduce((m, p, j) => m + p.w * (ref[j] - stationZ(j, 2, f, deck)), 0));
     expect(TRIM.reach[0]).toBeCloseTo(at(0), 3); expect(TRIM.reach[1]).toBeCloseTo(at(1), 3);
+    // (out on the side deck, aft of the jib winch, the forward end is short of the benches': hullTrim.ts's note)
+    expect(at(1, true)).toBeCloseTo(-0.0221, 3);
   });
 });

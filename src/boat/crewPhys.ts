@@ -197,8 +197,17 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.65, cockpitAft: 2.5,
  * Boat Detail's from Josephine's photos), so the forward hand sits out just aft of it, the pedestal's radius and half a
  * hip's width clear (1.4 + 0.075 + 0.18). On the benches inside the coaming, in the middle, they can go on forward.
  */
-const DECK_ARM = 0.5;
-const stationZ = (j: number, count: number, f: number, deck: boolean) => {
+/** At the coaming: the hips outboard of about this (m), out on the side deck or on the bench leaning back against the
+ * coaming (its inside face 0.71–0.74 between 1.35 and 1.65, render/hull.ts cockpitHalf), where the jib winch on its
+ * pedestal just outboard of it (render/crew.ts winchAt, x about 0.84) would be at their shoulder. Further in, on the
+ * bench or the sole, they're clear of it. (Drawn on the deck from about 0.66: render/crew.ts crewPose. Taking 0.66 here
+ * as well put a crew member leaning on the coaming in a puffy 7 kt back and forth across it, 87 seat moves in ten
+ * minutes against 75.) */
+export const DECK_ARM = 0.5;
+/** Crew member `j`'s place fore and aft among `count` free crew, `f` of the way from the aft end to the forward end
+ * (on a side deck, from just aft of the winch). Two crew at most (settings.ts): a third wouldn't fit along one side
+ * deck aft of the winch (1.65 to 2.5 is 0.85 m, three a shoulder's width apart need 1.0). */
+export const stationZ = (j: number, count: number, f: number, deck: boolean) => {
   const za = Z.cockpitAft - (count - 1 - j) * Z.gap, zf = Math.min(za, (deck ? Z.deckFwd : Z.cockpitFwd) + j * Z.gap);
   return za + (zf - za) * f;
 };
@@ -446,8 +455,15 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // across: crossing the cockpit (ducking under the boom) about 1 m/s for a club crew; leaning out or in, about 0.7 m/s
     const crossing = Math.sign(goal.x) !== Math.sign(a.x) && Math.abs(goal.x - a.x) > 0.5;
     const vx = (crossing ? 1.0 : 0.7) * pace(p) * (c.roll?.phase === 'flatten' ? 1.3 : 1);
+    const x0 = a.x, z0 = a.z;
     a.x += clamp(goal.x - a.x, -vx * dt, vx * dt);
     a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
+    // (in the cockpit, round the jib winch on the side deck, not through it: in off the deck before going forward of it,
+    // and aft of it before going out on the deck. Going on forward of the cockpit, to the mast, they climb past it)
+    if (i > 0 && goal.z > Z.cockpitFwd - 0.05 && z0 > Z.cockpitFwd - 0.05) {
+      if (Math.abs(a.x) > DECK_ARM && a.z < Z.deckFwd && z0 >= Z.deckFwd - 1e-6) a.z = Z.deckFwd;
+      else if (a.z < Z.deckFwd && Math.abs(a.x) > DECK_ARM && Math.abs(x0) <= DECK_ARM) a.x = Math.sign(a.x) * DECK_ARM;
+    }
     const arm = a.x * w;
     const he = i === 0 ? deckHalf(Z.helm) : crewEdge(c, i);
     a.lean = clamp((arm - sitArm(p, he)) / Math.max(0.05, hikeArm(p, 1, he) - sitArm(p, he)), 0, 1);
@@ -505,13 +521,19 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
   // while the other stays put would otherwise put them in each other's laps)
-  // (and none of them out on a side deck forward of the winch there, held or not)
-  const out = tgt.map((t, i) => i > 0 && !!t && (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') && Math.abs(t.arm) > DECK_ARM ? i : -1).filter(i => i > 0);
-  for (const i of out) if (tgt[i].z < Z.deckFwd) { tgt[i].z = Z.deckFwd; const hi = held[i]; if (hi) hi.z = Z.deckFwd; }
-  out.sort((a, b) => tgt[a].z - tgt[b].z);
+  // (and none of them out on a side deck forward of the winch there, held or not; and clear of a crewmate working the
+  // cabin-top lines from that side deck, whose place is fixed by the job)
+  const seated = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
+  const onDeckI = (i: number) => i > 0 && !!tgt[i] && Math.abs(tgt[i].arm) > DECK_ARM;
+  const out = tgt.map((t, i) => onDeckI(i) && seated(t) ? i : -1).filter(i => i > 0);
+  const atJob = tgt.map((t, i) => onDeckI(i) && !seated(t) && t.z > Z.cockpitFwd - 0.5 ? i : -1).filter(i => i > 0);
+  const put = (i: number, z: number) => { tgt[i].z = z; const hi = held[i]; if (hi) hi.z = z; };
+  for (const i of out) if (tgt[i].z < Z.deckFwd) put(i, Z.deckFwd);
+  for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
+  // (in their order along the cockpit, front to back: the one whose place is forward keeps it)
   for (let q = 1; q < out.length; q++) for (let r = 0; r < q; r++) {
     const a = tgt[out[r]], b = tgt[out[q]];
-    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) { b.z = Math.min(Z.cockpitAft, a.z + Z.gap); const hq = held[out[q]]; if (hq) hq.z = b.z; }
+    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) put(out[q], Math.min(Z.cockpitAft, a.z + Z.gap));
   }
 }
 
