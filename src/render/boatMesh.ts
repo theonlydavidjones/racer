@@ -645,6 +645,8 @@ const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Ve
  * car upwind. And the vang's block under the boom, about a quarter of the way out (the same photo).
  */
 const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
+/** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
+const MS_GAP = 0.15;
 /** The vang's lower block: on its fitting at the foot of the mast, abaft it (fixed to the mast: the tackle swings to the boom's block). */
 const VANG_FOOT = new THREE.Vector3(0, sheer(uAtZ(MAST_Z)) + 0.045 + 0.07 + 0.05, MAST_AFT_Z + 0.05);
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
@@ -705,7 +707,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   sailPics.set(jibMat, { front: jibMat, back: jibBack, stbd: pics.jibStbd, port: pics.jibPort });
   const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, MAST_AFT_Z); rig.add(boomPivot);
   // the mainsheet's upper block, hung from a strap under the boom's end
-  { for (const dx of [-0.014, 0.014]) { const ub = sheaveBlock(0.03, -0.075); ub.position.set(dx, BOOM_END.y - BOOM_R, MS_R); boomPivot.add(ub); } } // (a double block)
+  { for (const dz of [-MS_GAP / 2, MS_GAP / 2]) { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, MS_R + dz); boomPivot.add(ub); } } // (two blocks on bails, fore and aft)
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
   if (aluBoom) { // the extrusion's black moulded end fitting, at its after end (as CircleSea's)
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R * 1.05, BOOM_R * 1.05, 0.06, 10), MAT.dark); cap.rotation.x = Math.PI / 2; cap.position.set(0, BOOM_TOP - BOOM_R, E + 0.12 - 0.02); boomPivot.add(cap);
@@ -1076,11 +1078,14 @@ function syncLines(m: BoatMesh, b: Boat): void {
   const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
-  // (four parts between the lower block's sheave on the car and the upper double block's under the boom, side by side
-  // across the boom, then the tail from the car's block aft to the helmsman's hand)
-  { const ux = Math.cos(a), uz = -Math.sin(a), lo = tmpC.set(cx, L2.travCar.position.y + 0.06, TRAV_Z), boomZ = m.boomPivot.position.z;
-    const hi = tmpD.set(Math.sin(a) * MS_R, BOOM_END.y - BOOM_R - 0.075, boomZ + Math.cos(a) * MS_R);
-    for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.007, q = i % 2 ? hi : lo; p.setXYZ(i, q.x + ux * o, q.y, q.z + uz * o); }
+  // (four parts between the car's block and the two blocks under the boom, the after one then the forward one, then the
+  // tail from the car's block aft to the helmsman's hand)
+  { const ux = Math.cos(a), uz = -Math.sin(a), lo = tmpC.set(cx, L2.travCar.position.y + 0.06, TRAV_Z), boomZ = m.boomPivot.position.z, hy = BOOM_END.y - BOOM_R - 0.075;
+    for (let i = 0; i <= 4; i++) {
+      const o = (i - 2) * 0.007;
+      if (i % 2) { const r = MS_R + (i === 1 ? MS_GAP / 2 : -MS_GAP / 2); p.setXYZ(i, Math.sin(a) * r + ux * o, hy, boomZ + Math.cos(a) * r + uz * o); }
+      else p.setXYZ(i, lo.x + ux * o, lo.y, lo.z + uz * o);
+    }
     p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
