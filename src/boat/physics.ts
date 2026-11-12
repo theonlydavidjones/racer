@@ -164,6 +164,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   } else {
     let err = wrap(b.desired - b.h);
     const ai = b.ai;
+    // in the middle of a tack (within 20° of head to wind, committed to going through it) she finishes it to the course
+    // she set out for, whatever else comes up meanwhile: with her turn's inertia, a reversal there would leave her
+    // stopped head to wind; once she's through, she answers it (the keep-clear moves among them)
+    const midTack = !!ai && ai.turnCommit !== 0 && Math.abs(wrap(b.ww.from - b.h)) < 20 && Math.sign(wrap(ai.commitFor - b.h)) === ai.turnCommit;
+    if (midTack) err = wrap(ai!.commitFor - b.h);
     // a commitment ends when the turn is nearly done or she wants to go somewhere else
     if (ai && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
     if (ai && ai.turnCommit === 0 && Math.abs(err) > 30) {
