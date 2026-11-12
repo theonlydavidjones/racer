@@ -19,6 +19,26 @@ What's planned, roughly in order. Done work is described in the README.
 
 ## Priorities (owner's ranking, November 2026)
 
+**The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
+1. P0 phase 2: the interior true to a real Folkboat (Boat Detail, running; 6–10 h).
+2. Crystal clarity on the crew and trim controls: the full trim-panel review (the lines' ends are named, v104; 4–6 h).
+3. Finish the crew figures: the owner's choice on moving the crew's stations onto the real benches (<1 h once chosen,
+   then its own reviewed PR for the trim calibration).
+4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
+5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
+7. The debrief shown on the replay (3–5 h).
+8. Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home" (7–12 h).
+9. The flags' original motion back, and "Strike ensign" (1–2 h).
+10. P0 phase 4: deck hardware and lines, with the rigging detail (4–8 h).
+Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
+rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Building, aluminium spars, the boat cards, the
+showroom's time and conditions, the swinging lantern); Sam's; accounts for other players; real slip numbers and nicer
+moored boats; the sea inside the marinas; the desktop release; the phone layout (on hold). The Bay East work carries on
+as it is.
+
+The original ranking, for the record:
+
 Estimates are focused build hours including tests, review and publishing, ±50%.
 
 1. ~~Saves kept with your account; save or discard after each sail~~ (done, v53).
