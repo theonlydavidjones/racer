@@ -133,30 +133,62 @@ export function sailable(b: Boat, desired: number): number {
 
 /**
  * Racing called off for the day (N over A, or AP over A: "no more racing today", RRS Race Signals), as it is in a breeze
- * over the fleet's limit (sim/signals.ts): she sails home, to the entrance of the racing harbour nearest the course
- * (geo/marina.ts), by the way round the land a skipper would draw (sim/routing.ts), beating on the tack that points
- * nearer it and tacking off the shore; there, off the entrance, she lies to with her sails luffing (going in to her
- * berth is the harbour's work, not drawn yet). She's not racing, so the rules' Part 2 doesn't apply between her and
- * the others (keeping clear of the ships still does: World.keepClearOfShips).
+ * over the fleet's limit (sim/signals.ts): she sails home, to the racing harbour nearest the course (geo/marina.ts), by
+ * the way round the land a skipper would draw (sim/routing.ts), allowing for the current as she does racing (crabFor).
+ * Off the harbour she stands off and lies to (going in to her berth is the harbour's work, not drawn yet): at a spot of
+ * her own (the fleet spread along the wind, not all on one point), with open water a long way to leeward for the drift
+ * while she lies there, on the tack she came in on; drifted well off it, or with the land coming up to leeward, she
+ * sails back. The rest is her ordinary sailing (aiThink): the shore, the marks, and the right-of-way rules, which still
+ * apply between boats that have been racing (Part 2 preamble), though a boat not racing takes no penalty for breaking one.
  */
-function goHome(w: World, b: Boat): void {
-  const ai = b.ai!, from = b.ww.from;
+function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beating: boolean } {
+  const ai = b.ai!, from = b.ww.from, beat = beatFor(b);
   if (!ai.home) {
     let at = w.C.center, best = Infinity;
     for (const H of HARBORS) for (const e of H.exits) { const d = dist(e, w.C.center); if (d < best) { best = d; at = e; } }
-    ai.home = { route: routeAround(b, at, 120), i: 0, at };
+    const stand = standOff(w, b, at, from);
+    ai.home = { route: routeAround(b, stand, 120), i: 0, at: stand, lying: false };
   }
-  const h = ai.home;
-  if (dist(b, h.at) < HOME_R) { b.desired = n360(from + 90); b.luff = true; return; } // (home: off the entrance)
-  while (h.i < h.route.length - 1 && dist(b, h.route[h.i]) < 60) h.i++; // (each turn of the way passed within 60 m)
-  let desired = sailable(b, brg(h.route[h.i].x - b.x, h.route[h.i].y - b.y));
-  // beating, with the shore 100 m ahead on this tack: tack (the way's turns keep 120 m off, but a beat zigzags across it)
-  const beating = Math.abs(wrap(from - desired)) < beatFor(b) + 5;
-  if (beating && blocked(w, b, desired, 100)) desired = n360(from + (b.tack === 'S' ? 1 : -1) * (beatFor(b) + 1));
-  b.desired = desired; b.luff = false;
+  const h = ai.home, toLee = (p: Vec, d: number) => { const u = V(from + 180); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; };
+  // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
+  // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
+  if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
+  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = b.tack; }
+  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+  // her way: each turn of it passed within 60 m, or the next in sight with clear water to it
+  while (h.i < h.route.length - 1 && (dist(b, h.route[h.i]) < 60 || landAlong(b, h.route[h.i + 1]) === Infinity)) h.i++;
+  const q = h.i < h.route.length - 1 ? h.route[h.i] : h.at, bq = brg(q.x - b.x, q.y - b.y), rel = Math.abs(wrap(from - bq));
+  let desired = sailable(b, crabFor(bq, targetFor(b, rel) * 0.9, b.cur));
+  const beating = Math.abs(wrap(from - desired)) < beat + 5;
+  // the land within 100 m along her track over the ground (her heading through the water and the current's set): off it.
+  // Beating, she tacks, with way enough to (below about 1.5 m/s a tack becomes a gybe right round: physics.ts
+  // SLOW_TACK), and not onto land; else, or slow, she bears away to build speed and clear it
+  const track = (hd: number, d: number) => { const u = V(hd), s = Math.max(1, b.v); return { x: b.x + (u.x * s + b.cur.x) * d / s, y: b.y + (u.y * s + b.cur.y) * d / s }; };
+  if (landAlong(b, track(desired, 100)) < Infinity) {
+    const other = n360(from + (b.tack === 'S' ? 1 : -1) * (beat + 1));
+    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && landAlong(b, track(other, 60)) === Infinity) desired = other;
+    else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (landAlong(b, track(cand, 100)) === Infinity) { desired = cand; break; } }
+  }
+  return { desired, luff: false, beating };
 }
-/** How near the harbour's entrance (m) she counts herself home after racing's called off. */
-const HOME_R = 150;
+/**
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, reached from it straight, with no
+ * land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 40 m apart along the wind's line
+ * across, so the fleet isn't all on one point.
+ */
+function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
+  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
+  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
+  let best: Vec | null = null, cost = Infinity;
+  for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
+    const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r }, p = { x: c.x + across.x * spread, y: c.y + across.y * spread };
+    if (!clearLee(p) || landAlong(h, p) < Infinity) continue;
+    const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2; // (nearer, and upwind of the entrance, the better)
+    if (q < cost) { cost = q; best = p; }
+  }
+  return best ?? h;
+}
 
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
  * a few metres wide is in the way even if the water beyond it is clear. */
@@ -295,14 +327,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     b.luff = false; return;
   }
   ai.clearing = false;
-  if (w.cancelled && !b.finished) { goHome(w, b); return; } // (no more racing today: she sails home)
-  if (b.finished) { b.desired = n360(ww.from + 90); b.luff = true; return; }
+  const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
+  if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % 6 === 0; // heavy predictions 10× a second
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
   // see the wind she's in, not the course-wide wind); kept from the pre-start on, as crews take readings to learn it
   ai.avgFrom = ai.avgFrom == null ? ww.from : n360(ai.avgFrom + wrap(ww.from - ai.avgFrom) * Math.min(1, dt / 60));
-  if (w.t < 0) {
+  if (home) { desired = home.desired; luff = home.luff; beating = home.beating; }
+  else if (w.t < 0) {
     if (ai.mode === 'hold') {
       // reach back and forth below the line, each boat below her own part of it
       const off = (ai.f - 0.5) * w.lineLen * 0.7;
