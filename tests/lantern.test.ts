@@ -38,10 +38,17 @@ describe('cabin lantern', () => {
     expect(r).toBeLessThan(0.4); expect(r).toBeGreaterThan(0.1); // light damping: about a sixth left after 10 s
   });
 
-  it('a jump (a restart) starts it hanging still again', () => {
-    const g = hull(), s = makeLanternSwing(new THREE.Group()), at = new THREE.Vector3();
-    g.updateMatrix(); swingLantern(s, g, 1 / 60, at); s.v.set(1, 0, 0);
-    g.position.set(500, 0, 0); g.updateMatrix(); swingLantern(s, g, 1 / 60, at);
-    expect(angleOff(s)).toBeLessThan(0.1);
+  it('rolling 3° on a 3 s period, it swings against the cabin by about the roll, and her way over the ground does nothing', () => {
+    const g = hull(), s = makeLanternSwing(new THREE.Group()), at = new THREE.Vector3(), dt = 1 / 60;
+    let most = 0;
+    for (let i = 0; i < 60 * 30; i++) {
+      const t = i * dt; g.rotation.z = 3 * Math.PI / 180 * Math.sin(2 * Math.PI * t / 3); g.position.set(3 * t, 0.2 * Math.sin(t), 0); // (3 m/s, in steps)
+      swingLantern(s, g, dt, at); if (t > 20) most = Math.max(most, angleOff(s));
+    }
+    // driven well below its own period it stays near the world's plumb, so against the cabin it swings by the roll, and a
+    // little more because the shackle, H above her roll axis, is swung sideways too: ℓφ̈ = −gφ − Hθ̈ gives
+    // ψ = θ₀ (1 + (H/ℓ) r²/(1 − r²)), r = T₀/T
+    const r2 = (2 * Math.PI * Math.sqrt(LANTERN_DROP / 9.81) / 3) ** 2, want = 3 * (1 + LANTERN_PIVOT.y / LANTERN_DROP * r2 / (1 - r2));
+    expect(most).toBeGreaterThan(want * 0.93); expect(most).toBeLessThan(want * 1.07);
   });
 });

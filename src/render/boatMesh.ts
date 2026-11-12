@@ -744,7 +744,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   // the cabin's lantern swings on its chain under her motion, and its light goes with it
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
-    m.grp.updateMatrix(); swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
+    swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
     u.uLampUp.value.set(0, 1, 0).applyQuaternion(m.lantern.arm.quaternion); }
   const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
   m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);

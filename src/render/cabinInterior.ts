@@ -228,9 +228,9 @@ export function lanternGeometry(): THREE.BufferGeometry {
 
 /**
  * The lantern swinging on its chain: a damped pendulum hung from a point that moves with the hull. It's worked out in
- * the world (the scene's still frame), where gravity is simply down, so everything the hull does to the shackle (heel,
- * rolling and pitching in the waves, heaving, speeding up and turning) reaches the lamp only through the chain, as it
- * does in a real boat. The chain is taken as a light rigid link of length ℓ to the lamp's middle (a simple pendulum):
+ * a frame that keeps her place but not her turn, where gravity is simply down, so what the hull does to the shackle (heel,
+ * rolling and pitching in the waves, heaving) reaches the lamp only through the chain, as it does in a real boat. (Her
+ * surging and turning are left out: for a Folkboat they're a few hundredths of g, small beside the seaway's.) The chain is taken as a light rigid link of length ℓ to the lamp's middle (a simple pendulum):
  *   ẍ = g − 2ζω₀ (ẋ − ẋ_pivot) + T,  with T the chain's pull keeping |x − x_pivot| = ℓ,
  * which for small swings from a still pivot is θ̈ = −(g/ℓ)·θ − 2ζω₀·θ̇, period 2π√(ℓ/g) ≈ 1.1 s for ℓ ≈ 0.28 m
  * (e.g. Halliday, Resnick & Walker, Fundamentals of Physics, ch. 15: the simple and the damped pendulum). The damping (the
@@ -245,11 +245,13 @@ const G = new THREE.Vector3(0, -9.81, 0), ZETA = 0.03, W0 = Math.sqrt(9.81 / LAN
 const _p1 = new THREE.Vector3(), _r = new THREE.Vector3(), _vp = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _pp = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
 export function makeLanternSwing(arm: THREE.Group): LanternSwing { return { arm, x: new THREE.Vector3(), v: new THREE.Vector3(), p: new THREE.Vector3(), ok: false }; }
 /**
- * One frame of swinging (dt s of sim time), the hull already placed (grp's matrix up to date in its parent, the scene).
+ * One frame of swinging (dt s of sim time), the hull already turned and heaved (grp).
  * Turns the arm to the chain's new direction in the boat's frame, and returns the lamp's middle in the boat's frame.
  */
 export function swingLantern(s: LanternSwing, grp: THREE.Object3D, dt: number, out: THREE.Vector3): THREE.Vector3 {
-  _p1.copy(LANTERN_PIVOT).applyMatrix4(grp.matrix);
+  // the shackle as she turns and heaves about her own middle; her way over the ground is left out (steady, it does
+  // nothing to a pendulum, and the sim moves her in steps that would only jerk it)
+  _p1.copy(LANTERN_PIVOT).applyQuaternion(grp.quaternion); _p1.y += grp.position.y;
   // the first frame, or she's been moved (a restart, a new scene): start hanging still, plumb
   if (!s.ok || _p1.distanceToSquared(s.p) > 9) { s.p.copy(_p1); s.x.copy(_p1).addScaledVector(DOWN, LANTERN_DROP); s.v.set(0, 0, 0); s.ok = true; }
   if (dt > 0) {
