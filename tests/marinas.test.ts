@@ -191,6 +191,26 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     w.pushOff(); for (let i = 0; i < 60 * 20; i++) w.step(DT);
     expect(u.handled).toBeTruthy(); expect(u.aws).toBeGreaterThan(3); expect(Math.abs(rel(u.arel - rel(w.windHere(u, u).from - u.h)))).toBeLessThan(10);
   });
+  it('the tiller answers through the push-off, sails down: walked out it yaws her (the bow the way it\'s pushed), it hurries or slows the swing, and let go it turns her', () => {
+    const slip = slipsIn('west-harbor')[40], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
+    const run = (tiller: number) => {
+      const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 2, windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
+      const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user, h0 = u.h, rel = (a: number) => ((a + 540) % 360) - 180;
+      expect(u.rig!.main + u.rig!.jib).toBe(0); // (sails down)
+      w.pushOff(); const plan = u.handled!.plan; if (plan.kind !== 'swing') throw new Error('a swing');
+      let walkYaw = 0, t = 0;
+      for (; t < 60 * 200 && u.handled; t++) {
+        u.tiller = tiller; w.step(DT); expect(hitsHarbor(u)).toBe(false);
+        if (u.handled && u.handled.s < plan.back - 1.5) walkYaw = Math.max(walkYaw, Math.abs(rel(u.h - h0)));
+      }
+      const h1 = u.h; u.tiller = tiller; for (let i = 0; i < 60 * 3; i++) w.step(DT);
+      return { walkYaw, secs: t / 60, turned: rel(u.h - h1), sign: Math.sign(plan.turn) };
+    };
+    const a = run(0.8), b = run(-0.8), z = run(0);
+    expect(a.walkYaw).toBeGreaterThan(2); expect(b.walkYaw).toBeGreaterThan(2); expect(z.walkYaw).toBeLessThan(0.01); // (yawed by the tiller walking out; straight without it)
+    expect(Math.abs(a.secs - b.secs)).toBeGreaterThan(3); // (the swing hurried one way, slowed the other)
+    expect(Math.sign(a.turned)).toBe(-Math.sign(b.turned)); expect(Math.abs(a.turned)).toBeGreaterThan(3); // (let go, with way on, she turns as the tiller says)
+  }, 120000);
   it('end ties: berths alongside the free ends of the docks, bow out, which push off forward', () => {
     const ends = SLIPS.filter(s => s.kind === 'alongside');
     expect(ends.length).toBeGreaterThan(10);
