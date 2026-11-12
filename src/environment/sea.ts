@@ -138,22 +138,25 @@ export function onCurrent(H: number, T: number, U: number): { H: number; L: numb
 
 /* ---------- the swell ---------- */
 
-export interface Swell { hs: number; tp: number; from: number }
+/** The swell outside the Gate: its own height (m), period (s), direction from; `total`, the buoy's total height (m, the
+ * swell and the ocean's wind sea: what NDBC shows as WVHT), for saying what the buoy reads. */
+export interface Swell { hs: number; tp: number; from: number; total?: number }
 export type SwellDay = 0 | 1 | 2;
 const CLIMATE = climate as { months: { month: number; days: Swell[] }[] };
 /** The swell outside the Gate on a small, typical or big day for the month of `date` (YYYY-MM-DD). */
 export function swellFor(date: string, day: SwellDay): Swell {
   const m = clamp(+date.slice(5, 7) || 1, 1, 12), d = CLIMATE.months[m - 1].days[day];
-  return { ...d, hs: d.hs * swellShare(d.hs) }; // (the climate is of the total height: the swell's share of it)
+  return { ...d, hs: d.hs * swellShare(d.hs), total: d.hs }; // (the climate is of the total height: the swell's share of it)
 }
 /**
  * The swell's share of the total significant height NDBC 46237 reports (WVHT, which includes the ocean's own wind sea,
- * which the sim makes for itself from the wind over the water): SwH/WVHT from the buoy's spectral summary, 1,928
- * half-hourly records 2 October – 11 November 2026 (scripts/fetch-swell-split.mjs): a median 0.73 below 1.5 m, 0.80 at
- * 1.5–2.5 m, 0.89 above (big seas are mostly swell). Fitted 0.68 + 0.063·Hs. Only the autumn's: the station keeps no
- * spectral history, so for winter's storms and summer's wind-driven seas it's an estimate.
+ * which the sim makes for itself from the wind over the water): SwH/WVHT from the buoy's spectral summary, the 476
+ * half-hourly records in the afternoon window the days are averaged over (11:00–17:00 local), 2 October – 11 November
+ * 2026 (scripts/fetch-swell-split.mjs): a median 0.75 below 1.5 m, 0.82 at 1.5–2.5 m, 0.85 above (big seas are mostly
+ * swell); a tenth of the time under 0.62. Fitted 0.71 + 0.048·Hs. Only the autumn's: the station keeps no spectral
+ * history, so for summer's wind-driven afternoons (more wind sea, a smaller share) and winter's storms it's an estimate.
  */
-export const swellShare = (hs: number) => clamp(0.68 + 0.063 * hs, 0.6, 0.92);
+export const swellShare = (hs: number) => clamp(0.71 + 0.048 * hs, 0.55, 0.92);
 
 const BRIDGE = LL(37.81972, -122.47861), OUTSIDE = LL(37.8125, -122.53);
 /** The channel's direction into the bay from the bridge (toward Alcatraz and Berkeley), deg. */

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The swell on its own, day by day, for the last 45 days: NDBC 46237's spectral wave summary (realtime2 .spec), which
+ * The swell on its own, day by day, for the last 45 days (whole afternoons only): NDBC 46237's spectral wave summary (realtime2 .spec), which
  * splits the total significant height (WVHT) into the swell (SwH, its period SwP and direction SwD) and the ocean's own
  * wind sea (WWH, WWP, WWD). The sim makes its own wind sea from the wind over the water, so the swell it adds is SwH,
  * not the total. NDBC keeps the split only for the realtime window (the station's history has no spectral files), so
@@ -34,6 +34,7 @@ for (const line of (await res.text()).split('\n')) {
 }
 const data = JSON.parse(await readFile(OUT, 'utf8')), split = { ...(data.swellSplit ?? {}) }, r2 = x => Math.round(x * 100) / 100;
 for (const [date, v] of byDay) {
+  if (v.length < 10) continue; // (a part day, the first or today: keep what's stored rather than a mean of a few readings; 12 make a full afternoon)
   const ds = v.map(x => x[2]).filter(Number.isFinite), dx = ds.reduce((a, d) => a + Math.sin(d * Math.PI / 180), 0), dy = ds.reduce((a, d) => a + Math.cos(d * Math.PI / 180), 0);
   split[date] = [r2(v.reduce((a, x) => a + x[0], 0) / v.length), r2(v.reduce((a, x) => a + x[1], 0) / v.length), ds.length ? Math.round((Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360) : NaN];
 }

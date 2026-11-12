@@ -15,6 +15,13 @@ describe('the ocean swell into the Gate', () => {
     expect(nw).toBeLessThan(0.9 * w);
     expect(swellReach(BRIDGE_IN, true, 228).toward).toBeCloseTo(swellReach(BRIDGE_IN, true, 300).toward, 6); // (in the channel, the channel's way)
   });
+  it('no jump crossing onto the bar or into the channel, for any swell', () => {
+    const OUTSIDE = LL(37.8125, -122.53), BRIDGE = LL(37.81972, -122.47861);
+    for (const from of [228, 260, 300]) for (const x0 of [OUTSIDE.x, BRIDGE.x]) {
+      const a = swellReach({ x: x0 - 0.5, y: BRIDGE.y }, true, from), b = swellReach({ x: x0 + 0.5, y: BRIDGE.y }, true, from);
+      expect(Math.abs(a.k - b.k)).toBeLessThan(0.02); expect(Math.abs(((a.toward - b.toward + 540) % 360) - 180)).toBeLessThan(3);
+    }
+  });
   it("the buoy's total height counts the ocean's own wind sea: the swell is most of a big sea and less of a small one", () => {
     expect(swellShare(1)).toBeCloseTo(0.74, 1); expect(swellShare(3)).toBeCloseTo(0.87, 1);
     expect(swellShare(3)).toBeGreaterThan(swellShare(1));

@@ -247,9 +247,9 @@ export function dayWeather(date: string, kind: WindKind | 'auto' = 'auto', windD
   // the observed swell on its own (NDBC's SwH, SwP, SwD) where the buoy's split is kept; before that, the total height's
   // swell share (sea.ts swellShare); the NWS forecast's swell is the swell already
   const split = R.swellSplit?.[date], obsSwell = R.swell[date], fc = R.forecast[date];
-  const realSwell: Swell | null = split && split[0] > 0 ? { hs: split[0], tp: split[1], from: Number.isFinite(split[2]) ? split[2] : obsSwell?.[2] ?? 285 }
-    : obsSwell ? { hs: obsSwell[0] * swellShare(obsSwell[0]), tp: obsSwell[1], from: obsSwell[2] }
-    : fc && fc.swell[0] != null && fc.swell[1] != null ? { hs: fc.swell[0], tp: fc.swell[1], from: fc.swell[2] ?? 285 } : null;
+  const realSwell: Swell | null = split && split[0] > 0 ? { hs: split[0], tp: split[1], from: Number.isFinite(split[2]) ? split[2] : obsSwell?.[2] ?? 285, ...(obsSwell ? { total: obsSwell[0] } : {}) }
+    : obsSwell ? { hs: obsSwell[0] * swellShare(obsSwell[0]), tp: obsSwell[1], from: obsSwell[2], total: obsSwell[0] }
+    : fc && fc.swell[0] != null && fc.swell[1] != null ? { hs: fc.swell[0], tp: fc.swell[1], from: fc.swell[2] ?? 285 } : null; // (NWS's primary swell; where the grid has none, scripts/fetch-real-days.mjs falls back to its total wave height, which then counts its wind sea too: a small overstatement on those days)
   const swell = (d: SwellDay) => kind === 'auto' && realSwell ? { ...realSwell } : swellFor(date, d);
   if (kind === 'auto') {
     const obs = observedSamples(date), samples = obs ?? forecastSamples(date);
