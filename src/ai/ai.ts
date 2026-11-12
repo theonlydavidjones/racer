@@ -2,6 +2,7 @@ import type { PrepFlag } from '../sim/signals';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
+import { driveRatio } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK } from '../boat/physics';
@@ -261,7 +262,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (refresh || Number.isNaN(ai.plan.leave)) { // NaN: not worked out yet
         const app = bestApproach(w, b), d = w.lineD(bow(b));
         const turn = Math.abs(wrap(app.h - b.h)) / Math.max(4, maxTurnRate(Math.max(b.v, 1.2)) * 0.7);
-        ai.plan.leave = turn + timeToCover(-d, b.v, targetFor(b, Math.abs(wrap(ww.from - app.h))), app.along, c.x * N.x + c.y * N.y);
+        { const ta = Math.abs(wrap(ww.from - app.h)), vt = targetFor(b, ta); ai.plan.leave = turn + timeToCover(-d, b.v, vt, app.along, c.x * N.x + c.y * N.y, 240, v => driveRatio(ww.kt, ta, v, vt)); }
       }
       if (tl < ai.plan.leave + 8 + ai.aggr) ai.mode = 'approach';
     }
@@ -273,7 +274,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         // moving through the turn, on headings between this one and the approach, so count that ground too.
         const turn = Math.abs(wrap(goH - b.h)) / Math.max(4, maxTurnRate(Math.max(b.v, 1)) * 0.7), cN = c.x * N.x + c.y * N.y;
         const inTurn = turn * (b.v * (V(b.h).x * N.x + V(b.h).y * N.y + app.along) / 2 + cN);
-        ai.plan.tReach = turn + timeToCover(-d - inTurn, b.v, targetFor(b, twaD), app.along, cN);
+        { const vt = targetFor(b, twaD); ai.plan.tReach = turn + timeToCover(-d - inTurn, b.v, vt, app.along, cN, 240, v => driveRatio(ww.kt, twaD, v, vt)); }
         // how far toward the line we'd coast if we eased the sails now
         ai.plan.coast = coastDistance(b.v, tl, ww.kt, b.twa, targetFor(b, b.twa)) * (V(b.h).x * N.x + V(b.h).y * N.y);
       }

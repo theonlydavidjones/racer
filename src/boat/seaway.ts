@@ -1,6 +1,7 @@
 import { D2R, KT, wrap } from '../core/math';
 import type { SeaHere } from '../environment/sea';
-import { HULL, driveFrom, hullResistance } from './dynamics';
+import { HULL, driveFrom, hullResistance, type DriveCurve } from './dynamics';
+import { driveRatio } from './driveCurve';
 import { beatAngle as beatAngleCalm, polar } from './polar';
 
 /**
@@ -21,7 +22,7 @@ import { beatAngle as beatAngleCalm, polar } from './polar';
 
 const RHO = 1025, G = 9.81, BEAM = 2.21, LWL = HULL.length;
 /** Added-resistance coefficient (dimensionless): the calibration knob. */
-export const C_AW = 0.045;
+export const C_AW = 0.034; // (0.045 with the old flat ×1.6 drive at rest; 0.034 since the drive's shape comes from the sail model, driveCurve.ts, which upwind gives a slowed boat less push: the same 12%)
 
 /** Added resistance (N) in waves of height H (m) and period T (s) meeting the bow at `enc` deg (0 head-on, 180 from astern), at speed v (m/s). */
 export function addedResistance(H: number, T: number, enc: number, v: number): number {
@@ -45,11 +46,11 @@ export function seaDrag(s: SeaHere, h: number, v: number): number {
 }
 
 /** Steady speed (m/s) when the sails would drive her at `vt` in flat water and the sea adds `drag(v)` newtons. */
-export function steadySpeed(vt: number, drag: (v: number) => number): number {
+export function steadySpeed(vt: number, drag: (v: number) => number, k?: DriveCurve): number {
   if (vt <= 0) return 0;
   let lo = 0, hi = vt;
   const rvt = hullResistance(vt); // (drive(v, vt) at every v of the search)
-  for (let i = 0; i < 30; i++) { const v = (lo + hi) / 2; if (driveFrom(rvt, v, vt) > hullResistance(v) + drag(v)) lo = v; else hi = v; }
+  for (let i = 0; i < 30; i++) { const v = (lo + hi) / 2; if (driveFrom(rvt, v, vt, k) > hullResistance(v) + drag(v)) lo = v; else hi = v; }
   return (lo + hi) / 2;
 }
 
@@ -58,7 +59,7 @@ export function speedInChop(kt: number, twa: number, hs: number, tp: number): nu
   const vt = polar(kt, twa);
   if (hs < 0.01) return vt;
   const k = awAt(hs, tp, twa);
-  return steadySpeed(vt, v => k * awSpeed(v)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once)
+  return steadySpeed(vt, v => k * awSpeed(v), v => driveRatio(kt, twa, v, vt)); // (addedResistance(hs, tp, twa, v), its fixed part worked out once; slowed by the sea, the sails' drive as the apparent wind then gives it)
 }
 
 const beatCache = new Map<string, number>();

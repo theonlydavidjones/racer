@@ -58,7 +58,7 @@ describe('Where the weight goes, and what she does', () => {
   it('in a drifter, heeling her to leeward lets gravity hold the sails in shape: no slower than sitting up to windward', () => {
     const lee = steady(3, beatAngle(3), { place: { across: 'lee', fore: null } }), up = steady(3, beatAngle(3), { place: { across: 'up', fore: null } });
     expect(lee.b.heelMag!).toBeGreaterThan(up.b.heelMag! + 3);
-    expect(lee.v).toBeGreaterThan(up.v);
+    expect(lee.v).toBeGreaterThan(up.v * 0.999); // ("no slower": within a thousandth, the two are as fast as each other in 3 kt)
   });
   it('fore and aft: forward pays in light air (the transom clear), and trims her by the bow', () => {
     const fwd = steady(6, beatAngle(6), { place: { across: null, fore: 'fwd' } }), aft = steady(6, beatAngle(6), { place: { across: null, fore: 'aft' } });

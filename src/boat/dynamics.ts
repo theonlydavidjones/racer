@@ -5,9 +5,9 @@ import orc from './data/nordic-folkboat-orc.json';
  * Folkboat speed and turning dynamics.
  *
  * Speed: m·dv/dt = drive − hull resistance − windage − turning drag.
- * Drive is set so the boat settles exactly at its polar target speed: drive = R(target),
- * plus a boost at low speed (stopped or slow, the apparent wind is broader and nearly as
- * strong as the true wind, so the sails pull harder than at full speed).
+ * Drive is set so the boat settles exactly at its polar target speed: drive = R(target), shaped below and above
+ * that speed by how the sails' drive changes with the apparent wind (a DriveCurve: driveCurve.ts, from the sail model;
+ * close-hauled she has less push slow than at speed, on a run more).
  * Hull resistance uses the certificate's wetted surface (ITTC-57 friction) and a residuary
  * (wave) term that climbs steeply toward hull speed. The constants below are the tuning knobs;
  * tests/boat.test.ts pins the behaviour they produce.
@@ -25,8 +25,6 @@ export const HANDLING = {
   mass: HULL.displacement * 1.08,
   /** Friction form factor for a full-bodied long-keel hull. */
   formFactor: 1.15,
-  /** Extra drive at zero speed, as a fraction of the drive at target speed. */
-  driveBoost: 0.6,
   /** Drag area of hull, mast and rigging, m². */
   windageCdA: 2.0,
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
@@ -94,13 +92,16 @@ export function resistanceParts(v: number): { friction: number; residuary: numbe
   return { friction, residuary: HULL.displacement * G * residuaryFraction(fn) };
 }
 
+/** The sails' drive at speed v as a share of their drive at the target speed (driveCurve.ts driveRatio, for the wind and
+ * angle she's sailing). Without one, the drive is the target's at every speed (eased sails, or nothing better known). */
+export type DriveCurve = (v: number) => number;
 /** Sail drive (N) at speed v when the trimmed target speed is vt. */
-export function drive(v: number, vt: number): number {
+export function drive(v: number, vt: number, k?: DriveCurve): number {
   if (vt <= 0) return 0;
-  return driveFrom(hullResistance(vt), v, vt);
+  return driveFrom(hullResistance(vt), v, vt, k);
 }
 /** drive(v, vt), given hullResistance(vt) (`rvt`): for a search over v at one vt, which needn't look it up each time. */
-export const driveFrom = (rvt: number, v: number, vt: number): number => rvt * (1 + HANDLING.driveBoost * Math.max(0, 1 - v / vt));
+export const driveFrom = (rvt: number, v: number, _vt: number, k?: DriveCurve): number => rvt * (k ? k(v) : 1);
 
 /**
  * Air drag (N) against forward motion when the sails aren't drawing: rig windage plus flogging sails.
@@ -124,8 +125,8 @@ export function flogAmount(twa: number, beat: number, noGo: number, luffing: boo
 }
 
 /** Surge acceleration, m/s². */
-export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HULL.displacement): number {
-  return (drive(v, vt) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
+export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HULL.displacement, k?: DriveCurve): number {
+  return (drive(v, vt, k) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
 }
 
 /** Fastest the helm can turn the boat at speed v (m/s), deg/s. Rudder authority comes from water flow. */
@@ -139,12 +140,12 @@ export function maxTurnRate(v: number): number {
  * heading and the direction of progress, `drift` is current along that direction (m/s).
  * Returns Infinity if not reached within `limit` seconds.
  */
-export function timeToCover(dist: number, v0: number, vt: number, along = 1, drift = 0, limit = 240): number {
+export function timeToCover(dist: number, v0: number, vt: number, along = 1, drift = 0, limit = 240, k?: DriveCurve): number {
   if (dist <= 0) return 0;
   const dt = 0.25;
   let v = v0, x = 0;
   for (let t = 0; t < limit; t += dt) {
-    const v1 = Math.max(0, v + surgeAccel(v, vt, 0) * dt);
+    const v1 = Math.max(0, v + surgeAccel(v, vt, 0, HULL.displacement, k) * dt);
     const dx = ((v + v1) / 2 * along + drift) * dt;
     if (x + dx >= dist) return t + dt * (dist - x) / Math.max(1e-6, dx);
     x += dx; v = v1;

@@ -424,7 +424,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    Nav steer her leeway above the beat. The compass's "tack" marker and its mean close-hauled
    heading allow for it too (ui/hud.ts); the laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
    in and she rounds up and tacks; it was before leeway too).
-8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
+8. ~~**Too much push from rest and through a tack**~~ (done: the drive's shape from the sail model, driveCurve.ts; 1 kt → 90% close-hauled in 6 kt now 50 s; the Delft resistance, below, still to do) (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
 9. **Sail shape and speed** (sails 2, 6): RIG.fullDepth (unsourced) puts ORC's full power at a light-air shape, so the
