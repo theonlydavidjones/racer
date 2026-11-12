@@ -325,7 +325,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   bottom-left bar, just left of Autopilot (in a race the same slot is Course; ~15 min). And the Hail icon (owner, "the hail button icon is the same as the
   sound icon. let's fix that too."): a distinct icon, a hand cupped to the mouth or a sailor calling, never a speaker or
   megaphone (that reads as Sound).
-- **Next — the flags: bring back the original motion, and strike the ensign in a blow** (polish + feature; 1–2 h; for
+- ~~**The flags: bring back the original motion, and strike the ensign in a blow**~~ (done, v126, #92) (polish + feature; 1–2 h; for
   Boat Detail): owner, "I know we dialed down the flag flapping but the new flag physics are ugly and stiff. let's bring
   back the original physics, and add an option to strike the ensign in high wind. not urgent. put the 'strike ensign'
   button with the bottom-right controls, and only during cruise mode when winds are high." Restore the flag motion from
