@@ -1,14 +1,15 @@
 import type { Boat, LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
-import { boomAngle, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
+import { boomAngle, crewSolve, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
 import { crewMass, crewMoment, displacement } from './crewPhys';
-import { condition } from './condition';
+import { condition, mainRig } from './condition';
 import { driveSpeedRatio, hullResistance } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
 import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { KT, clamp } from '../core/math';
+import { TUNE_PRESETS, forestayTension, presetFor, tuneName, tuneWords } from './rigTune';
 
 /**
  * The trim coach, as a teacher: the one thing that matters most right now, why, and what to look at on the boat to
@@ -112,7 +113,7 @@ function speedFactor(b: Boat, c: Controls): number {
   if (clew < 0) return 0; // backed: not sailing
   const jib = clamp(clew, SAILS.jib.min, SAILS.jib.max);
   const tm = sailTrim('main', awa, main), tj = plan === 'jib' ? sailTrim('jib', awa, jib) : null;
-  const ms = mainShape(c, tws, cond?.main, aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws) : null;
+  const ms = mainShape(c, tws, mainRig(b), aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws, mainRig(b)?.tune) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
   // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
@@ -347,9 +348,51 @@ export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: 
     }
     list.push(...helmLessons(b, s, list.filter(l => l.line).length));
   }
+  if (!busy) list.push(...rigLessons(b, s));
   for (const src of SOURCES) list.push(...src(b, s, ctx));
   list.sort((x, y) => y.gain - x.gain);
   return { s, list };
+}
+
+/**
+ * What her tune costs her sails right now (a share of speed): with it against the guide's tune for this wind (rigTune.ts),
+ * each with the crew's best lines, at her sheets, heel and crew as they are. Only the sails' share: in the full physics
+ * (benchSpeed) the difference is up to about twice this, as heel, the crew's weight and the depowering steps follow.
+ */
+export function tuneLoss(b: Boat): number {
+  if (!b.tune) return 0;
+  // each rig with the crew's best settings for it (crewSolve), at her sheets as they are: a soft rig wants more backstay
+  const guide: Boat = { ...b, tune: undefined, rigMain: undefined }, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  const tws = b.ww.kt, main = boomAngle(b.ctl), jib = jibClew(b.ctl, b.tack);
+  if (jib < 0) return 0;
+  const best = (x: Boat): Controls => {
+    const v = crewSolve(tws, b.awaSlow, b.tack, main, jib, undefined, mainRig(x), cond?.jib, b.aws / KT, b.depower);
+    return { ...b.ctl, traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul, backstay: v.backstay, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard,
+      mainsheet: mainsheetFor(main, v.traveller) };
+  };
+  const k = speedFactor(b, best(b)) / Math.max(1e-6, speedFactor(guide, best(guide)));
+  return k >= 1 ? 0 : 1 - k; // (speedFactor is already a share of speed)
+}
+
+/**
+ * The rig's tune, upwind, when it's the wrong one for the wind she's in (rigTune.ts): nothing to fix under way (the
+ * forestay, shrouds and mast foot are fixed while racing, CR 7.40), so it's said, with what it costs, only when there's
+ * nothing else to fix (gain 0), and only when it costs at least half a percent: the cost is her speed with her tune
+ * against the guide's tune for this wind, in the same equations (speedFactor).
+ */
+function rigLessons(b: Boat, s: Situation): Lesson[] {
+  if (!b.tune || !s.up) return [];
+  const name = tuneName(b.tune), want = presetFor(s.tws);
+  if (name === want) return [];
+  const loss = tuneLoss(b);
+  if (loss < 0.005) return [];
+  const soft = forestayTension(b.tune) < forestayTension(TUNE_PRESETS[want]);
+  const pct = `${(100 * loss).toFixed(1)}%`;
+  return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
+    head: soft ? `Her rig is tuned soft for ${Math.round(s.tws)} kt: her sails give up about ${pct}. Backstay on hard.` : `Her rig is tuned tight for ${Math.round(s.tws)} kt: her sails give up about ${pct}. Backstay off, foot a little.`,
+    why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5); the backstay is free.`
+      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5).`,
+    look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];
 }
 
 /** The one thing to say when nothing needs fixing. */

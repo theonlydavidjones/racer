@@ -213,7 +213,8 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
         u.tiller = tiller; w.step(DT); expect(hitsHarbor(u)).toBe(false);
         if (u.handled && u.handled.s < plan.back - 1.5 && Math.abs(rel(u.h - h0)) > walkYaw) { walkYaw = Math.abs(rel(u.h - h0)); signed = rel(u.h - h0); }
       }
-      const h1 = u.h; u.tiller = tiller; for (let i = 0; i < 60 * 3; i++) w.step(DT);
+      // (let go at a walking pace, she answers the helm over a few seconds: her yaw inertia, physics.ts yawLag, about 3 s there)
+      const h1 = u.h; u.tiller = tiller; for (let i = 0; i < 60 * 5; i++) w.step(DT);
       return { walkYaw, signed, secs: t / 60, turned: rel(u.h - h1) };
     };
     const a = run(0.8), b = run(-0.8), z = run(0), k = run(0, -0.8);

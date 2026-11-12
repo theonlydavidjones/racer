@@ -32,7 +32,7 @@ export const HANDLING = {
   flogCdA: 3,
   /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). */
   turnRadius: 9,
-  /** Turn rate available when nearly stopped (backing the jib, sculling), deg/s. */
+  /** Turn rate when nearly stopped, by sculling (physics.ts: only toward close-hauled from above it, rule 42.3(d)), deg/s. An estimate. */
   minTurnRate: 4,
   /** Hard limit on turn rate, deg/s. */
   maxTurnRate: 22,
@@ -159,6 +159,8 @@ export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HUL
 export function maxTurnRate(v: number): number {
   return Math.min(HANDLING.maxTurnRate, Math.max(HANDLING.minTurnRate, v / HANDLING.turnRadius / D2R));
 }
+/** The turn rate the rudder alone gives at speed v (m/s) through the water, deg/s: none without water flowing past it. */
+export const flowTurnRate = (v: number): number => Math.min(HANDLING.maxTurnRate, Math.max(0, v) / HANDLING.turnRadius / D2R);
 
 /**
  * Time (s) to make `dist` metres of progress in some direction if the boat sheets in now and
