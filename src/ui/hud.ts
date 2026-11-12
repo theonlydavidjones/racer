@@ -427,7 +427,7 @@ export class Hud {
       // (one short line on the card, the owner: no degrees; the end's name only)
       const endName = (k > 0 ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
       const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favoured</span>`;
-      const ends: [string, string] = [C.pinLabel.toUpperCase().slice(0, 10), C.committeeLabel.toUpperCase().slice(0, 10)];
+      const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
       if (d > 0) {
         this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
         el.innerHTML = w.t < 0 ? `Over by ${d.toFixed(0)} m · get back below the line` : u.roundEnd ? 'I flag: back round an end of the line' : 'OCS · dip back below the line and start';
@@ -453,7 +453,7 @@ export class Hud {
           + `<circle cx="75" cy="34" r="4" fill="#3fd197"/>`);
         el.innerHTML = `Leave it to ${m.side === 's' ? 'starboard' : 'port'} · bearing ${bs}°`;
       } else {
-        const ends: [string, string] = [C.pinLabel.toUpperCase().slice(0, 10), C.committeeLabel.toUpperCase().slice(0, 10)];
+        const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
         const near = dist(u, w.pin) < dist(u, w.committee) ? 0 : 1;
         this.card('', 'Finish line', n, un, this.lineSketch(w, u, ends, near, false, true));
         el.innerHTML = `Bearing ${bs}° · the ${near === 0 ? C.pinLabel : C.committeeLabel} end is closer`;
