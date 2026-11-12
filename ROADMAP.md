@@ -52,6 +52,10 @@ What's planned, roughly in order. Done work is described in the README.
    - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
    Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
    (starboard, jib luff tension), with a physics review.
+   After the band (owner, 12 November; not urgent; 1–2 h): line colours chosen in the boat editor, one per line (jib
+   sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
+   band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
+   the starting set; saved with the boat.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
    Includes, from a physics review: the drifter heel. In about 3 kt the crew's placement prefers near upright over the
