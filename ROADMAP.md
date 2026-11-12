@@ -500,9 +500,11 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   Village's) are only partly cut out of the 50 m terrain, so from the air a few docks seem to stand on land. Polish: the land's 50 m cells make a
   stair-step coast from the air (the Berkeley and Emeryville shores); the terrain stops at the world's edge (122.213 W,
   37.985 N), so from high up the hills east of Berkeley and Oakland end in a straight cut.
-  Open questions from review: the current in the embayments with no NOAA station (San Rafael Bay, Richardson Bay, San
-  Leandro Bay) is the nearest stations' in sight, very likely too strong for such shallow water (a depth- or
-  tidal-prism-based easing needs a source); BYC's and Encinal YC's own racing marks aren't published where we could
+  Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
+  sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); San Rafael Bay and San Leandro Bay have no measurement
+  inside them, so their current is the nearest stations' in sight, very likely too strong for such shallow water (USGS's
+  San Pablo Bay surveys, WRI 84-4339's speed-against-depth relation, and SFEI's San Leandro Bay model are the leads,
+  but pubs.usgs.gov and sfei.org aren't reachable here); BYC's and Encinal YC's own racing marks aren't published where we could
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).

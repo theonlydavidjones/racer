@@ -1,0 +1,86 @@
+{
+ "source": "NOAA CO-OPS observed currents (api.tidesandcurrents.noaa.gov, product=currents, near-surface bin, 6-minute), fitted by scripts/fit-current-station.mjs with the sim's predictor; knots, degrees true, phases GMT",
+ "fetched": "2026-11-12",
+ "stations": [
+  {
+   "id": "SFB1219",
+   "kind": "harmonic",
+   "name": "Richardson Bay",
+   "note": "Richardson Bay, mid-bay: the sim's fit to NOAA's 55-day record (no published constants)",
+   "lat": 37.85668,
+   "lon": -122.46987,
+   "bin": 6,
+   "flood": 74,
+   "ebb": 254,
+   "z0": -0.045,
+   "hc": [
+    [
+     "M2",
+     0.3006,
+     55.13
+    ],
+    [
+     "S2",
+     0.0743,
+     88.44
+    ],
+    [
+     "N2",
+     0.0399,
+     321.79
+    ],
+    [
+     "K1",
+     0.0355,
+     313.22
+    ],
+    [
+     "O1",
+     0.0609,
+     138.86
+    ],
+    [
+     "M4",
+     0.126,
+     283.1
+    ],
+    [
+     "MS4",
+     0.031,
+     253.84
+    ],
+    [
+     "M6",
+     0.0781,
+     321.73
+    ],
+    [
+     "MK3",
+     0.1331,
+     298.02
+    ],
+    [
+     "2MK3",
+     0.1119,
+     251.64
+    ],
+    [
+     "MN4",
+     0.0343,
+     256.93
+    ],
+    [
+     "P1",
+     0.0118,
+     313.22
+    ],
+    [
+     "K2",
+     0.0202,
+     88.44
+    ]
+   ],
+   "fitted": "20120715–20120909"
+  }
+ ]
+}
