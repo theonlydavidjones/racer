@@ -251,8 +251,9 @@ export class RaceReplay {
     // where it cost you time: each moment's stretch of your track in its colour, with its number
     const idx = (t: number) => { const j = F.findIndex(f => f.t >= t); return j < 0 ? F.length - 1 : j; };
     for (const m of D.moments) {
-      const a = idx(m.t0), b = Math.max(a + 1, idx(m.t1)), on = this.sel === m;
-      ctx.strokeStyle = hexA(ink(m.key), on ? 1 : .75); ctx.lineWidth = on ? 6 : 4; ctx.lineCap = 'round';
+      // (still ahead of the playhead: dimmer and thinner, so it doesn't read as where you are now)
+      const a = idx(m.t0), b = Math.max(a + 1, idx(m.t1)), on = this.sel === m, ahead = m.t0 > this.t;
+      ctx.strokeStyle = hexA(ink(m.key), on ? 1 : ahead ? .35 : .8); ctx.lineWidth = on ? 6 : ahead ? 2.5 : 4; ctx.lineCap = 'round';
       if (line(u, a, b + 1)) ctx.stroke();
       ctx.lineCap = 'butt';
     }
