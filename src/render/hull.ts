@@ -77,22 +77,38 @@ export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - 
 const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
 /** The stem's slope (m of height per unit of u): a straight, raked stem from the stemhead down to the forefoot. */
 const STEM_SLOPE = -1.06 / BOW;
-/** From y0 to y1 over s 0..1, leaving at `m` (dy/ds) and arriving level: the forefoot's round, picking up the stem's slope. */
-const turn = (y0: number, y1: number, m: number, s: number) => { const k = Math.max(1, m / (y1 - y0)); return y0 + (y1 - y0) * (1 - Math.pow(1 - Math.min(1, Math.max(0, s)), k)); };
-function canoe(u: number): number {
+/**
+ * The line below the stem, from where it meets the water at (BOW, y0) to (u1, y1): straight, with a short knee at its top
+ * where it leaves the stem's steeper rake (the knee's length KNEE in u), so the lines plan's long, straight, raked entry
+ * and not a deep round forefoot.
+ */
+const KNEE = 0.03;
+function knee(y0: number, y1: number, u: number, u1: number): number {
+  const s = u - BOW, span = u1 - BOW, e = KNEE * (1 - Math.exp(-span / KNEE));
+  const sl = (y1 - y0 - STEM_SLOPE * e) / (span - e); // (the line's slope, so it ends at y1)
+  return y0 + sl * s + (STEM_SLOPE - sl) * KNEE * (1 - Math.exp(-s / KNEE));
+}
+export function canoe(u: number): number {
   // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then
   // rounding into the hull's bottom without a knuckle
   if (u < BOW) return 0.96 + STEM_SLOPE * u;
-  if (u < 0.45) return turn(-0.1, -0.62, STEM_SLOPE * (0.45 - BOW), (u - BOW) / (0.45 - BOW));
+  if (u < 0.45) return knee(-0.1, -0.62, u, 0.45);
   if (u < 0.62) return -0.62; // where the hollow garboards meet the keel amidships (the plan's main section at St. 8)
   return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
 }
 /** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band), where the sternpost rises. */
 const U_HEEL = (HEEL.z + L / 2) / L;
-function keel(u: number): number {
+/** Where the keel's leading edge meets its bottom (fraction of L from the bow). */
+const U_KEEL = 0.405;
+export function keel(u: number): number {
   if (u <= BOW) return canoe(u);
-  if (u < 0.33) return turn(-0.1, -0.95, STEM_SLOPE * (0.33 - BOW), (u - BOW) / (0.33 - BOW)); // the cutaway forefoot, rounding down from the stem
-  return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / (U_HEEL - 0.33));
+  // the keel's leading edge: on from the stem in a nearly straight raked line (a short knee where it leaves the stem's
+  // steeper rake) down to the keel's forward corner, about 3.1 m aft of the stemhead at 1.1 m draft (Theo Rye's redrawing
+  // of Sunden's lines, and the class's own lines plan); then the bottom, nearly level, to the heel at 1.2 m. A small round
+  // at the corner.
+  const lead = (v: number) => knee(-0.1, -1.1, v, U_KEEL), bottom = (v: number) => -1.1 - 0.1 * (v - U_KEEL) / (U_HEEL - U_KEEL);
+  const t = Math.min(1, Math.max(0, (u - (U_KEEL - 0.03)) / 0.06)), sm = t * t * (3 - 2 * t);
+  return Math.max(-1.2, (1 - sm) * lead(Math.min(u, U_KEEL + 0.03)) + sm * bottom(u));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
@@ -105,14 +121,14 @@ function keelHalf(u: number): number {
  * Half-breadth = keel + (deck − keel) · F(q), q the height from the keel's side (0) to the sheer (1), with
  * F(q) = (1 − (1 − q)^α)^β: α sets how long the topsides stay upright, β > 1 the hollow into the keel. Fitted to the
  * St. 8 section (within about 3 cm at the waterline, the turn of the bilge and the garboards); finer and more V-shaped
- * forward, and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
+ * forward (nearly straight-sided V's at the bow, as the lines plan's body plan draws them), and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
  * nearly upright-sided at the deck, curving in to meet the sternpost near the waterline (the owner's photos).
  */
 function sectionShape(u: number): { al: number; be: number } {
   // toward the transom the hollow gives way to a full, round run (Josephine hauled out: the owner's photo), so the
   // transom's foot is a broad, nearly flat U at about the waterline, not a point
   const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.78) / 0.18);
-  return { al: 1.6 + 2.4 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
+  return { al: 1.15 + 2.85 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
 }
 
 const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
