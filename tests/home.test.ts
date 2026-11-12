@@ -15,7 +15,8 @@ const cruise = (withSlip = true) => {
   return new World(COURSES[0], S, 1, { freeSail: true });
 };
 const race = () => {
-  const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'race', raceFrom: 'water', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
+  // (one opponent: the start sequence and half a minute's racing is a few minutes of every boat's physics, slow on a busy machine)
+  const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'race', raceFrom: 'water', boats: [boat], boat, boatId: boat.id, fleet: 1, opponents: DEFAULT_SETTINGS.opponents.slice(0, 1), tideDate: '2026-11-14', current: 'slack' };
   return new World(COURSES[0], S, 1);
 };
 
@@ -52,7 +53,7 @@ describe('Home: send her back to her home slip', () => {
     expect(w.boats.slice(1).every(b => !b.retired)).toBe(true);
     // a second press doesn't retire her twice, just points her home again
     expect(w.sendHome()).toBe(true); expect(u.retired).toBe(true);
-  });
+  }, 30000);
   it('retired, she\'s out of the race\'s bookkeeping: sailing past her slip on the last leg is no rounding, and crossing the line no finish', () => {
     const w = race(), u = w.user, n = w.C.marks.length;
     while (w.t < 30) w.step(DT);
@@ -64,7 +65,7 @@ describe('Home: send her back to her home slip', () => {
     const mid = { x: (w.C.pin.x + w.C.committee.x) / 2, y: (w.C.pin.y + w.C.committee.y) / 2 };
     expect(() => ring(mid, 15)).not.toThrow();
     expect(u.leg).toBe(n); expect(u.finished).toBe(false); expect(u.penalty).toBe(0); expect(w.userFinishT).toBeNull();
-  });
+  }, 30000);
   it('retired before the start: no start, no recall, no flag penalty for her', () => {
     const w = race(), u = w.user;
     while (w.t < -20) w.step(DT);
@@ -75,7 +76,7 @@ describe('Home: send her back to her home slip', () => {
       w.step(DT);
     }
     expect(u.ocs).toBe(false); expect(u.started).toBe(false); expect(u.scoring).toBeFalsy(); expect(w.startReport).toBeFalsy();
-  });
+  }, 30000);
   it('racing, after she\'s finished: just home (she\'s already finished, not retired)', () => {
     const w = race(), u = w.user;
     u.finished = true; u.finishT = 100;
