@@ -37,12 +37,12 @@ export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceRes
   const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', windKind: 'auto', windKt: 0, current: 'real', tideDate: day.date, tideTime: day.start, raceLength: lengthFor(day.winnerS), opponents: FLEET, fleet: FLEET.length };
   const pick = chooseCourse(COURSES, S);
   if (!pick) throw new Error('no course');
-  const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number })[] = [];
+  const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number; abandoned: boolean })[] = [];
   for (const seed of seeds) {
     const w = new World(pick.est.file, S, seed);
     const limit = Math.max(2 * day.winnerS, 3 * pick.est.minutes * 60); // (the real time limits are about this)
     let ktSum = 0, n = 0;
-    while (w.t < limit && !w.boats.slice(1).every(b => b.finished)) {
+    while (w.t < limit && !w.cancelled && !w.boats.slice(1).every(b => b.finished)) {
       w.step(DT);
       if (w.t > 0 && (w.steps % 60) === 0) { ktSum += w.wind.kt; n++; }
     }
@@ -50,7 +50,9 @@ export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceRes
     out.push({
       label: `${day.date} seed ${seed}`, course: pick.est.no, seed, windKt: day.windKt, meanKt: Math.round(ktSum / Math.max(1, n) * 10) / 10,
       finishers: fleet.filter(b => b.finished && b.finishT != null).map(b => ({ key: b.name, elapsedS: b.finishT! })),
-      dnf: fleet.filter(b => !b.finished).length
+      dnf: fleet.filter(b => !b.finished).length,
+      // (abandoned by the committee, N over A, for too much wind or too little: no result, as in a real series)
+      abandoned: !!w.cancelled
     });
   }
   fs.mkdirSync(OUT, { recursive: true });
