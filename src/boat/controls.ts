@@ -246,8 +246,21 @@ export function shapeEfficiency(s: Shape, t: Shape): number {
 
 /** How fast the crew (or you) can work each control, in full range per second. Hauling in a loaded line is slower. */
 export const CONTROL_RATE: Record<Exclude<keyof Controls, 'car'>, number> = {
-  mainsheet: 0.12, traveller: 0.6, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3, jibHalyard: 0.2
+  mainsheet: 0.12, traveller: 0.6 /* (unused: the traveller runs at travellerRate, below) */, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3, jibHalyard: 0.2
 };
+
+/**
+ * The traveller's car (−1 windward … +1 leeward, a range of 2): let go under load it runs to leeward almost at once, the
+ * mainsheet's pull doing the work (with no load, in a drifter, it's pushed across by hand about as fast): about a second
+ * end to end. Hauled to windward by hand it's a little slower: about 1.4 s end to end in light air, where the car carries
+ * almost no load, to about 3 s in a breeze, as the sheet's load grows (the owner, 12 Nov 2026: "IRL releasing it is very rapid; pulling it in is slightly
+ * slower but still quick"). ESTIMATES: a search found no measured times. Only words: dropping the traveller spills
+ * the wind "instantly" (Yachting Monthly, "Easy ways to power up your mainsheet"); ball-bearing cars "adjust and
+ * release under load" (Harken mid-range). North Sails' Nordic Folkboat guide sets two cars joined by ~40 cm wires to the
+ * mainsheet block, 15–20 cm to windward in light air, central in medium, eased to leeward in a breeze; it gives no
+ * speeds. The breeze's slowing follows the winch's (winchFactor), floored at half speed.
+ */
+export const travellerRate = (easing: boolean, tws: number) => (easing ? 2 : 1.4 * clamp(1.25 - tws / 24, 0.5, 1));
 
 /** Winch: hauling the jib sheet in gets slower as the breeze builds (one hand cranks, the other tails). Easing is quick. */
 export const winchFactor = (tws: number, hauling: boolean) => (hauling ? clamp(1.25 - tws / 24, 0.35, 1) : 1.6);

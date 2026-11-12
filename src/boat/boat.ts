@@ -7,6 +7,7 @@ import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
 import type { Controls, CrewSettings, SailRig, Shape } from './controls';
 import type { RigTune } from './rigTune';
+import type { SkipperKnobs } from '../ai/skipper';
 
 /** A line you can work: every control, plus the lazy jib car's pins. */
 export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
@@ -21,6 +22,8 @@ export interface AiState {
   aggr: number; // seconds of extra margin taken on the approach
   width: number; // how far off the rhumb line before tacking back, m
   aware: boolean; // accounts for current on the approach
+  /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
+  kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
   /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
   below?: boolean;
@@ -33,6 +36,8 @@ export interface AiState {
   tackNow?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
+  /** The world's step on which she last thought (world.ts AI_EVERY) */
+  thought?: number;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
    * wind and slow, a passing change of plan mustn't turn her back. */
   hailTack?: { to: 'S' | 'P'; at: number; with: number } | null;
