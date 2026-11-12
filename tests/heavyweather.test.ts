@@ -21,6 +21,14 @@ describe('heavy weather at the Gate (the conditions adjuster maxed out)', () => 
     expect(three.tpW).toBeGreaterThan(1.5 * one.tpW);
     expect(three.steep).toBeLessThanOrEqual(0.1);
   });
+  it("never past a fully developed sea, however far it's turned up (Hs ≤ 0.243·U²/g, JONSWAP's limit)", () => {
+    const w = atTheGate({ ...max, chop: 30 }), U = w.user.ww.kt * 0.5144;
+    expect(w.user.sea.hsW).toBeLessThanOrEqual(0.243 * U * U / 9.81 * 1.3); // (a little over it where an opposing current steepens it)
+  });
+  it('× 0.5 is smaller, in shorter waves (never under a second)', () => {
+    const one = atTheGate({ ...max, chop: 1 }).user.sea, half = atTheGate({ ...max, chop: 0.5 }).user.sea;
+    expect(half.hsW).toBeLessThan(0.7 * one.hsW); expect(half.tpW).toBeLessThan(one.tpW); expect(half.tpW).toBeGreaterThanOrEqual(1);
+  });
   it('glassy at × 0', () => {
     expect(atTheGate({ ...max, chop: 0 }).user.sea.hsW).toBe(0);
   });

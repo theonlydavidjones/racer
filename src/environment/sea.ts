@@ -246,16 +246,16 @@ export class SeaField {
     // (the fetch stretched or shortened by the current: the waves spend longer or less under the wind crossing it; a sea
     // still growing is limited by the time the wind has blown, which the current doesn't change)
     const F = this.fetch(p, ww.from), Fd = Number.isFinite(duration) ? durationFetch(U, duration) : Infinity;
-    let w = windSea(U, Math.min(F, Fd));
-    for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = windSea(U, Math.min(F * cg / Math.max(0.3 * cg, cg + Uc), Fd)); }
+    // (the conditions adjuster: the chop × `chop` as the sea a longer fetch would make, F × chop², so its height goes ×
+    // chop and its period with it (JONSWAP's fetch-limited laws, windSea: Hs ∝ F^½, Tp ∝ F^⅓), and never past the fully
+    // developed sea; not its height alone at the same period, which only made it steeper until it broke)
+    const k2 = this.chop * this.chop, grow = (X: number) => windSea(U, X * k2);
+    let w = grow(Math.min(F, Fd));
+    for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = grow(Math.min(F * cg / Math.max(0.3 * cg, cg + Uc), Fd)); }
     // ... then steepened (or eased) by the change in current since the water the waves came through, ~1 km upwind
     const up = currentAt({ x: p.x - to.x * 1000, y: p.y - to.y * 1000 });
-    // the conditions adjuster: the chop × `chop` grows as a sea does with more wind or fetch, its period with it (the
-    // fetch-limited growth laws windSea uses, JONSWAP's: Hs ∝ F^½, Tp ∝ F^⅓, so Tp ∝ Hs^⅔), not
-    // its height alone at the same period, which only made it steeper until it broke (and capped it there)
-    if (this.chop > 0 && this.chop !== 1) w = { ...w, hs: w.hs * this.chop, tp: w.tp * Math.pow(this.chop, 2 / 3) };
     const wc = onCurrent(w.hs, w.tp, Uc - dot(up, to));
-    let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * (this.chop > 0 ? 1 : 0); // glassy below ~2 m/s
+    let hsW = wc.H * clamp((U - 1) / 2, 0, 1); // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     // (in a marina, its own walls shelter it below, traced finely: the 50 m terrain grid's shadow can land on the wrong side of a breakwater)
@@ -264,7 +264,8 @@ export class SeaField {
     if (inBasin(p) && !basinRay(p, reach.toward + 180).out) reach.k *= 0.15;
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
     const hsS = Math.min(sc.H, 0.1 * sc.L);
-    // whitecaps: the classic fraction-vs-wind law (Monahan), more where the chop is steep or blocked
+    // whitecaps: the classic fraction-vs-wind law (Monahan), more where the chop is steep or blocked (a longer, older sea in
+    // the same wind, as the chop adjuster makes, is a little less steep and breaks a little less: real cover goes with wave age)
     const steep = hsW / Math.max(1, wc.L);
     const white = clamp(3.84e-6 * Math.pow(U, 3.41) * clamp(steep / 0.05, 0.5, 3) * (wc.blocked ? 2 : 1), 0, 0.2);
     return { hsW, tpW: w.tp, fromW: ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
