@@ -46,7 +46,7 @@ import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { onSaveTrouble } from './store/cloud';
-import { layerMenu, type LayerKey } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
 import { SetupChart } from './ui/setupChart';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
@@ -671,16 +671,28 @@ setupChart = new SetupChart(hud, {
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
   set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); }
 });
+let openChartHook = () => {}; // (the field picker, set to the layers in force when the chart opens)
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
   pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
 {
-  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = { ...S.mapLayers, [k]: on }; w.settings.mapLayers = S.mapLayers; saveSettings(S); };
+  // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
+  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); };
   const redraw = () => { if (chart.isOpen) chart.draw(); };
-  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f));
-  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f));
+  // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
+  const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button')];
+  const syncField = () => { const f = fieldLayer(w?.settings ?? S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
+  for (const b of fieldBtns) b.addEventListener('click', () => {
+    const f = b.dataset.field!;
+    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); }
+    else setLayer(f as LayerKey, true);
+    redraw(); setTimeout(() => menus.forEach(m => m()), 30); // (after the chart's redrawn, so the key lists what's on it now)
+  });
+  syncField(); openChartHook = syncField;
+  const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f)),
+    layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
 }
-$('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); });
+$('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
 /* ---------------- message log ---------------- */
@@ -1516,4 +1528,4 @@ newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRo
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __hud: hud, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
