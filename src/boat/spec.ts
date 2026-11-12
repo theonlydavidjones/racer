@@ -1,4 +1,5 @@
 import slipRenames from '../geo/data/slip-renames.json';
+import { fixTune, type RigTune } from './rigTune';
 
 /**
  * Your boat as you've set her up: how she looks (hull, deck, sails, flags) and the things about her that change
@@ -51,6 +52,10 @@ export interface BoatSpec {
     mastStiffness: 'soft' | 'average' | 'stiff'; // a wooden mast's own character (aluminium masts are all alike)
     outboard: 'none' | 'stowed' | 'bracket'; // left ashore, stowed below, or on its transom bracket (lifted)
     gearKg: number; // gear and stores beyond the racing minimum
+    /** The rig's tune at the dock (rigTune.ts): absent, on the guide's tune for the wind (as the sim always sailed). */
+    tune?: RigTune;
+    /** The jumpers adjustable under way: a row in the sail band (CR 7.40 allows it; most crews never do). */
+    jumpersUnderWay?: boolean;
   };
 }
 
@@ -137,6 +142,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
   spec.sails.number = String(spec.sails.number).replace(/\D/g, '').slice(0, 5) || d.sails.number;
   spec.perf.cleanedWeeks = Math.max(0, Math.min(26, Math.round(Number(spec.perf.cleanedWeeks) || 0)));
   spec.perf.gearKg = Math.max(0, Math.min(400, Number(spec.perf.gearKg) || 0));
+  if (spec.perf.tune) spec.perf.tune = fixTune(spec.perf.tune); // (absent: the guide's tune for the wind, rigTune.ts)
   return spec;
 }
 
