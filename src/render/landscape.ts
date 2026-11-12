@@ -199,7 +199,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // dials glow from behind (photographs).
   // Reasonable calls, not from a source: the dials sit at the top of the shaft; the arcade's bays are drawn 6 m wide;
   // the colours; and the PORT OF SAN FRANCISCO sign (put up on the Bay side in 1951–52: photo captions, OpenSFHistory)
-  // is drawn in dark letters along the top of the Bay face, unlit: its lettering, colour and lighting weren't found
+  // is drawn in dark letters standing on the Bay face's roofline across from the tower, unlit: its lettering, colour and lighting weren't found
   // (the Port's own Ferry Building Sign Guidelines are only at its Pier 1 offices: sfport.com, Sign Guidelines, 2021).
   {
     type Way = { pts: [number, number][]; height?: string };
@@ -231,7 +231,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       for (let i = 0; i < hall.length; i++) {
         const a = hall[i], b = hall[(i + 1) % hall.length], L = Math.hypot(b.x - a.x, b.y - a.y);
         const brg = (Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI + 360) % 360;
-        if (L < 10 || !(Math.abs(brg - 144) < 10 || Math.abs(brg - 324) < 10)) continue; // the long faces only
+        if (L < 3 || !(Math.abs(brg - 144) < 10 || Math.abs(brg - 324) < 10)) continue; // the long faces only
         const n = Math.max(1, Math.round(L / BAY)), g = new THREE.PlaneGeometry(L, HALL);
         const uv = g.getAttribute('uv') as THREE.BufferAttribute; for (let k = 0; k < uv.count; k++) uv.setX(k, uv.getX(k) * n);
         const ox = (b.y - a.y) / L * 0.15, oy = -(b.x - a.x) / L * 0.15; // (out from the wall)
@@ -267,24 +267,26 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
         fbg.add(d);
       }
     }
-    // the sign on the Bay face: the long north-east wall nearest the tower, along its top
+    // the sign on the Bay face, standing on its roof edge square across from the tower (the hall's Bay face is
+    // stepped there, so the letters stand along the roofline rather than on any one wall)
     {
       const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 64; const c = cv.getContext('2d')!;
       c.fillStyle = '#2b2622'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PORT OF SAN FRANCISCO', 512, 34);
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-      let best = -1, bd = Infinity;
+      // out from the tower toward the Bay (bearing 54°, square to the building's long axis at 144°: the outline's
+      // long sides), to where that line leaves the hall's outline
+      const n = { x: Math.sin(54 * Math.PI / 180), y: Math.cos(54 * Math.PI / 180) };
+      let far = 0;
       for (let i = 0; i < hall.length; i++) {
-        const a = hall[i], b = hall[(i + 1) % hall.length], L = Math.hypot(b.x - a.x, b.y - a.y), brg = (Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI + 360) % 360;
-        if (L < 25 || Math.abs(brg - 324) > 10) continue;
-        const dd = Math.hypot((a.x + b.x) / 2 - tc.x, (a.y + b.y) / 2 - tc.y); if (dd < bd) { bd = dd; best = i; }
+        const a = hall[i], b = hall[(i + 1) % hall.length], ex = b.x - a.x, ey = b.y - a.y, den = n.x * ey - n.y * ex;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((a.x - tc.x) * ey - (a.y - tc.y) * ex) / den, u = ((a.x - tc.x) * n.y - (a.y - tc.y) * n.x) / den;
+        if (u >= 0 && u <= 1 && t > far) far = t;
       }
-      if (best >= 0) {
-        const a = hall[best], b = hall[(best + 1) % hall.length], L = Math.hypot(b.x - a.x, b.y - a.y), W = Math.min(L - 2, 30);
-        const s = new THREE.Mesh(new THREE.PlaneGeometry(W, W / 16), new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.4 }));
-        s.rotation.y = Math.atan2(b.y - a.y, b.x - a.x);
-        s.position.copy(P3((a.x + b.x) / 2 + (b.y - a.y) / L * 0.25, (a.y + b.y) / 2 - (b.x - a.x) / L * 0.25, B0 + HALL - 0.6 - W / 32));
-        fbg.add(s);
-      }
+      const W = 40, s = new THREE.Mesh(new THREE.PlaneGeometry(W, W / 16), new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.4 }));
+      s.rotation.y = Math.atan2(n.x, -n.y); // (the plane's face out along n)
+      s.position.copy(P3(tc.x + n.x * (far - 1), tc.y + n.y * (far - 1), B0 + HALL + W / 32));
+      fbg.add(s);
     }
     // the ferry gates: floating concrete pontoons riding 0.8 m out of the water, and the shelters over them at OSM's
     // heights, on posts
