@@ -134,9 +134,9 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button>
-<span class="sb-tab sb-pen" hidden></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden title="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds); then it's yours until Auto-trim."></button><button type="button" class="sb-tab sb-all" data-act="all" title="Auto-trim: every line, both jib cars and the whisker pole back to the crew">Auto-trim</button></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
+<span class="sb-tillerslot"></span>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden title="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds); then it's yours until Auto-trim."></button><button type="button" class="sb-tab sb-all" data-act="all" title="Auto-trim: every line, both jib cars and the whisker pole back to the crew">Auto-trim</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
@@ -162,6 +162,8 @@ export class SailBand {
     });
   }
 
+  /** The middle of the band's top edge, for the tiller strip (the app puts it there). */
+  get tillerSlot(): HTMLElement { return this.el.querySelector<HTMLElement>('.sb-tillerslot')!; }
   /** Put away, the band leaves only its windex (and a hail, when there is one): the helm still looks up at the masthead. */
   get open(): boolean { return !this.el.classList.contains('shut'); }
   show(on: boolean): void { this.el.classList.toggle('shut', !on); if (!on) this.up(null); }

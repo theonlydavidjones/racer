@@ -269,7 +269,11 @@ export class Hud {
         : ' · overpowered: backstay on, vang on, traveller down, flatten';
       const advice = u.luff ? '' : hn > 5 ? (up ? overUp : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveller up, ease backstay, fuller sails' : heel > 24 && up ? (crewTrims && dp < 0.95 ? ' · heeling too far: the crew is depowering' : ' · heeling too far: depower') : '';
       if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveller down (Trim coach explains).`, 6000); }
-      $('tpBalance').innerHTML = `Heel <b>${heel}°</b> · Helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b><span class="warn">${advice}</span>`; }
+      // the Coach card's second line (the chase-view layout): the sails' state, heel and helm, where the crew are; a state
+      // that isn't good in amber or red
+      const st = (name: string, w: string, c: string) => `${name} <b class="tp-st ${c}">${w.toLowerCase()}</b>`;
+      const c = u.crew, crew = !c ? '' : ` · crew ${c.mode === 'hike' ? 'hiking' : c.mode === 'leeward' ? 'to leeward' : c.mode === 'foredeck' ? 'on the foredeck' : c.fore > 0.55 ? 'forward' : c.fore < 0.25 ? 'aft' : 'amidships'}`;
+      $('tpBalance').innerHTML = `${st('Main', mw, mc)} · ${st('Jib', jw, jc)} · Heel <b>${heel}°</b> · helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b>${crew}<span class="warn">${advice}</span>`; }
     // (the line under the sails' state is the trim coach's headline: app.ts coachTick)
   }
 

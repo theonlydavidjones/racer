@@ -760,7 +760,21 @@ button.kkeys:hover,button.kkeys:focus-visible{border-color:var(--accent)}
 .sailband.off{opacity:.55}
 .sailband button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 .sailband button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
-.sb-tabs{position:absolute;right:10px;top:-22px;display:flex;gap:4px}
+.sb-edge{position:absolute;left:10px;right:10px;top:-22px;height:22px;display:flex;align-items:flex-end;gap:6px;pointer-events:none}
+.sb-ltabs,.sb-tabs{display:flex;gap:4px;flex:none;pointer-events:auto}
+.sb-tabs{margin-left:auto}
+.sb-tillerslot{flex:0 1 360px;min-width:0;margin:0 auto;display:flex;gap:4px;height:22px;pointer-events:auto}
+.sb-tillerslot:empty{display:none}
+/* the tiller strip on the band's top edge (the UI session, 12 Nov): drag it, or hold it with the keys */
+.sb-tillerslot .tiller{flex:1 1 auto;height:22px;border-radius:7px 7px 0 0;border-bottom:0;background:rgba(9,22,33,.86)}
+.sb-tillerslot .tiller-track{height:2px;margin-top:-1px}
+.sb-tillerslot .tiller-mid{top:4px;bottom:4px}
+.sb-tillerslot .tiller-handle{top:3px;bottom:3px;width:12px;margin-left:-6px;border-radius:4px}
+.sb-tillerslot .tiller-lab{left:50%;bottom:auto;top:6px;transform:translateX(-50%);font-size:8.5px;opacity:.75}
+.sb-tillerslot #bPilot{height:22px;min-width:0;padding:0 8px;border-radius:7px 7px 0 0;flex-direction:row;gap:5px;font:700 10px/1 var(--f-inst)}
+.sb-tillerslot #bPilot svg{width:12px;height:12px}
+.sb-tillerslot #pilot{position:absolute;right:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3}
+.sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
 .sb-tab[hidden]{display:none}
@@ -768,10 +782,10 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-pole{color:var(--text)!important}
 .sb-pole.mine{color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
-.sb-hail{position:absolute;left:10px;top:-22px;background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
+.sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
 .sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}
 .sb-hail .k{font-size:9.5px;border:1px solid rgba(26,18,5,.5);border-radius:3px;padding:1px 3px}
-.sb-pen{position:absolute;left:50%;top:-22px;transform:translateX(-50%);color:var(--accent)!important;cursor:default}
+.sb-pen{color:var(--accent)!important;cursor:default}
 /* the windex between the two vangs: looking up at the masthead */
 .sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}
 .sb-wx svg{width:100%;height:100%;display:block}
@@ -923,3 +937,19 @@ body.showroom #crewPop{visibility:hidden}
 #msgRecent li:nth-child(n+3){display:none}
 #toast{bottom:calc(env(safe-area-inset-bottom,0px) + 200px)}
 #crewPop{background:var(--pod-solid);box-shadow:0 8px 30px rgba(0,0,0,.45)}
+/* a new message, lit for a moment as it arrives (toast(): the Messages card's newest line) */
+#toast{display:none!important}
+@keyframes msgflash{0%,60%{background:rgba(255,182,39,.28);box-shadow:0 0 0 4px rgba(255,182,39,.28)}100%{background:transparent;box-shadow:none}}
+#msgRecent li.flash{animation:msgflash 2s ease-out;border-radius:3px}
+#coachTip{display:none!important}
+#trimPanel .tp-hint.flash{animation:msgflash 2s ease-out}
+/* the Coach card: the sails' states join the second line (good plain; luffing amber, stalled or aback red) */
+#trimPanel .tp-states{display:none}
+#trimPanel .tp-balance{font-size:11px;line-height:1.35}
+.tp-st.good{color:var(--text)} .tp-st.luffing{color:var(--caution)} .tp-st.stalled{color:var(--giveway)} .tp-st.backed{color:var(--giveway)} .tp-st.off{color:var(--muted)}
+/* the situation: a strip on top of the Coach card (the UI session, 12 Nov) */
+#trimPanel #situ{position:static;transform:none;width:auto;margin:-8px -10px 4px -10px;border-radius:7px 7px 0 0;box-sizing:border-box;flex-wrap:wrap;gap:4px 8px}
+#trimPanel #situ .msg{font-size:13px}
+/* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
+.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
+#mapHint{display:none}

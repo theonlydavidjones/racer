@@ -358,6 +358,9 @@ const band = new SailBand({
   hail: () => doHail(),
   hailKey: () => keymap.label('hail')
 }, document.body);
+// the tiller strip on the band's top edge, the tiller pilot's toggle at its right end and its panel over it (the UI
+// session's placement, 12 Nov: nothing fixed in the middle of the view, the helm's controls where the eye already is)
+band.tillerSlot.append($('tiller'), $('bPilot'), $('pilot'));
 function openLines(open = !band.open): void {
   band.show(open); S.band = open ? 1 : 0; saveSettings(S);
   document.body.classList.toggle('band-open', open);
@@ -419,6 +422,8 @@ function coachTick(dt: number): void {
   // the headline on the water: only when the panel's shut (it says the same), for six seconds of real time, and it
   // follows the coach while it's up (it never contradicts the panel or the trim panel)
   const tip = $('coachTip'), open = !$('coachPanel').hidden;
+  // (the chase-view layout: the Coach card's main line is the headline; it lights for a moment when it's new)
+  if (r.fresh && !w.paused) { const h = $('tpHint'); h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash'); }
   if (r.fresh && !w.paused && !open) { tip.textContent = r.fresh; tip.className = 'on ' + (r.done ? 'done' : r.view.top.kind); coachTipUntil = performance.now() + 6000; }
   else if (tip.classList.contains('on') && !r.done) { if (r.view.top.kind === 'fix') tip.textContent = r.view.top.head; else coachTipUntil = 0; }
   if (open) coachTipUntil = 0;
