@@ -23,8 +23,8 @@ import { FLEET } from './boat/boat';
 import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
-import { DT, World, describeTide } from './sim/world';
-import type { Controls } from './boat/controls';
+import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
+import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
 import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
 import { SailBand } from './ui/sailBand';
@@ -104,6 +104,15 @@ const KIND_NOTE: Record<WindKind, string> = {
   light: 'Hardly any wind and no settled direction: patches of breeze come and go. Keep the boat moving and sail to the pressure.'
 };
 
+/**
+ * The showroom's own time of day (minutes after midnight, local) and conditions (the panel's settings): her on show at dawn,
+ * at dusk with her lights on, or in a blow, without changing the day and conditions of your races and cruises. Null: the
+ * day's own. (The world's clock starts the start sequence before the start time: the time set is the one shown.)
+ */
+let showMin: number | null = null, showCond: Partial<Settings> | null = null;
+/** The settings the conditions panel had before it was opened from the showroom (put back when it closes). */
+let showSaved: Partial<Settings> | null = null;
+const hhmm = (m: number) => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 /** The conditions panel open from the pause menu: its changes go to the sail that's running, not a new one. */
 let condLive = false;
 function newGame(seed = randomSeed()): void {
@@ -112,7 +121,9 @@ function newGame(seed = randomSeed()): void {
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
   // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
-  const WS = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
+  const WS1 = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
+  // (on show: the showroom's own time of day and conditions, if you've set them; your races' and cruises' are untouched)
+  const WS = shown ? { ...WS1, ...(showCond ?? {}), ...(showMin != null ? { tideTime: hhmm(showMin + WS1.seq) } : {}) } : WS1;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
@@ -1043,7 +1054,34 @@ $('courseMode').addEventListener('click', e => {
 });
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
-$('bCondClose').onclick = $('bCondDone').onclick = () => { $('condDlg').hidden = true; if (condLive) { condLive = false; $('pause').hidden = false; } };
+$('bCondClose').onclick = $('bCondDone').onclick = () => {
+  $('condDlg').hidden = true;
+  if (condLive) { condLive = false; $('pause').hidden = false; }
+  if (showSaved) { // (from the showroom: what was set becomes the showroom's, and your own conditions go back as they were)
+    const cond: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
+    for (const k of CONDITION_KEYS) (cond as Record<string, unknown>)[k] = rec[k];
+    showCond = cond; Object.assign(S, showSaved); showSaved = null; saveSettings(S); paintSeg(); newGame(); showBar();
+  }
+};
+/* ---------------- the showroom's own time of day and conditions ---------------- */
+/** The bar under her on show: the time (and whether it's day, dusk or night there), and the conditions. */
+function showBar(): void {
+  const min = showMin ?? (([h, m]) => h * 60 + m)((S.tideTime || '12:00').split(':').map(Number));
+  ($('showTime') as HTMLInputElement).value = String(min);
+  const el = sunPosition(w.clockUtc * 60000).el; // (the sun at the time shown: the showroom's clock)
+  $('showTimeV').textContent = `${hhmm(min)} · ${el > 6 ? 'day' : el > -6 ? (min < 720 ? 'dawn' : 'dusk') : 'night'}`; // (civil twilight: the sun within 6° below the horizon)
+  $('bShowReal').hidden = showMin == null && showCond == null;
+}
+$('showTime').addEventListener('input', () => { const m = Number(($('showTime') as HTMLInputElement).value); $('showTimeV').textContent = hhmm(m); });
+$('showTime').addEventListener('change', () => { showMin = Number(($('showTime') as HTMLInputElement).value); newGame(); showBar(); });
+$('bShowCond').onclick = () => {
+  // the same panel; while it's open your conditions take the showroom's, and they're put back when it closes
+  const saved: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
+  for (const k of CONDITION_KEYS) (saved as Record<string, unknown>)[k] = rec[k];
+  showSaved = saved; Object.assign(S, showCond ?? {}); showCond = null;
+  paintSeg(); tideBox(); $('condDlg').hidden = false;
+};
+$('bShowReal').onclick = () => { showMin = null; showCond = null; newGame(); showBar(); };
 // mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
@@ -1240,6 +1278,7 @@ $('bBoat').onclick = () => { fleetFrom = 'setup'; $('setup').hidden = true; flee
 let fleetFrom: 'home' | 'setup' = 'home';
 /** The showroom: on while one of your boats is on show (her page in the Fleet, or editing her). */
 function showroom(on: boolean): void {
+  if (on) queueMicrotask(showBar); // (once she's on show: the time she's shown at)
   if (on && !document.body.classList.contains('showroom')) { look.yaw = 0.6; look.pitch = 0; }
   document.body.classList.toggle('showroom', on);
   if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = undefined; }

@@ -40,6 +40,12 @@
 <div id="linebox" hidden></div>
 <div id="transit" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<!-- the showroom: her on show at any time of day, in any conditions (just here: a race's or a cruise's own are set in Setup) -->
+<div id="showBar" class="showbar" aria-label="Showroom conditions">
+  <label>Time of day <input type="range" id="showTime" min="300" max="1410" step="15" aria-describedby="showTimeV"></label><b id="showTimeV"></b>
+  <button type="button" class="ghost sm" id="bShowCond" title="Wind, sea, sky: just for the showroom">Conditions…</button>
+  <button type="button" class="linkbtn" id="bShowReal" title="Back to the day's own time and conditions">Real</button>
+</div>
 <div id="coachTip" role="status" aria-live="polite"></div>
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
