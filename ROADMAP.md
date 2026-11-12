@@ -23,8 +23,18 @@ What's planned, roughly in order. Done work is described in the README.
 1. P0 phase 2: the interior true to a real Folkboat (Boat Detail, running; 6–10 h).
 2. Finish the crew figures: the owner's choice on moving the crew's stations onto the real benches (<1 h once chosen,
    then its own reviewed PR for the trim calibration).
-3. Crystal clarity on the crew and trim controls: a new, more true-to-life view of the trim controls, which the owner
-   is planning and will describe; nothing is built until it's agreed (the lines' ends are named, v104; 4–6 h).
+3. Crystal clarity on the crew and trim controls: **the sail controls band**, the owner's design (12 November): "toggle
+   on a view of the sail controls that stretches across the bottom of the screen — maybe the bottom quarter; more if it
+   needs the room". Three horizontal layers in the band, top to bottom:
+   - **The piano**, "mirroring what really exists on Josephine" (the table under Full sail controls: starboard, inboard
+     to outboard, vang · outhaul · jib Cunningham; port, vang · outhaul · the main Cunningham's clam cleat · jib
+     Cunningham, with the downhaul and the jib halyard tail): trim / ease buttons on each.
+   - **The jib**: a sheet on each side, trim / ease.
+   - **The main**: the mainsheet, the backstay, and "the traveller specifically I would want to move left and right
+     like a real traveler" (a car you drag along a track).
+   Laid out as you face forward from the helm (port on the left), each control with its auto pill, its setting, and its
+   ends named. Later: the jib cars and the rig ("we can figure that out later"). A clickable mock-up goes to the owner
+   before the build. 6–10 h; replaces the trim-panel review.
 4. Outside the Gate, the sea dial against the chart and the water (flood or ebb, the 9 ft swell; 2–3 h).
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
 6. The racing rules still to finish: 20.3, 20.2(e)'s end, blanketing for Rule 23, a boat as the obstruction (4–6 h).
