@@ -6,6 +6,11 @@
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighbouring bins, as driveCalibration already does across the wind.
+- **AI boats into the harbour after an abandonment** (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
+  after N or AP over A the AI boats now sail home and stand off the nearest racing harbour, each at her own spot with
+  open water to leeward, lying to (ai.ts homeCourse). Real boats would go in: sail or motor through the entrance and
+  berth in the basin, out of the breeze (lying to for an hour in 23+ kt is hard on the sails). That needs the AI boats
+  given slips and the marina's way in (geo/marina.ts), as the user's boat has.
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
