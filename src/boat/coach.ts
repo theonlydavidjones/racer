@@ -222,6 +222,10 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
         why: more ? 'The breeze has blown the main\'s draft aft: luff tension pulls it forward again.' : 'The draft is too far forward: the front is round and the leech flat. Easing it lets the draft move back toward the middle, for power.',
         look: 'the draft stripes: the deepest point a little less than halfway back', done: 'draft where it should be' };
     }
+    case 'jibHalyard': return { ...base,
+      head: more ? `Jib halyard on, ${amount(d)}.` : `Ease the jib halyard, ${easeAmount(d)}.`,
+      why: more ? 'The jib\'s luff has gone soft and its draft blown aft: halyard tension pulls it forward, as the main halyard does the main\'s.' : 'The jib\'s luff is stretched hard and its draft is too far forward: ease the halyard a little.',
+      look: 'the jib\'s luff: horizontal wrinkles off the hanks are too little tension, a crease up the luff too much', done: 'jib luff right' };
     case 'jibCunningham': return { ...base,
       head: more ? `Jib Cunningham on, ${amount(d)}.` : `Ease the jib Cunningham, ${easeAmount(d)}.`,
       why: more ? 'The jib\'s draft has blown aft: luff tension brings it forward.' : 'The jib\'s draft is too far forward.',
@@ -290,7 +294,7 @@ function hoveLessons(b: Boat, s: Situation): Lesson[] {
 /* ---------- the crew's line ---------- */
 
 const NAME: Record<LineKey, string> = { mainsheet: 'mainsheet', jibsheet: 'jib sheet', jibsheetW: 'windward jib sheet', traveller: 'traveller', backstay: 'backstay', vang: 'vang',
-  outhaul: 'outhaul', cunningham: 'Cunningham', downhaul: 'main halyard', jibCunningham: 'jib Cunningham', car: 'jib car' };
+  outhaul: 'outhaul', cunningham: 'Cunningham', downhaul: 'main halyard', jibCunningham: 'jib Cunningham', jibHalyard: 'jib halyard', car: 'jib car' };
 const listWords = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 
 function crewLine(b: Boat, s: Situation): string {
@@ -318,7 +322,7 @@ function crewLine(b: Boat, s: Situation): string {
 
 /* ---------- putting it together ---------- */
 
-const LINE_KEYS = ['mainsheet', 'jibsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham'] as const;
+const LINE_KEYS = ['mainsheet', 'jibsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'] as const;
 
 /** Every lesson for now, biggest first. */
 export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: Lesson[] } {

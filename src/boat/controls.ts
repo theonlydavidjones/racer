@@ -36,6 +36,8 @@ export interface Controls {
    */
   jibsheetW: number;
   jibCunningham: number; // 0 .. 1
+  /** The jib halyard's tension (starboard, under way): the jib's coarse luff tension, as the main halyard is the main's. 0 .. 1 */
+  jibHalyard: number;
   /** Jib car pin per side: fore–aft (0 = forward .. CAR_FORE_PINS−1 = aft) and athwartships (0 = inboard ..). */
   car: Record<Tack, { fore: number; ins: number }>;
 }
@@ -45,7 +47,7 @@ export const CAR_FORE_PINS = 7, CAR_IN_PINS = 5;
 
 export const defaultControls = (): Controls => ({
   mainsheet: 0.1, traveller: 0, vang: 0.2, outhaul: 0.5, cunningham: 0.2, downhaul: 0.3, backstay: 0.3,
-  jibsheet: 0.1, jibsheetW: 1, jibCunningham: 0.3, car: { S: { fore: 3, ins: 1 }, P: { fore: 3, ins: 1 } }
+  jibsheet: 0.1, jibsheetW: 1, jibCunningham: 0.3, jibHalyard: 0.3, car: { S: { fore: 3, ins: 1 }, P: { fore: 3, ins: 1 } }
 });
 
 /* ---------- from controls to sheet angles ---------- */
@@ -175,9 +177,12 @@ export function mainShape(c: Controls, tws: number, rig: SailRig = STD_RIG, aws 
 export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = SAIL_WEAR.new, aws = tws): Shape {
   const car = loadedCar(c, tack), aft = car.fore / (CAR_FORE_PINS - 1); // 0 forward .. 1 aft
   const sheetT = smooth((0.28 - c.jibsheet) / 0.28);
+  // luff tension, as the main's: the halyard coarse, the Cunningham fine (at their defaults, 0.3 each, the same as the
+  // jib Cunningham alone gave before the halyard was a control)
+  const luff = 0.6 * (c.jibHalyard ?? 0.3) + 0.4 * c.jibCunningham;
   return age({
-    depth: 0.135 - 0.035 * c.backstay + 0.012 * (0.5 - aft) - 0.01 * c.jibCunningham,
-    draft: clamp(0.44 - 0.09 * c.jibCunningham + 0.004 * (tws - 10), 0.28, 0.55),
+    depth: 0.135 - 0.035 * c.backstay + 0.012 * (0.5 - aft) - 0.01 * luff,
+    draft: clamp(0.44 - 0.09 * luff + 0.004 * (tws - 10), 0.28, 0.55),
     twist: clamp(9 + 12 * aft - 6 * sheetT, 3, 24)
   }, wear, aws);
 }
@@ -211,7 +216,7 @@ export function shapeEfficiency(s: Shape, t: Shape): number {
 
 /** How fast the crew (or you) can work each control, in full range per second. Hauling in a loaded line is slower. */
 export const CONTROL_RATE: Record<Exclude<keyof Controls, 'car'>, number> = {
-  mainsheet: 0.12, traveller: 0.6, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3
+  mainsheet: 0.12, traveller: 0.6, vang: 0.25, outhaul: 0.3, cunningham: 0.3, downhaul: 0.2, backstay: 0.3, jibsheet: 0.16, jibsheetW: 0.16, jibCunningham: 0.3, jibHalyard: 0.2
 };
 
 /** Winch: hauling the jib sheet in gets slower as the breeze builds (one hand cranks, the other tails). Easing is quick. */
@@ -222,7 +227,7 @@ export const winchFactor = (tws: number, hauling: boolean) => (hauling ? clamp(1
  * sheet angles the conditions call for (`mainAngle`, `jibAngle` in deg). A small coordinate search over the
  * controls; the jib car's fore–aft pin is searched too (it's set on the lazy side, before the tack).
  */
-export interface CrewSettings { traveller: number; vang: number; outhaul: number; cunningham: number; downhaul: number; backstay: number; jibCunningham: number; carFore: number; carIn: number }
+export interface CrewSettings { traveller: number; vang: number; outhaul: number; cunningham: number; downhaul: number; backstay: number; jibCunningham: number; jibHalyard: number; carFore: number; carIn: number }
 /**
  * Where a Folkboat crew sets the lines upwind for the wind speed, from North Sails' Nordic Folkboat tuning guide (Theis
  * Palm; northsails.com/sailing/en/resources/nordic-folkboat-tuning-guide, read 2026-11-11):
@@ -264,7 +269,7 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
  */
 export function depowerLimits(depower: number, awa: number, tws?: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>>; carAft: number } {
   const d = Math.abs(awa) < 70 ? depower : 0, st = (a: number, b: number) => smooth((d - a) / (b - a));
-  const steps: Partial<Record<keyof CrewSettings, number>> = { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibCunningham: st(0.25, 0.8), vang: 0.9 * st(0.3, 0.8), traveller: -1 + 1.6 * st(0.6, 1) };
+  const steps: Partial<Record<keyof CrewSettings, number>> = { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibCunningham: st(0.25, 0.8), jibHalyard: 0.9 * st(0.3, 0.85), vang: 0.9 * st(0.3, 0.8), traveller: -1 + 1.6 * st(0.6, 1) };
   const g = tws == null ? { min: {}, max: {} } : guideLimits(tws, awa);
   const min: Partial<Record<keyof CrewSettings, number>> = {}, max: Partial<Record<keyof CrewSettings, number>> = { ...g.max };
   for (const k of Object.keys(steps) as (keyof CrewSettings)[]) {
@@ -285,8 +290,8 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const hi = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? 1 : lim.max[k]) ?? 1;
   // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle
   const carIn = clamp(Math.floor((jibAng - 1 - 8) / 1.25), 0, CAR_IN_PINS - 1);
-  const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, carFore: 3, carIn, ...from };
-  const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const;
+  const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, jibHalyard: 0.3, carFore: 3, carIn, ...from };
+  const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
   for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
   // with your mainsheet held, the traveller is how the crew puts the boom where they want it (up to windward in light
   // air with your sheet eased; never below their depowering floor), aimed at their angle, not yours: it doesn't run away
@@ -324,7 +329,7 @@ export function crewShapes(tws: number, awa: number, depower: number, mainAngle:
   const hit = crewShapeCache.get(key); if (hit) return hit;
   const v = crewSolve(t / 2, a, 'S', ma, ja, undefined, STD_RIG, SAIL_WEAR.new, t / 2, d / 16);
   const c: Controls = { mainsheet: mainsheetFor(ma, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
-    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
   c.jibsheet = jibsheetFor(ja, c, 'S');
   const out = { main: mainShape(c, t / 2, STD_RIG, t / 2), jib: jibShape(c, t / 2, 'S', SAIL_WEAR.new, t / 2) };
   crewShapeCache.set(key, out);
@@ -334,7 +339,7 @@ export function crewShapes(tws: number, awa: number, depower: number, mainAngle:
 /** The drive (as a share of the best) the sails' shapes give with these settings, for the sheet angles wanted. */
 function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: number, jibAng: number, tm: Shape, tj: Shape, rig: SailRig, jibWear: SailWear, aws: number, mainsheet?: number): number {
   const c: Controls = { mainsheet: mainsheet ?? mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
-    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
   c.jibsheet = jibsheetFor(jibAng, c, tack);
   return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws), tj);
 }
@@ -347,9 +352,9 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
 export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number): Partial<Record<keyof CrewSettings, number>> {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
   const loaded = loadedCar(c, tack);
-  const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, carFore: loaded.fore, carIn: loaded.ins };
+  const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, jibHalyard: c.jibHalyard ?? 0.3, carFore: loaded.fore, carIn: loaded.ins };
   const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet), out: Partial<Record<keyof CrewSettings, number>> = {};
-  for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham'] as const) {
+  for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
     const m = lim.min[k], mx = lim.max[k];
     if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) { out[k] = 1; continue; }
     // with your mainsheet held, the traveller is how they put the boom where it should be: that's the sheet's angle of

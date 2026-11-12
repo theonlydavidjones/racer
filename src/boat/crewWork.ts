@@ -30,8 +30,8 @@ import { CAR_ARM, Z, allAboard, pace, reactTime, skillOf, type Aboard, type Crew
 
 type Ctl = Exclude<keyof Controls, 'car'>;
 /** The lines in the order they're seen to: sheets first, then the main's power, then shape. */
-export const PRIORITY: readonly Ctl[] = ['jibsheet', 'mainsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham'];
-const PIANO = new Set<string>(['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham']);
+export const PRIORITY: readonly Ctl[] = ['jibsheet', 'mainsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'];
+const PIANO = new Set<string>(['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard']);
 /** The cabin-top lines led to both sides (controls.ts: vang, outhaul and jib Cunningham are dual-ended): worked from the windward side deck. */
 const BOTH_SIDES = new Set<string>(['vang', 'outhaul', 'jibCunningham']);
 /**
@@ -46,7 +46,7 @@ export const LINE_TAU = 20;
 
 /**
  * The crew's own lines that wait while you've placed them across the boat: the ones they'd have to leave their place
- * for, so they make the trip only for a big change (PLACED_TRIP), not every tweak. With crew, the main Cunningham (led to the port side) and the downhaul (the middle); the dual-ended vang, outhaul
+ * for, so they make the trip only for a big change (PLACED_TRIP), not every tweak. With crew, the main Cunningham (led to the port side), the downhaul (the middle) and the jib halyard (starboard); the dual-ended vang, outhaul
  * and jib Cunningham are led to both side decks, so they work those from where they sit. Alone, the helm would have to
  * leave the tiller for any of the cabin-top lines.
  */
@@ -54,7 +54,7 @@ export const LINE_TAU = 20;
 export const PLACED_TRIP = 0.3;
 export function waitingLines(c: CrewState): readonly string[] {
   if (c.place?.across == null) return [];
-  return c.spec.crew.length ? ['cunningham', 'downhaul'] : [...PIANO];
+  return c.spec.crew.length ? ['cunningham', 'downhaul', 'jibHalyard'] : [...PIANO];
 }
 
 /** How far in the jib sheet has to come (of its range) for the trimmer to go to the winch: the haul after a tack, when the
@@ -96,6 +96,8 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
     // dual-ended lines from the windward side deck (in off the rail); the main Cunningham is on the port side, the downhaul in the middle
     if (BOTH_SIDES.has(line)) return { arm: 0.7, z: Z.cockpitFwd, pose: 'piano' };
     if (line === 'cunningham') return { arm: windward < 0 ? 0.7 : -0.4, z: Z.piano, pose: 'piano' };
+    // (the jib halyard's tail is on the starboard side of the piano, the owner's Josephine: the mirror of the main Cunningham)
+    if (line === 'jibHalyard') return { arm: windward > 0 ? 0.7 : -0.4, z: Z.piano, pose: 'piano' };
     return { arm: 0.3, z: Z.piano, pose: 'piano' };
   }
   // hauling the jib sheet in (after a tack): at the leeward winch, or in a breeze from the windward side of the cockpit

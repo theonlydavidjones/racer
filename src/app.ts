@@ -279,6 +279,7 @@ const CTL_UI: CtlItem[] = [
   { group: 'Piano', key: 'cunningham', label: 'Cunningham' },
   { group: 'Piano', key: 'downhaul', label: 'Main halyard' },
   { group: 'Piano', key: 'jibCunningham', label: 'Jib Cunningham' },
+  { group: 'Piano', key: 'jibHalyard', label: 'Jib halyard' },
   { group: 'Winches', key: 'jibsheet', label: 'Jib sheet' },
   { group: 'Winches', key: 'jibsheetW', label: 'Windward sheet' },
   { group: 'Cabin top: the lazy jib car', key: 'carFore', label: 'Car fore–aft' },

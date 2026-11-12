@@ -51,9 +51,9 @@ const chev = (dir: 'u' | 'd' | 'l' | 'r') => {
   return `<svg viewBox="0 0 12 12" aria-hidden="true"><polygon points="${p}"/></svg>`;
 };
 /** Short two-line names over the vertical lines. */
-const SHORT: Partial<Record<CtlKey, string>> = { downhaul: 'Main<br>hal.', jibCunningham: 'Jib<br>Cunn', cunningham: 'Main<br>Cunn', outhaul: 'Out-<br>haul', vang: 'Vang', jibsheet: 'Jib<br>sheet', jibsheetW: 'Jib<br>sheet' };
+const SHORT: Partial<Record<CtlKey, string>> = { downhaul: 'Main<br>hal.', jibHalyard: 'Jib<br>hal.', jibCunningham: 'Jib<br>Cunn', cunningham: 'Main<br>Cunn', outhaul: 'Out-<br>haul', vang: 'Vang', jibsheet: 'Jib<br>sheet', jibsheetW: 'Jib<br>sheet' };
 /** Each rope's colour, with a laid fleck (the owner: for usability, not Josephine's colours; none port red or starboard green). */
-const ROPE: Partial<Record<CtlKey | 'jib', string>> = { jib: '#ff8a3d', jibCunningham: '#f2c230', mainsheet: '#3d8bff', outhaul: '#2ec4d6', vang: '#9b6bff', cunningham: '#ec6aae', downhaul: '#8fa3b8', backstay: '#e8edf0' };
+const ROPE: Partial<Record<CtlKey | 'jib', string>> = { jib: '#ff8a3d', jibCunningham: '#f2c230', jibHalyard: '#c0652a', mainsheet: '#3d8bff', outhaul: '#2ec4d6', vang: '#9b6bff', cunningham: '#ec6aae', downhaul: '#8fa3b8', backstay: '#e8edf0' };
 const CLEAT: Partial<Record<CtlKey, string>> = { cunningham: 'clam', downhaul: 'block', jibsheet: 'winch', jibsheetW: 'winch' };
 
 /** A vertical line: its name, ▲ eases, the cleat, the well with the rope showing how much is on, ▼ pulls on. */
@@ -102,7 +102,7 @@ export class SailBand {
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
   <span class="sb-gap" title="The companionway"></span>
-  ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}<span class="sb-slot" title="The jib halyard: coming"></span>
+  ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
 <div class="sb-bot">${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveller')}</div>${bstay('S')}</div>`;
