@@ -250,8 +250,12 @@ export class SeaField {
     for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = windSea(U, Math.min(F * cg / Math.max(0.3 * cg, cg + Uc), Fd)); }
     // ... then steepened (or eased) by the change in current since the water the waves came through, ~1 km upwind
     const up = currentAt({ x: p.x - to.x * 1000, y: p.y - to.y * 1000 });
+    // the conditions adjuster: the chop × `chop` grows as a sea does with more wind or fetch, its period with it (the
+    // fetch-limited growth laws windSea uses, JONSWAP's: Hs ∝ F^½, Tp ∝ F^⅓, so Tp ∝ Hs^⅔), not
+    // its height alone at the same period, which only made it steeper until it broke (and capped it there)
+    if (this.chop > 0 && this.chop !== 1) w = { ...w, hs: w.hs * this.chop, tp: w.tp * Math.pow(this.chop, 2 / 3) };
     const wc = onCurrent(w.hs, w.tp, Uc - dot(up, to));
-    let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * this.chop; // glassy below ~2 m/s
+    let hsW = wc.H * clamp((U - 1) / 2, 0, 1) * (this.chop > 0 ? 1 : 0); // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     // (in a marina, its own walls shelter it below, traced finely: the 50 m terrain grid's shadow can land on the wrong side of a breakwater)

@@ -344,7 +344,7 @@ export class SceneView {
   private harbor!: Harbor;
   setWorld(w: World): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
-    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.waves.primed = false;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
     this.ripAngle = -w.windModel.base * D2R; this.wtex.offset.set(0, 0);
     this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
@@ -621,7 +621,7 @@ export class SceneView {
   private updateRain(w: World, dt: number, camera: THREE.Camera): void {
     const level = w.settings.rain ?? 0;
     if (!level) { if (this.rain) this.rain.mesh.visible = false; return; }
-    const N = 2400, R = 45, H = 30;
+    const N = 7200, R = 45, H = 30; // (heavy rain at all of them; light at a sixth)
     if (!this.rain) {
       const drops = new Float32Array(N * 3);
       for (let i = 0; i < N; i++) { drops[i * 3] = (Math.random() * 2 - 1) * R; drops[i * 3 + 1] = Math.random() * H; drops[i * 3 + 2] = (Math.random() * 2 - 1) * R; }
@@ -630,8 +630,8 @@ export class SceneView {
       mesh.frustumCulled = false; this.scene.add(mesh); this.rain = { mesh, drops };
     }
     const { mesh, drops } = this.rain, pos = mesh.geometry.attributes.position as THREE.BufferAttribute, a = pos.array as Float32Array;
-    mesh.visible = true; (mesh.material as THREE.LineBasicMaterial).opacity = level === 2 ? 0.45 : 0.28;
-    const n = level === 2 ? N : N / 3, fall = 8.5, wv = V(w.wind.from + 180), wk = w.wind.kt * 0.5144 * 0.6;
+    mesh.visible = true; (mesh.material as THREE.LineBasicMaterial).opacity = level === 2 ? 0.55 : 0.28;
+    const n = level === 2 ? N : N / 6, fall = 8.5, wv = V(w.wind.from + 180), wk = w.wind.kt * 0.5144 * 0.6;
     const vx = wv.x * wk, vz = -wv.y * wk, len = 0.06 * (1 + level); // streak: the drop's path over a sixtieth of a second, stretched for the eye
     const c = camera.position;
     for (let i = 0; i < N; i++) {
