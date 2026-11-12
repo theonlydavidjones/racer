@@ -3,7 +3,7 @@ import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../b
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
@@ -320,7 +320,7 @@ export class World {
     for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
-    for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
@@ -464,10 +464,13 @@ export class World {
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
-  currentAt(p: Vec): Vec {
-    return withPierWakes(p, this.streamAt(p), this.pierFlows(), this.t);
+  currentAt(p: Vec, lattice = false): Vec {
+    return withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t);
   }
-  private streamAt(p: Vec): Vec { return this.tide ? this.tide.atShore(p) : currentAt(p, this.cvec); }
+  /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
+   * every step, where the same places come up again and again; the sea map, the chart and the arrows, which sample the
+   * whole area once, keep the exact distance, or they'd fill a tile for every look) */
+  private streamAt(p: Vec, lattice: boolean): Vec { return this.tide ? this.tide.atShore(p, lattice) : currentAt(p, this.cvec, lattice); }
   /**
    * The stream meeting each pier, refreshed every half minute (the tide turns over hours): the open water's (the
    * stations' current there, or the preset), not eased by the shore relief, which would read the pier itself as shore.
@@ -586,6 +589,16 @@ export class World {
 
   /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
   private belowSinceGun = new Set<number>();
+  /**
+   * Definitions, Racing: "from her preparatory signal until she finishes and clears the finishing line and marks or
+   * retires, or until the race committee signals a general recall, postponement or abandonment".
+   */
+  racing(b: Boat): boolean {
+    if (this.freeSail || this.cancelled || notRacing(b)) return false;
+    const prep = this.sequence.find(s => s.name === 'Preparatory signal');
+    return !prep || this.t >= prep.t;
+  }
+
   /** Rule 21.1: how long (s) each returning boat has been sailing clearly away from the line (to release the latch). */
   private awayFromLine = new Map<number, number>();
   /**
@@ -690,7 +703,7 @@ export class World {
   private updateTide(): void {
     const f = this.tide!, now = this.clockUtc;
     f.cover(now); f.setTime(now); // (the predictions roll on past the race's window: a long sail)
-    this.cvec = this.streamAt(this.C.center); // (the tide at the course, not the piers' eddies)
+    this.cvec = this.streamAt(this.C.center, false); // (the tide at the course, not the piers' eddies)
     this.cur = { ...this.cur, ...describeTide(f, this.C.center, now), set: brg(this.cvec.x, this.cvec.y), kt: Math.hypot(this.cvec.x, this.cvec.y) / KT };
   }
 
@@ -709,7 +722,7 @@ export class World {
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
     for (const b of this.boats) {
-      b.forced14 = null; b.cur = this.currentAt(b); b.ww = windOnWater(this.windHere(b, b), b.cur);
+      b.forced14 = null; b.cur = this.currentAt(b, true); b.ww = windOnWater(this.windHere(b, b), b.cur);
       b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
     }
     this.vessels = this.traffic.vessels(this.trafficT);
@@ -850,7 +863,11 @@ export class World {
       // the same touch until she's got clearly away from that mark
       const prev = b.markTouch ? marks.find(m => m.name === b.markTouch) : undefined;
       const stillNear = !!prev && solidGap(bw, st, prev) - prev.r - HULL_HALF_BEAM < 1.5;
-      if (touching && b.markTouch !== touching.name) {
+      if (touching && b.markTouch !== touching.name && !this.racing(b)) {
+        // Rule 31 is "while racing": before her preparatory signal or once racing's called off, no penalty
+        b.v *= 0.6;
+        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
+      } else if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
         // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
         const sameIncident = this.t - (this.lastFoul.get(b.id) ?? -Infinity) < SAME_INCIDENT;
@@ -935,12 +952,38 @@ export class World {
     });
   }
 
+  /** Assess every pair in full every step (for the tests): otherwise pairs far apart are let be (apart()). */
+  exactPairs = false;
+  /**
+   * Two boats with nothing between them: over 150 m apart, not coming within 60 m of each other in the next 12 s at the
+   * speeds they're going (Rule 14's and every right-of-way rule's business starts a few lengths off), neither near her
+   * mark's zone, and no hail, mark-room, rule 17 or rule 15 grace on their record. Their record is set to "nothing
+   * between them" (as when two boats first meet) and their full assessment skipped this step: it's the most of the
+   * step's rules work (28 pairs in a fleet of eight), and the most of it is for boats a long way apart.
+   * The record then differs from a full assessment's in what it remembers from far off: an overlap (the rules' is pure
+   * geometry, at any distance) begun hundreds of metres away is recorded afresh when they come within 150 m, and a
+   * right of way that changed hands then starts no rule 15 grace (3.5 s, and they're 140 m and more apart). Neither can
+   * touch a call: incidents need contact or a forced swerve, under 10 m. tests/approx.test.ts: the same race, and the
+   * same incidents and penalties, as the full assessment.
+   */
+  private apart(A: Boat, B: Boat, rec: PairRecord, ctx: RulesContext): boolean {
+    const dx = A.x - B.x, dy = A.y - B.y;
+    if (dx * dx + dy * dy < 150 * 150) return false;
+    if (rec.hail || rec.r202e || rec.mark || rec.r183 || rec.r17 != null || rec.grace > ctx.t || A.forced14 === B.id || B.forced14 === A.id) return false;
+    const n = ctx.marks.length, nearZone = (X: Boat) => X.leg < n && markDist(X, ctx.marks[X.leg]) < ZONE * 2.5;
+    if (nearZone(A) || nearZone(B) || cpa(A, B).d < 60) return false;
+    rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null; rec.blanket = {};
+    rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT; // (rule 18.3: tacks seen as they happen)
+    return true;
+  }
+
   private checkPairs(): void {
     this.kcMemo = { t: this.t, m: new Map() }; // after the boats have moved this step
     const bs = this.boats, ctx = this.rulesCtx(), found: { A: Boat; B: Boat; incident: Incident<Boat> }[] = [];
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
+      if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
       const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
       const po = rec.hail?.kind === 'room' ? rec.hail.passedOn : undefined;
@@ -974,17 +1017,22 @@ export class World {
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
       if (incident.kind !== 'hail' && incident.kind !== 'blanket' && by && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW) incident.exoneratedBy = by.by;
+      // Part 2 preamble: the rules of Part 2 still apply between boats that intend to race, are racing or have been racing,
+      // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
+      // sim doesn't model, and rule 23.1, handled as its own case)
+      if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
-      if (incident.exoneratedBy == null) this.lastFoul.set(f.id, this.t);
+      // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
+      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.lastFoul.set(f.id, this.t);
       if (A.isUser || B.isUser) {
         this.paused = true;
-        if (incident.exoneratedBy == null) { if (f.isUser) this.fouls++; else this.fouledBy++; }
+        if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.exoneratedBy == null && incident.part !== '23.1' && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them (and one not racing, under 23.1, takes none: rule 44.1)
+      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1' && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them (and one not racing, under 23.1, takes none: rule 44.1)
     }
   }
 
@@ -1365,7 +1413,7 @@ export class World {
     if (this.tide) this.updateTide();
     // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
     // as it would on the water, until the new mean settles in)
-    for (const b of this.boats) { b.cur = this.currentAt(b); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
     if (!this.freeSail) {
       // racing: the laid marks stay where they are, but which legs are beats, reaches and runs goes with the wind they're
       // sailed in (rule 18.1(a), the laylines, the AI); the committee boat swings to the new wind at her anchor

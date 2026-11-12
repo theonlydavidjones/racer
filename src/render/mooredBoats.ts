@@ -22,8 +22,7 @@ export interface MooredPart { geo: THREE.BufferGeometry; colour: number; own?: '
 interface Lines { beam: number; fbBow: number; fbStern: number; transom: number; draft: number; rake: number }
 
 /** The hull, lofted from its stations: topsides and bottom (one surface), and the deck (another, for its own colour). */
-function hull(L: Lines): { side: THREE.BufferGeometry; deck: THREE.BufferGeometry; sheer: (u: number) => number; half: (u: number) => number } {
-  const N = 24;
+function hull(L: Lines, N = 24): { side: THREE.BufferGeometry; deck: THREE.BufferGeometry; sheer: (u: number) => number; half: (u: number) => number } {
   // half-breadth along her (u: 0 at the stem, 1 at the transom): full by 55%, easing to the transom's width aft
   const half = (u: number) => {
     const b = L.beam / 2;
@@ -102,9 +101,12 @@ export const MOORED = {
   power: { beam: 0.36, fbBow: 0.15, fbStern: 0.115, transom: 0.9, draft: 0.05, rake: 0.1, house: 0.13 }
 };
 
-/** A sailboat's parts: hull, deck, cabin, its ports, the rig (mast, boom and stays), and the furled main under its cover. */
-export function sailParts(): MooredPart[] {
-  const M = MOORED.sail, h = hull(M);
+/**
+ * A sailboat's parts: hull, deck, cabin, its ports, the rig (mast, boom and stays), and the furled main under its cover.
+ * `far`: as seen from over a kilometre off, a few pixels long: the hull from 6 stations, the mast alone, no rubrail or ports.
+ */
+export function sailParts(far = false): MooredPart[] {
+  const M = MOORED.sail, h = hull(M, far ? 6 : 24);
   const u0 = 0.3, u1 = 0.66, yb = (u: number) => h.sheer(u) - 0.003, yc = Math.max(yb(u0), yb(u1));
   const cabin = trunk(h.half(0.48) * 0.62, h.half(0.48) * 0.5, u0 - 0.5, u1 - 0.5, u0 - 0.5 + 0.05, u1 - 0.5 - 0.01, yc - 0.02, yc + M.cabin);
   const ports = trunk(h.half(0.48) * 0.62 * 0.93 + 0.0015, h.half(0.48) * 0.62 * 0.86 + 0.0015, u0 - 0.5 + 0.06, u1 - 0.5 - 0.08, u0 - 0.5 + 0.075, u1 - 0.5 - 0.085, yc + M.cabin * 0.3, yc + M.cabin * 0.62);
@@ -116,16 +118,20 @@ export function sailParts(): MooredPart[] {
     rod(head, new THREE.Vector3(0, M.fbBow, -0.495), 0.0012, 3), // the forestay, to the stemhead
     rod(head, new THREE.Vector3(0, M.fbStern + 0.01, 0.49), 0.0012, 3) // the backstay, to the transom
   ].map(g => g.toNonIndexed()));
-  const cover = rod(new THREE.Vector3(0, boomY + 0.016, mastZ + 0.01), new THREE.Vector3(0, boomY + 0.01, boomEnd.z - 0.03), 0.017, 7);
+  const cover = rod(new THREE.Vector3(0, boomY + 0.016, mastZ + 0.01), new THREE.Vector3(0, boomY + 0.01, boomEnd.z - 0.03), 0.017, far ? 4 : 7);
+  if (far) return [
+    { geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: h.deck, colour: 0xe9e5da }, { geo: cabin, colour: 0xf2efe7 },
+    { geo: rod(mastFoot, head, 0.008, 3), colour: 0xc4c9ce }, { geo: cover, colour: 0xffffff, own: 'cover' }
+  ];
   return [
     { geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: rubrail(h.sheer, h.half), colour: 0x2a2d30 }, { geo: h.deck, colour: 0xe9e5da }, { geo: cabin, colour: 0xf2efe7 },
     { geo: ports, colour: 0x1d2328 }, { geo: rig, colour: 0xc4c9ce }, { geo: cover, colour: 0xffffff, own: 'cover' }
   ];
 }
 
-/** A powerboat's parts: hull, deck, deckhouse, its windows, and the flybridge's rail and console. */
-export function powerParts(): MooredPart[] {
-  const M = MOORED.power, h = hull(M);
+/** A powerboat's parts: hull, deck, deckhouse, its windows, and the flybridge's rail and console (`far`: the hull from 6 stations, the deckhouse and its windows). */
+export function powerParts(far = false): MooredPart[] {
+  const M = MOORED.power, h = hull(M, far ? 6 : 24);
   const y0 = h.sheer(0.45) - 0.004;
   const house = trunk(h.half(0.5) * 0.8, h.half(0.5) * 0.72, -0.12, 0.3, -0.06, 0.28, y0, y0 + M.house);
   const windows = trunk(h.half(0.5) * 0.8 * 0.97 + 0.0015, h.half(0.5) * 0.72 * 1.02 + 0.0015, -0.09, 0.26, -0.05, 0.25, y0 + M.house * 0.45, y0 + M.house * 0.85);
@@ -135,6 +141,7 @@ export function powerParts(): MooredPart[] {
     rod(new THREE.Vector3(-0.11, top + 0.06, -0.06), new THREE.Vector3(-0.11, top + 0.06, 0.26), 0.003),
     rod(new THREE.Vector3(0, top, 0.02), new THREE.Vector3(0, top + 0.16, 0.02), 0.004) // the radar and light mast
   ].map(g => g.toNonIndexed()));
+  if (far) return [{ geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: h.deck, colour: 0xe9e5da }, { geo: house, colour: 0xf4f2ec }, { geo: windows, colour: 0x1a2026 }];
   return [
     { geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: rubrail(h.sheer, h.half), colour: 0x2a2d30 }, { geo: h.deck, colour: 0xe9e5da }, { geo: house, colour: 0xf4f2ec },
     { geo: windows, colour: 0x1a2026 }, { geo: bridge, colour: 0xd8dadc }

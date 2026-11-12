@@ -409,7 +409,8 @@ export class CurrentField {
    * The current at a point, with the slack water along the Cityfront beach: the shore relief (current.ts) applies
    * only where no station is close by to say what the water there does (a station near the shore already measures it).
    */
-  atShore(p: Vec): Vec {
+  /** (`lattice`: the shore's distance off its 10 m lattice, for a boat's own current every step: environment/current.ts shoreRelief) */
+  atShore(p: Vec, lattice = false): Vec {
     let dn = Infinity;
     { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest in sight is always among them)
     dn = Math.sqrt(dn);
@@ -417,7 +418,7 @@ export class CurrentField {
     const B = bayAt(p);
     let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
     for (const k of B?.inflows ?? []) bay = Math.min(bay, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
-    const k = 1 - (1 - shoreRelief(p)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
+    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
     return { x: c.x * k, y: c.y * k };
   }
 }

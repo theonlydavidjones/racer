@@ -327,6 +327,7 @@ describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(
   it('touching the committee boat before starting is a one-turn penalty, and she bounces off', () => {
     const w = new World(TRAIN, settings({ fleet: 0, current: 'slack' }), 3);
     const u = w.user, cb = w.committeeHull!;
+    w.t = w.sequence.find(s => s.name === 'Preparatory signal')!.t + 10; // (racing: after her preparatory signal)
     expect(w.touchableMarks(u).map(m => m.name)).toContain('the committee boat');
     // sail straight at the middle of its side
     const side = V(w.C.base + 90), c = w.C.committee, h = brg(-side.x, -side.y);
@@ -338,6 +339,19 @@ describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(
     // she never ends up inside its hull
     const a = cb.p, b2 = cb.q!, ax = b2.x - a.x, ay = b2.y - a.y, k = Math.max(0, Math.min(1, ((u.x - a.x) * ax + (u.y - a.y) * ay) / (ax * ax + ay * ay)));
     expect(Math.hypot(u.x - (a.x + ax * k), u.y - (a.y + ay * k))).toBeGreaterThan(2);
+  });
+
+  it('rule 31 is "while racing": touching the committee boat before the preparatory signal costs nothing (she still bounces off)', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack' }), 3);
+    const u = w.user, prep = w.sequence.find(s => s.name === 'Preparatory signal')!.t;
+    w.t = prep - 30;
+    const side = V(w.C.base + 90), c = w.C.committee, h = brg(-side.x, -side.y);
+    Object.assign(u, { x: c.x + side.x * 9, y: c.y + side.y * 9, h, v: 2, desired: h });
+    let toasts = '';
+    for (let i = 0; i < 60 * 6; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg; }
+    expect(w.t).toBeLessThan(prep);
+    expect(toasts).toContain("aren't racing");
+    expect(u.penaltyTotal).toBe(0);
   });
 
   it('a mark touch in the same incident as a Part 2 foul costs no extra turn (Rule 44.1(a))', () => {
