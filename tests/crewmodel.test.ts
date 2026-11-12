@@ -124,4 +124,24 @@ describe('the crew model, phase B: the pole, by the owner\'s timings', () => {
     sail(b, poleEta(run(crewOf(0.6))).set + 2, () => { b.h = 195; });
     expect(b.pole).toBe('set');
   }, 30_000);
+  it('stowing pays the trip forward too, when the forward hand is back aft', () => {
+    const b = run(crewOf(0.6)); b.poleWant = true;
+    sail(b, 40, () => { b.h = 195; });
+    expect(b.pole).toBe('set');
+    // (sent back into the cockpit after the set: far aft of the mast)
+    const fwd = b.crew!.people[2]; const aft = fwd.z > 0;
+    b.poleWant = false; sail(b, 3, () => { b.h = 195; });
+    if (aft) expect(b.pole).toBe('set'); // still walking forward, the jib still poled out
+    sail(b, 40, () => { b.h = 195; });
+    expect(b.pole).toBe('down');
+  }, 30_000);
+  it('ready at the mast before the bear-away lapses by itself when nothing renews it (no forward hand stuck up there)', () => {
+    const b = run(crewOf(0.9)); b.h = 195;
+    sail(b, 2, () => { b.h = 195; });
+    b.polePrepUntil = (b.crew!.clock ?? 0) + 10;
+    sail(b, 6, () => { b.h = 195; });
+    expect(b.crew!.people[2].job?.line).toBe('pole'); expect(b.crew!.people[2].z).toBeLessThan(Z.mast + 0.6);
+    sail(b, 30, () => { b.h = 195; });
+    expect(b.crew!.people[2].job?.line).not.toBe('pole'); expect(b.pole).toBe('down');
+  }, 30_000);
 });

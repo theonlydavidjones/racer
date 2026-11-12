@@ -602,7 +602,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
 /**
  * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
  * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
- * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
+ * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 10–25 s, by the crew, plus the
+ * trip forward (physics.ts POLE, the owner's timings), so the gap keeps them
  * from doing it over and over as she wanders about a deep run. The AI boats' crews, and yours while the pole is theirs
  * (the band's Auto-trim).
  */
@@ -612,11 +613,13 @@ export function crewPoleCall(w: World, b: Boat): void {
   // goes on as soon as she's down (the owner: from the foredeck, "already pre-positioned (which a seasoned crew member
   // knows to do)", 10 s against 20 from the cockpit). Only in the last seconds before the bear-away (about 8 s out at
   // her speed: off the rail any sooner costs her on the beat, and a tack with someone at the mast is slow), and not while
-  // she needs their weight hiking; not alone, not through a tack, and not where you've put them. (An estimate of practice.)
+  // she needs their weight hiking; not alone, not through a tack, and not where you've put them. Renewed while it holds,
+  // and held 10 s past (the leg moves on mid-rounding; she's still bearing away), then it lapses by itself. (An estimate
+  // of practice; the 0.7: "seasoned", above a club crew.)
   const c = b.crew, fwd = c && c.spec.crew.length ? c.spec.crew[c.spec.crew.length - 1] : null;
   const nextDeep = !!nm && nm.type === 'round' && Math.abs(wrap(b.ww.from - brg(nm.next.x - nm.p.x, nm.next.y - nm.p.y) - 180)) < 30;
-  b.polePrep = !!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < Math.max(12, 8 * b.v)
-    && (c!.hike ?? 0) < 0.3 && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0;
+  if (!!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < Math.max(12, 8 * b.v)
+    && (c!.hike ?? 0) < 0.3 && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0) b.polePrepUntil = (c!.clock ?? 0) + 10;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
   if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
   else if (twa > 157) b.poleWant = true;

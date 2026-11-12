@@ -127,8 +127,8 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
 /** How far off a line has to be (of its full range) before this person goes to fix it: a skilled crew makes finer adjustments. */
 export function startThreshold(line: string, skill: number, to?: number): number {
   // (the sheets are in hand and the trimmer watches the leech: small changes move the leech, controls.ts mainShape. A club
-  // trimmer's band, 0.006 of the sheet (about 0.3° of boom upwind), the sim's calibration; an expert's half that, a
-  // novice's about twice: their tolerance as their trim, an estimate: no study measures a trimmer's error)
+  // trimmer's band, 0.006 of the sheet (about 0.3° of boom upwind), the sim's calibration; halving or doubling with
+  // every 0.3 of trim either side (an expert's 0.4×, a novice's at 0.25 2.2×): an estimate, no study measures a trimmer's error)
   const band = Math.pow(2, (0.6 - skill) / 0.3);
   if (line === 'jibsheet' || line === 'mainsheet') return 0.006 * band;
   // (the traveller is in the main trimmer's other hand on the thwart, played with the sheet: as fine, over its range of 2)
@@ -272,17 +272,27 @@ function carJob(b: Boat, dt: number): void {
 
 
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
+/** The forward hand (or whoever has the pole) is at the mast or forward of it (no crew: the boat's own, always). */
+export function poleAt(b: Boat): boolean {
+  const c = b.crew; if (!c) return true;
+  const a = c.people[ownerFor(c, 'pole')];
+  return !a || a.z <= Z.mast + 0.6;
+}
+/** Where the forward hand sits in the cockpit (z, m): the start of the owner's "from the cockpit" trip. */
+const POLE_FROM = 1.85;
 /**
- * How long (s) before the forward hand (or whoever has the pole) is at the mast to start on it: nothing if they're
- * there already (at the mast or on the foredeck), else their reaction time and the trip out of the cockpit, along the
- * side deck and round the shrouds (`forward` s for a club crew, at their pace; alone, the helm also has to leave the
- * tiller: one-handed pace).
+ * How long (s) before the forward hand (or whoever has the pole) can start on it: nothing if they're at the mast or on
+ * the foredeck already; else their reaction time, then the trip out of the cockpit, along the side deck and round the
+ * shrouds, and the pole off its chocks: `forward` s for a club crew from the cockpit, at their pace, and in proportion
+ * from wherever they are (from the piano, a shorter way). Alone, the helm also has to leave the tiller: one-handed pace.
+ * (Their weight goes up the deck at a human pace meanwhile, crewPhys.ts; physics.ts waits for them to be there too.)
  */
 export function poleTrip(b: Boat, forward: number): number {
   const c = b.crew; if (!c) return 0;
   const who = ownerFor(c, 'pole'), a = c.people[who];
   if (!a || a.z <= Z.mast + 0.6) return 0;
-  return reactTime(allAboard(c.spec)[who]) + forward / workPace(b, who);
+  const share = clamp((a.z - Z.mast) / (POLE_FROM - Z.mast), 0.2, 1.3);
+  return reactTime(allAboard(c.spec)[who]) + share * forward / workPace(b, who);
 }
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;

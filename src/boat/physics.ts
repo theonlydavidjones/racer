@@ -11,7 +11,7 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, reactTime, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs, ownerFor, poleTrip, workPace } from './crewWork';
+import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag } from './condition';
@@ -84,22 +84,32 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
 /** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
 function crewPole(b: Boat, dt: number, emit: Emit): void {
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg }); };
-  // the forward hand (or whoever there is) goes to the mast to set, stow or gybe it, at their own pace; a seasoned one
-  // goes up before the bear-away, ready (b.polePrep: ai.ts crewPoleCall)
-  const prep = !!b.polePrep && b.pole === 'down' && !b.poleWant;
-  const hands = bodyJob(b, 'pole', prep || b.pole === 'setting' || b.pole === 'stowing' || (b.poleWant && b.pole === 'down') || (!b.poleWant && b.pole === 'set'));
-  // first they get forward (the jib drawing to leeward meanwhile); someone already at the mast starts at once
-  if (b.poleWant && b.pole === 'down') {
+  // a seasoned forward hand goes up before the bear-away, ready (ai.ts crewPoleCall renews b.polePrepUntil, a few
+  // seconds ahead on the crew's clock, while it holds: so it lapses by itself once she's round, or when nothing renews it)
+  const prep = (b.polePrepUntil ?? -1) > (b.crew?.clock ?? 0) && b.pole === 'down' && !b.poleWant && !(b.penalty > 0);
+  // what the pole wants now: set it, stow it, or gybe it end-for-end (the boat gybed with it set)
+  const act = b.poleWant ? (b.pole === 'down' || b.pole === 'stowing' ? 'set' : b.pole === 'set' && b.tack !== b.poleTack ? 'gybe' : null)
+    : b.pole === 'set' || b.pole === 'setting' ? 'stow' : null;
+  const working = b.pole === 'setting' || b.pole === 'stowing';
+  // the forward hand (or whoever there is) goes to the mast for it, and works at their own pace
+  const hands = bodyJob(b, 'pole', prep || working || act != null);
+  if (working) {
+    // (they're at the mast: a change of mind turns the job round there and then)
+    b.poleWalk = undefined;
+    if (act === 'set' && b.pole === 'stowing') { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+    else if (act === 'stow' && b.pole === 'setting') { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
+  } else if (act) {
+    // first they get to the mast (the jib as it was meanwhile: drawing to leeward, or still poled out), and ready the pole:
+    // the trip's time from where they are, and not before they're really there (crewWork.ts poleTrip, poleAt)
     b.poleWalk ??= poleTrip(b, POLE.forward);
     b.poleWalk -= dt;
-    if (b.poleWalk <= 0) { b.poleWalk = undefined; b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+    if (b.poleWalk <= 0 && (poleAt(b) || b.poleWalk < -15)) {
+      b.poleWalk = undefined;
+      if (act === 'set') { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+      else if (act === 'stow') { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
+      else { b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack; say('Gybing the pole end-for-end. The jib is down while it goes across.'); }
+    }
   } else b.poleWalk = undefined;
-  if (b.poleWant && b.pole === 'stowing') { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
-  else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
-  else if (b.pole === 'set' && b.tack !== b.poleTack) {
-    b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack;
-    say('Gybing the pole end-for-end. The jib is down for a few seconds.');
-  }
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
     b.poleT -= dt;
@@ -1038,7 +1048,7 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
 export function settleTrim(b: Boat, from: number, windKt: number): void {
   const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), sw = sailWind(from, windKt, b.h, b.v), c = b.ctl;
   b.rel = rel; b.twa = Math.abs(rel); b.tack = rel >= 0 ? 'S' : 'P';
-  b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = sw.awa;
+  b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = b.awaMain = b.awaJib = sw.awa;
   const side = b.tack === 'S' ? -1 : 1;
   c.mainsheet = mainsheetFor(optimalSheet('main', sw.awa), c.traveller); c.jibsheet = jibsheetFor(optimalSheet('jib', sw.awa), c, b.tack);
   b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);

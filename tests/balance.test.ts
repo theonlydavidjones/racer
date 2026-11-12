@@ -137,7 +137,7 @@ describe('The crew', () => {
       const eta = poleEta(b).set; // (an expert from the cockpit: about 20 s, the owner's "absolute fastest")
       let at = -1;
       sail(b, 40, t => { b.h = 195; if (at < 0 && b.crew?.people[2]?.pose === 'bow') at = t; });
-      // (straight there as the pole is set, not after a stop at the mast)
+      // (up to the mast for the pole, then straight on to the bow once it's set)
       expect(eta).toBeGreaterThan(19); expect(eta).toBeLessThan(22);
       expect(at).toBeGreaterThan(0); expect(at).toBeLessThan(eta + 4);
       expect(b.crew!.mode).toBe('foredeck');

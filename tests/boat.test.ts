@@ -1,4 +1,4 @@
-import { POLE } from '../src/boat/physics';
+import { POLE, sailPlan } from '../src/boat/physics';
 import { describe, expect, it } from 'vitest';
 import orc from '../src/boat/data/nordic-folkboat-orc.json';
 import { FOLKBOAT, Polar, jibOnlyDeadRun, type OrcPolarData } from '../src/boat/polar';
@@ -197,8 +197,10 @@ describe('downwind: wing-on-wing with the whisker pole', () => {
     b.h = 185; b.turnTarget = null; // gybe
     sail(b, 1);
     expect(b.tack).not.toBe(tack0);
-    expect(b.pole).toBe('setting');
-    sail(b, POLE.gybe + 2);
+    // (the forward hand came back aft once it was set, in 12 kt: up to the mast again first, then end-for-end)
+    expect(b.pole === 'setting' || b.poleWalk != null).toBe(true);
+    expect(sailPlan(b)).toBe('main'); // (the jib not drawing: poled out on the old side)
+    sail(b, 8 + POLE.gybe + 2);
     expect(b.pole).toBe('set');
     expect(b.poleTack).toBe(b.tack);
   });

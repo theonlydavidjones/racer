@@ -190,8 +190,8 @@ export interface Boat {
   poleT: number; // seconds left in the current crew job
   /** Seconds left of the forward hand's trip to the mast before they start setting the pole (the jib drawing meanwhile). */
   poleWalk?: number;
-  /** The forward hand is going up to the mast, ready to set the pole after the bear-away (ai.ts crewPoleCall). */
-  polePrep?: boolean;
+  /** Until when (the crew's clock, s) the forward hand stays up at the mast, ready to set the pole after the bear-away (ai.ts crewPoleCall renews it). */
+  polePrepUntil?: number;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
