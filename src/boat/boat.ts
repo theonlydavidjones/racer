@@ -36,6 +36,9 @@ export interface AiState {
   tackNow?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
+  /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
+   *  harbour, and whether she's lying to there (and on which tack) */
+  home?: { route: Vec[]; i: number; at: Vec; lying: boolean; tack?: 'S' | 'P' };
   /** The world's step on which she last thought (world.ts AI_EVERY) */
   thought?: number;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
@@ -56,6 +59,10 @@ export interface AiState {
   passing?: { key: string; side: number } | null;
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
+  /** Her aim point (the mark, a detour round the land, or the line) upwind of her: within 44° of the wind, let go past
+   *  48° (ai.ts); and the leg it was decided on, as each leg decides afresh */
+  upwind?: boolean;
+  upwindLeg?: number;
   /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
   avgFrom?: number;
   /** How long she's been headed (s), by her compass. */
@@ -282,7 +289,7 @@ export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood
 const WOOD: Build = { hull: 'wood', spars: 'wood' };
 
 /** How a boat looks: hull topsides, boot stripe, bottom paint, deck, and the name on her quarters (if shown). */
-export interface Paint { deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** her navigation lights under sail */ navLights?: 'deck' | 'tricolour'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic'; /** the companionway open or shut */ companionway?: 'open' | 'closed'; /** the colour her name is lettered in (else one that stands out on the cabin side) */ nameColor?: string }
+export interface Paint { /** the sail numbers' and the class insignia's colours, when chosen (spec.ts) */ numberColor?: string; insigniaColor?: string; deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** her navigation lights under sail */ navLights?: 'deck' | 'tricolour'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic'; /** the companionway open or shut */ companionway?: 'open' | 'closed'; /** the colour her name is lettered in (else one that stands out on the cabin side) */ nameColor?: string }
 export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
   // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom

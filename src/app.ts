@@ -75,7 +75,7 @@ let w!: World;
 let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
+const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -89,6 +89,37 @@ function setLook(yaw: number, pitch: number): void {
   look.pitch = Math.max(LOOK_PITCH_MIN, Math.min(LOOK_PITCH_MAX, pitch));
 }
 function lookAhead(): void { setLook(0, 0); }
+/**
+ * Looking at the cabin-top instrument (render/tacktick.ts): the eye at the helm, on the windward side as in the cockpit
+ * view, turned and tipped down to its face, held there each frame (she heels and tacks) until you press the key again or
+ * change view. The view, eye and look you had are put back after.
+ */
+let instLook: { view: number; aft: number; yaw: number; pitch: number } | null = null;
+function toggleInstrumentLook(): void {
+  if (instLook) { const b = instLook; instLook = null; look.fov = undefined; setView(b.view); look.aft = b.aft; setLook(b.yaw, b.pitch); return; }
+  if (!view.userMesh?.instrument) return;
+  instLook = { view: viewMode, aft: look.aft, yaw: look.yaw, pitch: look.pitch };
+  // the eye at the helm, and the view narrowed to about 22° (as your eye settles on a small thing 2½ m off: the unit is
+  // drawn true to size, its 28 mm digits a few pixels high in the cockpit view's 72°)
+  setView(0); look.aft = EYE_MIN; look.fov = 22; aimAtInstrument();
+}
+/** Each frame while you look at it: nudge the look so the instrument's face sits in the middle of the view (she heels,
+ * pitches and changes side at a tack, so the first aim drifts). */
+function centreInstrument(): void {
+  const inst = view.userMesh?.instrument; if (!inst) return;
+  const cam = view.camera, p = inst.grp.getWorldPosition(cam.position.clone()); p.y += 0.07; p.project(cam);
+  if (p.z > 1 || !Number.isFinite(p.x)) { aimAtInstrument(); return; } // (behind the eye, as just after a tack: start again)
+  const half = cam.fov / 2 * D2R;
+  setLook(look.yaw - p.x * half * cam.aspect * 0.3, look.pitch + p.y * half * 0.3);
+}
+function aimAtInstrument(): void {
+  const inst = view.userMesh?.instrument; if (!inst) return;
+  // the cockpit eye's place in her frame (as render/scene.ts sets it), and the instrument's face
+  const aft = look.aft, side = w.user.rel >= 0 ? 1 : -1;
+  const ex = Math.max(0.35, 0.8 - (aft - 3.3) * 0.06) * side, ey = 1.6 + Math.max(0, aft - 3.3) * 0.25;
+  const t = inst.grp.position, dx = t.x - ex, dy = t.y + 0.07 - ey, dz = t.z - aft;
+  setLook(Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)) + 4 * D2R); // (the cockpit camera tips down 4° of its own)
+}
 let setupChart: SetupChart | null = null;
 let pendingPenalty: Boat | null = null;
 
@@ -791,6 +822,7 @@ addEventListener('keydown', e => {
     case 'ctlPrev': ctlSel = (ctlSel + CTL_UI.length - 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'sailBand': openLines(); break;
+    case 'lookInstrument': toggleInstrumentLook(); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': pilotOff('Pilot on standby.'); unlash(); centreTiller(); break;
     case 'lashTiller': lash(); break;
@@ -891,6 +923,7 @@ function keyLook(dt: number): void {
   if (held.has('lookRight')) setLook(look.yaw - rate, look.pitch);
   if (held.has('lookUp')) setLook(look.yaw, look.pitch + rate);
   if (held.has('lookDown')) setLook(look.yaw, look.pitch - rate);
+  if (instLook) { if (viewMode !== 0) { instLook = null; look.fov = undefined; } else centreInstrument(); }
   if (held.has('zoomIn')) { if (viewMode === 2) zoomOverhead(Math.exp(-1.2 * dt)); else if (viewMode === 0) setEye(look.aft - 2.5 * dt); else look.chase = Math.max(8, (look.chase ?? view.chaseDist) * Math.exp(-1.2 * dt)); }
   if (held.has('zoomOut')) { if (viewMode === 2) zoomOverhead(Math.exp(1.2 * dt)); else if (viewMode === 0) setEye(look.aft + 2.5 * dt); else look.chase = Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(1.2 * dt)); }
 }
