@@ -27,7 +27,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { berthClear, harborOf, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition } from '../boat/condition';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
@@ -1173,6 +1173,22 @@ export class World {
     this.arrivedT = null;
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
     this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
+    return true;
+  }
+
+  /**
+   * Cruising, a new start without ending the cruise: she's put at `p`, stopped, on the heading she had, her sails as they
+   * were; the clock, her destination and the log carry on (the distance sailed counts only what she sails). Not racing:
+   * that would be a restart. False on land.
+   */
+  moveHere(p: Vec, name: string): boolean {
+    if (!this.freeSail || onLand(p) || hitsHarbor(p)) return false;
+    const u = this.user;
+    u.x = p.x; u.y = p.y; u.v = 0; u.astern = 0; u.sway = 0; u.vx = 0; u.vy = 0; u.turnTarget = null;
+    u.docked = undefined; u.handled = undefined; u.pushing = undefined;
+    if (this.pilot.mode !== 'off') this.pilot.mode = 'off'; // (stopped: a tiller pilot needs way on)
+    if (this.dest && this.arrivedT != null && markDist(u, this.dest) > 40) this.arrivedT = null; // (somewhere to sail to again)
+    this.emit({ type: 'toast', msg: `Moved to ${name}. The cruise and its log carry on.`, ms: 3500 });
     return true;
   }
 

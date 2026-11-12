@@ -53,6 +53,12 @@ export class Chart {
       this.w.setDest(this.pick.p, this.pick.name);
       this.close();
     };
+    // cruising: a new start, without ending the cruise (she's put there, stopped; the clock and the log carry on)
+    $('bChartMove').onclick = () => {
+      if (!this.w || !this.pick) return;
+      if (!this.w.moveHere(this.pick.p, this.pick.name)) { this.info('She can\'t be put there: pick a spot on open water.'); return; }
+      this.close();
+    };
     addEventListener('resize', () => { if (this.isOpen) this.draw(); });
   }
 
@@ -65,7 +71,7 @@ export class Chart {
     this.scale = Math.min(innerWidth, innerHeight) / 6000; // about 3 nm across to begin with
     $('chart').hidden = false;
     $('chartTitle').textContent = w.cruising ? 'Chart · pick a destination' : 'Chart';
-    $('chartSub').textContent = w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
+    $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place: sail there, or move her there. Drag to move, scroll to zoom.' : w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
     this.info(); this.palLabel();
     this.draw();
   }
@@ -103,6 +109,7 @@ export class Chart {
   private info(note?: string): void {
     const el = $('chartInfo'), go = $('bChartGo') as HTMLButtonElement, w = this.w;
     go.hidden = !(w?.cruising && this.pick);
+    $('bChartMove').hidden = !(w?.freeSail && this.pick); // (not in a race, even retired: that would be a restart)
     if (!w || !this.pick) {
       el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Tap the water or a place to choose one.</p>` : '';
       return;
