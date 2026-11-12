@@ -13,6 +13,7 @@ import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '..
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
+import { routeAround } from '../sim/routing';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
@@ -39,11 +40,12 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawCurrentArrows, drawWindField, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { drawCourse, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
-import { layerOn, type LayerKey } from './layers';
+import { fieldLayer, layerOn, type LayerKey } from './layers';
+import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
 import { driveCurveFor } from '../boat/driveCurve';
@@ -84,6 +86,13 @@ export class Hud {
   hailKey: () => string = () => 'H';
   private dialC = $<HTMLCanvasElement>('dial');
   private mapC = $<HTMLCanvasElement>('map');
+  /** The wind or current as Windy draws it (ui/flow.ts): the colour field for each map, and its moving streaks (drawn
+   * every frame on a canvas over each map: the maps themselves are drawn ten times a second, or when the chart moves). */
+  private flowField = { inset: new FlowField(), chart: new FlowField() };
+  private streaks = { inset: new Streaks(150), chart: new Streaks(1500) };
+  private mapFx = $<HTMLCanvasElement>('mapFx');
+  /** how each map was drawn last (its transform), for the streaks */
+  private drawn: Partial<Record<'inset' | 'chart', { tf: Tf; w: number; h: number; scale: number; kind: FlowKind | null }>> = {};
 
   /** Mean close-hauled heading on each tack over the last couple of minutes (the reference for lifts and headers). */
   private meanHdg: Record<'S' | 'P', number | null> = { S: null, P: null };
@@ -204,6 +213,7 @@ export class Hud {
     this.signals(w);
     this.transit(w, w.user);
     this.compass(w, w.user, dt);
+    this.insetStreaks(dt);
     this.acc += dt; if (this.acc < 0.1) return; this.acc = 0;
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
@@ -524,9 +534,12 @@ export class Hud {
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
     const lab = W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
-    say(lab, 34, 12, 'left'); // (right of the layers button on the map's corner)
+    // (the inset is a circle: the label and the north arrow go at its top middle, inside the rim, where it's widest
+    // enough for them, clear of the layers button on its upper left)
+    const tw = ctx.measureText(lab).width, lx0 = w / 2 - (tw + 22) / 2, ly0 = 26;
+    say(lab, lx0, ly0, 'left');
     // north, as the map's turned (wind up in a race): a small arrow by the label, so a westerly's map isn't read as north-up
-    { const a = northOnMap(W), nx = 34 + ctx.measureText(lab).width + 16, ny = 9;
+    { const a = northOnMap(W), nx = lx0 + tw + 14, ny = ly0 - 3;
       ctx.save(); ctx.translate(nx, ny); ctx.rotate(a); ctx.lineJoin = 'round';
       ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4, 4); ctx.lineTo(0, 2); ctx.lineTo(-4, 4); ctx.closePath();
       ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = I.text; ctx.fill(); ctx.restore();
@@ -534,15 +547,12 @@ export class Hud {
     const fog = this.fogNote(wd, true);
     // (the inset is a circle now: its labels go at the bottom middle, inside it, not in the corners)
     if (fog) say(fog, w / 2, h - 10, 'center');
-    const ckt = Math.hypot(u.cur.x, u.cur.y) / KT;
-    if (ckt > 0.05 && layerOn(wd.settings, 'current')) {
-      // the current where you are
-      const cb = (brg(u.cur.x, u.cur.y) - W) * D2R, ox = w / 2, oy = h - 44 - (fog ? 12 : 0);
-      const cc = day ? '#0060aa' : '#6fd0ff';
-      ctx.strokeStyle = I.halo; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
-      ctx.strokeStyle = cc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox - Math.sin(cb) * 8, oy + Math.cos(cb) * 8); ctx.lineTo(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8); ctx.stroke();
-      ctx.fillStyle = cc; ctx.beginPath(); ctx.arc(ox + Math.sin(cb) * 8, oy - Math.cos(cb) * 8, 2.5, 0, 6.29); ctx.fill();
-      say('CURRENT HERE ' + ckt.toFixed(1) + ' kt', w / 2, h - 22 - (fog ? 12 : 0), 'center');
+    // with the wind or the current on: what's on the water where you are, the layer's own first (as the chart's readout)
+    const kind = this.drawn.inset?.kind;
+    if (kind) {
+      const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
+      ctx.font = '700 11px "Saira Semi Condensed", sans-serif'; say(a.toUpperCase(), w / 2, y, 'center');
+      ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say(b.toUpperCase(), w / 2, y + 12, 'center');
     }
   }
 
@@ -597,6 +607,41 @@ export class Hud {
     ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
     const cw = ctx.measureText(chartCredit()).width; ctx.fillStyle = I.deep; ctx.globalAlpha = 0.85; ctx.fillRect(w - cw - 16, h - 19, cw + 12, 15);
     ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
+    const kind = this.drawn.chart?.kind; if (kind) drawLegend(ctx, kind, w / 2, h - 40); // (the colours' scale, in kt)
+  }
+
+  /** The inset's streaks, every frame, on its overlay (the map under it is drawn ten times a second). */
+  private fxT = 0;
+  /** what the streaks cost (ms of JS a frame, smoothed), the inset's and the chart's: for the frame-cost check */
+  fxMs = { inset: 0, chart: 0 };
+  private insetStreaks(dt: number): void {
+    const t0 = performance.now(); this.insetStreaks0(dt); this.fxMs.inset += (performance.now() - t0 - this.fxMs.inset) * 0.05;
+  }
+  private insetStreaks0(dt: number): void {
+    const fx = this.mapFx, d = this.drawn.inset;
+    this.fxT -= dt;
+    if (this.fxT <= 0) { // (the overlay kept over the map: it moves with the layout, not every frame)
+      this.fxT = 0.5; const r = this.mapC.getBoundingClientRect();
+      Object.assign(fx.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', display: r.width ? '' : 'none' });
+    }
+    const [ctx, w, h] = fitCanvas(fx); ctx.clearRect(0, 0, w, h);
+    if (!d?.kind || !w || this.mapC.hidden) return;
+    this.streaks.inset.draw(ctx, d.tf, w, h, d.scale, this.flowField.inset, d.kind, dt, 1.1);
+  }
+
+  /** The chart's streaks and the readout under the cursor, every frame while it's open, on its overlay. */
+  chartFx(fx: HTMLCanvasElement, wd: World, dt: number, cursor: [number, number] | null): void {
+    const t0 = performance.now(); this.chartFx0(fx, wd, dt, cursor); this.fxMs.chart += (performance.now() - t0 - this.fxMs.chart) * 0.05;
+  }
+  private chartFx0(fx: HTMLCanvasElement, wd: World, dt: number, cursor: [number, number] | null): void {
+    const [ctx, w, h] = fitCanvas(fx); ctx.clearRect(0, 0, w, h);
+    const d = this.drawn.chart; if (!d?.kind) return;
+    this.streaks.chart.draw(ctx, d.tf, w, h, d.scale, this.flowField.chart, d.kind, dt, 1.4);
+    if (cursor) {
+      const o = d.tf(0, 0), ex = d.tf(1, 0), ey = d.tf(0, 1), a = ex[0] - o[0], b = ex[1] - o[1], c = ey[0] - o[0], e = ey[1] - o[1], det = a * e - b * c;
+      const X = cursor[0] - o[0], Y = cursor[1] - o[1], p = { x: (e * X - c * Y) / det, y: (-b * X + a * Y) / det };
+      if (!onLand(p)) drawReadout(ctx, readout(wd, d.kind, p), cursor[0], cursor[1], w);
+    }
   }
 
   /** The sea state, remembered for ten seconds of the race at each spot (it's worked out from the wind, current and fetch). */
@@ -642,12 +687,14 @@ export class Hud {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     const S = wd.settings, pal = S.chartPal ?? 'day', I = INK[pal], on = (k: LayerKey) => layerOn(S, k), half = Math.max(w, h) / scale * 0.75;
     drawEncChart(ctx, tf, scale, w, h, pal, detail, avoid); // NOAA's chart underneath everything the sim draws
-    if (on('sea')) drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
-    if (on('wind')) { // the wind across the course: where it blows harder and lighter, and which way; and the puffs and lulls
-      drawWindField(ctx, tf, p => { const f = wd.fieldAt(p); return { k: f.k / Math.max(0.3, wd.fieldMeanK), from: wd.wind.from + f.turn }; }, ctr.x, ctr.y, half, Math.max(250, half / 7), onLand, I);
-      drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I);
-    }
-    const fog = on('fog') ? visibilityFor(wd.raceDate, wd.clockUtc) : null, L = laylinesFor(wd, u);
+    // one field layer at a time (ui/layers.ts fieldLayer): the wind or the current as colour for its speed, with moving
+    // streaks over it (drawn every frame on the map's overlay: insetStreaks, chartFx); the sea state; or the fog
+    const field = fieldLayer(S), kind: FlowKind | null = field === 'wind' || field === 'current' ? field : null;
+    if (field === 'sea') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
+    if (kind) this.flowField[detail].draw(ctx, tf, w, h, scale, wd, kind, detail === 'chart' ? 0.6 : 0.35, detail === 'chart' ? 16 : 8);
+    if (kind === 'wind') drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I); // (the puffs and lulls, drifting over the mean)
+    this.drawn[detail] = { tf, w, h, scale, kind };
+    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null, L = laylinesFor(wd, u);
     // what this map shows, for its key
     const sim: SimKey[] = ['you'];
     if (wd.boats.length > 1) sim.push('boats');
@@ -655,17 +702,15 @@ export class Hud {
     else if (wd.dest) sim.push('dest', 'destline');
     if (on('laylines') && L) sim.push('laylines');
     if (on('ships') && wd.vessels.length) sim.push('ships');
-    if (on('current')) sim.push('current');
-    if (on('wind')) sim.push('wind', 'puffs');
-    if (on('sea') && !wd.sea.flat) sim.push('sea');
+    if (kind === 'current') sim.push('current');
+    if (kind === 'wind') sim.push('wind', 'puffs');
+    if (field === 'sea' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
     if (on('shadows') && !wd.freeSail) sim.push('shadows');
     this.keyState[detail] = { sim, pal, scale };
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
-    // the current across the water around you, from the sim's own current field
-    if (on('current')) drawCurrentArrows(ctx, tf, p => wd.currentAt(p), ctr.x, ctr.y, half, Math.max(60, half / 4), 9, onLand, I);
     if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I);
     else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
@@ -698,8 +743,18 @@ export class Hud {
 
 }
 
+/** The navigator's route to the destination (routeAround: the passage plan's way round the land), re-planned as she
+ * goes: when the destination changes, or she's 100 m from where it was last planned from (at most every 2 s: it's an A*
+ * search on a 50 m grid when the land is in the way). */
+let routeMemo: { dest: CourseMark; from: Vec; at: number; pts: Vec[] } | null = null;
+export function navRoute(u: { x: number; y: number }, dest: CourseMark): Vec[] {
+  const now = performance.now(), here = { x: u.x, y: u.y }, m = routeMemo;
+  if (!m || m.dest !== dest || (dist(m.from, here) > 100 && now - m.at > 2000)) routeMemo = { dest, from: here, at: now, pts: routeAround(here, dest.p) };
+  return routeMemo!.pts;
+}
+
 /**
- * Just sailing, on the map: the buoys around you, and where you're heading. If that's off the map, an arrow at the
+ * Just sailing, on the map: the buoys around you, and where you're heading, by the navigator's route. If that's off the map, an arrow at the
  * edge points to it.
  */
 function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink): void {
@@ -711,9 +766,15 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   }
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
-  ctx.save();
-  ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-  ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+  // the navigator's route there (the passage plan's: round the land, sim/navigator.ts), from where she is now
+  const legs = navRoute(u, dest).map(q => tf(q.x, q.y)); legs[0] = a;
+  const path = () => { ctx.beginPath(); legs.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
+  ctx.save(); ctx.lineJoin = 'round';
+  ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();
+  ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
+  // the turns on the way: small dots
+  for (const q of legs.slice(1, -1)) { ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.line; ctx.beginPath(); ctx.arc(q[0], q[1], 2, 0, 6.29); ctx.fill(); }
+  ctx.restore();
   const shape = (pts: [number, number][]) => {
     ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = I.mark; ctx.fill(); ctx.strokeStyle = I.edge; ctx.lineWidth = 1.2; ctx.stroke();
