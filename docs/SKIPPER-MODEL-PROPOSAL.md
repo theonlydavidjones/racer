@@ -278,10 +278,15 @@ What it shows:
 
 Later: cheating, protests and hearings (8–12 h, as the ROADMAP has it).
 
-## Questions for the owner
+## The owner's answers (12 November, via the Coordinator)
 
-1. **Sliders.** Are two sliders (Level and Mix) right, or do you also want to set each opponent's skipper by hand?
-2. **Showing skill.** Should the player see the skippers' attributes (on the boat card, or in the strategist's
-   "the competition"), or only discover them by racing?
-3. **Lasting skippers.** Should club boats keep the same made-up skipper race to race (so you learn that one is a
-   great starter), or should the fleet be drawn afresh each race until Seasons?
+1. **Sliders.** Two per row, Level and Mix, for now. Setting each opponent's skipper by hand can come later if it's
+   missed.
+2. **Showing skill.** Skippers' attributes are discovered by racing, not shown. A short note on the boat card may come
+   later.
+   - Note: the strategist's "the competition" already describes each AI boat's start dice ("pushes the line hard",
+     "underrates the current": sim/strategist.ts). That is close to showing attributes. Should it stay as "what
+     you'd hear about her at the club"? Raised with the Coordinator.
+3. **Lasting skippers.** Club boats keep the same seeded skippers from race to race.
+
+Phase 4's panel layout still goes to the owner before it's built.
