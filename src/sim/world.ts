@@ -748,10 +748,11 @@ export class World {
       // toward it to start, she is returning and keeps clear of boats that aren't, until her hull is completely below it
       b.returning = this.returningNow(b, d, wasReturning);
       // Definitions, Start: she starts when, "her hull having been entirely on the pre-start side of the starting line at
-      // or after her starting signal", any part of her hull crosses it toward the first mark. So: has it been, since the gun?
+      // or after her starting signal", any part of her hull crosses it from the pre-start side to the course side. So: has it been, since the gun?
       if (this.t >= 0 && d <= 0 && this.lineD(stern(b)) <= 0) this.belowSinceGun.add(b.id);
-      const within = Math.abs(a) <= this.lineLen / 2 + 2;
-      if (gun && ((d > 0 && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
+      // (rules 29.1 and 30.1: "any part of her hull" on the course side, so her bow or her stern; the crossing is her bow's)
+      const within = Math.abs(this.lineA(bw)) <= this.lineLen / 2 + 2, over = Math.max(d, this.lineD(stern(b))) > 0;
+      if (gun && ((over && Math.abs(a) < this.lineLen / 2 + 25) || b.roundEnd)) {
         b.ocs = true;
         if (b.isUser) this.emit({ type: 'toast', msg: 'Over early! Return below the line, then start. Keep clear while you do (Rule 21.1).', ms: 4500 });
       }
@@ -855,7 +856,7 @@ export class World {
       windFrom: this.wind.from,
       boats: this.boats.map(b => ({
         d: this.lineD(bow(b)), frac: (this.lineA(b) + this.lineLen / 2) / this.lineLen, v: b.v,
-        target: polar(b.ww.kt, beatAngle(b.ww.kt)), ocs: this.lineD(bow(b)) > 0 && Math.abs(this.lineA(b)) < this.lineLen / 2 + 25, penalty: b.penalty > 0
+        target: polar(b.ww.kt, beatAngle(b.ww.kt)), ocs: Math.max(this.lineD(bow(b)), this.lineD(stern(b))) > 0 && Math.abs(this.lineA(b)) < this.lineLen / 2 + 25, penalty: b.penalty > 0
       }))
     };
   }
@@ -1080,11 +1081,11 @@ export class World {
       if (b.retired) continue; // (she's out of the race: rule 30 is for boats starting)
       if (f === 'I') {
         // Rule 30.1: on the course side of the line or its extensions
-        if (!b.roundEnd && this.lineD(bow(b)) > 0) {
+        if (!b.roundEnd && Math.max(this.lineD(bow(b)), this.lineD(stern(b))) > 0) { // (any part of her hull: rule 30.1)
           b.roundEnd = true;
           if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'I flag: you were on the course side in the last minute. Sail back around an end of the line to the pre-start side, then start (Rule 30.1).' });
         }
-      } else if (!b.scoring && (inTriangle(bow(b), a, b2, c) || inTriangle(b, a, b2, c))) {
+      } else if (!b.scoring && (inTriangle(bow(b), a, b2, c) || inTriangle(b, a, b2, c) || inTriangle(stern(b), a, b2, c))) {
         b.scoring = f === 'Z' ? 'ZFP' : f === 'U' ? 'UFD' : 'BFD';
         if (b.isUser) this.emit({ type: 'toast', ms: 6000, msg: f === 'Z'
           ? 'Z flag: you were in the triangle in the last minute. 20% scoring penalty (Rule 30.2). Keep racing.'

@@ -116,6 +116,21 @@ describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {
     expect(u.started).toBe(true);
   });
 
+  it('at the gun: bow below but stern still over is OCS (rule 29.1, "any part of her hull"); whole hull below, then across, starts', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
+    const toCourse = brg(w.N.x, w.N.y), u = w.user;
+    // heading down to the line, bow 1 m below it and stern 6.6 m above, at the gun
+    w.t = -0.5; u.x = w.center.x + w.N.x * 2.8; u.y = w.center.y + w.N.y * 2.8; u.h = toCourse + 180; u.v = 0; u.luff = true; u.prevD = null;
+    for (let i = 0; i < 60; i++) w.step(DT);
+    expect(u.ocs).toBe(true);
+    const w2 = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1), u2 = w2.user;
+    w2.t = -0.5; u2.x = w2.center.x - w2.N.x * 4.8; u2.y = w2.center.y - w2.N.y * 4.8; u2.h = toCourse; u2.v = 0; u2.luff = true; u2.prevD = null; // bow 1 m below
+    for (let i = 0; i < 60; i++) w2.step(DT);
+    expect(u2.ocs).toBe(false);
+    u2.x += w2.N.x * 3; u2.y += w2.N.y * 3; w2.step(DT); // across
+    expect(u2.started).toBe(true);
+  });
+
   it('behind the line at the gun → not OCS', () => {
     const w = new World(TRAIN, settings({ fleet: 0, current: 'slack', seq: 2 }), 1);
     w.t = -0.5; place(w, -20, brg(w.N.x, w.N.y));
