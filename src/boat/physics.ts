@@ -3,7 +3,7 @@ import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
-import { HANDLING, HULL, airDrag, driveExponent, flogAmount, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
+import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
@@ -117,25 +117,36 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.hove = canHeave && ((b.jibBacked ?? 0) > 0.2 || (!!b.hove && (b.jibBacked ?? 0) > 0));
   if (b.hove) { heaveTo(b, dt, t, emit, groundToast); return; }
   const ww = b.ww;
-  // turn rate falls off at low speed: a Folkboat needs water flowing over the rudder
-  const maxRate = maxTurnRate(b.v);
+  // turn rate falls off at low speed: a Folkboat needs water flowing over the rudder, ahead or astern (going astern it
+  // works backwards, and less well: 0.7 of it). Nearly stopped, she turns only by sculling, which RRS 2025–2028 rule
+  // 42.3(d) allows in one case: "When a boat is above a close-hauled course and either stationary or moving slowly, she
+  // may scull to turn to a close-hauled course" (on either tack: World Sailing's rule 42 interpretations, SCULL 1). So
+  // from head to wind she can be pumped round onto the wind, but not up into it nor through it: a tack at a crawl
+  // stalls head to wind, and she drifts astern (42.2(d): sculling "that ... prevents her from moving astern" is banned)
+  const toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, astern = b.astern ?? 0, aheadK = b.v + astern > 0 ? b.v / (b.v + astern) : 1;
+  const flow = flowTurnRate(b.v) * aheadK + flowTurnRate(astern) * 0.7 * (1 - aheadK); // (with way on both ways at once, by which way the water mostly flows past the rudder)
+  const aboveCH = Math.abs(wrap(ww.from - b.h)) < beatAngle(ww.kt) - 2;
+  /** The most she can turn this way (+ to starboard), deg/s. */
+  const rateFor = (dir: number) => aboveCH && dir * toWind < 0 ? Math.max(flow, HANDLING.minTurnRate) : flow;
+  const maxRate = Math.max(1e-3, flow);
   // helm balance: with weather helm she turns toward the wind unless the rudder holds her (balance.ts)
-  const toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * toWind;
+  const balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * toWind;
   let rate: number, rudder: number; // rudder: fraction of full, in the turn-rate sense (+ turns to starboard)
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
-      rate = b.turnDir * maxRate;
+      rate = b.turnDir * rateFor(b.turnDir);
       if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.h = b.turnTarget; b.turnTarget = null; }
     } else {
       // tiller to starboard turns the bow to port; keys add a push of their own
       const helm = clamp(b.steer - b.tiller, -1, 1);
-      rate = helm * maxRate; if (helm !== 0) b.turnTarget = null;
-      // going astern the rudder works backwards, and less well: the bow goes the way you push the tiller (with way on
-      // both ways at once, by which way the water mostly flows past the rudder)
-      if (b.astern) { const fwd = b.v / (b.v + b.astern); rate = helm * (maxRate * fwd - maxTurnRate(b.astern) * 0.7 * (1 - fwd)); }
+      if (helm !== 0) b.turnTarget = null;
+      // going astern the rudder works backwards: the bow goes the way you push the tiller (sculling, though, turns her the
+      // way the tiller's pumped, whichever way she's moving)
+      const sternFirst = astern > b.v, dir = Math.sign(helm) * (sternFirst ? -1 : 1);
+      rate = dir * Math.abs(helm) * (dir ? rateFor(dir) : 0);
     }
-    rudder = rate / Math.max(1e-6, maxRate);
+    rudder = clamp(rate / Math.max(1e-6, maxRate), -1, 1);
     if (b.turnTarget == null) rate += balRate; // let go of the tiller and she rounds up (or bears away)
   } else if (b.penalty > 0 && !b.ai?.clearing) {
     // penalty turns: the crew backs the sails to spin the boat even when slow
@@ -157,8 +168,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       const long = err + ai.turnCommit * 360;
       if (Math.abs(long) > 330) ai.turnCommit = 0; else err = long; // target moved: drop the commitment
     }
-    rate = clamp(err * 1.6, -maxRate, maxRate);
-    rudder = (rate - balRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
+    const lim = rateFor(Math.sign(err));
+    rate = clamp(err * 1.6, -lim, lim);
+    rudder = clamp((rate - balRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
   }
   b.helm = clamp(rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller)
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
@@ -278,10 +290,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
-  // (on a bare rig: with her sails struck, as at the dock. With them up, in irons, she'd drift astern too, but the AI's
-  // sailing doesn't yet reckon with sternway, so there she stops, as before: ROADMAP, for Deep Physics and the AI)
-  const v1 = b.v + a * dt, bareRig = hm + hj < 0.5;
-  if (v1 >= 0 || !bareRig) b.v = Math.max(0, v1); else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
+  // (with her sails up and flogging, in irons, the same: their windage on top of the rig's, so she gathers sternway
+  // faster, and the rudder then works backwards; the way out is to bear away, the tiller pushed the way she's to go)
+  const v1 = b.v + a * dt;
+  if (v1 >= 0) b.v = v1; else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
   // (headway and sternway are one motion through the water: netted, so the drag on each doesn't push the other)
   if (b.v > 0 && (b.astern ?? 0) > 0) { const n = b.v - b.astern!; if (n >= 0) { b.v = n; b.astern = 0; } else { b.v = 0; b.astern = -n; } }
   // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
