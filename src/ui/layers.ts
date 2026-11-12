@@ -38,12 +38,12 @@ export function withLayer(s: Settings, k: LayerKey, on: boolean): NonNullable<Se
  * app keeps the saved settings and the running race's in step); `changed` redraws.
  */
 export function layerMenu(button: HTMLElement, pop: HTMLElement, get: () => Settings | null, set: (k: LayerKey, on: boolean) => void, changed: () => void,
-  key?: (el: HTMLElement, force: boolean) => void): void {
+  key?: (el: HTMLElement, force: boolean) => void): () => void {
   let keyEl: HTMLElement | null = null;
   const render = () => {
     const s = get(); if (!s) return;
     pop.innerHTML = '<div class="lp-h">Map layers</div>' + LAYERS.map(l =>
-      `<label title="${l.what}"><input type="checkbox" data-layer="${l.key}"${layerOn(s, l.key) ? ' checked' : ''}><span>${l.name}</span></label>`).join('')
+      `<label title="${l.what}"><input type="checkbox" data-layer="${l.key}"${shown(s, l.key) ? ' checked' : ''}><span>${l.name}</span></label>`).join('')
       + (key ? '<div class="lp-h lp-kh">Key: what\'s on the map</div><div class="lp-key"></div>' : '');
     keyEl = pop.querySelector('.lp-key');
     if (key && keyEl) key(keyEl, true);
@@ -58,4 +58,8 @@ export function layerMenu(button: HTMLElement, pop: HTMLElement, get: () => Sett
     if (k) { set(k, t.checked); render(); changed(); if (key && keyEl) setTimeout(() => key(keyEl!, false), 60); }
   });
   document.addEventListener('pointerdown', e => { if (!pop.hidden && !pop.contains(e.target as Node) && e.target !== button) { pop.hidden = true; button.setAttribute('aria-expanded', 'false'); } });
+  // (for a change made elsewhere, the chart's field picker: the list and its key follow it if it's open)
+  return () => { if (!pop.hidden) render(); };
 }
+/** Ticked in the menu: a field layer only if it's the one showing (an older save may have two on: one shows). */
+const shown = (s: Settings, k: LayerKey): boolean => (FIELD_LAYERS as readonly string[]).includes(k) ? fieldLayer(s) === k : layerOn(s, k);

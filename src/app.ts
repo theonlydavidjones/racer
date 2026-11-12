@@ -652,11 +652,11 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
     const f = b.dataset.field!;
     if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); }
     else setLayer(f as LayerKey, true);
-    redraw();
+    redraw(); setTimeout(() => menus.forEach(m => m()), 30); // (after the chart's redrawn, so the key lists what's on it now)
   });
   syncField(); openChartHook = syncField;
-  layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f));
-  layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f));
+  const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f)),
+    layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
 }
 $('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); });
 
