@@ -46,7 +46,7 @@ describe('Home: send her back to her home slip', () => {
     expect(u.retired).toBe(true); expect(w.cruising).toBe(true);
     expect(w.dest?.key).toBe('slip'); expect(w.nextMark(u)).toBe(w.dest);
     expect(w.touchableMarks(u)).toEqual([]); // (no longer racing: rule 31 is for boats racing)
-    engage(u, w.pilot, 'nav'); u.v = 2.5;
+    engage(u, w.pilot, 'nav'); u.v = 2.5; u.astern = 0; // (unsailed head to wind since the gun, she'd gathered sternway: under way now)
     for (let i = 0; i < 60 * 5; i++) w.step(DT);
     expect(u.pilotSteers).toBe(true); expect(u.finished).toBe(false); expect(w.userFinishT).toBeNull();
     // the rest of the fleet races on
