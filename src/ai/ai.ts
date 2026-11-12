@@ -51,7 +51,7 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
         // own rule, a slow boat would gybe instead, the long way, and swing her bow across the mark: physics review)
         const keepH = n360(bm - side * need), away = Math.abs(wrap(sailable(b, keepH) - keepH)) > 1;
         desired = away ? n360(bm + 180) : keepH; near = key;
-        if (away && b.ai && b.ai.turnCommit === 0) { b.ai.turnCommit = -side; b.ai.commitFor = desired; }
+        if (away && b.ai && b.ai.turnCommit !== -side) { b.ai.turnCommit = -side; b.ai.commitFor = desired; }
         if (b.ai) b.ai.passing = { key, side };
         continue;
       }
@@ -365,9 +365,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // wind or wheel round and run off). Dropped once she's round, if it hasn't happened in 20 s (something stopped her),
     // or if she's on another leg or point of sail than the one she decided it for.
     const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt), upwind = rel < 44 && !b.ocs;
+    // the course she'd steer to make good the straight line to it, up-current of it by as much as the current across
+    // her track would set her down (a crew that reckons with the current allows for all of it, the others for some)
+    const crab = crabFor(bP, targetFor(b, rel) * 0.9, { x: c.x * (ai.aware ? 1 : 0.6), y: c.y * (ai.aware ? 1 : 0.6) });
     // (running for a mark deeper than her best downwind angle, with some hysteresis so she doesn't flip between sailing
-    // the angle and steering at the mark as the wind swings about it)
-    ai.running = b.started && !b.ocs && (ai.running ? rel > ra - 8 : rel > ra - 2);
+    // the angle and steering at the mark as the wind swings about it. By the course she'd steer, not the bearing: a
+    // current across a broad reach can put that course past dead downwind, and the run's held gybe then decides the
+    // gybe, once; steered as a reach she gybed back and forth across it every few seconds: physics review)
+    const relC = Math.abs(wrap(ww.from - crab));
+    ai.running = b.started && !b.ocs && (ai.running ? relC > ra - 8 : relC > ra - 2);
     const mode = upwind ? 'beat' : ai.running ? 'run' : 'reach';
     if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || w.t - ai.goTack.at > 20 || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
     let headedNow = false;
@@ -439,8 +445,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (just short of a run, where the run's held gybe has let go of her as the mark's angle dipped under it), she
       // gybes for it: held on this gybe at its running angle she sailed on away from the mark, a minute and a half and
       // 30° of overstand in a 12 kt race (physics review)
-      const vs = Math.max(b.v, targetFor(b, rel) * 0.8);
-      desired = sailable(b, crabFor(bP, vs, { x: c.x * (ai.aware ? 1 : 0.6), y: c.y * (ai.aware ? 1 : 0.6) }));
+      desired = sailable(b, crab);
       const sd = wrap(ww.from - desired);
       if (Math.abs(sd) > ra) desired = n360(ww.from - Math.sign(sd || 1) * ra);
     }

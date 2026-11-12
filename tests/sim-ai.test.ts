@@ -52,6 +52,28 @@ describe('the AI sails the boat as a sailor does', () => {
       expect([...touches]).toEqual([]);
     }
   }, 120000);
+  it('running across a current she gybes when the other gybe lays the mark, not back and forth across dead downwind', async () => {
+    // (a 1.5 kt current setting 350° across the run home, about 080: steered up-current, her course through the water is
+    // within a few degrees of dead downwind. Decided by the bearing she steered it as a reach and gybed every few
+    // seconds, 51 times in the fleet at this seed: physics review. Uniform presets added here only, for the test)
+    const { CURRENTS } = await import('../src/environment/current');
+    CURRENTS.testCross = { id: 'testCross', set: 350, kt: 1.5, label: '', button: '' };
+    const w = race(12, 'testCross', 72), ai = w.boats.filter(b => !b.isUser), last = new Map<number, { tack: string; t: number }>();
+    let quick = 0;
+    while (w.t < 1500 && !ai.every(b => b.finished)) {
+      w.step(DT);
+      if (w.t < 0) continue;
+      for (const b of ai) {
+        if (!b.started || b.finished || b.penalty > 0) continue;
+        const L = last.get(b.id);
+        if (L && L.tack !== b.tack && b.twa > 100 && w.t - L.t < 15) quick++;
+        if (!L || L.tack !== b.tack) last.set(b.id, { tack: b.tack, t: w.t });
+      }
+    }
+    delete CURRENTS.testCross;
+    expect(ai.every(b => b.finished)).toBe(true);
+    expect(quick).toBeLessThanOrEqual(10); // (5 as it stands, the five boats over the race)
+  }, 180000);
   it("close-hauled she steers her leeway above the beat angle, so her course through the water is the polar's beat", () => {
     const w = race(12), beat = beatAngle(12);
     let s = 0, n = 0;
