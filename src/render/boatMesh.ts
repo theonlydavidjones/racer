@@ -10,7 +10,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -254,8 +254,15 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));
     grp.add(new THREE.Mesh(rail(caps, 0.02, 0.04), MAT.wood));
-    // toerail along the sheer
-    grp.add(new THREE.Mesh(rail(sheerLine(s, 0.03), 0.035, 0.03), MAT.wood));
+    // the toerail along the sheer forward; alongside the cabin's after end and the cockpit it becomes the hiking rail, a
+    // broad varnished plank laid flat along the deck's edge on spacer blocks, that the crew sit on when they hike out
+    // (Josephine: the owner's photo of her starboard side at the dock)
+    const sl = sheerLine(s, 0.03, 160), fwd = sl.filter(p => p.z <= HIKE_RAIL.z0 + 0.01), aft = sheerLine(s, HIKE_RAIL.inset, 160).filter(p => p.z >= HIKE_RAIL.z0 && p.z <= HIKE_RAIL.z1);
+    grp.add(new THREE.Mesh(rail(fwd, 0.035, 0.03), MAT.wood));
+    grp.add(new THREE.Mesh(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t), MAT.wood));
+    const blocks: THREE.BufferGeometry[] = [];
+    for (let z = HIKE_RAIL.z0 + 0.05; z < HIKE_RAIL.z1; z += 0.38) { const u = uAtZ(z), x = s * (halfBeam(u) - HIKE_RAIL.inset); blocks.push(new THREE.BoxGeometry(HIKE_RAIL.w * 0.75, HIKE_RAIL.gap + 0.004, 0.05).translate(x, sheer(u) + HIKE_RAIL.gap / 2, z)); }
+    grp.add(new THREE.Mesh(mergeGeometries(blocks), MAT.wood));
     // and the rubbing strake just under the sheer, a half-round of the same wood standing proud of the topsides (CR 2.218:
     // 13 × 26 to 14 × 28 mm, round the sheer)
     // (ending just short of the stem and of the transom's corner, where the strake is cut off)
@@ -353,6 +360,21 @@ export interface BoatMesh {
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
   travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; jibSheets: Record<Tack, THREE.Line>; winches: Record<Tack, THREE.Vector3>;
+}
+/**
+ * The hiking rail (as on Josephine, the owner's photo): a varnished plank about 80 × 28 mm laid flat along the deck's edge
+ * on spacer blocks, from abreast the cabin's after part to near the transom's corner. The size is read off the photo
+ * against the deck's and coaming's known widths: an estimate, within a centimetre.
+ */
+const HIKE_RAIL = { z0: 0.25, z1: 3.62, inset: 0.045, w: 0.08, t: 0.028, gap: 0.014 };
+/** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
+function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
+  const pos: number[] = [], idx: number[] = [], n = pts.length;
+  for (const p of pts) { const sx = Math.sign(p.x || 1); for (const [dx, dy] of [[-w / 2, 0], [-w / 2, t], [w / 2, t], [w / 2, 0]]) pos.push(p.x + sx * dx, p.y + dy, p.z); }
+  for (let i = 0; i < n - 1; i++) for (let k = 0; k < 4; k++) { const a = i * 4 + k, b = i * 4 + (k + 1) % 4; idx.push(a, a + 4, b, b, a + 4, b + 4); }
+  for (const e of [0, n - 1]) { const o = e * 4; idx.push(o, o + 1, o + 2, o, o + 2, o + 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
@@ -499,9 +521,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, jibSheets = {} as Record<Tack, THREE.Line>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
     // the jib sheet winch, as on Josephine (the owner's photos): on a moulded pedestal standing on the side deck against
-    // the coaming's outer face, about 1.4 m aft of amidships (just aft of her name, some 0.6 m forward of the thwart);
+    // the coaming's outer face, about half-way between the cabin's after end and the thwart, a little nearer the thwart:
+    // room for a crew to sit on the rail forward of it and another, a little less, aft of it (the owner);
     // the pedestal tapers up from a broader foot to about the coaming's top, and the chromed winch stands on it
-    const zw = 1.4, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) + 0.03;
+    const zw = JIB_WINCH_Z, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) + 0.03;
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.095, top - deck, 20), sideMatFor(grp)); ped.scale.z = 1.25; ped.position.set(wx, (top + deck) / 2, zw); grp.add(ped);
     const wy = top, winch = new THREE.Group(); winch.position.set(wx, wy, zw); grp.add(winch);
     for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {

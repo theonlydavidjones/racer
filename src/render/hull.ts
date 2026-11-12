@@ -271,6 +271,12 @@ export const COCKPIT_FIT = {
 /** The coaming's height above the deck along the cockpit (z): CR 3.22's least heights, 200 mm aft of the cabin, 140 at St. 4½, 80 at St. 3, a little over. */
 export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
 /** The thwart's top (m over the waterline). */
+/**
+ * Where the jib winches stand fore and aft (m aft of amidships): 0.52 m aft of the cabin's after end and 0.45 m forward
+ * of the thwart's front face, so a crew sits on the rail between it and the cabin, and another, with a little less room,
+ * between it and the thwart (the owner, of Josephine).
+ */
+export const JIB_WINCH_Z = 1.58;
 export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
 /** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
 export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);

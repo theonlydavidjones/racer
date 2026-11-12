@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, Z } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, JIB_WINCH_Z } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -68,7 +68,7 @@ const ZC_FWD = COCK0 + 0.3, ZC_AFT = Math.min(BENCH_AFT - 0.09, THWART.z - THWAR
 /** Sitting on the side deck (or hiking from it), legs in over the coaming (crewPhys.ts Z: the owner's choice): from the
  * cockpit's forward corner aft beside the benches, and on past the thwart beside the footwell and the after shelf to
  * about 2.5, short of the helm; the shins clear of the thwart either side of it. */
-// (out on the side deck, no further forward than just aft of the jib winch on its pedestal there: winchAt, at 1.4, its
+// (out on the side deck, no further forward than just aft of the jib winch on its pedestal there: winchAt, at JIB_WINCH_Z, its
 // pedestal's radius and half a hip's width clear; crewPhys.ts Z.deckFwd)
 const DECK_FWD = Z.deckFwd, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.13, THW_B = THWART.z + THWART.half + 0.13;
 const deckZ = (z: number) => { const q = Math.min(DECK_AFT, Math.max(DECK_FWD, z)); return q > THW_A && q < THW_B ? (q - THW_A < THW_B - q ? THW_A : THW_B) : q; };
@@ -130,7 +130,7 @@ const keepOnSole = (p: THREE.Vector3) => {
 /** The jib winch on side `ws` (boatMesh.ts buildLines, Boat Detail's, from Josephine's photos: on a moulded pedestal on
  * the side deck against the coaming's outer face, 1.4 m aft of amidships; the sheet leading to it 0.07 above its base);
  * `up` higher, as for the handle on top. */
-const winchAt = (ws: number, up = 0) => { const wz = 1.4, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) + 0.03 + 0.07 + up, wz); };
+const winchAt = (ws: number, up = 0) => { const wz = JIB_WINCH_Z, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) + 0.03 + 0.07 + up, wz); };
 /** What the crew watch: the jib's luff (its telltales). */
 const JIB_LUFF = V(0, 1.5, -1.6);
 
