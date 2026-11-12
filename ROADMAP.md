@@ -208,6 +208,17 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   (3) water in the cockpit: water shipped, its weight, the pump;
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
+  Update (12 November): owner, "nobody who races Folkboats on the bay has a reef setup. races just get canceled at 23
+  knots… at 23 knots everyone takes a vote on canceling. mostly bc at that speed things start breaking on boats." The
+  SFBFA's site (sfbayfolkboats.org/racing, fetched 12 November) has a "Proposed High Wind Race Cancellation Protocol":
+  "OA will cancel racing for the day when wind is above 25 knots"; before dockout, if the forecast is above 25 kt, the
+  Race Chair with the OA decides, and tells the fleet by text. It's marked proposed; the bylaws say nothing on wind. So
+  in racing: no reefing; the committee cancels in a blow, by the fleet's practice (the owner's 23 kt vote; the written
+  proposal's 25 kt), signalled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
+  the forecast. Racing above that isn't part of the Bay fleet's sailing. For cruising: the owner expects blue-water
+  Folkboats to reef; still unconfirmed. Ann Gash (solo round the world, 1975–77) reportedly used a working jib and a
+  trysail in a storm, not a reefed main (a search summary of her memoir, not read); Hasler's Jester was junk-rigged
+  (Folk Boat Year Book 2021, p.46). Richard Sherwood (1994, via Wikipedia): she "often carries full sail in 20–25".
 - **Next — cruising and racing: pick places on the map, change the conditions, and "Send her home"** (feature; 6–10 h
   in all): owner, "when cruising, I'd like to be able to pick my start and end locations on the map rather than in
   dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
