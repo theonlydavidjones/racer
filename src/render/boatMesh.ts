@@ -612,6 +612,21 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.03, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02); grp.add(gb);
     upMast([fb, new THREE.Vector3(-0.045, deckM + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(-0.03, BOOM_TOP - 0.01, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham');
   }
+  // The halyards, led inside the mast and out above the deck (CR 6.2.5), where the sail controls' layout has them (the jib
+  // halyard's tail to starboard, the main halyard with its tackle to port): exit plates on the mast, the tails down its
+  // sides to cleats on the mast. Where they exit and are cleated isn't in the owner's photos: estimates, flagged.
+  for (const [side, yExit, zExit, key] of [[1, DECK_AT_MAST + 1.3, MAST_FRONT_Z + 0.004, 'jibHalyard'], [-1, DECK_AT_MAST + 1.15, MAST_AFT_Z - 0.004, 'downhaul']] as const) {
+    const xs = side * (MAST_ATH / 2 + 0.006);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.set(side * 0.03, yExit, zExit); grp.add(plate);
+    const cleat = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.07, 0.04), BLACK); cleat.position.set(xs, DECK_AT_MAST + 0.55, MAST_Z); grp.add(cleat);
+    const pts = [new THREE.Vector3(side * 0.03, yExit - 0.04, zExit), new THREE.Vector3(xs, yExit - 0.15, MAST_Z)];
+    if (key === 'downhaul') { // the main halyard's tackle: a small block on the tail, two parts down to the cleat (the band's "downhaul")
+      const tb = sheaveBlock(0.014, -0.025); tb.position.set(xs, DECK_AT_MAST + 0.85, MAST_Z); grp.add(tb);
+      pts.push(new THREE.Vector3(xs, DECK_AT_MAST + 0.83, MAST_Z), new THREE.Vector3(xs + side * 0.006, DECK_AT_MAST + 0.58, MAST_Z + 0.008), new THREE.Vector3(xs + side * 0.012, DECK_AT_MAST + 0.83, MAST_Z + 0.006));
+    }
+    pts.push(new THREE.Vector3(xs + side * 0.01, DECK_AT_MAST + 0.56, MAST_Z), new THREE.Vector3(xs + side * 0.03, DECK_AT_MAST + 0.2, MAST_Z + 0.03), new THREE.Vector3(xs + side * 0.06, DECK_AT_MAST + 0.03, MAST_Z + 0.08)); // (the tail, coiled at the mast's foot)
+    upMast(pts, key === 'jibHalyard' ? 'jib' : 'main', key);
+  }
   // the mast's own bands: a black boot where it goes through the deck, and the lower band (CR 6.1.11: its upper edge the
   // Lower Mast Point, 1.00 m up; dark on Josephine), from the photos of her mast foot
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
