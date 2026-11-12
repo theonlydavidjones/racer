@@ -506,8 +506,9 @@ skippers acting on what they believe; cheating, protests and hearings). Also ask
   Open questions from review: ~~Richardson Bay's current~~ (done: NOAA's 2012 ADCP record there, SFB1219, fitted by the
   sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: a dead end, so by continuity: Point
   San Quentin's tide, NOAA 9414873 from San Francisco's constants by NOAA's offsets, fills and empties the water beyond
-  each line across the bay, NOAA chart depths; peak about 0.1–0.2 kt inside against 1.7 kt at the mouth, handed over
-  across the first kilometre; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
+  each line across the bay, NOAA chart depths; peak about 0.1–0.3 kt over the open bay against 1.7 kt at the mouth,
+  handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
+  water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
   as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
   behind it); San
   Leandro Bay still has no measurement inside it, so its current is the nearest stations' in sight, likely too strong;
