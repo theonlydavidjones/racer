@@ -37,20 +37,28 @@ export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceRes
   const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', windKind: 'auto', windKt: 0, current: 'real', tideDate: day.date, tideTime: day.start, raceLength: lengthFor(day.winnerS), opponents: FLEET, fleet: FLEET.length };
   const pick = chooseCourse(COURSES, S);
   if (!pick) throw new Error('no course');
-  const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number; abandoned: boolean })[] = [];
+  const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number; abandoned: boolean; boats: unknown[] })[] = [];
   for (const seed of seeds) {
     const w = new World(pick.est.file, S, seed);
     const limit = Math.max(2 * day.winnerS, 3 * pick.est.minutes * 60); // (the real time limits are about this)
     let ktSum = 0, n = 0;
+    // (what decided it, boat by boat: penalties taken, and whether she was over at the gun)
+    const pens = new Map<number, number>(), was = new Map<number, number>(), ocs = new Set<number>();
     while (w.t < limit && !w.cancelled && !w.boats.slice(1).every(b => b.finished)) {
       w.step(DT);
       if (w.t > 0 && (w.steps % 60) === 0) { ktSum += w.wind.kt; n++; }
+      for (const b of w.boats) {
+        if (b.penalty > 0 && !(was.get(b.id)! > 0)) pens.set(b.id, (pens.get(b.id) ?? 0) + 1);
+        was.set(b.id, b.penalty);
+        if (b.ocs) ocs.add(b.id);
+      }
     }
     const fleet = w.boats.slice(1);
     out.push({
       label: `${day.date} seed ${seed}`, course: pick.est.no, seed, windKt: day.windKt, meanKt: Math.round(ktSum / Math.max(1, n) * 10) / 10,
       finishers: fleet.filter(b => b.finished && b.finishT != null).map(b => ({ key: b.name, elapsedS: b.finishT! })),
       dnf: fleet.filter(b => !b.finished).length,
+      boats: fleet.map(b => ({ key: b.name, startS: w.startTimes[b.id], penalties: pens.get(b.id) ?? 0, ocs: ocs.has(b.id), sk: b.ai?.sk })),
       // (abandoned by the committee, N over A, for too much wind or too little: no result, as in a real series)
       abandoned: !!w.cancelled
     });
