@@ -30,7 +30,7 @@ import { destMark, place as getPlace } from './places';
 import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { condition, stepJumpers } from '../boat/condition';
-import { TUNE_HEIKKILA, TUNE_PRESETS, fixTune, presetFor, type RigTune } from '../boat/rigTune';
+import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
 import { genericSpec, genericTag, isGeneric } from '../boat/generic';
 
@@ -337,7 +337,7 @@ export class World {
    * Racing, each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
    * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5). A boat set up in the Boat panel keeps her
    * own tune. With none, you're set to North Sails' setting for the forecast (rigTune.ts presetFor); the club boats
-   * mostly are too, a few on Heikkilä Sailmaker's all-round tune and a few on the setting next to the right one (a crew
+   * mostly are too, a few on Heikkilä Sailmaker's tune for the day and a few on the setting next to the right one (a crew
    * that read the forecast differently). Their own random draw, so the race's other draws (and replays) don't move.
    */
   private tuneAtDock(): void {
@@ -350,7 +350,7 @@ export class World {
       let t: RigTune = TUNE_PRESETS[right];
       if (!b.isUser) {
         const x = r(), i = order.indexOf(right);
-        if (x > 0.85) t = TUNE_HEIKKILA;
+        if (x > 0.85) t = heikkilaFor(kt);
         else if (x > 0.7) t = TUNE_PRESETS[order[i === 0 ? 1 : i === 2 ? 1 : (r() < 0.5 ? 0 : 2)]];
       }
       b.tune = { ...t };

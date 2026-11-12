@@ -349,7 +349,7 @@ function trimSection(w: World, o: Outlook, legs: LegPlan[], finishT: number): Br
   items.push({ head: 'Downwind', src: 'model', text: `Running deep, wing on wing with the whisker pole (a Folkboat races without a spinnaker unless the sailing instructions allow one). Crew weight ${fore > 0.5 ? 'forward, by the mast, so the transom lifts clear and she stops dragging it' : 'back, to keep the bow up in a breeze'}. Vang on to stop the main twisting off; ease the outhaul and backstay for depth.` });
   { // the rig's tune, set at the dock (boat/rigTune.ts): against the day's range
     const kts = phases.map(ph => o.breeze((ph.a + ph.b) / 2).kt), lo = Math.min(...kts), hi = Math.max(...kts), mean = kts.reduce((a, b) => a + b, 0) / kts.length;
-    items.push(u.tune ? { head: 'Rig tune', src: 'model', text: tuneBrief(u.tune, lo, mean, hi) }
+    items.push(u.tune ? { head: 'Rig tune', src: 'model', text: tuneBrief(u.tune, Math.min(lo, w.forecastKt), w.forecastKt || mean, Math.max(hi, w.forecastKt), !!u.spec?.perf.jumpersUnderWay) }
       : { head: 'Rig tune', src: 'practice', text: 'Before you leave the dock, set the rig for the middle of the day\'s range: the sailmakers\' Folkboat guides take up on the shrouds as the breeze builds (less forestay sag, a flatter jib that points) and ease them in light air (more sag, more power).' });
   }
   return { id: 'trim', title: 'Trim and tuning, by phase', lede: 'From the boat\'s own sail and crew model: the settings below are what makes the fastest sail shapes in that wind here, and what the crew will set if they\'re trimming.', items };

@@ -306,7 +306,7 @@ export class RaceLog {
       const kt = this.tune.kt / this.tune.n, want = presetFor(kt);
       out.push({ key: 'tune', title: 'Rig tune', lost: this.tune.lost,
         detail: `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)} in about ${Math.round(kt)} kt, where ${tuneName(u.tune) === want ? 'it was right only part of the time' : `${tuneWords(TUNE_PRESETS[want])} would have fitted`}.`,
-        tip: 'Tune the rig at the dock for the forecast: the forestay, shrouds and mast foot can\'t be touched once racing (CR 7.40). If the wind is forecast to cross a setting, tune for the part of the race that matters most, and use the backstay for the rest.' });
+        tip: 'Tune the rig at the dock for the forecast: the forestay and shrouds can\'t be touched once racing (CR 7.40), nor the mast foot (CR 6.1.5). (The time is what her sails gave up; heel and the rest add to it.) If the wind is forecast to cross a setting, tune for the part of the race that matters most, and use the backstay for the rest.' });
     }
     if (this.pen.n) out.push({ key: 'penalty', title: 'Penalties', lost: this.pen.t,
       detail: `${this.pen.n} penalt${this.pen.n === 1 ? 'y' : 'ies'}: ${mmss(this.pen.t)} doing turns.`,

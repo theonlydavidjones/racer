@@ -354,7 +354,11 @@ export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: 
   return { s, list };
 }
 
-/** What her tune costs her right now (a share of speed): her sails with it against the guide's tune for this wind (rigTune.ts). */
+/**
+ * What her tune costs her sails right now (a share of speed): with it against the guide's tune for this wind (rigTune.ts),
+ * each with the crew's best lines, at her sheets, heel and crew as they are. Only the sails' share: in the full physics
+ * (benchSpeed) the difference is up to about twice this, as heel, the crew's weight and the depowering steps follow.
+ */
 export function tuneLoss(b: Boat): number {
   if (!b.tune) return 0;
   // each rig with the crew's best settings for it (crewSolve), at her sheets as they are: a soft rig wants more backstay
@@ -385,9 +389,9 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
   const soft = forestayTension(b.tune) < forestayTension(TUNE_PRESETS[want]);
   const pct = `${(100 * loss).toFixed(1)}%`;
   return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
-    head: soft ? `Her rig is tuned soft for ${Math.round(s.tws)} kt: about ${pct} slower. Backstay on hard.` : `Her rig is tuned tight for ${Math.round(s.tws)} kt: about ${pct} slower. Backstay off, foot a little.`,
-    why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. It's set at the dock (CR 7.40); the backstay is the one rig control you have.`
-      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. It's set at the dock (CR 7.40).`,
+    head: soft ? `Her rig is tuned soft for ${Math.round(s.tws)} kt: her sails give up about ${pct}. Backstay on hard.` : `Her rig is tuned tight for ${Math.round(s.tws)} kt: her sails give up about ${pct}. Backstay off, foot a little.`,
+    why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5); the backstay is free.`
+      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5).`,
     look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];
 }
 

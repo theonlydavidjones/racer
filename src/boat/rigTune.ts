@@ -41,7 +41,7 @@
  * - the jumpers may be adjusted while racing (CR 7.40 allows the jumper stays to be adjusted above deck): loose in
  *   light air, tightened in medium "so the crew hiking can keep her pointing and fast", and tightened again in a
  *   strong wind if the mast bends past the main's luff round.
- * The presets here are North Sails'; Heikkilä's is TUNE_HEIKKILA.
+ * The presets here are North Sails'; Heikkilä's is heikkilaFor (the day's wind).
  *
  * The sim's sail shapes (controls.ts) were set up as a well-tuned boat's, whatever the wind: a boat on the guide's tune
  * for that wind (guideTune, blended between its three settings). So every effect here is the difference between her
@@ -70,13 +70,18 @@ export const TUNE_PRESETS: Record<'light' | 'medium' | 'strong', RigTune> = {
   strong: { forestayMark: 1.31, footAft: 10, shroudTurns: 3, jumperTurns: 0 }
 };
 /**
- * Heikkilä's tune (above), on this boat's scales: 1.355 m of forestay; the foot locked where the mast just meets the
- * hole's after edge with a little pressure (his main wants no pre-bend: 10 mm here, the least of North Sails'); the
- * shrouds set for his 4–6 cm in light and medium air (a quarter turn past North Sails' light setting gives about
- * 2.5 cm in 6 kt, 5 cm in 9 kt and 8.5 cm in 12 kt, beating: forestaySag); the jumpers
- * at North Sails' medium. (Its use for every wind is his; the fit to these scales is the sim's.)
+ * Heikkilä's tune (above) for a forecast wind (kt), on this boat's scales: what he fixes for every wind, the rake
+ * (1.355 m of forestay) and the mast foot (locked where the mast just meets the hole's after edge with a little
+ * pressure: his main wants no pre-bend, so 10 mm here, the least of North Sails'); what he sets for the day, the shrouds
+ * for his 4–6 cm of sag beating (5 cm, in the day's wind, from 6 to 14 kt: in more, the backstay keeps it there) and
+ * the jumpers (loose in light air, tightened in medium, a turn more in a breeze, against the mast bending past the
+ * main's luff round; the turns are North Sails' scale, his guide gives none).
  */
-export const TUNE_HEIKKILA: RigTune = { forestayMark: 1.355, footAft: 10, shroudTurns: 0.25, jumperTurns: 2.5 };
+export function heikkilaFor(kt: number): RigTune {
+  const t0 = { forestayMark: 1.355, footAft: 10, shroudTurns: 0, jumperTurns: 0 };
+  const want = tensionFor(0.05, 1.45 * clamp(kt, 6, 14)), turns = (want - forestayTension(t0)) / FORESTAY.perTurn;
+  return { ...t0, shroudTurns: clamp(Math.round(turns * 4) / 4, 0, TUNE_RANGE.shroudTurns[1]), jumperTurns: kt < 8.5 ? 0 : kt < 14.5 ? 2.5 : 3.5 };
+}
 /** The guide's setting for a forecast wind (kt): light to 8 kt, medium 9–14, strong above (a crew picks one). */
 export const presetFor = (kt: number): 'light' | 'medium' | 'strong' => kt < 8.5 ? 'light' : kt < 14.5 ? 'medium' : 'strong';
 
@@ -84,13 +89,14 @@ export const presetFor = (kt: number): 'light' | 'medium' | 'strong' => kt < 8.5
 export function tuneName(t: RigTune): 'light' | 'medium' | 'strong' | 'heikkila' | 'custom' {
   const same = (a: RigTune, b: RigTune) => Math.abs(a.forestayMark - b.forestayMark) < 1e-4 && a.footAft === b.footAft && a.shroudTurns === b.shroudTurns && a.jumperTurns === b.jumperTurns;
   for (const k of ['light', 'medium', 'strong'] as const) if (same(t, TUNE_PRESETS[k])) return k;
-  return same(t, TUNE_HEIKKILA) ? 'heikkila' : 'custom';
+  // (Heikkilä's by what he fixes: the rake and the mast foot; the shrouds and jumpers are his for the day)
+  return Math.abs(t.forestayMark - 1.355) < 1e-4 && t.footAft === 10 ? 'heikkila' : 'custom';
 }
 /** The mast's rake from upright (deg, aft +) on this tune: the hounds' setback over their height (geometry, below). */
 export const rakeDeg = (t: RigTune) => Math.atan2((t.forestayMark - TUNE_DEFAULT.forestayMark) * HOUNDS_AFT_PER_M, STAY.rise) * 180 / Math.PI;
 /** Short notes in the Boat panel. */
 export const TUNE_INFO = {
-  tune: 'Set before you leave the dock: the class rules forbid adjusting the forestay, the shrouds or the mast\'s foot while racing (CR 7.40, 12.10, 6.1.5); the backstay is free, and the jumpers may be adjusted above deck. "For the forecast": racing, North Sails\' setting for the forecast wind (so a big change in the wind leaves her on the wrong tune); cruising, always right. Heikkilä Sailmaker uses one tune for every wind.',
+  tune: 'Set before you leave the dock: the class rules forbid adjusting the forestay, the shrouds or the mast\'s foot while racing (CR 7.40, 12.10, 6.1.5); the backstay is free, and the jumpers may be adjusted above deck. "For the forecast": racing, North Sails\' setting for the forecast wind (so a big change in the wind leaves her on the wrong tune); cruising, always right. Heikkilä Sailmaker fixes the rake and the mast foot for every wind and sets the shrouds (for 4–6 cm of sag) and the jumpers for the day: his preset here is for the wind you\'ve set up.',
   forestayMark: 'The forestay laid along the mast, marked at the gooseneck, then measured from the deck: North Sails 131 cm, Heikkilä 135–136. Longer rakes the mast aft and moves the sails\' push aft: more weather helm.',
   footAft: 'How hard the foot is pressed aft along its rail once the mast touches the hole\'s after edge: North Sails 22 mm in 0–8 kt, 16 in 9–14, 10 in a breeze. The deck pushes the mast\'s middle forward: pre-bend (a flatter main) and a slacker forestay (a fuller jib).',
   shroudTurns: 'Turns on the shroud turnbuckles past the light-air setting (about 8 cm of forestay sag in light air): North Sails 1½ in medium air, 3 in a breeze. Tighter shrouds pull the forestay straighter: a flatter jib that points higher.',
@@ -127,8 +133,15 @@ const STAY_LEN = Math.hypot(STAY.run, STAY.rise);
  * hold the hounds' height): 3.4 cm per cm. The mast pivots about the deck, so a point h up moves aft by that × h/rise.
  */
 export const HOUNDS_AFT_PER_M = STAY_LEN / STAY.run;
-/** Heights above the sheer (m) of each sail's centre of effort (balance.ts SAIL_GEOM: the main 4.44, the jib 2.2). */
+/** Heights above the deck at the mast (m) of each sail's centre of effort (balance.ts: the main 4.44, the jib 2.2). */
 const CE_UP = { main: 4.44, jib: 2.2 };
+/**
+ * How far each sail's centre moves aft as the mast rakes, as a height on the mast (m above the deck) that moves the same:
+ * the main's corners each move with their own point (the tack and the clew, on the boom, at the gooseneck 1.0 m up; the
+ * head 9.75 m up, CR 6.1.11), so its centroid goes aft by their average, 0.60 of the hounds' move (3.9 m up); the jib's
+ * luff pivots on the stem, so its centre moves as the mast does at its own height.
+ */
+const RAKE_UP = { main: (1.0 + 1.0 + 9.75) / 3, jib: CE_UP.jib };
 /** Chords at the centre of effort (balance.ts CHORD): the lever shift goes into Shape.ceAft, a share of half the chord. */
 const CHORD = { main: 2.4, jib: 2.0 };
 
@@ -188,14 +201,15 @@ export interface TuneEffect extends TuneParts { bend: number }
 
 /**
  * Pre-bend from the foot pressed aft: the deck pushes the mast's middle forward. The bend per millimetre isn't
- * published. Its size here: the deck partner just under 1.1 m above the mast's foot (Heikkilä Sailmaker, "Kansanveneen
- * trimmiohje" 2021, for a mast through the deck), so 6 mm more at the foot leans the mast's top 6.5/1.1 × 6 = 35 mm
- * forward of the line the stays hold it to, bending its middle forward about half of
- * that (a beam pinned at the hounds, pushed at the deck: an estimate). Taking the backstay's full range as about 60 mm of
- * bend (an estimate) for the 2.5% of camber the sim gives it (mainShape), that is about 0.12% of camber per mm.
+ * published. Its size here: the mast as a continuous beam on the foot, the deck partner just under 1.1 m above it
+ * (Heikkilä Sailmaker, "Kansanveneen trimmiohje" 2021, for a mast through the deck) and the hounds 6.5 m above the deck.
+ * The foot moved δ puts a moment 3EIδ/(L1(L1+L2)) on the mast at the partner (the three-moment equation), and that bows
+ * the span above by 0.0642·M·L2²/EI: about 0.97 δ, a millimetre of bow per millimetre at the foot (the stays taken as
+ * rigid: their stretch makes it less). Taking the backstay's full range as about 60 mm of bend (an estimate) for the
+ * 2.5% of camber the sim gives it (mainShape), that is about 0.04% of camber per mm.
  * (Heikkilä: his main is cut for "very little or no" pre-bend at rest: "Prebend flattens the mainsail unnecessarily".)
  */
-const PREBEND_DEPTH_PER_MM = 0.025 * (0.5 * (6.5 / 1.1)) / 60;
+const PREBEND_DEPTH_PER_MM = 0.025 * (0.0642 * 3 * 6.5 ** 2 / (1.1 * (1.1 + 6.5))) / 60;
 /**
  * The jumpers (the guide: too tight curves the bottom and leaves the top straight; too loose, the reverse). Per turn
  * from the guide's medium 2.5: tighter flattens the lower main a little and closes the upper leech, looser opens the
@@ -211,10 +225,10 @@ function parts(t: RigTune, bend: number): TuneParts {
     stay: forestayTension(t),
     mainDepth: (-PREBEND_DEPTH_PER_MM * (t.footAft - d.footAft) + JUMPER.depthPerTurn * dj) * bend,
     mainTwist: JUMPER.twistPerTurn * dj * bend,
-    mainCeAft: 2 * aft(CE_UP.main) / CHORD.main,
+    mainCeAft: 2 * aft(RAKE_UP.main) / CHORD.main,
     // (the jib's tack stays on the stem fitting and its head goes aft with the hounds: a point on the luff h up moves as
     // the mast does at that height)
-    jibCeAft: 2 * aft(CE_UP.jib) / CHORD.jib
+    jibCeAft: 2 * aft(RAKE_UP.jib) / CHORD.jib
   };
 }
 export const tuneEffect = (t: RigTune, bend = 1): TuneEffect => ({ ...parts(t, bend), bend });
@@ -244,19 +258,30 @@ export function guideTune(tws: number): RigTune {
  * wind (no steps for a puff to cross). Each setting's part is worked out once per mast bendiness.
  */
 const presetParts = new Map<number, [TuneParts, TuneParts, TuneParts]>();
+let lastG = { tws: NaN, bend: NaN, p: null as TuneParts | null };
 function guideParts(tws: number, bend: number): TuneParts {
+  // (one entry kept: the crew's search tries ~180 settings at the same wind, and the main and jib ask in turn)
+  if (tws === lastG.tws && bend === lastG.bend) return lastG.p!;
   let p = presetParts.get(bend);
   if (!p) presetParts.set(bend, p = [parts(TUNE_PRESETS.light, bend), parts(TUNE_PRESETS.medium, bend), parts(TUNE_PRESETS.strong, bend)]);
   const [a, b] = guideWeights(tws), [L, M, S] = p;
   const mix = (k: keyof TuneParts) => (L[k] + (M[k] - L[k]) * a) * (1 - b) + S[k] * b;
-  return { stay: mix('stay'), mainDepth: mix('mainDepth'), mainTwist: mix('mainTwist'), mainCeAft: mix('mainCeAft'), jibCeAft: mix('jibCeAft') };
+  const out = { stay: mix('stay'), mainDepth: mix('mainDepth'), mainTwist: mix('mainTwist'), mainCeAft: mix('mainCeAft'), jibCeAft: mix('jibCeAft') };
+  lastG = { tws, bend, p: out };
+  return out;
 }
 
 /** The forestay's extra sag (m) over the guide's tune for this wind, at this backstay (0..1) and apparent wind (kt). */
 export function sagDelta(e: TuneEffect, tws: number, backstay: number, aws: number): number {
+  // (one entry kept: the main and the jib ask for the same one in turn)
+  const m = lastSag;
+  if (m.e === e && m.tws === tws && m.bs === backstay && m.aws === aws) return m.v;
   const g = guideParts(tws, e.bend);
-  return forestaySag(withBackstay(e.stay, backstay), aws) - forestaySag(withBackstay(g.stay, backstay), aws);
+  const v = forestaySag(withBackstay(e.stay, backstay), aws) - forestaySag(withBackstay(g.stay, backstay), aws);
+  lastSag = { e, tws, bs: backstay, aws, v };
+  return v;
 }
+let lastSag = { e: null as TuneEffect | null, tws: NaN, bs: NaN, aws: NaN, v: 0 };
 /** The masthead falling off to leeward with a slacker rig opens the main's upper leech, a tighter one holds it closed: a
  * degree per 10 cm of sag more or less than the guide's (an estimate). */
 const MAIN_TWIST_PER_M_SAG = 10;
@@ -273,21 +298,25 @@ export function jibTune(e: TuneEffect, tws: number, backstay: number, aws: numbe
 
 /* ---------- the coach's words ---------- */
 
-const NAMES = { light: 'North Sails\' light-air setting (0–8 kt)', medium: 'North Sails\' medium setting (9–14 kt)', strong: 'North Sails\' strong-wind setting', heikkila: 'Heikkilä Sailmaker\'s all-round tune', custom: 'your own tune' } as const;
+const NAMES = { light: 'North Sails\' light-air setting (0–8 kt)', medium: 'North Sails\' medium setting (9–14 kt)', strong: 'North Sails\' strong-wind setting', heikkila: 'Heikkilä Sailmaker\'s tune', custom: 'your own tune' } as const;
 /** A tune in words. */
 export const tuneWords = (t: RigTune) => NAMES[tuneName(t)];
 const fmtSet = (t: RigTune) => `forestay mark ${(t.forestayMark * 100).toFixed(1)} cm, foot ${Math.round(t.footAft)} mm aft, shrouds ${t.shroudTurns ? `+${t.shroudTurns} turns` : 'at the light-air setting'}, jumpers ${t.jumperTurns ? `${t.jumperTurns} turns` : 'loose'}`;
 
 /**
  * What the coach says about her tune for the day, before the start: the wind's range over the race (kt, the
- * forecast's low, mean and high), against the guide's settings. Beating, the apparent wind is about 1.45 × the true.
+ * forecast's low and high), and the forecast the boats were tuned for at the dock (`mean`: world.ts forecastKt), against
+ * the guide's settings. `jumpers`: rigged to adjust them under way. Beating, the apparent wind is about 1.45 × the true.
  */
-export function tuneBrief(t: RigTune, lo: number, mean: number, hi: number): string {
+export function tuneBrief(t: RigTune, lo: number, mean: number, hi: number, jumpers = false): string {
   const want = presetFor(mean), name = tuneName(t), g = TUNE_PRESETS[want];
   const T = forestayTension(t), sag = (kt: number) => Math.round(100 * forestaySag(T, kt * 1.45));
   const sagNow = `Beating with the backstay off, her forestay sags about ${sag(lo)}–${sag(hi)} cm in ${Math.round(lo)}–${Math.round(hi)} kt.`;
-  const locked = 'It\'s set now: the forestay, shrouds and mast foot can\'t be touched while racing (CR 7.40); the backstay takes up the difference, and the jumpers may be adjusted.';
-  const spans = presetFor(lo) !== presetFor(hi) ? ` The wind crosses a setting today (${Math.round(lo)}–${Math.round(hi)} kt): ${presetFor(hi) === 'strong' || (presetFor(hi) === 'medium' && presetFor(lo) === 'light') ? 'as it builds, the backstay goes on harder and sooner than usual' : 'as it eases, ease the backstay right off for a fuller jib'}.` : '';
+  const locked = `It's set now: the forestay and shrouds can't be touched while racing (CR 7.40), nor the mast foot (CR 6.1.5); the backstay is free${jumpers ? ', and so are the jumpers, rigged to adjust above deck' : ''}.`;
+  // the wind crossing a setting: her rig against the settings for the day's low and high ends
+  const T_lo = forestayTension(TUNE_PRESETS[presetFor(lo)]), T_hi = forestayTension(TUNE_PRESETS[presetFor(hi)]);
+  const spans = presetFor(lo) === presetFor(hi) ? '' : T < T_hi * 0.87 ? ` The wind crosses a setting today (${Math.round(lo)}–${Math.round(hi)} kt): her rig is soft for the top of it, so in the stronger part the backstay goes on harder and sooner than usual.`
+    : T > T_lo * 1.15 ? ` The wind crosses a setting today (${Math.round(lo)}–${Math.round(hi)} kt): her rig is tight for the bottom of it, so in the lighter part ease the backstay right off for a fuller jib.` : '';
   if (name === want) return `She's on ${NAMES[name]}, right for ${Math.round(mean)} kt. ${sagNow}${spans} ${locked}`;
   if (name === 'heikkila' || name === 'custom') {
     const tighter = T > forestayTension(g) * 1.15, softer = T < forestayTension(g) / 1.15;
@@ -298,3 +327,6 @@ export function tuneBrief(t: RigTune, lo: number, mean: number, hi: number): str
     ? 'too soft a rig for it. The forestay will sag (a full jib with a round entry that won\'t point), and she\'ll heel and carry more helm: get the backstay on early and hard, and the traveller down sooner.'
     : 'too tight a rig for it. The forestay will be straight and the jib flat: it points, but has no power to drive through a lull or the chop. Keep the backstay right off, ease the jib sheet a touch, and foot for speed.'} ${sagNow} For next time, North Sails' setting: ${fmtSet(g)}. ${locked}`;
 }
+
+/** Heikkilä's tune for a medium day (12 kt), worked out once the forestay's figures above are (for the tests). */
+export const TUNE_HEIKKILA: RigTune = heikkilaFor(12);

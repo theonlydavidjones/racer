@@ -4,7 +4,7 @@ import { BURGEES, CLUBS } from '../render/burgees';
 import { ENSIGNS } from '../render/flagArt';
 import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
-import { TUNE_DEFAULT, TUNE_HEIKKILA, TUNE_INFO, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
+import { TUNE_DEFAULT, TUNE_INFO, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
 import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
 
 /**
@@ -101,7 +101,7 @@ export class BoatPanel {
       case 'outboard': this.set(b => { b.perf.outboard = v as BoatSpec['perf']['outboard']; }); return;
       case 'tune': this.set(b => { // (Auto: none set, she's tuned for the forecast at the dock)
         if (v === 'auto') delete b.perf.tune;
-        else if (v === 'heikkila') b.perf.tune = { ...TUNE_HEIKKILA };
+        else if (v === 'heikkila') b.perf.tune = heikkilaFor(this.S.windKt || 12); // (his shrouds and jumpers for the wind you've set up)
         else if (v in TUNE_PRESETS) b.perf.tune = { ...TUNE_PRESETS[v as keyof typeof TUNE_PRESETS] };
       }); return;
       case 'finish': this.set(b => { b.perf.finish = v as BoatSpec['perf']['finish']; }); return;
@@ -308,5 +308,5 @@ function rigTuneFields(b: BoatSpec, seg: Seg): string {
     ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25, TUNE_INFO.shroudTurns)}
     ${row('tuneJumper', 'jumperTurns', 'Jumpers', 1, 0.5, TUNE_INFO.jumperTurns)}
     <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}
-    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band: the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
+    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band (under the traveller): the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
 }

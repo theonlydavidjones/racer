@@ -36,8 +36,9 @@ describe('rig tune (rigTune.ts): North Sails\' Nordic Folkboat guide', () => {
   it('more forestay rakes the mast aft and moves both sails\' force aft: more weather helm', () => {
     const e = tuneEffect({ ...TUNE_PRESETS.medium, forestayMark: 1.36 });
     expect(e.mainCeAft).toBeGreaterThan(0); expect(e.jibCeAft).toBeGreaterThan(0);
-    // 5 cm more forestay: the hounds about 17 cm aft, the main's centre of effort about 11 cm
-    expect(e.mainCeAft * 2.4 / 2).toBeCloseTo(0.05 * 3.4 * 4.44 / 6.5, 2);
+    // 5 cm more forestay: the hounds about 17 cm aft, the main's centroid 0.60 of that (its corners: tack and clew at the
+    // gooseneck, head at the top), about 10 cm
+    expect(e.mainCeAft * 2.4 / 2).toBeCloseTo(0.05 * 3.4 * 0.603, 2);
     const h0 = up(12).helm, h1 = up(12, { forestayMark: 1.36 }).helm, h2 = up(12, { forestayMark: 1.26 }).helm;
     expect(h1).toBeGreaterThan(h0 + 0.2); expect(h2).toBeLessThan(h0 - 0.2);
   });

@@ -184,7 +184,7 @@ function tuned(sh: Shape, t: { depth: number; twist?: number; ceAft: number } | 
   if (!t) return sh;
   const { depth, twist = 0, ceAft } = t;
   if (!depth && !twist && !ceAft) return sh;
-  return { ...sh, depth: sh.depth + depth, twist: clamp(sh.twist + twist, 3, 26), ...(ceAft ? { ceAft: (sh.ceAft ?? 0) + ceAft } : {}) };
+  return { ...sh, depth: sh.depth + depth, twist: twist ? clamp(sh.twist + twist, 4, 24) : sh.twist, ...(ceAft ? { ceAft: (sh.ceAft ?? 0) + ceAft } : {}) };
 }
 
 /** The jib's shape: the car sets its twist and foot depth, the backstay its luff sag. */
