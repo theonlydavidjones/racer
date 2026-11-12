@@ -314,7 +314,8 @@ export function gapKd(bl: number, rl: number, deg: number): number {
  * The swell inside a marina (0..1 of the ocean's, and the way it travels): what reaches each entrance from outside,
  * spread through it by diffraction (gapKd). A swell meeting the entrance at an angle goes through as if through a gap
  * as wide as the entrance looks from its way (the Shore Protection Manual's method for oblique waves, after Johnson
- * 1952), the pattern turned to its way. Swell through two entrances adds as energy.
+ * 1952), the pattern turned to its way; and over the spread of directions a real swell has. Swell through two
+ * entrances adds as energy.
  */
 export function harborSwell(p: Vec, T: number): { k: number; toward: number } {
   const H = harborAt(p), gaps = H ? harborGaps(H) : [];
@@ -322,11 +323,21 @@ export function harborSwell(p: Vec, T: number): { k: number; toward: number } {
   let e2 = 0, best = 0, toward = 0;
   for (const g of gaps) {
     const out = { x: g.c.x - g.n.x * (g.B / 2 + 10), y: g.c.y - g.n.y * (g.B / 2 + 10) }, r = swellReach(out, true);
-    const t = V(r.toward), cosA = t.x * g.n.x + t.y * g.n.y;
-    if (r.k <= 0 || cosA <= 0.05) continue; // (swell running along the shore, or out of the harbor: none goes in)
+    if (r.k <= 0) continue;
     const L = waveLength(T, g.depth ?? 1e3), dx = p.x - g.c.x, dy = p.y - g.c.y, d = Math.hypot(dx, dy);
-    const off = d > 0 ? Math.acos(clamp((dx * t.x + dy * t.y) / d, -1, 1)) / D2R : 0;
-    const k = r.k * gapKd(g.B * cosA / L, d / L, off);
+    // a swell's waves don't all run one way: spread about it as cos^2s(θ/2), s = 75 for a swell come from far off
+    // (Mitsuyasu's spreading function with Goda's s_max for swell, Goda 1985, as the Coastal Engineering Manual II-2 gives
+    // it), so one running along the entrance still sends some in; each direction through as wide as the gap looks
+    // from it, the energy summed
+    let kk = 0, wsum = 0;
+    for (let dd = -40; dd <= 40; dd += 4) {
+      const w = Math.cos(dd * D2R / 2) ** 150, t = V(r.toward + dd), cosA = t.x * g.n.x + t.y * g.n.y;
+      wsum += w;
+      if (cosA <= 0) continue; // (running out of the harbor, or along its shore: none goes in)
+      const off = d > 0 ? Math.acos(clamp((dx * t.x + dy * t.y) / d, -1, 1)) / D2R : 0;
+      kk += w * gapKd(g.B * cosA / L, d / L, off) ** 2;
+    }
+    const k = r.k * Math.sqrt(kk / wsum);
     e2 += k * k;
     if (k > best) { best = k; toward = d > 1 ? brg(dx, dy) : r.toward; }
   }
