@@ -102,9 +102,9 @@ export class Chart {
   /** What the picked spot is from here: how far, which way, and what sort of sail it'll be. */
   private info(note?: string): void {
     const el = $('chartInfo'), go = $('bChartGo') as HTMLButtonElement, w = this.w;
-    go.hidden = !(w?.freeSail && this.pick);
+    go.hidden = !(w?.cruising && this.pick);
     if (!w || !this.pick) {
-      el.innerHTML = note ? `<p>${note}</p>` : w?.freeSail ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Tap the water or a place to choose one.</p>` : '';
+      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Tap the water or a place to choose one.</p>` : '';
       return;
     }
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);
