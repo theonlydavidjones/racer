@@ -19,7 +19,7 @@
     "data:wharf": "NODE_USE_ENV_PROXY=1 node scripts/make-wharf.mjs",
     "data:results": "NODE_USE_ENV_PROXY=1 node scripts/fetch-folkboat-results.mjs",
     "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs",
-    "test:fast": "vitest run --exclude 'tests/perf.test.ts' --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts' --exclude 'tests/sim-ai.test.ts' --exclude 'tests/pushoff-all.test.ts'"
+    "test:fast": "vitest run --exclude 'tests/perf.test.ts' --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts' --exclude 'tests/sim-ai.test.ts' --exclude 'tests/pushoff-all.test.ts' --exclude 'tests/pushoff-letgo.test.ts'"
   },
   "dependencies": {
     "three": "^0.186.1"

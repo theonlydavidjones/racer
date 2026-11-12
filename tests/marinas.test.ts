@@ -156,9 +156,9 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     }
     expect(n).toBeGreaterThan(40); expect(held).toBeGreaterThan(10); // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead)
     // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
-    // (West Harbor's 677, on its west dock: the berth main's old order picks, A7 when the docks had the sim's letters; the
-    // first there that's held head to wind now the plan leaves her room to leeward)
-    const slip = slipById('west-harbor:677')!, p0 = pushOffPlan(slip, 270, 14);
+    // (West Harbor's 135: the first of its berths still held head to wind now the let-go needs 20 m of clear water along her
+    // path as she rounds up and sags (pushoff-letgo.test.ts); 677, old A7, is shoved off astern instead)
+    const slip = slipById('west-harbor:135')!, p0 = pushOffPlan(slip, 270, 14);
     expect(slip.kind === 'bow-in' && p0.kind === 'swing' && !!p0.hold).toBe(true);
     expect(slip).toBeTruthy();
     const boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
@@ -187,7 +187,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
-    expect(n).toBeGreaterThan(20);
+    expect(n).toBeGreaterThan(8); // (was 20: since she must have 20 m clear along her path as she gathers way, main alone and hands off (pushoff-letgo.test.ts), many narrow berths shove her off astern instead)
   }, 120000); // (every fourth berth of all the marinas': about 35 s alone, since Richmond YC's 214 joined)
   it('her flags and windex show the wind while she\'s made fast and while the crew has her', () => {
     const slip = slipsIn('west-harbor')[30], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
