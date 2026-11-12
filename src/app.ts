@@ -321,6 +321,9 @@ document.addEventListener('click', e => {
   if (you) { takeLine(w.user, k); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
   else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
 });
+// the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout)
+function crewPopOpen(open = !!$('crewPop').hidden): void { $('crewPop').hidden = !open; $('bCrew').setAttribute('aria-expanded', String(open)); $('bCrew').classList.toggle('on', open); }
+$('bCrew').onclick = () => crewPopOpen();
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
 /* The sail controls band (ui/sailBand.ts): every line, laid out as you face forward from the helm. */
 const band = new SailBand({
@@ -339,6 +342,7 @@ function openLines(open = !band.open): void {
   document.body.classList.toggle('band-open', open);
   $('tpMore').textContent = open ? 'Sail controls ▾' : 'Sail controls ▸'; $('tpMore').setAttribute('aria-expanded', String(open));
   $('bBand').classList.toggle('on', open); $('bBand').setAttribute('aria-pressed', String(open));
+  chaseFrame();
 }
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
@@ -398,6 +402,7 @@ function showLines(): void {
   showTrimOwner();
   const k = CTL_UI[ctlSel].key; band.select(k === 'carFore' || k === 'carIn' ? null : k);
   band.update();
+  word('bCrew', w.user.crew?.place ? 'Crew · you' : 'Crew · auto'); $('bCrew').classList.toggle('mine', !!w.user.crew?.place);
 }
 /* Placing the crew yourself (boat/crewPhys.ts): their weight across the boat and fore and aft. Choosing a place takes
  * the crew off auto and they stay there (through tacks, puffs and lulls) until you choose another or tap Auto, as a
@@ -1129,7 +1134,17 @@ function showResults(): void {
 }
 
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
-function resize(): void { view.resize(innerWidth, innerHeight); }
+/**
+ * The chase camera's frame (scene.setChaseFrame, the chase-view layout): the boat between the bottom of the top pods and
+ * the top of the sail controls band (its tab row included). Put away, the band leaves its windex: she sits above that.
+ */
+function chaseFrame(): void {
+  const top = Math.max($('hud').getBoundingClientRect().bottom, $('hudRight').getBoundingClientRect().bottom);
+  const wx = band.el.querySelector<HTMLElement>('.sb-wx')!.getBoundingClientRect();
+  const bottom = band.open ? band.el.getBoundingClientRect().top - 22 : wx.top;
+  view.setChaseFrame({ top, bottom: bottom > 0 ? bottom : innerHeight });
+}
+function resize(): void { view.resize(innerWidth, innerHeight); chaseFrame(); }
 addEventListener('resize', resize); resize();
 
 let last = performance.now();

@@ -354,51 +354,101 @@ export class Hud {
     el.className = (kc ? 'kc' : 'row') + (kc && risk && c.t < 6 && c.d < 8 ? ' alarm' : '');
   }
 
-  /** Before the start: distance / time to line, time to burn, favored end. After: next mark range and bearing. */
+  private cardKey = '';
+  /** The "where next" card's header, number and sketch (only rewritten when they change). */
+  private card(cls: string, head: string, num: string, unit: string, svg: string): void {
+    const key = cls + head + num + unit + svg; if (key === this.cardKey) return; this.cardKey = key;
+    const el = $('nextCard'); el.hidden = false; el.className = cls;
+    $('ncHead').textContent = head; $('ncNum').innerHTML = `${num}<span>${unit}</span>`; $('ncSketch').innerHTML = svg;
+  }
+  /**
+   * A line in the card's sketch, seen from below it looking up the course: its two ends (the favoured one starred),
+   * and you as a dot (red when you're over it), your arrow toward the line or away from it.
+   */
+  private lineSketch(w: World, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean): string {
+    const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
+    // which end is on the left, looking up the course (N): the pin if it's to the left of N
+    const left = { x: -w.N.y, y: w.N.x }, pinLeft = dot(sub(w.pin, w.center), left) > 0;
+    const [lName, rName] = pinLeft ? ends : [ends[1], ends[0]], lFav = fav === (pinLeft ? 0 : 1), rFav = fav === (pinLeft ? 1 : 0);
+    const along = clamp(dot(sub(u, w.center), left) / (w.lineLen / 2), -1.3, 1.3); // + toward the left end
+    const X = Math.round(75 - along * 61), Y = over ? 4 : 30, col = over ? '#ff5d4c' : '#3fd197', dir = toward === over ? 1 : -1; // (arrow down, away from the line's course side, or up)
+    const ly = over ? 18 : 12;
+    return `<line x1="14" y1="${ly}" x2="136" y2="${ly}" stroke="#94abb7" stroke-width="2" stroke-dasharray="4 3"/>`
+      + `<rect x="8" y="${ly - 6}" width="12" height="12" rx="2" fill="${lFav ? '#ffb627' : '#e9f2f5'}"/>${T(14, ly + 18, lName + (lFav ? ' ★' : ''), lFav ? '#ffb627' : '#94abb7')}`
+      + `<circle cx="136" cy="${ly}" r="5" fill="${rFav ? '#ffb627' : '#e9f2f5'}"/>${T(136, ly + 18, rName + (rFav ? ' ★' : ''), rFav ? '#ffb627' : '#94abb7')}`
+      + `<circle cx="${X}" cy="${Y}" r="4" fill="${col}"/><path d="M${X} ${Y + 3 * dir} v${7 * dir}" stroke="${col}" stroke-width="2"/>`
+      + `<path d="M${X - 3.5} ${Y + 7 * dir} l3.5 ${4 * dir} l3.5 ${-4 * dir}" fill="none" stroke="${col}" stroke-width="2"/>`;
+  }
+  /** Distance in the card's units: metres close in, nautical miles further off. */
+  private range(m: number): [string, string] { return m < 0.2 * 1852 ? [m.toFixed(0), 'm'] : [(m / 1852).toFixed(m < 1852 * 10 ? 1 : 0), 'nm']; }
+
+  /**
+   * The "where next" card (the chase-view layout), top left: what's next and how far, in five states. Start line
+   * (before the start: distance, time to the line, time to burn, the favoured end); Over early (red); Next mark (its
+   * name, range, which side to leave it, the bearing); Finish; and, cruising, the Navigator (the destination, range,
+   * speed made good toward it, the time at that rate). The transits go on its last line (transit()).
+   */
   private lineBox(w: World, u: Boat): void {
     const el = $('linebox'), C = w.C;
-    if (u.finished) { el.hidden = true; return; }
+    if (u.finished) { $('nextCard').hidden = true; return; }
+    const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const target = steadySpeed(polar(u.ww.kt, u.twa, sailPlan(u)), v => seaDrag(u.sea, u.h, v)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
       const vmg = u.v * Math.cos(u.twa * D2R) / KT;
-      el.hidden = false; el.className = '';
       const speed = `Target ${(target / KT).toFixed(1)} kt at ${Math.round(u.twa)}° · you ${pct}%`;
       const d = w.dest;
       if (d && w.arrivedT == null) {
         // to the destination: range and bearing, your speed made good toward it over the ground (with the current), and how long at that rate
         const rng = dist(u, d.p), b = brg(d.p.x - u.x, d.p.y - u.y), vmc = (u.vx * (d.p.x - u.x) + u.vy * (d.p.y - u.y)) / Math.max(1, rng);
-        const eta = vmc > 0.1 ? rng / vmc : Infinity, nm = rng / 1852;
-        el.innerHTML = `<b>${d.name}</b> · ${nm < 0.2 ? Math.round(rng) + ' m' : nm.toFixed(2) + ' nm'} at ${String(Math.round(b)).padStart(3, '0')}° · `
-          + (vmc > 0.05 ? `making ${(vmc / KT).toFixed(1)} kt toward it${isFinite(eta) ? ` · ${eta < 60 ? 'under a minute' : eta < 3600 ? Math.round(eta / 60) + ' min' : (eta / 3600).toFixed(1) + ' h'}` : ''}` : 'sailing away from it')
+        const eta = vmc > 0.1 ? rng / vmc : Infinity, [n, un] = this.range(rng);
+        const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 55);
+        this.card('', 'Navigator', n, un, `<circle cx="75" cy="36" r="4" fill="#3fd197"/><path d="M75 36 L${mx} 12" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
+          + `<path d="M${mx} 2 v14 M${mx} 2 l9 4 l-9 4" fill="#ffb627" stroke="#ffb627" stroke-width="1.5"/>${T(clamp(mx, 40, 110), 46, d.name.toUpperCase().slice(0, 22), '#ffb627')}`);
+        el.innerHTML = `${String(Math.round(b)).padStart(3, '0')}° · ` + (vmc > 0.05 ? `making ${(vmc / KT).toFixed(1)} kt toward it${isFinite(eta) ? ` · ${eta < 60 ? 'under a minute' : eta < 3600 ? Math.round(eta / 60) + ' min' : (eta / 3600).toFixed(1) + ' h'}` : ''}` : 'sailing away from it')
           + `<br><small>${speed}</small>`;
         return;
       }
+      this.card('', 'Sailing', (u.v / KT).toFixed(1), 'kt', `${T(75, 26, `${pct}% OF TARGET`, '#3fd197')}`);
       el.textContent = speed + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
       return;
     }
-    el.hidden = false;
     if (w.t < 0 || u.ocs || !u.started) {
       const d = w.lineD(bow(u)), uN = Math.sin(u.h * D2R) * w.N.x + Math.cos(u.h * D2R) * w.N.y;
-      let fav = '';
-      if (w.settings.aids) {
-        // the end closer to the wind on the water is favored
-        const k = dot(sub(w.pin, w.committee), V(u.ww.from)) / w.lineLen, deg = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
-        fav = deg < 2 ? ' · <span class="fav">Square line</span>' : ` · <span class="fav">${k > 0 ? C.pinLabel : C.committeeLabel} end favored ${deg.toFixed(0)}°</span>`;
+      // the end closer to the wind on the water is favored
+      const k = dot(sub(w.pin, w.committee), V(u.ww.from)) / w.lineLen, deg = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
+      const favEnd: 0 | 1 | -1 = !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
+      const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${k > 0 ? C.pinLabel : C.committeeLabel} end favoured ${deg.toFixed(0)}°</span>`;
+      const ends: [string, string] = [C.pinLabel.toUpperCase().slice(0, 10), C.committeeLabel.toUpperCase().slice(0, 10)];
+      if (d > 0) {
+        this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
+        el.innerHTML = w.t < 0 ? `Over by ${d.toFixed(0)} m · get back below the line` : u.roundEnd ? 'I flag: back round an end of the line' : 'OCS · dip back below the line and start';
+        return;
       }
-      if (d > 0) { el.className = 'over'; el.innerHTML = w.t < 0 ? `Over the line by ${d.toFixed(0)} m · get back` : 'OCS · dip back below the line'; return; }
-      el.className = '';
       // time to the line on this heading if you sheet in now: accelerating from your current speed, with the current
       const cN = u.cur.x * w.N.x + u.cur.y * w.N.y;
       const tl = uN > 0.15 ? timeToCover(-d, u.v, polar(u.ww.kt, u.twa, sailPlan(u)), uN, cN) : Infinity;
-      const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
+      const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
-      el.innerHTML = `Line ${(-d).toFixed(0)} m · ${tStr}${burn}${fav}`;
+      this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0));
+      el.innerHTML = (u.ocs ? 'You were over: now start properly · ' : '') + tStr + burn + fav;
     } else {
-      el.className = '';
       const m = w.nextMark(u), tgt = m ? m.p : w.center;
-      const d = dist(u, tgt), bs = String(Math.round(brg(tgt.x - u.x, tgt.y - u.y))).padStart(3, '0');
-      el.textContent = m ? `${m.name} to ${m.side === 's' ? 'starboard' : 'port'} · ${d.toFixed(0)} m · ${bs}°` : `Finish line · ${d.toFixed(0)} m · ${bs}°`;
+      const d = dist(u, tgt), b = brg(tgt.x - u.x, tgt.y - u.y), bs = String(Math.round(b)).padStart(3, '0'), [n, un] = this.range(d);
+      if (m) {
+        // the mark ahead or abeam, as it bears from her bow; a curl round it the way it's left
+        const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 45), side = m.side === 's' ? 1 : -1;
+        const name = m.name.toUpperCase().slice(0, 22);
+        this.card('', 'Next mark', n, un, `<circle cx="${mx}" cy="14" r="6" fill="#ffb627"/>${T(clamp(mx, 45, 105), 44, name, '#ffb627')}`
+          + `<path d="M75 34 C 75 ${24}, ${mx - side * 14} 8, ${mx} 4 C ${mx + side * 12} 2, ${mx + side * 14} 18, ${mx + side * 8} 24" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
+          + `<circle cx="75" cy="34" r="4" fill="#3fd197"/>`);
+        el.innerHTML = `Leave it to ${m.side === 's' ? 'starboard' : 'port'} · bearing ${bs}°`;
+      } else {
+        const ends: [string, string] = [C.pinLabel.toUpperCase().slice(0, 10), C.committeeLabel.toUpperCase().slice(0, 10)];
+        const near = dist(u, w.pin) < dist(u, w.committee) ? 0 : 1;
+        this.card('', 'Finish line', n, un, this.lineSketch(w, u, ends, near, false, true));
+        el.innerHTML = `Bearing ${bs}° · the ${near === 0 ? C.pinLabel : C.committeeLabel} end is closer`;
+      }
     }
   }
 
