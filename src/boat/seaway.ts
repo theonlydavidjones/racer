@@ -80,7 +80,9 @@ let chopNext = 0;
 function beatSearch(kt: number, hs: number, tp: number): number {
   let best = 40, bestV = -1;
   for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
-  return best;
+  // (no headway at any angle, light air in a big chop: not "pinch hardest", as the first angle tried would say, but the
+  // widest, footing off for speed being her only hope)
+  return bestV > 0 ? best : 65;
 }
 const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
