@@ -91,6 +91,8 @@ export interface Job {
   to?: number;
   /** A trip a crew you've placed makes only for a big change (crewWork.ts PLACED_TRIP). */
   big?: boolean;
+  /** a big lasting change of a cabin-top line (crewWork.ts LINE_URGENT): seen through, a jib tweak waits */
+  urgent?: boolean;
 }
 /** Where a job puts a person: across (m, + to windward), fore-and-aft (m), and how they're posed. */
 export interface Station { arm: number; z: number; pose: Pose }
@@ -140,7 +142,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number;
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number;
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -665,13 +667,14 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   let f = 0.5, top = -Infinity;
   for (let x = 0; x <= 1.0001; x += 0.125) { const sc = score(x); if (sc > top + 1e-9) { top = sc; f = x; } }
   const sk = smoothSkill(skill), want = 0.5 + (f - 0.5) * sk;
-  // (a move along the cockpit for a real gain only, 0.05%: near the crossover it isn't worth the move. An estimate.)
-  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && score(want) - score(c.fore01) < 0.0005) return c.fore01;
-  // (and having just moved, they stay a while: a gust-lull cycle's worth, about 20 s, unless it's worth 0.3% now. Their
-  // weight out on the rail and in again in each puff changes the reckoning, and they were along the cockpit and back
-  // with each one: the owner's "fussing". Estimates)
+  // (a move along the cockpit for a real gain only, 0.1%: near the crossover it isn't worth the move; at 0.05% hikers in
+  // 18 kt went half a metre aft and back each minute between two places worth the same. An estimate.)
+  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && score(want) - score(c.fore01) < 0.001) return c.fore01;
+  // (and having just moved, they stay a while: a gust-lull cycle (about a minute, Bethwaite), unless it's worth 0.3% now.
+  // Their weight out on the rail and in again in each puff changes the reckoning, and they were along the cockpit and back
+  // with each one: the owner's "fussing"; with half a cycle, still once a puff in a breeze. The 0.3% is an estimate)
   const t = c.clock ?? 0;
-  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && t - (c.foreSetT ?? -1e9) < 20 && score(want) - score(c.fore01) < 0.003) return c.fore01;
+  if (c.fore01 != null && Math.abs(want - c.fore01) > 1e-6 && t - (c.foreSetT ?? -1e9) < 60 && score(want) - score(c.fore01) < 0.003) return c.fore01;
   if (c.fore01 == null || Math.abs(want - c.fore01) > 1e-6) c.foreSetT = t;
   c.fore01 = want;
   return c.fore01;

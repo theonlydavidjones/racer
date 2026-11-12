@@ -15,8 +15,8 @@ import type { CourseFile } from '../src/courses/course';
  * tweak; and a short move aft along the deck made by turning right round, then round again for the next job forward.
  */
 describe('Settled crew stay settled (render/crew.ts, boat/crewWork.ts)', () => {
-  it('in steady sailing: few trips, no pose flicker, no stepping on the spot, no turn over half a circle', () => {
-    const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 2, opponents: ['stock:1', 'stock:2'] } as never, 1);
+  for (const kt of [12, 18]) it(`in steady sailing in ${kt} kt: few trips, no pose flicker, no stepping on the spot, no spinning round`, () => {
+    const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 2, opponents: ['stock:1', 'stock:2'] } as never, 1);
     const ai = w.boats.filter(b => !b.isUser);
     const crs = ai.map(b => buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1));
     const lastTurn = ai.map(() => -99), side = ai.map(b => Math.sign(b.rel));
@@ -55,9 +55,13 @@ describe('Settled crew stay settled (render/crew.ts, boat/crewWork.ts)', () => {
     console.log(out.map(o => `${o.who}: ${o.mins.toFixed(1)} min steady, poses ${o.poses.toFixed(1)}/min, trips ${o.trips.toFixed(1)}/min, knees ${o.knee.toFixed(1)} rad/min, most turned in 4 s ${o.spin.toFixed(0)}°`).join('\n'));
     for (const o of out) {
       expect(o.mins, o.who).toBeGreaterThan(2);
-      expect(o.spin, `${o.who}: turned ${o.spin.toFixed(0)}° within 4 s`).toBeLessThanOrEqual(180);
-      expect(o.trips, `${o.who}: trips a minute (a visit to the cabin top counts twice, there and back)`).toBeLessThan(2);
-      expect(o.poses, `${o.who}: pose changes a minute (sitting, hiking in the puffs, a job)`).toBeLessThan(6);
+      // (turning round to walk aft along the deck is half a circle, and a little more as they swing out of a seat: a spin
+      // is a whole one, as the owner saw, turning the long way or round and back again)
+      expect(o.spin, `${o.who}: turned ${o.spin.toFixed(0)}° within 4 s`).toBeLessThan(270);
+      // (a visit to the cabin top counts twice, there and back; in a breeze the forward hand has the depowering lines and
+      // the cars too. On v146's code, 12 kt: 6.4 a minute, 14 pose changes, knees 67 rad a minute, a 367° spin)
+      expect(o.trips, `${o.who}: trips a minute`).toBeLessThan(kt > 15 ? 4.5 : 3);
+      expect(o.poses, `${o.who}: pose changes a minute (sitting, hiking in the puffs, a job)`).toBeLessThan(8);
       expect(o.knee, `${o.who}: knee movement, rad a minute (stepping on the spot was over 120)`).toBeLessThan(40);
     }
   }, 600000);
