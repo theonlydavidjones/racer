@@ -32,12 +32,14 @@ describe('the AI sails the boat as a sailor does', () => {
         // head to wind (within 10°) for more than 6 s
         const h2w = b.twa < 10 ? (stuck.get(b.id) ?? 0) + DT : 0; stuck.set(b.id, h2w);
         if (h2w > 6 && h2w - DT <= 6) stalls.push(`${b.name} t${w.t.toFixed(0)}`);
-        // on the run (leg 1, the mark well downwind), her mean angle: while she can lay where she's going at her best
-        // angle. (Past the layline, having gybed late, she reaches up to it, hotter, as she should: in a whole race the
-        // gybe's timing is chaos in the fleet's positions, and the right course then is the straight one, not the polar's)
+        // on the run (leg 1, the mark well downwind), her mean angle: but not while she's past the layline, the mark more
+        // than 15° hotter than her run-angle course (having gybed late: in a whole race the gybe's timing is chaos in the
+        // fleet's positions), when she reaches up to it, as she should. (Only past it: at a run angle of 168° the mark is
+        // within 15° of her course most of the leg, so leaving out the layline as well left one boat 595 samples and the
+        // rest none.) The angle measured from the wind on her own side, on past dead downwind.
         if (b.leg === 1 && b.twa > 120) {
-          const P = aimPoint(w, b), twaP = Math.abs(wrap(b.ww.from - Math.atan2(P.x - b.x, P.y - b.y) * 180 / Math.PI));
-          if (twaP < runAngle(12) - 10) continue;
+          const P = aimPoint(w, b), side = Math.sign(wrap(b.ww.from - b.h)) || 1, t = side * wrap(b.ww.from - Math.atan2(P.x - b.x, P.y - b.y) * 180 / Math.PI);
+          if ((t >= 0 ? t : 360 + t) < runAngle(12) - 15) continue;
           const r = run.get(b.id) ?? { s: 0, n: 0 }; r.s += b.twa; r.n++; run.set(b.id, r);
         }
       }
