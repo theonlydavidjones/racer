@@ -91,6 +91,13 @@ button{font:inherit;color:inherit}
 .v.off{opacity:.3} .v.off .well{cursor:default}
 .v.winch .cleat{background:#55656e}
 .v.winch .well{border-radius:4px}
+.pole{width:52px;display:flex;flex-direction:column;align-items:center;gap:2px;align-self:flex-end}
+.pole .n{height:20px;display:flex;align-items:flex-end;margin-bottom:3px}
+.pole svg{width:44px;height:44px;cursor:pointer;border-radius:6px;background:var(--well);box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.pole .pst{font:600 8.5px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);height:14px;display:flex;align-items:center}
+.pole.no{opacity:.35} .pole.no svg{cursor:default}
+.pole.mine .n{color:var(--accent);cursor:pointer}
+.pole.mine svg{box-shadow:inset 0 1px 2px rgba(0,0,0,.6),0 0 0 1.5px var(--accent)}
 .gapl{width:1px;align-self:stretch;margin:22px 4px 14px;background:var(--rule)}
 
 /* horizontal: the jib sheets and backstay ends, pulled outboard */
@@ -133,11 +140,13 @@ button{font:inherit;color:inherit}
       <circle cx="120" cy="100" r="4" fill="#5f7f90"/>
       <path id="jib" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
       <line id="boom" stroke="#2a3b47" stroke-width="4" stroke-linecap="round"/>
+      <line id="poleLine" stroke="#c9d2d6" stroke-width="2.5" stroke-linecap="round"/>
       <rect id="tcar" y="210" width="10" height="8" rx="2" fill="#c9d2d6"/>
     </svg>
   </div>
   <div class="mock">
     <div class="seg" id="tackSeg"><button data-t="S" aria-pressed="true">Stbd tack</button><button data-t="P" aria-pressed="false">Port tack</button></div>
+    <div class="seg" id="posSeg"><button data-p="beat" aria-pressed="true">Close-hauled</button><button data-p="run" aria-pressed="false">Run</button></div>
     <div class="seg" id="windSeg"><button data-w="6">6 kt</button><button data-w="12" aria-pressed="true">12 kt</button><button data-w="20">20 kt</button></div>
   </div>
   <button class="toggle" id="bandToggle">Sail controls<span class="k">4</span></button>
@@ -150,7 +159,7 @@ button{font:inherit;color:inherit}
 // values as in src/boat/controls.ts (0..1; sheets 0 = hard in; traveller −1 windward .. +1 leeward)
 const L = { vang:{v:.3,a:1}, outhaul:{v:.6,a:1}, jibCunningham:{v:.3,a:1}, cunningham:{v:.2,a:1}, downhaul:{v:.85,a:1}, jibHalyard:{v:.5,a:1},
   backstay:{v:.4,a:1}, mainsheet:{v:.1,a:1}, traveller:{v:0,a:1}, jibP:{v:1,a:1}, jibS:{v:.1,a:1} };
-let tack = 'S', wind = 12;
+let tack = 'S', wind = 12, pos = 'beat';
 const working = () => tack === 'S' ? 'jibP' : 'jibS';
 const SHEETS = new Set(['mainsheet','jibP','jibS']);
 
@@ -177,6 +186,8 @@ const chevH = dir => `<svg viewBox="0 0 7 10" style="width:7px;height:10px"><pat
 // rough stand-ins for the crew's close-hauled settings (the build uses controls.ts)
 function crew(k){
   const t = Math.min(1, Math.max(0, (wind - 6) / 14)), m = (a,b) => a + (b - a) * t;
+  if (pos === 'run') return ({ vang:m(.3,.6), outhaul:.3, jibCunningham:0, cunningham:0, downhaul:.85, jibHalyard:.5, backstay:.1,
+    mainsheet:.95, traveller:0, jibP: k === working() ? .75 : 1, jibS: k === working() ? .75 : 1 })[k];
   return ({ vang:m(.1,.65), outhaul:m(.3,.95), jibCunningham:m(.1,.75), cunningham:m(0,.75), downhaul:.85, jibHalyard:.5, backstay:m(.1,.85),
     mainsheet: wind === 12 ? .1 : .16, traveller: wind <= 6 ? -.4 : wind >= 20 ? .6 : 0,
     jibP: k === working() ? (wind <= 6 ? .16 : .1) : 1, jibS: k === working() ? (wind <= 6 ? .16 : .1) : 1 })[k];
@@ -197,6 +208,14 @@ const jcar = side => {
   return `<div class="jcar" data-jcar="${side}" title="${side === 'P' ? 'Port' : 'Starboard'} jib car: click a pin to move it. Forward is up, inboard toward the middle. Forward closes the jib's leech; aft opens it. Inboard points higher; outboard gives power. The crew moves the loaded (leeward) one at the next tack."><button class="n" type="button" data-ncar="${side}">Jib car</button><div class="grid"><span class="rail" style="left:6px;width:3px;top:5px;bottom:5px"></span><span class="rail" style="right:6px;width:3px;top:5px;bottom:5px"></span><span class="rail bar" style="left:6px;right:6px;height:3px"></span>${pins}</div><span class="tag"></span></div>`;
 };
 const lead = 9.25;
+// the whisker pole: down → setting → set → stowing → down; the crew sets it on a run (times are stand-ins)
+const POLE = { st:'down', t:0, a:1 };
+const poleOk = () => pos === 'run';
+function poleGo(want){
+  if (want && POLE.st === 'down' && poleOk()) { POLE.st = 'setting'; POLE.t = 3; }
+  else if (!want && POLE.st === 'set') { POLE.st = 'stowing'; POLE.t = 2; }
+}
+function poleToggle(){ if (POLE.st === 'down' && !poleOk()) return; POLE.a = 0; poleGo(POLE.st === 'down'); }
 const boomAngle = () => Math.min(85, Math.max(-2, 9.5 * L.traveller.v + 80 * Math.pow(L.mainsheet.v, 1.5)));
 const jibClew = () => Math.min(Math.min(68, carLead(leeCar().ins) + 70 * Math.pow(L[working()].v, 1.4)), -carLead(wwCar().ins) + 140 * Math.pow(L[tack === 'S' ? 'jibS' : 'jibP'].v, 1.4));
 
@@ -221,7 +240,7 @@ document.getElementById('band').innerHTML =
   `<button class="allcrew" type="button" id="allCrew" title="Hand every line back to the crew">All ↺</button>
   <div class="mid">
     <div class="piano">${jcar('P')}${vert('jibP','P','winch')}<span class="gapl"></span>${vert('downhaul','P','tackle')}${vert('jibCunningham','P')}${vert('cunningham','P','clam')}${vert('outhaul','P')}${vert('vang','P')}
-      <span class="gapl"></span>
+      <span class="gapl"></span><div class="pole" id="pole" title="Whisker pole: click it to set it out, click again to stow it. Only on a run (about 140° off the wind and deeper). It goes out to windward, opposite the boom, and holds the jib's clew out there (wing and wing). Setting it takes the crew a few seconds."><button class="n" type="button" data-npole>Pole</button><svg viewBox="0 0 44 44" id="poleSvg" role="button" aria-label="Whisker pole"></svg><span class="pst" id="pst"></span></div><span class="gapl"></span>
       ${vert('vang','S')}${vert('outhaul','S')}${vert('jibCunningham','S')}${vert('jibHalyard','S')}<span class="gapl"></span>${vert('jibS','S','winch')}${jcar('S')}</div>
   </div>
   <div class="thwart">${horiz('backstay','P')}
@@ -285,10 +304,13 @@ document.addEventListener('keydown', e => {
 document.addEventListener('click', e => {
   const n = e.target.closest('button[data-n]'); if (n) L[n.dataset.n].a = 1;
   const t = e.target.closest('#tackSeg button'); if (t) { const x = carX(); tack = t.dataset.t; if (!L.traveller.a) setCar(x); seg('tackSeg','t',tack); }
+  const ps = e.target.closest('#posSeg button'); if (ps) { pos = ps.dataset.p; seg('posSeg','p',pos); }
+  const pl = e.target.closest('#poleSvg'); if (pl) poleToggle();
+  const np = e.target.closest('[data-npole]'); if (np) POLE.a = 1;
   const wd = e.target.closest('#windSeg button'); if (wd) { wind = +wd.dataset.w; seg('windSeg','w',String(wind)); }
 });
 const seg = (id, a, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[a] === v)));
-document.getElementById('allCrew').onclick = () => { for (const k in L) L[k].a = 1; CAR.P.a = CAR.S.a = 1; };
+document.getElementById('allCrew').onclick = () => { for (const k in L) L[k].a = 1; CAR.P.a = CAR.S.a = 1; POLE.a = 1; };
 document.addEventListener('click', e => {
   const pin = e.target.closest('.pin'); if (pin) { const c = CAR[pin.dataset.car]; c.fore = +pin.dataset.fore; c.ins = +pin.dataset.ins; c.a = 0; }
   const nc = e.target.closest('[data-ncar]'); if (nc) CAR[nc.dataset.ncar].a = 1;
@@ -333,12 +355,26 @@ function draw(){
   const s = tack === 'S' ? -1 : 1, b = boomAngle() * Math.PI / 180, c = jibClew() * Math.PI / 180;
   const bm = $('boom'); bm.setAttribute('x1',120); bm.setAttribute('y1',100);
   bm.setAttribute('x2',(120 + s * Math.sin(b) * 112).toFixed(1)); bm.setAttribute('y2',(100 + Math.cos(b) * 112).toFixed(1));
-  const cx = 120 + s * Math.sin(c) * 64, cy = 30 + Math.cos(c) * 64;
+  let cx = 120 + s * Math.sin(c) * 64, cy = 30 + Math.cos(c) * 64;
+  const pf = POLE.st === 'set' ? 1 : POLE.st === 'setting' ? 1 - POLE.t / 3 : POLE.st === 'stowing' ? POLE.t / 2 : 0, pl = $('poleLine');
+  if (pf > 0) { const px = 120 - s * 58 * pf; pl.setAttribute('x1',120); pl.setAttribute('y1',100); pl.setAttribute('x2',px.toFixed(1)); pl.setAttribute('y2',96); pl.style.display = '';
+    if (POLE.st === 'set') { cx = px; cy = 96; } } else pl.style.display = 'none';
   $('jib').setAttribute('d', `M120 30 Q ${((120 + cx) / 2 + s * 6 * Math.cos(c)).toFixed(1)} ${((30 + cy) / 2).toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)}`);
   $('tcar').setAttribute('x', (120 + x * 22 - 5).toFixed(1));
   const wx = tack === 'S' ? 1 : -1;
-  $('windArrow').innerHTML = `<line x1="${120 + wx * 98}" y1="4" x2="${120 + wx * 42}" y2="70" stroke="#e9f2f5" stroke-width="2" marker-end="url(#ah)"/>
+  const [y1, y2] = pos === 'run' ? [296, 236] : [4, 70];   // a run: the wind from over the windward quarter
+  $('windArrow').innerHTML = `<line x1="${120 + wx * 98}" y1="${y1}" x2="${120 + wx * 42}" y2="${y2}" stroke="#e9f2f5" stroke-width="2" marker-end="url(#ah)"/>
     <text x="${120 + wx * 76}" y="8" fill="#e9f2f5" font-size="11" font-family="Saira Semi Condensed, sans-serif" text-anchor="${wx > 0 ? 'end' : 'start'}">${wind} kt</text>`;
+}
+function drawPole(){
+  const el = $('pole'), ww = tack === 'S' ? 1 : -1;   // to windward: right on starboard tack, as seen from the helm
+  const f = POLE.st === 'set' ? 1 : POLE.st === 'setting' ? 1 - POLE.t / 3 : POLE.st === 'stowing' ? POLE.t / 2 : 0;
+  el.classList.toggle('no', POLE.st === 'down' && !poleOk());
+  el.classList.toggle('mine', !POLE.a);
+  // stowed: lying fore and aft on the deck; out: square to the boat from the mast, to windward
+  const ex = 22 + ww * 17 * f, ey = 10 + 28 * (1 - f);
+  $('poleSvg').innerHTML = `<circle cx="22" cy="10" r="3.5" fill="#94abb7"/><line x1="22" y1="10" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#c9d2d6" stroke-width="3" stroke-linecap="round"/>${f === 1 ? `<circle cx="${ex}" cy="${ey}" r="3" fill="none" stroke="#ff8a3d" stroke-width="1.5"/>` : ''}`;
+  $('pst').textContent = { down: poleOk() ? 'Stowed' : 'Run only', setting: 'Setting…', set: 'Out ' + (ww > 0 ? 'S' : 'P'), stowing: 'Stowing…' }[POLE.st];
 }
 function frame(now){
   const dt = Math.min(.05, (now - (frame.t || now)) / 1000); frame.t = now;
@@ -352,6 +388,10 @@ function frame(now){
   }
   for (const k in L) if (L[k].a) L[k].v += (crew(k) - L[k].v) * Math.min(1, dt * 1.5);
   for (const sd of ['P','S']) if (CAR[sd].a) Object.assign(CAR[sd], carCrew());
+  if (POLE.t > 0) { POLE.t -= dt; if (POLE.t <= 0) { POLE.t = 0; POLE.st = POLE.st === 'setting' ? 'set' : 'down'; } }
+  if (POLE.a) poleGo(poleOk());
+  if (!poleOk() && POLE.st === 'set') poleGo(false);   // off a run it comes in: a poled jib on a reach is aback
+  drawPole();
   document.querySelectorAll('.jcar').forEach(el => {
     const sd = el.dataset.jcar, c = CAR[sd], cc = carCrew();
     el.classList.toggle('mine', !c.a);
