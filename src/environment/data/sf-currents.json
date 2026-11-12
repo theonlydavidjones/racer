@@ -1,6 +1,6 @@
 {
  "source": "NOAA CO-OPS current predictions (api.tidesandcurrents.noaa.gov): harmonic constituents along the major axis, near-surface bins, knots; subordinate offsets.",
- "fetched": "2026-11-11",
+ "fetched": "2026-11-12",
  "units": "knots, degrees true (direction the water flows toward), phases GMT",
  "stations": [
   {
@@ -1567,8 +1567,8 @@
    "lon": -122.44197,
    "bin": 9,
    "depthM": 5.7,
-   "flood": null,
-   "ebb": null,
+   "flood": 57,
+   "ebb": 237,
    "z0": -0.093,
    "hc": [
     [
@@ -2388,7 +2388,7 @@
    "bin": 1,
    "depthM": 1.4,
    "flood": 157,
-   "ebb": null,
+   "ebb": 327,
    "z0": 0.055,
    "hc": [
     [

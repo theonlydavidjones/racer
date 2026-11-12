@@ -79,7 +79,10 @@ for (const s of HARMONIC) {
   stations.push({
     // (a reference outside the world, San Mateo Bridge's, is only a reference too: its stream is a different water's)
     id: key(s), ...(key(s) !== s.id || !inWorld(m) ? { refOnly: true } : {}), kind: 'harmonic', name: m.name, note: s.note, lat: round(m.lat, 5), lon: round(m.lng, 5), bin: s.bin, depthM: round(hc[0].binDepth * 0.3048, 1),
-    flood: cp[0].meanFloodDir, ebb: cp[0].meanEbbDir,
+    // (NOAA leaves a few stations' mean flood or ebb direction out of their predictions, Raccoon Strait's SFB1212 both:
+    // there, the major axis's azimuth from its constants, which is within 2–10° of the published flood direction where
+    // both are given, and the ebb opposite it)
+    flood: cp[0].meanFloodDir ?? Math.round(hc[0].azi), ebb: cp[0].meanEbbDir ?? Math.round((hc[0].azi + 180) % 360),
     z0: round(hc[0].majorMeanSpeed),
     hc: hc.map(c => [c.constituentName, round(c.majorAmplitude, 4), round(c.majorPhaseGMT, 2)])
   });
