@@ -112,10 +112,17 @@ export const driveFrom = (rvt: number, v: number, _vt: number, k?: DriveCurve): 
 export function speedForDrive(vt: number, K: number, k?: DriveCurve): number {
   if (vt <= 0 || K <= 0) return 0;
   if (Math.abs(K - 1) < 1e-9) return vt;
-  const rvt = hullResistance(vt);
-  let lo = 0, hi = vt * (K > 1 ? 1.4 : 1);
-  for (let i = 0; i < 20; i++) { const v = (lo + hi) / 2; if (K * driveFrom(rvt, v, vt, k) > hullResistance(v)) lo = v; else hi = v; } // (to 1 ppm of vt)
-  return (lo + hi) / 2;
+  const rvt = hullResistance(vt), f = (v: number) => K * driveFrom(rvt, v, vt, k) - hullResistance(v);
+  // (the one crossing, bracketed between rest and 1.4·vt, found by false position with the Illinois step: to 1 ppm of
+  // vt in 6–10 looks where bisection took 20; it runs every step for every boat)
+  let a = 0, fa = f(0), c = vt * (K > 1 ? 1.4 : 1), fc = f(c), side = 0;
+  if (fc >= 0) return c;
+  for (let i = 0; i < 40; i++) {
+    const m = (a * fc - c * fa) / (fc - fa), fm = f(m);
+    if (Math.abs(c - a) < 1e-6 * vt || Math.abs(fm) < 1e-7 * rvt) return m;
+    if (fm > 0) { a = m; fa = fm; if (side === 1) fc /= 2; side = 1; } else { c = m; fc = fm; if (side === -1) fa /= 2; side = -1; }
+  }
+  return (a + c) / 2;
 }
 /** speedForDrive as a ratio of speeds: what K × the drive is worth at vt (1 at K = 1). */
 export const driveSpeedRatio = (vt: number, K: number, k?: DriveCurve): number => vt > 0.05 ? speedForDrive(vt, K, k) / vt : Math.sqrt(Math.max(0, K));

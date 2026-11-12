@@ -461,9 +461,9 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    debrief all count it the same way). RIG.fullDepth: kept. ORC's own text (VPP Documentation 2022, §5 and after eq.
    5.48) makes flat = 1 the maximum lift, and its maximum lift the sail at its fullest ("the inability to increase sail
    camber in light airs" is why a simple rig has less), so full power at the light-air depth is ORC's reading, not an
-   error; no sourced camber figure for a Folkboat (or ORC's flat against camber) was found. Still open from the same
-   reading: ORC's least flat is 0.62 of full lift ("observed in wind tunnel tests"), where the sim's flatOf goes down to
-   0.42 (the fully depowered main, 8% against 14.5%, is 0.55).
+   error (the depth itself, 0.145/0.141, is still unsourced: no camber figure for a Folkboat, or ORC's flat against
+   camber, was found). ORC's least flat is 0.42 since 2023 (VPP Documentation 2023, §5: "reduced to 0.42 from 0.62"),
+   as the sim's flatOf has it.
 10. **In irons** (hull 3): at rest she turns 4°/s the way the tiller points and sails off; a real boat gathers sternway
    and the rudder works backwards. Turning at rest is sculling, legal only toward close-hauled from above it (RRS
    42.3(d)). And no yaw inertia (hull 7): a full turn starts and stops in a step (about 0.6 s at 4.7 kt from her own

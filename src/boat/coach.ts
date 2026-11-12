@@ -260,7 +260,7 @@ function helmLessons(b: Boat, s: Situation, lineFixes: number): Lesson[] {
     out.push({ id: 'steer:feather', who: 'helm', head: 'Feather in the puffs: head up a touch as each one hits.',
       why: 'Every depowering line is on. What\'s left is to sail a little higher in the gusts, letting the main lift, so she stays on her feet.',
       look: `the heel (${deg(heel)}) and the tiller pulling (${deg(hn)} of weather helm): feather until both ease`, done: 'she\'s on her feet',
-      gain: Math.max(1 - heelFactor(heel), 0.5 * rudderDrag(Math.min(12, hn), v) / Math.max(1, hullResistance(v))), kind: 'fix' });
+      gain: Math.max(1 - heelFactor(heel), 1 - driveSpeed(b, Math.max(0, 1 - rudderDrag(Math.min(12, hn), v) / Math.max(1, hullResistance(v))))), kind: 'fix' });
   }
   return out;
 }

@@ -106,11 +106,15 @@ export const bestTrim = (v: number, sea = 0) => best(v, sea).t;
  * allows, at the mast, gains nothing beyond the polar, which is the boat sailed well).
  */
 export function trimSpeedFactor(vt: number, t: number, sea = 0): number {
+  return 1 / trimResistance(vt, t, sea) ** (1 / Math.max(1.5, best(Math.max(0.5, vt), sea).n));
+}
+/** The same as a multiplier on the hull's resistance (1 at the best trim): what the boat itself uses (physics.ts, as a
+ * share of the drive, 1/r, through the resistance and the drive curve together: dynamics.ts speedForDrive). */
+export function trimResistance(vt: number, t: number, sea = 0): number {
   const v = Math.max(0.5, vt), bt = best(v, sea);
-  const d = bt.fF * TRIM.wsK * t + bt.wR * t - bt.d; // (trimDrag, at the cached speed)
   // (and a trim the cockpit can't reach, the crew right up on the foredeck in light air, pays its little: the owner's
   // crews go there because it's fast, and the polar is a crew sailing from the cockpit)
-  return 1 / (1 + d) ** (1 / Math.max(1.5, bt.n));
+  return 1 + bt.fF * TRIM.wsK * t + bt.wR * t - bt.d; // (trimDrag, at the cached speed)
 }
 /** How far forward (m) the centre of lateral resistance moves with trim t (m, + bow down). */
 export const clrShift = (t: number) => (t / TRIM.lwl) * TRIM.keelL ** 2 / (12 * TRIM.keelT);
@@ -145,6 +149,9 @@ export function heelWetted(heelDeg: number): number {
  * the change in skin friction (the canoe body's share of it) against a resistance R ∝ vⁿ.
  */
 export function heelWettedFactor(vt: number, heelDeg: number, refHeel: number): number {
-  const bt = best(Math.max(0.5, vt));
-  return 1 / (1 + bt.fF * CANOE_SHARE * (heelWetted(heelDeg) - heelWetted(refHeel))) ** (1 / Math.max(1.5, bt.n));
+  return 1 / heelWettedResistance(vt, heelDeg, refHeel) ** (1 / Math.max(1.5, best(Math.max(0.5, vt)).n));
+}
+/** The same as a multiplier on the hull's resistance (as trimResistance). */
+export function heelWettedResistance(vt: number, heelDeg: number, refHeel: number): number {
+  return 1 + best(Math.max(0.5, vt)).fF * CANOE_SHARE * (heelWetted(heelDeg) - heelWetted(refHeel));
 }
