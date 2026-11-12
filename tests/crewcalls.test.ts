@@ -15,23 +15,23 @@ const crewOf = (attr: Partial<Record<Attr, number>>): CrewSpec => ({ helm: { ...
 
 /** A boat beating on starboard in 12 kt from the north, and one puff (or lull: amp < 0) `ahead` m upwind of her and
  * `across` m to the west, in her path as she beats north-west. */
-function scene(spec: CrewSpec, amp = 0.25, ahead = 260, across = -70, W = 12, look = true) {
+function scene(spec: CrewSpec, amp = 0.25, ahead = 260, across = -70, W = 12, look = true, r = 90) {
   const b = testBoat({ heading: 315, kt: 5, windFrom: 0, windKt: W }); b.crew = newCrew(spec, 'S');
   const puffs = new Puffs(makeRng(1), { x: b.x, y: b.y }, 3000, 0);
-  puffs.cells.push({ x: b.x + across, y: b.y + ahead, r: 90, amp, age: 100, life: 400 });
+  puffs.cells.push({ x: b.x + across, y: b.y + ahead, r, amp, age: 100, life: 400 });
   const wind = { from: 0, kt: W };
   let t = 0;
-  const log: { t: number; calls: NonNullable<typeof b.calls>; k: number; boom: number; heel: number }[] = [];
+  const log: { t: number; calls: NonNullable<typeof b.calls>; k: number; boom: number; heel: number }[] = [], fine: { t: number; boom: number; ease: number }[] = [];
   // (the puff's wind on her, as the World gives it: windHere's puff factor and veer on the mean)
   const run = (secs: number) => {
     for (let s = 0; s < secs; s++) {
       puffs.step(1, wind);
-      sail(b, 1, () => { b.h = 315; const q = puffs.at(b); b.ww = { from: wind.from + q.veer, kt: wind.kt * q.k }; });
+      sail(b, 1, tt => { b.h = 315; const q = puffs.at(b); b.ww = { from: wind.from + q.veer, kt: wind.kt * q.k }; fine.push({ t: t + tt, boom: b.sheets.main, ease: b.puffEase ?? 0 }); });
       t++; if (look) crewLook(b, puffs, t);
       log.push({ t, calls: [...(b.calls ?? [])], k: puffs.at(b).k, boom: b.sheets.main, heel: b.heelMag ?? 0 });
     }
   };
-  return { b, puffs, run, log };
+  return { b, puffs, run, log, fine };
 }
 
 describe('the crew\'s eyes and their calls', () => {
@@ -53,8 +53,9 @@ describe('the crew\'s eyes and their calls', () => {
     // when the count reaches zero she's in it (within a couple of seconds)
     const zero = near.find(e => e.calls.some(c => !c.far && c.in < 0.5))!;
     expect(zero).toBeTruthy();
-    const inIt = s.log.find(e => e.k > 1.05)!;
-    expect(Math.abs(inIt.t - (near[0].t + first.in))).toBeLessThan(3);
+    // ("puff on!": she's at its half-strength edge)
+    const inIt = s.log.find(e => e.k - 1 > (first.strength - 1) / 2 * 0.9)!;
+    expect(Math.abs(inIt.t - (near[0].t + first.in))).toBeLessThan(2.5);
   });
   it('far off, a "wind over there" call first, for the strategy; then the countdown', () => {
     const s = scene(crewOf({ eyes: 0.9 }), 0.28, 420, -110);
@@ -85,17 +86,23 @@ describe('the crew\'s eyes and their calls', () => {
 });
 
 describe('the crew\'s answer to a puff (phase C2)', () => {
-  it('on the call, the main is eased as the puff hits, not after: ahead of a crew that didn\'t see it', () => {
-    const saw = scene(crewOf({ eyes: 0.9 })), blind = scene(crewOf({ eyes: 0.9 }), 0.25, 260, -70, 12, false);
+  it('on the call, the main eases as the puff fills, not after: ahead of a crew that didn\'t see it, and never in and out again', () => {
+    // (a sharp puff, filling in a few seconds, and a slow trimmer: looking a lag ahead matters when it comes on fast;
+    // in a slow one the change in a lag is inside their band)
+    const saw = scene(crewOf({ eyes: 0.9, react: 0.1 }), 0.3, 200, -50, 12, true, 35), blind = scene(crewOf({ eyes: 0.9, react: 0.1 }), 0.3, 200, -50, 12, false, 35);
     saw.run(70); blind.run(70);
-    const hit = saw.log.findIndex(e => e.k > 1.05);
-    expect(hit).toBeGreaterThan(5);
-    // (in the second it reaches her, the main that was called is already out further)
-    expect(saw.log[hit].boom).toBeGreaterThan(blind.log[hit].boom + 0.5);
+    const base = saw.log[10].boom, out = (s: typeof saw) => s.fine.find(e => e.t > 12 && e.boom > base + 1.5)?.t ?? Infinity;
+    expect(out(saw)).toBeLessThan(out(blind) - 0.3); // (eased sooner, by about the trimmer's lag)
+    // (as it fills, the boom only goes out: no ease, trim, ease)
+    const peak = saw.log.reduce((m, e, i) => (e.k > saw.log[m].k ? i : m), 0), from = saw.log.findIndex(e => e.k > 1.02);
+    for (let i = from + 1; i <= peak; i++) expect(saw.log[i].boom).toBeGreaterThan(saw.log[i - 1].boom - 0.4);
   });
-  it('in a gust in a breeze a good main trimmer eases to hold her down; a novice lets her heel more', () => {
-    const peak = (trim: number) => { const s = scene(crewOf({ trim, eyes: 0.6 }), 0.3, 260, -70, 17, false); s.run(80); return Math.max(...s.log.map(e => e.heel)); };
-    expect(peak(0.95)).toBeLessThan(peak(0.15) - 0.5);
+  it('in a gust in a breeze the main trimmer eases to hold her down: a good one sooner and more than a novice', () => {
+    const run = (trim: number) => { const s = scene(crewOf({ trim, eyes: 0.6 }), 0.3, 260, -70, 17, false); s.run(80); return s; };
+    const good = run(0.95), novice = run(0.15), most = (s: ReturnType<typeof run>) => Math.max(...s.fine.map(e => e.ease));
+    expect(most(good)).toBeGreaterThan(1.5);
+    expect(most(good)).toBeGreaterThan(most(novice) + 0.5);
+    expect(Math.max(...good.log.map(e => e.heel))).toBeLessThan(Math.max(...novice.log.map(e => e.heel)));
   });
   it('in a gusty breeze the main is eased once and trimmed back once a gust: it doesn\'t hunt (Deep Physics\' check)', () => {
     for (const [W, A, P] of [[18, 3, 40], [19, 4, 30], [20, 3, 60]]) {

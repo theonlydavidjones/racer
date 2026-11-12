@@ -46,6 +46,19 @@ export interface PuffCall {
   far: boolean;
   /** Which puff (stable while it lasts). */
   id: number;
+  /** Her track through it as the lookout judges it (puffAlong: the puff's strength on her any time after the call):
+   * where she is and how she moves in its own frame (scaled by its half-length and half-width, as Puffs.weight), and
+   * its strength then (amplitude × gustiness × its fade in or out at the time she's in it). */
+  track: { pa: number; pb: number; va: number; vb: number; a: number };
+}
+
+/**
+ * The puff's wind on her `t` s after the call, along the track the lookout judged (its factor on the wind, and its
+ * veer, deg): as Puffs.at gives it for this one puff. The crew trim and hike to how it'll change, not to its peak.
+ */
+export function puffAlong(c: PuffCall, t: number): { k: number; veer: number } {
+  const { pa, pb, va, vb, a } = c.track, x = pa + va * t, y = pb + vb * t, w = (1 - Math.min(1, x * x + y * y)) ** 2, q = a * w;
+  return { k: 1 + q, veer: clamp(q > 0 ? q * 30 : q * 12, -6, 12) };
 }
 
 /** A typical puff seen by a club crew, m: the owner's "a good 50 yards out". */
@@ -54,8 +67,9 @@ export const SPOT_RANGE = 46;
 export const CALL_WINDOW = 10;
 /** How much further off they see the pressure for a far call (an estimate: across the course, a few hundred metres). */
 const FAR = 4;
-/** The scaled ellipse (Puffs.weight's d² = 0.5) a sailor would call the puff's edge: about where it's half strength. */
-const EDGE2 = 0.5;
+/** The scaled ellipse a sailor would call the puff's edge, where it's half strength: Puffs.weight's (1 − d²)² = ½ at
+ * d² ≈ 0.29 ("puff on!"). */
+const EDGE2 = 1 - Math.SQRT1_2;
 /** The streak's shape (environment/wind.ts PUFF_LONG, PUFF_WIDE). */
 const LONG = 1.5, WIDE = 0.75;
 
@@ -91,14 +105,15 @@ const idOf = (c: Puff) => (Math.round(c.r * 1000) * 73856093) ^ (Math.round(c.li
 export function crewLook(b: Boat, puffs: Puffs, clock: number): void {
   const ppl = b.crew ? (b.crew.ppl ??= allAboard(b.crew.spec)) : null;
   const n = ppl ? ppl.length : 1;
-  const vb = b.v, hb = b.h * D2R, bx = Math.sin(hb) * vb, by = Math.cos(hb) * vb, side = b.tack === 'S' ? 1 : -1;
+  // (her way over the ground, current and leeway included: the puffs drift over the ground)
+  const bx = b.vx ?? Math.sin(b.h * D2R) * b.v, by = b.vy ?? Math.cos(b.h * D2R) * b.v, side = b.tack === 'S' ? 1 : -1;
   const seen = b.seenPuffs ??= new Map<number, { t0: number; who: number }>();
   const eyes = ppl ? ppl.map(p => attrOf(p, 'eyes')) : [0.6];
-  const ranges = eyes.map(spotRange), maxR = Math.max(...ranges) * FAR;
+  const ranges = eyes.map(spotRange), maxR = Math.max(...ranges) * FAR * 1.3;
   const calls: PuffCall[] = [], live = new Set<number>();
   for (const c of puffs.cells) {
-    const env = Math.sin(Math.PI * c.age / c.life), a = c.amp * puffs.gustiness * env;
-    if (Math.abs(a) < 0.03) continue; // (nothing to see yet, or any more)
+    const env = Math.sin(Math.PI * c.age / c.life), aSeen = c.amp * puffs.gustiness * env;
+    if (Math.abs(aSeen) < 0.03) continue; // (nothing to see yet, or any more)
     const dx = b.x - c.x, dy = b.y - c.y, d = Math.hypot(dx, dy);
     const A = c.r * LONG, B = c.r * WIDE;
     if (d - A > maxR) continue;
@@ -115,16 +130,19 @@ export function crewLook(b: Boat, puffs: Puffs, clock: number): void {
       tIn = (-pv - Math.sqrt(disc)) / vv; tOut = (-pv + Math.sqrt(disc)) / vv;
       if (tIn < 0) continue; // (gone by)
     }
-    // how deep she'll go into it: its strength where her track passes nearest its middle
+    // how deep she'll go into it (its strength where her track passes nearest its middle), as strong as it'll be then
+    // (fading in or out over its life)
     const tMid = vv > 1e-9 ? clamp(-pv / vv, tIn, tOut) : tIn, ma = pa + va * tMid, mb = pb + vbb * tMid, depth = (1 - Math.min(1, ma * ma + mb * mb)) ** 2;
+    const a = c.amp * puffs.gustiness * Math.max(0, Math.sin(Math.PI * Math.min(1, (c.age + tMid) / c.life)));
     const strength = 1 + a * depth;
-    const veer = a > 0 ? a * depth * 30 : a * depth * 12; // (as Puffs.at: a full puff veers ~9°, a deep lull backs ~3°)
-    const edge = Math.max(0, d - Math.sqrt(EDGE2) * (A + B) / 2);
+    const veer = clamp(a > 0 ? a * depth * 30 : a * depth * 12, -6, 12); // (as Puffs.at: a full puff veers ~9°, a deep lull backs ~3°)
+    // (how far off its edge is: along the way she and it close, m)
+    const edge = tIn * Math.hypot(rvx, rvy);
     const brg = (Math.atan2(c.x - b.x, c.y - b.y) / D2R + 360) % 360, rel = wrap(brg - b.h);
     const id = idOf(c);
     // who sees it: within their range for a puff this strong (weak ones closer; lulls, pale water, a little closer
     // still), not hidden by the sails, and not one they miss
-    const vis = clamp(Math.abs(a) / 0.15, 0.3, 1.3) * (a < 0 ? 0.8 : 1);
+    const vis = clamp(Math.abs(aSeen) / 0.15, 0.3, 1.3) * (aSeen < 0 ? 0.8 : 1);
     let who = -1;
     for (let i = 0; i < n; i++) {
       const far = tIn > CALL_WINDOW, R = ranges[i] * vis * (far ? FAR : 1);
@@ -141,7 +159,7 @@ export function crewLook(b: Boat, puffs: Puffs, clock: number): void {
     const caller = ppl ? ppl[s.who] : null;
     if (clock - s.t0 < (caller ? reactTime(caller) : 0.9)) continue;
     const off = 1 + (1 - eyes[s.who]) * 0.3 * (2 * draw(id, s.who, 2) - 1);
-    calls.push({ kind: a > 0 ? 'puff' : 'lull', in: tIn * off, lasts: tOut - tIn, strength, veer, lift: side * veer, bearing: brg, dist: edge, who: s.who, far: tIn > CALL_WINDOW, id });
+    calls.push({ kind: a > 0 ? 'puff' : 'lull', in: tIn * off, lasts: tOut - tIn, strength, veer, lift: side * veer, bearing: brg, dist: edge, who: s.who, far: tIn > CALL_WINDOW, id, track: { pa, pb, va: va / off, vb: vbb / off, a } });
   }
   for (const id of seen.keys()) if (!live.has(id)) seen.delete(id);
   calls.sort((p, q) => p.in - q.in);

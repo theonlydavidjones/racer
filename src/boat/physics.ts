@@ -11,7 +11,7 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, attrOf, reactTime, Z, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import type { PuffCall } from './crewEyes';
+import { puffAlong } from './crewEyes';
 import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
@@ -798,7 +798,7 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
 /** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step: up to about 7°). */
 export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? 7 * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
 /** The boom angle the crew is aiming for. */
-export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaMain ?? b.awaSlow) + crewEaseBoom(b);
+export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaMain ?? b.awaSlow) + crewEaseBoom(b) + (b.puffEase ?? 0);
 
 /** Taking in a slack sheet by hand, full range per second (an arm's length of line a second, no load on it). */
 const SLACK_RATE = 0.6;
@@ -868,44 +868,50 @@ function trimmerLag(b: Boat, line: 'mainsheet' | 'jibsheet'): number {
   return p ? CREW_LAG * (reactTime(p) / CLUB_REACT) : CREW_LAG;
 }
 /**
- * The apparent wind angle a trimmer trims to ahead of a called puff or lull (b.calls, crewEyes.ts): once it's about
- * their own lag away (and a moment to move the sheet), the wind they'll have in it, from its called strength and turn
- * on her present speed: a puff draws the apparent wind aft (and a lift frees her), so they ease as it hits, not after;
- * a lull the other way. Only an imminent call, and only on the wind and reaching; null when there's none.
+ * The puff's change to her wind from now to `ahead` s on, along the track her crew judged (crewEyes.ts puffAlong): its
+ * factor on the wind she has (relative to what that puff already gives her) and the turn it adds (deg, + veered).
+ * Null if nothing called is changing her wind then.
  */
-function calledAwa(b: Boat, awa: number, lag: number): number | null {
-  const cs = b.calls; if (!cs || !cs.length || Math.abs(awa) > 120) return null;
+function calledChange(b: Boat, ahead: number, puffsOnly = false): { k: number; veer: number } | null {
+  const cs = b.calls; if (!cs || !cs.length || Math.abs(b.twa) > 120) return null;
   const age = b.callsAge ?? 0;
   for (const c of cs) {
-    if (c.far) continue;
-    const inNow = c.in - age;
-    if (inNow <= 0 || inNow > lag + 0.5) continue;
-    return Math.sign(awa || 1) * inPuff(b, c).awa;
+    if (c.far || (puffsOnly && c.kind !== 'puff')) continue;
+    if (c.in - age + c.lasts < -2) continue; // (gone by)
+    const now = puffAlong(c, age), then = puffAlong(c, age + ahead), k = then.k / now.k;
+    if (Math.abs(k - 1) > 0.01) return { k, veer: then.veer - now.veer };
   }
   return null;
 }
 /**
- * The apparent wind she'll have in a called puff or lull, on her present heading and speed: its true wind (the called
- * strength, turned by its lift) and her own way through the water, as vectors (deg, and the apparent wind's square
- * against now's). Leeway and current left out: the crew judge it from the water and the boat.
+ * The apparent wind she'll have with that change (deg, and the apparent wind's square against now's): the same
+ * triangle worked twice, with and without it, and the difference put on her apparent wind angle as she has it (her
+ * sails' own: the gradient, the heel and leeway included), so the call moves the trim by what the puff changes, no more
+ * (the physics review). On her heading and her speed now; the veer as a lift or a header by her tack now.
  */
-function inPuff(b: Boat, c: PuffCall): { awa: number; aws2: number } {
-  const tws = b.ww.kt * KT, v = b.v, twa0 = Math.abs(b.twa) * D2R, twa = clamp(Math.abs(b.twa) + c.lift, 0, 180) * D2R;
-  const ax = tws * c.strength * Math.sin(twa), ay = tws * c.strength * Math.cos(twa) + v;
-  const ax0 = tws * Math.sin(twa0), ay0 = tws * Math.cos(twa0) + v;
-  return { awa: Math.atan2(ax, ay) / D2R, aws2: (ax * ax + ay * ay) / Math.max(1e-6, ax0 * ax0 + ay0 * ay0) };
+function withChange(b: Boat, awa: number, ch: { k: number; veer: number }): { awa: number; aws2: number } {
+  const tws = b.ww.kt * KT, v = b.v, twa0 = Math.abs(b.twa) * D2R, twa = clamp(Math.abs(b.twa) + (b.tack === 'S' ? 1 : -1) * ch.veer, 0, 180) * D2R;
+  const ax = tws * ch.k * Math.sin(twa), ay = tws * ch.k * Math.cos(twa) + v, ax0 = tws * Math.sin(twa0), ay0 = tws * Math.cos(twa0) + v;
+  const d = (Math.atan2(ax, ay) - Math.atan2(ax0, ay0)) / D2R;
+  return { awa: Math.sign(awa || 1) * clamp(Math.abs(awa) + d, 0, 180), aws2: (ax * ax + ay * ay) / Math.max(1e-6, ax0 * ax0 + ay0 * ay0) };
 }
 /**
- * How much more the sails will push in a puff called to hit in the next two seconds (1: none called, or a lull): as the
- * apparent wind's square (Deep Physics' review: her own speed adds to it unchanged, so a 1.2× puff close-hauled in 12 kt
- * at 5 kt is about 1.32×, not 1.44×). The apparent wind's swing aft in the puff also changes the sails' force
- * coefficients a little: second order, left out.
+ * The apparent wind angle a trimmer trims to on a call: the wind she'll have one lag ahead (theirs), so the sheet is
+ * where the puff wants it as the puff gets there, and follows it in and out (ease as it fills, trim as it passes), not
+ * after (a lull the other way). Null with nothing called.
+ */
+function calledAwa(b: Boat, awa: number, lag: number): number | null {
+  const ch = calledChange(b, lag);
+  return ch ? withChange(b, awa, ch).awa : null;
+}
+/**
+ * How much more the sails will push in the next second and a half of a called puff (1: none, or a lull), the hikers'
+ * lead: as the apparent wind's square (her own speed adds to it unchanged: Deep Physics' review). The apparent wind's
+ * swing aft changes the sails' force coefficients too: second order, left out.
  */
 function calledPuffForce(b: Boat): number {
-  const cs = b.calls; if (!cs || !cs.length || Math.abs(b.twa) > 120) return 1;
-  const age = b.callsAge ?? 0;
-  for (const c of cs) { const t = c.in - age; if (!c.far && c.kind === 'puff' && t > 0 && t < 2) return inPuff(b, c).aws2; }
-  return 1;
+  const ch = calledChange(b, 1.5, true);
+  return ch && ch.k > 1 ? withChange(b, b.awa, ch).aws2 : 1;
 }
 /**
  * The main played in a puff: as a gust comes on (the wind on the water above its own last 20 s, b.twsSlow) and would
@@ -924,7 +930,10 @@ function puffEase(b: Boat, dt: number): number {
   b.heelSlow = b.heelSlow == null ? h : b.heelSlow + (h - b.heelSlow) * Math.min(1, dt / 20);
   const p = trimmerOf(b, 'mainsheet');
   if (!p || byHand(b, 'mainsheet') || Math.abs(b.awaSlow) > 70 || b.twsSlow == null) { b.puffEase = 0; return 0; }
-  const r = b.ww.kt / Math.max(1, b.twsSlow), trim = attrOf(p, 'trim');
+  // (the wind over the last few seconds against the last 20: a puff, minute-scale, not the turbulence's second-scale
+  // eddies, which a trimmer doesn't chase)
+  b.twsFast = b.twsFast == null ? b.ww.kt : b.twsFast + (b.ww.kt - b.twsFast) * Math.min(1, dt / 3);
+  const r = b.twsFast / Math.max(1, b.twsSlow), trim = attrOf(p, 'trim');
   if (r <= 1) { b.puffEase = (b.puffEase ?? 0) * (1 - Math.min(1, dt / trimmerLag(b, 'mainsheet'))); return b.puffEase; }
   const heelIn = Math.max(0, b.heelSlow) * r * r;
   const want = clamp(1.5 * (heelIn - crewBestHeel(Math.abs(b.twa), b.ww.kt, trim) - (1.5 + 3 * (1 - trim))), 0, 10);
@@ -1060,7 +1069,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.trim.jib = plan === 'jib' ? sailTrim('jib', awa, b.sheets.jib) : null; // poled out or down: the sheet isn't in play
   // the sheets against where they should be: the main against the crew's intended boom (eased down the traveller on the
   // last depowering steps on purpose: that's counted with the sails' power, powerFactor), the jib against its best
-  b.trimDriveK = trimDrive(sailTrim('main', awa, clamp(b.sheets.main - easeBoom, SAILS.main.min, SAILS.main.max)), b.trim.jib);
+  // (the depowering's ease is priced in its own search, powerFactor; a puff's ease costs its drive here, as the sail has it)
+  b.trimDriveK = trimDrive(sailTrim('main', awa, clamp(b.sheets.main - crewEaseBoom(b), SAILS.main.min, SAILS.main.max)), b.trim.jib);
   // shape
   const ms = mainShape(c, tws, cond?.main, b.aws / KT), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, b.aws / KT) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;

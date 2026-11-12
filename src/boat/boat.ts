@@ -210,6 +210,8 @@ export interface Boat {
   callsAge?: number;
   /** The main's ease for a puff (deg), and her heel over the last 20 s (physics.ts puffEase). */
   puffEase?: number; heelSlow?: number;
+  /** The wind on the water over the last few seconds (kt): a puff's, not the turbulence's (physics.ts puffEase). */
+  twsFast?: number;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;
