@@ -145,8 +145,20 @@ step. perf.test sits at 54.7, near its limit. I'll measure before and after each
 
 ## 4. The Yacht Club sliders
 
-The Race setup gets a **Fleet** section beside "competitors". It has two sliders, and the owner chooses the layout
-before I build it:
+**Agreed with Crew Model:** one panel with two rows, **Skippers** and **Crews**. Each row has a Level and a Mix.
+
+- **Same people each race.** Each AI boat's people are drawn from a fixed seed from her name, so a boat has the same
+  people race to race.
+- **Crew follows skipper.** A boat's crew level is correlated with her skipper's (r ≈ 0.5), because good skippers
+  sail with good crews.
+- **The crew's puff calls.** Their `b.calls` (kind, seconds away, strength, veer, where) feed the skipper's
+  `mind.puffs`, along with what she sees herself.
+- **Calibration is joint.** The real results measure boat, skipper and crew together, so the default pair is
+  fitted with both models plugged in.
+- **Who builds it.** I build the panel, with the crew row as a plug-in. The layout goes to the owner first.
+
+The Race setup gets a **Fleet** section beside "competitors". The owner chooses the layout before I build it. Each
+row has:
 
 - **Level.** Club night … Club championship … Regional … Nationals … Worlds. This sets the fleet's mean ability.
 - **Mix.** Even … Typical … Mixed. This sets how far apart the skippers are. "Typical" gives the real shape: one
