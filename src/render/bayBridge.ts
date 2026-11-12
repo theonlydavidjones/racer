@@ -2,6 +2,7 @@ import './three-setup';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { LL } from '../geo/geo';
+import { PIERS } from '../geo/shore';
 import { P3 } from './coords';
 import { bayLightsMaterial, dayOnly, duskLights, nightDim, nightOnly, type Glint } from './night';
 
@@ -10,7 +11,7 @@ export const BAY_APPROACH: [{ x: number; y: number }, { x: number; y: number }][
 
 type V2 = { x: number; y: number };
 /** A centreline (sim coords), with distance along it. */
-class Path {
+export class Path {
   private cum: number[] = [0];
   constructor(readonly pts: V2[]) { for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)); }
   get len() { return this.cum[this.cum.length - 1]; }
@@ -28,7 +29,7 @@ class Path {
  * Collects pieces per material in the bridge's own frame (x across, to the right going along the path; y up; s
  * along), and merges them into one mesh per material at the end, so both spans cost a handful of draw calls.
  */
-class Kit {
+export class Kit {
   private parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
   private m = new THREE.Matrix4(); private r = new THREE.Matrix4();
   constructor(public path: Path) {}
@@ -81,7 +82,7 @@ class Kit {
 }
 
 /** A square-ish frustum (a tower leg): bottom bw × bd at height 0 centred at bx, top tw × td at height h centred at tx. */
-function frustum(bw: number, bd: number, bx: number, tw: number, td: number, tx: number, h: number): THREE.BufferGeometry {
+export function frustum(bw: number, bd: number, bx: number, tw: number, td: number, tx: number, h: number): THREE.BufferGeometry {
   const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
   const bot = c.map(([i, k]) => [bx + i * bw / 2, 0, k * bd / 2]), top = c.map(([i, k]) => [tx + i * tw / 2, h, k * td / 2]);
   const pos: number[] = [];
@@ -111,8 +112,8 @@ function frustum(bw: number, bd: number, bx: number, tw: number, td: number, tx:
  * four steel legs tied by shear links, a 385 m main span and a 180 m back span, its single cable looped round the
  * west end and anchored in the deck at the east end, hung to the outer edges of the twin decks; then the Skyway,
  * twin concrete box girders on paired piers, falling toward the Oakland touchdown. Clearance 58 m (190 ft). White.
- * Its line runs from the tunnel's east portal through Wikipedia's coordinate for the bridge (37.81806 N,
- * 122.34667 W, on the Skyway) to the Oakland shore, bending as the real one does.
+ * Its line runs from the tunnel's east portal along OpenStreetMap's deck to the Oakland touchdown on the mole, bending
+ * as the real one does.
  *
  * The Bay Lights hang on the West Span's suspenders (night.ts). Returns the lights to reflect on the water.
  */
@@ -224,11 +225,17 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     // the tunnel (Wikipedia, "Yerba Buena Tunnel": 160 m long, centred at 37.8094 N, 122.3656 W) → its east portal
     const tc0 = LL(37.8094, -122.3656), ux = (tc0.x - b.x), uy = (tc0.y - b.y), n = Math.hypot(ux, uy);
     const portal = { x: tc0.x + ux / n * 80, y: tc0.y + uy / n * 80 };
-    const east = new Path([portal, LL(37.81806, -122.34667), LL(37.8245, -122.3140)]), E = new Kit(east), eLen = east.len;
+    // the deck's line from OpenStreetMap (I-80 westbound, way 236348361, the north deck: bending from the SAS onto the
+    // Skyway's straight run to the Oakland touchdown on the mole), moved 24 m south onto the middle between the two decks
+    const mid = (lat: number, lon: number) => LL(lat - 0.000217, lon + 0.0000483);
+    const east = new Path([portal, mid(37.81737, -122.35522), mid(37.81864, -122.35234), mid(37.81919, -122.34980), mid(37.82219, -122.32776)]), E = new Kit(east), eLen = east.len;
     const eg = (s: number, dx = 0) => { const p = east.at(s); return Math.max(0, groundAt(p.x + dx * p.uy, p.y - dx * p.ux)); };
-    // the island's east shore under the line: where the SAS's west pier (W2) stands
-    let shore = 60; while (shore < 1500 && eg(shore) > 1) shore += 5;
-    const W2 = shore - 25, T1 = W2 + 180, E2 = T1 + 385, SAS = 62, OAK = 9, HALF = 24.5, DW = 27, GIRDER = 5.5;
+    // the tower (T1) where OSM has it (way 237735191, 160 m: 37.81527 N, 122.35848 W), 180 m from the SAS's west pier W2
+    // on the island's shore and 385 m (the main span) from E2 (Wikipedia, "Eastern span replacement of the San
+    // Francisco–Oakland Bay Bridge")
+    const tw = LL(37.81527, -122.35848);
+    let T1 = 0; for (let s = 0, best = Infinity; s < 1500; s += 2) { const q = east.at(s), d = Math.hypot(q.x - tw.x, q.y - tw.y); if (d < best) { best = d; T1 = s; } }
+    const W2 = T1 - 180, E2 = T1 + 385, SAS = 62, OAK = 9, HALF = 24.5, DW = 27, GIRDER = 5.5;
     // the deck's height: from the tunnel (about 75 m) down to the SAS, level over it, then the Skyway's long fall
     const yD = (s: number) => s < W2 ? 75 + (SAS - 75) * Math.min(1, s / W2) : s < E2 ? SAS : SAS + (OAK - SAS) * Math.pow(Math.min(1, (s - E2) / (eLen - E2)), 1.25);
     for (const sx of [-1, 1]) {
@@ -242,7 +249,15 @@ export function buildBayBridge(parent: THREE.Object3D, groundAt: (x: number, y: 
     const pier = (s: number, w: number) => { for (const sx of [-1, 1]) { const g0 = eg(s, sx * HALF), top = yD(s) - GIRDER; if (top - g0 > 2) E.box(CONC, w, top - g0, 5, s, sx * HALF, (top + g0) / 2); } };
     for (let s = 40; s < W2; s += 45) pier(s, 10);
     pier(W2, 22); pier(E2, 22);
-    for (let s = E2 + 160; s < eLen - 20; s += 160) pier(s, 9);
+    // the Skyway's piers where the chart has them (Piers H–M, geo/shore.ts PIERS, solid there too), then on toward Oakland
+    // at the same spacing, about 160 m
+    const charted = PIERS.filter(P => /^Bay Bridge, Pier [H-M]$/.test(P.name)).map(P => {
+      const c = { x: P.pts.reduce((a, q) => a + q.x, 0) / P.pts.length, y: P.pts.reduce((a, q) => a + q.y, 0) / P.pts.length };
+      let best = 0; for (let s = 0, d0 = Infinity; s < eLen; s += 2) { const q = east.at(s), d = Math.hypot(q.x - c.x, q.y - c.y); if (d < d0) { d0 = d; best = s; } }
+      return best;
+    }).filter(s => s > E2 + 20).sort((a, b) => a - b);
+    for (const s of charted) pier(s, 9);
+    for (let s = (charted.length ? charted[charted.length - 1] : E2) + 160; s < eLen - 20; s += 160) pier(s, 9);
     // the tower: four legs, tapering, tied by shear-link beams, between the two decks
     E.box(CONC, 30, 10, 30, T1, 0, 3);
     for (const [ix, iz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {

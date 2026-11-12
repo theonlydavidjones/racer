@@ -32,7 +32,7 @@ export class Chart {
     this.c.addEventListener('wheel', e => {
       e.preventDefault();
       const r = this.c.getBoundingClientRect(), before = this.at(e.clientX - r.left, e.clientY - r.top);
-      this.scale = Math.min(3, Math.max(Math.min(innerWidth, innerHeight) / 26000, this.scale * Math.exp(-e.deltaY * 0.0015))); // out to the whole chart (the sim's world, about 21 by 23 km)
+      this.scale = Math.min(3, Math.max(Math.min(innerWidth, innerHeight) / 36000, this.scale * Math.exp(-e.deltaY * 0.0015))); // out to the whole chart (the sim's world, about 35 by 28 km, the Gate to Oakland and Richmond)
       const after = this.at(e.clientX - r.left, e.clientY - r.top); // zoom about the cursor
       this.cx += before.x - after.x; this.cy += before.y - after.y; this.draw();
     }, { passive: false });

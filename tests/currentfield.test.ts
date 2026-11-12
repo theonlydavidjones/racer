@@ -8,7 +8,7 @@ describe('the current field across the race area', () => {
     let worst = 0;
     for (let h = 0; h < 24; h += 0.5) {
       f.setTime(t0 + h * 60); own.setTime(t0 + h * 60);
-      st.forEach((s, i) => { const c = f.atShore(s.p), v = (own as unknown as { vecs: { x: number; y: number }[] }).vecs[i]; worst = Math.max(worst, Math.hypot(c.x - v.x, c.y - v.y) / 0.5144); });
+      st.forEach((s, i) => { const c = f.atShore(s.p), v = own.stationVec(i); worst = Math.max(worst, Math.hypot(c.x - v.x, c.y - v.y) / 0.5144); });
     }
     expect(worst).toBeLessThan(0.05);
   });

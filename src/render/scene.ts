@@ -202,7 +202,7 @@ export class SceneView {
   /** The race committee's signal flags, and the heading of whatever they're mounted on. */
   private signal: { mast: SignalMast; heading: number } | null = null;
   /** Marks, to lean and trail a wake in the current. */
-  private markObjs: { p: { x: number; y: number }; float: THREE.Object3D; wake: THREE.Mesh }[] = [];
+  private markObjs: { p: { x: number; y: number }; float: THREE.Object3D; wake: THREE.Mesh; fixed?: boolean }[] = [];
   private wakeTex: THREE.CanvasTexture | null = null;
   private seaAcc = 0;
   /** Sea map: wind-sea and swell scale and whitecaps on a coarse grid (refreshed every 2 s), sampled into the wind map. */
@@ -398,7 +398,7 @@ export class SceneView {
     const big = shape === 'lighted' ? 1.6 : 1;
     const wake = new THREE.Mesh(new THREE.PlaneGeometry(4 * big, 10 * big), new THREE.MeshLambertMaterial({ map: this.wakeTex, transparent: true, depthWrite: false })); // lit, so it dims after dark like the sea
     wake.rotation.x = -Math.PI / 2; wake.position.copy(P3(p.x, p.y, 0.12)); add(wake);
-    this.markObjs.push({ p, float, wake });
+    this.markObjs.push({ p, float, wake, fixed: shape === 'beacon' });
   }
 
   /** The course or destination changed (a new destination picked on the chart): build its marks again. */
@@ -696,8 +696,10 @@ export class SceneView {
     for (const mo of this.markObjs) {
       const c = w.currentAt(mo.p), kt = Math.hypot(c.x, c.y) / 0.5144, set = Math.atan2(c.x, c.y);
       const lean = Math.min(16, 6.5 * kt) * D2R; // a moored buoy heels over downstream on its chain
-      mo.float.rotation.set(0, 0, 0); mo.float.rotateOnWorldAxis(new THREE.Vector3(Math.cos(set), 0, Math.sin(set)), -lean);
-      const wv = this.waves.height(mo.p, tw, 1, 1); mo.float.position.y = wv;
+      if (!mo.fixed) { // (a beacon stands on its pile: it doesn't heel or ride the waves)
+        mo.float.rotation.set(0, 0, 0); mo.float.rotateOnWorldAxis(new THREE.Vector3(Math.cos(set), 0, Math.sin(set)), -lean);
+        mo.float.position.y = this.waves.height(mo.p, tw, 1, 1);
+      }
       const len = Math.min(1.6, kt / 1.5);
       mo.wake.visible = kt > 0.15; mo.wake.scale.set(0.6 + 0.4 * len, len, 1);
       mo.wake.rotation.z = -set + Math.PI; // trailing downstream
@@ -762,17 +764,27 @@ export class SceneView {
   }
 }
 
-const MARK_COL: Record<string, number> = { R: 0xc8262b, G: 0x1f8a4c, Y: 0xffc21a };
+const MARK_COL: Record<string, number> = { R: 0xc8262b, G: 0x1f8a4c, Y: 0xffc21a, O: 0xf0621e };
 /**
- * A mark as it looks on the water. Racing inflatables (a yellow sphere or cylinder); a yellow column (Blackaller,
- * Hank Easom); or a lighted navigation buoy: a round float with a steel tower and a light on top, painted in its
+ * A mark as it looks on the water. Racing inflatables (a yellow sphere or cylinder; the clubs' red and orange balls);
+ * a yellow column (Blackaller, Hank Easom); a light on a pile (a beacon); or a lighted navigation buoy: a round float with a steel tower and a light on top, painted in its
  * colours top to bottom (Harding Rock's red-green-red bands).
  */
 function markBody(shape: string, look: string): THREE.Group {
   const g = new THREE.Group(), lam = (c: number) => new THREE.MeshLambertMaterial({ color: c });
   const col = (i: number) => MARK_COL[look[Math.min(i, look.length - 1)]] ?? MARK_COL.Y;
-  if (shape === 'sphere') { const b = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), lam(0xffd21a)); b.position.y = 0.8; g.add(b); }
-  else if (shape === 'cylinder') { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 2.4, 12), lam(0xffc21a)); b.position.y = 0.8; g.add(b); }
+  if (shape === 'sphere') { const b = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), lam(look === 'Y' ? 0xffd21a : col(0))); b.position.y = 0.8; g.add(b); } // (the clubs' red and orange balls too)
+  else if (shape === 'cylinder') { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 2.4, 12), lam(look === 'Y' ? 0xffc21a : col(0))); b.position.y = 0.8; g.add(b); }
+  else if (shape === 'beacon') {
+    // a light on a pile (a fixed aid, USCG style): a dark steel or timber pile, the dayboard near the top (a green square
+    // for an odd-numbered mark, a red triangle for an even one, to leave to port and starboard coming in from sea), the
+    // light above it
+    const H = 5.2, pile = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, H + 2, 8), lam(0x3a3633)); pile.position.y = H / 2 - 1; g.add(pile);
+    const red = look[0] === 'R', board = new THREE.Mesh(red ? new THREE.CircleGeometry(0.75, 3) : new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshLambertMaterial({ color: col(0), side: THREE.DoubleSide }));
+    if (red) board.rotation.z = Math.PI / 2; // (a triangle point up)
+    board.position.set(0, H - 1.1, 0.3); g.add(board);
+    const lt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.35, 8), new THREE.MeshBasicMaterial({ color: red ? 0xffb0a8 : 0xa8ffc0 })); lt.position.y = H + 0.2; g.add(lt);
+  }
   else if (shape === 'column') {
     const b = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 3.6, 14), lam(col(0))); b.position.y = 1.4; g.add(b);
     const lt = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2b0 })); lt.position.y = 3.35; g.add(lt);
