@@ -35,7 +35,7 @@ export interface LegVs {
 }
 
 /** `won`: she won; `youWon`: you did; `youDone`: you've finished and both of you sailed every leg (the gap is the finish gap). */
-export interface Versus { rival: number; rivalName: string; won: boolean; youWon: boolean; youDone: boolean; legs: LegVs[]; total: number }
+export interface Versus { rival: number; rivalName: string; tie?: boolean; won: boolean; youWon: boolean; youDone: boolean; legs: LegVs[]; total: number }
 
 /**
  * Metres a boat sailed between two race times, from the track: each second's step over the ground counted only as far
@@ -122,7 +122,9 @@ export function versus(I: VsInput): Versus | null {
   const total = legs.reduce((s, l) => s + l.lost, 0);
   const rb = I.boats.find(b => b.id === r)!;
   const mine = I.boats.find(b => b.id === me)!, first = I.boats.filter(b => !b.dsq && b.finishT != null).sort(byScore)[0];
-  return { rival: r, rivalName: rb.name, won: first?.id === r, youWon: first?.id === me, youDone: mine.finishT != null && legs.length === I.legs.length + 1, legs, total };
+  // (equal points share the place: 44.3(c), A7; then neither of you won outright)
+  const tie = mine.finishT != null && rb.finishT != null && mine.points != null && mine.points === rb.points;
+  return { rival: r, rivalName: rb.name, tie, won: !tie && first?.id === r, youWon: !tie && first?.id === me, youDone: mine.finishT != null && legs.length === I.legs.length + 1, legs, total };
 }
 
 /** A leg's comparison in a line or two, for the list and the caption. */

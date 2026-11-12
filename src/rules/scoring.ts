@@ -14,22 +14,35 @@
  *   tenth of a point (0.05 rounded upward). The scores of other boats shall not be changed; therefore, two boats may
  *   receive the same score. However, the penalty shall not cause the boat's score to be worse than the score for Did
  *   Not Finish." (In 2021–24 it rounded to the nearest whole point; the 2025 edition changed that.)
+ * - A6.1: "If a boat is disqualified from a race, or retires after finishing, or is scored Did not sail the course,
+ *   each boat with a worse finishing place shall be moved up one place": so the places a Z-flag boat's penalty is added
+ *   to are counted among the boats not disqualified.
  * - A7: boats tied at the finishing line share the points for the places they tied for and the place(s) below.
  *
  * So a Z-flag boat first across the line in a fleet of 10 scores 1 + 2.2 = 3.2, and the boat second across, on 2,
  * wins; nobody is moved up or down by her penalty.
  */
 
-export type ScoreCode = 'ZFP' | 'UFD' | 'BFD' | null;
-export interface ScoreIn { id: number; finishT: number | null; code: ScoreCode }
+export type ScoreCode = 'ZFP' | 'UFD' | 'BFD' | 'RET' | null;
+/**
+ * `ahead`: for a boat still racing, where she is in the race now (lower = further on), to project how the boats still
+ * out there will finish: a Z-flag boat's final place waits on them (every boat that finishes later on fewer points
+ * than hers beats her).
+ */
+export interface ScoreIn { id: number; finishT: number | null; code: ScoreCode; ahead?: number }
 export interface ScoreOut {
   id: number;
   /** Points (lower is better); null while she's still racing. */
   points: number | null;
   /** Her place across the line among the boats scored by finishing (A4), before any penalty; null if none. */
   across: number | null;
-  /** Her rank by points, 1 = won; boats on equal points share a rank. Null while still racing. */
+  /**
+   * Her rank by points, 1 = won; boats on equal points share a rank. Null while still racing. When it could still
+   * change (a Z-flag boat whose points the boats still racing can beat), it's the rank projected with them finishing
+   * in the order they're in now, and `final` is false.
+   */
   rank: number | null;
+  final: boolean;
   /** The points added for a scoring penalty (44.3(c)), if any. */
   penalty: number;
   code: ScoreCode;
@@ -52,15 +65,22 @@ export function raceScores(boats: ScoreIn[], entries = boats.length): ScoreOut[]
     i = j + 1;
   }
   const out: ScoreOut[] = boats.map(b => {
-    if (b.code === 'UFD' || b.code === 'BFD') return { id: b.id, points: dnf, across: null, rank: null, penalty: 0, code: b.code };
+    if (b.code === 'UFD' || b.code === 'BFD' || b.code === 'RET') return { id: b.id, points: dnf, across: null, rank: null, final: true, penalty: 0, code: b.code };
     const a = across.get(b.id) ?? null;
-    if (a == null) return { id: b.id, points: null, across: null, rank: null, penalty: 0, code: b.code };
+    if (a == null) return { id: b.id, points: null, across: null, rank: null, final: false, penalty: 0, code: b.code };
     const p = b.code === 'ZFP' ? Math.min(dnf - a, pen) : 0;
-    return { id: b.id, points: tenth(a + p), across: a, rank: null, penalty: tenth(p), code: b.code };
+    return { id: b.id, points: tenth(a + p), across: a, rank: null, final: true, penalty: tenth(p), code: b.code };
   });
-  // ranks by points; equal points share a rank (44.3(c): "two boats may receive the same score")
-  const scored = out.filter(o => o.points != null).sort((a, b) => a.points! - b.points!);
-  scored.forEach((o, i) => { o.rank = i > 0 && scored[i - 1].points === o.points ? scored[i - 1].rank : i + 1; });
+  // the boats still racing will take the places after the f boats in so far: a score of f + 1 or better can't be beaten
+  const f = fin.length, racing = boats.filter(b => b.finishT == null && b.code !== 'UFD' && b.code !== 'BFD' && b.code !== 'RET').sort((a, b) => (a.ahead ?? 0) - (b.ahead ?? 0));
+  for (const o of out) if (o.points != null && o.across != null) o.final = !racing.length || o.points <= f + 1;
+  // ranks by points; equal points share a rank (44.3(c): "two boats may receive the same score"). With the boats
+  // still racing projected into the places after f, in the order they're in now
+  const proj = new Map(racing.map((b, k) => [b.id, f + 1 + k]));
+  const all = out.map(o => ({ o, pts: o.points ?? proj.get(o.id) ?? null })).filter(x => x.pts != null).sort((a, b) => a.pts! - b.pts!);
+  const rk = new Map<ScoreOut, number>();
+  all.forEach((x, i) => rk.set(x.o, i > 0 && all[i - 1].pts === x.pts ? rk.get(all[i - 1].o)! : i + 1));
+  for (const o of out) if (o.points != null) o.rank = rk.get(o)!;
   return out;
 }
 

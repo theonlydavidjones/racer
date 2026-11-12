@@ -39,8 +39,9 @@ describe('scoring (RRS 2025–2028 Appendix A, 30.2 and 44.3(c))', () => {
     expect(s.get(2)!.points).toBe(2.8);
     const one = by(raceScores([{ id: 0, finishT: 500, code: 'ZFP' }], 1)); // a fleet of one: DNF 2, 1 + 0.4
     expect(one.get(0)!.points).toBe(1.4);
-    const capped = by(raceScores([{ id: 0, finishT: 500, code: null }, { id: 1, finishT: 510, code: 'ZFP' }], 2)); // DNF 3: 2 + 0.6
-    expect(capped.get(1)!.points).toBeLessThanOrEqual(3);
+    // last across in 10 boats: 10 + 2.2 would be worse than DNF (11), so she scores 11
+    const capped = by(raceScores(fleet(10, { 9: 'ZFP' })));
+    expect(capped.get(9)!.points).toBe(11); expect(capped.get(9)!.penalty).toBe(1);
   });
 
   it('rounding to the nearest tenth, 0.05 up; boats tied at the line share the places (A7); still racing has no score', () => {
@@ -58,5 +59,24 @@ describe('scoring (RRS 2025–2028 Appendix A, 30.2 and 44.3(c))', () => {
     const I = { frames: [], you: 5, startTimes: [], marks: [], from: { x: 0, y: 0 }, legs: [],
       boats: fleet(10, { 0: 'ZFP' }).map(b => ({ id: b.id, name: `B${b.id}`, finishT: b.finishT, dsq: false, points: sc.get(b.id)!.points })) };
     expect(rivalOf(I)).toBe(1);
+  });
+
+  it('a Z-flag place waits on the boats still racing: projected in the order they\'re in now, and not final until settled', () => {
+    // 10 boats; you (0) cross first with the Z flag (3.2 points), nobody else in yet; the others in order 1, 2, 3 …
+    const boats = Array.from({ length: 10 }, (_, i) => ({ id: i, finishT: i === 0 ? 600 : null, code: (i === 0 ? 'ZFP' : null) as 'ZFP' | null, ahead: i }));
+    let s = by(raceScores(boats));
+    expect(s.get(0)!.points).toBe(3.2); expect(s.get(0)!.final).toBe(false);
+    expect(s.get(0)!.rank).toBe(3); // the next two boats home will score 2 and 3
+    // two more in: 2 and 3; she's settled at third (anyone else scores 4 or more)
+    boats[1].finishT = 610; boats[2].finishT = 620;
+    s = by(raceScores(boats));
+    expect(s.get(0)!.final).toBe(true); expect(s.get(0)!.rank).toBe(3);
+    expect(s.get(1)!.rank).toBe(1); expect(s.get(1)!.final).toBe(true);
+    // without a penalty, the first boat home is settled at once
+    const clean = by(raceScores(boats.map((b, i) => ({ ...b, code: null, finishT: i === 0 ? 600 : null }))));
+    expect(clean.get(0)!.rank).toBe(1); expect(clean.get(0)!.final).toBe(true);
+    // a retired boat scores DNF and takes no place
+    const ret = by(raceScores([{ id: 0, finishT: null, code: 'RET' }, { id: 1, finishT: 600, code: null }]));
+    expect(ret.get(0)!.points).toBe(3); expect(ret.get(1)!.points).toBe(1);
   });
 });
