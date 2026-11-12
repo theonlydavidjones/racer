@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 const HOST = 'https://charts.noaa.gov/ENCs/';
 // the sim's world (the terrain and land mask, src/geo/data/shore-mask.json)
-const BOX = { south: 37.735, north: 37.985, west: -122.61, east: -122.215 };
+const BOX = { south: 37.735, north: 37.985, west: -122.61, east: -122.188 };
 const CACHE = new URL('../.cache/enc/', import.meta.url).pathname;
 const OUT = new URL('../src/geo/data/enc-chart.json', import.meta.url).pathname;
 mkdirSync(CACHE, { recursive: true });

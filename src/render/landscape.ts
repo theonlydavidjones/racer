@@ -84,7 +84,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const glass = ['#b7c1c6', '#c9cdc9', '#9fa9ae', '#d8d6cf', '#aab3b4'].map(h => new THREE.Color(h));
     const m0 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const dLat = STEP / 111320, dLon = STEP / (111320 * Math.cos(37.8 * Math.PI / 180));
-    for (let lat = 37.746; lat < 37.975; lat += dLat) for (let lon = -122.515; lon < -122.215; lon += dLon) {
+    for (let lat = 37.746; lat < 37.975; lat += dLat) for (let lon = -122.515; lon < -122.189; lon += dLon) {
       const la = lat + (rand() - 0.5) * dLat * 0.5, lo = lon + (rand() - 0.5) * dLon * 0.5, H = hood(la, lo), r = rand();
       if (!H || r > H.p) continue;
       const p = LL(la, lo), g = terrain.heightAt(p.x, p.y);
