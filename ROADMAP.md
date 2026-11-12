@@ -318,10 +318,8 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    the keel's lift (slender wing, Newman §5.12) and the hull's broadside drag, as a sideways motion; close-hauled 2.9°,
    4.3° and 6.0° in 6, 12 and 20 kt; slow, 0.36 kt at 1.5 kt in 12 kt. The polar's speed is her course's; the sails
    are trimmed and their forces read in ORC's frame (the wind across her course, turned from her heading by her steady
-   leeway); she, the AI and Nav steer that much above the beat. Later (ui/hud.ts, not ours): the compass's "tack" marker
-   shows the beat angle as a heading, so it's her leeway too far off the wind (from ± (beatFor − u.leeway)); its mean
-   close-hauled heading collects only within 6° of the beat by heading, which her leeway (6° in 20 kt) reaches. The
-   laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
+   leeway); she, the AI and Nav steer that much above the beat. The compass's "tack" marker and its mean close-hauled
+   heading allow for it too (ui/hud.ts); the laylines are right as they are (her track). Hove to in 8 kt is a knife edge (a few % more speed going
    in and she rounds up and tacks; it was before leeway too).
 8. **Too much push from rest and through a tack** (hull 2): driveBoost ×1.6 everywhere; ORC's own sail model gives
    0.7–0.8 of the full-speed drive close-hauled at rest (more only from 120°). 1 kt to 90% close-hauled in 6 kt takes
