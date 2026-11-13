@@ -71,6 +71,28 @@ describe('docking', () => {
     }
     expect(made + lost).toBeGreaterThan(0); // (one or the other happens: nothing hangs or blows up)
   }, 120000);
+  it('the handoff: lines let go with way on, and a line ashore with way on, carry her speed, sway and turn across the step', () => {
+    const w = cruise(4); for (let i = 0; i < 30; i++) w.step(DT);
+    const s = free[0], u = w.user; approach(w, s, 9, 0.4); w.linesReady();
+    for (let i = 0; i < 60 * 40 && !(u.mooring?.lines.length); i++) w.step(DT); // (a line ashore)
+    expect(u.mooring?.lines.length).toBeGreaterThan(0);
+    // lines off while she's moving: 0.4 m/s ahead, sliding sideways, turning
+    Object.assign(u, { v: 0.4, astern: 0, sway: 0.15, turnRate: 1.5 });
+    const before = { v: u.v - (u.astern ?? 0), sway: u.sway!, r: u.turnRate! };
+    w.letGoLines(); w.step(DT);
+    const after = { v: u.v - (u.astern ?? 0), sway: u.sway!, r: u.turnRate! };
+    expect(Math.abs(after.v - before.v)).toBeLessThan(0.02); expect(Math.abs(after.sway - before.sway)).toBeLessThan(0.02); expect(Math.abs(after.r - before.r)).toBeLessThan(0.3);
+    // and the other way: a line going ashore while she has way on
+    const w2 = cruise(4); for (let i = 0; i < 30; i++) w2.step(DT);
+    const u2 = w2.user; approach(w2, s, 9, 0.4); w2.linesReady();
+    let prev = { v: 0, sway: 0, r: 0 }, jump = 0;
+    for (let i = 0; i < 60 * 40; i++) {
+      const had = !!u2.mooring?.lines.length; prev = { v: u2.v - (u2.astern ?? 0), sway: u2.sway ?? 0, r: u2.turnRate ?? 0 };
+      w2.step(DT);
+      if (!had && u2.mooring?.lines.length) { jump = Math.max(Math.abs(u2.v - (u2.astern ?? 0) - prev.v), Math.abs((u2.sway ?? 0) - prev.sway)); break; }
+    }
+    expect(jump).toBeLessThan(0.02);
+  }, 120000);
   it('Home still makes her fast in her own slip on its own (as before)', () => {
     const w = cruise(); for (let i = 0; i < 30; i++) w.step(DT);
     w.sendHome(); approach(w, home, 2, 0.2);
