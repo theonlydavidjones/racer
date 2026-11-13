@@ -419,7 +419,7 @@ export class Wildlife {
    * Move them. `focus`: the boat you're watching (birds stay around her); `boats`: everyone afloat (the animals keep
    * clear); `sea(x, y)`: the water's height; `t` the time (s).
    */
-  update(dt: number, t: number, focus: Vec, boats: Vec[], sea: (x: number, y: number) => number): void {
+  update(dt: number, t: number, focus: Vec, boats: readonly Vec[], sea: (x: number, y: number) => number): void {
     const r = this.r, near = (p: Vec, d: number) => boats.some(b => (b.x - p.x) ** 2 + (b.y - p.y) ** 2 < d * d);
     // porpoises: a bout of three or four quick rolls, ten seconds or so apart, then a long dive; keeping clear of boats
     for (const a of this.porpoises) {

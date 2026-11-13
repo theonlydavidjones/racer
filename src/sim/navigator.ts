@@ -4,7 +4,7 @@ import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
 import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
-import type { World } from './world';
+import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
 import { landDist, routeAround, sailLeg, type SailResult } from './routing';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
@@ -56,7 +56,7 @@ const placeName = (o: Outlook, p: Vec): string => {
   return nearFeature(p, 3000) ?? 'open water';
 };
 
-export function passagePlan(w: World): PassagePlan | null {
+export function passagePlan(w: SimView): PassagePlan | null {
   const dest = w.dest; if (!dest) return null;
   const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
   const from = { x: u.x, y: u.y }, to = dest.p, route = routeAround(from, to);

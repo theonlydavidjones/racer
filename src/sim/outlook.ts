@@ -3,7 +3,7 @@ import { CURRENTS, currentAt, currentVector, windOnWater } from '../environment/
 import type { SeaHere } from '../environment/sea';
 import { CurrentField, events, sfClock, type TideStation } from '../environment/tide';
 import { landLee, type Wind } from '../environment/wind';
-import type { World } from './world';
+import type { SimView } from './host';
 
 /**
  * The day ahead, as a forecaster would look at it: the wind, the current and the sea at any place and time, from the
@@ -41,7 +41,7 @@ function leeAt(p: Vec, from: number): number {
 }
 
 /** The outlook for a World's day, with its settings (a set wind strength or direction, a practice current) as it sails them. */
-export function outlookFor(w: World): Outlook {
+export function outlookFor(w: SimView): Outlook {
   const S = w.settings, wx = w.weather, gun = w.gunUtc;
   const fixedFrom = w.windModel.base, fixedKt = S.windKt;
   const breeze = (t: number) => {

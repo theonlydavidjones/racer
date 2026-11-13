@@ -49,7 +49,7 @@ export class Wakes {
     this.SAMPLE = opt.sample ?? 0.15; this.N = opt.n ?? 110; this.scale = opt.scale ?? 1; this.HALF = (opt.len ?? 7.64) / 2;
   }
 
-  reset(boats: Mover[] | Boat[]): void {
+  reset(boats: readonly Mover[] | readonly Boat[]): void {
     const N = this.N;
     for (const t of this.trails) { this.scene.remove(t.mesh, t.bow, t.spray); t.mesh.geometry.dispose(); }
     this.trails = boats.map(() => {
@@ -88,7 +88,7 @@ export class Wakes {
   show(on: boolean): void { for (const t of this.trails) t.mesh.visible = t.bow.visible = t.spray.visible = on; }
 
   /** `t` race time (s), `dt` frame time; `sea(x, y)` the water height there; `pitch` each boat's pitch now (rad, bow up). */
-  update(boats: (Mover | Boat)[], t: number, dt: number, sea: (x: number, y: number) => number, pitch: number[]): void {
+  update(boats: readonly (Mover | Boat)[], t: number, dt: number, sea: (x: number, y: number) => number, pitch: number[]): void {
     const N = this.N, SAMPLE = this.SAMPLE, HALF = this.HALF, sc = this.scale;
     (boats as Mover[]).forEach((b, k) => {
       const tr = this.trails[k]; if (!tr) return;

@@ -1,7 +1,7 @@
 import { D2R, ZONE, type Vec } from '../core/math';
 import type { CourseMark } from '../courses/course';
 import { laylinesFor } from '../sim/laylines';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { $ } from './dom';
 import { drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
@@ -15,7 +15,7 @@ const short = (name: string) => name.split(' ')[0];
 const COL = { s: '#3fd197', p: '#ff5d4c', path: 'rgba(233,242,245,.9)', dim: 'rgba(233,242,245,.14)', mark: '#ffc21a', pass: '#d9c05a', line: 'rgba(255,216,74,.9)' };
 
 /** Plain-language description of each leg, for the list beside the map. */
-export function legDescriptions(w: World): string[] {
+export function legDescriptions(w: SimView): string[] {
   const C = w.C, out: string[] = [];
   C.marks.forEach((m, i) => {
     const from = i === 0 ? 'Start' : short(C.marks[i - 1].name);
@@ -30,7 +30,7 @@ export function legDescriptions(w: World): string[] {
 }
 
 /** Where each leg starts and ends (start/finish legs use the middle of the line). */
-function legEnds(w: World, i: number): [Vec, Vec] {
+function legEnds(w: SimView, i: number): [Vec, Vec] {
   const C = w.C, n = C.marks.length;
   const a = i === 0 ? C.center : C.marks[i - 1].p, b = i < n ? C.marks[i].p : C.center;
   return [a, b];
@@ -43,7 +43,7 @@ function legEnds(w: World, i: number): [Vec, Vec] {
  */
 export class CourseView {
   private timer = 0;
-  private world: World | null = null;
+  private world: SimView | null = null;
   private view = { cx: 0, cy: 0, scale: 1 }; // world point at the canvas centre, pixels per metre
   private focus: number | null = 0; // leg index, or null for the whole course
   private pointers = new Map<number, P>();
@@ -52,7 +52,7 @@ export class CourseView {
   private canvas = $<HTMLCanvasElement>('cvcanvas');
   /** Which tab: the course, or the strategist's briefing (with its plans drawn on the map). */
   private tab: 'course' | 'brief' = 'course';
-  private brief: { w: World; b: RaceBrief } | null = null;
+  private brief: { w: SimView; b: RaceBrief } | null = null;
 
   constructor() {
     for (const t of $('cvTabs').querySelectorAll<HTMLButtonElement>('[data-tab]')) t.onclick = () => this.setTab(t.dataset.tab as 'course' | 'brief');
@@ -87,7 +87,7 @@ export class CourseView {
 
   get isOpen(): boolean { return !$('courseView').hidden; }
 
-  open(w: World): void {
+  open(w: SimView): void {
     this.world = w;
     $('courseView').hidden = false;
     $('cvTitle').textContent = w.C.title;
@@ -101,7 +101,7 @@ export class CourseView {
     this.timer = window.setInterval(() => this.draw(), 250); // live while racing
   }
   close(): void { $('courseView').hidden = true; clearInterval(this.timer); this.world = null; }
-  toggle(w: World): void { if (this.isOpen) this.close(); else this.open(w); }
+  toggle(w: SimView): void { if (this.isOpen) this.close(); else this.open(w); }
 
   /** Switch tabs. The briefing is worked out the first time it's asked for (it takes a moment), for this race. */
   setTab(tab: 'course' | 'brief'): void {

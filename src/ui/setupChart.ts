@@ -1,4 +1,4 @@
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import type { Hud } from './hud';
 import { $ } from './dom';
 import { PLACES, place, spotId } from '../sim/places';
@@ -14,7 +14,7 @@ import type { Vec } from '../core/math';
  * slip, to put it there. Drag to move, scroll to zoom.
  */
 export interface SetupPicks {
-  world(): World;
+  world(): SimView;
   /** her start or her destination: a place id (sim/places.ts), 'slip', a spot ('at:lat,lon'), or '' (nowhere in particular) */
   set(which: 'from' | 'to', id: string): void;
   get(which: 'from' | 'to'): string;

@@ -13,6 +13,7 @@ import { WIND_KIND_LABEL, slotFlow } from '../environment/wind';
 import type { CourseMark } from '../courses/course';
 import type { Boat } from '../boat/boat';
 import type { World } from './world';
+import type { SimView } from './host';
 import { clockOf, currentWords, nearestStation, outlookFor, stationEvents, tideWord, type Outlook } from './outlook';
 import { AS_FORECAST, bestPlan, comparePlans, type LegKind, type Plan, type SailResult, type Scenario } from './routing';
 import { amount, deg3, kt1, mins, sideWords, type Brief, type BriefItem, type BriefSection } from './brief';
@@ -65,7 +66,7 @@ function legEnds(C: World['C'], i: number): { from: Vec; to: Vec; extra: number 
 }
 
 /** Plan every leg in turn, each starting when the last one's best plan gets there. */
-export function planLegs(w: World, o: Outlook): LegPlan[] {
+export function planLegs(w: SimView, o: Outlook): LegPlan[] {
   const C = w.C, out: LegPlan[] = [];
   let t = o.t0;
   for (let i = 0; i <= C.marks.length; i++) {
@@ -113,7 +114,7 @@ const shiftSide = (dFrom: number, kind: LegKind): 'left' | 'right' => ((dFrom > 
 
 /* ---------- the sections ---------- */
 
-const srcWords = (w: World) => {
+const srcWords = (w: SimView) => {
   const wx = w.weather, mo = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' });
   return wx.source === 'observed' ? { lede: `A past day: the wind is what NOAA's Fort Point station recorded every 6 minutes, spread across the course by the other stations around the Bay; the tide is NOAA's prediction for the day. This is hindsight, so the big picture is right; the puffs on the water are the sim's.`, sure: 'high' }
     : wx.source === 'forecast' ? { lede: `The National Weather Service forecast (issued ${new Date(wx.issued!).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', minute: '2-digit' })}), hour by hour on its 2.5 km grid, and NOAA's tidal current predictions. The tide is astronomy and will be close; the wind's timing and strength are a forecast, so the plans below are tested against it coming early or late, stronger or lighter, veered or backed.`, sure: 'medium' }
@@ -125,7 +126,7 @@ const srcWords = (w: World) => {
  * Too windy to race? The SF Bay Folkboat fleet calls racing off at about 23 kt (signals.ts CANCEL_KT): if the forecast
  * reaches it over the course between the warning signal and the finish, say so first, and when, ahead of the dock.
  */
-function windLimitSection(w: World, o: Outlook, finishT: number): BriefSection | null {
+function windLimitSection(w: SimView, o: Outlook, finishT: number): BriefSection | null {
   const gun = o.t0, warn = gun - w.settings.seq;
   let peak = { kt: 0, t: warn };
   const pts = [w.C.center, ...w.C.marks.map(m => m.p)];
@@ -145,7 +146,7 @@ function windLimitSection(w: World, o: Outlook, finishT: number): BriefSection |
 }
 
 /** The day: a timeline of the wind, tide and sea at the line, and what it means. */
-function daySection(w: World, o: Outlook, finishT: number): BriefSection {
+function daySection(w: SimView, o: Outlook, finishT: number): BriefSection {
   const C = w.C, gun = o.t0, warn = gun - w.settings.seq;
   const times = [warn, gun, ...[30, 60, 90, 120, 150].map(m => gun + m).filter(t => t < finishT - 8), finishT];
   const flood = o.stations ? nearestStation(o.stations, C.center).flood : null;
@@ -189,7 +190,7 @@ function daySection(w: World, o: Outlook, finishT: number): BriefSection {
 }
 
 /** The start: which end is favoured, what the current does at the line, which end leads to the favoured side. */
-function startSection(w: World, o: Outlook, legs: LegPlan[]): BriefSection {
+function startSection(w: SimView, o: Outlook, legs: LegPlan[]): BriefSection {
   // the wind on the water (air minus tide), which is what you see heading to wind on the line, and what the boats sail in
   const C = w.C, gun = o.t0, wd = o.windOnWater(C.center, gun), up = V(wd.from), items: BriefItem[] = [];
   const line = sub(C.committee, C.pin), len = Math.hypot(line.x, line.y), gain = dot(line, up); // + committee end upwind
@@ -272,7 +273,7 @@ function courseSection(o: Outlook, legs: LegPlan[]): BriefSection {
 }
 
 /** The other boats: what you know about them. */
-function fleetSection(w: World): BriefSection {
+function fleetSection(w: SimView): BriefSection {
   const items: BriefItem[] = [];
   const opp = w.boats.filter(b => !b.isUser);
   const describe = (b: Boat): string => {
@@ -303,7 +304,7 @@ function fleetSection(w: World): BriefSection {
 }
 
 /** How to set the boat up, phase by phase, from the boat's own sail and crew model (boat/controls.ts, crewPhys.ts). */
-function trimSection(w: World, o: Outlook, legs: LegPlan[], finishT: number): BriefSection {
+function trimSection(w: SimView, o: Outlook, legs: LegPlan[], finishT: number): BriefSection {
   const items: BriefItem[] = [], gun = o.t0, u = w.user, cond = u.cond ?? (u.spec ? condition(u.spec, +w.raceDate.slice(5, 7)) : null);
   const span = finishT - gun;
   const phases = span < 40 ? [{ name: 'The race', a: gun, b: finishT }]
@@ -356,7 +357,7 @@ function trimSection(w: World, o: Outlook, legs: LegPlan[], finishT: number): Br
 }
 
 /** The strategist's whole briefing for a World, before the start. */
-export function raceBrief(w: World): RaceBrief {
+export function raceBrief(w: SimView): RaceBrief {
   const o = outlookFor(w), legs = planLegs(w, o), last = legs[legs.length - 1], finishT = last.t0 + last.minutes;
   const sure = srcWords(w).sure;
   const limit = windLimitSection(w, o, finishT);
