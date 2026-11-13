@@ -1222,3 +1222,7 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .mtools{justify-content:flex-end}
 .mgroup{font:600 11px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
 .mgrid + .mgroup{margin-top:20px}
+/* The wind angle dial, when it's on: on the right, directly under the inset map, centred on it (the owner, ROADMAP 8b:
+   "on the … side under the inset map", "I meant right side"). The map is 210 px across at the top right. */
+#dial{position:fixed!important;left:auto!important;top:calc(env(safe-area-inset-top,0px) + 76px + 210px + 12px)!important;
+  right:calc(max(16px,env(safe-area-inset-right,0px)) + (210px - 96px) / 2)!important;width:96px!important;height:96px!important}
