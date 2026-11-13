@@ -198,6 +198,12 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - Bug: the flag index doesn't scroll.
    - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
+   - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
+     between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
+     no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
+     One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
+     some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
+     first.
    - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
