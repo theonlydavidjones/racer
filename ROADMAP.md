@@ -228,6 +228,27 @@ What's planned, roughly in order. Done work is described in the README.
    - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
      Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
      Gashouse Cove with the wind on the beam both ways.
+8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
+   trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
+   reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
+   its "IDLE SPEED / NO WAKE" sign and light to the west, Fort Mason's pier to the east, the Bay and Angel Island
+   beyond) and reference/photos/fort-mason-pier-piles-gashouse-exit.jpg (the pier's open undercroft of massive concrete
+   piles).
+   1. Inside, sheltered: "the marina side of the exit is nicely sheltered from wind and current by the breakwater."
+   2. Outside, all at once: "the bay side of the exit smacks straight into the wind and the tidal current, and the boat
+      usually feels it immediately." The shelter has to end at the entrance in a few boat lengths, not fade over a
+      long distance, for the wind, the current and the chop alike.
+   3. The Fort Mason pier to leeward: "the eastern (usually leeward) side of the exit is the ft mason pier, which has
+      massive concrete piers supporting it. the wind (and often current) badly want to push you into those piers. that
+      means bye bye to your boat; you would just churn around under there in all the decades-old concrete and rebar and
+      barnacles." So:
+      - the pier's pile field is solid to the boat;
+      - the current runs through and under the piles, while the shed above blocks the wind;
+      - getting set under it is a real wreck, with damage and the sail over, not a bounce;
+      - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
+        of the pier, and pick the tide.
+   Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
+   common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
