@@ -4,6 +4,7 @@
  */
 import { PREP_MEANING } from '../sim/signals';
 import { LESSONS, type LessonId } from '../sim/lessons';
+import { lessonGridHtml } from '../ui/lessons';
 import { describeSea } from '../environment/sea';
 import { CURRENTS } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
@@ -386,7 +387,14 @@ $('bCondClose').onclick = () => {
   }
 };
 
+/** Learn to sail's lesson tiles (ui/lessons.ts): the ones passed ticked; a tile starts its lesson. */
+function openLessons(): void {
+  $('lessonGrid').innerHTML = lessonGridHtml(app.S.lessonsPassed ?? []);
+  $('lessons').hidden = false;
+}
+$('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLElement).closest<HTMLElement>('[data-lesson]')?.dataset.lesson as LessonId | undefined; if (id) { $('lessons').hidden = true; beginLesson(id); } });
+$('bLessonsX').onclick = () => { $('lessons').hidden = true; };
 /** Start a Learn to sail lesson (its tile, in the Drill section). */
 function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup']) $(el).hidden = true; beginRace(); }
-return { beginLesson, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, tideBox, wake };
+return { beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, tideBox, wake };
 }

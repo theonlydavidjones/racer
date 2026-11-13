@@ -17,7 +17,7 @@ import { DrillTracker } from './drill';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'gybing' | 'heaveto';
+export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto';
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
@@ -25,7 +25,7 @@ export const LESSONS: { id: LessonId; no: number; title: string; icon: string; a
   { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', asa: '22, 28–32' },
   { id: 'irons', no: 5, title: 'Stop, go, irons', icon: '🛑', asa: '25' },
   { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', asa: '5, 33' },
-  { id: 'gybing', no: 7, title: 'Gybing', icon: '↪️', asa: '5, 34' },
+  { id: 'jibing', no: 7, title: 'Jibing', icon: '↪️', asa: '5, 34' },
   { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' }
 ];
 /** The lessons that start by a buoy (the tiller's, steered for; stop, go and irons', stopped by). */
@@ -49,8 +49,8 @@ export const LESSON_MARKS = {
    * (bow within IRONS_TWA of the wind, under STOP_KT) for STOP_S; and out of irons, sailing (TWA over OUT_TWA, over GO_KT)
    * within OUT_S of getting in. */
   stopM: 25, stopKt: 0.5, stopS: 3, goKt: 2, ironsTwa: 25, outTwa: 50, outS: 30,
-  /** Tacking and gybing: this many good ones (scored by the tack and gybe drill's own measure, sim/drill.ts: from a steady
-   * course, back to speed within its time); a gybe also without rounding up past GYBE_OVER (deg) after it. */
+  /** Tacking and jibing: this many good ones (scored by the tack and gybe drill's own measure, sim/drill.ts: from a steady
+   * course, back to speed within its time); a jibe also without rounding up past GYBE_OVER (deg) after it. */
   turns: 3, gybeOver: 25,
   /** Heave to: hove to (the physics' own state: the jib aback, boat/physics.ts heaveTo) and under HOVE_KT for HOVE_S. */
   hoveKt: 1, hoveS: 60
@@ -58,7 +58,7 @@ export const LESSON_MARKS = {
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Sail to the buoy and stop by it: ease both sheets',
-  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', gybing: 'Bear away to a run. "Ready to gybe" … "Gybe-ho" (0 of 3)', heaveto: 'Heave to: tack, leave the jib aback, tiller to leeward'
+  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: tack, leave the jib aback, tiller to leeward'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -84,7 +84,7 @@ export class LessonTracker {
   /** The tiller: the buoy to steer for, and then the course to hold (deg, by the compass). */
   readonly buoy: Vec | null;
   course: number | null = null;
-  /** Tacking and gybing: the good ones so far, scored by the tack and gybe drill's own tracker. */
+  /** Tacking and jibing: the good ones so far, scored by the tack and gybe drill's own tracker. */
   good = 0;
   readonly turns: DrillTracker | null;
   private held = 0; private seen = 0; private ironsT = 0;
@@ -92,7 +92,7 @@ export class LessonTracker {
   constructor(id: LessonId, buoy: Vec | null) {
     this.id = id; this.buoy = BUOY_LESSONS.has(id) ? buoy : null;
     this.cue = FIRST[id] || POINTS[0].cue;
-    this.turns = id === 'tacking' || id === 'gybing' ? new DrillTracker() : null;
+    this.turns = id === 'tacking' || id === 'jibing' ? new DrillTracker() : null;
   }
 
   update(b: Boat, t: number, dt: number, hs = 0): void {
@@ -170,7 +170,7 @@ export class LessonTracker {
     this.progress = this.good / LESSON_MARKS.turns;
     if (this.good >= LESSON_MARKS.turns) { this.passed = true; return; }
     // (the helm's commands, as ASA 101 teaches them, its knowledge 5)
-    this.cue = kind === 'tack' ? `"Ready about" … "Hard alee": tack (${this.good} of ${LESSON_MARKS.turns})` : `Bear away to a run. "Ready to gybe" … "Gybe-ho" (${this.good} of ${LESSON_MARKS.turns})`;
+    this.cue = kind === 'tack' ? `"Ready about" … "Hard alee": tack (${this.good} of ${LESSON_MARKS.turns})` : `Bear away to a run. "Ready to jibe" … "Jibe-ho" (${this.good} of ${LESSON_MARKS.turns})`;
   }
 
   private heaveTo(b: Boat, dt: number): void {

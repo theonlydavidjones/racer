@@ -79,6 +79,7 @@ const ctx = {
   get S() { return S; },
   get beginRace() { return setup.beginRace; },
   get beginLesson() { return setup.beginLesson; },
+  get openLessons() { return setup.openLessons; },
   get drillRuns() { return drillRuns; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
@@ -625,6 +626,8 @@ function lessonTick(): void {
     lessonCue = L.cue;
     if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
     if (L.passed && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
+    // passed: a moment to see it, then paused on the lessons, this one ticked
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); setup.openLessons(); } }, 3000);
   }
   tipFade();
 }

@@ -15,7 +15,7 @@ on-the-water practical (the skill items 21–40).
 | 4 Points of sail | S22 trim; S28–32 close-hauled, close reach, beam reach, broad reach, run | built; **changed**: it had 3 points and now has ASA's 5 |
 | 5 Stop, go, irons | S25 get out of irons | built |
 | 6 Tacking | S33 tack; K5 the commands ("Ready about" … "Hard alee") | built; the cue now gives the commands |
-| 7 Gybing | S34 gybe; K5 the commands | built; ASA writes "jibe" (see below) |
+| 7 Jibing | S34 gybe; K5 the commands | built; ASA writes "jibe" (see below) |
 | 8 Heave to | — (not in ASA 101) | kept from US Sailing BK, as an extra |
 | 9 Rules of the road | K6–13 the Navigation Rules; K14–15 aids to navigation | |
 | 10 Crew overboard | S36 | |

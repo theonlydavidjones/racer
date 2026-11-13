@@ -89,10 +89,10 @@ describe('Learn to sail: the lessons\' checks', () => {
     expect(L.good).toBe(3); expect(L.passed).toBe(true);
   });
 
-  it('gybing: three good gybes', () => {
+  it('jibing: three good jibes', () => {
     const tws = 12, a = FOLKBOAT.runAngle(tws), b = testBoat({ heading: 360 - a, kt: FOLKBOAT.speedKt(tws, a), windKt: tws });
     b.poleWant = true;
-    const L = new LessonTracker('gybing', null); let t = 0;
+    const L = new LessonTracker('jibing', null); let t = 0;
     const tick = () => { L.update(b, t, 1 / 60); t += 1 / 60; };
     sail(b, 60, tick);
     for (let k = 0; k < 3; k++) { startTack(b); sail(b, 90, tick); }
