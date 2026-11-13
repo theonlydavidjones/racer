@@ -78,12 +78,14 @@ describe('the shore distance off a 10 m lattice', () => {
 describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
   // A helmsman's reaction is a few tenths of a second; her boat answers the helm every step. Thinking every sixth step
   // (staggered across the fleet) against every step: no further from that race than a 0.1% change in the current takes
-  // it (as the lattice above), and no more penalties.
-  it('sails no further from the every-step race than a 0.1% change in the current does, over eight races, with no more fouls', () => {
+  // it (as the lattice above), and no more penalties. Over sixteen races (eight on each course): each race is chaotic, so
+  // a change elsewhere in the sim draws a different sample of them, and eight left the mean a few hundredths of a point
+  // either side of the bound by luck (the Coordinator, 13 Nov 2026: a stronger test, not a looser one)
+  it('sails no further from the every-step race than a 0.1% change in the current does, over sixteen races, with no more fouls', () => {
     const dev: number[] = [], nudge: number[] = [];
     let penE = 0, penD = 0;
     const pens = (r: ReturnType<typeof race>) => r.fouls;
-    for (const [i, seed] of [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const) {
+    for (const [i, seed] of [[0, 3], [0, 4], [0, 5], [0, 6], [0, 11], [0, 12], [0, 13], [0, 14], [1, 7], [1, 8], [1, 9], [1, 10], [1, 15], [1, 16], [1, 17], [1, 18]] as const) {
       const exR = race(i, { grid: true, skip: true, seed, exactAI: true }), ex = fleetV(exR.boats), dR = race(i, { grid: true, skip: true, seed });
       dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR);
       nudge.push((Math.abs(fleetV(race(i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }).boats) / ex - 1) + Math.abs(fleetV(race(i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }).boats) / ex - 1)) / 2);
@@ -91,7 +93,7 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(mean(dev), `twenty a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
     expect(penD, `penalties: every step ${penE}, twenty a second ${penD}`).toBeLessThanOrEqual(penE * 1.3 + 2);
-  }, 1_800_000);
+  }, 3_600_000);
 });
 
 describe('pairs far apart are let be', () => {

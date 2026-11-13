@@ -87,6 +87,71 @@ turn the physics into understanding.
 - **Open questions:** which passages first? Should a seamanship challenge be scored, and how? Does cruising keep the
   same boat and crew as racing?
 
+## 4. Community (owner, 13 November)
+
+The owner's words: "You can't race in real life without belonging to a club. No single person can know or do everything
+required to sail and maintain a boat. The building of marinas, the trading and training of crew, the flying of
+burgees, the traditions, the legacies, the trophies all belong to that community element. Eventually we'll want a live
+multiplayer mode." The priority still holds: physics and racing first. Community builds on them.
+
+### Middle: the Yacht Club as the hub
+
+- **What it is:** the club as the place your sailing lives.
+  - **Membership:** you join a club, and its burgee flies from your boat.
+  - **Crew:** crew trained and traded between members, their skills growing with the races they sail.
+  - **Officers:** a commodore and a race committee, with the club's burgee, flag etiquette and traditions (the
+    first-race-of-the-season blessing, the Wednesday nights).
+  - **Perpetual trophies** with their history: every winner's name on them, year after year.
+  - **Seasons and standings**, run by the club.
+- **Why it serves the mission:** racing on the Bay is a club life. Crewing for others and learning from better
+  sailors is how real sailors improve, and the traditions are part of the magic.
+- **Prerequisites:**
+  - the skipper and crew models (section 1);
+  - the Yacht Club screens (section 2, Crew Model and Skipper Model's design);
+  - accounts, so other people and their boats persist. The artifact already declares the `user` and `db`
+    capabilities that the saves use (store/cloud.ts).
+  - Seasons (section 2).
+- **Size:** 15–25 h beyond the Yacht Club and Seasons themselves.
+- **The owner's answers (13 November):**
+  - **Real clubs**, for now (GGYC, StFYC, the Corinthian, SBYC…). Before any public release, each real club's name and
+    burgee need its permission.
+  - **Crew trading with AI members only**, until multiplayer.
+  - **Traditions:** researched, ranked by how central they are to a member's life and by what a sim can honestly
+    portray, in docs/TRADITIONS.md.
+
+### Long term: live multiplayer
+
+- **What it is:** racing other people in real time, on the same Bay, in the same wind and tide, under the same rules.
+  Later: cruising together, and a club's own regattas.
+- **Why it serves the mission:** racing real people is the real test of tactics and the rules. It's also the community
+  the owner describes.
+- **What the Capacity work already gives it** (steps 1–3, under way):
+  - the sim in a Web Worker, apart from the page;
+  - a snapshot/command boundary: the page reads the race through a read-only view and changes it only by commands.
+    Commands are exactly what a network would carry;
+  - deterministic, seeded races, so every player's machine can run the same race from the same inputs, with only the
+    commands sent.
+- **What it would still need:**
+  - **A server.** An artifact page can't host a live race, so this needs a game server, or a relay that orders the
+    commands. This is the step the desktop release's watch note anticipates.
+  - **Authority and anti-cheat.** The server is authoritative for positions and the rules, so no client can push its
+    boat.
+  - **Latency on rules calls.** Overlaps, hails and protests decided at the server's tick, with the delay shown
+    fairly. Close-quarters moves like a mark rounding or a port–starboard crossing are where 100–200 ms shows.
+  - **Accounts and identity,** beyond the artifact's user and db.
+  - **Moderation** for chat and hails.
+- **Prerequisites:**
+  - physics and racing dialled in (section 1);
+  - the Capacity work complete;
+  - the Yacht Club;
+  - the desktop release or a hosted page that can reach a server.
+- **Size:** 60–120 h for a first live race of a few boats, more for a full regatta.
+- **The owner's answers (13 November):**
+  - **Club members only**, but "membership is just an attribute at this point".
+  - **"Ghost" races first:** racing against another member's recorded race, with no server needed.
+  - **Who runs the server:** open for later. When it's time, this doc lays out the simple options and their costs in
+    plain words.
+
 ## Open questions for the owner
 
 1. Are the fleet's protest and penalty rates recorded anywhere (results with DSQs, protest committee minutes)? This
