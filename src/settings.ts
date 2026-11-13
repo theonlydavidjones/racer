@@ -33,6 +33,9 @@ export interface Settings {
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2;
+  /** The race applies Appendix P (special procedures for rule 42, judges on the water): a first rule 42 penalty is a
+   * Two-Turns Penalty (P2.1), a second means retiring (P2.2). Omitted: rule 42 is protested and the penalty is DSQ. */
+  appendixP?: boolean;
   sea: 'real' | 'flat'; // waves: real (from the wind, the fetch, the current and the buoy swell) or flat water
   swellDay: 0 | 1 | 2;
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';

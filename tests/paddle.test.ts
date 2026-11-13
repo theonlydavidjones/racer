@@ -95,6 +95,30 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     applyCommand(w, { k: 'paddle', side: 'P' });
     expect(w.paddleAllowed(w.user)).toBe(true);
   });
+  // (a boat racing, paddling one spell for 15 s)
+  const paddleSpell = (w: World) => { applyCommand(w, { k: 'paddle', side: 'P' }); for (let i = 0; i < 60 * 15; i++) w.step(DT); applyCommand(w, { k: 'paddle', side: null }); w.step(DT); };
+  const racingWorld = (appendixP?: boolean) => {
+    const S = { ...DEFAULT_SETTINGS, mode: 'race' as const, windKt: 1, windKind: 'west' as const, current: 'slack', sea: 'flat' as const, traffic: 0 as const, fleet: 0, opponents: [], ...(appendixP ? { appendixP } : {}) };
+    const w = new World(courseFile('train'), S, 4242, {});
+    while (!w.racing(w.user)) w.step(DT);
+    toasts(w);
+    return w;
+  };
+  it('the penalty for paddling while racing: disqualification (rule 44.1\'s turns cover only Part 2 and rule 31); one penalty a spell, however many strokes', () => {
+    const w = racingWorld();
+    paddleSpell(w);
+    expect(w.user.scoring).toBe('DSQ');
+    expect(w.user.penaltyTotal ?? 0).toBe(0);
+    expect(toasts(w).filter(m => /DSQ/.test(m)).length).toBe(1);
+  });
+  it('with Appendix P: a first rule 42 penalty is a Two-Turns Penalty (P2.1), a second spell means retiring (P2.2)', () => {
+    const w = racingWorld(true);
+    paddleSpell(w);
+    expect(w.user.penaltyTotal).toBe(720);
+    expect(w.user.scoring ?? null).toBeNull();
+    paddleSpell(w);
+    expect(w.user.retired).toBe(true);
+  });
   it('racing, the crew never paddle of themselves (they keep rule 42) unless she has just hit something', () => {
     const w = world('race', 1, 'flood');
     while (!w.racing(w.user)) w.step(DT);

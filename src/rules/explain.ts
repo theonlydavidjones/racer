@@ -19,6 +19,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '21.1': ['Rule 21.1 · Returning to start', 'After her starting signal, a boat sailing back toward the pre-start side of the starting line (or its extensions) to start keeps clear of boats that are not, until her hull is completely on the pre-start side.'],
   '21.2': ['Rule 21.2 · Taking a penalty', 'A boat taking a penalty keeps clear of boats that are not.'],
   '21.3': ['Rule 21.3 · Backing a sail', 'A boat moving astern, or sideways to windward, through the water by backing a sail keeps clear of one that is not.'],
+  '42': ['Rule 42 · Propulsion', 'A boat shall compete by using only the wind and water to increase, maintain or decrease her speed; her crew may adjust the trim of sails and hull and perform other acts of seamanship, but shall not otherwise move their bodies to propel her (42.1). Paddling is propulsion. The exceptions: to help a person or vessel in danger (42.3(g)); to get clear after grounding or colliding with a vessel or object, by her crew\'s force or any equipment other than an engine (42.3(h)); or if the sailing instructions allow it (42.3(i)). Rule 44.1\'s turns don\'t cover rule 42: the penalty is disqualification, unless the race applies Appendix P (on-the-water judging), where a first penalty is a Two-Turns Penalty and a second means retiring.'],
   '23': ['Rule 23 · Interfering with another boat', 'If reasonably possible, a boat not racing (one that has retired, or finished and cleared the finishing line) shall not interfere with a boat that is racing (23.1). And, if reasonably possible, a boat shall not interfere with a boat taking a penalty, sailing on another leg, or returning to start under rule 21.1, except that after the starting signal she may sail her proper course (23.2). The rules don\'t define "interfere": by the owner\'s decision this sim calls rule 23 only for getting in her way, not for taking her wind, which is tactics.']
 };
 
@@ -177,7 +178,8 @@ export function situationText(rule: RuleId, youKeepClear: boolean, other: string
     '21.1': kc ? `You're returning. Keep clear of everyone.` : `${nm} is returning and must keep clear.`,
     '21.2': kc ? `You're doing turns. Keep clear of everyone.` : `${nm} is doing turns and must keep clear.`,
     '21.3': kc ? `You're backing down. Keep clear of everyone.` : `${nm} is backing down and must keep clear.`,
-    '23': kc ? `Don't interfere with ${nm}.` : `${nm} must not interfere with you.`
+    '23': kc ? `Don't interfere with ${nm}.` : `${nm} must not interfere with you.`,
+    '42': `Sail her: no paddling while racing (rule 42).`
   };
   return msgs[rule];
 }

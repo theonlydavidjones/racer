@@ -23,7 +23,7 @@
  * wins; nobody is moved up or down by her penalty.
  */
 
-export type ScoreCode = 'ZFP' | 'UFD' | 'BFD' | 'RET' | null;
+export type ScoreCode = 'ZFP' | 'UFD' | 'BFD' | 'RET' | 'DSQ' | null;
 /**
  * `ahead`: for a boat still racing, where she is in the race now (lower = further on), to project how the boats still
  * out there will finish: a Z-flag boat's final place waits on them (every boat that finishes later on fewer points
@@ -65,14 +65,14 @@ export function raceScores(boats: ScoreIn[], entries = boats.length): ScoreOut[]
     i = j + 1;
   }
   const out: ScoreOut[] = boats.map(b => {
-    if (b.code === 'UFD' || b.code === 'BFD' || b.code === 'RET') return { id: b.id, points: dnf, across: null, rank: null, final: true, penalty: 0, code: b.code };
+    if (b.code === 'UFD' || b.code === 'BFD' || b.code === 'RET' || b.code === 'DSQ') return { id: b.id, points: dnf, across: null, rank: null, final: true, penalty: 0, code: b.code };
     const a = across.get(b.id) ?? null;
     if (a == null) return { id: b.id, points: null, across: null, rank: null, final: false, penalty: 0, code: b.code };
     const p = b.code === 'ZFP' ? Math.min(dnf - a, pen) : 0;
     return { id: b.id, points: tenth(a + p), across: a, rank: null, final: true, penalty: tenth(p), code: b.code };
   });
   // the boats still racing will take the places after the f boats in so far: a score of f + 1 or better can't be beaten
-  const f = fin.length, racing = boats.filter(b => b.finishT == null && b.code !== 'UFD' && b.code !== 'BFD' && b.code !== 'RET').sort((a, b) => (a.ahead ?? 0) - (b.ahead ?? 0));
+  const f = fin.length, racing = boats.filter(b => b.finishT == null && b.code !== 'UFD' && b.code !== 'BFD' && b.code !== 'RET' && b.code !== 'DSQ').sort((a, b) => (a.ahead ?? 0) - (b.ahead ?? 0));
   for (const o of out) if (o.points != null && o.across != null) o.final = !racing.length || o.points <= f + 1;
   // ranks by points; equal points share a rank (44.3(c): "two boats may receive the same score"). With the boats
   // still racing projected into the places after f, in the order they're in now

@@ -737,12 +737,28 @@ export class World {
    * the penalty (DSQ, or Appendix P's two turns where the race applies it), once a spell; until then it's told.
    */
   rule42(b: Boat, why: 'paddle'): void {
-    const p = b.paddle; if (!p || !b.isUser || this.r42told === p.t0) return;
-    this.r42told = p.t0;
-    this.emit({ type: 'toast', ms: 6000, msg: `Paddling while racing breaks rule 42.1 (propulsion). Only getting clear after hitting something (42.3(h)) or helping someone in danger (42.3(g)) allows it.` });
-    void why;
+    // (one penalty a spell of paddling, b.paddle.t0: switching sides is the same spell; stopping and starting again, a new one)
+    const p = b.paddle; if (!p || this.r42spell.get(b.id) === p.t0 || b.retired || b.finished) return;
+    this.r42spell.set(b.id, p.t0);
+    const n = (this.r42count.get(b.id) ?? 0) + 1; this.r42count.set(b.id, n);
+    const how = why === 'paddle' ? 'Paddling' : 'Propelling her';
+    if (this.settings.appendixP) {
+      // Appendix P (judges on the water): P2.1, a first penalty is a Two-Turns Penalty under 44.2; P2.2, a second in the
+      // event, she shall promptly retire
+      if (n === 1) {
+        addPenalty(b, 720);
+        if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `${how} while racing breaks rule 42.1 (propulsion). Appendix P applies: a Two-Turns Penalty (P2.1). Get clear and take it. A second rule 42 penalty means retiring (P2.2).` });
+      } else if (b.isUser) this.retire(': a second rule 42 penalty (Appendix P2.2)');
+      else { b.retired = true; b.penalty = 0; }
+    } else {
+      // no Appendix P: rule 44.1's turns are for Part 2 and rule 31 only, so a rule 42 breach is protested and disqualified
+      b.scoring = 'DSQ';
+      if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `${how} while racing breaks rule 42.1 (propulsion): she will be disqualified (DSQ). No penalty turns can exonerate it (rule 44.1 covers Part 2 and rule 31 only). Only getting clear after hitting something (42.3(h)) or helping someone in danger (42.3(g)) allows it.` });
+    }
   }
-  private r42told = NaN;
+  /** Rule 42 penalties: the spell (b.paddle.t0) each boat was last penalized for, and how many this race (Appendix P2.2). */
+  private r42spell = new Map<number, number>();
+  private r42count = new Map<number, number>();
   /**
    * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
    * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons with the shore
