@@ -16,10 +16,10 @@ import { SyncMirror, SyncSource } from '../src/sim/sync';
 /** A fixed workload like the sim's (trig, square roots, small arrays). */
 /**
  * The mirror's budgets (ratios against the reference workload, as the step's; the second test). Measured 13 Nov 2026,
- * after the review's fixes (the sea's fetch memo kept on each side): the page's part 20.9–21.6, the worker's 133.5–134.2
- * (about 0.5 and 3.1 CPU ms a frame in this container). About a fifth above: room for the noise, not for a creep.
+ * after the sync's walk was made cheaper (one record per object, memos looked up once per object): the page's part
+ * 18.0–18.1, the worker's 100–104 (it was 134 before). About a fifth above: room for the noise, not for a creep.
  */
-const PAGE_BUDGET = 26, WORKER_BUDGET = 160;
+const PAGE_BUDGET = 22, WORKER_BUDGET = 125;
 const scratch = new Float64Array(256);
 let sink = 0;
 /** The process's own CPU time, ms: unlike the clock on the wall, it doesn't run while the process waits for a core. */
