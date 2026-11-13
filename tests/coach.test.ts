@@ -48,15 +48,16 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
       expect(v.top.kind).toBe('ok'); expect(v.top.head).toMatch(/^Trim's right/); expect(v.more).toEqual([]);
     }
   });
-  it('the traveller held up in 20 kt costs a little (about 1%): the coach names the traveller, and nothing bigger', () => {
-    // (the crew eases the sheet to hold the boom where it should be, so most of the cost is gone; what's left is the
-    // middle crew's finer play of traveller and sheet together, with the helm on the after deck where it's narrower, and
-    // the crew hiking aft along the side deck where it's narrower too: a little less righting moment, so dropping it is
-    // worth a touch more, about 1.04%)
+  it('the traveller held up in 20 kt costs little with the vang on: the coach says why most boats drop it, and names nothing bigger', () => {
+    // (the crew eases the sheet to hold the boom where it should be, and the forward hand has the vang hard on, so the leech
+    // is held and the traveller up costs almost nothing in the model: the coach's confirmation explains it rather than
+    // calling it a fix. With the vang still part way on, the traveller costs about 1% and the coach names it: either way
+    // it's the traveller or nothing, never something bigger. (Which, depends on when the forward hand has got to the vang:
+    // crewWork.ts LINE_TRIP)
     const b = boat({ heading: 318, windKt: 20, sea: CHOP }); wrong(b, 'traveller', -1);
-    const top = teach(b).top;
-    expect(top.kind).toBe('fix');
-    if (top.kind === 'fix') { expect(top.line).toBe('traveller'); expect(top.gain).toBeLessThan(2.75 * FIX_MIN); }
+    const v = teach(b);
+    if (v.top.kind === 'fix') { expect(v.top.line).toBe('traveller'); expect(v.top.gain).toBeLessThan(2.75 * FIX_MIN); }
+    else expect(v.top.why).toMatch(/vang holds the leech/);
   });
   it('in a gale the crew easing the main is explained as deliberate, never "trim in"', () => {
     // (the boom eases out down the traveller only on the last depowering steps: physics.ts crewEaseBoom)

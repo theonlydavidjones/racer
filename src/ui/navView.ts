@@ -2,7 +2,7 @@ import type { Vec } from '../core/math';
 import { onLand } from '../geo/shore';
 import { passagePlan, type PassagePlan } from '../sim/navigator';
 import { ROUTES } from '../sim/traffic';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { briefHtml } from './briefView';
 import { $ } from './dom';
 import { drawCurrentArrows, drawLand, fitCanvas, makeTf } from './draw2d';
@@ -14,13 +14,13 @@ type P = [number, number];
  * current gates, where the wind is strongest, the ship and ferry routes she crosses), and the plan in words below.
  */
 export class NavView {
-  private world: World | null = null;
+  private world: SimView | null = null;
   private plan: PassagePlan | null = null;
   private canvas = $<HTMLCanvasElement>('navcanvas');
 
   get isOpen(): boolean { return !$('navView').hidden; }
 
-  open(w: World): void {
+  open(w: SimView): void {
     this.world = w;
     $('navView').hidden = false;
     if (!w.dest) {
@@ -44,7 +44,7 @@ export class NavView {
     }, 30);
   }
   close(): void { $('navView').hidden = true; this.world = null; }
-  toggle(w: World): void { if (this.isOpen) this.close(); else this.open(w); }
+  toggle(w: SimView): void { if (this.isOpen) this.close(); else this.open(w); }
 
   private draw(): void {
     const w = this.world, [ctx, cw, ch] = fitCanvas(this.canvas);

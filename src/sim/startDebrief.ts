@@ -1,5 +1,5 @@
 import { D2R, KT, LOA, V, clamp, dot, sub } from '../core/math';
-import type { World } from './world';
+import type { SimView } from './host';
 
 export interface StartDebrief {
   grade: 'great' | 'good' | 'late' | 'slow' | 'ocs' | 'none';
@@ -15,7 +15,7 @@ const lengths = (m: number) => { const n = m / LOA; return n < 0.95 ? `${Math.ro
  * What happened at your start and what to try next time: distance and speed at the gun, where on
  * the line, crossing order, the favored end, and specific tips. Pure: reads the world, changes nothing.
  */
-export function startDebrief(w: World): StartDebrief {
+export function startDebrief(w: SimView): StartDebrief {
   const g = w.gun, u = w.user, C = w.C;
   if (!g) return { grade: 'none', title: 'No start yet', facts: [], tips: [] };
   const me = g.boats[u.id];

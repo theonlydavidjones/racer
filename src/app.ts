@@ -26,9 +26,10 @@ import { FLEET } from './boat/boat';
 import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
-import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
-import type { Controls } from './boat/controls';
-import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
+import { CONDITION_KEYS, World, describeTide } from './sim/world';
+import { LocalHost, type SimView } from './sim/host';
+import type { Command, CtlKey } from './sim/commands';
+import { POLE, byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
 import { YOU, ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
@@ -54,8 +55,9 @@ import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from '.
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
+import { passageNow, whyNot } from './sim/navigator';
 import { FlowPanel } from './ui/flowPanel';
-import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
+import type { PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
 // the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
@@ -81,10 +83,15 @@ const raceReplay = new RaceReplay($('raceReplay'));
 const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
 let drillShown = false;
 
-let w!: World;
+/** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
+let host!: LocalHost;
+/** Development only: the view refuses writes (sim/host.ts guarded), to find any the compiler can't see. */
+const SIM_GUARD = import.meta.env.DEV && /[?&]simguard\b/.test(location.search);
+let w!: SimView;
+const send = (c: Command) => host.send(c);
 /** An older race sailed again that was saved with a pinned 'Wind from' (before Turn the wind): its direction, for that race only. */
 let replayPin: number | null = null;
-let viewMode = 0, acc = 0;
+let viewMode = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
 const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; panelShift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, panelShift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
@@ -163,7 +170,8 @@ const hhmm = (m: number) => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60
 let condLive = false;
 function newGame(seed = randomSeed()): void {
   incidentClips = []; // (a new race: its own rule incidents)
-  if (condLive && w?.running) { w.applyConditions(S); saveSettings(S); view.conditionsChanged(w); return; } // (the owner: at once, without a restart)
+  if (condLive && w?.running) { send({ k: 'conditions', settings: S }); saveSettings(S); view.conditionsChanged(w); return; } // (the owner: at once, without a restart)
+  pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
@@ -173,9 +181,9 @@ function newGame(seed = randomSeed()): void {
   const WS = shown ? { ...WS1, ...(showCond ?? {}), ...(showMin != null ? { tideTime: hhmm(showMin + WS1.seq) } : {}) } : WS1;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
-  w = new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
-    S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) });
-  acc = 0; drillShown = false;
+  host = new LocalHost(new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
+    S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) }), SIM_GUARD);
+  w = host.view; drillShown = false;
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint();
   view.setWorld(w);
@@ -226,7 +234,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   lastClip = clip;
   if (w.log) {
     const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
-    w.log.note({ key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length });
+    send({ k: 'logNote', note: { key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length } });
     incidentClips.push({ clip, title, what: ex.what });
   }
   $('replay').hidden = false;
@@ -236,16 +244,16 @@ $('bReplay').onclick = () => { if (lastClip) replayView.play(w, lastClip); };
 $('bCont').onclick = () => {
   $('replay').hidden = true; replayView.stop();
   if (pendingPenalty) {
-    w.assignPenalty(pendingPenalty);
+    send({ k: 'penalty', boat: pendingPenalty.id });
     if (pendingPenalty.isUser) toast(`Do your ${w.penaltyDeg === 720 ? 'two turns' : 'turn'} now: put the tiller over and keep turning the same way.`, 4000);
     pendingPenalty = null;
   }
-  w.paused = false;
+  send({ k: 'pause', on: false });
 };
 
 /* ---------------- input ---------------- */
 function setControlsIdle(): void {
-  const u = w.user; u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0;
+  send({ k: 'handsOff' });
 }
 
 /** A cluster button's word (under its icon), set only when it changes. */
@@ -253,7 +261,7 @@ function word(id: string, t: string): void { const e = $(id).querySelector('.w')
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
-function setTiller(v: number): void { const u = w.user; u.tiller = Math.max(-1, Math.min(1, v)); if (u.lashed != null) u.lashed = u.tiller; }
+function setTiller(v: number): void { send({ k: 'tiller', v }); }
 /* Lashing the tiller: a line from the tiller to a cleat holds it where you leave it, hands off (heaving to). It's done on
  * the tiller itself: right-click (or double-click, or the key) to lash it where it is. The lashing shows on the tiller guide; a click
  * or A/D takes the tiller and the lashing comes off; double-click again to lash it somewhere else. */
@@ -263,14 +271,14 @@ function lash(): void {
   const u = w.user;
   if (u.lashed != null) { unlash(); return; }
   pilotOff('Pilot on standby.'); releaseTiller();
-  u.lashed = u.tiller; showLash();
+  send({ k: 'lash', on: true }); showLash();
   const t = u.tiller, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
   const fast = u.v > 2 / 1.944 && lee && Math.abs(t) > 0.15 && !((u.jibBacked ?? 0) > 0.5);
   toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack. To heave to, back the jib first and let her slow to a knot or two, then lash.`
     : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. To lash it elsewhere, take the tiller, move it, and right-click (or double-click).'
     : `Tiller lashed ${lashWhere(t)} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Click or ${keymap.label('steerPort')}/${keymap.label('steerStbd')} takes the tiller; right-click or double-click lashes it again.`, fast ? 6000 : 4500);
 }
-function unlash(): void { const u = w.user; if (u.lashed == null) return; u.lashed = null; showLash(); toast('Lashing off: you have the tiller.', 2000); }
+function unlash(): void { const u = w.user; if (u.lashed == null) return; send({ k: 'lash', on: false }); showLash(); toast('Lashing off: you have the tiller.', 2000); }
 function showLash(): void {
   const l = w.user.lashed, on = l != null;
   document.body.classList.toggle('lashed', on); $('tiller').classList.toggle('lashed', on);
@@ -343,7 +351,6 @@ gl.addEventListener('wheel', e => {
 }, { passive: false });
 
 /* ---------------- sail trim: who trims, the sheets, and every other line ---------------- */
-type CtlKey = Exclude<keyof Controls, 'car'>;
 type CtlItem = { key: CtlKey | 'carFore' | 'carIn'; label: string; group: string };
 /** The lines, grouped as they are on Josephine. */
 const CTL_UI: CtlItem[] = [
@@ -372,7 +379,7 @@ function showTrimOwner(): void {
   $('tpWho').title = n === 0 ? 'The crew trims every line. Work any line in the sail controls and that one is yours.' : `Yours: ${names.join(', ')}. The crew trims the rest. Tap a line's amber name to give it back.`;
   $('tpWho').parentElement!.classList.toggle('mine', n > 0);
 }
-function giveBack(k: LineKey): void { takeLine(w.user, k, false); showTrimOwner(); }
+function giveBack(k: LineKey): void { send({ k: 'line', key: k, mine: false }); showTrimOwner(); }
 /** Every Crew · You switch in the trim panel: a line's (data-line), or the crew's weight ("crew"). */
 document.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('.who [data-who]'); if (!b || !w.running) return;
@@ -381,12 +388,12 @@ document.addEventListener('click', e => {
   if (line === 'crew') {
     const c = w.user.crew; if (!c) return;
     if (you) { if (!c.place) setPlace('across', autoAcross(w.user)); }
-    else if (c.place) { c.place = undefined; showCrewPlace(); toast('Crew back on auto: they place their own weight again.', 2500); }
+    else if (c.place) { send({ k: 'crewPlace', place: null }); showCrewPlace(); toast('Crew back on auto: they place their own weight again.', 2500); }
     return;
   }
   const k = line as LineKey;
   if (you === byHand(w.user, k)) return;
-  if (you) { takeLine(w.user, k); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
+  if (you) { send({ k: 'line', key: k, mine: true }); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
   else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
 });
 // the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout)
@@ -396,10 +403,11 @@ $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); s
 /* The sail controls band (ui/sailBand.ts): every line, laid out as you face forward from the helm. */
 const band = new SailBand({
   world: () => w,
+  send,
   hold: (k, d) => { if (d == null) delete btnCmd[k]; else btnCmd[k] = d; applyHeld(); },
   changed: () => showTrimOwner(),
   toast: (m, ms) => toast(m, ms),
-  allBack: () => { allToCrew(w.user); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line, both jib cars and the pole back to the crew.', 2500); },
+  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line, both jib cars and the pole back to the crew.', 2500); },
   pole: () => togglePole(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
@@ -513,8 +521,7 @@ function coachTick(dt: number): void {
 function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 function stepCar(k: 'carFore' | 'carIn', d: number): void {
   if (!w.running || w.paused) return;
-  takeLine(w.user, 'car');
-  moveLazyCar(w.user, k === 'carFore' ? d : 0, k === 'carIn' ? d : 0);
+  send({ k: 'lazyCar', fore: k === 'carFore' ? d : 0, ins: k === 'carIn' ? d : 0 });
 }
 /** Every frame: who has the lines, and the band's ropes, boom and cars (you can watch the crew work theirs too). */
 function showLines(): void {
@@ -530,9 +537,9 @@ const ACROSS: PlaceAcross[] = ['lee', 'mid', 'up', 'hike'], FORE: PlaceFore[] = 
 function setPlace(part: 'across' | 'fore', v: PlaceAcross | PlaceFore): void {
   const c = w.user.crew; if (!c || !w.running) return;
   if (!c.spec.crew.length && part === 'fore') { toast('Single-handed, you can\'t leave the tiller to move forward: only your own weight across the boat moves.', 3500); return; }
-  const was = !!c.place, pl = c.place ?? { across: null, fore: null };
+  const was = !!c.place, pl = { across: c.place?.across ?? null, fore: c.place?.fore ?? null };
   if (part === 'across') pl.across = v as PlaceAcross; else pl.fore = v as PlaceFore;
-  c.place = pl;
+  send({ k: 'crewPlace', place: pl });
   if (!was) toast('Crew off auto: they stay where you put them until you move them or tap Auto.', 3000);
   showCrewRow(w.user);
 }
@@ -548,24 +555,24 @@ document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt 
 document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => bt.onclick = () => {
   const c = w.user.crew, pl = c?.place;
   if (!c || !pl || pl.fore !== bt.dataset.cf) { setPlace('fore', bt.dataset.cf as PlaceFore); return; }
-  pl.fore = null; if (pl.across == null) c.place = undefined;
+  send({ k: 'crewPlace', place: pl.across == null ? null : { across: pl.across, fore: null } });
   showCrewPlace(); toast(c.place ? 'Fore and aft back to the crew; where they sit across stays yours.' : 'Crew back on auto: they place their own weight again.', 2500);
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const u = w.user; u.poleWant = !u.poleWant; u.poleMine = true; // (yours now, until Auto-trim)
+  const u = w.user; send({ k: 'pole', want: !u.poleWant }); // (yours now, until Auto-trim)
   toast(u.poleWant ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it
 $('sigPanel').addEventListener('click', () => hud.flagIndex(w, !!$('flagIndex').hidden));
 $('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
-function doHail(): void { if (w.running && !w.paused) w.userHail(); }
+function doHail(): void { if (w.running && !w.paused) send({ k: 'hail' }); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
-function pushOff(): void { if (w.running && !w.paused) w.pushOff(); }
+function pushOff(): void { if (w.running && !w.paused) send({ k: 'pushOff' }); }
 $('bPushOff').onclick = pushOff;
 /* Hoist or strike a sail (the crew does it at their pace: boat/physics.ts crewRig). */
-function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; w.setSail(sail, !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true)); }
+function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; send({ k: 'sail', sail, up: !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true) }); }
 // (on press, like the pole button: the label changes as the crew works, and a click needs the same thing under the pointer at both ends)
 for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
   $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); halyard(sail); });
@@ -580,14 +587,14 @@ function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
   if (u.docked || u.pushing || (u.astern ?? 0) > 0.1 || u.v < 0.5) { toast('Get her sailing first: a tiller pilot needs way on to steer.', 3500); return; }
   unlash();
   if (mode === 'nav' && (!w.dest || w.arrivedT != null)) { toast('Nav needs somewhere to go: tap the map and pick a destination.', 4000); return; }
-  releaseTiller(); pilotEngage(u, w.pilot, mode);
+  releaseTiller(); send({ k: 'pilot', op: 'engage', mode });
 }
-function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; pilotStandby(w.pilot); if (msg) toast(msg, 2500); }
+function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
 function pilotTick(dt: number): void {
   const p = w.pilot, on = p.mode !== 'off' && w.running;
-  if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) pilotAdjust(w.user, p, d * 20 * dt); }
+  if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) send({ k: 'pilot', op: 'adjust', d: d * 20 * dt }); }
   const chip = $('bPilot'), hide = !w.running || !w.cruising;
   if (chip.hidden !== (hide || on)) chip.hidden = hide || on; // (while it steers, its panel takes the button's place)
   chip.classList.toggle('on', on);
@@ -624,29 +631,29 @@ function motorUi(): void {
 $('bMotor').onclick = () => { motorOpen = !motorOpen; motorUi(); };
 function motorStartUi(): void {
   const m = w.user.motor; if (!m) return;
-  if (m.running || m.pulling) { w.motorStop(); return; }
-  if (w.motorStart() === 'racing') { w.paused = true; $('motorAsk').hidden = false; ($('bMotorNo') as HTMLButtonElement).focus(); }
+  if (m.running || m.pulling) { send({ k: 'motor', op: 'stop' }); return; }
+  if (send({ k: 'motor', op: 'start', retireFirst: false }) === 'racing') { send({ k: 'pause', on: true }); $('motorAsk').hidden = false; ($('bMotorNo') as HTMLButtonElement).focus(); }
 }
 for (const b of $('motorHead').querySelectorAll<HTMLButtonElement>('[data-mo]')) b.onclick = () => {
   const k = b.dataset.mo;
-  if (k === 'tilt') w.motorTilt(); else if (k === 'start') motorStartUi(); else if (k === 'swivel') w.motorSwivel(); else if (k === 'castoff') w.castOff();
+  if (k === 'tilt') send({ k: 'motor', op: 'tilt' }); else if (k === 'start') motorStartUi(); else if (k === 'swivel') send({ k: 'motor', op: 'swivel' }); else if (k === 'castoff') send({ k: 'castOff' });
   motorUi();
 };
-for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.onclick = () => { w.motorGear(b.dataset.mg as 'F' | 'N' | 'R'); motorUi(); };
-$('moThrottle').addEventListener('input', () => w.motorThrottle(Number(($('moThrottle') as HTMLInputElement).value) / 100));
-$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; w.paused = false; w.motorStart(true); word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); motorUi(); };
-$('bMotorNo').onclick = () => { $('motorAsk').hidden = true; w.paused = false; };
+for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.onclick = () => { send({ k: 'motor', op: 'gear', gear: b.dataset.mg as 'F' | 'N' | 'R' }); motorUi(); };
+$('moThrottle').addEventListener('input', () => send({ k: 'motor', op: 'throttle', v: Number(($('moThrottle') as HTMLInputElement).value) / 100 }));
+$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); send({ k: 'motor', op: 'start', retireFirst: true }); word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); motorUi(); };
+$('bMotorNo').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); };
 
 /* ---------------- Home: send her back to her home slip (racing, it retires her first) ---------------- */
 function goHome(): void {
   if (!w.running) return;
   if (!w.homeSlip) { toast('She has no home slip: give her one in the Fleet.', 3500); return; }
-  if (!w.freeSail && !w.user.finished && !w.user.retired) { w.paused = true; $('homeAsk').hidden = false; ($('bHomeNo') as HTMLButtonElement).focus(); return; }
-  if (w.sendHome()) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); }
+  if (!w.freeSail && !w.user.finished && !w.user.retired) { send({ k: 'pause', on: true }); $('homeAsk').hidden = false; ($('bHomeNo') as HTMLButtonElement).focus(); return; }
+  if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); }
 }
 $('bHome').onclick = goHome;
-$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; w.paused = false; if (w.sendHome()) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); } };
-$('bHomeNo').onclick = () => { $('homeAsk').hidden = true; w.paused = false; };
+$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); } };
+$('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
 /** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
 function homeButton(): void {
   const el = $('bHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
@@ -661,8 +668,8 @@ for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pm]')) b.o
 for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pa]')) b.onclick = () => {
   const a = b.dataset.pa!, p = w.pilot;
   if (a === 'off') pilotOff('Pilot on standby: you have the tiller.');
-  else if (a === 'tack') { if (p.mode === 'nav') toast('Nav calls its own tacks, on the laylines. Switch to Auto or Wind to tack when you choose.', 3500); else pilotTack(w.user, p); }
-  else pilotAdjust(w.user, p, +a);
+  else if (a === 'tack') { if (p.mode === 'nav') toast('Nav calls its own tacks, on the laylines. Switch to Auto or Wind to tack when you choose.', 3500); else send({ k: 'pilot', op: 'tack' }); }
+  else send({ k: 'pilot', op: 'adjust', d: +a });
 };
 /** The halyard buttons: a sail that's down (or on its way up or down) always has one; striking a sail is for the marina. */
 function sailButtons(): void {
@@ -689,7 +696,7 @@ function ensignButton(): void {
   word('bEnsign', u.ensignStruck ? 'Hoist ensign' : 'Strike ensign');
   el.classList.toggle('on', !!u.ensignStruck);
 }
-$('bEnsign').onclick = () => { const u = w.user; u.ensignStruck = !u.ensignStruck; toast(u.ensignStruck ? 'Ensign struck: down and stowed below till the breeze eases.' : 'Ensign hoisted again.', 2500); };
+$('bEnsign').onclick = () => { const u = w.user; send({ k: 'ensign', struck: !u.ensignStruck }); toast(u.ensignStruck ? 'Ensign struck: down and stowed below till the breeze eases.' : 'Ensign hoisted again.', 2500); };
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
@@ -698,10 +705,10 @@ $('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
-$('bFast').onclick = () => { w.speed = w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1; word('bFast', 'Speed ' + w.speed + '×'); };
+$('bFast').onclick = () => { send({ k: 'speed', v: w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1 }); word('bFast', 'Speed ' + w.speed + '×'); };
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 $('bPause').onclick = () => {
-  if (!w.running) return; w.paused = true; setControlsIdle(); $('pause').hidden = false;
+  if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;
   $('bRestart').textContent = w.freeSail ? 'Restart this cruise' : 'Restart this race';
   const d = $('pauseDebrief'), html = w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
   $('pauseWatch').hidden = !html || w.track.length < 2;
@@ -727,7 +734,7 @@ function watchRace(): void {
   });
 }
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
-$('bResume').onclick = () => { $('pause').hidden = true; w.paused = false; };
+$('bResume').onclick = () => { $('pause').hidden = true; send({ k: 'pause', on: false }); };
 $('bRestart').onclick = () => { $('pause').hidden = true; beginRace(); };
 $('bSettings').onclick = () => { $('pause').hidden = true; openSetup(); };
 $('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
@@ -738,7 +745,7 @@ let chartDest: unknown = null;
 const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); }
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); tideBox(); } // (the tide graph's Arrive moves with them)
 };
 setupChart = new SetupChart(hud, cruisePicks);
 /** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
@@ -746,18 +753,18 @@ const planChart = new PlanChart(hud, cruisePicks, () => setupChart?.sync(true));
 $('bPlanOpen').onclick = () => { planChart.open(); openChartHook(); };
 let openChartHook = () => {}; // (the field picker, set to the layers in force when the chart opens)
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
-  pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
+  pal => { S.chartPal = pal; send({ k: 'settings', patch: { chartPal: pal } }); saveSettings(S); }, send);
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
-  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); };
+  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); };
   const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
   const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button, #planField button')];
   const syncField = () => { const f = fieldLayer(w?.settings ?? S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
   for (const b of fieldBtns) b.addEventListener('click', () => {
     const f = b.dataset.field!;
-    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); }
+    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); }
     else setLayer(f as LayerKey, true);
     redraw(); setTimeout(() => menus.forEach(m => m()), 30); // (after the chart's redrawn, so the key lists what's on it now)
   });
@@ -805,8 +812,7 @@ $('bKeys2').onclick = () => keysView.open();
 /** Helm and sheets follow whatever is held. */
 function applyHeld(): void {
   const u = w.user;
-  u.steer = w.pilot.mode !== 'off' ? 0 : (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); // (on the pilot, the steering keys turn its course: pilotTick)
-  u.luff = held.has('luff');
+  const steer = w.pilot.mode !== 'off' ? 0 : (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); // (on the pilot, the steering keys turn its course: pilotTick)
   // the lines you're working: sheet keys, the selected line's keys, and the panel's buttons
   const cmd: Partial<Record<CtlKey, number>> = { ...btnCmd };
   const add = (k: CtlKey, d: number) => { if (d) cmd[k] = Math.max(-1, Math.min(1, (cmd[k] ?? 0) + d)); };
@@ -814,8 +820,8 @@ function applyHeld(): void {
   add('jibsheet', (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0));
   const sel = CTL_UI[ctlSel];
   if (sel.key !== 'carFore' && sel.key !== 'carIn') add(sel.key, (held.has('ctlUp') ? 1 : 0) - (held.has('ctlDown') ? 1 : 0));
-  if (u.steer && u.lashed != null) unlash(); // a hand on the tiller: the lashing comes off
-  u.ctlCmd = cmd; u.sheetCmd.main = cmd.mainsheet ?? 0; u.sheetCmd.jib = cmd.jibsheet ?? 0;
+  if (steer && u.lashed != null) unlash(); // a hand on the tiller: the lashing comes off
+  send({ k: 'helm', steer, luff: held.has('luff'), ctl: cmd });
 }
 function setView(i: number): void {
   viewMode = i; lookAhead(); look.chase = undefined; // (the chase view starts framed: design/chase-layout.html)
@@ -874,7 +880,7 @@ addEventListener('keydown', e => {
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
     case 'pushOff': pushOff(); break;
-    case 'navLights': w.user.lightsOff = !w.user.lightsOff; toast(w.user.lightsOff ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break;
+    case 'navLights': send({ k: 'lights', off: !w.user.lightsOff }); toast(w.user.lightsOff ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break;
     case 'jibHalyard': halyard('jib'); break;
     case 'mainHalyard': halyard('main'); break;
     case 'viewCockpit': setView(0); break;
@@ -1132,8 +1138,20 @@ function drawTideGraph(): void {
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  ctx.fillStyle = '#ffb627'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc), 10);
+  const pn = cruise && w.dest ? passageNow(w) : null, near = pn?.eta != null && tx(pn.eta) - tx(w.gunUtc) < 44;
+  ctx.fillStyle = '#ffb627'; if (near) ctx.textAlign = 'right'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc) - (near ? 4 : 0), 10); ctx.textAlign = 'center';
+  // cruising somewhere: when she'd get there leaving then (sim/navigator.ts passageNow: the course she'd sail, tacks and
+  // all, in the forecast wind and NOAA's current), as a second bar; past the graph's end, an arrow at its edge
+  if (pn?.eta != null) {
+    const xa = tx(pn.eta), inside = xa <= W - 8, xd = Math.min(xa, W - 10);
+    ctx.strokeStyle = '#3fd197'; ctx.lineWidth = 2; ctx.setLineDash(inside ? [] : [3, 3]); ctx.beginPath(); ctx.moveTo(xd, top - 6); ctx.lineTo(xd, bot + 6); ctx.stroke(); ctx.setLineDash([]);
+    // (close to the leave bar, the label goes to the right of its bar, clear of 'leave')
+    const close = inside && near;
+    ctx.fillStyle = '#3fd197'; ctx.textAlign = !inside ? 'right' : close ? 'left' : 'center';
+    ctx.fillText(inside ? 'arrive' : `arrive ${sfClock(pn.eta)} →`, !inside ? W - 12 : close ? xd + 4 : xd, 10);
+  }
   const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
@@ -1190,13 +1208,13 @@ function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
   replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (S.mode === 'drill') { S.mode = 'race'; newGame(); }
-  courseView.close(); navView.close(); w.running = false; ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
+  courseView.close(); navView.close(); send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
   saveSettings(S);
   newGame(seed);
   logMessage(`— ${S.mode === 'sail' ? `Cruise · ${place(S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
-  w.running = true; w.paused = false;
+  send({ k: 'running', on: true }); send({ k: 'pause', on: false });
   word('bFast', 'Speed 1×');
   horn(1.0);
   const m0 = w.C.marks[0];
@@ -1216,7 +1234,7 @@ function beginRaceNow(seed?: number): void {
 /* ---------------- start practice debrief ---------------- */
 let drillClip: ReplayClip | null = null;
 function showDrill(): void {
-  drillShown = true; w.paused = true; setControlsIdle();
+  drillShown = true; send({ k: 'pause', on: true }); setControlsIdle();
   const d = startDebrief(w);
   $('dTitle').textContent = d.title;
   const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -1231,7 +1249,7 @@ const closeDrill = () => { $('drill').hidden = true; drillView.stop(); };
 $('bDReplay').onclick = () => { if (drillClip) drillView.play(w, drillClip); };
 $('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
 $('bDNew').onclick = () => { closeDrill(); beginRace(); };
-$('bDKeep').onclick = () => { closeDrill(); w.paused = false; };
+$('bDKeep').onclick = () => { closeDrill(); send({ k: 'pause', on: false }); };
 $('bDSetup').onclick = () => { closeDrill(); openSetup(); };
 $('bGo').onclick = () => { if (S.mode === 'drill') S.mode = 'race'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
 $('bDrill').onclick = () => { S.mode = 'drill'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
@@ -1315,7 +1333,7 @@ function raceSetup(): RaceSetup {
 }
 /** The race, into the logbook of every boat of yours in it: her place (or why she has none) and her time. */
 function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
-  if (w.logged || S.mode === 'drill') return; w.logged = true;
+  if (w.logged || S.mode === 'drill') return; send({ k: 'shown', logged: true });
   const title = `${w.C.title}${w.courseSignal ? ` (course ${w.courseSignal.no})` : ''}`, out: LogEntry[] = [];
   rows.forEach(b => {
     const spec = b.isUser ? S.boat : b.spec && S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
@@ -1329,16 +1347,16 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
 function logOuting(): void {
   if (!w || w.logged || S.mode === 'drill') return;
   if (S.mode === 'sail' && w.freeSail && w.t >= 60) {
-    w.logged = true;
+    send({ k: 'shown', logged: true });
     const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : place(S.sailFrom)?.name ?? 'the Bay';
     stage([{ ...outing(S.boat, true), kind: 'cruise', title: `From ${from}${w.dest ? ` to ${w.dest.name}` : ''}`, elapsed: Math.round(w.t), nm: w.sailedM / 1852, arrived: w.arrivedT != null }]);
   } else if (S.mode === 'race' && !w.freeSail && w.cancelled) {
     // racing called off for the wind: no result, but the outing goes in her logbook
-    w.logged = true;
+    send({ k: 'shown', logged: true });
     stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'CXL', of: w.boats.length, setup: raceSetup() }]);
   } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
     // you left the race before finishing: retired
-    w.logged = true;
+    send({ k: 'shown', logged: true });
     stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'RET', of: w.boats.length, setup: raceSetup() }]);
   }
 }
@@ -1379,7 +1397,7 @@ function scores(): Map<number, ScoreOut> {
 }
 
 function showResults(): void {
-  w.finishShown = true;
+  send({ k: 'shown', finishShown: true });
   // in order of points (RRS A4, 44.3(c)), then of time across the line for the boats still racing
   const sc = scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
   logRace(rows, sc);
@@ -1399,7 +1417,7 @@ function showResults(): void {
   $('resDebrief').innerHTML = db; $('resDebrief').hidden = !db; $('resStart').hidden = !!db; // the debrief has the start in full
   $('bWatch').hidden = !w.log || w.track.length < 2;
   $('results').hidden = false;
-  w.paused = true;
+  send({ k: 'pause', on: true });
 }
 
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
@@ -1416,11 +1434,7 @@ function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   let simMs = 0;
   if (w.running && !w.paused) {
-    acc += dt * w.speed;
-    while (acc >= DT) {
-      w.step(DT); acc -= DT;
-      if (w.paused) { acc = 0; break; }
-    }
+    host.frame(dt);
     simMs = performance.now() - t0;
     if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
@@ -1428,9 +1442,9 @@ function frame(now: number): void {
     // nothing running (the start page, setup, the showroom): she still sails, in the real wind and physics, so her sails,
     // heel and flags agree; in the showroom on a close reach
     const showing = boatPanel.open || fleet.boatOpen;
-    acc += dt; while (acc >= DT) { w.idle(DT, showing ? showroomTwa : undefined); acc -= DT; }
+    host.idle(dt, showing ? showroomTwa : undefined);
   }
-  for (const e of w.drainEvents()) handle(e);
+  for (const e of host.drainEvents()) handle(e);
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick();
   const t1 = performance.now();
@@ -1516,7 +1530,7 @@ const fleet: Fleet = new Fleet(S, {
 });
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
-  courseView.close(); navView.close(); w.running = false; w.paused = false;
+  courseView.close(); navView.close(); send({ k: 'running', on: false }); send({ k: 'pause', on: false });
   for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
@@ -1611,4 +1625,4 @@ newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRo
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
