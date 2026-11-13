@@ -311,6 +311,8 @@ export interface CrewCall {
   sea?: number;
   /** Her heel now (deg, + to leeward), for the roll tack's flatten: out hard until she's upright. */
   heel?: number;
+  /** The heel the crew sail her at now (deg, + to leeward: physics.ts crewBestHeel, or a fixed one hove to). */
+  bestHeel?: number;
   /** A tack is coming: she's turning up toward the wind to tack (a roll tack starts here). */
   tackComing?: boolean;
   /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
@@ -341,7 +343,15 @@ export const ROLL_HOLD = 2;
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30 };
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30, helmHeel: 3, helmLast: 20 };
+// (helmHeel, helmLast: in light air, short of the breeze the crew sit up for (under 8 kt, placeCrew's `breeze`), on a
+// reach (15 degrees free of the beat up to a run), the helm, one heavy weight that swings her heel some 4 degrees at a
+// stroke, goes across the cockpit
+// only for a heel error from the crew's own (k.bestHeel) that the move takes off of more than helmHeel degrees, for
+// helmLast seconds, or at once for twice that in a puff that needs them out. Without it, the weight wanted about the
+// middle, the helm's own crossing swung her heel past what was wanted and back they came, across every few seconds
+// (Crew Figures' cruising probe: 6 kt, a beam reach). The crew's lighter moves make up the difference meanwhile. Not on a
+// beat: there the extra heel costs her speed (probed: 6 kt at 45 true, 9.8 degrees mean against 5.6, 0.9% slower). Estimates.)
 // (crossHeel, crossLast: on a run (the crew's own `downwind`, past 120 true), a move across to the other side of the
 // boat, between gybes, waits until she has carried more than crossHeel degrees of heel that the move takes off, for
 // crossLast seconds (half a gust-lull cycle, Bethwaite's minute: not one puff or lull, and many roll periods: a roll's
@@ -554,6 +564,10 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
   };
   const heelLee = k.heel ?? 0; // (+ to leeward: physics.ts heelMag)
+  const helmLight = (i: number) => {
+    const t = tgt[i], h = held[i];
+    return i === 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+  };
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
@@ -576,6 +590,14 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
       const puff = out && heelLee > 2 * HOLD.crossHeel && dArm > HOLD.urgent * dead;
       if (!puff && h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
     } else h.cross = 0;
+    // (the helm in light air on a reach, across only for a heel error the move takes off, lasting:
+    // HOLD.helmHeel, helmLast)
+    if (helmLight(i)) {
+      const err = heelLee - (k.bestHeel ?? heelLee), fixes = out ? err : -err;
+      h.cross = fixes > HOLD.helmHeel ? (h.cross ?? 0) + step : Math.max(0, (h.cross ?? 0) - step);
+      const puff = out && fixes > 2 * HOLD.helmHeel && dArm > HOLD.urgent * dead;
+      if (!puff && h.cross < HOLD.helmLast) { h.off = 0; stay(i, h, t); return; }
+    }
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a

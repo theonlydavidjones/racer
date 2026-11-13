@@ -33,6 +33,14 @@ describe('the crew off the wind', () => {
       const w = b.crew!.wind;
       expect(b.crew!.people.filter(p => p.x * w > 0.15).length, b.crew!.people.map(p => (p.x * w).toFixed(2)).join(',')).toBeGreaterThanOrEqual(2);
     }, 30_000);
+  for (const twa of [75, 90, 110])
+    it(`on a light-air reach (${twa}° true), the wind hovering about 6 kt, the helm stays on their side (crewPhys.ts HOLD.helmHeel)`, () => {
+      const b = testBoat({ heading: 360 - twa, kt: 3, windKt: 6 });
+      sail(b, 40, () => { b.h = 360 - twa; });
+      // (gusts and lulls of half a knot either side, a few seconds each: the wind about the light-air threshold)
+      let t = 0;
+      expect(crossings(b, 150, () => { t += 1 / 60; b.ww.kt = 6 + 0.6 * Math.sin(t / 3) * Math.sin(t / 11); b.h = 360 - twa; })[0]).toBe(0);
+    }, 30_000);
   it('a gybe still takes them across', () => {
     const b = testBoat({ heading: 360 - 165, kt: 4, windKt: 12 });
     sail(b, 30, () => { b.h = 360 - 165; });
