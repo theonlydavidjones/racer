@@ -87,7 +87,7 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * (manoeuvreS's `hs`).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 4.3]],
+  tack: [[3, 24.6], [4, 15.0], [6, 8.6], [8, 5.4], [12, 3.3], [16, 3.5], [20, 3.3], [25, 5.5]],
   gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
 };
 /**
