@@ -3,7 +3,7 @@ import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
-import { HANDLING, HULL, airDrag, windCdA, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
+import { HANDLING, HULL, airDrag, windFore, windSide, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce } from './motor';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
@@ -331,14 +331,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
   // which is how a roll tack starts her turning with less rudder), so the same turn costs less or more by her balance
   b.v = Math.max(0, b.v * (1 - turnBleed(rate, b.v, b.h, ww.from, b.helmNeed) * dt));
-  // leeway, as a motion: her sails' side force across the water and the wind on her topsides and rig (dynamics.ts windCdA) set
+  // leeway, as a motion: her sails' side force across the water and the wind on her topsides and rig (dynamics.ts windSide) set
   // her bodily to leeward; her keel's lift with way on (slender wing: ½ρ·A·(πAR/2)·u·v = ½ρ·πT²·u·v) and her hull and keel
   // broadside to the water (cross-flow drag, HOVE.crossCd: Hoerner) hold her. At speed the lift does it: a few degrees
   // (b.leeway, above); slow, little holds her and she sags off to leeward (0.5–0.7 kt at 1.5 kt in 12 kt); stopped, only
   // the broadside drag does. With her sails struck, the wind on her rig alone (leaving a berth).
   {
-    const awaR = ap.awa * D2R, q = 0.5 * 1.225 * ap.aws * ap.aws, side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
-    const Fy = side * (q * windCdA(ap.awa) * Math.abs(Math.sin(awaR)) + (b.luff ? 0 : Fside)); // (windage: its part across her, dynamics.ts windCdA)
+    const q = 0.5 * 1.225 * ap.aws * ap.aws, side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
+    const Fy = side * (q * windSide(ap.awa) + (b.luff ? 0 : Fside)); // (windage: its part across her, dynamics.ts windSide)
     const sw = b.sway ?? 0, aL = Math.PI * HOVE.aspect / 2, Fw = -0.5 * 1025 * HOVE.latArea * (aL * Math.max(0, b.v) * sw + HOVE.crossCd * sw * Math.abs(sw));
     b.sway = sw + (Fy + Fw) / (disp * (1 + HOVE.swayAdded)) * dt;
     if (Math.abs(b.sway) < 1e-4) b.sway = 0;
@@ -389,7 +389,7 @@ export const HOVE = {
   swayAdded: 0.9, yawAdded: 0.4,
   /** Radius of gyration in yaw, as a fraction of LOA (0.25, the usual figure for a yacht). */
   gyration: 0.25,
-  /** How far ahead of the keel's centre her windage acts side-on (the mast is forward), m (its size: dynamics.ts windCdA). */
+  /** How far ahead of the keel's centre her windage acts side-on (the mast is forward), m (its size: dynamics.ts windSide). */
   windLever: 0.3,
   /** How much of the sideways flow reaches the rudder: the long keel ahead of it straightens half of it (estimate). */
   rudderFlow: 0.5,
@@ -451,10 +451,10 @@ export function driveCalibration(tws: number, twa: number): number {
 function calAt(w: number, twa: number): number {
   const a = Math.round(clamp(Math.max(twa, beatAngle(w)), 30, 175) / 5) * 5, key = w * 1000 + a;
   const hit = driveCal.get(key); if (hit != null) return hit;
-  const vt = polar(w, a, 'jib'), ap = sailWind(0, w, n360(-a), vt), awaR = ap.awa * D2R;
+  const vt = polar(w, a, 'jib'), ap = sailWind(0, w, n360(-a), vt);
   const sm = optimalSheet('main', ap.awa), sj = optimalSheet('jib', ap.awa);
   const sf = sailForces(ap.aws, ap.awa, { trim: sailTrim('main', ap.awa, sm), shape: targetShape('main', w, ap.awa), out: sm }, { trim: sailTrim('jib', ap.awa, sj), shape: targetShape('jib', w, ap.awa) }, false);
-  const windX = -0.5 * 1.225 * ap.aws ** 2 * windCdA(ap.awa) * Math.cos(awaR), drive = sf.main.drive + sf.jib.drive;
+  const windX = -0.5 * 1.225 * ap.aws ** 2 * windFore(ap.awa), drive = sf.main.drive + sf.jib.drive;
   const k = drive > 1 ? clamp((hullResistance(vt) - windX) / drive, 0.02, 1) : 1;
   driveCal.set(key, k);
   return k;
@@ -503,7 +503,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // further aft than a drawing jib's does: `ceAft` shortens its lever ahead of the keel by that (balance.ts sailYaw).
   const jib = { heel: fn * Math.cos(clew), drive: fn * Math.sin(clew), ceAft: 0.25 * Math.sin(clamp(alpha, 0, Math.PI / 2)) };
   // windage: along the apparent wind's flow (aft and to leeward)
-  const windX = -q * windCdA(ap.awa) * Math.cos(awaR), windY = q * windCdA(ap.awa) * Math.sin(awaR);
+  const windX = -q * windFore(ap.awa), windY = q * windSide(ap.awa);
   // hull and keel: strips along the waterline, each with lift (with way on, either way: a foil's lift opposes the
   // sideways flow whichever end leads; trailing edge first, about half of it: an estimate) and broadside drag
   const L = orc.boat.imsL, A = HOVE.latArea, AR = HOVE.aspect, aL = Math.PI * AR / 2, N = 8;

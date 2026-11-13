@@ -3,7 +3,7 @@ import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
-import { HANDLING, windCdA } from '../boat/dynamics';
+import { HANDLING, windSide } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -144,7 +144,7 @@ const WALK = 0.45, CREW_TURN = 2;
 const SWING_DRAG = 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3 / 4;
 /** How fast the wind on her side swings her about her bow, deg/s: its turning force (side windage, acting at her middle, 3.8 m from the bow) against the water's. */
 function windSwing(kt: number, rel: number): number {
-  const vSide = kt * KT * Math.sin(rel * D2R), torque = 0.5 * 1.225 * windCdA(90) * vSide * vSide * 3.8;
+  const vSide = kt * KT * Math.sin(rel * D2R), torque = 0.5 * 1.225 * windSide(90) * vSide * vSide * 3.8;
   return Math.sqrt(torque / SWING_DRAG) / D2R;
 }
 

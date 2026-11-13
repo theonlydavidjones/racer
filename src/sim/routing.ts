@@ -87,8 +87,8 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * (manoeuvreS's `hs`).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 24.6], [4, 15.0], [6, 8.6], [8, 5.4], [12, 3.3], [16, 3.5], [20, 3.3], [25, 5.5]],
-  gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
+  tack: [[3, 23.4], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.1], [20, 3.1], [25, 5.0]],
+  gybe: [[3, 4.2], [4, 3.6], [6, 2.8], [8, 1.8], [12, 1.1], [16, 0.7], [20, 0.5], [25, 0.5]]
 };
 /**
  * The cost (s) of a tack or a gybe in `tws` kt, and `hs` m of chop: in a wind sea a tack costs about 40% more a metre of
