@@ -3,7 +3,7 @@ import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
-import { CAR_FORE_PINS, CAR_IN_PINS, carLead } from '../boat/controls';
+import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
@@ -13,7 +13,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -214,37 +214,47 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const lanternArm = new THREE.Group(); lanternArm.add(new THREE.Mesh(lanternGeometry(), below)); grp.add(lanternArm);
   grp.userData.lantern = makeLanternSwing(lanternArm);
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
-  // wooden grab rails on the cabin top, and the sliding hatch (one mesh: the same varnished wood)
-  // the companionway open (the hatch slid forward, the doors stowed below) or shut (the hatch slid aft, the doors in)
-  const shut = paint.companionway === 'closed';
-  const woodTop = [slidingHatch(shut).toNonIndexed(), ...(shut ? companionwayDoors().map(g => (g.index ? g.toNonIndexed() : g)) : [])];
-  if (shut) { // the doors' panels a darker varnish, set in; their hinges and latch bronze
-    const dp = companionwayDoorPanels(), keep = (g: THREE.BufferGeometry) => { const q = g.toNonIndexed(); for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; };
-    grp.add(new THREE.Mesh(mergeGeometries(dp.panels.map(keep), false)!, DOOR_PANEL));
-    grp.add(new THREE.Mesh(mergeGeometries(dp.metal.map(keep), false)!, BRONZE));
-  }
+  // the companionway (Josephine: the owner's photos): the sliding hatch, weathered teak, on bronze runners, and three
+  // varnished washboards of equal height in the doorway, a small brass lock at the top board's top centre. They move
+  // with her companionway's state (syncCompanionway): the hatch slides forward first, then the boards come out, the top
+  // one first, and are stowed below.
+  const comp = buildCompanionway(grp);
+  const woodTop: THREE.BufferGeometry[] = [], railTop: THREE.BufferGeometry[] = [];
   { // the doorway's frame (a post each side, the sill across its foot) and the hatch's runners along the cabin top
     const { hw, len, sill } = COMPANIONWAY, z1 = zc(CABIN.u1), top = cabinTopAt(CABIN.u1, hw);
     for (const sx of [1, -1]) {
       woodTop.push(new THREE.BoxGeometry(0.04, top - sill, 0.025).toNonIndexed().translate(sx * (hw + 0.02), (top + sill) / 2, z1 + 0.012));
-      const xr = sx * (hw + 0.045), zf = z1 - 2 * len - 0.08, zm = (z1 + zf) / 2;
-      woodTop.push(new THREE.BoxGeometry(0.025, 0.035, z1 - zf).toNonIndexed().translate(xr, cabinTopAt(uAtZ(zm), xr) + 0.017, zm));
+      const xr = sx * (hw + 0.045), zf = z1 - 2 * len - 0.08, N = 12; // (the hatch's runners: bronze, following the roof)
+      for (let i = 0; i < N; i++) { const za = zf + (z1 - zf) * i / N, zb = zf + (z1 - zf) * (i + 1) / N, ya = cabinTopAt(uAtZ(za), xr) + 0.017, yb = cabinTopAt(uAtZ(zb), xr) + 0.017;
+        const g = new THREE.BoxGeometry(0.02, 0.03, Math.hypot(zb - za, yb - ya) + 0.002); g.rotateX(-Math.atan2(yb - ya, zb - za)); g.translate(xr, (ya + yb) / 2, (za + zb) / 2); comp.runners.push(g); }
     }
     woodTop.push(new THREE.BoxGeometry(2 * hw + 0.08, 0.03, 0.05).toNonIndexed().translate(0, sill - 0.015, z1 + 0.005));
+    grp.add(new THREE.Mesh(mergeGeometries(comp.runners), BRONZE));
   }
+  // the grab rails: along most of the cabin top, from abreast the jib cars' forward ends to near its after end, bent to
+  // the roof's curve (it slants down forward), about halfway between the hatch's runner and the roof's edge (Josephine:
+  // the owner's photo from the mast). Each a varnished rail on its feet, the hand-holds between them.
   for (const s of [1, -1]) {
-    const gu = (CABIN.u0 + CABIN.u1) / 2 + 0.03, gx = s * (CABIN.w - 0.2);
-    woodTop.push(new THREE.BoxGeometry(0.04, 0.05, 1.2).toNonIndexed().translate(gx, cabinTopAt(gu, gx) + 0.03, zc(gu)));
+    const z0 = HANDRAIL_Z0, z1 = -L / 2 + CABIN.u1 * L - 0.08, N = 24, x = s * HANDRAIL_X;
+    const top = (z: number) => cabinTopAt(uAtZ(z), x);
+    for (let i = 0; i < N; i++) {
+      const za = z0 + (z1 - z0) * i / N, zb = z0 + (z1 - z0) * (i + 1) / N, ya = top(za) + 0.045, yb = top(zb) + 0.045;
+      const seg = new THREE.BoxGeometry(0.032, 0.025, Math.hypot(zb - za, yb - ya) + 0.002).toNonIndexed();
+      seg.rotateX(-Math.atan2(yb - ya, zb - za)); seg.translate(x, (ya + yb) / 2, (za + zb) / 2); railTop.push(seg);
+    }
+    for (let k = 0; k <= 4; k++) { const z = z0 + 0.02 + (z1 - z0 - 0.04) * k / 4; railTop.push(new THREE.BoxGeometry(0.032, 0.04, 0.05).toNonIndexed().translate(x, top(z) + 0.02, z)); } // its feet
   }
   for (const g of woodTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
-  grp.add(new THREE.Mesh(mergeGeometries(woodTop, false)!, MAT.wood));
+  for (const g of railTop) for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+  grp.add(new THREE.Mesh(grainUV(mergeGeometries(woodTop, false)!), teakMat().warm)); // the doorway's posts and sill: oiled teak
+  grp.add(new THREE.Mesh(grainUV(mergeGeometries(railTop, false)!), teakMat().trim)); // the grab rails: weathered teak
   // cockpit well, seats, and coamings
   // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
-  const cockpitTeak = new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide });
+  const cockpitTeak = teakMat().deck; // (oiled: the owner)
   const cg = cockpitGeometry(), flat = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.map(g => (g.index ? g.toNonIndexed() : g)), false)!;
   grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), cockpitTeak)); // the sole, benches and shelf (one mesh)
   grp.add(new THREE.Mesh(flat(cg.lining), COCKPIT_LINING)); // the hull's inside round the footwell, under the side decks, and the after wall: smooth moulding
-  grp.add(new THREE.Mesh(flat(cg.panel), LOCKER)); // the lazarettes: varnished lockers, fronts, ends and lids
+  grp.add(new THREE.Mesh(grainUV(flat(cg.panel)), teakMat().trim)); // the lazarettes: teak lockers, fronts, ends and lids, weathered
   // each lazarette's lid: the seam where it lifts, its two hinges along the outboard edge, and a finger-hole at the front
   { const seams: THREE.BufferGeometry[] = [], hinges: THREE.BufferGeometry[] = [], g = 0.007;
     for (const l of lazaretteLids()) {
@@ -256,7 +266,6 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(mergeGeometries(seams.map(q => q.toNonIndexed()), false)!, BLACK));
     grp.add(new THREE.Mesh(mergeGeometries(hinges.map(q => q.toNonIndexed()), false)!, CHROME)); }
-  const strakes: THREE.BufferGeometry[] = [];
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
@@ -266,14 +275,18 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));
     grp.add(new THREE.Mesh(rail(caps, 0.02, 0.04), MAT.wood));
-    // toerail along the sheer
-    grp.add(new THREE.Mesh(rail(sheerLine(s, 0.03), 0.035, 0.03), MAT.wood));
-    // and the rubbing strake just under the sheer, a half-round of the same wood standing proud of the topsides (CR 2.218:
-    // 13 × 26 to 14 × 28 mm, round the sheer)
-    // (ending just short of the stem and of the transom's corner, where the strake is cut off)
-    strakes.push(rail(sheerLine(s, -0.007, 200).slice(3, -2).map(p => p.setY(p.y - 0.045)), 0.027, 0.014).toNonIndexed());
+    // the toerail along the sheer, unbroken; and alongside the cockpit, just inboard of it, the hiking rail, a broad varnished plank laid flat along
+    // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
+    // starboard side at the dock)
+    const sl = sheerLine(s, 0.03, 160), aft = sheerLine(s, HIKE_RAIL.inset, 160).filter(p => p.z >= HIKE_RAIL.z0 && p.z <= HIKE_RAIL.z1);
+    grp.add(new THREE.Mesh(grainUV(rail(sl, 0.035, 0.03)), teakMat().trim)); // (the toerail, unbroken stem to transom)
+    grp.add(new THREE.Mesh(grainUV(plank(aft.map(p => p.clone().setY(p.y + HIKE_RAIL.gap)), HIKE_RAIL.w, HIKE_RAIL.t)), teakMat().trim));
+    const blocks: THREE.BufferGeometry[] = [];
+    for (let z = HIKE_RAIL.z0 + 0.05; z < HIKE_RAIL.z1; z += 0.38) { const u = uAtZ(z), x = s * (halfBeam(u) - HIKE_RAIL.inset); blocks.push(new THREE.BoxGeometry(HIKE_RAIL.w * 0.75, HIKE_RAIL.gap + 0.004, 0.05).translate(x, sheer(u) + HIKE_RAIL.gap / 2, z)); }
+    grp.add(new THREE.Mesh(grainUV(mergeGeometries(blocks)), teakMat().trim));
+    // (no separate rubbing strake on the topsides: Josephine, a GRP boat, has only the one wooden rail capping the sheer
+    // (the owner's photos from the bow and the dock); the class's half-round strake, CR 2.218, is a wooden boat's)
   }
-  grp.add(new THREE.Mesh(mergeGeometries(strakes, false)!, MAT.wood));
   deckFittings(grp);
   // the raised lip across the after end of the cockpit, moulded in with the side coamings and turning into them round
   // its corners (at least 80 mm high at station 3, CR 3.22), so water on the after deck stays out of the cockpit
@@ -365,10 +378,12 @@ export interface BoatMesh {
   nav: NavLights;
   /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
   lantern: LanternSwing;
+  /** The companionway's sliding hatch and washboards, moved by syncCompanionway. */
+  companionway: Companionway;
 }
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
-  travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; winches: Record<Tack, THREE.Vector3>;
+  travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; carBars: Record<Tack, THREE.Mesh>; winches: Record<Tack, THREE.Vector3>;
   /** The jib sheet: one line, its middle made fast to the ring on the clew, each half through its car and its fairlead
    * block to its winch and the tail into the cockpit (JIB_SHEET_PTS points: port's tail first, starboard's last). */
   jibSheet: THREE.Line; clewRing: THREE.Mesh;
@@ -381,12 +396,102 @@ interface Lines {
   /** The vang's tackle, from the boom's block (it swings with the boom) to the lower block on the mast's foot. */
   vang: THREE.Line;
 }
+/**
+ * The hiking rail (as on Josephine, the owner's photo): a varnished plank about 80 × 28 mm laid flat along the deck's edge
+ * on spacer blocks, alongside the cockpit, from its forward end to the after end of the coaming: where the crew sit to hike
+ * out (the owner). The size is read off the photo
+ * against the deck's and coaming's known widths: an estimate, within a centimetre.
+ */
+const CABIN_Z1 = -L / 2 + CABIN.u1 * L;
+/** The jib car's H track: the cross-bar's and the tracks' lengths (m: about 5 in and 7 in, the owner, of Josephine). */
+const TRACK = { bar: 0.127, leg: 0.178 };
+/** The cabin-top grab rails: their middle station, and how far out (m), halfway between the hatch's runner and the roof's edge there. */
+const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.hw + 0.045 + cabinHalf(HANDRAIL_U) - CABIN_LEAN) / 2;
+/** Where the grab rails begin forward: level with the jib car tracks' forward ends (the owner). */
+const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
+/** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
+const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
+/** The jib winch's height, base to the top of its drum's cap. */
+const WINCH_H = 0.123;
+let teakMats: { trim: THREE.Material; deck: THREE.Material; warm: THREE.Material } | null = null;
+/**
+ * Josephine's teak (the owner): all of it oiled warm brown, the washboards, doorway posts, hatch, grab rails, toerail and
+ * hiking rail, cockpit floor, lazarettes and thwart. (Weathered silver-grey looked wrong beside it; one day a choice in
+ * the boat editor.) Grain textures (teakTexture): the cockpit floor with its planks' seams, the rest plain grain.
+ */
+function teakMat() {
+  return teakMats ??= {
+    trim: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide }),
+    deck: new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide }),
+    warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30 })
+  };
+}
+/** Texture coordinates for a piece of teak: the grain along its length (z, fore and aft; or x, across, for the washboards), about 0.3 m across a repeat. */
+function grainUV(g: THREE.BufferGeometry, across = false): THREE.BufferGeometry {
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];
+  for (let i = 0; i < p.count; i++) {
+    const along = across ? p.getX(i) : p.getZ(i), side = Math.abs(n.getY(i)) > 0.7 ? (across ? p.getZ(i) : p.getX(i)) : p.getY(i);
+    uv.push(side / 0.3 + (across ? 0 : p.getX(i) * 0.7), along / 1.2);
+  }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
+}
+const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
+/** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
+function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
+  const pos: number[] = [], idx: number[] = [], n = pts.length;
+  for (const p of pts) { const sx = Math.sign(p.x || 1); for (const [dx, dy] of [[-w / 2, 0], [-w / 2, t], [w / 2, t], [w / 2, 0]]) pos.push(p.x + sx * dx, p.y + dy, p.z); }
+  for (let i = 0; i < n - 1; i++) for (let k = 0; k < 4; k++) { const a = i * 4 + k, b = i * 4 + (k + 1) % 4; idx.push(a, a + 4, b, b, a + 4, b + 4); }
+  for (const e of [0, n - 1]) { const o = e * 4; idx.push(o, o + 1, o + 2, o, o + 2, o + 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
+}
+/**
+ * The companionway's moving parts. The hatch is drawn shut (slid aft, its after edge flush with the top washboard) and
+ * moved forward along the roof by its state; each washboard lifts up out of its grooves and, once clear, is stowed below.
+ */
+interface Companionway { hatch: THREE.Group; hatchMesh: THREE.Mesh; hatchT: number; boards: THREE.Group[]; runners: THREE.BufferGeometry[]; boardH: number }
+function buildCompanionway(grp: THREE.Group): Companionway {
+  const { hw, sill } = COMPANIONWAY, z1 = -L / 2 + CABIN.u1 * L;
+  // the hatch, shut: a nearly flat board of weathered teak arched with the roof, a thick rounded after edge
+  const hatch = new THREE.Group(); grp.add(hatch);
+  const keep = (g: THREE.BufferGeometry) => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; };
+  const hatchMesh = new THREE.Mesh(grainUV(keep(slidingHatch(0))), teakMat().trim); hatch.add(hatchMesh);
+  // (as it slides it's redrawn on the roof where it is, so it lies on the roof's curve all along its travel)
+  // the washboards: three of equal height from the sill up to the shut hatch's underside, in grooves inside the posts
+  const top = cabinTopAt(CABIN.u1, 0) + 0.045, boardH = (top - sill) / 3, boards: THREE.Group[] = [];
+  for (let k = 0; k < 3; k++) { // (k 0 the top board)
+    const y0 = sill + (2 - k) * boardH, y1 = y0 + boardH - 0.003, g = new THREE.Group(); grp.add(g);
+    let geo: THREE.BufferGeometry;
+    if (k === 0) { // the top board's upper edge follows the roof's arch
+      const ring: THREE.Vector2[] = [new THREE.Vector2(-hw - 0.012, y0), new THREE.Vector2(hw + 0.012, y0)];
+      for (let j = 0; j <= 10; j++) { const x = hw + 0.012 - (2 * hw + 0.024) * j / 10; ring.push(new THREE.Vector2(x, Math.min(top, cabinTopAt(CABIN.u1, Math.min(Math.abs(x), hw)) + 0.045))); }
+      geo = new THREE.ExtrudeGeometry(new THREE.Shape(ring), { depth: 0.02, bevelEnabled: false }).translate(0, 0, z1 + 0.002);
+    } else geo = new THREE.BoxGeometry(2 * hw + 0.024, y1 - y0, 0.02).translate(0, (y0 + y1) / 2, z1 + 0.012);
+    g.add(new THREE.Mesh(grainUV(keep(geo), true), teakMat().warm));
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(2 * hw - 0.08, 0.004, 0.004).translate(0, y1 - 0.02, z1 + 0.023), DOOR_PANEL)); // a chamfer line along its top
+    if (k === 0) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0095, 0.0095, 0.006, 16).rotateX(Math.PI / 2).translate(0, y1 - 0.06, z1 + 0.024), BRONZE)); // the lock, about 3/4 in across
+    boards.push(g);
+  }
+  const c: Companionway = { hatch, hatchMesh, hatchT: 0, boards, runners: [], boardH };
+  grp.userData.companionway = c;
+  return c;
+}
+/** The hatch and washboards where her state has them (b.companionway: hatchT 0 shut … 1 open; doorsT 0 in … 1 out). */
+function syncCompanionway(c: Companionway, b: Boat): void {
+  const st = (b as Boat & { companionway?: { hatchT: number; doorsT: number } }).companionway;
+  const open = (b.paint ?? FLEET[b.id]?.paint)?.companionway !== 'closed', hT = st ? st.hatchT : open ? 1 : 0, dT = st ? st.doorsT : open ? 1 : 0;
+  const t = Math.max(0, Math.min(1, hT));
+  if (Math.abs(t - c.hatchT) > 1e-4) { c.hatchMesh.geometry.dispose(); const g = slidingHatch(t).toNonIndexed(); g.computeVertexNormals(); c.hatchMesh.geometry = grainUV(g); c.hatchT = t; }
+  c.boards.forEach((g, k) => { // (each board's share of the time: lifted straight up and out, then gone below)
+    const p = Math.max(0, Math.min(1, dT * 3 - k));
+    g.visible = p < 1; g.position.y = p * (c.boardH * (3 - k) + 0.12);
+  });
+}
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
 /** The companionway doors' panels (a darker varnish, set in) and their bronze hinges and latch. */
 const DOOR_PANEL = new THREE.MeshPhongMaterial({ color: 0x5e3a1e, specular: 0x442211, shininess: 40 }), BRONZE = new THREE.MeshPhongMaterial({ color: 0x9a7a3c, specular: 0xffe0a0, shininess: 80 });
-/** The lazarettes' varnished panels (seen from either side: the lockers are built of single surfaces). */
-const LOCKER = new THREE.MeshPhongMaterial({ color: 0x8a5a30, specular: 0x553322, shininess: 40, side: THREE.DoubleSide });
 /** Polished chrome (the winches): bright, mirror-like, taking the sky. */
 const CHROME = reflect(new THREE.MeshPhongMaterial({ color: 0x8c939c, specular: 0xffffff, shininess: 220 }), 0.32);
 /** A smoked acrylic hatch lid: dark, glossy, a little see-through. */
@@ -395,11 +500,17 @@ const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xfffff
 const COCKPIT_LINING = new THREE.MeshLambertMaterial({ color: 0xe9e3d4, side: THREE.DoubleSide });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), CAM_GREEN = new THREE.MeshLambertMaterial({ color: 0x3fb36a });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
+/** Josephine's jib car on its cabin-top H (m): the bar's middle off the centreline, its holes' spacing, and the middle fore–aft hole's distance aft of the forestay pin. */
+export const JOSEPHINE_CAR = { centre: 0.66, pin: 0.024, aft: 2.65 };
 const carPos = (side: number, fore: number, ins: number) => {
-  // the middle fore–aft pin 2.65 m aft of the stay (North Sails' tuning guide); across, where the physics' lead angle puts it
-  // (carLead, seen from the tack: 12.3° puts the car the guide's 58 cm off the centreline)
-  const z = FORESTAY_DECK.z + 2.65 + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (z - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
-  return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.035, z); // on the cabin top's arch
+  // where Josephine's car is (the owner): on the cabin top, on a short H whose cross-bar (about 5 in) lies between the
+  // grab rail and the roof's edge, the car's forward edge level with the rail's forward end. On our cabin top that puts
+  // the bar's middle JOSEPHINE_CAR.centre off the centreline, its holes JOSEPHINE_CAR.pin apart; fore and aft, the middle
+  // hole JOSEPHINE_CAR.aft behind the forestay pin, holes 25 mm apart. (North Sails' guide gives 58 cm and 2.65 m for a
+  // cabin-top lead; Josephine's own figures, from the owner's description, stand until the owner measures them.) The
+  // physics' sheet lead (carLead) takes the same figures; tests/rig.test.ts holds the two together.
+  const z = FORESTAY_DECK.z + JOSEPHINE_CAR.aft + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2));
+  return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.045, z); // on the cabin top's arch, riding its bar
 };
 /** Whether (x, z) is over the cabin top. */
 const onCabin = (x: number, z: number) => { const u = uAtZ(z); return u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u); };
@@ -540,7 +651,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // traveller: the thwart, a deep varnished beam across the cockpit in front of the helm, on its post (hull.ts
   // COCKPIT_FIT), the track on its top, and the car
   const tu = uAtZ(TRAV_Z), tw = cockpitHalf(tu), ty = thwartTop();
-  grp.add(new THREE.Mesh(thwartGeometry()[0], MAT.wood));
+  grp.add(new THREE.Mesh(grainUV(thwartGeometry()[0].index ? thwartGeometry()[0].toNonIndexed() : thwartGeometry()[0], true), teakMat().trim));
   const track = new THREE.Mesh(new THREE.BoxGeometry(TRAV_HALF * 2 + 0.08, 0.02, 0.035), STEEL); track.position.set(0, ty + 0.005, TRAV_Z); grp.add(track);
   const travCar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.06), BLACK); travCar.position.set(0, ty + 0.03, TRAV_Z); grp.add(travCar);
   // the mainsheet's lower block, on its swivel on the car: a sheave between black cheeks (it turns with the car); the
@@ -560,7 +671,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // its dual-ended control line: from the blocks on the quarters, forward along the inside of the hull to a cam
   // cleat at each end of the thwart, where the thwart meets the hull
   for (const side of [1, -1]) {
-    const x = side * (tw - 0.02), foot = new THREE.Vector3(side * 0.3, sheer(1) - 0.05, 3.62);
+    const x = side * (tw - 0.02), foot = new THREE.Vector3(side * 0.3, sheer(1) - 0.12, 3.5); // (under the after deck: it runs below it, out of sight, and comes up at the thwart's end)
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.06), CAM_GREEN); cl.position.set(x, ty + 0.017, TRAV_Z); grp.add(cl); // green cam cleats, as on Josephine
     // (under the after deck and the side deck, inside her: scripts/check/line-clash.cjs lists it as inside by design)
     { const l = line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay', 'backstay'); l.userData.inside = true; grp.add(l); }
@@ -579,12 +690,13 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const jam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.05), BLACK); jam.position.copy(VANG_FOOT).add(new THREE.Vector3(0.03, -0.02, 0.02)); grp.add(jam); } // (the jammer on the lower block)
   const vang = line(Array.from({ length: 5 }, () => VANG_FOOT.clone()), 'main', 'vang'); grp.add(vang);
   // winches on the cockpit coamings, near the forward end
-  const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>;
+  const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, carBars = {} as Record<Tack, THREE.Mesh>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
     // the jib sheet winch, as on Josephine (the owner's photos): on a moulded pedestal standing on the side deck against
-    // the coaming's outer face, about 1.4 m aft of amidships (just aft of her name, some 0.6 m forward of the thwart);
-    // the pedestal tapers up from a broader foot to about the coaming's top, and the chromed winch stands on it
-    const zw = 1.4, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) + 0.03;
+    // the coaming's outer face, about half-way between the cabin's after end and the thwart, a little nearer the thwart:
+    // room for a crew to sit on the rail forward of it and another, a little less, aft of it (the owner);
+    // the pedestal tapers up from a broader foot, and the chromed winch stands on it, its top about flush with the coaming's
+    const zw = JIB_WINCH_Z, u = uAtZ(zw), xo = cockpitHalf(u) + COAMING_T, wx = side * (xo + 0.075), deck = deckY(u, xo + 0.075), top = deckY(u, xo) + COAMING_H(zw) - WINCH_H + 0.01; // (the winch's top about flush with the coaming's: the owner, Josephine's photo)
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.095, top - deck, 20), sideMatFor(grp)); ped.scale.z = 1.25; ped.position.set(wx, (top + deck) / 2, zw); grp.add(ped);
     const wy = top, winch = new THREE.Group(); winch.position.set(wx, wy, zw); grp.add(winch);
     for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {
@@ -592,10 +704,19 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     }
     const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.004, 12), BLACK); socket.position.y = 0.121; winch.add(socket); // the handle's socket
     winches[tk] = new THREE.Vector3(wx, wy + 0.07, zw);
-    // H-shaped car track on the cabin top: two short fore–aft rails and the cross rail
-    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1);
-    for (const x of [a.x, b2.x]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, b2.z - a.z + 0.06), STEEL); r.position.set(x, a.y - 0.05, (a.z + b2.z) / 2); grp.add(r); }
-    const cr = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(b2.x - a.x) + 0.025, 0.02, 0.025), STEEL); cr.position.set((a.x + b2.x) / 2, a.y - 0.05, (a.z + b2.z) / 2); grp.add(cr);
+    // the H-shaped car track on the cabin top (Josephine, the owner's photo looking aft from the mast): two short fore–aft
+    // tracks lying flat on the roof, inboard and outboard of the car's run, with their pin holes; across them a bar, pinned
+    // to both at the car's fore–aft hole, carrying the car, which slides along it to its athwartships hole (syncBoatMesh
+    // moves the bar with the car)
+    const a = carPos(side, 0, 0), b2 = carPos(side, CAR_FORE_PINS - 1, CAR_IN_PINS - 1), zm = HANDRAIL_Z0 + TRACK.leg / 2, len = TRACK.leg; // (its forward end level with the grab rail's)
+    const legX = [(a.x + b2.x) / 2 - side * (TRACK.bar / 2 - 0.008), (a.x + b2.x) / 2 + side * (TRACK.bar / 2 - 0.008)];
+    for (const x of legX) {
+      const u = uAtZ(zm), y = cabinTopAt(u, x), slope = (cabinTopAt(u, x + 0.01) - cabinTopAt(u, x - 0.01)) / 0.02;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.007, len), TRACK_ALU); m.rotation.z = Math.atan(slope); m.position.set(x, y + 0.004, zm); grp.add(m);
+    }
+    { const yi = cabinTopAt(uAtZ(zm), legX[0]), yo = cabinTopAt(uAtZ(zm), legX[1]), dx = legX[1] - legX[0], dy = yo - yi;
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(TRACK.bar, 0.008, 0.014), TRACK_ALU); bar.rotation.z = Math.atan2(dy, dx);
+      bar.position.set((legX[0] + legX[1]) / 2, (yi + yo) / 2 + 0.022, zm); grp.add(bar); carBars[tk] = bar; }
     // the car, and its block on top (the jib's lead: the car's pins set where it is, and with it the sheeting angle and
     // the fore–aft lead; the fairlead behind only turns the sheet aft). The block's sheave runs fore and aft, its strap on the car
     const car = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.07), BLACK); grp.add(car); cars[tk] = car;
@@ -689,7 +810,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
   }
-  return { travCar, backstay, cars, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  return { travCar, backstay, cars, carBars, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
 }
 /** Mainsheet: from the end of the boom (its height and distance from the gooseneck) down to the traveller. */
 const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Vector3(0, 0.78, 3.62);
@@ -934,7 +1055,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, hideHelm: false, nav, ropes, lantern: grp.userData.lantern };
+  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -947,6 +1068,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // rudder and tiller follow the helm the sim is using (steady, not estimated from frame-to-frame heading changes,
   // which jitter with the frame rate); eased so it swings like a real tiller
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
+  // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
+  syncCompanionway(m.companionway, b);
   // the cabin's lantern swings on its chain under her motion, and its light goes with it
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
@@ -1190,7 +1313,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
   q.setXYZ(JIB_HALF_PTS, clew.x, clew.y, clew.z);
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
     const pin = c.car[tk], car = carPos(side, pin.fore, pin.ins);
-    L2.cars[tk].position.copy(car);
+    L2.cars[tk].position.copy(car); L2.carBars[tk].position.z = car.z; // (the bar pinned at the car's fore–aft hole)
     const loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
     const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
@@ -1351,7 +1474,7 @@ function nameColor(hull: string, boot: string): string {
   return lum(hull) > 0.45 ? '#1f2c4f' : '#f2eee4';
 }
 
-const teakCache = new Map<boolean, THREE.CanvasTexture>();
+const teakCache = new Map<string, THREE.CanvasTexture>();
 /** Laid teak: planks with black caulked seams and grain; weathered silver-grey, or oiled and polished. */
 /**
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
@@ -1369,8 +1492,8 @@ function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
-function teakTexture(silver: boolean): THREE.CanvasTexture {
-  const hit = teakCache.get(silver); if (hit) return hit;
+function teakTexture(silver: boolean, seams = true): THREE.CanvasTexture {
+  const key = `${silver}${seams}`, hit = teakCache.get(key); if (hit) return hit;
   const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!, planks = 4, pw = W / planks;
   let seed = silver ? 7 : 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -1384,10 +1507,12 @@ function teakTexture(silver: boolean): THREE.CanvasTexture {
     }
   }
   g.fillStyle = silver ? '#3b3a37' : '#17130f';
-  for (let i = 0; i < planks; i++) g.fillRect(i * pw, 0, 2.5, H); // caulked seams
-  for (let i = 0; i < planks; i++) { const y = (rnd() * 0.8 + 0.1) * H; g.fillRect(i * pw, y, pw, 2); } // butt joints, staggered
+  if (seams) {
+    for (let i = 0; i < planks; i++) g.fillRect(i * pw, 0, 2.5, H); // caulked seams
+    for (let i = 0; i < planks; i++) { const y = (rnd() * 0.8 + 0.1) * H; g.fillRect(i * pw, y, pw, 2); } // butt joints, staggered
+  }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
-  teakCache.set(silver, t); return t;
+  teakCache.set(key, t); return t;
 }
 
 /** The face for boats' names: a hand-lettered script (Google Fonts' Playball, loaded with the page), falling back to any script. */

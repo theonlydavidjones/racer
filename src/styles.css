@@ -233,7 +233,7 @@ body.pilot-on #keysHint{display:none}
 .mo-thr input{width:110px}
 #moGears .tp-btn[aria-pressed="true"],#motorHead .tp-btn.on{border-color:var(--accent);color:var(--accent)}
 #bMotor.on{border-color:var(--accent);color:var(--accent)}
-#bHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
+#bHome.dim,#bNavHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
 @media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)} }
 /* one line along the bottom: the helm's buttons, then the pilot's control head while it steers (clear of the view buttons) */
 #controls{flex-direction:row;align-items:flex-end;padding-right:calc(max(16px,env(safe-area-inset-right,0px)) + 96px)}
@@ -1119,3 +1119,18 @@ body.showroom #flowPanel{display:none}
 #realRows:not(:empty){margin-bottom:10px}
 #realRows .warn,#resReal .warn{color:#ffb08a}
 #resReal tr.you td{color:var(--accent);font-weight:700}
+
+/* the surface audit (owner, 13 Nov): controls folded into what's already on screen */
+/* the where-next card opens the course (racing) or the navigator (cruising) */
+#nextCard{cursor:pointer}
+#nextCard:hover,#nextCard:focus-visible{border-color:var(--accent)}
+/* the Coach card's crew line opens the crew's places (in place of the Crew button); amber once you've placed them */
+.tp-crew{pointer-events:auto;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+.tp-crew:hover{color:var(--text)}
+.tp-crew.mine{color:var(--accent)}
+/* messages rest once they're stale: the card keeps only its header (and All, for the log) */
+#msgLog.rest #msgRecent{display:none}
+#nextCard{pointer-events:auto}
+/* the navigator's Sail home sits beside its Close (the owner: Home belongs in the navigator) */
+.cvhead .btnrow{flex-wrap:nowrap;align-items:flex-start}
+.cvhead .btnrow .ghost{width:auto;white-space:nowrap}
