@@ -70,3 +70,11 @@ showing it, and add to it whenever the owner confirms something. One line each; 
 - No post under the thwart (that was the boom crutch, only for stowing). The thwart's underside is curved, about 6 in
   deep at the middle tapering to 4 in at the ends. No slanted panels below it.
 - Nothing pokes up through the after deck.
+- No after bench or shelf. Under the after deck, a hollow open to the cockpit (storage, and room for the footrest).
+- The footrest: one teak plank, 1 in thick, about 2 ft fore and aft, right across the cockpit's after end, its top
+  level with the seats, the same wood look as the washboards. It slides out from under the after deck for the helm
+  sitting on the after deck (its forward edge then halfway between the thwart's after edge and the cockpit's after end),
+  and back under the deck, flush with the after end, so the helm can stand to steer. Open underneath. On Josephine it
+  runs on slim metal rails on the hull's inside; the sim leaves them out for simplicity (owner).
+- The coaming's teak cap runs all the way round the after coaming, turning the corners in a smooth curve.
+- The cabin front's foot is aft of the mast foot's horseshoe, with a strip of deck between them.
