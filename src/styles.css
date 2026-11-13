@@ -1158,3 +1158,8 @@ body.showroom #flowPanel{display:none}
 /* the field: one of several, as radio rows boxed together apart from the switches (ui/layers.ts) */
 .layerpop .lp-field{display:flex;flex-direction:column;padding:2px 6px;margin:0 -4px;border:1px solid var(--rule);border-radius:5px;background:rgba(255,255,255,.03)}
 .layerpop .lp-sub{text-transform:none;letter-spacing:0}
+/* The flag index sits in the left column, which lets the pointer through to the boat (pointer-events:none); the index
+   itself must take the pointer, or the wheel and a drag go to the view behind it and it never scrolls (the owner). */
+#flagIndex{pointer-events:auto;overscroll-behavior:contain;cursor:grab}
+#flagIndex.drag{cursor:grabbing;-webkit-user-select:none;user-select:none}
+#flagIndex .fi-x{cursor:pointer}

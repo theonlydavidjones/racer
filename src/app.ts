@@ -591,6 +591,23 @@ function togglePole(): void {
 // the Flags tile opens the flag index; × or Esc closes it
 $('sigPanel').addEventListener('click', () => hud.flagIndex(w, !!$('flagIndex').hidden));
 $('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
+// Drag the flag index to scroll it, as you'd push a page up (the wheel scrolls it too); a drag that moves isn't a click.
+{
+  const fi = $('flagIndex'); let drag: { y: number; top: number; id: number; moved: boolean } | null = null;
+  fi.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    drag = { y: e.clientY, top: fi.scrollTop, id: e.pointerId, moved: false };
+  });
+  fi.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.abs(dy) < 4) return;
+    if (!drag.moved) { drag.moved = true; fi.setPointerCapture(e.pointerId); fi.classList.add('drag'); }
+    fi.scrollTop = drag.top - dy; e.preventDefault();
+  });
+  const end = (e: PointerEvent) => { if (!drag || e.pointerId !== drag.id) return; drag = null; fi.classList.remove('drag'); };
+  fi.addEventListener('pointerup', end); fi.addEventListener('pointercancel', end);
+}
 function doHail(): void { if (w.running && !w.paused) send({ k: 'hail' }); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) send({ k: 'pushOff' }); }
