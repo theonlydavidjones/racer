@@ -44,7 +44,7 @@ export interface Controls {
   car: Record<Tack, { fore: number; ins: number }>;
 }
 
-/** Pin positions on the cabin-top tracks (an estimate until counted: 25 mm apart). */
+/** Pin positions on the cabin-top tracks (an estimate until counted: 25 mm apart fore and aft, JOSEPHINE_CAR.pin across). */
 export const CAR_FORE_PINS = 7, CAR_IN_PINS = 5;
 
 export const defaultControls = (): Controls => ({
@@ -94,23 +94,28 @@ export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.m
 /**
  * Josephine's jib cars, the one source for the lead (render/boatMesh.ts draws them from it): the athwartships bar's
  * middle hole `centre` m off the centreline, its holes `pin` m apart, and the middle fore–aft hole `aft` m behind the
- * forestay's pin on the deck. The centre and the aft are North Sails' Nordic Folkboat tuning guide's ("the jib-lead
- * track is placed with its centre 58 cm from the boat's centreline"; "2.65 m from the pin in the forestay"): 12.3° at the
- * middle hole, which puts the jib at its best trim close-hauled (the beat's apparent wind, about 30°, less trim.ts's 18°).
+ * forestay's pin on the deck. The centre and the tape are North Sails' Nordic Folkboat tuning guide's ("the jib-lead
+ * track is placed with its centre 58 cm from the boat's centreline"; "2.65 m from the pin in the forestay"): 12.65° at
+ * the middle hole, which puts the jib at its best trim close-hauled (the beat's apparent wind, about 30–31° in 10–12 kt,
+ * less trim.ts's 18°).
  * Until the owner measures Josephine: the drawing (Boat Detail, from a photo) reads 0.66 m, within a photo's error of
  * it; the holes' 24 mm is the drawing's. (reference/design/sheet-geometry.md, Rigging.)
  */
-export const JOSEPHINE_CAR = { centre: 0.58, pin: 0.024, aft: 2.65 };
+export const JOSEPHINE_CAR = { centre: 0.58, pin: 0.024, tape: 2.65, rise: 0.06 };
+/** How far aft of the forestay's pin the middle hole is, fore and aft (m): North's 2.65 m is a tape from the pin to the
+ * block ("measure 2.65 m from the pin in the forestay to the centre of the block"), across the 58 cm and up the car's
+ * `rise` above the pin (about 6 cm on the drawn cabin top), so 2.585 m. */
+export const CAR_AFT = Math.sqrt(JOSEPHINE_CAR.tape ** 2 - JOSEPHINE_CAR.centre ** 2 - JOSEPHINE_CAR.rise ** 2);
 /**
  * The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins` (0 inboard
- * .. CAR_IN_PINS−1 outboard): atan(out / aft), 11.3° to 13.3°, 12.3° at the middle hole, half a degree a hole.
+ * .. CAR_IN_PINS−1 outboard): atan(out / CAR_AFT), 11.6° to 13.7°, 12.65° at the middle hole, half a degree a hole.
  */
-export const carLead = (ins: number) => Math.atan((JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2)) / JOSEPHINE_CAR.aft) * 180 / Math.PI;
+export const carLead = (ins: number) => Math.atan((JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2)) / CAR_AFT) * 180 / Math.PI;
 /** The outermost athwartships pin whose lead is no wider than `angle` deg (the innermost if none is). */
 export const carInFor = (angle: number) => { let k = 0; for (let i = 1; i < CAR_IN_PINS; i++) if (carLead(i) <= angle) k = i; return k; };
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). The sheet's 0–1 to the
  * angle, lead + 70·s^1.4, is a feel scale, like the mainsheet's: with a 12.3° lead, reaching 20° takes 5% of real
- * rope's ease, where this takes 21% (24% at the middle hole's 10.5°: reference/design/sheet-geometry.md). */
+ * rope's ease, where this takes 21% (reference/design/sheet-geometry.md). */
 export function jibAngle(c: Controls, tack: Tack): number {
   const lead = carLead(c.car[tack === 'S' ? 'P' : 'S'].ins); // the loaded car is the leeward one
   return Math.min(68, lead + 70 * Math.pow(c.jibsheet, 1.4));
@@ -363,9 +368,11 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const free = fixed.mainsheet != null ? depowerLimits(depower ?? 0, awa) : null;
   const lo = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? free.min.traveller : lim.min[k]) ?? (k === 'traveller' ? -1 : 0);
   const hi = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? 1 : lim.max[k]) ?? 1;
-  // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle
-  const carIn = carInFor(jibAng - 1);
-  const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, jibHalyard: 0.3, carFore: 3, carIn, ...from };
+  // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle (a quarter of a
+  // degree in hand: half a hole); worked out afresh each time, not carried over from the last plan, which froze it at
+  // the first one's
+  const carIn = carInFor(jibAng - 0.25);
+  const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, jibHalyard: 0.3, carFore: 3, ...from, carIn };
   const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
   for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
   // with your mainsheet held, the traveller is how the crew puts the boom where they want it (up to windward in light
