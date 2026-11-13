@@ -38,7 +38,14 @@ function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'lan
   // corner from there, as a boat does), so the track runs on unbroken and every metre of it is sailed and timed
   let at = route[0];
   for (let i = 1; i < route.length; i++) {
-    const r = sailLeg(o, at, route[i], tt, 'middle', undefined, i === route.length - 1 ? 30 : 120, 360);
+    const arrive = i === route.length - 1 ? 30 : 120;
+    let r = sailLeg(o, at, route[i], tt, 'middle', undefined, arrive, 360);
+    // run ashore up the middle (its lanes either side of the course meet the shore): a navigator would sail it the other
+    // ways, the long board first to one side or the other, and take whichever gets there soonest
+    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) {
+      const q = sailLeg(o, at, route[i], tt, pl, undefined, arrive, 360);
+      if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q;
+    }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
     // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
@@ -98,7 +105,7 @@ export function passageNow(w: SimView): PassageNow | null {
   // (the laylines she tacked or gybed onto: the wind and the current where and when she made her last turn, which is
   // where she saw she'd lay the mark; with no turn on the last stretch, those at the mark when she gets there)
   const lt = last?.turns[last.turns.length - 1], ltT = lt ? r.track.find(q => dist(q.p, lt.p) < 1)?.t : undefined;
-  const laylines = lk ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
+  const laylines = lk && r.ok ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
   const v: PassageNow = { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
     tacks: turns.filter(q => q.kind === 'tack').map(q => q.p), gybes: turns.filter(q => q.kind === 'gybe').map(q => q.p),
     laylines, leave: t0, eta: r.ok ? t0 + r.minutes : null };

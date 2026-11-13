@@ -2,7 +2,7 @@ import type { Boat, LineKey } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
 import { byHand } from '../boat/physics';
 import type { BoatView } from '../sim/host';
-import type { Command, CommandResult } from '../sim/commands';
+import type { Command } from '../sim/commands';
 import { CAR, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
@@ -29,7 +29,7 @@ import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 export interface BandHost {
   world(): { readonly user: BoatView; readonly running: boolean; readonly paused: boolean };
   /** Change the race (sim/commands.ts): the band never writes to the boat itself. */
-  send(c: Command): CommandResult;
+  send(c: Command): void;
   /** Hold a line moving (+1 / −1 in the line's own value) or let it go (null): the app's held-button commands. */
   hold(k: CtlKey, d: number | null): void;
   /** Something changed hands: the trim panel's line. */
@@ -173,7 +173,7 @@ export class SailBand {
    * until it runs out (performance.now(), ms; Infinity while the crew is at it). */
   private note: { text: string; until: number } | null = null;
   /** The jib car you've asked for, while the crew is on it (to say when it's done). */
-  private carAsked: { side: Side; fore: number; ins: number } | null = null;
+  private carAsked: { side: Side; fore: number; ins: number; t: number; seen: boolean } | null = null;
 
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
@@ -331,16 +331,21 @@ export class SailBand {
     // takes the load off it (it's then the windward car, and yours to set for the tack after)
     if (side !== windSide(u)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
-    const from = u.carCmd ?? u.ctl.car[side]; this.host.send({ k: 'lazyCar', fore: row - from.fore, ins: ins - from.ins }); this.host.changed();
-    this.carAsked = u.carCmd ? { side, ...u.carCmd } : null; this.carNote(u);
+    // (the hole itself is sent, not a move from where the car seems to be: the page sees the race a frame late, and two
+    // quick clicks must leave the car in the second hole)
+    this.host.send({ k: 'lazyCarTo', fore: row, ins }); this.host.changed();
+    // (where you asked for, worked out here: the sim may answer a frame later, once it runs apart from the page)
+    this.carAsked = { side, fore: Math.max(0, Math.min(CAR_FORE_PINS - 1, row)), ins: Math.max(0, Math.min(CAR_IN_PINS - 1, ins)), t: performance.now(), seen: false }; this.carNote(u);
   }
   /** The Coach card's word on the jib car you've asked for: the crew going forward, moving it (and about how long), set. */
   private carNote(u: Boat): void {
     const a = this.carAsked; if (!a) return;
     const name = `${a.side === 'P' ? 'Port' : 'Starboard'} jib car`, at = `pin row ${a.fore + 1}, hole ${a.ins + 1} from inboard`;
     const car = u.ctl.car[a.side];
-    // done (or a tack loaded it first: then it stays where it was)
-    if (!u.carCmd || a.side !== windSide(u)) {
+    if (u.carCmd) a.seen = true;
+    // done (or a tack loaded it first: then it stays where it was); not before the sim has taken the call, unless it
+    // never does (the car was already there)
+    if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || a.side !== windSide(u)) {
       const set = car.fore === a.fore && car.ins === a.ins;
       this.note = { text: set ? `${name}: set at ${at}. It takes over at the next tack.` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
       this.carAsked = null; return;
@@ -356,7 +361,7 @@ export class SailBand {
   private jumpersNow(u: Boat): number { return (u.tune ?? guideTune(u.ww.kt)).jumperTurns; }
   /** Ask the crew for a half turn more or less on the jumpers, from where they're going (or where they are). */
   private turnJumpers(d: number): void {
-    const u = this.host.world().user; this.host.send({ k: 'jumpers', turns: (u.jumperTarget ?? this.jumpersNow(u)) + d }); this.host.changed();
+    this.host.send({ k: 'jumpersBy', d }); this.host.changed(); // (worked out in the race: two quick presses make a whole turn)
   }
   /** The jumpers' dials: shown only if her Rig tune has them adjusted under way. */
   private jumpers(u: Boat): void {

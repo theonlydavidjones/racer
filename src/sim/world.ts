@@ -16,7 +16,7 @@ import { ShiftField, shiftStats } from '../environment/shifts';
 import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
-import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, type Frame } from '../replay/recorder';
+import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
@@ -34,7 +34,7 @@ import { ensignFor, sailNo } from '../boat/spec';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
-import { genericSpec, genericTag, isGeneric } from '../boat/generic';
+import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
@@ -385,7 +385,7 @@ export class World {
     // an opponent: a stock club boat, or one of your own saved boats (her looks and her condition), sailed by the AI
     const pick = isUser ? null : this.settings.opponents?.[i - 1] ?? `stock:${i}`;
     // (a generic club Folkboat, boat/generic.ts: her sail number clear of your boats')
-    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
+    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? realSpec(pick) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
@@ -537,7 +537,7 @@ export class World {
   windHere(p: Vec, self?: Boat, gusts = true): Wind {
     const q = this.puffs.at(p), sh = this.shadowAt(p, self);
     if (self) self.shadowK = sh.k;
-    const f = this.fieldAt(p);
+    const f = this.fieldAt(p, !!self); // (a boat's own wind: the shore's distance off the lattice, as for her current)
     // (the shifts here against the course's centre: the boat to windward has the header first)
     const s = this.shifts ? this.shifts.at(p) : null, turn = s ? s.turn - this.shiftRef.turn : 0, sk = s ? s.k / this.shiftRef.k : 1;
     // and the gusts, the turbulence of the seconds-to-a-minute, sized for the wind here (environment/gusts.ts)
@@ -606,7 +606,7 @@ export class World {
     return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) };
   }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
-  fieldAt(p: Vec): { k: number; turn: number; extra: number } {
+  fieldAt(p: Vec, lattice = false): { k: number; turn: number; extra: number } {
     const g = this.field;
     if (!g) return this.fieldExact(p);
     const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
@@ -620,7 +620,7 @@ export class World {
     // would meet a seam in the wind. At the edge itself, the exact field
     const e = this.fieldEdge(fx, fy);
     if (e < 1) { const x = this.fieldExact(p), s = e * e * (3 - 2 * e); extra = x.extra + (extra - x.extra) * s; turn = x.turn + wrap(turn - x.turn) * s; }
-    return { k: windTerrain(p, this.wind.from) * extra, turn, extra };
+    return { k: windTerrain(p, this.wind.from, lattice) * extra, turn, extra }; // (`lattice`: for a boat's own wind, windHere)
   }
 
   /**
@@ -774,8 +774,8 @@ export class World {
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
-    // boat answers her helm every step); in close quarters (a boat or a mark within CLOSE_M, about to touch, or taking a
-    // penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
+    // boat answers her helm every step); in close quarters (World.closeQuarters: a boat or a mark within four lengths, about to
+    // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
     for (const b of this.boats) if (!b.isUser) {
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
@@ -809,7 +809,7 @@ export class World {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
-    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(snapshot(this.t, this.boats));
+    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
   }
 
   private checkLines(prevT: number): void {
@@ -1004,7 +1004,7 @@ export class World {
     if (b.ai?.urgent || b.penalty > 0) return true;
     const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
     for (const o of this.boats) if (o !== b && near(o)) return true;
-    for (const m of this.C.marks) if (near(m.p)) return true;
+    for (const m of this.C.marks) if (near(m.p)) return true; // (a mark: the rounding's timing is close work, coming or going)
     const cb = this.committeeHull; // (the committee boat by her whole hull, as avoidMarks steers round it)
     return near(this.C.pin) || (!!cb && (cb.q ? segPt(b, cb.p, cb.q) : dist(b, cb.p)) < CLOSE_M);
   }

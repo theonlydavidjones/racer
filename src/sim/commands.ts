@@ -13,6 +13,7 @@ import type { LineKey, Boat } from '../boat/boat';
 import type { PlaceAcross, PlaceFore } from '../boat/crewPhys';
 import { allToCrew, moveLazyCar, takeLine } from '../boat/physics';
 import { wantJumpers } from '../boat/condition';
+import { guideTune } from '../boat/rigTune';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from '../boat/autopilot';
 import type { Settings } from '../settings';
 import type { Moment } from './debrief';
@@ -43,6 +44,10 @@ export type Command =
   | { k: 'ctlTargetClear'; keys: CtlKey[] }
   /** The crew to turn the jumpers' turnbuckle to so many turns (the band's dials). */
   | { k: 'jumpers'; turns: number }
+  /** A half turn more or less on the jumpers, from where they're going (or where they are): worked out with the race's own numbers. */
+  | { k: 'jumpersBy'; d: number }
+  /** The lazy jib car to a hole (taking the cars), from wherever it is or was going: the band's click on a hole. */
+  | { k: 'lazyCarTo'; fore: number; ins: number }
   /** Where the crew sit: your choice across and fore and aft (null: theirs), or null to put them back on auto. */
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
   /** Set or stow the whisker pole (it's yours until Auto-trim). */
@@ -105,6 +110,12 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'ctlTarget': (u.ctlTarget ??= {})[c.key] = c.v; takeLine(u, c.key); return;
     case 'ctlTargetClear': if (u.ctlTarget) for (const key of c.keys) delete u.ctlTarget[key]; return;
     case 'jumpers': wantJumpers(u, c.turns); return;
+    case 'jumpersBy': wantJumpers(u, (u.jumperTarget ?? (u.tune ?? guideTune(u.ww.kt)).jumperTurns) + c.d); return;
+    case 'lazyCarTo': {
+      // (as the band did it: from where she'd been asked to put the car, or where the lazy car is; moveLazyCar works from the same)
+      const lazy = u.ctl.car[u.tack], from = u.carCmd ?? { fore: lazy.fore, ins: lazy.ins };
+      takeLine(u, 'car'); moveLazyCar(u, c.fore - from.fore, c.ins - from.ins); return;
+    }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
     case 'pole': u.poleWant = c.want; u.poleMine = true; return;
     case 'ensign': u.ensignStruck = c.struck; return;
