@@ -332,8 +332,10 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     for (const m of moves(10)) expect(m).toBeLessThan(20);
     // in 7 kt the same ±2 kt takes her from light air (weight to leeward) to a breeze (up to windward) every half minute:
     // out on the puff and in on the lull (a step more at most), not every flicker (twenty cycles: under four moves a cycle; without the dead
-    // band it was over 700)
-    for (const m of moves(7)) expect(m).toBeLessThan(80);
+    // band it was over 700). The limit, in moves to a new place (settledCounter): counted by every 0.1 m step of the
+    // goal it was 80, against main's 75 then, a margin of 5; counted as moves, main reads 68 and 70, so the same margin
+    // gives 74 (the Coordinator and Deep Physics, 13 Nov 2026: changing the count isn't to loosen the limit)
+    for (const m of moves(7)) expect(m).toBeLessThan(74);
     // (and the lines aren't hunted: a trip out to them once a puff-and-lull cycle at most, the outhaul set for the wind
     // there is, not back and forth within one; 18 in the twenty cycles as it stands, each about half a second, kneeling
     // at the cockpit's forward end)
