@@ -37,7 +37,7 @@ export const CAUSES: { key: Cause; label: string; color: string }[] = [
   { key: 'laylines', label: 'Laylines', color: '#c77dff' },
   { key: 'clearAir', label: 'Clear air', color: '#e69f00' },
   { key: 'manoeuvres', label: 'Tacks & gybes', color: '#f0e442' },
-  { key: 'penalty', label: 'Penalties', color: '#e8603c' },
+  { key: 'penalty', label: 'Penalties', color: '#9a7b5f' }, // (brown: clear of the boats' own reds)
   { key: 'other', label: 'Speed & other', color: '#94abb7' }
 ];
 

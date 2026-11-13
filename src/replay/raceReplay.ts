@@ -398,10 +398,10 @@ export class RaceReplay {
     const hs = Math.max(scale, 1.6);
     w.boats.forEach((bt, i) => {
       const p = now[i]; if (!p) return;
-      const lab = i === u ? `You · ${p[3]}` : i === rv ? null : this.follow ? bt.name : null;
+      const lab = i === u ? `You · ${p[3]}` : i === rv ? null : this.follow ? bt.no || bt.name : null; // (a fleet goes by sail numbers)
       drawHull(ctx, P(p), p[2] - W, p[4], i === rv ? hs * 1.15 : hs, i === u || i === rv ? bt.color : hexA(bt.color, .7), lab);
       // her name below her hull (yours is above yours), so the two don't crowd when you're close
-      if (i === rv) { const q = P(p); ctx.fillStyle = bt.color; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillText(`${bt.name}${D.vs!.won ? ' (won)' : ''}`, q[0] + 12, q[1] + 20); }
+      if (i === rv) { const q = P(p); ctx.fillStyle = bt.color; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillText(`${bt.no || bt.name}${D.vs!.won ? ' (won)' : ''}`, q[0] + 12, q[1] + 20); }
     });
     // close in, with her out of sight: an arrow at the edge toward her, and how far
     if (rv >= 0 && this.follow && now[rv]) {
