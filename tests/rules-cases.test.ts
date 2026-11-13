@@ -382,11 +382,12 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     // before the start: D holding station below the line; L overlapped 5 m to leeward of her; W, clear astern of D,
     // overlapped 2.5 m to windward of L, heading into the gap between them
     const D = boat('D', { at: [0, 0], heading: 315, speed: 0.3, started: false });
-    const L = boat('L', { at: off([0, 0], 315, -2, -5), heading: 315, speed: 1, started: false }), W = boat('W', { at: off([0, 0], 315, -8, -2.5), heading: 315, speed: 1, started: false });
+    const L = boat('L', { at: off([0, 0], 315, -2, -5), heading: 315, speed: 1.5, started: false }), W = boat('W', { at: off([0, 0], 315, -8, -2.5), heading: 315, speed: 1, started: false });
     const fleet = fleetCtx([D, L, W], -15);
     const p = pair(L, W, [], dObstruction ? { ...fleet, keepsClearOf: () => true } : fleet);
     const before = clean(p, -15);
-    moveTo(W, off([0, 0], 315, -7.5, -3.9)); // W sags down onto L, finding no room
+    // L luffs 10° (under rule 16.1's trigger) and closes up on W: squeezing her toward D, were D an obstruction
+    moveTo(L, off([0, 0], 315, -0.6, -3.6), 325, 315);
     return { before, contact: p.at(-14) };
   };
   it('Case 117: before the start, L overlapped to leeward of D in a row of boats has right of way over her, so D is no obstruction between L and W: no 19.2(b), and W, to windward of L, keeps clear (11)', () => {

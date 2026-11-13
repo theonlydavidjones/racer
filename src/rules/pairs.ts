@@ -352,7 +352,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
       insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
     }
     const [oA, oB] = obstructionsFor(A, B, ctx, rec);
-    if (oA && oB) { const ins = insideAt(A, B, oA, oB), oo = ins === A ? oB : oA; insideObst = ins.id; obstUnable = oo.d - 1.1 < ROOM_GAP; }
+    // (could the outside boat give room then: the space between the inside boat and the obstruction plus what lies between
+    // the two hulls, less her half-beam, against the room the inside boat needs: the old outside-distance test, whichever is nearer)
+    if (oA && oB) { const ins = insideAt(A, B, oA, oB), oi = ins === A ? oA : oB; insideObst = ins.id; obstUnable = oi.d + hullGap(A, B) - 1.1 < ROOM_GAP; }
     rec.ovStart = { t: ctx.t, astern, tacker, insideMark, markUnable, insideObst, obstUnable };
   } else if (!overlapped) rec.ovStart = null;
   rec.wasOverlapped = overlapped;
@@ -513,7 +515,12 @@ function boatObstruction<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec
     // (a boat no longer racing is just a vessel in the way: an obstruction to everyone, like the committee boat)
     if (Math.min(dA, dB) >= bd || (!notRacing(C) && (!ctx.keepsClearOf(A, C) || !ctx.keepsClearOf(B, C)))) continue;
     if (r18 && ov(A, C) && ov(B, C)) continue;
-    const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - C.x) * u.x + (X.y - C.y) * u.y, -LOA / 2, LOA / 2), dx = X.x - C.x - u.x * k, dy = X.y - C.y - u.y * k, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
+    // (which way she lies from each: from where she'll be as the pair passes her, by their motion relative to hers, so a
+    // starboard boat still on the port boats' bow, that they'll pass astern of, lies on the side they'll leave her: WS
+    // Case 125. Rule 19.2(a): the right-of-way boat chooses the side; the pair passing astern of her, it's that side)
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, wx = C.vx - (A.vx + B.vx) / 2, wy = C.vy - (A.vy + B.vy) / 2, ww = wx * wx + wy * wy;
+    const tc = ww > 1e-4 ? clamp(-((C.x - mx) * wx + (C.y - my) * wy) / ww, 0, 15) : 0, cx = C.x + wx * tc, cy = C.y + wy * tc;
+    const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - cx) * u.x + (X.y - cy) * u.y, -LOA / 2, LOA / 2), dx = X.x - cx - u.x * k, dy = X.y - cy - u.y * k, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
     best = [{ d: dA, n: toward(A), continuing: false }, { d: dB, n: toward(B), continuing: false }]; bd = Math.min(dA, dB);
   }
   return best;
@@ -560,7 +567,7 @@ function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord,
   const [oA, oB] = obstructionsFor(A, B, ctx, rec);
   if (!oA || !oB) return null;
   const I = insideAt(A, B, oA, oB), O = I === A ? B : A, oI = I === A ? oA : oB;
-  if (oI.d > AT_OBSTRUCTION) return null;
+  if (Math.min(oA.d, oB.d) > AT_OBSTRUCTION) return null; // (at it: either of them near it, Rule 19.1)
   const ov = rec.ovStart, unable = !!ov && ov.insideObst === I.id && ov.obstUnable;
   if (oI.continuing && unable && ov!.astern === I.id) return { fouler: I, part: '19.2(c)' };
   // squeezing: the outside boat moving in toward the obstruction (and the inside boat), more than the inside boat is
