@@ -112,6 +112,16 @@ why each feature's +1 shows. Rendering is the larger share of the main thread, a
   isn't visible without loading the artifact in a signed-in browser. This is the one fact that can block the plan, so
   the first step checks it.
 
+### 1.5a The probe page
+
+The owner approved a probe page: https://claude.ai/artifact/AR1y44ZFdL63SzwV2Byc5s. It is a separate private artifact,
+not the live one. It checks the blob and data: Workers (classic, and module the way Vite's `?worker&inline` builds
+them), `crossOriginIsolated`, a 64 KB transfer round trip, a fleet-sized structured-clone round trip, and the perf
+test's reference workload in the worker against the page's own thread. It saves each run to its db (`runs`). Locally
+in headless Chromium, all three Worker kinds started; the transfer round trip took 0.1 ms and the clone round trip
+1.0 ms (so pack the snapshot into typed arrays and transfer it). The reference workload took the same time in the
+worker as on the page (110.6 against 110.8 ms). The host's own result is pending until the owner opens the page.
+
 ### 1.6 What a snapshot costs
 
 A structured clone of every cloneable field of all eight boats is ~5.1–5.8 KB a boat, 42 KB for the fleet, and takes
