@@ -170,21 +170,31 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // Beating, she tacks, with way enough to (below about 1.5 m/s a tack becomes a gybe right round: physics.ts
   // SLOW_TACK), and not onto land; else, or slow, she bears away to build speed and clear it
   const track = (hd: number, d: number) => { const u = V(hd), s = Math.max(1, b.v); return { x: b.x + (u.x * s + b.cur.x) * d / s, y: b.y + (u.y * s + b.cur.y) * d / s }; };
-  if (landAlong(b, track(desired, 100)) < Infinity) {
+  // (her whole width, not just her centreline: a line 4 m either side too, so she doesn't brush a breakwater's end)
+  const landOn = (hd: number, d: number) => {
+    const q = track(hd, d), dx = q.x - b.x, dy = q.y - b.y, L = Math.hypot(dx, dy) || 1, sx = -dy / L * 4, sy = dx / L * 4;
+    return landAlong(b, q) < Infinity || landAlong({ x: b.x + sx, y: b.y + sy }, { x: q.x + sx, y: q.y + sy }) < Infinity || landAlong({ x: b.x - sx, y: b.y - sy }, { x: q.x - sx, y: q.y - sy }) < Infinity;
+  };
+  if (landOn(desired, 100)) {
     const other = n360(from + (b.tack === 'S' ? 1 : -1) * (beat + 1));
-    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && landAlong(b, track(other, 60)) === Infinity) desired = other;
-    else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (landAlong(b, track(cand, 100)) === Infinity) { desired = cand; break; } }
+    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && !landOn(other, 60)) desired = other;
+    else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (!landOn(cand, 100)) { desired = cand; break; } }
   }
   return { desired, luff: false, beating };
 }
 /**
- * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, reached from
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
  * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
  * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 80 m apart along the wind's line
  * across, so the fleet isn't all on one point.
  */
+/** No land, pier, dock or breakwater within r m of p, looking out eight ways (anyShoreDist doesn't see what's built). */
+function clearRound(p: Vec, r: number): boolean {
+  for (let a = 0; a < 360; a += 45) { const u = V(a); if (landAlong(p, { x: p.x + u.x * r, y: p.y + u.y * r }) < Infinity) return false; }
+  return true;
+}
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
-  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
+  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && clearRound(p, 100) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
   const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 80;
   let best: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
