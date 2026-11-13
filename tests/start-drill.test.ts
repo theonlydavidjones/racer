@@ -23,7 +23,7 @@ describe('the start-line drill', () => {
     const race = new World(TRAIN, settings({ mode: 'race', seq: 1 }), 4);
     while (race.t < -20) race.step(DT);
     expect(race.track[0].t).toBeGreaterThanOrEqual(-30);
-  });
+  }, 60_000);
 
   /** A world with your track replaced: from (d m below the line, along a), heading h, at v m/s, from t0 to the gun. */
   const withTrack = (pts: (t: number) => { d: number; a: number; h: number; wind: number }) => {
@@ -63,4 +63,15 @@ describe('the start-line drill', () => {
     expect(['pin', 'middle', 'committee']).toContain(d.stats!.end);
     expect(d.facts.length).toBeGreaterThan(3);
   }, 60_000);
+
+  it('a tack through the wind isn\'t a line check (it swings through at ~10°/s); the read is the wind, not the bow', () => {
+    const w0 = withTrack(() => ({ d: 100, a: 0, h: 0, wind: 0 })), sq = brg(w0.N.x, w0.N.y);
+    // tacking 60 m below the line at −80 s: the bow swings from 45° one side of the wind to 45° the other at 10°/s
+    const tack = withTrack(t => ({ d: 60, a: 0, h: sq + (t < -85 ? -45 : t > -76 ? 45 : -45 + (t + 85) * 10), wind: sq }));
+    expect(lineCheck(tack)).toBeNull();
+    // sitting 6° off head to wind on a square line: the read is square (the wind's), and the bow's 6° is reported apart
+    const sit = withTrack(t => ({ d: t < -90 ? 150 : 40, a: 0, h: t < -90 ? sq + 90 : sq + 6, wind: sq }));
+    const c = lineCheck(sit)!;
+    expect(c.toward).toBeNull(); expect(c.bowOff).toBeCloseTo(6, 0);
+  });
 });

@@ -417,6 +417,7 @@ export class World {
       let d = 60 + this.startAt * 0.7 + r() * 40; const a = (r() - 0.5) * this.lineLen * 0.6;
       p = place(d, a);
       while (onLand(p) && d > 60) { d -= 20; p = place(d, a); }
+      if (onLand(p)) p = place(100, -this.lineLen * 0.1); // (as a race's start, if even that's ashore)
       h = n360(lineH + (r() < 0.5 ? 0 : 180));
     } else if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
     else {
