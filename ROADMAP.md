@@ -143,10 +143,20 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Deep Physics
+   (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
+   Next for the rules (owner, 13 November):
+   - **Protests and hearings (RRS Part 5): design approved** (docs/PROTESTS-PROPOSAL.md, branch rules-protests-design;
+     owner, 13 November):
+     - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
+     - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
+       option.
+   - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
+     committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
    Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
    (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
@@ -882,8 +892,8 @@ placeholder names, marked as placeholders in the code (and the doc) so they're n
 After each race, the club's evening at the race's level: drinks; drinks and dinner; drinks, dinner and results; drinks,
 dinner, results and awards (owner). The Plastic Classic's committee-boat mark, when it's built (TRADITIONS item 14), as in real life (owner, 13 November:
 "this is a true to life sim"): its crew of adult women flash the fleet as boats round, topless only, nothing sexual,
-in the crew figures' stylized style. Pending the owner: whether it sits behind a mature-content setting, and the
-default. Before any public release, the host club's permission covers it.
+in the crew figures' stylized style. Shown blurred (owner: "just blur the titties"); no mature-content setting. Before any public release, the host
+club's permission covers it.
 
 Also asked for:
 

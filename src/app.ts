@@ -501,7 +501,7 @@ const band = new SailBand({
   hold: (k, d) => { if (d == null) delete btnCmd[k]; else btnCmd[k] = d; applyHeld(); },
   changed: () => showTrimOwner(),
   toast: (m, ms) => toast(m, ms),
-  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line, both jib cars and the pole back to the crew.', 2500); },
+  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
@@ -731,7 +731,7 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant; send({ k: 'pole', want }); // (yours now, until Auto-trim)
+  const want = !w.user.poleWant; send({ k: 'pole', want }); // (the pole is always yours: your call only)
   toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
@@ -2050,7 +2050,7 @@ const fleet: Fleet = new Fleet(S, {
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
-  seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons()) : ''; },
+  seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons(), liveBoat) : ''; },
   sailSeason: (id, no) => sailSeason(id, no),
   back: () => nav.back(),
   toBoat: id => nav.go({ k: 'boat', id }),
@@ -2168,6 +2168,13 @@ const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id
   : COURSES.slice().sort((a, b) => b.title.length - a.title.length).find(c => e.title.startsWith(c.title))?.id ?? null;
 /* ---------------- the season (club/season.ts): a real club series, race by race, against the club's fleet ---------------- */
 let pendingSeason: { series: Series; no: number; at: string } | null = null;
+/** A boat as she is now, by sail number: your boats and the club's other Folkboats, from their specs (club/season.ts LiveBoat). */
+const liveBoat = (sail: string) => {
+  const mine = S.boats.find(b => sailNo(b).replace(/^US\s+/, 'USA ') === sail);
+  if (mine) return { name: mine.name || undefined, hull: mine.hull.upper, club: mine.club };
+  for (const id of seasons()[0]?.fleet ?? []) if (isGeneric(id)) { const g = genericSpec(id, S.boats.map(x => x.sails.number)); if (g && sailNo(g) === sail) return { name: g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), hull: g.hull.upper, club: g.club }; }
+  return undefined;
+};
 /** Sail race `no` of the season: its real day and start, the day's observed wind and tide, its course (or the committee's), the club's fleet. */
 function sailSeason(id: string, no: number): void {
   const series = seasonById(id), r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
@@ -2201,7 +2208,7 @@ function hullOf(b: Boat): string {
 function seasonResult(at: string): SeasonResult | null {
   if (!w) return null;
   const sc = scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
-  return { at, scores: rows.map((b, i) => { const s = sc.get(b.id)!; return { sail: b.no.replace(/^US\s+/, 'USA '), name: b.isUser ? (S.boat.name || 'You') : b.name, hull: hullOf(b), you: b.isUser, points: s.points ?? (b.isUser ? w.boats.length + 1 : i + 1), code: s.points == null && b.isUser ? 'RET' : s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.code }; }) };
+  return { at, scores: rows.map((b, i) => { const s = sc.get(b.id)!; return { sail: b.no.replace(/^US\s+/, 'USA '), name: b.isUser ? (S.boat.name || 'You') : b.name, hull: hullOf(b), you: b.isUser, club: b.isUser ? S.boat.club : b.spec?.club, points: s.points ?? (b.isUser ? w.boats.length + 1 : i + 1), code: s.points == null && b.isUser ? 'RET' : s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.code }; }) };
 }
 /** At the finish of a season race: where this race puts you in the series (counted once you save it). */
 function seasonLine(): string {
