@@ -173,7 +173,7 @@ export class SailBand {
    * until it runs out (performance.now(), ms; Infinity while the crew is at it). */
   private note: { text: string; until: number } | null = null;
   /** The jib car you've asked for, while the crew is on it (to say when it's done). */
-  private carAsked: { side: Side; fore: number; ins: number } | null = null;
+  private carAsked: { side: Side; fore: number; ins: number; t: number; seen: boolean } | null = null;
 
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
@@ -332,15 +332,18 @@ export class SailBand {
     if (side !== windSide(u)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
     const from = u.carCmd ?? u.ctl.car[side]; this.host.send({ k: 'lazyCar', fore: row - from.fore, ins: ins - from.ins }); this.host.changed();
-    this.carAsked = u.carCmd ? { side, ...u.carCmd } : null; this.carNote(u);
+    // (where you asked for, worked out here: the sim may answer a frame later, once it runs apart from the page)
+    this.carAsked = { side, fore: Math.max(0, Math.min(CAR_FORE_PINS - 1, row)), ins: Math.max(0, Math.min(CAR_IN_PINS - 1, ins)), t: performance.now(), seen: false }; this.carNote(u);
   }
   /** The Coach card's word on the jib car you've asked for: the crew going forward, moving it (and about how long), set. */
   private carNote(u: Boat): void {
     const a = this.carAsked; if (!a) return;
     const name = `${a.side === 'P' ? 'Port' : 'Starboard'} jib car`, at = `pin row ${a.fore + 1}, hole ${a.ins + 1} from inboard`;
     const car = u.ctl.car[a.side];
-    // done (or a tack loaded it first: then it stays where it was)
-    if (!u.carCmd || a.side !== windSide(u)) {
+    if (u.carCmd) a.seen = true;
+    // done (or a tack loaded it first: then it stays where it was); not before the sim has taken the call, unless it
+    // never does (the car was already there)
+    if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || a.side !== windSide(u)) {
       const set = car.fore === a.fore && car.ins === a.ins;
       this.note = { text: set ? `${name}: set at ${at}. It takes over at the next tack.` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
       this.carAsked = null; return;
