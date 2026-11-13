@@ -1149,6 +1149,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     // (the tube made with radius 1, then each ring brought in to the cigar's radius there, a little flattened where it lies on the deck)
     for (let i = 0; i <= T; i++) { curve.getPointAt(i / T, c); const r = rAt(i / T); for (let j = 0; j <= R; j++) { const k = i * (R + 1) + j; p.setXYZ(k, c.x + (p.getX(k) - c.x) * r, c.y + (p.getY(k) - c.y) * r * 0.92, c.z + (p.getZ(k) - c.z) * r); } }
     g.computeVertexNormals(); jibBag.add(new THREE.Mesh(g, clothMat));
+    jibBag.userData.clew = pts[T].clone(); // (the roll's after end, where the clew is rolled in: the sheets lead from there when she's down)
     for (const t of [0.36, 0.72]) { const q = curve.getPointAt(t), d = curve.getTangentAt(t), r = rAt(t), tie = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012 / r, 4, 14), MAT.dark); // (a sail tie round it, snug)
       tie.scale.set(r + 0.004, (r + 0.004) * 0.92, r + 0.004); tie.position.copy(q); tie.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d); jibBag.add(tie); }
     // the hanks, still on the stay: stacked at its foot
@@ -1512,7 +1513,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // the jib sheet: one line, its middle at the clew's ring; each half runs through its car on the cabin top, off the cabin's
   // side to its fairlead on the side deck, aft along the rail to its winch, round it, and the tail into the cockpit. The
   // working half (the leeward, or the windward when she's backed) taut; the lazy one slack, lying on the boat
-  const clew = tmpC.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position);
+  // (with the jib down, its clew is rolled into the after end of the roll on the foredeck, and the sheets lead from
+  // there, slack, lying on the deck and the cabin top; while it's hoisted or lowered, the clew comes between the two)
+  const hj = b.rig?.jib ?? 1, clew = tmpC.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position);
+  if (hj < 1) { const rc = m.jibBag.userData.clew as THREE.Vector3; tmpG.copy(rc).multiplyScalar(m.jibBag.scale.x).add(FORESTAY_DECK); clew.lerp(tmpG, 1 - hj); }
   L2.clewRing.position.copy(clew); L2.clewRing.quaternion.copy(m.jibPivot.quaternion);
   const q = L2.jibSheet.geometry.attributes.position as THREE.BufferAttribute;
   q.setXYZ(JIB_HALF_PTS, clew.x, clew.y, clew.z);
@@ -1522,7 +1526,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     // the winch's handle under the deck: turned by whoever is cranking it (Crew Figures' crew.winch: side and turn, rad
     // about the spindle, 0 pointing aft); a handle nobody is working rests pointing aft
     { const w = (m.crew as { winch?: { side: number; turn: number } }).winch; L2.handles[tk].rotation.y = w && w.side === side ? w.turn : 0; }
-    const loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
+    const loaded = hj > 0.9 && (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
     const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
     for (let k = 1; k <= 12; k++) {
