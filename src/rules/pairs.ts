@@ -7,7 +7,7 @@ import type { Incident, PairRecord, RulesBoat, RulesContext, RulesMark, Verdict 
 export const CONTACT_GAP = 2.2;
 /** Rule 15: how long a boat that just acquired right of way must give the other boat room, s. */
 export const RULE15_GRACE = 3.5;
-/** A boat counts as having "just tacked" for this long after passing head to wind, s. */
+/** How long a boat counts as having "just tacked", s: after any change of tack for rule 15, after passing head to wind for 18.2(d). */
 export const JUST_TACKED = 2;
 /** After an incident, the same pair can't foul again for this long, s. */
 export const INCIDENT_COOLDOWN = 6;
