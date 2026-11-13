@@ -348,21 +348,49 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     mergeByMaterial(fbg, [TWR, DECK, SHELTER, POLE]);
     glows.push({ ...tc, h: 45, color: 0xffe0b0, i: 0.45, w: 6 });
   }
-  // Sutro Tower: three red-and-white legs on Mt Sutro, 298 m, crossarms at two levels, three masts on top
+  // Sutro Tower (1973) on Mount Sutro, the city's mark you see from all over the Bay. Wikipedia ("Sutro Tower"): a three-
+  // legged steel truss 297.8 m (977 ft) to its top from a base 254.2 m (834 ft) above the sea; the legs' triangle 45.7 m
+  // (150 ft) a side at the base, drawn in to 18.3 m (60 ft) at the waist and out again to 30.5 m (100 ft) at the
+  // antenna level; Level 6, the outriggers' deck, at 228.8 m (751 ft). The steel ends at 237.7 m (779.9 ft, "structure
+  // height excluding appurtenances": ASR 1001289 as the FCC's licence records repeat it), and three antenna stacks stand
+  // above it, one over each leg, to the top. Painted in alternate bands of aviation orange and white, orange at top and
+  // bottom (FAA AC 70/7460-1: bands about a seventh of the height, none over 100 ft: eleven of 27 m here; the tower's own
+  // count isn't published that we could reach). Lit (Sutro Tower Inc., after the 2020 repack): a medium-intensity beacon
+  // on each stack's top, flashing white by day and red at night, and six steady red lights on Level 6's outriggers. The
+  // waist's height (about 152 m), the outriggers' reach and the stacks' girth (3 m) are read off photographs.
+  // (It was drawn before with thin rods above 230 m that vanished at any distance: the "decapitated" look.)
   {
-    const g = new THREE.Group(), RW = [lam(0xc8372d), lam(0xf2f0ea)];
-    const leg = (a: THREE.Vector3, b: THREE.Vector3, r: number, bands: number) => {
-      for (let i = 0; i < bands; i++) {
-        const p0 = a.clone().lerp(b, i / bands), p1 = a.clone().lerp(b, (i + 1) / bands), len = p0.distanceTo(p1);
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), RW[i % 2]); m.position.copy(p0).lerp(p1, 0.5);
-        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p1.clone().sub(p0).normalize()); g.add(m);
+    const H = 297.7, STEEL = 237.7, L6 = 228.8, WAIST = 152, BAND = H / 11, g = new THREE.Group();
+    const ORANGE = lam(0xd9532c), WHITE = lam(0xf2f0ea), DECK = lam(0x8a8a86);
+    const tri = (side: number, y: number) => [0, 1, 2].map(k => new THREE.Vector3(side / Math.sqrt(3) * Math.sin(k * 2.0944), y, side / Math.sqrt(3) * Math.cos(k * 2.0944)));
+    // a member from a to b, r thick, coloured by the band each piece of it is in (cut at the bands' edges)
+    const member = (a: THREE.Vector3, b: THREE.Vector3, r: number) => {
+      const cuts = [0, 1]; for (let y = BAND; y < H; y += BAND) { const t = (y - a.y) / (b.y - a.y); if (t > 0 && t < 1) cuts.push(t); }
+      cuts.sort((u, v) => u - v);
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const p0 = a.clone().lerp(b, cuts[i]), p1 = a.clone().lerp(b, cuts[i + 1]), len = p0.distanceTo(p1); if (len < 0.05) continue;
+        const band = Math.floor(((p0.y + p1.y) / 2) / BAND), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), band % 2 === 0 ? ORANGE : WHITE);
+        m.position.copy(p0).lerp(p1, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p1.clone().sub(p0).normalize()); g.add(m);
       }
     };
-    const tri = (r: number, y: number) => [0, 1, 2].map(k => new THREE.Vector3(r * Math.sin(k * 2.094), y, r * Math.cos(k * 2.094)));
-    const base = tri(26.5, 0), mid = tri(14, 157), top = tri(12, 230), tips = tri(12, 298);
-    for (let k = 0; k < 3; k++) { leg(base[k], top[k], 2.2, 8); leg(top[k], tips[k], 1.2, 3); }
-    for (const lvl of [mid, top]) for (let k = 0; k < 3; k++) leg(lvl[k], lvl[(k + 1) % 3], 1.3, 3);
-    void mid;
+    const base = tri(45.7, 0), waist = tri(18.3, WAIST), l6 = tri(30.5, L6), top = tri(30.5, STEEL), tips = tri(30.5, H);
+    for (let k = 0; k < 3; k++) {
+      member(base[k], waist[k], 2.4); member(waist[k], l6[k], 2.2); member(l6[k], top[k], 2.2); // the legs
+      member(top[k], tips[k], 1.5); // the antenna stack over the leg
+    }
+    // the horizontal frames between the legs: low down, at the waist, Level 6 and the top of the steel
+    for (const lvl of [tri(36, 60), waist, l6, top]) for (let k = 0; k < 3; k++) member(lvl[k], lvl[(k + 1) % 3], 1.1);
+    // Level 6's deck, and its outriggers reaching out past each leg
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(30.5 / Math.sqrt(3) + 2, 30.5 / Math.sqrt(3) + 2, 1.6, 3), DECK); deck.position.y = L6; g.add(deck);
+    const reach = tri(30.5 + 2 * 9 * Math.sqrt(3), L6); // (9 m beyond each leg)
+    for (let k = 0; k < 3; k++) member(l6[k], reach[k], 1.0);
+    // the lights: points of a fixed size on screen (a light at night is seen from far beyond where its lamp would be a
+    // pixel), the beacons flashing (sutroBeacons, scene.ts), the outriggers' six steady
+    const pts = (ps: THREE.Vector3[], color: number, size: number) => { const geo = new THREE.BufferGeometry().setFromPoints(ps); const o = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, fog: false })); o.visible = false; g.add(o); return o; };
+    const beaconAt = tips.map(t => t.clone().setY(H + 0.8));
+    sutroBeacons.red = pts(beaconAt, 0xff2a1a, 4); sutroBeacons.white = pts(beaconAt, 0xffffff, 3);
+    const steady: THREE.Vector3[] = []; for (let k = 0; k < 3; k++) { steady.push(reach[k].clone().setY(L6 + 1)); steady.push(l6[k].clone().lerp(l6[(k + 1) % 3], 0.5).setY(L6 + 1)); }
+    bridgeLights.push(pts(steady, 0xff2a1a, 3));
     place(g, 37.75523, -122.45284);
   }
   // the Palace of Fine Arts: the rotunda (an octagon of columns under a salmon dome, 49 m) and the colonnades
@@ -536,6 +564,11 @@ function rsq(a: number, hw: number, r: number, aspect = 1): [number, number] {
 
 /** Lights that come on at dusk: the towers' red aviation lights and the roadway lamps. */
 export const bridgeLights: THREE.Object3D[] = [];
+/**
+ * Sutro Tower's three beacons (medium intensity, FAA L-864/L-865): red flashes at night, white by day, 30 a minute (the
+ * FAA's 20–40), each lit for a third of a second (scene.ts).
+ */
+export const sutroBeacons: { red?: THREE.Object3D; white?: THREE.Object3D } = {};
 
 /**
  * The Golden Gate Bridge from its published dimensions: a 1,280 m main span between towers 227 m above the
