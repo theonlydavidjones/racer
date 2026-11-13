@@ -169,6 +169,21 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8h. **Now — the chart's Wind shadow layer shows nothing** (bug; 1–2 h): owner, "also on chart: toggling wind shadow
+   doesn't do anything that I can see." Find out whether it draws nothing (a bug), draws only near other boats or only
+   while racing (then say so on the chart when there's nothing to show), or draws too faintly (as with Waves). The
+   shadows to show: boats' dirty air, ships, the committee boat, the lee of the land and of the bridge piers, all already
+   in the physics. With 8f and 8g: the same layer row.
+8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
+   small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
+   chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
+   swell's direction) plainly where it matters, without cluttering the chart. Options to the owner if the look changes
+   much.
+8f. **Now — the map layer buttons need two clicks** (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
+   OFF, the long visibility note above it), "these buttons are requiring two clicks for some reason". One click should
+   switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
+   re-render under the pointer swallows it. Check every chip row with the same pattern (the map layers, the setup's
+   choices). A test that one click switches.
 8e. **Now — a crew member's arms are on backwards** (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
@@ -179,6 +194,37 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+   the owner first):
+   - "all sail stuff together, all hull stuff together, etc." Proposed groups:
+     - **Her:** name, sail number and country, club.
+     - **Hull:** material, topsides, boot stripe, bottom paint and its finish, bottom last cleaned, name lettering, weight
+       over the class minimum.
+     - **Deck and cabin:** deck, cabin top, forehatch, companionway, whisker pole stowage, navigation lights, outboard.
+     - **Rig:** mast, boom, rig tune.
+     - **Sails:** sailcloth, mainsail, jib, sail number color, class letter F color.
+     - **Lines:** each line's color.
+   - The skipper, and the home marina and slip: "not sure skipper assignment belongs here. also not sure about marina and
+     slip assignment. help me decide." **Owner's decision (13 November): as recommended.** The skipper moves to the Yacht Club, which is
+     already where crew are assigned to boats; the boat page shows the skipper read-only, with a link there. The home
+     marina and slip stay with the boat, as her "Home berth" at the end, since a berth is where the boat lives, not a
+     person's attribute.
+   - Color: "I don't like the little color chips, or the fact that some elements use a kind of toggle array for color.
+     I'd like a color picker for everything ideally, with ability to add hex codes, and some smarts to save a few custom
+     color chips (like in Google Docs) so I don't have to re-enter them for each different thing." One color picker for
+     every color on the boat (hull, boot stripe, bottom, deck, cabin top, lettering, sail numbers, the F, each line): a
+     full picker, a hex field, the class's usual colors as presets, and a row of your own saved custom colors shared by
+     every picker and kept with your account. Where a choice is a material rather than a color (teak or fiberglass,
+     sailcloth), it stays a choice.
+   - Lines are the exception (owner, 13 November): "color selection for lines should probably give options for real rope
+     patterns. there's not a ton of options IRL, so an infinite color picker seems to be the wrong choice." Lines get a
+     palette of real rope colorways, not the free picker. Sourced so far, from New England Ropes only (Sta-Set, Endura
+     Braid, VPC; neropes.com, fetched 13 November):
+     - solids: white, red, blue, black, green;
+     - flecks: red, blue and green fleck (on white, inferred from the naming).
+     Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
+     fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
+     Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
@@ -211,6 +257,15 @@ What's planned, roughly in order. Done work is described in the README.
      first.
    - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
+   - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
+     OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
+     of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
+     the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
+     the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
+     these.
+   - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
+     there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
@@ -875,6 +930,20 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modelled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labelled where it's illustrative.
+
+- **3. The tack and gybe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+  the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
+  "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
+  also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
+  maybe even some on-water tracks or something. this doesn't feel different from regular cruise mode."
+  - **Cues where you're looking, in a word or two:** beside or above the boat, not in the Coach card: "Build speed",
+    "Tack now", "Hold", "Ease", "Trim". The full advice moves to after each rep.
+  - **On-water guides:** a lane or track drawn on the water showing the line to sail, where to start the turn, and the
+    new course after it; a target heading mark; and her wake shown against the ideal turn afterwards. All drawn from
+    the sim's own polar and turn model.
+  - **A drill's own shape,** so it doesn't feel like cruising: a set course in open water, numbered reps, a short
+    score after each (speed lost, distance lost, the turn's rate and the tiller's), and a best-of summary.
+  - On the screen rule: the cues live on the water and on the boat, not as new buttons.
 
 ## Next up
 

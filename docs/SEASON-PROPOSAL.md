@@ -1,4 +1,4 @@
-# A racing season: proposal for the owner (13 Nov 2026, nothing built)
+# A racing season (approved by the owner 13 Nov 2026; built: src/club/season.ts, src/ui/season.ts)
 
 A series of real races, sailed one by one on their real days, scored as a series, against the same club fleet each
 time, for a trophy that stays in the club's history. It joins racing to the community element: you race *for the club's
@@ -85,3 +85,22 @@ summaries only. Until it's settled, the sim's trophy is simply "the series troph
 1. Start with the Seaweed Soup 2025–26, or wait for the Folkboat Season Championship's rules?
 2. Does the fleet race the Seaweed Soup on PHRF ratings, and are the ratings equal? Is there a known discard rule?
 3. Roughly 6–10 h to build (the roadmap's estimate for seasons and awards), after Skipper Model's club fleet exists.
+
+## The owner's answers, and what was built (13 Nov 2026)
+
+1. **Start with the Seaweed Soup:** built. Yacht Club → Season. Each race day opens its race on its real day, start and
+   course, in the day's observed wind and tide (Fort Point), against the club's fleet: the five club boats and the club's
+   first two other Folkboats, 8 entries. Race 3 stays abandoned. Race 2's course wasn't recorded, so it's sailed on the
+   race committee's choice for the day's wind. A race counts once you save it to her logbook; sailing it again and saving
+   replaces it. The results show where the race puts you in the series.
+2. **PHRF or level: level.** The real series scored Folkboats on PHRF time on time, but in every saved race (2025–26
+   races 1, 2, 4, 5 and 2026–27 race 1) the published points follow elapsed time exactly, as equal ratings give. Time on
+   time on equal ratings is boat for boat.
+3. **Discards: one throwout, only once all five races are sailed.** Latitude 38, 25 Apr 2025, quoting Scott Easom: "all
+   five races completed … which created the throwout"
+   (https://latitude38.com/lectronic/golden-gate-yc-seaweed-soup-san-francisco). With race 3 abandoned, 2025–26 has no
+   throwout. The series' own sailing instructions are still unread (ggyc.com and jibeset refuse this project's fetches).
+   A DNF scores starters + 1, as the real series scored them (A5.3); a DNC entries + 1 (A5.2).
+4. **Colours: hull colours, duplicates and all** (the owner: "that's true in life too"). Each sparkline ends in its sail
+   number, and a row's line thickens on hover, so two lines of one colour can be told apart. A faint light edge keeps a
+   black or navy hull visible on the dark panel.

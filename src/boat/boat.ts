@@ -25,6 +25,9 @@ export interface AiState {
   /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
   kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** The penalty total she last saw: a new penalty while she's turning sends her to clear water again first (44.2). */
+  penSeen?: number;
+  reclear?: boolean;
   /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
   below?: boolean;
   /** Expensive start-timing predictions, refreshed 10 times a second. */
@@ -227,6 +230,8 @@ export interface Boat {
   carPlan?: { fore: number; ins: number } | null; carOff?: number;
   /** Heel rate (deg/s, + rolling to port) and the boat's roll: heel follows its equilibrium as a damped oscillator (balance.ts rollStep). */
   heelRate?: number;
+  /** The waves' motion (boat/seaway.ts waveMotion): heave (m, up) and its rate (m/s), pitch (rad, bow up) and its rate (rad/s). */
+  heave?: number; heaveRate?: number; pitch?: number; pitchRate?: number;
   /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
   seaShare?: number; seaShareT?: number;
   /** Her push against the polar crew's, a share of the drive (physics.ts powerFactor), and seconds until it's worked out again. */
