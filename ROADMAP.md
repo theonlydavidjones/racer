@@ -18,6 +18,13 @@ menus, the Keys), not as new buttons on the screen. Every item below that adds a
 **The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
 then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
 - **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
+  Scenery for it (owner, 13 November; later, with the Bay's beauty):
+  - **Oracle Park** (6–10 h): the ballpark on the shore by McCovey Cove, with its pennants waving during games, the
+    lights on for night games and concerts, the scoreboard lit during games, and kayakers in the cove waiting for splash
+    hits. Driven by the Giants' real home schedule and the park's events for the sim's date, where it can be sourced.
+  - **Alcatraz, properly built out** (6–10 h): the cellhouse, the lighthouse, the water tower, the guardhouse and
+    dock, the ruins, at real scale and in significant detail.
+  - **The Palace of Fine Arts, refined** (2–4 h).
 - **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
