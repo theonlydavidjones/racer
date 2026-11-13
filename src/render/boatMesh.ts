@@ -251,12 +251,18 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   grp.add(new THREE.Mesh(grainUV(mergeGeometries(woodTop, false)!), teakMat().warm)); // the doorway's posts and sill: oiled teak
   grp.add(new THREE.Mesh(grainUV(mergeGeometries(railTop, false)!), teakMat().trim)); // the grab rails: weathered teak
   // cockpit well, seats, and coamings
-  // the cockpit: oiled teak throughout (sole, sides and seats), whatever the deck, as on Josephine
-  const cockpitTeak = teakMat().deck; // (oiled: the owner)
+  // the cockpit: oiled teak (sole and lazarettes), whatever the deck, as on Josephine; or, chosen in the boat editor, the
+  // glassfibre moulding, gelcoat with the deck's non-skid on what's walked and sat on (the owner)
   const cg = cockpitGeometry(), flat = (gs: THREE.BufferGeometry[]) => mergeGeometries(gs.map(g => (g.index ? g.toNonIndexed() : g)), false)!;
-  grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), cockpitTeak)); // the sole, benches and shelf (one mesh)
+  if (b.spec?.cockpit === 'fiberglass') {
+    const ns = cockpitNonSkid(paint.deck.startsWith('teak') ? GELCOAT : paint.deck, GELCOAT);
+    grp.add(new THREE.Mesh(planUV(flat(cg.teak), 'deck'), ns)); // the sole
+    grp.add(new THREE.Mesh(planUV(flat(cg.panel), 'deck'), ns)); // the lazarettes: moulded lockers, their lids non-skid
+  } else {
+    grp.add(new THREE.Mesh(plankUV(flat(cg.teak)), teakMat().deck)); // the sole (oiled: the owner)
+    grp.add(new THREE.Mesh(grainUV(flat(cg.panel)), teakMat().trim)); // the lazarettes: teak lockers, fronts, ends and lids
+  }
   grp.add(new THREE.Mesh(flat(cg.lining), COCKPIT_LINING)); // the hull's inside round the footwell, under the side decks, and the after wall: smooth moulding
-  grp.add(new THREE.Mesh(grainUV(flat(cg.panel)), teakMat().trim)); // the lazarettes: teak lockers, fronts, ends and lids, weathered
   // each lazarette's lid: the seam where it lifts, its two hinges along the outboard edge, and a finger-hole at the front
   { const seams: THREE.BufferGeometry[] = [], hinges: THREE.BufferGeometry[] = [], g = 0.007;
     for (const l of lazaretteLids()) {
@@ -609,6 +615,24 @@ function nonSkidMaterial(which: 'deck' | 'top', field: string, margin: string): 
       diffuseColor.rgb *= mix(uMargin, uField * (1.0 + nsG * 1.6), nsF);`);
   };
   mat.customProgramCacheKey = () => 'nonSkid'; mat.userData.ns = uniforms; // (its uniforms, for trying the grit styles)
+  return mat;
+}
+/**
+ * A glassfibre cockpit's surface: the deck's non-skid (`field`, with its grit) on what faces up, the sole and the
+ * lazarettes' lids, and smooth gelcoat (`margin`) on the upright faces, the lockers' fronts and ends. Takes planUV.
+ */
+function cockpitNonSkid(field: string, margin: string): THREE.MeshLambertMaterial {
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const uniforms = { uField: { value: new THREE.Color(field) }, uMargin: { value: new THREE.Color(margin) }, uGrit: { value: nsGrit(GRIT) },
+    uRep: { value: new THREE.Vector2((NS_PLAN.x1 - NS_PLAN.x0) / NS_GRIT_REP, (NS_PLAN.z1 - NS_PLAN.z0) / NS_GRIT_REP) } };
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.vertexShader = 'varying vec2 vPlan;\nvarying float vUp;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvPlan = uv; vUp = abs(normal.y);');
+    sh.fragmentShader = 'uniform vec3 uField;\nuniform vec3 uMargin;\nuniform sampler2D uGrit;\nuniform vec2 uRep;\nvarying vec2 vPlan;\nvarying float vUp;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+      `float nsF = smoothstep(0.6, 0.8, vUp); float nsG = texture2D(uGrit, vPlan * uRep).r - 0.5;
+      diffuseColor.rgb *= mix(uMargin, uField * (1.0 + nsG * 1.6), nsF);`);
+  };
+  mat.customProgramCacheKey = () => 'cockpitNonSkid';
   return mat;
 }
 /** Plan texture coordinates (x across, z fore and aft) for the deck or the cabin top, matching nsMask. */

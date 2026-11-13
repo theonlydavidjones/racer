@@ -25,6 +25,9 @@ export interface BoatSpec {
   /** The forehatch: a varnished teak cover on a wooden frame, or a smoked acrylic lid in an aluminium frame (the usual
    * modern production hatch, as Lewmar's). */
   hatch?: 'teak' | 'acrylic';
+  /** The cockpit's floor and lazarettes: oiled teak (Josephine's), or the glassfibre moulding with the deck's non-skid
+   * on its walking surfaces (the owner). */
+  cockpit?: 'teak' | 'fiberglass';
   /** The companionway: open (the hatch slid forward, the doors stowed below), or shut (the hatch slid aft over it, the doors in). */
   companionway?: 'open' | 'closed';
   /** The colour her name is lettered in on the cabin sides ('' or absent: one that stands out). */
@@ -140,6 +143,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
     hatch: x.hatch === 'acrylic' || x.hatch === 'teak' ? x.hatch : d.hatch ?? 'teak',
     companionway: x.companionway === 'closed' ? 'closed' : 'open',
+    cockpit: x.cockpit === 'fiberglass' ? 'fiberglass' : 'teak',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
     ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})

@@ -17,3 +17,12 @@ describe('colors', () => {
     expect(s.deck).toBe(DEFAULT_BOAT.deck); expect(s.cabinTop).toBeUndefined();
   });
 });
+
+/** The cockpit's floor and lazarettes: teak (Josephine's, and older saves') or fiberglass with the deck's non-skid. */
+describe('cockpit', () => {
+  it('is teak unless fiberglass is chosen', () => {
+    expect(fixSpec({}).cockpit).toBe('teak');
+    expect(fixSpec({ cockpit: 'fiberglass' }).cockpit).toBe('fiberglass');
+    expect(fixSpec({ cockpit: 'marble' } as never).cockpit).toBe('teak');
+  });
+});
