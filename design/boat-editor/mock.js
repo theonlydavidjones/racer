@@ -31,6 +31,19 @@ window.__mockEditor = (mode) => {
   .mk .ropes div{display:flex;align-items:center;gap:8px;font:500 12px var(--f-inst);color:var(--text)}.mk .ropes div.on{color:var(--accent)}.mk .ropes div.on .rope{outline:2px solid var(--accent);outline-offset:1px}
   .mk .src{font:500 11px/1.35 var(--f-inst);color:var(--muted)}
   .mk .seg button{font-size:12px}
+  .mk .fold>header{grid-template-columns:1fr auto !important}
+  .mk .fold>header b{font-size:11.5px !important;color:var(--accent) !important}
+  .mk .sum,.mk .in{padding:0 12px 10px;display:flex;flex-direction:column;gap:0}
+  .mk .kv{display:grid;grid-template-columns:132px 1fr;align-items:center;min-height:30px;border-top:1px solid rgba(150,196,218,.08)}
+  .mk .in .kv{min-height:40px}
+  .mk .kv>span:first-child{font:500 12.5px var(--f-inst);color:var(--muted);letter-spacing:.02em}
+  .mk .kv>*:last-child{justify-self:end}
+  .mk .v{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--f-inst);color:var(--text)}.mk .v.mu{color:var(--muted);font-weight:500}.mk .v a{color:var(--accent);text-decoration:none}
+  .mk .sq{width:16px;height:16px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3),0 0 0 1px rgba(233,242,245,.15)}
+  .mk .kv .seg{width:210px}.mk .slide input{width:150px}.mk .slide em{font-style:normal;color:var(--muted);font-weight:500;width:34px}
+  .mk .num{width:56px}
+  .mk .cbtn{min-width:150px}
+  .mk .picker,.mk .ropes{margin:2px 0 8px}
   .mk .tile{display:inline-flex;align-items:center;gap:6px}.mk .tile i{width:11px;height:11px;border-radius:50%;border:2.5px solid;box-sizing:border-box;box-shadow:0 0 0 1px rgba(233,242,245,.28)}.mk .tile em{font-style:normal;color:var(--muted)}`;
   // a rope as drawn: its braid (the cover's crossing strands), and the colorway's fleck or tracer
   const rope = (base, kind, mark, w = 46, h = 14) => {
@@ -48,33 +61,32 @@ window.__mockEditor = (mode) => {
     ['Red fleck', '#eef0ee', 'fleck', '#c8312f'], ['Blue fleck', '#eef0ee', 'fleck', '#2f5fb3'], ['Green fleck', '#eef0ee', 'fleck', '#2f7a45'], ['Gold fleck', '#eef0ee', 'fleck', '#c99a2e'],
     ['White, red tracers', '#eef0ee', 'tracer', '#c8312f'], ['Navy, beige tracer', '#1f2a4a', 'tracer', '#cdb98f']];
   const R = n => { const r = ROPES.find(x => x[0] === n); return rope(r[1], r[2], r[3]); };
-  const fold = (label, summary, open = false, inner = '', ro = '') => `<div class="fold${open ? ' open' : ''}"><header><b>${label}</b><span>${summary}</span><i>${open ? 'Done ▴' : 'Change ▾'}</i></header>${ro}${open ? `<div class="in">${inner}</div>` : ''}</div>`;
-  const dot = c => `<i class="dot" style="background:${c}"></i>`;
-  const cbtn = (c, n, on = false) => `<button class="cbtn${on ? ' on' : ''}"><i style="background:${c}"></i>${n} <em>${c.toUpperCase()}</em></button>`;
-  const cf = (label, c, n, on) => `<div class="cfield"><span>${label}</span>${cbtn(c, n, on)}</div>`;
-  const CLASS = [['Pearl', '#f4f1e8'], ['Snow white', '#f7f7f4'], ['Cream', '#efe6cf'], ['Buff', '#d9c49a'], ['Navy', '#1f2c4f'], ['Flag blue', '#24407a'], ['Hunter green', '#2a4a33'], ['Racing green', '#1f5a3a'], ['Signal red', '#b3302a'], ['Black', '#1c1d20'], ['Light grey', '#c9ccd0']];
+  // one property per row: label left (muted), value or control right, on one grid
+  const sw = (c, n) => `<span class="v"><i class="sq" style="background:${c}"></i>${n}</span>`;
+  const row = (label, value) => `<div class="kv"><span>${label}</span>${value}</div>`;
+  const fold = (label, rows, open = false, inner = '') => `<div class="fold${open ? ' open' : ''}"><header><b>${label}</b><i>${open ? 'Done ▴' : 'Change ▾'}</i></header>${open ? `<div class="in">${inner}</div>` : `<div class="sum">${rows.join('')}</div>`}</div>`;
+  const cbtn = (c, n, on = false) => `<button class="cbtn${on ? ' on' : ''}"><i style="background:${c}"></i>${n}</button>`;
+  const CLASS = [['Pearl', '#f4f1e8'], ['Snow white', '#f7f7f4'], ['Cream', '#efe6cf'], ['Buff', '#d9c49a'], ['Navy', '#1f2c4f'], ['Flag blue', '#24407a'], ['Hunter green', '#2a4a33'], ['Racing green', '#1f5a3a'], ['Signal red', '#b3302a'], ['Black', '#1c1d20']];
   const picker = `<div class="picker"><div class="sv"></div><div class="hue"></div>
-    <div class="hexrow"><input class="pick" value="#F4F1E8" aria-label="Hex"><small>Pearl</small></div>
+    <div class="hexrow"><input class="pick" value="#F4F1E8" aria-label="Hex"></div>
     <div class="prow"><b>Folkboat colors</b>${CLASS.map(([n, c], i) => `<i class="ps${i === 0 ? ' on' : ''}" style="background:${c}" title="${n}"></i>`).join('')}</div>
-    <div class="prow"><b>Your colors · on every picker, saved with your account</b>${['#8e9f7c', '#24324f', '#a8802f'].map(c => `<i class="ps" style="background:${c}"></i>`).join('')}<i class="ps add" title="Save this color">+</i></div></div>`;
+    <div class="prow"><b>Your colors</b>${['#8e9f7c', '#24324f', '#a8802f'].map(c => `<i class="ps" style="background:${c}"></i>`).join('')}<i class="ps add" title="Save this color">+</i></div></div>`;
   const seg = (opts, cur) => `<div class="seg">${opts.map(o => `<button type="button" aria-pressed="${o === cur}">${o}</button>`).join('')}</div>`;
-  const field = (label, inner) => `<div class="field"><span>${label}</span>${inner}</div>`;
-  const hullIn = field('Hull', seg(['Fiberglass', 'Wood'], 'Fiberglass')) + cf('Topsides', '#f4f1e8', 'Pearl', true) + picker
-    + cf('Boot stripe', '#24324f', 'Midnight') + cf('Bottom paint', '#2a2d33', 'Black') + field('Bottom finish', seg(['As rolled on', 'Wet-sanded, burnished'], 'As rolled on'))
-    + field('Bottom last cleaned · <b>2 weeks ago</b>', '<input type="range" min="0" max="26" value="2">') + cf('Name lettering', '#1f2c4f', 'Navy')
-    + field('Weight over the class minimum', '<label class="inline"><input class="pick" value="0"> lb</label>');
+  const hullIn = row('Hull', seg(['Fiberglass', 'Wood'], 'Fiberglass')) + row('Topsides', cbtn('#f4f1e8', 'Pearl', true)) + picker
+    + row('Boot stripe', cbtn('#24324f', 'Midnight')) + row('Bottom paint', cbtn('#2a2d33', 'Black')) + row('Bottom finish', seg(['As rolled on', 'Burnished'], 'As rolled on'))
+    + row('Last cleaned', '<span class="v slide"><input type="range" min="0" max="26" value="2"><em>2 wk</em></span>') + row('Name lettering', cbtn('#1f2c4f', 'Navy'))
+    + row('Over the minimum', '<span class="v"><input class="pick num" value="0"> lb</span>');
   const LINES = [['Jib sheets', 'Red fleck'], ['Main halyard', 'White'], ['Jib Cunningham', 'Red'], ['Main Cunningham', 'Blue'], ['Outhaul', 'Blue fleck'], ['Vang', 'Navy'], ['Jib halyard', 'White, red tracers'], ['Mainsheet', 'Blue fleck'], ['Backstay', 'White']];
-  const linesIn = LINES.map(([n, r], i) => `<div class="lrow${i === 0 ? ' on' : ''}"><span>${n} <em>· ${r}</em></span>${R(r)}</div>${i === 0 ? `<div class="ropes">${ROPES.map(x => `<div class="${x[0] === r ? 'on' : ''}">${rope(x[1], x[2], x[3], 40, 13)}${x[0]}</div>`).join('')}</div>` : ''}`).join('')
-    + `<div class="src">Real rope colorways: New England Ropes (Sta-Set, Sta-Set X), Samson (XLS), Marlow (Doublebraid).</div>`;
-  const her = fold('Her', `<span class="tile"><i style="border-color:#f4f1e8"></i>JOSEPHINE <em>USA 110</em></span> · St. Francis YC`, false, '', `<div class="ro">Skipper: You · <a href="#">set in the Yacht Club ›</a></div>`);
-  const hull = fold('Hull', `Fiberglass · ${dot('#f4f1e8')}Pearl · ${dot('#24324f')}Midnight stripe · ${dot('#2a2d33')}Black bottom · cleaned 2 weeks ago`, mode === 'hull', hullIn);
-  const deck = fold('Deck and cabin', `${dot('#8e9f7c')}Sage non-skid · teak hatch · pole to port · bow and stern lights · outboard ashore`);
-  const rig = fold('Rig', 'Aluminum mast and boom · rig tune as measured');
-  const sails = fold('Sails', `White Dacron · midlife main and jib · ${dot('#1f2c4f')}Navy numbers and F`);
-  const lines = fold('Lines', LINES.map(([, r]) => R(r).replace('width="46" height="14"', 'width="21" height="11"').replace('viewBox="0 0 46 14"', 'viewBox="0 0 24 12"').replace('<svg','<svg preserveAspectRatio="none"')).join(' '), mode === 'lines', linesIn);
-  const berth = fold('Home berth', 'West Harbor · B dock, slip 12');
+  const ropeBtn = (r, on) => `<button class="cbtn${on ? ' on' : ''}">${R(r)}${r}</button>`;
+  const linesIn = LINES.map(([n, r], i) => row(n, ropeBtn(r, i === 0)) + (i === 0 ? `<div class="ropes">${ROPES.map(x => `<div class="${x[0] === r ? 'on' : ''}">${rope(x[1], x[2], x[3], 40, 13)}${x[0]}</div>`).join('')}</div>` : '')).join('');
+  const her = fold('Her', [row('Boat', `<span class="v"><span class="tile"><i style="border-color:#f4f1e8"></i>JOSEPHINE</span></span>`), row('Sail number', '<span class="v">USA 110</span>'), row('Club', '<span class="v">St. Francis YC</span>'), row('Skipper', '<span class="v">You · <a href="#">Yacht Club ›</a></span>')]);
+  const hull = fold('Hull', [row('Topsides', sw('#f4f1e8', 'Pearl')), row('Boot stripe', sw('#24324f', 'Midnight')), row('Bottom', sw('#2a2d33', 'Black')), row('Last cleaned', '<span class="v">2 weeks ago</span>')], mode === 'hull', hullIn);
+  const deck = fold('Deck and cabin', [row('Deck', sw('#8e9f7c', 'Sage non-skid')), row('Forehatch', '<span class="v">Teak</span>'), row('Outboard', '<span class="v">Ashore</span>')]);
+  const rig = fold('Rig', [row('Mast and boom', '<span class="v">Aluminum</span>'), row('Rig tune', '<span class="v">As measured</span>')]);
+  const sails = fold('Sails', [row('Sailcloth', '<span class="v">White Dacron</span>'), row('Main · jib', '<span class="v">Midlife</span>'), row('Numbers and F', sw('#1f2c4f', 'Navy'))]);
+  const lines = fold('Lines', [row('Jib sheets', `<span class="v">${R('Red fleck')}</span>`), row('Mainsheet', `<span class="v">${R('Blue fleck')}</span>`), row('Halyards', `<span class="v">${R('White')}</span>`), row('6 more', '<span class="v mu">Change to see</span>')], mode === 'lines', linesIn);
+  const berth = fold('Home berth', [row('Marina', '<span class="v">West Harbor</span>'), row('Slip', '<span class="v">B dock, slip 12</span>')]);
   el.innerHTML = `<style>${css}</style>${shade}<div class="bphead"><h2>Edit JOSEPHINE</h2><button type="button" class="ghost sm">Turn her</button><button type="button" class="cta">Done</button></div>
-    <div class="garage"><small>Every change is saved as you make it.</small></div>
     <div class="bpbody mk">${her}${hull}${deck}${rig}${sails}${lines}${berth}</div>`;
   if (mode !== 'folded') { const o = el.querySelector('.fold.open'), body = el.querySelector('.bpbody'); body.scrollTop += o.getBoundingClientRect().top - body.getBoundingClientRect().top - 8; }
 };

@@ -2,9 +2,9 @@
 
 The real editor panel with `mock.js` injected (`node design/boat-editor/shoot.cjs design/boat-editor`, dev server on 5199):
 
-- `editor-folded.png`: every group folded to a one-line summary. The groups are Her, Hull, Deck and cabin, Rig, Sails,
+- `editor-folded.png`: every group folded to a short vertical list (label left, value right; at most four rows). The groups are Her, Hull, Deck and cabin, Rig, Sails,
   Lines, Home berth. The skipper is read-only under Her, with a link to the Yacht Club.
-- `editor-hull.png`: Hull open, with the one color picker on Topsides. It has a hue and shade field, a hex field, the
+- `editor-hull.png`: Hull open, one row per property on a single grid; the one color picker opens under Topsides. It has a hue and shade field, a hex field, the
   class's usual colors as presets, and your own saved colors, which every picker shares and your account keeps.
 - `editor-lines.png`: Lines open. Each line picks from real rope colorways, drawn as rope (braid, flecks, tracers), not
   from the free picker (the owner).
