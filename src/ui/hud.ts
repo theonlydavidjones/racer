@@ -607,7 +607,7 @@ export class Hud {
     ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
     const cw = ctx.measureText(chartCredit()).width; ctx.fillStyle = I.deep; ctx.globalAlpha = 0.85; ctx.fillRect(w - cw - 16, h - 19, cw + 12, 15);
     ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
-    const kind = this.drawn.chart?.kind; if (kind) drawLegend(ctx, kind, w / 2, h - 40); // (the colours' scale, in kt)
+    const kind = this.drawn.chart?.kind; if (kind && h >= 420 && w >= 600) drawLegend(ctx, kind, w / 2, h - 40); // (the colours' scale, in kt: not on the setup's small chart, where it would cover it)
   }
 
   /** The inset's streaks, every frame, on its overlay (the map under it is drawn ten times a second). */

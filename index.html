@@ -45,6 +45,16 @@
 <button type="button" id="bMapLayers" class="maplayers" title="Map layers: wind, current, sea, fog, ships…" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5Z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
 <div id="mapLayersPop" class="layerpop" hidden></div>
 <div id="mapHint">Tap map · chart</div>
+<div id="plan" hidden role="dialog" aria-modal="true" aria-labelledby="planTitle">
+  <div class="ch-head">
+    <div><h2 id="planTitle">Plan the cruise</h2><p class="ch-sub" id="planSub">Drag the start or the destination to move it. Tap the water, a place or her slip to put the one that's selected there. Drag the chart to move it, scroll to zoom.</p></div>
+    <div class="ch-btns"><div class="seg" id="planPinSeg"><button type="button" data-pin="from">Tap sets: start</button><button type="button" data-pin="to">Tap sets: destination</button></div><button class="ghost" type="button" id="bPlanSlip">Her slip</button><button class="ghost" type="button" id="bPlanNone">No destination</button><button class="ghost" type="button" id="bPlanCancel">Cancel · Esc</button><button class="cta" type="button" id="bPlanDone">Done</button></div>
+  </div>
+  <canvas id="planC" aria-label="Chart of the Bay: drag the start or the destination, tap to place the selected one, drag to move, scroll to zoom"></canvas>
+  <canvas id="planFx" aria-hidden="true"></canvas>
+  <div id="planField" class="fieldpick" role="radiogroup" aria-label="What the chart colours the water with"><button type="button" data-field="wind" role="radio">Wind</button><button type="button" data-field="current" role="radio">Current</button><button type="button" data-field="sea" role="radio">Waves</button><button type="button" data-field="fog" role="radio">Fog</button><button type="button" data-field="off" role="radio">Off</button></div>
+  <div class="ch-info"><div id="planInfo"></div></div>
+</div>
 <div id="chart" hidden role="dialog" aria-modal="true" aria-labelledby="chartTitle">
   <div class="ch-head">
     <div><h2 id="chartTitle">Chart</h2><p class="ch-sub" id="chartSub"></p></div>
@@ -210,7 +220,7 @@
           <div class="coursecard" id="courseCard"></div></div>
         <div class="field step" id="fleetField"><span>Competitors <b id="oppCount"></b></span>
           <div class="opps" id="oppList"></div></div>
-        <div class="field step" id="whereField"><span>Where</span>
+        <div class="field step" id="whereField"><span>Where <button type="button" class="ghost sm" id="bPlanOpen" title="Both pins on one big chart: drag either, then Done">Plan on the big chart</button></span>
           <div class="seg" id="setupPinSeg"><button type="button" data-pin="from">Start</button><button type="button" data-pin="to">Destination</button></div>
           <canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas>
           <p class="pins" id="setupPins"></p>
