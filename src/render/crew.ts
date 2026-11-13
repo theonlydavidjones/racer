@@ -399,7 +399,11 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     const px = out > 0 ? s * Math.max(ax, ax + (Math.max(ax, side) - ax) * out) : x;
     // (along the side deck, straight along it, fore or aft: the shins trailing behind on the deck, not across the cabin)
     const along = out > 0.3 ? (Math.cos(motion) >= 0 ? 0 : Math.PI) : motion;
-    return moving(fig, px, zz, inCockpit(Math.abs(px), zz) ? 0 : along, k);
+    // (in the cockpit, facing forward: except someone coming aft into it already facing aft, back from the mast along
+    // the side deck, who walks on aft as they are. Turned round to face forward at the cockpit's end, then round again
+    // to sit, they spun most of a circle in four seconds)
+    const inC = inCockpit(Math.abs(px), zz), aftNow = !!fig.cur && Math.cos(fig.cur.yaw) < 0 && Math.cos(motion) < 0;
+    return moving(fig, px, zz, inC ? (aftNow ? Math.PI : 0) : along, k);
   }
   if (job === 'bow') {
     // deep downwind with the pole out: sitting astride the bow just forward of the forestay, a leg over each side, hands
