@@ -1337,6 +1337,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
     const pin = c.car[tk], car = carPos(side, pin.fore, pin.ins);
     L2.cars[tk].position.copy(car); L2.carBars[tk].position.z = car.z; // (the bar pinned at the car's fore–aft hole)
+    // the winch's handle under the deck: turned by whoever is cranking it (Crew Figures' crew.winch: side and turn, rad
+    // about the spindle, 0 pointing aft); a handle nobody is working rests pointing aft
+    { const w = (m.crew as { winch?: { side: number; turn: number } }).winch; L2.handles[tk].rotation.y = w && w.side === side ? w.turn : 0; }
     const loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
     const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
