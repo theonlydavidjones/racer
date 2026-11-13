@@ -329,7 +329,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: SimView, u: Boat): void {
-    if (w.t < 0 || u.finished || u.retired || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
+    if (w.t < 0 || u.finished || u.retired) return; // (the pole is yours to call: a cue, never done for you)
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;

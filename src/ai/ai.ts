@@ -11,7 +11,7 @@ import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
-import { HARBORS } from '../geo/marina';
+import { HARBORS, inBasin } from '../geo/marina';
 import { AI_EVERY, type World } from '../sim/world';
 
 /**
@@ -787,12 +787,21 @@ export function aiThink(w: World, b: Boat, dt: number): void {
  * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
  * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
  * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
- * from doing it over and over as she wanders about a deep run. The AI boats' crews, and yours while the pole is theirs
- * (the band's Auto-trim).
+ * from doing it over and over as she wanders about a deep run. The AI boats' crews only: never inside a harbor's basin.
+ * Yours never sets it on their own (the owner: "pole-out should only ever be on my command"): poleMustCome.
  */
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
+  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0 || inBasin(b)) b.poleWant = false;
   else if (twa > 157) b.poleWant = true;
+}
+/**
+ * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come
+ * in: she's come up past where it pays (under 140 true the poled-out jib is aback), the jib is down, penalty turns, a
+ * harbor's basin, or the dock. (Gybing it end for end with her, as she gybes, is still your pole going across.)
+ */
+export function poleMustCome(b: Boat): boolean {
+  const jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp);
+  return b.twa < 140 || jibDown || !!b.docked || b.penalty > 0 || inBasin(b);
 }
