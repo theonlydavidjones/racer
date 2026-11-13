@@ -367,25 +367,38 @@ describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(
   });
 
   // (WS Cases 28 and 95: a boat touching the mark because another boat broke a rule against her is exonerated, 43.1(a)/(b))
-  const touchAfterFoul = (otherNear: boolean) => {
+  // (`how`: the other boat abeam and a little aft, the far side of her from the mark, `near`; 200 m off, `far`; on her
+  // mark side, pulling away from it, `markSide`; `stale`: near, but the breach over more than COMPELLED_WINDOW before the
+  // touch. Each step but `stale` keeps the breach going on, as a squeeze does)
+  const touchAfterFoul = (how: 'near' | 'far' | 'markSide' | 'stale') => {
     const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 7);
     w.t = 30; const u = w.user, o = w.boats[1]; u.started = true; u.ocs = false; u.leg = 0;
     const m = w.C.marks[0], h = w.wind.from + 180, back = V(w.wind.from), side = V(w.wind.from + 90);
     Object.assign(u, { x: m.p.x + back.x * 12, y: m.p.y + back.y * 12, h: h % 360, v: 2, desired: h % 360 });
-    const op = otherNear ? { x: u.x + side.x * 9, y: u.y + side.y * 9 } : { x: u.x + side.x * 200, y: u.y + side.y * 200 };
-    Object.assign(o, { ...op, h: h % 360, v: 2, desired: h % 360, started: true, ocs: false, leg: 0 });
-    (w as unknown as { fouledAt: Map<number, unknown> }).fouledAt.set(u.id, { by: o.id, t: w.t }); // o has just fouled her
+    const off = how === 'far' ? 200 : 9, ahead = how === 'markSide' ? -4 : 3, place = () => { o.x = u.x + side.x * off + back.x * ahead; o.y = u.y + side.y * off + back.y * ahead; };
+    Object.assign(o, { h: h % 360, v: 2, desired: h % 360, started: true, ocs: false, leg: 0 }); place();
+    const fa = (w as unknown as { fouledAt: Map<number, { by: number; t: number; on: number; x: number; y: number }> }).fouledAt;
+    const t0 = w.t; fa.set(u.id, { by: o.id, t: t0, on: t0, x: u.x, y: u.y }); // o has just fouled her, here near the mark
     let toasts = '';
-    for (let i = 0; i < 60 * 6; i++) { w.step(DT); (w as unknown as { fouledAt: Map<number, unknown> }).fouledAt.set(u.id, { by: o.id, t: w.t - 1 }); if (!otherNear) { o.x = u.x + side.x * 200; o.y = u.y + side.y * 200; } for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg; }
+    for (let i = 0; i < 60 * 6; i++) {
+      w.step(DT); const r = fa.get(u.id)!; r.on = how === 'stale' ? t0 : w.t; place();
+      for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg;
+    }
     return { u, toasts };
   };
-  it('touching the mark because another boat, still on her, has just fouled her: no penalty (43.1(a)/(b), WS Cases 28, 95)', () => {
-    const { u, toasts } = touchAfterFoul(true);
+  it('touching the mark because another boat, still on her, is squeezing her onto it: no penalty (43.1(a)/(b), WS Cases 28, 95)', () => {
+    const { u, toasts } = touchAfterFoul('near');
     expect(toasts).toContain('43.1');
     expect(u.penaltyTotal).toBe(0);
   });
   it('but with that boat long gone, the touch is her own: a one-turn penalty', () => {
-    expect(touchAfterFoul(false).u.penaltyTotal).toBe(360);
+    expect(touchAfterFoul('far').u.penaltyTotal).toBe(360);
+  });
+  it('nor when that boat is on her mark side: she wasn\'t pushed toward the mark', () => {
+    expect(touchAfterFoul('markSide').u.penaltyTotal).toBe(360);
+  });
+  it('nor when the breach was over more than COMPELLED_WINDOW before she touched', () => {
+    expect(touchAfterFoul('stale').u.penaltyTotal).toBe(360);
   });
 
   it('a mark touch in the same incident as a Part 2 foul costs no extra turn (Rule 44.1(a))', () => {
