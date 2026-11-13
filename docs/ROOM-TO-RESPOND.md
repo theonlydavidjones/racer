@@ -7,7 +7,7 @@ Built (13 Nov 2026): `escapes()` in src/boat/arcs.ts, and rule 16.1 in src/rules
 
 **What the rules ask.** Rule 16.1: "When a right-of-way boat changes course, she shall give the other boat room to keep clear."
 Definitions, *Room*: "The space a boat needs in the existing conditions, including space to comply with her obligations under the
-rules of Part 2 and rule 31, while manoeuvring promptly in a seamanlike way." *Keep Clear*: the right-of-way boat "can sail her
+rules of Part 2 and rule 31, while maneuvering promptly in a seamanlike way." *Keep Clear*: the right-of-way boat "can sail her
 course with no need to take avoiding action".
 
 **What WS Case 105 says** (Case Book 2025–2028, p.235). Two boats are running on opposite tacks, side by side, after a long time
@@ -25,8 +25,8 @@ redesign needs exactly that: "If I turn hard now, do I clear?"
 
 ## One primitive: `escapes()`
 
-This is a pure function. It predicts the keep-clear boat's best avoiding manoeuvres from a given moment, using the physics' own
-turning model, against the right-of-way boat's actual course. It reports whether any of those manoeuvres keeps her clear.
+This is a pure function. It predicts the keep-clear boat's best avoiding maneuvers from a given moment, using the physics' own
+turning model, against the right-of-way boat's actual course. It reports whether any of those maneuvers keeps her clear.
 
 ```ts
 // src/boat/arcs.ts: Deep Physics owns src/boat, so this is to be agreed with them. It reads only dynamics.ts and physics.ts exports.
@@ -49,7 +49,7 @@ The "hold" candidate continues whatever turn she is already making (`turnRate`: 
 doesn't misjudge a turn she has already committed to. Skipper Model's points, 13 Nov 2026. The per-step kinematics (turn
 rate, yaw lag, speed loss) are exported, so the AI and the rules use exactly the same motion.
 
-**The candidate manoeuvres.** The helm goes over after `delay`, each way, at each of several amounts (full, half, and holding
+**The candidate maneuvers.** The helm goes over after `delay`, each way, at each of several amounts (full, half, and holding
 her course). For each one she:
 
 - **turns** at physics' own rate: `maxTurnRate(v)` from src/boat/dynamics.ts (the 9 m turning radius, capped at 4–22°/s),
@@ -77,7 +77,7 @@ which is rare. The AI would call it per threatened pair, about once a second (Sk
    - If an escape exists, the right-of-way boat gave room. Contact is then the keep-clear boat's breach of the basic rule
      (10, 11, 12 or 13). That is Case 105's answer.
    - If none exists, she didn't give room. That is 16.1, or 16.2 for a starboard boat bearing away on a beat.
-4. **The parameters.** These are modelling choices, to be confirmed with the researcher (human reaction time at the helm,
+4. **The parameters.** These are modeling choices, to be confirmed with the researcher (human reaction time at the helm,
    and what "seamanlike" margin protest committees accept):
    - `delay` = 1.0 s ("promptly": a helmsman watching the other boat);
    - `horizon` = until the predicted closest point of approach has passed, at most 8 s;

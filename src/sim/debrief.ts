@@ -300,7 +300,7 @@ export class RaceLog {
       tip: 'Downwind, sail the best angle for the wind (the downwind laylines show it): heat up a little in the lulls, sail lower in the puffs. Running deep, pole the jib out to windward.' });
     if (this.heel.lost > 0.5) out.push({ key: 'heel', title: 'Heel', lost: this.heel.lost,
       detail: `${mmss(this.heel.t)} heeled past about 22°.`,
-      tip: 'In the puffs, depower before she lays over: backstay on, traveller down, ease the main a little. A Folkboat is fastest at about 15–20° of heel.' });
+      tip: 'In the puffs, depower before she lays over: backstay on, traveler down, ease the main a little. A Folkboat is fastest at about 15–20° of heel.' });
     if (this.trim.lost > 1) out.push({ key: 'trim', title: 'Sail trim', lost: this.trim.lost,
       detail: 'Your sheets and controls, against the best trim for the conditions.',
       tip: 'Watch the telltales, and open the Trim coach for what to change.' });
