@@ -4,6 +4,7 @@ import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { engage } from '../src/boat/autopilot';
+import { Z } from '../src/boat/crewPhys';
 import { buildCrew, syncCrew } from '../src/render/crew';
 import { LL } from '../src/geo/geo';
 import { n360 } from '../src/core/math';
@@ -51,7 +52,10 @@ function cruise(twa: number, kt: number, mins: number) {
         if (Math.abs(now.gz - q.gz) > 0.3 || (job(now.pose) && !job(q.pose))) s.trips++;
         // (a crossing: from a seat out beyond 0.15 m on one side to one on the other; a few centimetres either way about
         // the middle isn't one: tests/crewcross.test.ts's own)
-        if (Math.abs(now.x) > 0.15 && !job(now.pose)) { const sd = Math.sign(now.x); if (s.seat && sd !== s.seat) s.cross++; s.seat = sd; }
+        // (and only in the cockpit: forward of it, at the mast or on the foredeck, they're not on a side, and back from there
+        // to a seat on the other side is a trip, counted as one, not a crossing)
+        if (a.z < Z.cockpitFwd) s.seat = undefined;
+        else if (Math.abs(now.x) > 0.15 && !job(now.pose)) { const sd = Math.sign(now.x); if (s.seat && sd !== s.seat) s.cross++; s.seat = sd; }
         // (the knees while they're not on their way anywhere: walking is legs moving, as it should be, and the trips and
         // the travel along the deck are counted on their own; the "knee kicking" was legs moving while sat still)
         if (!f.going && !f.route) s.knee += Math.abs(now.knee[0] - q.knee[0]) + Math.abs(now.knee[1] - q.knee[1]);
