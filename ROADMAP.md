@@ -1,5 +1,22 @@
 # Build plan
 
+**The mission** (the owner's words, 13 November 2026; in full at the top of CLAUDE.md): a true-to-life sailing simulator
+that helps people learn to sail, sail better and race better, as good as actually sailing to the maximum reasonable
+extent. Racing (tactics, seamanship, helmsmanship, teamwork, knowing the conditions and your boat) and cruising (you and
+your crew against yourselves, and the beauty and magic of sailing), on San Francisco Bay, for its complexity,
+variability and staggering beauty, in a Folkboat, the purest sailing boat a normal person can own. "If you can sail the
+Bay, you can sail anywhere; if you can sail a Folkboat, you can sail anything." Every item below is weighed against it.
+
+**The vision roadmap** (adopted by the owner, 13 November): docs/VISION-ROADMAP.md, near, middle and long term. Its
+seven "dialled in" criteria are the bar for physics and racing. On its questions: the owner will try to get protest
+records (Skipper Model researches meanwhile); crew timings come from published sources until next season.
+
+**The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
+then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
+- **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
+- **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
+  reefing (reefing still waits on a Folkboat source); a cruising log.
+
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighbouring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
@@ -132,6 +149,9 @@ What's planned, roughly in order. Done work is described in the README.
    view of the map to select start and end. I should be able to select both in the same map and not have to bounce from
    one to another." One large chart, opened from the cruise setup, where you place both the start and the destination
    (and move either), then return to the setup with both set.
+   Also (owner, 12 November; polish; queued, not to interrupt running work; 1–2 h): "the navigator button is at
+   bottom-right atm. it should just be a view in the inset map." The navigator becomes one of the inset map's views
+   (its route and advice there), and its button leaves the bottom-right cluster.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
