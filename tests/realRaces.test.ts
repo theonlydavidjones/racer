@@ -10,7 +10,10 @@ import { World } from '../src/sim/world';
 describe('the real past races', () => {
   const rs = realRaces();
   it('are the Seaweed Soup races with every finisher timed, a course on the sheet and the day\'s wind on record', () => {
-    expect(rs.map(r => r.id).sort()).toEqual(['GGYC_T008047221-r1', 'GGYC_T008047221-r4', 'GGYC_T008047221-r5']);
+    expect(rs.map(r => r.id).sort()).toEqual(['GGYC_T00227699-r1', 'GGYC_T008047221-r1', 'GGYC_T008047221-r4', 'GGYC_T008047221-r5']);
+    // 7 Nov 2026: the course from the owner, who sailed it (the results give none)
+    const n7 = realRace('GGYC_T00227699-r1')!;
+    expect([n7.courseId, n7.start, n7.date]).toEqual(['ss2', '13:35', '2026-11-07']); expect(n7.courseFrom).toMatch(/last minute course change/);
     for (const r of rs) {
       expect(r.boats.filter(b => b.elapsedS != null && b.code == null).length).toBeGreaterThanOrEqual(3);
       expect(courseFile(r.courseId).id).toBe(r.courseId);
@@ -71,7 +74,10 @@ describe('a real race whose course is uncertain', () => {
       const w = new World(courseFile(r.courseId), S, 7), o = outlookFor(w), legs = planLegs(w, o), last = legs[legs.length - 1];
       const perfect = (last.t0 - o.t0 + last.minutes) * 60;
       const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).map(b => b.elapsedS!).sort((a, b) => a - b);
-      expect(!!r.uncertain, `${r.id}: perfect ${(perfect / 60).toFixed(1)} min, median real ${(fin[Math.floor(fin.length / 2)] / 60).toFixed(1)}`).toBe(perfect > fin[Math.floor(fin.length / 2)]);
+      // (a course given by someone who sailed it is known: a perfect boat slower than the fleet there is the sim's to
+      // answer for, not the course's; 7 Nov 2026, in a 2.3 kt ebb, the planner runs out in the stream where the fleet
+      // would hug the Cityfront, sim/realRaces.ts)
+      expect(!!r.uncertain, `${r.id}: perfect ${(perfect / 60).toFixed(1)} min, median real ${(fin[Math.floor(fin.length / 2)] / 60).toFixed(1)}`).toBe(!r.courseFrom && perfect > fin[Math.floor(fin.length / 2)]);
     }
     expect(realFleetFor('GGYC_T008047221-r1')!.uncertain).toMatch(/Course uncertain/);
     expect(realFleetFor('GGYC_T008047221-r5')!.uncertain).toBe(null);
