@@ -352,7 +352,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
       insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
     }
     const [oA, oB] = obstructionsFor(A, B, ctx, rec);
-    if (oA && oB) { const ins = oA.d < oB.d ? A : B, oo = ins === A ? oB : oA; insideObst = ins.id; obstUnable = oo.d - 1.1 < ROOM_GAP; }
+    if (oA && oB) { const ins = insideAt(A, B, oA, oB), oo = ins === A ? oB : oA; insideObst = ins.id; obstUnable = oo.d - 1.1 < ROOM_GAP; }
     rec.ovStart = { t: ctx.t, astern, tacker, insideMark, markUnable, insideObst, obstUnable };
   } else if (!overlapped) rec.ovStart = null;
   rec.wasOverlapped = overlapped;
@@ -530,6 +530,23 @@ function obstructionsFor<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec
 }
 
 /**
+ * Of two overlapped boats at an obstruction, the inside one: the one between the other and the obstruction (Definitions,
+ * Room, Rule 19.2(b): "room between her and the obstruction"). Judged across the pair, square to their mean heading, by
+ * which side the obstruction lies on, not by which is nearer it: with the obstruction still ahead on the bow (a
+ * starboard boat they'll pass astern of, WS Case 125) the outside boat can be the nearer one. Dead ahead or astern,
+ * where the sides don't tell, the nearer.
+ */
+function insideAt<B extends RulesBoat>(A: B, B: B, oA: { d: number; n: Vec }, oB: { d: number; n: Vec }): B {
+  const ua = V(A.h), ub = V(B.h), mx = ua.x + ub.x, my = ua.y + ub.y, l = Math.hypot(mx, my);
+  if (l > 0.2) {
+    const ab = { x: -my / l, y: mx / l }; // square to the mean heading
+    const sep = (A.x - B.x) * ab.x + (A.y - B.y) * ab.y, toward = -((oA.n.x + oB.n.x) * ab.x + (oA.n.y + oB.n.y) * ab.y); // (n points out from the obstruction)
+    if (Math.abs(sep) > 0.5 && Math.abs(toward) > 0.3) return sep * toward > 0 ? A : B;
+  }
+  return oA.d < oB.d ? A : B;
+}
+
+/**
  * Rule 19 at an incident between overlapped boats at an obstruction (the shore, or the committee boat after the start).
  * The boat nearer it is inside. 19.2(b): the outside boat gives the inside boat room between her and the obstruction,
  * unless she couldn't from the moment the overlap began; squeezing the inside boat toward it breaks the rule.
@@ -542,7 +559,7 @@ function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord,
   if (!sameTackOrDeep || clearAstern(A, B) || clearAstern(B, A)) return null;
   const [oA, oB] = obstructionsFor(A, B, ctx, rec);
   if (!oA || !oB) return null;
-  const I = oA.d < oB.d ? A : B, O = I === A ? B : A, oI = I === A ? oA : oB;
+  const I = insideAt(A, B, oA, oB), O = I === A ? B : A, oI = I === A ? oA : oB;
   if (oI.d > AT_OBSTRUCTION) return null;
   const ov = rec.ovStart, unable = !!ov && ov.insideObst === I.id && ov.obstUnable;
   if (oI.continuing && unable && ov!.astern === I.id) return { fouler: I, part: '19.2(c)' };
