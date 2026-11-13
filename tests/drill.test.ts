@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
 import { FOLKBOAT } from '../src/boat/polar';
 import { D2R, KT, wrap } from '../src/core/math';
-import { DrillTracker, SIM_CREW, simCrew, type ManoeuvreScore } from '../src/sim/drill';
+import { DrillTracker, SIM_CREW, coachLine, simCrew, type ManoeuvreScore } from '../src/sim/drill';
 import { manoeuvreS } from '../src/sim/routing';
+import { takeLine } from '../src/boat/physics';
 import type { Boat } from '../src/boat/boat';
 
 /** Settle her on the wind (a tack) or on her run (a gybe), then turn: the sim crew's own way (`how` absent), or by a
@@ -73,5 +74,54 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
       if (kind === 'tack') expect(Math.abs(s.deadS - g.dead), `${tws} kt dead ${s.deadS.toFixed(1)} vs ${g.dead}`).toBeLessThan(Math.max(0.5, 0.15 * g.dead));
       expect(Math.abs(s.lostM - g.lostM), `${kind} ${tws} kt lost ${s.lostM.toFixed(1)} vs ${g.lostM}`).toBeLessThan(Math.max(0.5, 0.15 * g.lostM));
     }
+  });
+
+  // the physics review's cases: only a real manoeuvre, from a steady course on that point of sail, is scored
+  const run = (b: Boat & { handsOff?: boolean }, d: DrillTracker, secs: number, each?: () => void) => { let t = (d as unknown as { _t?: number })._t ?? 0; sail(b, secs, () => { each?.(); d.step(b, t, 1 / 60); t += 1 / 60; }); (d as unknown as { _t?: number })._t = t; };
+  it('bearing away from close-hauled straight into a gybe is noted, not scored (and never a negative loss)', () => {
+    const tws = 12, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    run(b, d, 40); b.poleWant = true;
+    // one long turn from close-hauled on port, round through the run and into the gybe
+    b.handsOff = true; b.tiller = 0.6; run(b, d, 25); b.handsOff = false; b.tiller = 0; run(b, d, 60);
+    const g = d.list.filter(x => x.kind === 'gybe');
+    expect(g.length).toBeGreaterThan(0);
+    expect(g.every(x => !x.scored)).toBe(true);
+    expect(g[0].coach).toMatch(/Gybe not scored/);
+    expect(d.list.every(x => x.lostM >= -3)).toBe(true);
+  });
+  it('a tack from a reach is noted, not scored', () => {
+    const tws = 12, b = testBoat({ heading: 270, kt: 5, windKt: tws }) as Boat, d = new DrillTracker();
+    run(b, d, 40); startTack(b); run(b, d, 60);
+    const s = d.list[0];
+    expect(s?.scored).toBe(false); expect(s?.coach).toMatch(/Tack not scored/);
+  });
+  it('a wind shift that flips the tack with no turn is not a manoeuvre', () => {
+    const tws = 12, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    run(b, d, 40); b.handsOff = true; b.tiller = 0;
+    b.ww = { ...b.ww, from: (b.ww.from - 2 * ang - 10 + 360) % 360 }; // (a 90°-odd shift: she's on the other tack where she points)
+    run(b, d, 40, () => { b.h = 360 - ang; });
+    expect(d.list.filter(x => x.scored).length).toBe(0);
+  });
+  it('tacking on a header is not scored as a loss: the twin sails in the same wind', () => {
+    const tws = 12, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    run(b, d, 60); startTack(b);
+    // a 10° header on the new tack, 8 s after the flip; she's sailed close-hauled in it, as a sailor would
+    let flipT = -1, t = 0;
+    run(b, d, 90, () => { t += 1 / 60; if (flipT < 0 && b.tack === 'P') flipT = t;
+      if (flipT >= 0 && t - flipT > 8) { if (t - flipT < 8 + 1 / 59) b.ww = { ...b.ww, from: (b.ww.from - 10 + 360) % 360 }; b.h = (b.ww.from + ang + 360) % 360; } });
+    const s = d.list.find(x => x.scored)!;
+    expect(Math.abs(s.lostM - s.goodM), `lost ${s.lostM.toFixed(1)} vs ${s.goodM.toFixed(1)}`).toBeLessThan(2.5);
+  });
+  it('hove to (the jib left aback) is not scored as a tack', () => {
+    const tws = 12, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    // (heaving to: tack and leave the old jib sheet made fast, so the jib stays aback on the new windward side)
+    run(b, d, 40); takeLine(b, 'jibsheet'); takeLine(b, 'jibsheetW'); startTack(b);
+    run(b, d, 60, () => { if (b.tack === 'P') { b.ctl.jibsheetW = 0; b.ctl.jibsheet = 1; } });
+    expect(b.hove).toBe(true);
+    expect(d.list.length).toBe(0);
+  });
+  it("a good tack with the jib sheets yours is still a good tack (no 'too early' line without an honest signal for it)", () => {
+    const s = drill('tack', 12)!;
+    expect(coachLine(s, true)).toMatch(/^A good tack/);
   });
 });

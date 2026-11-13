@@ -491,24 +491,26 @@ function drillTick(): void {
   if (list.length === drillSeen) return;
   for (let i = drillSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by manoeuvre and wind band)
     const s = list[i], k = drillKey(s), b = S.practiceBest?.[k];
-    if (!b || s.lostM < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: s.lostM, goodM: s.goodM } }; saveSettings(S); }
+    if (!s.scored) continue; // (a turn noted, not scored, is no best)
+    if (!b || Math.max(0, s.lostM) < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(S); }
   }
   drillSeen = list.length;
   const s = list[list.length - 1], best = S.practiceBest?.[drillKey(s)];
   el.hidden = false;
-  el.innerHTML = `<b>${drillName(s.kind)} ${list.filter(x => x.kind === s.kind).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
+  if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
+  el.innerHTML = `<b>${drillName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
   el.querySelector('.tp-dcoach')!.textContent = s.coach;
 }
 /** The Pause screen's list: every manoeuvre so far, with its numbers, and your bests. */
 function drillHtml(): string {
   const list = w.drill?.list ?? [], f = (v: number | null, d = 0) => (v == null ? '—' : v.toFixed(d));
   // (the best of each kind this run, the fewest metres lost: lit, as the start-line drill lights its best)
-  const bestOf = (k: 'tack' | 'gybe') => list.reduce((bi, x, i) => (x.kind === k && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
+  const bestOf = (k: 'tack' | 'gybe') => list.reduce((bi, x, i) => (x.kind === k && x.scored && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
   const lit = new Set([bestOf('tack'), bestOf('gybe')]);
-  const rows = list.map((s, i) => `<tr${lit.has(i) ? ' class="best"' : ''}><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td><b>${Math.max(0, Math.round(s.lostM))} m</b> / ${Math.round(s.goodM)} m</td><td>${f(s.rate)}°/s</td><td>${s.kind === 'tack' ? f(s.deadS, 1) + ' s' : '—'}</td><td>${f(s.overshoot)}°</td><td>${s.acrossS == null ? '—' : (s.acrossS >= 0 ? '+' : '') + s.acrossS.toFixed(1) + ' s'}</td><td>${f(s.backS)} s</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>`).join('');
-  const bests = Object.entries(S.practiceBest ?? {}).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Gybe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
-  return `<h3>Tacks and gybes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or gybes yet: tack when you\'re ready, or bear away to gybe.</p>'}`
-    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on, until she was back to 90% speed (98% after a gybe), not the whole loss to full speed. Good crew: the sim's own crew, measured the same way in this wind and sea. Turn: its mean rate. Past course: how far past the new close-hauled course (or up from the run). Across: when the jib (or the boom) came across, in seconds after head to wind (dead downwind).</p>`
+  const rows = list.map((s, i) => !s.scored ? `<tr class="noscore"><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td colspan="6">not scored</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>` : `<tr${lit.has(i) ? ' class="best"' : ''}><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td><b>${Math.max(0, Math.round(s.lostM))} m</b> / ${Math.round(s.goodM)} m</td><td>${f(s.rate)}°/s</td><td>${s.kind === 'tack' ? f(s.deadS, 1) + ' s' : '—'}</td><td>${f(s.overshoot)}°</td><td>${s.acrossS == null ? '—' : (s.acrossS >= 0 ? '+' : '') + s.acrossS.toFixed(1) + ' s'}</td><td>${f(s.backS)} s</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>`).join('');
+  const bests = Object.entries(S.practiceBest ?? {}).filter(([k]) => /^(tack|gybe)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Gybe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
+  return `<h3>Tacks and gybes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or gybes yet: tack when you\'re ready, or bear away to a run, settle, and gybe.</p>'}`
+    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on, until she was back to 90% speed (98% after a gybe), not the whole loss to full speed. Good crew: the sim's own crew, measured the same way in this wind, in flat water (in a chop she'll lose a little more). A shift or a puff reaches the twin too. Only a tack from close-hauled and a gybe from a run, each from a steady course, are scored. Turn: its mean rate. Past course: how far past the new close-hauled course (or up from the run). Across: when the jib (or the boom) came across, in seconds after head to wind (dead downwind).</p>`
     + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
 }
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
@@ -1284,7 +1286,7 @@ function beginRaceNow(seed?: number): void {
   saveSettings(S);
   newGame(seed);
   if (S.mode === 'manoeuvres') { logMessage('— Tacks and gybes'); send({ k: 'running', on: true }); send({ k: 'pause', on: false }); word('bFast', 'Speed 1×');
-    toast(`Tacks and gybes: ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
+    toast(`Tacks and gybes: ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
   logMessage(`— ${S.mode === 'sail' ? `Cruise · ${place(S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
   send({ k: 'running', on: true }); send({ k: 'pause', on: false });
   word('bFast', 'Speed 1×');
