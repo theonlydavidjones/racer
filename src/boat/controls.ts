@@ -54,22 +54,35 @@ export const defaultControls = (): Controls => ({
 
 /* ---------- from controls to sheet angles ---------- */
 
+/**
+ * How far the traveller alone swings the boom (deg, the car from the middle to either end): the car travels ±0.5 m on
+ * Josephine's thwart (the drawn track, render/boatMesh.ts TRAV_HALF, from the owner's photos) under the mainsheet's
+ * blocks on the boom 2.96 m aft of the gooseneck (the thwart's distance from the mast, SHEET_ON_BOOM in #165), so the
+ * boom's end follows the car round a 2.96 m circle: asin(0.5 / 2.96) = 9.7°. (North Sails' guide moves the cars 15–20 cm
+ * to windward in light air: −0.3 to −0.4 of the travel.)
+ */
+export const TRAVELLER_SWING = Math.asin(0.5 / 2.96) * 180 / Math.PI;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
   // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:
-  // the car's ±0.5 m of travel swings the boom about ±9.5°; centred, the boom is on the centreline
-  const car = 9.5 * c.traveller;
+  // the car's ±0.5 m of travel swings the boom ±TRAVELLER_SWING; centred, the boom is on the centreline
+  const car = TRAVELLER_SWING * c.traveller;
+  // (the sheet's 0–1 to the boom's angle, 80·s^1.5: a feel scale, not the rope's geometry. Real rope swings the boom
+  // out fast for the first of the ease: 10° for 6% of it, where this takes 25%. Whether the band should read rope eased
+  // is the owner's call: reference/design/sheet-geometry.md)
   return Math.min(85, Math.max(-2, car + 80 * Math.pow(c.mainsheet, 1.5)));
 }
 /** Sheet length that puts the boom at an angle, for a traveller position (inverse of boomAngle). */
 export function mainsheetFor(angle: number, traveller: number): number {
-  return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - 9.5 * traveller) / 80, 1 / 1.5)));
+  return Math.min(1, Math.max(0, Math.pow(Math.max(0, angle - TRAVELLER_SWING * traveller) / 80, 1 / 1.5)));
 }
 /** Where the traveller puts the boom at `angle` with the mainsheet at `sheet` (inverse of boomAngle), within [floor, 1]. */
-export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.min(1, Math.max(floor, (angle - 80 * Math.pow(sheet, 1.5)) / 9.5));
+export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.min(1, Math.max(floor, (angle - 80 * Math.pow(sheet, 1.5)) / TRAVELLER_SWING));
 /** The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins`. */
 export const carLead = (ins: number) => 8 + 1.25 * ins;
-/** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). */
+/** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). The sheet's 0–1 to the
+ * angle, lead + 70·s^1.4, is a feel scale, like the mainsheet's: reaching 20° takes 5% of real rope's ease, where this
+ * takes 21% (reference/design/sheet-geometry.md). */
 export function jibAngle(c: Controls, tack: Tack): number {
   const lead = carLead(c.car[tack === 'S' ? 'P' : 'S'].ins); // the loaded car is the leeward one
   return Math.min(68, lead + 70 * Math.pow(c.jibsheet, 1.4));
@@ -266,7 +279,7 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   luff disappear. When the wind exceeds 15 knots it is pulled hard".
  * - Traveller: "In light winds (0-6 knots) pull the traveller cars 15-20 cm to windward. In medium winds (6-14 knots) set
  *   them in the middle. In higher wind the cars are eased to leeward to decrease heel and thus rudder pressure." (The
- *   traveller's ±1 is ±9.5° of boom, ±0.5 m of car under the end of the boom (boomAngle): 15–20 cm is −0.3 to −0.4.)
+ *   traveller's ±1 is ±9.7° of boom (TRAVELLER_SWING), ±0.5 m of car under the end of the boom (boomAngle): 15–20 cm is −0.3 to −0.4.)
  * - Vang: "Never use the kickingstrap upwind in less than 18 knots"; above that it's on, to hold the leech when the main
  *   is eased in the gusts.
  * - Jib halyard: "Never pull the halyard too tight. This will cause the draft of the jib to move too far forward. Pull it
