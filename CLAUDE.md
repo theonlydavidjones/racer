@@ -40,6 +40,7 @@ come later, once the physics and racing are dialed in.
 - Ask before big design changes. Desktop only (no phone layout).
 - Keep building through everything they've asked for. Don't install npm packages without asking.
 - Don't relabel things they've named (e.g. the S/P labels).
+- Be extremely conservative about new buttons and distractions on the game surface (owner, 13 Nov 2026): put new controls inside existing elements (the inset map, the sail band, menus, Keys), not as new on-screen buttons.
 
 ## Workflow
 

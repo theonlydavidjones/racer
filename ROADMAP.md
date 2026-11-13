@@ -11,6 +11,10 @@ Bay, you can sail anywhere; if you can sail a Folkboat, you can sail anything." 
 seven "dialled in" criteria are the bar for physics and racing. On its questions: the owner will try to get protest
 records (Skipper Model researches meanwhile); crew timings come from published sources until next season.
 
+**Standing rule for the screen** (owner, 13 November): "We should be extremely conservative about allowing new buttons
+and distractions on the game surface." New controls go inside existing elements (the inset map, the sail band, the
+menus, the Keys), not as new buttons on the screen. Every item below that adds a control is held to this.
+
 **The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
 then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
 - **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
