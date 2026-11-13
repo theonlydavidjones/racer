@@ -319,7 +319,7 @@ const zU = (z: number) => (z + L / 2) / L;
 export const SIDE_DECK = 0.30;
 /** The line of the cabin sides and the coamings' outer face: the sheer less the side deck. */
 export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
-export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
+export const CABIN = { u0: zU(-0.847) /* (the front's foot about 4 cm aft of the mast: Josephine, the owner's side photo) */, u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
 export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
 /**
  * The cockpit's furniture, from the construction plan's profile and cockpit section (1:10; the arrangement is free,
@@ -421,12 +421,14 @@ export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + cabinSideH(u);
 /** The cabin side's height above the deck at station u. */
 export const cabinSideH = (u: number) => (CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)))) * cabinNose(u);
 /**
- * The cabin's front, seen from the side, isn't a flat face: the trunk rounds down to the deck over its first CABIN_NOSE m,
- * the sides and the top's arch alike (Josephine's profile photos: a big, soft curve from the foredeck up onto the cabin
- * top). A quarter ellipse: 0 at the very front, 1 from CABIN_NOSE aft.
+ * The cabin's front is a raked face, not an upright one (Josephine: the owner's side photo, as Rigging measured it,
+ * about 700 px/m; CR 3.11 agrees, the roof at least 1785 mm long against at least 1850 mm at the deck line): from the
+ * deck about 4 cm aft of the mast it rises to the cabin side's height over about CABIN_NOSE m, about 37° to the deck,
+ * steepest at its foot and easing round onto the roof. The roof's crown comes down with it in the same proportion: the
+ * side photo can't show the centreline's height at the front, so that much is an estimate.
  */
-export const CABIN_NOSE = 0.38;
-function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sqrt(1 - (1 - d / CABIN_NOSE) ** 2); }
+export const CABIN_NOSE = 0.265;
+function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sin(Math.PI / 2 * d / CABIN_NOSE); }
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
 /**
  * The cabin top is a slice of a cone lying on its side, its point toward the bow (the owner, of Josephine): each section
