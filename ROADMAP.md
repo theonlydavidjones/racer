@@ -205,7 +205,7 @@ What's planned, roughly in order. Done work is described in the README.
      - **Sails:** sailcloth, mainsail, jib, sail number color, class letter F color.
      - **Lines:** each line's color.
    - The skipper, and the home marina and slip: "not sure skipper assignment belongs here. also not sure about marina and
-     slip assignment. help me decide." Recommendation (owner to decide): the skipper moves to the Yacht Club, which is
+     slip assignment. help me decide." **Owner's decision (13 November): as recommended.** The skipper moves to the Yacht Club, which is
      already where crew are assigned to boats; the boat page shows the skipper read-only, with a link there. The home
      marina and slip stay with the boat, as her "Home berth" at the end, since a berth is where the boat lives, not a
      person's attribute.
