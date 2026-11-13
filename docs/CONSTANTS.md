@@ -51,12 +51,42 @@ Next, lower: traffic.ts VESSEL and shadows.ts SHIP_AIR (ship particulars, easy t
 ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 
 
+## Second pass: numbers inside formulas
+
+The first pass covered named constants. This one looks at the numeric literals written straight into the code
+(scripted the same way, 13 Nov 2026): 2,036 non-trivial literals on 1,072 lines, leaving out 0, 1, 2, 0.5, 90, 180,
+360, unit factors and the like. A literal counts as explained if the comments of the function or table it sits in carry a
+citation, a measurement or an "estimate" flag:
+
+| Explained by | Literals |
+|---|---:|
+| a citation nearby | 686 |
+| measured or calibrated | 145 |
+| flagged as an estimate | 175 |
+| unexplained | 1,030 |
+
+Most of the unexplained are not physics: map positions and routes (sim/places.ts, traffic.ts, transits.ts), the
+coach's and debrief's wording thresholds, sun-position series terms, loop counts and cache keys. The ones that do carry
+physics, ranked like the ten above:
+
+| # | Where | What they do | What would settle it | Owner |
+|---|---|---|---|---|
+| 1 | dynamics.ts RESIDUARY: residuary resistance / displacement weight by Froude number (0.0003 at 0.15 … 0.062 at 0.5, 0.11 at 0.6) | The wall at hull speed: top speed reaching and running, and how fast she accelerates | The Delft series regression for her dimensions (Keuning & Katgert 2008), or the residuary resistance ORC computes from her certificate | Deep Physics |
+| 2 | controls.ts targetShape (main depth 14% → 12.5%, draft 48% → 46%, twist 13° → 7°; jib 13.5% → 12%, 42% → 40%; depowered 4.5% flatter) and shapeEfficiency (the widths 0.025 depth, 0.08 draft, 6° twist; at most 8% lost) | The fastest sail shape for each wind, and what being off it costs: the heart of the trim lessons | Sailmakers' design shapes (depth and draft position by wind range), ORC's flat and twist terms | Deep Physics |
+| 3 | current.ts shoreRelief: 25% of the stream at the beach, full strength 350 m out | Current relief along the shore: the Cityfront's classic tactic on the flood and ebb | NOAA current predictions and ADCP surveys near the shore (the PORTS and survey stations off Crissy Field and the Marina), or a bottom-boundary-layer estimate from depth | Deep Physics (Bay East can source it) |
+| 4 | balance.ts sailYaw: the drive's leeward offset 0.55 × CE height × sin(heel), and 1.6 m × sin(boom angle) × ½ | Weather helm from heel and from easing the main: the round-up in a gust | Larsson & Eliasson's balance chapter; a VPP's yaw balance | Deep Physics |
+| 5 | controls.ts boomAngle / jibAngle: traveller ±9.5°, sheet 80° with exponent 1.5; jib 70° with 1.4, lead 8° + 1.25° a pin | How the controls map to sheet angles | The deck plan: traveller length, sheet geometry (measurable from the drawn boat) | Rigging |
+| 6 | trim.ts trimEfficiency: stall over 25° with exponent 1.3 and a floor of 0.5; downwind 0.4 + 0.6 × sin(sheet) | What a stalled or under-eased sail costs | The same sail-force data as the first ten's #1 | Deep Physics |
+| 7 | physics.ts crew depowering: starts at 14 kt true, full by 24 (line 875); off-wind 45°/120° | When the crew start to flatten and twist | North Sails' Folkboat guide (its wind bands), the owner's fleet | Crew Model |
+| 8 | seaway.ts added resistance: peak at wavelength 1.2 × her length, width 0.6, heading exponent 1.3, speed 0.4 + 0.6·min(1, v/2.5) | Speed lost in the Bay's chop | Gerritsma & Beukelman's added resistance, the Delft series in waves | Deep Physics |
+| 9 | controls.ts winchFactor: 1.25 − TWS/24 hauling (0.35 to 1), 1.6 easing | How much slower a loaded sheet comes in | Timed trimming (the owner, next season); winch power data | Crew Model |
+
 ## Method and limits
 
 - Extracted by script: top-level `const NAME = number` (and simple arithmetic), and the numeric fields of top-level
   `const NAME = { … }` tables. **Not covered:** numbers written inline in formulas (e.g. `0.08 * (1 - …)` in
-  controls.ts shapeEfficiency, the 0.55 in balance.ts heelFactor), and lower-case or function-local constants. Those
-  are the second pass.
+  controls.ts shapeEfficiency, the 0.55 in balance.ts heelFactor), and lower-case or function-local constants. The second pass, above, takes them
+  by function rather than one by one.
 - Classified first by the comments around each constant and in its file's header, then corrected by hand. A constant
   counts as sourced only if the citation is for the number: a comment naming "Rule 15" for a 3.5 s grace period is
   unsourced, since the rule gives no number.
