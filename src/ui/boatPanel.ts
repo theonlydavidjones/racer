@@ -219,7 +219,7 @@ export class BoatPanel {
         <div class="field"><span>${name(deckList, b.deck)}</span>${sw('deck', deckList, b.deck)}${wood ? '' : '<small>Teak laid over the glassfibre deck, as many owners have done.</small>'}</div>
         <div class="field"><span>Cabin top · ${b.cabinTop ? name(deckList, b.cabinTop) : b.deck.startsWith('teak') ? 'painted canvas' : 'like the deck'}</span>${sw('cabinTop', deckList, b.cabinTop ?? '', 'Like the deck')}</div>
         <div class="field"><span>Name lettering</span>${seg('nameColor', [['', 'Auto'], ['#1e5236', 'Dark green'], ['#1f2c4f', 'Navy'], ['#16181b', 'Black'], ['#a8802f', 'Gold'], ['#8c1d24', 'Red']], b.nameColor ?? '')}<small>In script on the cabin sides, aft of the window.</small></div>
-        <div class="field"><span>Forehatch</span>${seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic (smoked, aluminium frame)']], b.hatch ?? 'teak')}</div>
+        <div class="field"><span>Forehatch</span>${seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic (smoked, aluminum frame)']], b.hatch ?? 'teak')}</div>
         <div class="field"><span>Companionway</span>${seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')}<small>Open: the hatch slid forward and the doors stowed below. Closed: the hatch slid aft over it and the doors in.</small></div>
         <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}<small>Flat alongside the toe rail, by the cabin.</small></div>
         <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolour']], b.navLights ?? 'deck')}<small>Lit from sunset to sunrise. Under 20 m, a sailing boat may show the three in one masthead lantern instead (Rule 25).</small></div>
@@ -229,9 +229,9 @@ export class BoatPanel {
         <div class="field"><span>Sail numbers</span>${seg('numberColor', [['', 'Auto'], ...NUMBER_INKS], b.sails.numberColor ?? '')}</div>
         <div class="field"><span>Class letter F</span>${seg('insigniaColor', [['', 'Like the numbers'], ...NUMBER_INKS], b.sails.insigniaColor ?? '')}<small>${SAIL_INK_NOTE}</small></div>
       </section>
-      <section><h3>Lines <em>· their colours in the sail controls band</em></h3>
+      <section><h3>Lines <em>· their colors in the sail controls band</em></h3>
         ${LINE_ROWS.map(([k, n]) => `<div class="field"><span>${n} · ${name(ROPE_COLORS, lineColor(b, k)) || 'custom'}</span><div class="swatches">${ROPE_COLORS.map(([cn, c]) => `<button type="button" class="sw" style="background:${c}" data-act="lineColor" data-line="${k}" data-v="${c}" aria-pressed="${lineColor(b, k) === c}" title="${cn}" aria-label="${n}: ${cn}"></button>`).join('')}</div></div>`).join('')}
-        <div class="field"><small>As on Josephine's piano, a colour for each line, so you find it by eye. ${b.lineColors ? '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual colours</button>' : 'These are the usual colours: jib lines warm, main lines cool, the backstay white.'}</small></div>
+        <div class="field"><small>As on Josephine's piano, a color for each line, so you find it by eye. ${b.lineColors ? '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual colors</button>' : 'These are the usual colors: jib lines warm, main lines cool, the backstay white.'}</small></div>
       </section>
       <section><h3>Condition <em>· changes her speed</em></h3>
         <div class="field"><span>Bottom last cleaned · <b id="bpWeeksV">${weeksLabel(b.perf.cleanedWeeks)}</b></span>
@@ -239,9 +239,9 @@ export class BoatPanel {
         <div class="field"><span>Bottom paint finish</span>${seg('finish', [['antifouling', 'As rolled on'], ['race', 'Wet-sanded, burnished']], b.perf.finish)}<small>${PERF_INFO.finish}</small></div>
         <div class="field"><span>Mainsail</span>${seg('mainAge', ages, b.perf.mainAge)}</div>
         <div class="field"><span>Jib</span>${seg('jibAge', ages, b.perf.jibAge)}<small>${PERF_INFO.sails}</small></div>
-        <div class="field"><span>Mast</span>${seg('mast', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.mast)}
+        <div class="field"><span>Mast</span>${seg('mast', [['aluminium', 'Aluminum'], ['wood', 'Wood (spruce)']], b.perf.mast)}
           ${b.perf.mast === 'wood' ? seg('stiff', [['soft', 'Soft'], ['average', 'Average'], ['stiff', 'Stiff']], b.perf.mastStiffness) : ''}</div>
-        <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminium'], ['wood', 'Wood (spruce)']], b.perf.boom)}<small>${PERF_INFO.spars}</small></div>
+        <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood (spruce)']], b.perf.boom)}<small>${PERF_INFO.spars}</small></div>
         ${rigTuneFields(b, seg)}
         <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}
           ${b.perf.outboard !== 'none' ? seg('outboardHp', [['2.5', '2.5 hp (no reverse)'], ['3.5', '3.5 hp'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5)) : ''}<small>${PERF_INFO.outboard}</small></div>
@@ -275,7 +275,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
 function flagNote(b: BoatSpec): string {
   const club = BURGEES.find(x => x.id === b.club), ens = ENSIGNS.find(x => x.id === ensignFor(b.sails.country));
-  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern. Her ensign keeps its hours: up at 0800 and down at sunset, and flown after dark only for entering or leaving harbour.`];
+  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern. Her ensign keeps its hours: up at 0800 and down at sunset, and flown after dark only for entering or leaving harbor.`];
   if (ens && ens.id !== 'us' && ens.id !== 'us-yacht') notes.push('As a visitor on the Bay she flies the US flag as a courtesy flag at the starboard spreader, and her burgee moves to port.');
   notes.push('Flags fly when she\'s cruising; racing boats strike them for a race. Officers\' flags will go with skippers, in the Yacht Club.');
   return notes.join(' ');
@@ -314,7 +314,7 @@ function rigTuneFields(b: BoatSpec, seg: Seg): string {
     ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25, TUNE_INFO.shroudTurns)}
     ${row('tuneJumper', 'jumperTurns', 'Jumpers', 1, 0.5, TUNE_INFO.jumperTurns)}
     <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}
-    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band (under the traveller): the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
+    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band (under the traveler): the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
 }
 
 /** Colours for the sail numbers and the F: the usual sailmakers' vinyls. */
@@ -324,4 +324,4 @@ const NUMBER_INKS: [string, string][] = [['#16181b', 'Black'], ['#1f2c4f', 'Navy
  * rules' Appendix G on colour (letters and numbers in one colour, contrasting with the sail) is from secondary sources:
  * its text couldn't be reached to quote. Nothing in either limits the F's colour.
  */
-const SAIL_INK_NOTE = 'Auto: black on white sails, white on black. The class places the F and the numbers as the racing rules\' Appendix G lays down (CR 9.14: at least 300 mm high, 200 wide, 40 thick, 60 apart); Appendix G asks for letters and numbers in one colour that contrasts with the sail. Nothing limits the F\'s colour.';
+const SAIL_INK_NOTE = 'Auto: black on white sails, white on black. The class places the F and the numbers as the racing rules\' Appendix G lays down (CR 9.14: at least 300 mm high, 200 wide, 40 thick, 60 apart); Appendix G asks for letters and numbers in one color that contrasts with the sail. Nothing limits the F\'s color.';
