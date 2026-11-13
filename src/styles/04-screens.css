@@ -1,0 +1,226 @@
+/* Your boat: the panel on the left, the boat in the showroom view on the right */
+.boatsum{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.boatsum span{color:var(--text);font:600 13px/1.3 var(--f-inst)}
+.boatpanel{position:fixed;left:0;top:0;bottom:0;width:min(440px,100vw);z-index:40;background:rgba(10,18,26,.94);border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;-webkit-user-select:text;user-select:text;box-shadow:8px 0 30px rgba(0,0,0,.35)}
+.bphead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px;border-bottom:1px solid var(--rule)}
+.bphead h2{margin:0;font:700 20px/1 var(--f-head,inherit);color:var(--text)}
+.bpbody{overflow-y:auto;padding:6px 18px 30px;display:flex;flex-direction:column;gap:6px}
+.bpbody section{display:flex;flex-direction:column;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.bpbody h3{margin:0;font:700 12px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.bpbody h3 em{font-style:normal;color:var(--muted);letter-spacing:.04em;text-transform:none}
+.swatches{display:flex;flex-wrap:wrap;gap:6px}
+.sw{width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.sw.none{width:auto;padding:0 8px;background:transparent;color:var(--muted);font:600 11px var(--f-inst)}
+.sw.teak-silver{background:repeating-linear-gradient(90deg,#a9a49a 0 5px,#3b3a37 5px 6px)}
+.sw.teak-polished{background:repeating-linear-gradient(90deg,#b07a45 0 5px,#17130f 5px 6px)}
+.row2{display:grid;grid-template-columns:1.6fr 1fr;gap:8px}
+.inline{display:flex;align-items:center;gap:8px;color:var(--muted);font:600 13px var(--f-inst)}
+.inline .pick{width:110px}
+.bpbody input[type=range]{width:100%;accent-color:var(--accent)}
+.bpreport{background:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;color:var(--text);font:500 12.5px/1.45 var(--f-inst)}
+.bpreport table{width:100%;border-collapse:collapse}
+.bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
+.bpreport small{color:var(--muted)}
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,body.showroom #keysHint,
+#showBar{display:none}
+body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-index:5;align-items:center;gap:10px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font:600 12px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+#showBar label{display:flex;align-items:center;gap:8px}
+#showBar input{width:200px}
+#showBar b{min-width:92px;color:var(--text)}
+body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
+
+.garage{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-bottom:1px solid var(--rule)}
+.gbtns,.gconfirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gconfirm{color:var(--text);font:600 13px var(--f-inst)}
+.garage small{color:var(--muted)}
+.ghost.danger{color:#ff8a7c;border-color:#ff8a7c}
+
+.opps{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.opp-h{flex-basis:100%;color:var(--muted);font:700 10px var(--f-inst);letter-spacing:.12em;text-transform:uppercase;margin-top:4px}
+.opp{display:flex;align-items:center;gap:7px;background:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:7px 10px;color:var(--muted);font:600 13px var(--f-inst);cursor:pointer}
+.opp i{width:12px;height:12px;border-radius:50%;flex:none}
+.opp small{color:var(--muted);font-weight:500;font-size:11px}
+.opp[aria-pressed="true"]{background:var(--btn-hi);color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
+.opp:disabled{opacity:.4;cursor:default}
+.opp-none{color:var(--muted)}
+.gsaved{color:#3fd197;font-weight:700;margin-left:6px;opacity:0;transition:opacity .3s}
+.gsaved.on{opacity:1}
+.grole{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--text);font:600 13px var(--f-inst)}
+.ghost.on{border-color:var(--accent);color:var(--accent)}
+
+/* the tactics debrief */
+.debrief{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--rule);padding-top:14px}
+.debrief ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.debrief li{display:flex;flex-direction:column;gap:3px}
+.debrief .dbHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.debrief .dbLost{font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap}
+.debrief li p{font-size:14px}
+/* protest hearings (results): validity ticks, the facts as tiles, the decision */
+.protests .pHead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.protests .pTiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.protests .pTile{background:var(--panel2,rgba(255,255,255,.05));border-radius:6px;padding:6px 8px;font-size:12px;color:var(--muted)}
+.protests .pTile b{display:block;font-size:15px;color:var(--ink,inherit)}
+.protests .pDec{border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-weight:600}
+.protests .pDec.bad{border-color:var(--accent)}
+.protests canvas.pClip{width:100%;height:220px;background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.protests .ok{color:#5fbf7a}.protests .no{color:var(--accent)}
+
+/* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */
+#raceReplay{z-index:30;background:rgba(6,14,21,.92)} /* (over the pause or results panel: none of it showing through) */
+.rrPanel{max-width:1320px}
+.rrHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rrHead .ghost{flex:0 0 auto}
+.rrGrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.rrMain{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rrCanvas{width:100%;height:min(62vh,640px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.rrTime{width:100%;height:64px;display:block;cursor:pointer;touch-action:none}
+.rrBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rrBtn{padding:8px 12px;font-size:13px}
+.rrPlay{min-width:84px}
+.rrSpeed{flex:0 0 auto}
+.rrSpeed button{padding:7px 10px}
+.rrClock{margin-left:auto;font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--muted)}
+.rrCaption{display:flex;gap:10px;align-items:center;min-height:40px;font-size:14px;line-height:1.4}
+.rrCaption .dbLost{font:600 13px/1 var(--f-inst);color:var(--accent);margin-left:4px}
+.rrCaption .ghost{margin-left:auto;flex:0 0 auto}
+.rrNo{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;margin-right:8px;
+  color:#0c2534;font:700 12px/1 var(--f-inst);flex:0 0 auto}
+.rrNo.rrVs{background:rgba(150,196,218,.3);padding:0 4px;box-sizing:border-box} .rrNo.rrVs.lost{background:#ff6a2a} .rrNo.rrVs.won{background:#56b4e9}
+.rrNo.hollow{background:#0c2534;border:2px solid;box-sizing:border-box}
+.rrList{max-height:calc(62vh + 120px);overflow-y:auto;border-top:0;padding-top:0}
+.rrList li{border:1px solid transparent;border-radius:8px;padding:6px 8px}
+.rrList li.rrPick{cursor:pointer}
+.rrList li.rrPick:hover,.rrList li.rrPick:focus-visible{border-color:var(--rule);background:rgba(150,196,218,.05);outline:0}
+.rrList li.on{border-color:var(--accent)}
+.rrMoments{list-style:none;margin:6px 0 0;padding:0 0 0 10px;border-left:2px solid var(--rule);display:flex;flex-direction:column;gap:4px}
+.rrMoments li{font-size:13px;line-height:1.4;padding:3px 6px;color:var(--text)}
+.rrMoments .dbLost{margin-right:4px}
+
+/* the race committee's choice of course */
+.coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.coursecard .rcpick b{font:600 14px/1.2 var(--f-inst);color:var(--accent)}
+.boatpanel .linkbtn{background:none;border:0;padding:0 0 0 8px;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer}
+.boatpanel .bphead{gap:8px}
+.boatpanel .bphead h2{flex:1}
+.coach-why{background:none;border:0;padding:4px 0;color:var(--accent);font:600 12px/1.2 var(--f-inst);letter-spacing:.04em;text-decoration:underline;cursor:pointer;text-align:left}
+#trimPanel .tp-btn.tp-pole{display:block;min-width:112px} /* the pole is the crew's job: there whoever trims */
+.tp-btn.tp-pole.on{background:var(--accent);color:#13202b;border-color:var(--accent)}
+
+/* the start page */
+.panel.home{max-width:760px}
+.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.modecard{display:flex;flex-direction:column;gap:6px;text-align:left;padding:16px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);cursor:pointer;font:inherit}
+.modecard b{font:700 20px/1.1 var(--f-inst);letter-spacing:.04em;color:var(--accent)}
+.modecard span{font-size:13px;line-height:1.45;color:var(--muted)}
+.modecard:hover,.modecard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
+.modecard.soon b{color:var(--muted)}
+.panel .linkbtn.back{align-self:flex-start;background:none;border:0;padding:0;color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;cursor:pointer}
+/* the conditions adjuster */
+.adjust{display:flex;flex-direction:column;gap:10px}
+#adjSum{color:var(--accent)}
+.adjrow{display:grid;grid-template-columns:96px auto 1fr 64px;gap:8px;align-items:center}
+.adjrow > span{font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.adjrow .seg{grid-column:2 / span 3}
+.adjrow input[type=range]{width:100%;accent-color:var(--accent)}
+.adjrow input.dim{opacity:.45}
+.adjrow b{font:600 13px/1 var(--f-inst);text-align:right;font-variant-numeric:tabular-nums}
+.realbtn{font:700 11px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border-radius:6px;border:1px solid var(--rule);background:var(--btn);color:var(--muted);cursor:pointer}
+.realbtn[aria-pressed=true]{background:var(--accent);color:#13202b;border-color:var(--accent)}
+/* the Fleet: your boats as a grid or a table; her page beside her in the showroom; Sail her */
+.panel.fleetpanel{max-width:1000px}
+.fhead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+/* the Yacht Club (ui/fleet.ts, ui/members.ts): its tabs, the members' cards and a member's page */
+.yctabs{display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--rule);margin:10px 0 14px}
+.yctabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;color:var(--muted);font:600 13px var(--f-inst);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.yctabs button[aria-pressed=true]{color:var(--text);border-color:var(--accent)}
+.yctabs .later{margin-left:auto;color:var(--muted);font-size:12px;opacity:.7}
+.mtools{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;align-items:start}
+.mcard{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:2px;background:var(--btn);border:1px solid var(--rule);border-radius:10px;padding:12px;color:var(--text);font:inherit;cursor:pointer}
+.mcard:hover{border-color:var(--accent)}
+.mcard b{font:600 16px var(--f-inst);letter-spacing:.03em}
+.msub{color:var(--muted);font-size:12px}
+.mwho{color:var(--accent);font-size:12px;margin:2px 0 6px}
+.mbars{display:grid;grid-template-columns:96px 1fr 24px;gap:3px 8px;align-items:center;font-size:12px;color:var(--muted)}
+.mbar{height:6px;border-radius:3px;background:var(--ink);position:relative;overflow:hidden}
+.mbar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#6fb6d9}
+.mpage{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:10px}
+.mpage h3{margin:0 0 8px}
+.mfield{display:grid;grid-template-columns:70px auto;align-items:center;gap:8px;margin:6px 0;color:var(--muted)}
+.mfield input,.mfield select{width:150px;background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:5px 7px;font:inherit}
+.mslider{display:grid;grid-template-columns:110px 1fr 56px;align-items:center;gap:8px;margin:6px 0;color:var(--muted);font-size:13px}
+.mslider input{width:100%}
+.mslider output{text-align:right;color:var(--text);font-size:12px}
+.mcheck{display:flex;align-items:center;gap:8px;margin:10px 0;color:var(--text)}
+.mhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.mhead .linkbtn{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
+.mhead h2{margin:0;font:600 22px var(--f-inst);letter-spacing:.03em}
+.mfield input[data-m=w]{width:90px}
+.fhead > div:first-child{flex:1}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.fcard{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px 12px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);cursor:pointer;font:inherit}
+.fcard:hover,.fcard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
+.fcard b{font:700 17px/1.15 var(--f-inst);letter-spacing:.04em}
+.fcard span{font:600 13px/1.2 var(--f-inst);color:var(--muted);font-variant-numeric:tabular-nums}
+.ftable{overflow-x:auto}
+.ftable table,.flog,.ftab{width:100%;border-collapse:collapse;font:500 13px/1.35 var(--f-inst);color:var(--text)}
+.ftable th,.flog th{text-align:left;font:700 10px/1 var(--f-inst);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--rule)}
+.ftable td{padding:9px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.ftable tbody tr{cursor:pointer}
+.ftable tbody tr:hover td,.ftable tbody tr:focus-visible td{background:var(--btn-hi)}
+.fnote{color:var(--muted)}
+.ftab td{padding:4px 0;vertical-align:top}
+.ftab td:first-child{color:var(--muted);width:40%}
+.flog td{padding:5px 6px 5px 0;vertical-align:top;border-bottom:1px solid var(--rule)}
+.flog td small{display:block;color:var(--muted);font-size:11px}
+.frec{font:500 13px/1.4 var(--f-inst)}
+.frec b{color:var(--accent)}
+.fno{font:600 13px/1 var(--f-inst);color:var(--muted)}
+.boatpanel .bphead .linkbtn{padding:0;text-decoration:none;font-weight:600}
+.fslip{display:flex;gap:8px;align-items:center;font:600 14px/1.3 var(--f-inst);color:var(--text)}
+.fslip.off{color:var(--muted)}
+.fslip input{accent-color:var(--accent);width:18px;height:18px}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+/* keyboard settings open from the pause screen (and the start page): always on top of them */
+#keysView{z-index:60}
+.fthumb{width:100%;aspect-ratio:400/300;object-fit:cover;border-radius:6px;margin-bottom:6px;background:linear-gradient(#86bcc0,#d6b3b2 45%,#7d8a9c 45%,#2f4e6a)} /* (until her picture is drawn: the same evening sky and sea) */
+.fslot{display:inline-flex;align-items:center;justify-content:flex-start;width:30px;height:14px;margin-right:8px;vertical-align:-2px;flex:none}
+.fflag{max-height:13px;max-width:30px;width:auto}
+.fcard span{display:flex;align-items:center}
+
+/* the chart: the inset map, full screen, the sail paused */
+#chart{position:fixed;inset:0;z-index:55;background:#0b1c28;display:flex;flex-direction:column}
+#chart[hidden]{display:none}
+.ch-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:14px 20px 10px;border-bottom:1px solid var(--rule)}
+.ch-head h2{margin:0;font:700 18px/1.2 var(--f-inst);letter-spacing:.06em;text-transform:uppercase}
+.ch-sub{margin:4px 0 0;color:var(--muted);font:500 13px/1.3 var(--f-body)}
+.ch-btns{display:flex;gap:8px}
+#chartC{flex:1;min-height:0;width:100%;display:block;cursor:crosshair;touch-action:none}
+/* the wind's or the current's moving streaks and the readout under the cursor, over the chart and the inset (ui/flow.ts) */
+#chartFx,#mapFx,#planFx{position:fixed;pointer-events:none}
+#chartFx,#planFx{z-index:1}
+/* the cruise planner: the start and the destination on one big chart, over the setup (ui/planChart.ts) */
+#plan{position:fixed;inset:0;z-index:58;background:#0b1c28;display:flex;flex-direction:column}
+#planC{flex:1;min-height:0;width:100%;display:block;cursor:crosshair;touch-action:none}
+#planC.grab{cursor:grab} #planC.grabbing{cursor:grabbing}
+#plan .ch-btns{align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#planPinSeg button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+#bPlanOpen{margin-left:8px;vertical-align:1px}
+#mapFx{border-radius:50%}
+/* the field layer picker: big, top left of the chart, where the eye goes first (one at a time, as Windy has it) */
+#chartField,#planField{position:absolute;left:12px;top:80px;z-index:2;display:flex;gap:4px;padding:4px;border-radius:24px;background:rgba(9,22,33,.9);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+#chartField button,#planField button{font:700 14px var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:#e9f2f5;background:none;border:0;border-radius:18px;padding:8px 18px;cursor:pointer}
+#chartField button:hover,#planField button:hover{background:rgba(255,255,255,.08)}
+#chartField button[aria-checked="true"],#planField button[aria-checked="true"]{background:#ffb627;color:#0c2534}
+.ch-info{position:absolute;left:20px;bottom:20px;max-width:380px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ch-info p{margin:0 0 4px;font:500 13px/1.4 var(--f-body)}
+.ch-info #chartInfo:empty{display:none}
+#map{cursor:zoom-in}
+
+/* save or discard the sail just ended; where your saves are kept */
+#keepAsk{z-index:70}
+.savenote{margin:14px 0 0;color:var(--muted);font:500 12px/1.4 var(--f-body)}
+

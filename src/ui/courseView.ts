@@ -120,7 +120,7 @@ export class CourseView {
   }
   private showBrief(): void {
     const b = this.brief!.b;
-    $('cvBrief').innerHTML = `<p class="lede"><b>${b.sub}</b> The plans are drawn on the map: step through the legs above to see each one.</p>` + briefHtml(b);
+    $('cvBrief').innerHTML = `<p class="lede"><b>${b.sub}</b></p>` + briefHtml(b);
     this.draw();
   }
 
