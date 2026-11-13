@@ -180,11 +180,11 @@ export class SailBand {
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
     el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
 <span class="sb-tillerslot"></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds); then it's yours until Auto-trim."></button><button type="button" class="sb-tab sb-all" data-act="all" data-help="Auto-trim: every line, both jib cars and the whisker pole back to the crew">Auto-trim</button></span></div>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds); then it's yours until Auto-trim."></button><button type="button" class="sb-tab sb-all" data-act="all" data-help="Auto-trim: every line, both jib cars and the whisker pole back to the crew">Auto-trim</button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
-  <span class="sb-wx" role="img">${windexSvg()}</span>
+  <span class="sb-wx" role="img">${windexSvg()}<span class="sb-wx-hint">▴ Sail controls</span></span>
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
