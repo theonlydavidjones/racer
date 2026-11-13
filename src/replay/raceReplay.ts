@@ -157,7 +157,7 @@ export class RaceReplay {
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p>${mom(L)}</li>`).join('');
-    return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg to sail it side by side.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
+    return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The metres are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
 
   /** Jump to one of the moments against her: follow you from a little before it. */
@@ -451,8 +451,10 @@ export class RaceReplay {
     // the moments against her on the strip: a tick at each tack, gybe or shift (white), the picked one taller
     if (D.vs) for (const m of D.vs.moments) {
       if (m.kind !== 'tack') continue;
-      const x = X(m.t0 + 5), on = this.selVsm === m;
-      ctx.fillStyle = on ? '#ffffff' : 'rgba(233,242,245,.75)'; ctx.fillRect(x - 1, STRIP_Y - (on ? 5 : 3), 2, 13 + (on ? 8 : 6));
+      // a small triangle above the strip, pointing down at the moment (not a line, which reads as a leg's edge)
+      const x = X(m.t0 + 5), on = this.selVsm === m, r = on ? 6 : 4.5;
+      ctx.fillStyle = on ? '#ffffff' : 'rgba(233,242,245,.85)'; ctx.strokeStyle = '#0c2534'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, STRIP_Y + 1); ctx.lineTo(x - r, STRIP_Y - r * 1.4); ctx.lineTo(x + r, STRIP_Y - r * 1.4); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
     // the playhead
     const x = X(this.t); ctx.strokeStyle = '#e9f2f5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, 2); ctx.lineTo(x, hpx - 2); ctx.stroke();

@@ -90,20 +90,48 @@ describe('your race against the winner', () => {
     const F = you.map((p, t) => ({ t, b: [p, her[t]] })) as unknown as Frame[];
     const V = versus(input(F, 400, 395))!;
     const tack = V.moments.find(m => m.kind === 'tack')!;
-    expect(tack.text).toMatch(/Blue tacked on a 10° header at 1:50; you held on 40 s longer, on a 10° header, and lost \d+ m\./);
+    expect(tack.text).toMatch(/Blue tacked onto port on a 10° header at 1:50; you stayed on starboard 40 s longer, on a 10° header, and lost \d+ m\./);
     // the cost: 40 s at 3 m/s with 20° worse to the mark than her: about 40·3·(cos 35° − cos 55°) ≈ 30 m
     expect(tack.lostM).toBeGreaterThan(20); expect(tack.lostM).toBeLessThan(45);
     expect(V.moments.some(m => m.kind === 'mark' && /Blue finished at 6:35 with you \d+ m back; you finished 5 s later/.test(m.text))).toBe(true);
   });
 
-  it('a penalty\'s turns aren\'t tacks', () => {
-    // she does a 360 (two changes of tack within 15 s) and sails on: no tack moments
+  it('a penalty\'s turns aren\'t tacks (the track flags them; in the sim they come 17–32 s apart)', () => {
     const F: Frame[] = [];
     for (let t = 0; t <= 200; t++) {
-      const herTack = t >= 50 && t < 58 ? 'P' : 'S';
-      F.push({ t, b: [[0, t * 3, 0, 'S', 0, 0], [0, t * 3, 0, herTack, 0, 0]] as Frame['b'] });
+      const pen = t >= 50 && t < 110, herTack = pen && t >= 70 && t < 95 ? 'P' : 'S';
+      F.push({ t, b: [[0, t * 3, 0, 'S', 0, 0, 0, 0], [0, pen ? 150 : t * 3, 0, herTack, 0, 0, 0, pen ? 1 : 0]] as Frame['b'] });
     }
     const V = versus(input(F, 200, 199))!;
+    expect(V.moments.filter(m => m.kind === 'tack')).toEqual([]);
+  });
+
+  // a beat on a steady or shifting wind: both boats close-hauled at 3 m/s, 45° off the wind, from the same spot on starboard,
+  // each tacking at the given times (a tack is instant here); the wind recorded in the track
+  const beat = (tacks: number[], wind: (t: number) => number, T = 500) => { const P: Frame['b'][number][] = []; let x = 0, y = 0, tack = 'S';
+    for (let t = 0; t <= T; t++) { if (tacks.includes(t)) tack = tack === 'S' ? 'P' : 'S'; const W = wind(t), h = tack === 'S' ? W - 45 : W + 45;
+      P.push([x, y, (h + 360) % 360, tack as 'S', 0, 0, W, 0]); x += 3 * Math.sin(h * Math.PI / 180); y += 3 * Math.cos(h * Math.PI / 180); }
+    return P; };
+  const race2 = (you: Frame['b'][number][], her: Frame['b'][number][], mark = { x: 0, y: 1000 }) => versus(input(you.map((p, t) => ({ t, b: [p, her[t]] })) as Frame[], 500, 495, { legs: [{ name: 'the finish', to: mark, kind: 'beat' }] }))!;
+
+  it('you were already on her new tack: you led her onto it, you didn\'t fail to follow', () => {
+    const V = race2(beat([100, 300], () => 0), beat([150], () => 0));
+    const t = V.moments.filter(m => m.kind === 'tack');
+    // (in a steady wind, below the layline, leading her onto port by 50 s cost and gained nothing: no moment at all)
+    expect(t.some(m => /you stayed on starboard, and over the next/.test(m.text))).toBe(false);
+  });
+
+  it('in a steady wind, tacking later costs nothing below the layline, even on a leg 10° off the wind', () => {
+    // the mark 10° to the right of the wind: measured across the mean wind (not along the leg), the order of tacks is free
+    const mark = { x: 1000 * Math.sin(10 * Math.PI / 180), y: 1000 * Math.cos(10 * Math.PI / 180) };
+    const V = race2(beat([150], () => 0), beat([110], () => 0), mark);
+    expect(V.moments.filter(m => m.kind === 'tack')).toEqual([]);
+  });
+
+  it('the plain speed difference isn\'t charged to a tack', () => {
+    // she's 10% faster all the way and you tack together: no tack moment
+    const fast = beat([150], () => 0).map(p => [p[0] * 1.1, p[1] * 1.1, ...p.slice(2)] as Frame['b'][number]);
+    const V = race2(beat([150], () => 0), fast);
     expect(V.moments.filter(m => m.kind === 'tack')).toEqual([]);
   });
 });

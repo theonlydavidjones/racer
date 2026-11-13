@@ -719,7 +719,7 @@ function vsInput(log: NonNullable<typeof w.log>): VsInput {
   // the finish leg's point of sail, as the course sets the others' (courses/course.ts: within 55° of the committee's wind a beat, past 125° a run)
   const off = Math.abs(wrap(brg(C.center.x - last.x, C.center.y - last.y) - wind)), fin = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
   return {
-    frames: w.track, you: w.user.id, startTimes: w.startTimes, marks: log.boatMarks, from: C.center,
+    frames: w.track, you: w.user.id, startTimes: w.startTimes, marks: log.boatMarks, from: C.center, finishLine: [C.pin, C.committee],
     boats: (sc => w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD', points: sc.get(b.id)!.points })))(scores()),
     legs: [...C.marks.map(m => ({ name: m.name, to: m.p, kind: m.leg })), { name: 'the finish', to: C.center, kind: fin as 'beat' | 'reach' | 'run' }]
   };
@@ -1341,8 +1341,8 @@ function vsDebriefHtml(log: NonNullable<typeof w.log>): string {
     return `<li><div class="dbHead"><b>${L.i ? `Leg ${L.i}, to ${esc(L.name)} (${kindW[L.kind]})` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div><p>${esc(legWords(L, V.rivalName))}${mark ? ` ${esc(mark.text)}` : ''}</p></li>`;
   }).join('');
   const big = bigMoments(V);
-  const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span>${esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
-  return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${rivalWho(V, w.boats[V.rival].finished)}</div><p class="lede">${esc(gapWords(V))} Leg by leg, from both your tracks (metres are distance made good along the leg, in the same minutes of wind):</p><ol>${legs}</ol>${moments}`;
+  const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span><b>Leg ${m.leg}:</b> ${esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
+  return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${rivalWho(V, w.boats[V.rival].finished)}</div><p class="lede">${esc(gapWords(V))} Leg by leg, from both your tracks. Metres are ground made good up or down the course (across the mean wind; along the leg on a reach), in the same minutes of wind, less your plain speed difference: so they're the tacks and the shifts. Downwind, a lift is the wind going aft: gybe on the lifts.</p><ol>${legs}</ol>${moments}`;
 }
 
 /* ---------------- the boats' logbooks ---------------- */
