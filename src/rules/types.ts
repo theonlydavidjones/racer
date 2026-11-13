@@ -97,7 +97,12 @@ export interface MarkRoomState {
 
 /** Per-pair memory the engine carries between steps. */
 /** A boat's recent poses, as this pair has seen them: a ring of samples every 0.1 s (src/rules/pairs.ts recordPose, one per boat). */
-export interface PoseRing { t: Float64Array; x: Float64Array; y: Float64Array; h: Float64Array; v: Float64Array; n: number; i: number }
+export interface PoseRing {
+  t: Float64Array; x: Float64Array; y: Float64Array; h: Float64Array; v: Float64Array;
+  /** The current's drift she'd had by each sample, m (a running sum of cur·Δt): positions less this are in the water. */
+  dx: Float64Array; dy: Float64Array;
+  n: number; i: number;
+}
 
 export interface PairRecord {
   kc: number | null; // id of the keep-clear boat at the last step

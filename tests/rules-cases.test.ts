@@ -286,6 +286,18 @@ describe('Rules 10–17 · Section A and B', () => {
     expect(duckingAstern(ducking, S, ctx(-30))).toBe(false); // (before the start: no beat to windward yet, WS Case 132)
   });
 
+  it('Case 105 late in a race, the two boats in currents 0.05 m/s apart: the same answers as in still water', () => {
+    const run = (luffRate: number, apart: number) => {
+      const S = boat('S', { at: [0, 0], heading: 181 }), P = boat('P', { at: [-apart, 0], heading: 179 });
+      const p = pair(S, P), T = 1500;
+      const hS = (t: number) => 181 + Math.min(30, Math.max(0, (t - T - 2) * luffRate));
+      const curOf = (b: typeof S) => b === S ? { x: 0.8, y: -0.6 } : { x: 0.85, y: -0.62 };
+      return sailOn(p, [[S, hS, 2.5], [P, () => 179, 2.5]], T, T + 22, b => { const c = curOf(b); b.cur = c; b.x += c.x * 0.1; b.y += c.y * 0.1; b.vx += c.x; b.vy += c.y; });
+    };
+    expect(run(6, 9)).toMatchObject({ by: 'P', rule: '10' });
+    expect(run(30, 4)).toMatchObject({ by: 'S', rule: '16.1' });
+  });
+
   it('Case 105 in a seaway: the yaw of each wave doesn\'t hide when her luff began', () => {
     const S = boat('S', { at: [0, 0], heading: 181 }), P = boat('P', { at: [-9, 0], heading: 179 });
     const p = pair(S, P);

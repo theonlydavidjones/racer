@@ -169,13 +169,15 @@ const RING = 80, RING_DT = 0.1;
 const RINGS = new WeakMap<object, PoseRing>(); // (one per boat, made once: pairs come and go as boats meet and part)
 export function recordPose(b: RulesBoat, t: number): void {
   let r = RINGS.get(b);
-  if (!r) RINGS.set(b, r = { t: new Float64Array(RING), x: new Float64Array(RING), y: new Float64Array(RING), h: new Float64Array(RING), v: new Float64Array(RING), n: 0, i: 0 });
+  if (!r) RINGS.set(b, r = { t: new Float64Array(RING), x: new Float64Array(RING), y: new Float64Array(RING), h: new Float64Array(RING), v: new Float64Array(RING), dx: new Float64Array(RING), dy: new Float64Array(RING), n: 0, i: 0 });
   const last = r.n ? (r.i + RING - 1) % RING : -1;
   // (time went back, a new race or a test re-run; or a gap, the pair not looked at while apart: start afresh)
   if (last >= 0 && (t < r.t[last] || t - r.t[last] > 1)) r.n = r.i = 0;
   else if (last >= 0 && t - r.t[last] < RING_DT - 1e-9) return;
-  const c = b.cur;
-  r.t[r.i] = t; r.x[r.i] = b.x - (c ? c.x * t : 0); r.y[r.i] = b.y - (c ? c.y * t : 0); r.h[r.i] = b.h;
+  // (the drift: the current she's in now over the time since her last sample, added to what she'd had)
+  const c = b.cur, prev = r.n ? (r.i + RING - 1) % RING : -1, dt = prev >= 0 ? t - r.t[prev] : 0;
+  r.dx[r.i] = (prev >= 0 ? r.dx[prev] : 0) + (c ? c.x * dt : 0); r.dy[r.i] = (prev >= 0 ? r.dy[prev] : 0) + (c ? c.y * dt : 0);
+  r.t[r.i] = t; r.x[r.i] = b.x; r.y[r.i] = b.y; r.h[r.i] = b.h;
   r.v[r.i] = b.v ?? Math.hypot(b.vx, b.vy);
   r.i = (r.i + 1) % RING; r.n = Math.min(RING, r.n + 1);
 }
@@ -183,17 +185,19 @@ export function recordPose(b: RulesBoat, t: number): void {
 /** The k-th newest sample's index (0 = the newest). */
 const at = (r: PoseRing, k: number) => (r.i + RING - 1 - k) % RING;
 
-/** Her pose at time t from the ring, between samples (headings the short way round); before the oldest, the oldest. */
+/** Her pose at time t from the ring, between samples (headings the short way round); before the oldest, the oldest. In the
+ * water's frame as it is now: her position less the drift the current has given her since t, so two boats in different
+ * currents, or one crossing a current's edge, are where the water has carried them, and a current both share changes
+ * nothing between them. */
 function poseAt(r: PoseRing, t: number): Pose {
+  const n0 = at(r, 0);
+  let a = at(r, r.n - 1), b = a, f = 0;
   for (let k = 0; k < r.n - 1; k++) {
-    const a = at(r, k + 1), b = at(r, k);
-    if (r.t[a] <= t && t <= r.t[b]) {
-      const f = r.t[b] > r.t[a] ? (t - r.t[a]) / (r.t[b] - r.t[a]) : 1;
-      return { x: r.x[a] + (r.x[b] - r.x[a]) * f, y: r.y[a] + (r.y[b] - r.y[a]) * f, h: r.h[a] + wrap(r.h[b] - r.h[a]) * f, v: r.v[a] + (r.v[b] - r.v[a]) * f };
-    }
+    const p = at(r, k + 1), q = at(r, k);
+    if (r.t[p] <= t && t <= r.t[q]) { a = p; b = q; f = r.t[q] > r.t[p] ? (t - r.t[p]) / (r.t[q] - r.t[p]) : 1; break; }
   }
-  const o = at(r, r.n - 1);
-  return { x: r.x[o], y: r.y[o], h: r.h[o], v: r.v[o] };
+  const lerp = (A: Float64Array) => A[a] + (A[b] - A[a]) * f;
+  return { x: lerp(r.x) + r.dx[n0] - lerp(r.dx), y: lerp(r.y) + r.dy[n0] - lerp(r.dy), h: r.h[a] + wrap(r.h[b] - r.h[a]) * f, v: lerp(r.v) };
 }
 
 /** Rule 16.1's "room to keep clear": the reaction time of a helmsman watching the other boat ("promptly", Definitions,
@@ -237,8 +241,8 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): numbe
   let t0 = tEnd - W;
   for (let t = tEnd; t - W >= oldest - 1e-9; t -= RING_DT) { if (turned(t) < 1) break; t0 = t - W; }
   // where the keep-clear boat was then, and the turn she was already making
-  const k0 = poseAt(K, t0), kb = poseAt(K, Math.max(oldest, t0 - 0.5));
-  const kc0 = { ...k0, turnRate: t0 - 0.5 >= oldest ? wrap(k0.h - kb.h) / 0.5 : 0 };
+  const kOld = K.t[at(K, K.n - 1)], kw = Math.min(TURN_WINDOW, t0 - kOld), k0 = poseAt(K, t0);
+  const kc0 = { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 }; // (over a window, through the waves' yaw)
   // the right-of-way boat's actual course from t0 (then on as she is)
   const v = row.v ?? Math.hypot(row.vx, row.vy), last = poseAt(R, now);
   const actual = (tau: number): Pose => {
@@ -248,8 +252,8 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): numbe
     return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
   };
   // what the keep-clear boat could see when she reacted: the other carrying on as she was then
-  const tr = Math.min(now, t0 + RESPOND_DELAY), seen = poseAt(R, tr), seenB = poseAt(R, Math.max(oldest, tr - 0.5));
-  const seenRate = tr - 0.5 >= oldest ? wrap(seen.h - seenB.h) / 0.5 : 0;
+  const tr = Math.min(now, t0 + RESPOND_DELAY), seen = poseAt(R, tr), sw = Math.min(TURN_WINDOW, tr - oldest);
+  const seenRate = sw > 0.2 ? wrap(seen.h - poseAt(R, tr - sw).h) / sw : 0;
   const ahead = straightOn(seen, seenRate);
   const predicted = (tau: number): Pose => t0 + tau <= tr ? actual(tau) : ahead(t0 + tau - tr);
   const wind = kc.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 2 };
@@ -269,7 +273,8 @@ export function duckingAstern(P: RulesBoat, S: RulesBoat, ctx: RulesContext): bo
   const p = V(P.headingAgo ?? P.h), s = V(S.headingAgo ?? S.h), cross = p.x * s.y - p.y * s.x;
   if (Math.abs(cross) < 1e-3) return false;
   const dx = S.x - P.x, dy = S.y - P.y, alongS = (dx * p.y - dy * p.x) / cross; // where P's course meets S's track, from S
-  return alongS < 0;
+  const alongP = (dx * s.y - dy * s.x) / cross; // and from P: still ahead of her (not a wake she's already crossed)
+  return alongS < 0 && alongP > 0;
 }
 
 /** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
