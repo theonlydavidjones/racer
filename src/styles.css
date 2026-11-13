@@ -917,7 +917,7 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-trk .sb-rin{grid-column:1;grid-row:2;text-align:right;font:600 8px/1 var(--f-inst);color:var(--muted);white-space:nowrap}
 .sb-trk .sb-rtk{grid-column:4;grid-row:2;position:relative;height:9px;pointer-events:none}
 .sb-rtk i{position:absolute;top:0;width:1px;height:3px;background:rgba(220,232,240,.3)}
-.sb-rtk i[data-l]::after{content:attr(data-l);position:absolute;top:3px;left:50%;transform:translateX(-50%);font:600 6.5px/1 var(--f-inst);color:var(--muted);opacity:.8;white-space:nowrap}
+.sb-rtk i[data-l]::after{content:attr(data-l);position:absolute;top:3px;left:50%;transform:translateX(-50%);font:600 7px/1 var(--f-inst);color:var(--muted);opacity:.95;white-space:nowrap}
 /* the backstay's ends: pulled outboard */
 .sb-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--rule);padding-top:5px}
 .sb-h{display:flex;flex-direction:column;gap:2px;align-items:center;border-radius:5px;padding:1px 2px}

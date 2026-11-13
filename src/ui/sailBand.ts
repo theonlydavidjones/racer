@@ -455,7 +455,7 @@ export class SailBand {
     const strip = d.querySelector<HTMLElement>('.sb-rtk')!, key = `${lee}${Math.round(c.traveller * 50)}`;
     if (strip.dataset.k === key) return;
     const LAB = new Set([12, 48, 192]);
-    strip.innerHTML = [6, 12, 24, 48, 96, 192, 300].map(i => {
+    strip.innerHTML = [12, 24, 48, 96, 192, 300].map(i => { // (no 6 in: it bunched against the 12)
       const x = 50 + lee * Math.sin(boomAtIn(i, c.traveller) * D2R) * 50;
       return `<i style="left:${x.toFixed(1)}%"${LAB.has(i) ? ` data-l="${i}″"` : ''}></i>`;
     }).join('');
