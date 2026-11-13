@@ -48,10 +48,7 @@ const out = process.argv[2] || '.';
   console.log('kept race 5:', JSON.stringify(r5?.scores.map(s => [s.sail, s.name, s.points, s.code])));
   if (!r5 || r5.scores.length !== 8 || !r5.scores.some(s => s.you)) fail('race 5 wasn\'t kept with all 8 boats and you');
   if (r5 && r5.scores.some(s => !/^[A-Z]{3} \d+$/.test(s.sail))) fail('a boat without country and sail number');
-  await page.click('#setupBack'); await page.waitForTimeout(300);
-  await page.evaluate(() => { for (const id of ['setup', 'raceChoose']) document.getElementById(id).hidden = true; });
-  await page.click('[data-home="fleet"]').catch(() => page.evaluate(() => { document.getElementById('home').hidden = false; }));
-  await page.evaluate(() => document.querySelector('[data-home="fleet"]')?.click()); await page.waitForTimeout(800);
+  await page.evaluate(() => document.getElementById('bBoat').click()); await page.waitForTimeout(800); // (the setup's Yacht Club link)
   await page.click('[data-f="tab"][data-v="season"]'); await page.waitForTimeout(500);
   const st = await page.evaluate(() => [...document.querySelectorAll('.standings tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim()));
   console.log('standings:', JSON.stringify(st));
