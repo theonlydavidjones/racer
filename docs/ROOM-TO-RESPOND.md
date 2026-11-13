@@ -38,8 +38,16 @@ interface EscapeOpts {
 }
 /** Can `kc`, starting at `from`, keep clear of `row` sailing the track `rowTrack`? Returns the best manoeuvre found,
  * or null when every one comes closer than `clearance`. */
-function escapes(kc: Pose, rowTrack: (t: number) => Pose, wind: number, o: EscapeOpts): { turn: number; minGap: number } | null;
+interface Candidate { helm: number; heading: number; minGap: number } // heading: the one she reaches (the AI sets it as `desired`)
+/** Each candidate's least hull gap, over the horizon, to every track given. */
+function escapes(kc: Pose & { turnRate: number }, rowTracks: Array<(t: number) => Pose>, wind: number, o: EscapeOpts): Candidate[];
 ```
+
+The rules engine passes one track and asks whether any candidate's `minGap` is at least `clearance`. The AI passes every
+threatening boat's track and steers for the candidate that keeps all the gaps above her clearance and stays nearest her course.
+The "hold" candidate continues whatever turn she is already making (`turnRate`: mid-tack, or answering the helm), so the AI
+doesn't misjudge a turn she has already committed to. Skipper Model's points, 13 Nov 2026. The per-step kinematics (turn
+rate, yaw lag, speed loss) are exported, so the AI and the rules use exactly the same motion.
 
 **The candidate manoeuvres.** The helm goes over after `delay`, each way, at each of several amounts (full, half, and holding
 her course). For each one she:
@@ -87,7 +95,7 @@ The same call drives the keep-clear decision:
   track is her course extrapolated, or her current turn continued.
 - If the only escapes left are the late, hard ones, she acts now and takes the best `turn`.
 
-A skipper's skill (docs/SKIPPER-MODEL-PROPOSAL.md) enters through her own `delay` and the errors in what she sees. The rules
+A skipper's skill (docs/SKIPPER-MODEL-PROPOSAL.md) enters through her own `delay` (an expert about 0.5 s, a novice about 2 s) and the errors in what she sees. The rules
 engine always judges with the fixed, exact values, so the AI's mistakes don't change what a protest would find. That is the
 proposal's rule: "rule-reading errors are applied to the `rights()` answer she acts on, not to the rules engine".
 
@@ -108,7 +116,7 @@ proposal's rule: "rule-reading errors are applied to the `rights()` answer she a
 | Part | Owner |
 |---|---|
 | `escapes()` in src/boat/arcs.ts | written by Rules, reviewed and owned by Deep Physics |
-| The pose ring buffer in world.ts | Rules, in agreement with whoever is in world.ts |
+| The pose ring buffer in world.ts (a fixed-size typed array per boat, about 50 poses × 8 boats, no per-step allocation: perf.test is at its limit) | Rules, in agreement with whoever is in world.ts |
 | 16.1 and 16.2 in pairs.ts | Rules |
 | The AI's use of it | Skipper Model |
 
