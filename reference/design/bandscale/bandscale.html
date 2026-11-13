@@ -37,14 +37,14 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 <div class="grid" id="g"></div>
 <div class="bottom">
   <div class="card"><h2>Mainsheet: boom angle against sheet eased</h2><div id="chart"></div>
-    <p class="note">The first 6 in of sheet off two-blocked swing the boom about 5° (0.8° per inch). Past 4 ft, each inch gives only about 0.15°. The first 10° of boom takes 6% of the rope to the shroud (Rigging). That's why on a true-rope scale every upwind trim sits in the first few percent of the track.</p></div>
+    <p class="note">The first 6 in of sheet off two-blocked swing the boom about 5° (0.8° per inch). Past 4 ft, each inch gives only about 0.15°. The first 10° of boom takes 6% of the rope to the shroud stop at 70° (Rigging). That's why on a true-rope scale every upwind trim sits in the first few percent of the track.</p></div>
   <div class="card"><h2>Purchases and travel used</h2>
     <table><thead><tr><th>Line</th><th>Purchase</th><th>Travel at the working end</th><th class="n">Rope, full range</th><th>Source</th></tr></thead><tbody id="tb"></tbody></table>
     <p class="note"><span class="est">Amber = estimate</span> (Rigging's own flags). The tension lines change the sail evenly with their value in the sim, so on true rope their marks stay where they are. Only the labels change, and each line gets its own total. The backstay's bridle is the exception: its purchase grows as the apex comes down, so true rope would put its mark further along early on. Its curve isn't worked yet, so it's drawn evenly here.</p>
   </div>
 </div>
 <script>
-const IN=0.0254,R=2.957,V=0.75,P=4,span=t=>Math.hypot(2*R*Math.sin(t*Math.PI/360),V),rope=t=>P*(span(t)-V)/IN,TOT=rope(80);
+const IN=0.0254,R=2.957,V=0.75,P=4,span=t=>Math.hypot(2*R*Math.sin(t*Math.PI/360),V),rope=t=>P*(span(t)-V)/IN,STOP=70,TOT=rope(STOP); // (the boom meets the shroud at about 70°: CR 7.20, Rigging's sheet-geometry.md)
 const angleAt=i=>{let lo=0,hi=85;for(let k=0;k<60;k++){const m=(lo+hi)/2;rope(m)<i?lo=m:hi=m}return lo};
 const LINES=[
  {k:'vang',n:'Vang',c:'var(--main)',p:'4:1',tr:'5–8 cm at the span (6.5 used)',cm:6.5,pu:4,src:'4 parts read off the owner\'s photo (could be more); travel an estimate (Rigging)',est:true},
@@ -64,7 +64,7 @@ function band(m,mode){ const mid=mode==='mid'; if(mid) mode='feel';
   const t=s.boom,pos=mode==='true'?rope(t)/TOT:Math.sin(t*Math.PI/180);
   h+=`<div class="rail"><span class="mid"></span><span class="boom" style="left:${pos*100}%"></span></div>`;
   if(mode==='true'){h+='<div class="scale">'+[0,48,96,192,300,400,Math.round(TOT)].map(i=>`<i style="left:${i/TOT*100}%">${i} in</i>`).join('')+'</div>';
-    h+='<div class="scale deg">'+[10,15,20,30,45,60,80].map(d=>`<i style="left:${rope(d)/TOT*100}%">${d}°</i>`).join('')+'</div>';
+    h+='<div class="scale deg">'+[10,15,20,30,45,60,70].map(d=>`<i style="left:${rope(d)/TOT*100}%">${d}°${d===70?' shroud':''}</i>`).join('')+'</div>';
     h+=`<div class="note">${rope(t).toFixed(0)} in eased (${(rope(t)/TOT*100).toFixed(0)}% of ${TOT.toFixed(0)} in) · boom ${t}°</div>`;}
   else if(mid){h+='<div class="scale">'+[6,12,24,48,96,192,300,400].map(i=>`<i style="left:${Math.sin(angleAt(i)*Math.PI/180)*100}%">${i}″</i>`).join('')+'</div>';h+=`<div class="note">boom ${t}° · today's marker, with inches of sheet eased marked under the track: ${rope(t).toFixed(0)} in out now</div>`;}
   else{h+='<div class="scale deg">'+[5,10,20,30,45,60,80].map(d=>`<i style="left:${Math.sin(d*Math.PI/180)*100}%">${d}°</i>`).join('')+'</div>';
@@ -75,7 +75,7 @@ function band(m,mode){ const mid=mode==='mid'; if(mid) mode='feel';
 const g=document.getElementById('g');
 g.innerHTML='<div></div><div class="colh">Today: feel scale<span>Each line\'s mark moves evenly over its travel; the mainsheet marker is where the boom is.</span></div><div class="colh">True rope eased<span>The mark moves by the rope that has run through the hand, given each line\'s purchase and geometry.</span></div><div class="colh">Middle way<span>Today\'s marks, unchanged, with inches of rope marked on each line and under the mainsheet track.</span></div>'
  +[['beat','Close-hauled','12 kt, 41° true'],['reach','Beam reach','12 kt, 100° true']].map(([k,a,b])=>`<div class="rowh">${a}<span>${b}</span></div>${band(k,'feel')}${band(k,'true')}${band(k,'mid')}`).join('');
-document.getElementById('tb').innerHTML=[{n:'Mainsheet',p:'4:1',tr:'boom end 0 → 80°',r:TOT.toFixed(0)+' in',src:'4 parts and the blocks 2.957 m out, 0.75 m over the car (Rigging, reference/design/sheet-geometry.md, measured); the sim lets the boom to 80°, the shroud stops it at about 70°; ignores the boom lifting',est:false}]
+document.getElementById('tb').innerHTML=[{n:'Mainsheet',p:'4:1',tr:'boom end 0 → 70° (the shroud)',r:TOT.toFixed(0)+' in',src:'4 parts and the blocks 2.957 m out, 0.75 m over the car (Rigging, reference/design/sheet-geometry.md, measured); the track ends where the shroud stops the boom, about 70° (the sim lets it to 85° today: Deep Physics is moving that stop); ignores the boom lifting',est:false}]
  .concat(LINES.map(L=>({n:L.n,p:L.p,tr:L.tr,r:(L.cm*L.pu/2.54).toFixed(1)+' in',src:L.src,est:L.est})))
  .map(r=>`<tr><td>${r.n}</td><td class="${r.est?'est':''}">${r.p}</td><td class="${r.est?'est':''}">${r.tr}</td><td class="n">${r.r}</td><td>${r.src}</td></tr>`).join('');
 // the chart: one series, boom angle (y) against inches eased (x)
@@ -83,7 +83,8 @@ document.getElementById('tb').innerHTML=[{n:'Mainsheet',p:'4:1',tr:'boom end 0 �
  let s=`<svg width="${W}" height="${H}" font-size="10.5" fill="#a9b7c3">`;
  for(const d of [0,20,40,60,80])s+=`<line x1="${l}" x2="${W-r}" y1="${y(d)}" y2="${y(d)}" stroke="#23323f"/><text x="${l-6}" y="${y(d)+3.5}" text-anchor="end">${d}°</text>`;
  for(const i of [0,100,200,300,400,500])s+=`<text x="${x(i)}" y="${H-b+16}" text-anchor="middle">${i} in</text>`;
- let p='';for(let d=0;d<=80;d+=0.5)p+=(p?'L':'M')+x(rope(d)).toFixed(1)+','+y(d).toFixed(1);
+ let p='';for(let d=0;d<=STOP;d+=0.5)p+=(p?'L':'M')+x(rope(d)).toFixed(1)+','+y(d).toFixed(1);
+ s+=`<line x1="${l}" x2="${W-r}" y1="${y(STOP)}" y2="${y(STOP)}" stroke="#6f8191" stroke-dasharray="4 4"/><text x="${l+6}" y="${y(STOP)-5}">the shroud: ${STOP}°, ${TOT.toFixed(0)} in</text>`;
  s+=`<path d="${p}" fill="none" stroke="#2f8fd8" stroke-width="2"/>`;
  for(const [k,lab] of [['beat','close-hauled'],['reach','beam reach']]){const d=M[k].boom,X=x(rope(d)),Y=y(d);s+=`<circle cx="${X}" cy="${Y}" r="5" fill="#2f8fd8" stroke="#13202b" stroke-width="2"/><text x="${X+9}" y="${Y+(k==='beat'?-6:14)}" fill="#e8eef3">${lab}: ${rope(d).toFixed(0)} in, ${d}°</text>`;}
  s+=`<text x="${(l+W-r)/2}" y="${H-2}" text-anchor="middle">mainsheet eased from two-blocked (in)</text></svg>`;document.getElementById('chart').innerHTML=s;})();
