@@ -148,4 +148,33 @@ describe('the race in its worker sails as in the page', () => {
     expect(W.faults).toBe(0);
     expect(W.world.t).toBeGreaterThan(-180 + 60); // (it sailed: past a minute of race)
   }, 600_000);
+
+  it('the setup\'s own World, asked its questions, becomes the mirror (no second World built), and the race is the same', () => {
+    // (the race setup builds a World for its cards and asks it things: the current, the line's transit, the sea; at
+    // Start the host takes that World as its mirror)
+    const a = race(), facts = new World(a.file, a.settings, a.seed, a.opts);
+    questions(facts); facts.laylineTransit(facts.C.marks[0].p, { x: 0, y: 0 }); facts.lineTransit; facts.seaDurationAt(facts.clockUtc);
+    const fake = new FakeWorker(true), W = new WorkerHost(fake as unknown as Worker, a, false, undefined, facts);
+    expect(W.world).toBe(facts);
+    const L = new LocalHost(new World(a.file, a.settings, a.seed, a.opts));
+    for (let i = 0; i < 300; i++) {
+      for (const c of SCRIPT.get(i) ?? []) { L.send(c); W.send(c); }
+      L.advance(frameDt(i)); W.advance(frameDt(i)); fake.deliver();
+    }
+    expect(W.mode).toBe('worker');
+    expect(firstDifference(fake.race.world!, W.world)).toBeNull();
+    expect(state(W.world)).toBe(state(L.world));
+    expect(W.faults).toBe(0);
+  }, 300_000);
+
+  it('a setup World numbered apart from the worker\'s: the race sails on it in the page instead, unbroken', () => {
+    const a = race(), facts = new World(a.file, a.settings, a.seed, a.opts);
+    (facts.boats[1] as unknown as Record<string, unknown>).extra = { made: 'by the page' }; // (an object the worker's World hasn't)
+    let why = '';
+    const fake = new FakeWorker(false), W = new WorkerHost(fake as unknown as Worker, a, false, w => { why = w; }, facts);
+    W.send({ k: 'running', on: true });
+    for (let i = 0; i < 120; i++) W.advance(1 / 60);
+    expect(W.mode).toBe('local'); expect(why).toMatch(/numbered apart/);
+    expect(W.view.t).toBeGreaterThan(-180 + 1.5); // (two seconds of race sailed, here)
+  }, 300_000);
 });

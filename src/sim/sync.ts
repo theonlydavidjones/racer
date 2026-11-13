@@ -78,6 +78,12 @@ export interface Packet {
  * first asked for, so their value depends on who asks first; they're sent, as the worker's.)
  */
 const LOCAL_WORLD = new Set(['kcMemo']);
+/**
+ * The World's memos that are sent (not local) but left out of the first numbering: the page's questions can fill them
+ * on a World before it's a mirror (the setup's cards ask the current, the line's transit, the sea's growth), and the two
+ * sides' numbers must not depend on who asked what. Their contents are sent as new objects the first time.
+ */
+const UNNUMBERED = new Set(['flows', 'flowsC', '_transit', 'seaNodes']);
 const LOCAL = new Map<object, ReadonlySet<string>>([
   [CurrentField.prototype, new Set(['vecs', 'stamp', 'bayFlow', 'cells', 'lastKey', 'lastList'])],
   // (the fetch on a 150 m grid by wind direction, worked out at the grid's node: the same whoever asks first)
@@ -115,7 +121,7 @@ function walkAll(w: World, see: (v: object) => void): void {
     for (const k of Object.keys(v)) { const x = (v as Record<string, unknown>)[k]; if (typeof x !== 'function' && !local(v, k)) visit(x); }
   };
   const o = w as unknown as Record<string, unknown>;
-  for (const k of Object.keys(o)) if (!NEVER.has(k) && !LOCAL_WORLD.has(k)) visit(o[k]);
+  for (const k of Object.keys(o)) if (!NEVER.has(k) && !LOCAL_WORLD.has(k) && !UNNUMBERED.has(k)) visit(o[k]);
 }
 
 /**

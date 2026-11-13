@@ -13,7 +13,8 @@ import type { Settings } from '../settings';
 
 /** What the page sends. */
 export type ToWorker =
-  | { k: 'init'; file: CourseFile; settings: Settings; seed: number; opts: WorldOptions }
+  /** `fresh`: the page's mirror is a World it already had (the setup's), so the first packet sends everything, with the count to check */
+  | { k: 'init'; file: CourseFile; settings: Settings; seed: number; opts: WorldOptions; fresh?: boolean }
   /** A frame: the page's time since the last (s), the showroom's point of sail if it's showing her, and what you did. */
   | { k: 'frame'; dt: number; twa?: number; cmds: { c: Command; id?: number }[] };
 /** What the worker sends back after each frame. */
@@ -34,7 +35,7 @@ export class RaceWorker {
   /** A message from the page; the answer to send back, if any. */
   handle(m: ToWorker): FromWorker | null {
     try {
-      if (m.k === 'init') { this.w = new World(m.file, m.settings, m.seed, m.opts); this.src = new SyncSource(this.w); this.acc = 0; return null; }
+      if (m.k === 'init') { this.w = new World(m.file, m.settings, m.seed, m.opts); this.src = new SyncSource(this.w, !!m.fresh); this.acc = 0; return null; }
       return this.w ? this.frame(m) : null;
     } catch (err) {
       return { k: 'failed', msg: err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err) };

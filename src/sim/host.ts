@@ -175,17 +175,26 @@ export class WorkerHost implements SimHost {
   private packetsNow = 0; private stepsNow = 0;
   /** After a failure: the mirror, sailing in the page's thread. */
   private local: LocalHost | null = null;
-  constructor(private worker: Worker, args: WorldArgs, private guard = false, private onFail?: (why: string) => void) {
-    this.world = new World(args.file, args.settings, args.seed, args.opts);
+  /**
+   * `mirror`: a World the page already built from these same args (the setup's, for its cards), to be the mirror rather
+   * than building a second. It must be untouched: never stepped, idled or sent a command (else a fresh one is built).
+   * The worker then sends everything in its first packet; if the two Worlds were numbered apart (a question on the
+   * setup's World made something the worker's hasn't), the race sails on that World in the page instead.
+   */
+  constructor(private worker: Worker, args: WorldArgs, private guard = false, private onFail?: (why: string) => void, mirror?: World) {
+    const adopt = !!mirror && mirror.steps === 0 && !mirror.running;
+    this.world = adopt ? mirror! : new World(args.file, args.settings, args.seed, args.opts);
     this.mirror = new SyncMirror(this.world);
     this.view = guard ? guarded(this.world) : this.world;
     worker.onmessage = (e: MessageEvent<FromWorker>) => this.receive(e.data);
     worker.onerror = e => { e.preventDefault(); this.fail(e.message || 'the worker stopped'); };
-    worker.postMessage({ k: 'init', ...args } satisfies ToWorker);
+    worker.postMessage({ k: 'init', ...args, ...(adopt ? { fresh: true } : {}) } satisfies ToWorker);
   }
   private receive(m: FromWorker): void {
     if (this.local) return;
     if (m.k === 'failed') { this.fail(m.msg); return; }
+    // (an adopted mirror numbered apart from the worker's World: the race sails on it here, which is right, if slower)
+    if (m.packet.count != null && m.resync == null && m.packet.count !== this.mirror.count) { this.fail(`the page's World and the worker's were numbered apart (${this.mirror.count} against ${m.packet.count})`); return; }
     this.inflight--;
     this.packetsNow++; this.stepsNow += m.steps;
     const frame = this.sent.shift();
