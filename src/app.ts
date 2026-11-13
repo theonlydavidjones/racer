@@ -29,8 +29,10 @@ import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, DT, World, describeTide } from './sim/world';
 import type { Controls } from './boat/controls';
 import { POLE, allToCrew, byHand, linesByHand, moveLazyCar, takeLine } from './boat/physics';
-import { DEFAULT_SKILL, type PlaceAcross, type PlaceFore } from './boat/crewPhys';
-import { ensureMembers, loadMembers, pullCrew, pushCrew, saveMembers, type Member } from './club/members';
+import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
+import { YOU, ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
+import { installSkipperUI } from './ui/skipperUI';
+installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said of her, her record)
 import { SailBand } from './ui/sailBand';
 import { WindLadder } from './render/windLadder';
 import { LINE_NAME } from './ui/lines';
@@ -50,7 +52,10 @@ import { NavView } from './ui/navView';
 import { onSaveTrouble } from './store/cloud';
 import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
-import { SetupChart } from './ui/setupChart';
+import { SetupChart, type SetupPicks } from './ui/setupChart';
+import { PlanChart } from './ui/planChart';
+import { passageNow, whyNot } from './sim/navigator';
+import { FlowPanel } from './ui/flowPanel';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
@@ -58,8 +63,6 @@ const S: Settings = loadSettings();
 const MEMBERS: Member[] = loadMembers();
 /** Your boat's crew from her seats (after choosing a boat, or at the start); saves what changed. */
 function crewFromClub(): void { if (ensureMembers(S, MEMBERS)) { saveMembers(MEMBERS); saveSettings(S); } pullCrew(S, MEMBERS); }
-/** The setup's crew rows or count changed: back to the members and her seats, and saved. */
-function crewToClub(): void { pushCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); }
 crewFromClub();
 if (S.course !== RC_COURSE && !COURSES.some(c => c.id === S.course)) S.course = COURSES[0].id;
 S.raceLength ??= 'medium';
@@ -84,7 +87,7 @@ let w!: World;
 let replayPin: number | null = null;
 let viewMode = 0, acc = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
+const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; panelShift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, panelShift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -434,6 +437,17 @@ function chaseFrame(): void {
   view.setChaseFrame({ top: 0, bottom: wx && wx.height > 0 ? wx.top - gl.top : r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
 }
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
+/* The flow view (ui/flowPanel.ts): her sails cut across at three heights, beside the 3D view; off until you open it. The
+ * picture moves left by half the panel, so she stays in the middle of what's left of the view. */
+const flowPanel = new FlowPanel(document.body, () => openFlow(false));
+function openFlow(open = !flowPanel.open): void {
+  flowPanel.show(open);
+  $('bFlow').classList.toggle('on', open); $('bFlow').setAttribute('aria-pressed', String(open));
+  document.body.classList.toggle('flow-open', open);
+  look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
+}
+$('bFlow').onclick = () => openFlow();
+addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 /* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
@@ -722,11 +736,15 @@ $('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
 /** Cruise setup: the start and the destination, picked on the chart (ui/setupChart.ts); each pick rebuilds the world. */
-setupChart = new SetupChart(hud, {
+const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); }
-});
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); tideBox(); } // (the tide graph's Arrive moves with them)
+};
+setupChart = new SetupChart(hud, cruisePicks);
+/** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
+const planChart = new PlanChart(hud, cruisePicks, () => setupChart?.sync(true));
+$('bPlanOpen').onclick = () => { planChart.open(); openChartHook(); };
 let openChartHook = () => {}; // (the field picker, set to the layers in force when the chart opens)
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
   pal => { S.chartPal = pal; w.settings.chartPal = pal; saveSettings(S); });
@@ -734,9 +752,9 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
   const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); w.settings.mapLayers = S.mapLayers; saveSettings(S); syncField(); };
-  const redraw = () => { if (chart.isOpen) chart.draw(); };
+  const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
-  const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button')];
+  const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button, #planField button')];
   const syncField = () => { const f = fieldLayer(w?.settings ?? S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
   for (const b of fieldBtns) b.addEventListener('click', () => {
     const f = b.dataset.field!;
@@ -845,6 +863,7 @@ addEventListener('keydown', e => {
     case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'sailBand': openLines(); break;
     case 'lookInstrument': toggleInstrumentLook(); break;
+    case 'flowView': openFlow(); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': pilotOff('Pilot on standby.'); unlash(); centreTiller(); break;
     case 'lashTiller': lash(); break;
@@ -1032,7 +1051,7 @@ function courseCard(): void {
   $('setupBack').textContent = cruise ? '‹ Start page' : '‹ Race'; $('setupBack').dataset.home = cruise ? 'home' : 'race';
   $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
   { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
-    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Just you'}, ${Math.round(kg / LB)} lb aboard`; }
+    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Single-handed'}, ${Math.round(kg / 0.4536)} lb aboard`; }
   adjustUi();
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
@@ -1114,8 +1133,20 @@ function drawTideGraph(): void {
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  ctx.fillStyle = '#ffb627'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc), 10);
+  const pn = cruise && w.dest ? passageNow(w) : null, near = pn?.eta != null && tx(pn.eta) - tx(w.gunUtc) < 44;
+  ctx.fillStyle = '#ffb627'; if (near) ctx.textAlign = 'right'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc) - (near ? 4 : 0), 10); ctx.textAlign = 'center';
+  // cruising somewhere: when she'd get there leaving then (sim/navigator.ts passageNow: the course she'd sail, tacks and
+  // all, in the forecast wind and NOAA's current), as a second bar; past the graph's end, an arrow at its edge
+  if (pn?.eta != null) {
+    const xa = tx(pn.eta), inside = xa <= W - 8, xd = Math.min(xa, W - 10);
+    ctx.strokeStyle = '#3fd197'; ctx.lineWidth = 2; ctx.setLineDash(inside ? [] : [3, 3]); ctx.beginPath(); ctx.moveTo(xd, top - 6); ctx.lineTo(xd, bot + 6); ctx.stroke(); ctx.setLineDash([]);
+    // (close to the leave bar, the label goes to the right of its bar, clear of 'leave')
+    const close = inside && near;
+    ctx.fillStyle = '#3fd197'; ctx.textAlign = !inside ? 'right' : close ? 'left' : 'center';
+    ctx.fillText(inside ? 'arrive' : `arrive ${sfClock(pn.eta)} →`, !inside ? W - 12 : close ? xd + 4 : xd, 10);
+  }
   const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
@@ -1125,7 +1156,7 @@ $<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
     const k = seg.dataset.k as keyof Settings;
-    const cur = (k as string) === 'crewN' ? String(S.crew?.n ?? 2) : String(S[k]);
+    const cur = String(S[k]);
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
   });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (S[c.dataset.t as 'aids' | 'windDial' | 'camRide'] ?? 0) === 1; });
 }
@@ -1137,34 +1168,36 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if ((k as string) === 'crewN') { (S.crew ??= { ...DEFAULT_SETTINGS.crew }).n = Number(v) as 0 | 1 | 2; while (S.crew.people.length < 2) S.crew.people.push({ h: 1.75, w: 75 }); crewToClub(); crewRows(); paintSeg(); newGame(); courseCard(); return; }
   if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); newGame(); courseCard(); tideBox();
 }));
-/* Crew: how many, and each person's height, weight (shown in feet and inches, and pounds) and skill. */
-/** Skill levels to choose from (boat/crewPhys.ts: 0 novice … 1 expert). */
-const SKILLS: [number, string][] = [[0.25, 'Novice'], [0.6, 'Club racer'], [0.9, 'Expert']];
-const LB = 0.4536, IN = 0.0254;
-const fmtHeight = (m: number) => { const t = Math.round(m / IN); return `${Math.floor(t / 12)}'${t % 12}"`; };
-const parseHeight = (s: string): number | null => {
-  const ft = s.match(/^\s*(\d)\s*['’ ]\s*(\d{1,2})?\s*("|”)?\s*$/), cm = s.match(/^\s*(\d{3})\s*cm\s*$/i), inches = s.match(/^\s*(\d{2})\s*(in|")?\s*$/);
-  if (ft) return (Number(ft[1]) * 12 + Number(ft[2] ?? 0)) * IN; if (cm) return Number(cm[1]) / 100; if (inches) return Number(inches[1]) * IN; return null;
-};
+/**
+ * Your crew in the race setup (the Yacht Club, phase 3; the owner: the race setup "isn't where crew are configured",
+ * but you may swap people in and out there): you at the helm, then a pick for each seat from the club's members (the
+ * middle crew: the main; the forward hand: the jib, the cabin top, the pole), the seats swapped, and the members
+ * themselves set up in the Yacht Club. There's no crew count (the owner): both seats left at None is single-handed, for
+ * practice or a race, and a seat left empty moves the forward hand up to the middle (one crew does both jobs).
+ */
 function crewRows(): void {
-  const c = S.crew ??= { ...DEFAULT_SETTINGS.crew }, rows = $('crewRows');
-  const people = [{ who: 'You (helm)', p: c.helm }, ...c.people.slice(0, c.n).map((p, i) => ({ who: `Crew ${i + 1}`, p }))];
-  const skillSel = (i: number, p: { skill?: number }) => `<label>Skill <select data-i="${i}" data-f="skill">${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((p.skill ?? DEFAULT_SKILL) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
-  rows.innerHTML = people.map((x, i) => `<span>${x.who}</span><label>Height <input data-i="${i}" data-f="h" value="${fmtHeight(x.p.h)}"></label><label>Weight <input data-i="${i}" data-f="w" value="${Math.round(x.p.w / LB)}" inputmode="numeric"> lb</label>${skillSel(i, x.p)}`).join('');
-  rows.querySelectorAll<HTMLSelectElement>('select').forEach(sel => sel.onchange = () => {
-    const i = Number(sel.dataset.i), p = i === 0 ? c.helm : c.people[i - 1]; p.skill = Number(sel.value); crewToClub(); newGame();
+  const rows = $('crewRows'), boat = S.boats.find(b => b.id === S.boatId) ?? S.boat, seats = boat.crewIds ?? [];
+  const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+  // (anyone who crews, and isn't on another seat of hers; someone on another of your boats can still be brought aboard)
+  const crewers = MEMBERS.filter(m => m.id !== YOU && m.roles.includes('crew'));
+  const seatName = (i: number) => (i === 0 ? 'Middle: main' : 'Forward: jib, pole');
+  const pick = (i: number) => `<label>${seatName(i)} <select data-seat="${i}"><option value="">None</option>${crewers.map(m => `<option value="${esc(m.id)}"${seats[i] === m.id ? ' selected' : ''}${seats.includes(m.id) && seats[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select></label>`;
+  const you = MEMBERS.find(m => m.id === YOU);
+  rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${pick(0)}${pick(1)}`
+    + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
+    + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
+  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); newGame(); courseCard(); crewRows(); };
+  rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => {
+    const ids = [...(boat.crewIds ?? [])], i = Number(sel.dataset.seat);
+    if (sel.value) ids[i] = sel.value; else ids.splice(i, 1);
+    boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
   });
-  rows.querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.onchange = () => {
-    const i = Number(inp.dataset.i), p = i === 0 ? c.helm : c.people[i - 1];
-    if (inp.dataset.f === 'h') { const h = parseHeight(inp.value); if (h && h > 1.2 && h < 2.3) p.h = h; inp.value = fmtHeight(p.h); }
-    else { const lb = Number(inp.value); if (lb > 70 && lb < 400) p.w = lb * LB; inp.value = String(Math.round(p.w / LB)); }
-    crewToClub(); newGame(); courseCard();
-  });
+  rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
+  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openMembers(); });
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
@@ -1419,6 +1452,7 @@ function frame(now: number): void {
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
+  if (w.running) flowPanel.update(w.user, now, { preStart: !w.freeSail && w.t < 0 }); // (as the coach has it)
   if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer);
 }
 
@@ -1479,6 +1513,9 @@ function showroom(on: boolean): void {
 }
 const fleet: Fleet = new Fleet(S, {
   changed: () => { fleetChanged(); boatSummary(); },
+  members: () => MEMBERS,
+  // (a member changed: saved, and your boat's race crew drawn again from her seats)
+  membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); newGame(); },
   edit: id => { showroom(true); boatPanel.show(id); newGame(); },
   sail: (id, mode, fromSlip) => {
@@ -1587,4 +1624,4 @@ newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRo
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __hud: hud, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => w, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });

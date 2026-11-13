@@ -71,6 +71,8 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
 }
 /** How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. */
 const SAME_INCIDENT = 8;
+/** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
+const TANGLE_MAX = 30;
 
 /** A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. */
 const COMPELLED_WINDOW = 3;
@@ -219,6 +221,8 @@ export class World {
   events: SimEvent[] = [];
   /** When each boat last broke a Part 2 rule, and last touched a mark (Rule 44.1(a)); who last fouled each boat (Rule 43.1(a)). */
   private lastFoul = new Map<number, number>();
+  /** Rule 44.1: each boat's last penalized foul, against whom, and whether she has since been clear of that boat. */
+  private lastFoulVs = new Map<number, { vs: number; t: number; clear: boolean }>();
   private lastTouch = new Map<number, number>();
   private fouledAt = new Map<number, { by: number; t: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
@@ -1035,6 +1039,8 @@ export class World {
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
+      // (Rule 44.1's tangle: once a boat that fouled has been a length clear of the boat she fouled, it's over)
+      for (const [X, Y] of [[A, B], [B, A]] as const) { const lf = this.lastFoulVs.get(X.id); if (lf && lf.vs === Y.id && !lf.clear && hullGap(X, Y) > LOA) lf.clear = true; }
       if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
       const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
@@ -1069,8 +1075,18 @@ export class World {
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
+      // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
+      // from that foul (she hasn't been a length clear of her since, nor begun her turns), is that same incident: no
+      // second foul, and her turns aren't restarted. Once she has started turning she must keep clear of everyone
+      // (rule 21.2) and should have got well clear first (rule 44.2), so a contact then is a new breach.
+      const prior = this.lastFoulVs.get(f.id);
+      if (incident.kind !== 'hail' && prior && prior.vs === victim.id && !prior.clear && f.penalty > 0 && !f.penaltyDir && this.t - prior.t < TANGLE_MAX) { // (penaltyDir: her turns have begun, 30° one way)
+        prior.t = this.t; // (the tangle goes on)
+        if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).` });
+        continue;
+      }
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
-      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.lastFoul.set(f.id, this.t);
+      if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, this.t); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       if (A.isUser || B.isUser) {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }

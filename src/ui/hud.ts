@@ -14,6 +14,7 @@ import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
 import { routeAround } from '../sim/routing';
+import { passageNow, type PassageNow } from '../sim/navigator';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
@@ -40,7 +41,7 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawPuffs, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { drawCourse, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
@@ -89,7 +90,7 @@ export class Hud {
   /** The wind or current as Windy draws it (ui/flow.ts): the colour field for each map, and its moving streaks (drawn
    * every frame on a canvas over each map: the maps themselves are drawn ten times a second, or when the chart moves). */
   private flowField = { inset: new FlowField(), chart: new FlowField() };
-  private streaks = { inset: new Streaks(150), chart: new Streaks(1500) };
+  private streaks = { inset: new Streaks(120), chart: new Streaks(900) };
   private mapFx = $<HTMLCanvasElement>('mapFx');
   /** how each map was drawn last (its transform), for the streaks */
   private drawn: Partial<Record<'inset' | 'chart', { tf: Tf; w: number; h: number; scale: number; kind: FlowKind | null }>> = {};
@@ -607,7 +608,7 @@ export class Hud {
     ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
     const cw = ctx.measureText(chartCredit()).width; ctx.fillStyle = I.deep; ctx.globalAlpha = 0.85; ctx.fillRect(w - cw - 16, h - 19, cw + 12, 15);
     ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
-    const kind = this.drawn.chart?.kind; if (kind) drawLegend(ctx, kind, w / 2, h - 40); // (the colours' scale, in kt)
+    const kind = this.drawn.chart?.kind; if (kind && h >= 420 && w >= 600) drawLegend(ctx, kind, w / 2, h - 40); // (the colours' scale, in kt: not on the setup's small chart, where it would cover it)
   }
 
   /** The inset's streaks, every frame, on its overlay (the map under it is drawn ten times a second). */
@@ -691,27 +692,32 @@ export class Hud {
     // streaks over it (drawn every frame on the map's overlay: insetStreaks, chartFx); the sea state; or the fog
     const field = fieldLayer(S), kind: FlowKind | null = field === 'wind' || field === 'current' ? field : null;
     if (field === 'sea') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
-    if (kind) this.flowField[detail].draw(ctx, tf, w, h, scale, wd, kind, detail === 'chart' ? 0.6 : 0.35, detail === 'chart' ? 16 : 8);
-    if (kind === 'wind') drawPuffs(ctx, tf, wd.puffs.cells, wd.puffs.dir, wd.puffs.gustiness, I); // (the puffs and lulls, drifting over the mean)
     this.drawn[detail] = { tf, w, h, scale, kind };
-    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null, L = laylinesFor(wd, u);
+    // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
+    // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
+    const plan = wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
+    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key
     const sim: SimKey[] = ['you'];
     if (wd.boats.length > 1) sim.push('boats');
     if (!wd.freeSail) { sim.push('start', 'marks'); if (u.leg < wd.C.marks.length) sim.push('next'); }
-    else if (wd.dest) sim.push('dest', 'destline');
+    else if (wd.dest) sim.push('dest', 'destline', ...(wd.running ? [] : ['track' as const]));
     if (on('laylines') && L) sim.push('laylines');
     if (on('ships') && wd.vessels.length) sim.push('ships');
     if (kind === 'current') sim.push('current');
-    if (kind === 'wind') sim.push('wind', 'puffs');
+    if (kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
     if (field === 'sea' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
     if (on('shadows') && !wd.freeSail) sim.push('shadows');
     this.keyState[detail] = { sim, pal, scale };
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
+    // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore);
+    // the inset's every 5 s of the clock (the puffs drift by), the chart's every 10 (it's paused)
+    if (kind) this.flowField[detail].draw(ctx, tf, w, h, scale, wd, kind, detail === 'chart' ? 0.6 : 0.35, detail === 'chart' ? 14 : 8, detail === 'chart' ? 10 : 5);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
-    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I);
+    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
     else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
@@ -743,6 +749,22 @@ export class Hud {
 
 }
 
+/**
+ * The course she'd sail (sim/navigator.ts passageNow): her track over the ground, solid, with a small mark where she
+ * tacks (a triangle pointing into the wind's side) and where she gybes (a circle), so the beats and runs show as the
+ * zigzags they are.
+ */
+function drawTrack(ctx: CanvasRenderingContext2D, tf: Tf, plan: PassageNow, I: Ink): void {
+  const pts = plan.track.map(q => tf(q.p.x, q.p.y));
+  const path = () => { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
+  ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.track.halo; path(); ctx.stroke();
+  ctx.strokeStyle = I.you; ctx.lineWidth = PEN.track.w; path(); ctx.stroke();
+  for (const q of plan.tacks) { const s = tf(q.x, q.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 4.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.you; ctx.beginPath(); ctx.moveTo(s[0], s[1] - 3.5); ctx.lineTo(s[0] + 3, s[1] + 2.5); ctx.lineTo(s[0] - 3, s[1] + 2.5); ctx.closePath(); ctx.fill(); }
+  for (const q of plan.gybes) { const s = tf(q.x, q.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 4.5, 0, 6.29); ctx.fill(); ctx.strokeStyle = I.you; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(s[0], s[1], 2.8, 0, 6.29); ctx.stroke(); }
+  ctx.restore();
+}
+
 /** The navigator's route to the destination (routeAround: the passage plan's way round the land), re-planned as she
  * goes: when the destination changes, or she's 100 m from where it was last planned from (at most every 2 s: it's an A*
  * search on a 50 m grid when the land is in the way). */
@@ -757,7 +779,7 @@ export function navRoute(u: { x: number; y: number }, dest: CourseMark): Vec[] {
  * Just sailing, on the map: the buoys around you, and where you're heading, by the navigator's route. If that's off the map, an arrow at the
  * edge points to it.
  */
-function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink): void {
+function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink, plan: PassageNow | null = null): void {
   // the racing marks and buoys the sim knows (the chart draws the real ones under them): small orange rings
   for (const pl of PLACES) if (pl.buoy) {
     const s = tf(pl.p.x, pl.p.y);
@@ -775,6 +797,7 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   // the turns on the way: small dots
   for (const q of legs.slice(1, -1)) { ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.line; ctx.beginPath(); ctx.arc(q[0], q[1], 2, 0, 6.29); ctx.fill(); }
   ctx.restore();
+  if (plan && plan.track.length > 1) drawTrack(ctx, tf, plan, I);
   const shape = (pts: [number, number][]) => {
     ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = I.mark; ctx.fill(); ctx.strokeStyle = I.edge; ctx.lineWidth = 1.2; ctx.stroke();
