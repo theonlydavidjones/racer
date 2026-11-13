@@ -205,6 +205,50 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8m. **Now — leaving the slip at Gashouse Cove: she drifts to windward under bare poles** (bug, physics; 3–5 h; owner, 13
+   November): "coming out of a slip at Gas House Cove. The wind is on the beam on the port side. I get pushed off. I
+   don't raise the sails. And the boat seems to just drift to windward, weirdly, even if I have the tiller at
+   centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
+   slip at Gas House Cove. I've tried over and over and over again. I just can't get pushed back far enough, and I
+   can't seem to get the nose around."
+   - **Drifting to windward with no sails up is a bug.** A boat with no way on and no sail up is set to leeward by
+     the wind on her hull and rig, plus or minus the current. Nothing drives her upwind. Look at the bare-pole windage
+     force's sign or direction, the hove-to and in-irons models acting with the sails down, the shelter field inside
+     the basin, and any current in the basin.
+   - **The crew's weight doesn't move her sideways.** It changes her heel, and so a little of her drag and turning, not
+     her drift. Crew hiking or sitting to leeward at the dock is itself odd: they should be aboard and ready, not hiking.
+   - **Which way her bow goes**, to check against a source: with no sail up, a boat usually lies beam-on or falls off,
+     because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
+     the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
+     get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **The place** (owner's chart screenshot): Josephine's real slip, at the west end of a Gashouse Cove fairway close to
+     the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
+     literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
+     crew would. It's hard but possible, as in real life.
+   - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
+     Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
+     Gashouse Cove with the wind on the beam both ways.
+8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
+   trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
+   reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
+   its "IDLE SPEED / NO WAKE" sign and light to the west, Fort Mason's pier to the east, the Bay and Angel Island
+   beyond) and reference/photos/fort-mason-pier-piles-gashouse-exit.jpg (the pier's open undercroft of massive concrete
+   piles).
+   1. Inside, sheltered: "the marina side of the exit is nicely sheltered from wind and current by the breakwater."
+   2. Outside, all at once: "the bay side of the exit smacks straight into the wind and the tidal current, and the boat
+      usually feels it immediately." The shelter has to end at the entrance in a few boat lengths, not fade over a
+      long distance, for the wind, the current and the chop alike.
+   3. The Fort Mason pier to leeward: "the eastern (usually leeward) side of the exit is the ft mason pier, which has
+      massive concrete piers supporting it. the wind (and often current) badly want to push you into those piers. that
+      means bye bye to your boat; you would just churn around under there in all the decades-old concrete and rebar and
+      barnacles." So:
+      - the pier's pile field is solid to the boat;
+      - the current runs through and under the piles, while the shed above blocks the wind;
+      - getting set under it is a real wreck, with damage and the sail over, not a bounce;
+      - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
+        of the pier, and pick the tide.
+   Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
+   common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
@@ -559,7 +603,19 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   30+ kt under full sail? The heel past a few degrees still needs the righting curve from the hull's offsets (see crew
   weight, above); if Bay racers sail on unreefed, she must be able to too, not lie at 60° at 0 kt;
   (2) the auto crew's heavy-air handling as Bay sailors do it (dump the main, sail on the jib, feather);
-  (3) water in the cockpit: water shipped, its weight, the pump;
+  (3) water in the cockpit and the bilge, and the bilge pump (owner, 13 November, "for later": "pumping the bilge is
+  important to the physics. unpumped adds substantial weight. we may need a crew animation for this, but only if
+  performance allows. also. need logic for how and when the bilge fills: rain fills it, heavy heeling can fill it,
+  heavy seas and splash can fill it"; 4–6 h):
+  - How the bilge fills, each from the physics:
+    - rain, from the observed and forecast rainfall for the day (NWS);
+    - heeling far enough to put the lee rail or cockpit coaming under;
+    - green water and spray in heavy seas;
+    - a wooden boat's planks weeping a little, as lapstrake hulls do.
+  - Its weight (1 kg a liter) is carried low and sloshes to leeward, adding to her displacement, heel and drag.
+  - Pumping: a crew member at the pump, at a sourced rate per stroke. The class rules allow pumps only while racing
+    (no self-bailers; NFIA 12.40). The smart crew pump when it pays.
+  - A pumping animation only if the frame budget allows; otherwise the crew member shows as busy at the pump.
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
   Update (12 November): owner, "nobody who races Folkboats on the bay has a reef setup. races just get canceled at 23
