@@ -6,8 +6,13 @@ series*, not just a race.
 
 ![Mock-up: the Yacht Club's Season page and the results line](season-mockup.png)
 
-*The mock-up uses real numbers: the 2025–26 Seaweed Soup Folkboat fleet's published race points (Jibeset, saved in
-src/boat/data/sf-folkboat-results.json), scored as a series. The highlighted row only shows where your boat would sit.*
+*The mock-up, redrawn after the owner's feedback (13 Nov). It's the Yacht Club's layout (Boats · Members · Season),
+and every boat list shows country and sail number beside the name, since sailors in a fleet go by sail numbers. Boat
+chips are in the boats' colours, and each row has a place-by-race sparkline, 1st at the top. The points are real: the
+2025–26 Seaweed Soup Folkboat fleet's published race points (Jibeset, saved in
+src/boat/data/sf-folkboat-results.json), scored as a series, and shown on the sim's fleet. Polperro's are on Red,
+Faith's on Blue, Josephine's on yours (JOSEPHINE, USA 110), Circle Sea's on Green, Thea's on Black, Shanty's on Varnish,
+Cicciolina's on FREYA and Rødhætte's on KITTIWAKE. FREYA and KITTIWAKE are the sim's first two generic club boats.*
 
 ## Which series
 
@@ -52,12 +57,13 @@ racing you.
 
 ## Where it lives (no new on-screen buttons)
 
-- **The Yacht Club page** (now a "Coming next" placeholder) gets a **Season** section:
-  - the calendar, each race with its "Sail it", the same as Run a past race's rows;
-  - the standings, with discards in brackets;
+- **The Yacht Club** gets a third tab, **Season**, beside Boats and Members. It replaces the "Club · Seasons: later"
+  note. Its sections:
+  - the calendar: five day tiles, each opening that race, the same as Run a past race's rows;
+  - the standings: # · sail number · boat · race scores (discards in brackets) · place by race · total · nett;
   - the trophy, with its past winners.
-- **The race results dialog:** one line under the table: "Seaweed Soup 2025–26, after race 4 of 5: 2nd of 8, 7 points
-  nett."
+- **The race results dialog:** its table gains the sail-number column, and one line goes under it: "Seaweed Soup: 3rd ·
+  9 nett · Red wins on 5"
 - **Run a past race:** the series' races are already there. Sailing one of them counts for the season. Saved, it goes in
   the logbook as now.
 
