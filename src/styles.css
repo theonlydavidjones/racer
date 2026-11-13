@@ -1218,3 +1218,7 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 /* (the results and pause panels widen for the tactical chart: desktop only) */
 #results .panel,#pause .panel{max-width:980px}
 #results,#pause{z-index:9} /* (over the HUD's own buttons, the map's layers among them, now the panel is wide enough to reach under them) */
+/* the Members tab: two plain lists, you and your crew, then the club (docs/UI-AUDIT.md §4.8); New member at the right */
+.mtools{justify-content:flex-end}
+.mgroup{font:600 11px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
+.mgrid + .mgroup{margin-top:20px}
