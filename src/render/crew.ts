@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number }
 type Limb = Body['arm'][number];
@@ -219,6 +219,10 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
     f.route = { side, z: z0, goal, face: goal < z0 || (goal - z0 < 1 && Math.cos(f.cur!.yaw) > 0.5) ? -1 : 1 };
   }
   const q = f.route!;
+  // (on their way across, and where they're going now back on the side they're still on (the physics' goal: its person,
+  // quicker across, may be partway back already), a tack coming before they'd crossed:
+  // they stay, not go on across and turn right round to come back: the owner's "moves restarted before they finish")
+  if (q.down && f.cur && f.goalSide === q.side && Math.sign(c.x) === q.side) { q.down = false; q.sitT = undefined; }
   if (q.down && f.cur) {
     // (across to the other side's seat aft of the thwart: sat on this side's deck, the legs swung in; down into the
     // cockpit forward of the thwart and across it low, under the boom; then up on to the other side's deck and aft along
@@ -851,6 +855,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       if (f.aftSide == null || Math.abs(x) > AFT_MID) f.aftSide = Math.sign(x) || windward;
       x = aftSide(f, x, a.z);
     } else f.aftSide = undefined;
+    f.goalSide = a?.goal && Math.abs(a.goal.x) > 0.3 ? Math.sign(a.goal.x) : undefined;
     const dir = track(f, x, a?.z ?? z, sdt);
     // (on the move from 0.22 m/s, settled again under 0.1: no flicker between walking and sitting)
     const go = f.going = travelling(f, a, x);
