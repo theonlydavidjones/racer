@@ -1187,3 +1187,7 @@ body.showroom #flowPanel{display:none}
 .sailband.shut .sb-wx{pointer-events:auto;cursor:pointer;border-radius:50%}
 .sailband.shut .sb-wx:hover .sb-wx-hint{opacity:1}
 .sailband.shut .sb-wx:hover svg{filter:drop-shadow(0 0 0 2px var(--accent)) brightness(1.15)}
+/* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
+   which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
+body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
+body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}

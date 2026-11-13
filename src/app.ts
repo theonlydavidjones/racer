@@ -180,8 +180,24 @@ let condLive = false;
  * ghost's very race), and your run of the race just logged (kept as a ghost if you save it). */
 let ghostNext: Ghost | null = null, activeGhost: Ghost | null = null, pendingGhost: Ghost | null = null;
 function newGame(seed = randomSeed()): void {
-  incidentClips = []; // (a new race: its own rule incidents)
   if (condLive && w?.running) { saveSettings(S); void host.ask({ k: 'conditions', settings: S }).then(() => view.conditionsChanged(w)); return; } // (redrawn once the race has them: the committee boat to the new wind) // (the owner: at once, without a restart)
+  // (a setup change still waiting on its debounce is overtaken: this race is built from the settings as they are now)
+  clearTimeout(setupTimer); const fs = [...setupAfter]; setupAfter.clear();
+  prepare(seed); show(); fs.forEach(f => f());
+}
+/*
+ * The setup's changes build the race but not the scene (the owner, 13 Nov 2026: "let me finish configuring the race
+ * before loading up the game"). prepare() builds the one World the setup's cards and charts read (its course, weather,
+ * tide, start) and hands it to the host, in the same worker (sim/host.ts rebuild, adopting it as the mirror); show()
+ * builds the scene for it, once, at Start or Cast off. Between the two the view is `still`: the last frame stays on the
+ * screen, nothing is drawn or sailed (the World handed over must stay untouched until the race starts), and the game's
+ * own displays are put away (body.still).
+ */
+let still = false, unshown = false;
+/** How many Worlds the page has built (for the checks: a setup change builds one, after the debounce). */
+let prepared = 0;
+function prepare(seed = randomSeed()): void {
+  incidentClips = []; // (a new race: its own rule incidents)
   pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
@@ -196,14 +212,23 @@ function newGame(seed = randomSeed()): void {
   const WSd = S.mode === 'manoeuvres' && !shown ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
   const args: WorldArgs = { file: rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), settings: WSd, seed,
     opts: S.mode === 'drill' ? { startAt: S.drillFrom ?? DRILL_FROM, solo: S.drillSolo ?? true, showFlags, courseSignal } : (S.mode === 'sail' || S.mode === 'manoeuvres') && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
-  host?.dispose();
-  // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
-  // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
-  const wk = SIM_INPROC ? null : spawnSimWorker();
-  host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); })
-    : new LocalHost(new World(args.file, args.settings, args.seed, args.opts), SIM_GUARD);
+  // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
+  const facts = new World(args.file, args.settings, args.seed, args.opts);
+  if (host) host.rebuild(args, facts);
+  else {
+    // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
+    // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
+    const wk = SIM_INPROC ? null : spawnSimWorker();
+    host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); }, facts)
+      : new LocalHost(facts, SIM_GUARD);
+  }
   w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false; resultsShown = false;
   document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
+  unshown = true; document.documentElement.dataset.prepared = String(++prepared);
+}
+/** The scene for the race prepare() built: the boats, marks and labels drawn, and the view live again. */
+function show(): void {
+  unshown = false; setStill(false);
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint(); insetViews();
   view.setWorld(w);
@@ -211,6 +236,22 @@ function newGame(seed = randomSeed()): void {
   // course, seed, start time and conditions); any other race has none
   activeGhost = ghostNext && S.mode === 'race' && setupKey(raceSetup()) === ghostNext.key ? ghostNext : null; view.setGhost(w, activeGhost?.pts ?? null);
   labels.build(w);
+}
+function setStill(on: boolean): void { still = on; document.body.classList.toggle('still', on); }
+/** Leaving the setup without sailing (the start page): its race drawn, and live again. */
+function wake(): void { if (unshown) show(); else setStill(false); }
+let setupTimer = 0;
+const setupAfter = new Set<() => void>();
+/**
+ * A choice in the setup: its race built once the clicks stop (120 ms), then `after` (the cards that read it). Outside
+ * the setup (the showroom, the pause menu's conditions) the change is drawn at once, as before.
+ */
+function setupChanged(after?: () => void, wait = 120): void {
+  if (!still || condLive) { newGame(); after?.(); return; }
+  if (after) setupAfter.add(after);
+  clearTimeout(setupTimer);
+  const go = () => { if (!still) return; prepare(); const fs = [...setupAfter]; setupAfter.clear(); fs.forEach(f => f()); };
+  if (wait <= 0) go(); else setupTimer = window.setTimeout(go, wait);
 }
 
 /* ---------------- sim events → UI ---------------- */
@@ -865,7 +906,7 @@ let chartDest: unknown = null;
 const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); tideBox(); } // (the tide graph's Arrive moves with them)
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); setupChanged(tideBox, 0); } // (the tide graph's Arrive moves with them; at once, for the chart that redraws from it)
 };
 setupChart = new SetupChart(hud, cruisePicks);
 /** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
@@ -1146,7 +1187,7 @@ function buildSetupChoices(): void {
   groups.delete('Practice');
   sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
   sel.value = S.course;
-  sel.onchange = () => { S.course = lastPick = sel.value; saveSettings(S); newGame(); courseCard(); tideBox(); };
+  sel.onchange = () => { S.course = lastPick = sel.value; saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); };
   $('condDlg').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
 function courseCard(): void {
@@ -1189,7 +1230,7 @@ function courseCard(): void {
   // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
   // clarification, March 2006, under class rule 1.11); the bracket can stay
   if (S.mode !== 'sail' && S.boat.perf.outboard === 'bracket') {
-    S.boat.perf.outboard = 'stowed'; saveSettings(S); newGame();
+    S.boat.perf.outboard = 'stowed'; saveSettings(S); if (still) prepare(); else newGame();
     toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
   }
   const cruise = S.mode === 'sail';
@@ -1302,8 +1343,8 @@ function drawTideGraph(): void {
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
-$<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); newGame(); tideBox(); });
-$<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); newGame(); tideBox(); });
+$<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); setupChanged(tideBox); });
+$<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); setupChanged(tideBox); });
 
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
@@ -1320,9 +1361,9 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
+  if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
-  paintSeg(); newGame(); courseCard(); tideBox();
+  paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 }));
 /**
  * Your crew in the race setup (the Yacht Club, phase 3; the owner: the race setup "isn't where crew are configured",
@@ -1342,7 +1383,7 @@ function crewRows(): void {
   rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${pick(0)}${pick(1)}`
     + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
     + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
-  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); newGame(); courseCard(); crewRows(); };
+  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); crewRows(); setupChanged(courseCard); };
   rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => {
     const ids = [...(boat.crewIds ?? [])], i = Number(sel.dataset.seat);
     if (sel.value) ids[i] = sel.value; else ids.splice(i, 1);
@@ -1354,8 +1395,11 @@ function crewRows(): void {
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
   replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
-  if (S.mode === 'drill' || S.mode === 'manoeuvres') { S.mode = 'race'; newGame(); }
-  courseView.close(); navView.close(); send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
+  if (S.mode === 'drill' || S.mode === 'manoeuvres') { S.mode = 'race'; prepare(); }
+  // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
+  // and is sent nothing until it starts)
+  setStill(true);
+  courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
   realRaceHolds();
@@ -1433,7 +1477,7 @@ $('bManoeuvres').onclick = () => { S.mode = 'manoeuvres'; courseView.close(); na
 /* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
 const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
 let lastPick = hostOf(S.course) === 'ggyc' && S.course !== RC_COURSE ? S.course : COURSES.find(c => c.group)!.id;
-function setCourse(id: string): void { S.course = id; saveSettings(S); newGame(); courseCard(); tideBox(); }
+function setCourse(id: string): void { S.course = id; saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); }
 $('hostSeg').addEventListener('click', e => {
   const h = (e.target as HTMLElement).closest<HTMLElement>('[data-host]')?.dataset.host; if (!h || h === hostOf(S.course)) return;
   setCourse(h === 'practice' ? COURSES.find(c => !c.group)!.id : RC_COURSE);
@@ -1476,7 +1520,7 @@ $('bShowReal').onclick = () => { showMin = null; showCond = null; newGame(); sho
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
   Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
-  saveSettings(S); paintSeg(); newGame(); courseCard(); tideBox();
+  saveSettings(S); paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 };
 
 /** The tactics debrief: what cost you time, most first, and your place at each mark. */
@@ -1634,6 +1678,7 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (still) return; // (behind the setup: the last frame stays, and its race waits untouched for the start)
   // the steps due (sim/host.ts: here, or in the worker): racing at the race's speed; with nothing running (the start
   // page, setup, the showroom) she still sails, in the real wind and physics, so her sails, heel and flags agree; in the
   // showroom on a close reach
@@ -1677,7 +1722,7 @@ function boatSummary(): void {
 function fleetChanged(): void {
   const ids = new Set(S.boats.map(b => b.id));
   S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId));
-  S.fleet = S.opponents.length; saveSettings(S); newGame(); oppRows();
+  S.fleet = S.opponents.length; saveSettings(S); oppRows(); setupChanged();
 }
 function oppRows(): void {
   const chip = (id: string, name: string, no: string, colour: string, hull: string) => {
@@ -1737,13 +1782,14 @@ const fleet: Fleet = new Fleet(S, {
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
     if (mode === 'cruise') { S.mode = 'sail'; S.sailFrom = fromSlip && b.slip ? 'slip' : S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom; }
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
-    saveSettings(S); boatSummary(); oppRows(); newGame(); openSetup();
+    saveSettings(S); boatSummary(); oppRows(); prepare(); openSetup();
   },
-  back: () => { newGame(); if (fleetFrom === 'setup') openSetup(); else $('home').hidden = false; }
+  back: () => { if (fleetFrom === 'setup') { prepare(); openSetup(); } else { newGame(); $('home').hidden = false; } }
 });
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
-  courseView.close(); navView.close(); send({ k: 'running', on: false }); send({ k: 'pause', on: false });
+  courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
+  wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
   for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
@@ -1756,8 +1802,8 @@ document.addEventListener('click', e => {
   if (where === 'home') { openHome(); return; }
   $('home').hidden = true; $('raceChoose').hidden = true; $('setup').hidden = true; $('condDlg').hidden = true;
   if (where === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceChoose').hidden = false; }
-  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); newGame(); openSetup(); }
-  else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); newGame(); openSetup(); }
+  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); prepare(); openSetup(); }
+  else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); prepare(); openSetup(); }
   else if (where === 'fleet') { fleetFrom = 'home'; fleet.openList(); }
   else if (where === 'club') $('club').hidden = false;
 });
@@ -1908,8 +1954,8 @@ function adjustUi(): void {
 for (const [k, a] of Object.entries(ADJ)) {
   const inp = $<HTMLInputElement>(a.el);
   inp.addEventListener('input', () => { $(a.el + 'V').textContent = a.show(Number(inp.value)); });
-  inp.addEventListener('change', () => { (a.set as (v: number | null) => void)(Number(inp.value)); saveSettings(S); newGame(); courseCard(); tideBox(); });
-  document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!.onclick = () => { (a.set as (v: number | null) => void)(null); saveSettings(S); newGame(); courseCard(); tideBox(); };
+  inp.addEventListener('change', () => { (a.set as (v: number | null) => void)(Number(inp.value)); saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); });
+  document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!.onclick = () => { (a.set as (v: number | null) => void)(null); saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); };
 }
 
 buildSetupChoices();
