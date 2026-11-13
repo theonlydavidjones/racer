@@ -21,7 +21,7 @@ import { n360 } from '../src/core/math';
  * - trips: along the boat to a new place, or out to a job;
  * - pose changes (sitting, hiking, to leeward, a job);
  * - crossings of the cockpit that her side didn't call for;
- * - the hips' travel fore and aft (the "crawling along the rail");
+ * - the hips' travel fore and aft while they're not on the way anywhere (the "crawling along the rail");
  * - the body's lean, pitch and roll (the "flopping");
  * - the knees' movement while they're not walking anywhere (the "knee kicking");
  * - the most they turn round in 4 s;
@@ -60,7 +60,7 @@ function cruise(twa: number, kt: number, mins: number) {
         // the travel along the deck are counted on their own; the "knee kicking" was legs moving while sat still)
         if (!f.going && !f.route) s.knee += Math.abs(now.knee[0] - q.knee[0]) + Math.abs(now.knee[1] - q.knee[1]);
         s.lean += Math.abs(now.pitch - q.pitch) + Math.abs(now.roll - q.roll);
-        s.crawl += Math.abs(now.hip.z - q.hip.z);
+        if (!f.going && !f.route) s.crawl += Math.abs(now.hip.z - q.hip.z); // (sliding along the deck while not going anywhere: a trip is counted as one)
         const d = Math.atan2(Math.sin(now.yaw - q.yaw), Math.cos(now.yaw - q.yaw));
         s.turned += d; s.hist.push(s.turned); if (s.hist.length > 4 / DT) s.hist.shift();
         s.spin = Math.max(s.spin, Math.max(...s.hist) - Math.min(...s.hist));
@@ -90,8 +90,8 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         // lasts, heeling her, and back up as the breeze fills: a move each way in a few minutes, not each puff)
         if (twa > 75) expect(o.cross, `${t}: crossings a minute`).toBe(0);
         else expect(o.cross, `${t}: crossings a minute`).toBeLessThan(0.5);
-        // (a trip to the cabin top and back is about 3 m; under one a minute, and nothing else along the deck)
-        expect(o.crawl, `${t}: along the boat, m a minute`).toBeLessThan(1.5);
+        // (sliding along the deck, sat or kneeling, not on the way anywhere: settling into a place, no more)
+        expect(o.crawl, `${t}: along the boat while not going anywhere, m a minute`).toBeLessThan(1);
         // (sitting, a body sways a little with the boat; not flopping out and in with each wave)
         expect(o.lean, `${t}: lean, rad a minute`).toBeLessThan(6);
         // (still legs, sitting: the knees moved in a minute while sat, or at a job, not walking)
