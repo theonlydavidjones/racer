@@ -222,7 +222,8 @@ const at = (r: PoseRing, k: number) => (r.i + RING - 1 - k) % RING;
  * nothing between them. */
 function poseAt(r: PoseRing, t: number): Pose {
   const n0 = at(r, 0);
-  let a = at(r, r.n - 1), b = a, f = 0;
+  // (after her newest sample, her newest; before her oldest, her oldest: never a stale pose for a recent time)
+  let a = t >= r.t[n0] ? n0 : at(r, r.n - 1), b = a, f = 0;
   for (let k = 0; k < r.n - 1; k++) {
     const p = at(r, k + 1), q = at(r, k);
     if (r.t[p] <= t && t <= r.t[q]) { a = p; b = q; f = r.t[q] > r.t[p] ? (t - r.t[p]) / (r.t[q] - r.t[p]) : 1; break; }
@@ -302,26 +303,30 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): numbe
 export function couldAvoid(f: RulesBoat, victim: RulesBoat, by: RulesBoat, since: number, ctx: RulesContext): boolean {
   const F = RINGS.get(f), Vr = RINGS.get(victim), B = RINGS.get(by);
   if (!F || !Vr || !B || F.n < 2) return false;
-  const now = F.t[at(F, 0)], oldest = Math.max(F.t[at(F, F.n - 1)], Vr.t[at(Vr, Vr.n - 1)], B.t[at(B, B.n - 1)]);
-  const t0 = Math.max(since, oldest);
+  const newest = (R: PoseRing) => R.t[at(R, 0)], oldestOf = (R: PoseRing) => R.t[at(R, R.n - 1)];
+  const now = Math.max(newest(F), newest(Vr), newest(B)), t0 = Math.max(since, oldestOf(F), oldestOf(Vr), oldestOf(B));
   if (now - t0 < 0.05) return false;
+  // each boat's actual track from t0: her recorded poses, then on from her own newest sample
   const track = (R: PoseRing, b: RulesBoat) => {
-    const v = b.v ?? Math.hypot(b.vx, b.vy), last = poseAt(R, now);
+    const v = b.v ?? Math.hypot(b.vx, b.vy), tn = newest(R), last = poseAt(R, tn);
     return (tau: number): Pose => {
       const t = t0 + tau;
-      if (t <= now) return poseAt(R, t);
-      const u = V(last.h), d = t - now;
+      if (t <= tn) return poseAt(R, t);
+      const u = V(last.h), d = t - tn;
       return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
     };
   };
-  const seen = (R: PoseRing) => { const p = poseAt(R, t0), w = Math.min(TURN_WINDOW, t0 - R.t[at(R, R.n - 1)]); return straightOn(p, w > 0.2 ? wrap(p.h - poseAt(R, t0 - w).h) / w : 0); };
-  const f0 = poseAt(F, t0), fw = Math.min(TURN_WINDOW, t0 - F.t[at(F, F.n - 1)]);
+  const seen = (R: PoseRing) => { const p = poseAt(R, t0), w = Math.min(TURN_WINDOW, t0 - oldestOf(R)); return straightOn(p, w > 0.2 ? wrap(p.h - poseAt(R, t0 - w).h) / w : 0); };
+  const f0 = poseAt(F, t0), fw = Math.min(TURN_WINDOW, t0 - oldestOf(F));
   const kc0 = { ...f0, turnRate: fw > 0.2 ? wrap(f0.h - poseAt(F, t0 - fw).h) / fw : 0 };
   const wind = f.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 1 };
-  const choices = escapes(kc0, [seen(Vr), seen(B)], wind, o);
-  const choice = choices.reduce((a, b) => b.minGap > a.minGap + 0.05 || (Math.abs(b.minGap - a.minGap) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
+  // the turn a prompt helmsman would choose then: clearest of the boat she must keep clear of (the victim), making things
+  // no worse with the boat that fouled her than holding on would (she has right of way over that one, owing only rule 14)
+  const choices = escapes(kc0, [seen(Vr), seen(B)], wind, o), hold = choices[0];
+  const ok = choices.filter(c => c.gaps[1] >= Math.min(hold.gaps[1], CONTACT_GAP) - 0.1);
+  const choice = (ok.length ? ok : [hold]).reduce((a, b) => b.gaps[0] > a.gaps[0] + 0.05 || (Math.abs(b.gaps[0] - a.gaps[0]) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
   const got = escapes(kc0, [track(Vr, victim), track(B, by)], wind, { ...o, turns: choice.turn ? [choice.turn] : [] }).find(q => q.turn === choice.turn)!;
-  return got.minGap >= CONTACT_GAP;
+  return got.gaps[0] >= KEEP_CLEAR_GAP; // (kept clear of the victim: Definitions, Keep Clear, as rule 16.1's room)
 }
 
 /**

@@ -32,7 +32,7 @@ export interface EscapeOpts {
 
 /** One avoiding manoeuvre: the heading change asked for, the heading she reaches (the AI's `desired`), and her least
  * hull-to-hull gap to any of the other boats over the horizon, m. `turn` 0 is holding on: carrying on her present turn. */
-export interface Candidate { turn: number; heading: number; minGap: number }
+export interface Candidate { turn: number; heading: number; minGap: number; /** her least gap to each track, in order */ gaps: number[] }
 
 const TURNS = [-90, -60, -30, 30, 60, 90];
 
@@ -46,6 +46,7 @@ export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFro
   const out: Candidate[] = [];
   const me = { x: 0, y: 0, h: 0 }; // (reused: hullGap memoises a hull's ends by its numbers)
   for (const turn of [0, ...(o.turns ?? TURNS)]) {
+    const gaps = tracks.map(() => Infinity);
     let x = kc.x, y = kc.y, h = kc.h, v = kc.v, r = kc.turnRate ?? 0, minGap = Infinity;
     const target = h + turn;
     for (let i = 1; i <= n; i++) {
@@ -63,9 +64,9 @@ export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFro
       v = Math.max(0, v * (1 - turnBleed(r, v, h, windFrom, kc.helmNeed ?? 0) * dt));
       const u = V(h); x += u.x * v * dt; y += u.y * v * dt;
       me.x = x; me.y = y; me.h = h;
-      for (const tr of tracks) { const g = hullGap(me, tr(t)); if (g < minGap) minGap = g; }
+      for (let k = 0; k < tracks.length; k++) { const g = hullGap(me, tracks[k](t)); if (g < gaps[k]) gaps[k] = g; if (g < minGap) minGap = g; }
     }
-    out.push({ turn, heading: ((h % 360) + 360) % 360, minGap });
+    out.push({ turn, heading: ((h % 360) + 360) % 360, minGap, gaps });
   }
   return out;
 }
