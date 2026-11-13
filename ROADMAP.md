@@ -22,6 +22,13 @@ then it's not a simulator." Later, once the physics and racing are dialled in (t
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighbouring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
+- **The vang's share of the leech** (for Deep Physics; from the mainsheet-point review): controls.ts mainShape lets a
+  full vang hold 90% of the sheet's leech tension, an unsourced estimate, and that decides where the traveller stops
+  mattering upwind (about 18.5 kt now: the coach then says the traveller up costs next to nothing, where North Sails'
+  Folkboat guide still eases the cars to leeward in higher wind). To source: the vang's purchase and its fitting on the
+  boom (drawn about 0.75 m aft of the gooseneck) against the mainsheet's purchase at its blocks, 2.96 m aft. With it,
+  the sheet's height in the same term (SHEET_H 1.25, where the sim's own rig gives about 0.73 m) and the curve set
+  against it (vf 0.9–0.99): lowered alone, light air's ideal trim can't be set (tests/controls.test.ts).
 - **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good

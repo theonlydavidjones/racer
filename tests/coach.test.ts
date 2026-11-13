@@ -48,13 +48,16 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
       expect(v.top.kind).toBe('ok'); expect(v.top.head).toMatch(/^Trim's right/); expect(v.more).toEqual([]);
     }
   });
-  it('the traveller held up in 20 kt costs little with the vang on: the coach says why most boats drop it, and names nothing bigger', () => {
-    // (the crew eases the sheet to hold the boom where it should be, and the forward hand has the vang hard on, so the leech
-    // is held and the traveller up costs almost nothing in the model: the coach's confirmation explains it rather than
-    // calling it a fix. With the vang still part way on, the traveller costs about 1% and the coach names it: either way
-    // it's the traveller or nothing, never something bigger. (Which, depends on when the forward hand has got to the vang:
-    // crewWork.ts LINE_TRIP)
-    const b = boat({ heading: 318, windKt: 20, sea: CHOP }); wrong(b, 'traveller', -1);
+  it('the traveller held up in 18 kt costs a little (under 1%): the coach names the traveller, or explains it, and nothing bigger', () => {
+    // (the crew eases the sheet to hold the boom where it should be, so most of the cost is gone; what's left is the
+    // middle crew's finer play of traveller and sheet together, with the helm on the after deck where it's narrower, and
+    // the crew hiking aft along the side deck where it's narrower too: a little less righting moment, about 0.5%.
+    // 18 kt: with the mainsheet's blocks over the car (controls.ts SHEET_ON_BOOM, SHEET_H), from about 18.5 kt the crew
+    // vangs hard and the vang alone holds the leech, so the traveller up costs next to nothing, which the coach
+    // explains instead. Where that falls rests on the vang's share of the leech (mainShape's 0.9, an estimate: ROADMAP);
+    // and on when the forward hand has got to the vang (crewWork.ts LINE_TRIP): either way it's the traveller or
+    // nothing, never something bigger)
+    const b = boat({ heading: 318, windKt: 18, sea: CHOP }); wrong(b, 'traveller', -1);
     const v = teach(b);
     if (v.top.kind === 'fix') { expect(v.top.line).toBe('traveller'); expect(v.top.gain).toBeLessThan(2.75 * FIX_MIN); }
     else expect(v.top.why).toMatch(/vang holds the leech/);
