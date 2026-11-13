@@ -27,7 +27,7 @@ export class NavView {
       this.plan = null;
       $('navTitle').textContent = 'No destination';
       $('navSub').textContent = '';
-      $('navBrief').innerHTML = '<p class="lede">Choose where you\'re going (Sail to, in the Cruise setup, or tap the chart and Sail here), and the navigator will plan the passage: when to go, the current gates on the way, the slot, the ship and ferry routes, and the hazards.</p>';
+      $('navBrief').innerHTML = '<p class="lede">Choose where you\'re going; the navigator plans the passage.</p>';
       this.draw();
       return;
     }
