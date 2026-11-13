@@ -259,6 +259,10 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The inset map's flag and layer icons off the game surface** (owner, 13 November; 1–2 h): "the little flag icon and
+     layer icon on the inset map doesn't belong on the game surface. those should be toggles in the full map view, with
+     the inset remembering my choices." The layer choices (and the flag index) move into the full chart. The inset shows
+     whatever was last chosen there, saved with the player's settings. The standing screen rule applies.
    - **The on-screen tiller instructions out** (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
