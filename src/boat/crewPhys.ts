@@ -342,11 +342,15 @@ export const ROLL_HOLD = 2;
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
 export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30 };
-// (crossHeel, crossLast: off the wind (from a beam reach down), a move across to the other side of the boat, between gybes, is for a heel the
-// move itself would take off of more than crossHeel degrees, wanted for crossLast seconds (half a gust-lull cycle,
-// Bethwaite's minute: not one puff or lull, and many roll periods). Downwind a few degrees of heel cost her almost
-// nothing and the helm steers them out, and a crew sitting on a run settles on one side for minutes, steadying the roll
-// by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Both estimates.)
+// (crossHeel, crossLast: on a run (the crew's own `downwind`, past 120 true), a move across to the other side of the
+// boat, between gybes, waits until she has carried more than crossHeel degrees of heel for crossLast seconds (half a
+// gust-lull cycle, Bethwaite's minute: not one puff or lull, and many roll periods: a roll's heel comes and goes in a few
+// seconds and starts the count again); at once only for twice that in a puff that needs them out (HOLD.urgent). On a run
+// heel costs her nothing below 20 degrees (balance.ts heelFactor) and the crew's aim there is 1 degree (crewBestHeel),
+// so the wanted weight hovers about the middle and swings with each roll; a crew sitting on a run settles on one side for
+// minutes, steadying the roll by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Not on a reach:
+// there the side they want changes with the breeze, and a puff needs them up to windward at once (the physics review).
+// Both numbers estimates.)
 interface Held { arm: number; z: number; since: number; off: number; cross?: number }
 
 /**
@@ -543,6 +547,12 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     if (i === 0) t.pose = 'helm';
     else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
   };
+  // (a move across the boat on a run; and the heel she's carrying, which is what a move across would be for)
+  const crossing = (i: number) => {
+    const t = tgt[i], h = held[i];
+    return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+  };
+  const heelNow = Math.abs(k.heel ?? 0);
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
@@ -555,11 +565,12 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
     if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
-    // (off the wind, from a beam reach down, across to the other side only for a real heel, lasting: HOLD.crossHeel, crossLast)
-    if (k.twa > 75 && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1) {
-      const heelOff = dArm * W[i] * 9.81 / (k.rmPerDeg ?? 250);
-      h.cross = heelOff > HOLD.crossHeel ? (h.cross ?? 0) + step : 0;
-      if (h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
+    // (on a run, across to the other side only for a real heel: lasting, or at once in a puff that needs them out;
+    // HOLD.crossHeel, crossLast)
+    if (crossing(i)) {
+      h.cross = heelNow > HOLD.crossHeel ? (h.cross ?? 0) + step : 0;
+      const puff = heelNow > 2 * HOLD.crossHeel && out && dArm > HOLD.urgent * dead;
+      if (!puff && h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
     } else h.cross = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
