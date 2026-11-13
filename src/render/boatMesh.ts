@@ -842,12 +842,21 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // flies the US flag as a courtesy flag at the starboard strut and moves her burgee to port.
   const flags: FlyingFlag[] = [];
   let ensign: BoatMesh['ensign'] = null;
+  const flagCleats = new Set<number>(); // (one flag-halyard cleat on each side of the mast that flies a flag)
   const hoist = (canvas: HTMLCanvasElement | null, at: THREE.Vector3, h: number, parent: THREE.Object3D, tail = true) => {
     if (!canvas) return;
     const fly = h * canvas.width / canvas.height, geo = new THREE.PlaneGeometry(fly, h, FLAG_SEGS, 2); geo.translate(fly / 2, -h / 2, 0); // hoisted at its top corner
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, alphaTest: 0.5 }));
     mesh.position.copy(at); parent.add(mesh);
-    if (tail) parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), new THREE.Vector3(at.x, DECK_AT_MAST + 0.3, at.z)]), MAT.wire)); // the halyard's tail
+    // the flag halyard: a loop from the block under the strut down to a cleat on the mast's side about 1.1 m up, where
+    // it's made fast and reached from the deck: one part from the block, the other from the flag's foot (before, a tail
+    // dropped straight down and stopped in the air: the owner's "false shrouds")
+    if (tail) {
+      const side = Math.sign(at.x) || 1, cleat = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), DECK_AT_MAST + 1.1, MAST_FRONT_Z + 0.03);
+      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), cleat.clone().setY(cleat.y + 0.02)]), MAT.wire));
+      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([at.clone().setX(at.x - side * 0.015), cleat.clone().setY(cleat.y + 0.02).setX(cleat.x - side * 0.004)]), MAT.wire));
+      if (!flagCleats.has(side)) { flagCleats.add(side); const cm = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.09, 0.02), STEEL); cm.position.copy(cleat); parent.add(cm); }
+    }
     flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly, h, ph: flags.length * 2.1 }); // (each its own phase)
   };
   // an officer's flag (her skipper's, when he or she is a flag officer of her club) flies by the club's rule: in place of
