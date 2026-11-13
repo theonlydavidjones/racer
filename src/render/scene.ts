@@ -16,6 +16,7 @@ import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
 import type { Boat } from '../boat/boat';
+import { cleatOf } from '../boat/dockLines';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import { updateNight } from './night';
@@ -187,6 +188,8 @@ export class SceneView {
   get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
   /** A ghost race's ghost: your earlier run of this race, drawn translucent on its track (replay/ghost.ts). Not in the race. */
   private ghost: { mesh: BoatMesh; pts: GhostPoint[] } | null = null;
+  /** Her dock lines ashore (up to six), drawn as rope: off-white, as a dock line usually is. */
+  private dockLines = (() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12 * 3), 3)); const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xe8e4d8 })); l.visible = false; l.frustumCulled = false; return l; })();
   /** Race against this track (null: none). Built from your own boat as she is now, see-through, and not lit at night. */
   setGhost(w: SimView, pts: GhostPoint[] | null): void {
     if (this.ghost) { this.scene.remove(this.ghost.mesh.grp); disposeUnused([this.ghost.mesh.grp], this.scene); this.ghost = null; }
@@ -296,6 +299,7 @@ export class SceneView {
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;
+    scene.add(this.dockLines); // (her dock lines: drawn while she has any ashore)
     const SKY = new THREE.Color('#aecbdb');
     scene.background = SKY;
     scene.fog = new THREE.Fog(SKY, 1500, 57000); // a clear day on the bay: Tamalpais hazy but plain at 25 km
@@ -825,6 +829,15 @@ export class SceneView {
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
     // the ghost: where its run was at this moment of the race, on the same waves (no heel: its track doesn't have it)
+    // her dock lines, from her cleats (at her rail, deck height) to the dock's (on the dock's top): boat/dockLines.ts
+    {
+      const L = w.user.mooring?.lines ?? [], g = this.dockLines;
+      if (L.length || g.visible) {
+        const pos = g.geometry.getAttribute('position') as THREE.BufferAttribute; let n = 0;
+        for (const l of L.slice(0, 6)) { const a = cleatOf(w.user, l), pa = P3(a.x, a.y, 0.95), pb = P3(l.to.x, l.to.y, 0.5); pos.setXYZ(n++, pa.x, pa.y, pa.z); pos.setXYZ(n++, pb.x, pb.y, pb.z); }
+        pos.needsUpdate = true; g.geometry.setDrawRange(0, n); g.visible = n > 0;
+      }
+    }
     if (this.ghost) {
       const g = ghostAt(this.ghost.pts, w.t), gm = this.ghost.mesh; gm.grp.visible = !!g;
       if (g) {
