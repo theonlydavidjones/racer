@@ -188,7 +188,8 @@ What's planned, roughly in order. Done work is described in the README.
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
-   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   remember the conditions it happened in, so the check covers every pose and wind.
 8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
@@ -201,8 +202,8 @@ What's planned, roughly in order. Done work is described in the README.
    float precision far from the origin. Owner's report: cruising, off South Beach (about 6 km southeast of the
    Cityfront, far from the sim's origin), when it started unknown. A second report with a chart screenshot: the boat just inside a breakwater's corner, by a
    channel marked by green lights "9" and "11" (Fl G 2.5s 15ft 4M) and an "Iso G 6s 34ft" light, in 3–5 ft charted
-   water, heading northeast along the shore. Check both the 3D water there and the chart's own moving streaks, which
-   the owner may be describing. Then add one test over every water layer: none moves past a still boat faster
+   water, heading northeast along the shore. Owner's answer: it was the chart's moving streaks, not the 3D water (Charts and
+   Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
 8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
