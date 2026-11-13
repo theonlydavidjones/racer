@@ -821,6 +821,7 @@ export class SceneView {
       if (g) {
         const gb = { ...w.user, id: 98, isUser: false, x: g.x, y: g.y, h: g.h, tack: g.tack, boom: g.boom, heel: 0, flags: [], burgee: undefined, ensign: undefined } as unknown as Boat;
         syncBoatMesh(gm, gb, t, boatOnWaves(this.waves, g, g.h, tw, 1, 1));
+        gm.crew.group.visible = false; // (no crew aboard the ghost: its track doesn't know where they sat, and a see-through crew is clutter)
       }
     }
     this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => this.waves.height(p, tw, 0.7, 0.4));
