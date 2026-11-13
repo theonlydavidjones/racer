@@ -17,7 +17,7 @@ export const LINE_NAME: Record<LineKey, string> = {
 };
 /** Their names as labels ("Main halyard"). */
 export const LINE_LABEL: Record<LineUiKey, string> = {
-  mainsheet: 'Mainsheet', traveller: 'Traveller', backstay: 'Backstay', vang: 'Vang', outhaul: 'Outhaul', cunningham: 'Cunningham',
+  mainsheet: 'Mainsheet', traveller: 'Traveler', backstay: 'Backstay', vang: 'Vang', outhaul: 'Outhaul', cunningham: 'Cunningham',
   downhaul: 'Main halyard', jibCunningham: 'Jib Cunningham', jibHalyard: 'Jib halyard', jibsheet: 'Jib sheet', jibsheetW: 'Windward sheet', carFore: 'Car fore–aft', carIn: 'Car in–out'
 };
 
@@ -44,7 +44,7 @@ export const LINE_WHAT: Record<LineUiKey, string> = {
  */
 export const LINE_ENDS: Record<LineUiKey, [string, string, string, string]> = {
   mainsheet: ['eased', 'boom out, the leech twisted open: less power', 'in', 'boom to the middle, the leech closed: power and pointing'],
-  traveller: ['leeward', 'boom off the centreline: depowers', 'windward', 'boom to the middle with the sheet eased, the leech open'],
+  traveller: ['leeward', 'boom off the centerline: depowers', 'windward', 'boom to the middle with the sheet eased, the leech open'],
   backstay: ['eased', 'fuller main, more forestay sag', 'on', 'flatter main, tighter forestay, straighter jib luff'],
   vang: ['off', 'once the sheet is eased, the boom free to rise and the leech twisting open', 'on', 'the boom held down, the leech closed on a reach or run'],
   outhaul: ['eased', 'fuller foot, more power', 'on', 'flatter foot: less power and heel, less drag'],

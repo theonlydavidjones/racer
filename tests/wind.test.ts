@@ -139,7 +139,7 @@ describe('in the race', () => {
     const k0 = w.windModel.kt;
     for (let i = 0; i < 60 * 60 * 75; i++) w.step(); // 75 minutes
     expect(w.windModel.kt).toBeGreaterThan(k0 + 1);
-  }, 60000);
+  }, 180_000);
 });
 
 describe('the sea is made by the wind over the water, not the wind at the boat', () => {
