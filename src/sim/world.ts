@@ -1,7 +1,7 @@
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
@@ -1544,6 +1544,7 @@ export class World {
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
     b.boom += (side * 75 - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
     crewRig(b, dt, this.emit);
+    crewAtDock(b, dt); // (the crew sit centred at the dock and through the push-off, not hiked or to leeward)
   }
 
   /** Just sail: a new destination, a place or a spot picked on the chart. */
