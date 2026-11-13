@@ -1,0 +1,90 @@
+// The race in its worker (sim/worker.ts RaceWorker, sim/host.ts WorkerHost; docs/CAPACITY.md step 3) sails exactly as
+// in the page's own thread (LocalHost): the same frames and commands give the same race to the last bit, whether the
+// worker answers within the frame or a frame late (as a real one does), and the page's mirror comes out equal to the
+// worker's World. Every message goes through a structured clone, as postMessage does. If the worker fails, the mirror
+// sails on. (The worker here is RaceWorker behind a stand-in for the browser's Worker: Node has no Web Workers.)
+import { describe, expect, it } from 'vitest';
+import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
+import type { CourseFile } from '../src/courses/course';
+import { COURSES } from '../src/courses/registry';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { World } from '../src/sim/world';
+import { LocalHost, WorkerHost, type WorldArgs } from '../src/sim/host';
+import { RaceWorker, type FromWorker, type ToWorker } from '../src/sim/worker';
+import type { Command } from '../src/sim/commands';
+
+/** A stand-in for the browser's Worker: RaceWorker answering each message (cloned both ways), now or when told. */
+class FakeWorker {
+  onmessage: ((e: { data: FromWorker }) => void) | null = null;
+  onerror: ((e: { message: string; preventDefault(): void }) => void) | null = null;
+  readonly race = new RaceWorker();
+  private out: FromWorker[] = [];
+  terminated = false;
+  constructor(private late: boolean) {}
+  postMessage(m: ToWorker): void { const r = this.race.handle(structuredClone(m)); if (r) this.out.push(structuredClone(r)); if (!this.late) this.deliver(); }
+  deliver(): void { for (const r of this.out.splice(0)) this.onmessage?.({ data: r }); }
+  terminate(): void { this.terminated = true; }
+}
+
+/** Every boat's whole state and the race's clock, to the last bit (as tests/host.test.ts). */
+function state(w: World): string {
+  return JSON.stringify({ t: w.t, steps: w.steps, wind: w.wind, pilot: w.pilot, dest: w.dest, paused: w.paused, speed: w.speed,
+    boats: w.boats.map(b => ({ ...b, ai: b.ai ? { ...b.ai } : null })) }, (_k, v) => (typeof v === 'number' && !Number.isFinite(v) ? String(v) : v));
+}
+const frameDt = (i: number) => [1 / 60, 1 / 60, 0.0171, 1 / 60, 0.033, 1 / 60, 0.016, 0.05][i % 8];
+const S = (o: Partial<Settings>): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 14, tideDate: '2026-11-14', ...o }) as Settings;
+const race = (): WorldArgs => ({ file: ss2 as unknown as CourseFile, settings: S({ fleet: 3, current: 'real' }), seed: 21, opts: {} });
+const at = (list: [number, Command][]) => { const m = new Map<number, Command[]>(); for (const [i, c] of list) (m.get(i) ?? m.set(i, []).get(i)!).push(c); return m; };
+const SCRIPT = at([
+  [0, { k: 'running', on: true }], [5, { k: 'speed', v: 4 }],
+  [20, { k: 'helm', steer: 1, luff: false, ctl: { mainsheet: -1 } }], [60, { k: 'helm', steer: 0, luff: false, ctl: {} }],
+  [70, { k: 'tiller', v: 0.4 }], [90, { k: 'lash', on: true }], [120, { k: 'lash', on: false }],
+  [130, { k: 'ctlTarget', key: 'vang', v: 0.7 }], [180, { k: 'crewPlace', place: { across: 'hike', fore: null } }],
+  [240, { k: 'pole', want: true }], [300, { k: 'pause', on: true }], [320, { k: 'pause', on: false }], [330, { k: 'speed', v: 1 }],
+  [400, { k: 'allToCrew' }], [450, { k: 'running', on: false }], [470, { k: 'running', on: true }]
+]);
+
+/** The same frames and commands through LocalHost and through WorkerHost; the two races' states, frame by frame. */
+function sail(late: boolean, frames: number): { local: string[]; worker: string[]; mirror: World; real: World } {
+  const L = new LocalHost(new World(race().file, race().settings, race().seed, race().opts));
+  const fake = new FakeWorker(late), W = new WorkerHost(fake as unknown as Worker, race());
+  const local: string[] = [], worker: string[] = [];
+  for (let i = 0; i < frames; i++) {
+    for (const c of SCRIPT.get(i) ?? []) { L.send(c); W.send(c); }
+    L.advance(frameDt(i)); W.advance(frameDt(i));
+    if (late) fake.deliver(); // (a frame late: the answer to this frame comes before the next)
+    if (i % 25 === 0) { local.push(state(L.world)); worker.push(state(fake.race.world!)); }
+  }
+  fake.deliver();
+  return { local, worker, mirror: W.world, real: fake.race.world! };
+}
+
+describe('the race in its worker sails as in the page', () => {
+  for (const late of [false, true]) it(late ? 'the worker answering a frame late, as a real one does' : 'the worker answering within the frame', () => {
+    const r = sail(late, 600);
+    const k = r.local.findIndex((x, i) => x !== r.worker[i]);
+    expect(k, `the races part at frame ${k * 25}`).toBe(-1);
+    // and the page's mirror is the worker's World after the last answer
+    expect(state(r.mirror)).toBe(state(r.real));
+    expect(r.real.t).toBeGreaterThan(-170); // (it sailed)
+  }, 300_000);
+
+  it('answers come back (the motor, the chart\'s move), and a worker that fails leaves the race sailing in the page', async () => {
+    const args: WorldArgs = { file: COURSES[0], settings: S({ mode: 'sail', sailFrom: 'cityfront', sailTo: '', current: 'slack' }), seed: 4, opts: { freeSail: true } };
+    const fake = new FakeWorker(false); let failed = '';
+    const W = new WorkerHost(fake as unknown as Worker, args, false, why => { failed = why; });
+    W.send({ k: 'running', on: true });
+    const moved = W.ask({ k: 'moveHere', p: { x: 1200, y: 600 }, name: 'Off the city front' });
+    W.advance(1 / 60);
+    expect(await moved).toBe(true);
+    for (let i = 0; i < 60; i++) W.advance(1 / 60);
+    expect(W.mode).toBe('worker');
+    const t0 = W.view.t;
+    // (a command that fails in the worker: a penalty for a boat that isn't there)
+    W.send({ k: 'penalty', boat: 99 });
+    W.advance(1 / 60);
+    expect(W.mode).toBe('local'); expect(failed).not.toBe(''); expect(fake.terminated).toBe(true);
+    for (let i = 0; i < 60; i++) W.advance(1 / 60);
+    expect(W.view.t).toBeGreaterThan(t0 + 0.9); // (the mirror sails on: a second more)
+  }, 300_000);
+});

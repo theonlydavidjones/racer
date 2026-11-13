@@ -25,6 +25,8 @@ const out = process.argv[2] || '.';
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1500);
   await click('#bGo'); await p.waitForTimeout(3000);
   const st = await selfTest(); console.log('guard self-test:', st); if (st !== 'refused') errs.push('the guard is off: ' + st);
+  // (the race sails in its worker, the page reading its mirror: sim/host.ts WorkerHost)
+  const mode = await p.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode); if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
   await step('speed', async () => { await click('#bFast'); await click('#bFast'); });
   await step('steer', async () => { await key('a', 600); await key('d', 600); });
   await step('sheets', async () => { for (const k of ['z', 'x', ',', '.', 's', ';', "'", ']', ';']) await key(k, 300); });

@@ -62,6 +62,9 @@ npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both
 - Anything that should look the same from either side of the boat (sails, numbers, flags, crew) must be checked from
   both sides on both tacks, not from one view.
 - Dev handles on `window` (dev server only): `sim()`, `__look(yaw, pitch, dist)`, `__view`, `__twa(angle)` (showroom tack).
+  The race sails in a Web Worker (src/sim/host.ts, docs/CAPACITY.md): `sim()` is then the page's mirror, and changes to it
+  don't reach the race. Scripts that change the World directly load the page with `?inproc` (the race in the page's thread).
+  The page changes the race only through commands (src/sim/commands.ts); `?simguard` makes any other write throw.
 
 ## Helpers (.claude/agents)
 

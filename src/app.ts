@@ -192,7 +192,7 @@ function newGame(seed = randomSeed()): void {
   const wk = SIM_INPROC ? null : spawnSimWorker();
   host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); })
     : new LocalHost(new World(args.file, args.settings, args.seed, args.opts), SIM_GUARD);
-  w = host.view; shownDest = w.dest; drillShown = false;
+  w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false;
   document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint();
@@ -718,7 +718,9 @@ $('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
-$('bFast').onclick = () => { send({ k: 'speed', v: w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1 }); word('bFast', 'Speed ' + w.speed + '×'); };
+/** The speed of time you've set (kept here: the race's own reaches the page a frame later, and two quick presses must make 4×). */
+let speedSet = 1;
+$('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 $('bPause').onclick = () => {
   if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;

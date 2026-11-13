@@ -182,8 +182,13 @@ export class WorkerHost implements SimHost {
     console.error('The race\'s worker failed; it sails on in the page:', why);
     this.worker.terminate();
     this.local = new LocalHost(this.world, this.guard); this.mode = 'local';
-    // (what was sent and not yet answered is done again here: the mirror is the race as of the last answer)
-    for (const { c, id } of this.queue) { const r = applyCommand(this.world, c); if (id != null) { this.asks.get(id)?.(r); this.asks.delete(id); } }
+    // (what wasn't yet sent is done here: the mirror is the race as of the worker's last answer. What was sent with the
+    // frame that failed is lost with it, the command that broke the worker perhaps among them)
+    for (const { c, id } of this.queue) {
+      let r: CommandResult;
+      try { r = applyCommand(this.world, c); } catch (e) { console.error('A command failed after the worker did:', c, e); }
+      if (id != null) { this.asks.get(id)?.(r); this.asks.delete(id); }
+    }
     for (const [, res] of this.asks) res(undefined);
     this.queue = []; this.asks.clear();
     this.onFail?.(why);
@@ -192,8 +197,8 @@ export class WorkerHost implements SimHost {
     if (this.local) return this.local.advance(dt, twa);
     this.due = Math.min(0.1, this.due + dt);
     if (this.inflight >= 2) return this.lastMs;
-    this.worker.postMessage({ k: 'frame', dt: this.due, twa, cmds: this.queue } satisfies ToWorker);
-    this.queue = []; this.due = 0; this.inflight++;
+    const cmds = this.queue, due = this.due; this.queue = []; this.due = 0; this.inflight++;
+    this.worker.postMessage({ k: 'frame', dt: due, twa, cmds } satisfies ToWorker);
     return this.lastMs;
   }
   send(c: Command): void { if (this.local) this.local.send(c); else this.queue.push({ c }); }

@@ -11,7 +11,7 @@ const out = process.argv[2];
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.setDefaultTimeout(180000);
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await page.goto('http://localhost:5199/'); await page.waitForTimeout(3000);
+  await page.goto('http://localhost:5199/?inproc'); await page.waitForTimeout(3000);
   await page.click('[data-home="race"]'); await page.waitForTimeout(500); await page.click('[data-home="create"]'); await page.waitForTimeout(1000);
   await page.click('#bGo'); await page.waitForTimeout(2500);
   // let boat 0 sail herself (the AI's skipper), so a whole race gets logged
