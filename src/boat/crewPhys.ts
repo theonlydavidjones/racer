@@ -343,9 +343,10 @@ export const ROLL_HOLD = 2;
  */
 export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30 };
 // (crossHeel, crossLast: on a run (the crew's own `downwind`, past 120 true), a move across to the other side of the
-// boat, between gybes, waits until she has carried more than crossHeel degrees of heel for crossLast seconds (half a
-// gust-lull cycle, Bethwaite's minute: not one puff or lull, and many roll periods: a roll's heel comes and goes in a few
-// seconds and starts the count again); at once only for twice that in a puff that needs them out (HOLD.urgent). On a run
+// boat, between gybes, waits until she has carried more than crossHeel degrees of heel that the move takes off, for
+// crossLast seconds (half a gust-lull cycle, Bethwaite's minute: not one puff or lull, and many roll periods: a roll's
+// heel comes and goes in a few seconds); at once only for twice that to leeward in a puff that needs them out
+// (HOLD.urgent). On a run
 // heel costs her nothing below 20 degrees (balance.ts heelFactor) and the crew's aim there is 1 degree (crewBestHeel),
 // so the wanted weight hovers about the middle and swings with each roll; a crew sitting on a run settles on one side for
 // minutes, steadying the roll by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Not on a reach:
@@ -552,7 +553,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const t = tgt[i], h = held[i];
     return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
   };
-  const heelNow = Math.abs(k.heel ?? 0);
+  const heelLee = k.heel ?? 0; // (+ to leeward: physics.ts heelMag)
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
@@ -568,8 +569,11 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // (on a run, across to the other side only for a real heel: lasting, or at once in a puff that needs them out;
     // HOLD.crossHeel, crossLast)
     if (crossing(i)) {
-      h.cross = heelNow > HOLD.crossHeel ? (h.cross ?? 0) + step : 0;
-      const puff = heelNow > 2 * HOLD.crossHeel && out && dArm > HOLD.urgent * dead;
+      // (the heel this move would take off: to windward against a heel to leeward, to leeward against one to windward; a
+      // roll the other way is no reason to cross, and a dip under it counts down, not from scratch)
+      const fixes = out ? heelLee : -heelLee;
+      h.cross = fixes > HOLD.crossHeel ? (h.cross ?? 0) + step : Math.max(0, (h.cross ?? 0) - step);
+      const puff = out && heelLee > 2 * HOLD.crossHeel && dArm > HOLD.urgent * dead;
       if (!puff && h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
     } else h.cross = 0;
     const worth = dArm > dead || dz > HOLD.fore;
