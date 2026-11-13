@@ -158,11 +158,11 @@ What's planned, roughly in order. Done work is described in the README.
    and destination picked on the chart; Change the conditions mid-sail, physics-reviewed; "Move her here" without
    ending the cruise; Home: back to her slip when cruising, retire and head home when racing). The showroom's own time
    of day and conditions are done too.
-   Follow-up (owner, 12 November; polish; next; 2–3 h): "on cruise configuration, I need to be able to open up a larger
+   ~~Follow-up~~ (done: both planned on one big chart) (owner, 12 November; polish; 2–3 h): "on cruise configuration, I need to be able to open up a larger
    view of the map to select start and end. I should be able to select both in the same map and not have to bounce from
    one to another." One large chart, opened from the cruise setup, where you place both the start and the destination
    (and move either), then return to the setup with both set.
-   Also (owner, 12 November; polish; queued, not to interrupt running work; 1–2 h): "the navigator button is at
+   ~~Also~~ (done: the navigator is a view of the inset map, toggled on the map's rim) (owner, 12 November; polish; 1–2 h): "the navigator button is at
    bottom-right atm. it should just be a view in the inset map." The navigator becomes one of the inset map's views
    (its route and advice there), and its button leaves the bottom-right cluster.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
@@ -188,15 +188,15 @@ What's planned, roughly in order. Done work is described in the README.
      racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
      The on-screen label is the owner's choice.
-8b. **A UI audit with real rigour** (owner, 13 November; next): "a UI audit on the roadmap to focus on real rigor on these
+8b. **A UI audit with real rigour** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
    navigation in place of "< Start page"; and the Yacht Club's Everyone / Skippers / Crew / Yours toggle, which confuses
    the owner. Proposals go to the owner before building; the screen rule above applies.
    Also filed with it:
-   - The setup builds the World only on Start (owner: the configurator lags because it rebuilds the play surface
+   - ~~The setup builds the World only on Start~~ (done: one World per change, the scene once at Start) (owner: the configurator lags because it rebuilds the play surface
      behind it).
-   - Bug: the flag index doesn't scroll.
+   - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
@@ -220,6 +220,19 @@ rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Buildi
 showroom's time and conditions, the swinging lantern); Sam's; accounts for other players; real slip numbers and nicer
 moored boats; the sea inside the marinas; the desktop release; the phone layout (on hold). The Bay East work carries on
 as it is.
+
+**Built 12–13 November beyond the ranked list** (to v174):
+- **Ghost races:** sail against your own recorded race, checked end to end. This is the first step to multiplayer.
+- **Real past races:** the replay against the real fleet, for a real past race; a race whose course is uncertain is
+  flagged.
+- **Training drills:** a start drill, and a mark-rounding drill with each rounding scored.
+- **The tactical debrief:** leg by leg against the fleet's middle, the leg's best and the ideal; seconds by cause; sail
+  numbers on the chips.
+- **Air temperature:** each day's own, from Fort Point and the NWS, for the crew's kit (shorts from 68 °F, the owner's).
+- **The ensign:** keeps its hours, 0800 to sunset; the burgee as the fleet flies it.
+- **The cabin instrument:** the Tacktick-style unit at the hatch garage's forward end, key 6. This begins the tactical
+  compass item.
+- **A racing season:** a proposal for the owner (docs), built from the real 2025–26 Seaweed Soup.
 
 **Owner's decisions, 12 November (morning)**, via the Coordinator:
 - Blanketing is not a foul: "stealing wind is a significant part of the strategy of tacking". Rules removes it as
@@ -297,7 +310,7 @@ is now "much better" (owner).
    pitch and heave, its light following) (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
-6. **True-to-life rigging, the owner's most important boat item** (12 November, from the owner's boat review; Rigging,
+6. ~~**True-to-life rigging, the owner's most important boat item**~~ (done: rigging-gear #159 and rigging-deck; the piano in the band's order, the halyard tackles, the jib sheet as Josephine has it) (12 November, from the owner's boat review; Rigging,
    after its current PRs; a big job, about 8–14 h): the blocks for the jib and main at the mast and the boom's junction,
    the Cunninghams, and the lines visible along the traveller, each led as on Josephine (the Full sail controls
    tables, reference/photos).
@@ -306,7 +319,7 @@ is now "much better" (owner).
      the cabin's front by the mast foot.
    - Winching (Crew Figures; 1–2 h): the jib winch handle sits under the deck, beneath the winch, which passes through
      the deck; and the crew winch in short pulls of at most 45°, not full circles.
-   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; the whisker pole stowed
+   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; ~~the whisker pole stowed~~ (done: its real 2.85 m, on the side deck)
      farther forward on the bow; cleats amidships.
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
@@ -845,10 +858,10 @@ Owner: "As part of the training tools suite, let's build a sort of midair wind i
 arrows floating in the air showing where the wind is. Ideally we could also build a second view showing how the wind is
 traveling over the hull and sails to help players learn about sail shape and laminar flow."
 
-- **1. A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
+- ~~**1. A midair wind indicator**~~ (done: true and apparent wind in the air beside her at three heights, key `, physics-reviewed) (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
   wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
   the rig (already in the physics) can be seen.
-- **2. A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+- ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modelled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labelled where it's illustrative.
 
