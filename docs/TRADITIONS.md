@@ -69,7 +69,24 @@ until the owner confirms it from the fleet.
      struck for racing. Built that way.
    - Built: the ensign keeps its hours (0800 to sunset, and entering or leaving harbor after dark: USPS, Seattle YC;
      src/boat/colours.ts).
-   - Not yet sourced: dipping the ensign, officers' flags, dressing ship.
+   - **Officers' flags** (CCA, https://cruisingclub.org/article/cca-flag-and-burgee-etiquette, 29 March 2024):
+     - A commodore's, vice commodore's or rear commodore's flag flies day and night at the masthead of a sloop, in
+       place of the burgee, on the officer's own boat.
+     - A guest officer flies it at the starboard spreader, with the owner's permission.
+     - A past officer flies it at the starboard spreader at club rendezvous.
+     - A private signal goes on the main's leech, about two-thirds of the way up from the clew, or at the masthead in
+       place of the burgee.
+     - The flags' designs aren't described.
+   - **Dressing ship** (CCA, same page):
+     - Allowed "when not underway (or when underway in a marine parade)", weather permitting, from morning to evening
+       colors.
+     - A marine parade is what Opening Day's parade is.
+     - Any order of signal flags will do. The suggested order from the bow is: AB2, UJ1, KE3, GH6, IV5, FL4, DM7, P O
+       3rd repeater, R N 1st repeater, S T 0, C X 9, W Q 8, Z Y 2nd repeater, answering pennant. The first two run
+       down to the water at the bow, the last two to the transom or boom.
+     - The Union Jack may fly at the bow on Sundays, holidays, or when dressed, only when not under way.
+   - Not yet sourced: dipping the ensign, or saluting. The CCA page doesn't cover it, and the USPS pages couldn't be
+     reached.
    - In the sim: the burgee at the masthead, the ensign struck at the preparatory signal (both partly in), and colors
      at the club.
 7. **The committee and protests.**
@@ -114,5 +131,6 @@ until the owner confirms it from the fleet.
 
 - Which of these does the Folkboat fleet really live by? In particular, the after-race customs and any crew rites.
 - Do the fleet's perpetual trophies have names and deeds of gift? Could someone share them, or a photo of the trophies?
-- Are the CCA and USPS sites worth allowing, for the rest of the flag etiquette (dipping, officers' flags, dressing
+- (Answered: the CCA and USPS sites were allowed. Officers' flags and dressing ship are now sourced from the CCA; dipping
+  the ensign is still unfound.) Were the CCA and USPS sites worth allowing, for the rest of the flag etiquette (dipping, officers' flags, dressing
   ship)?
