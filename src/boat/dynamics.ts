@@ -30,13 +30,15 @@ export const HANDLING = {
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
    * edge-on to the wind: ~0.12 × 25.8 m² of main and jib. */
   flogCdA: 3,
-  /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). */
+  /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). An uncited estimate: it sets
+   * the penalty turns' pace too (physics.ts PENALTY_TURN_RATE, where the sim's 720 is compared with a real one). */
   turnRadius: 9,
   /** Turn rate when nearly stopped, by sculling (physics.ts: only toward close-hauled from above it, rule 42.3(d)), deg/s. An estimate. */
   minTurnRate: 4,
   /** Hard limit on turn rate, deg/s. */
   maxTurnRate: 22,
-  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). */
+  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). An uncited estimate (with turnRadius it
+   * sets how long penalty turns take: physics.ts PENALTY_TURN_RATE). */
   turnDrag: 0.15,
   /** Drive while luffing (sails eased until they lift), as a fraction of normal target speed. */
   luffFactor: 0.12,
