@@ -27,8 +27,8 @@
 <div class="ibar dim" id="appBar">
   <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
   <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
-  <button class="ib" id="bSound" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
-  <button class="ib" id="bExit" type="button" hidden title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
+  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
+  <button class="ib" id="bExit" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
 </div>
 </div>
 <!-- top left, under the pods: where next, the flags flying, (the wind-angle dial, a training aid) -->
@@ -452,29 +452,35 @@
 </div>
 
 <div class="overlay" id="pause" hidden>
-  <div class="panel">
-    <h2>Paused</h2>
-    <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
-    <div class="btnrow"><button class="ghost" id="bPauseCond" type="button" title="New wind, current and sea, at once: the sail carries on">Change the conditions…</button></div>
-    <div id="pauseDebrief" class="debrief" hidden></div>
-    <div class="btnrow" id="pauseWatch" hidden><button class="ghost" id="bWatch2" type="button">Watch your race so far</button></div>
-    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Back to setup</button><button class="ghost" id="bKeys2" type="button">Settings</button></div>
-    <div class="btnrow"><button class="ghost" id="bSound2" type="button">Sound: on</button><button class="ghost" id="bExit2" type="button">Exit to the start page</button></div>
+  <div class="panel menu2">
+    <div class="mcol">
+      <h2>Paused</h2>
+      <div class="mgrp"><button class="cta" id="bResume" type="button">Resume</button></div>
+      <div class="mgrp"><button class="ghost" id="bPauseCond" type="button" title="New wind, current and sea, at once: the sail carries on">Change Conditions</button><button class="ghost" id="bWatch2" type="button" hidden>Watch Race So Far</button></div>
+      <div class="mgrp"><button class="ghost" id="bRestart" type="button">Restart Race</button><button class="ghost" id="bSettings" type="button">Back to Setup</button><button class="ghost" id="bKeys2" type="button">Settings</button></div>
+      <div class="mgrp apart"><button class="ghost mexit" id="bExit2" type="button">Exit</button></div>
+    </div>
+    <div id="pauseDebrief" class="debrief mbody" hidden></div>
   </div>
 </div>
 
 <div class="overlay" id="results" hidden>
-  <div class="panel">
-    <div class="eyebrow">Race complete</div>
-    <h2 id="resTitle">Finish</h2>
-    <p id="resStart"></p>
-    <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
-    <p id="resFouls" class="lede"></p>
-    <div id="resSeason" class="ressea" hidden></div>
-    <div id="resReal" class="debrief" hidden></div>
-    <div id="resDebrief" class="debrief"></div>
-    <div class="btnrow"><button class="ghost" id="bWatch" type="button">Watch your race</button></div>
-    <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Back to setup</button></div>
+  <div class="panel menu2">
+    <div class="mcol">
+      <div class="eyebrow">Race complete</div>
+      <h2 id="resTitle">Finish</h2>
+      <div class="mgrp"><button class="cta" id="bAgain" type="button">Race Again</button></div>
+      <div class="mgrp"><button class="ghost" id="bWatch" type="button">Watch Race</button><button class="ghost" id="bSet2" type="button">Back to Setup</button></div>
+      <div class="mgrp apart"><button class="ghost mexit" id="bExit3" type="button">Exit</button></div>
+    </div>
+    <div class="mbody">
+      <p id="resStart"></p>
+      <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
+      <p id="resFouls" class="lede"></p>
+      <div id="resSeason" class="ressea" hidden></div>
+      <div id="resReal" class="debrief" hidden></div>
+      <div id="resDebrief" class="debrief"></div>
+    </div>
   </div>
 </div>
 <div class="overlay" id="raceReplay" hidden></div>
@@ -486,6 +492,12 @@
     <h2 id="motorAskTitle">Retire to use her motor?</h2>
     <p>A boat racing may use only the wind and the water (RRS 42.1), and not an engine even to get clear after hitting something, unless the sailing instructions allow it (42.3(h), 42.3(i)). Starting the motor retires her: scored <b>RET</b> (RRS A5.1). Then it's hers to use; keep clear of the boats still racing.</p>
     <div class="btnrow"><button class="cta" type="button" id="bMotorYes">Retire and start it</button><button class="ghost" type="button" id="bMotorNo">Keep racing</button></div>
+  </div>
+</div>
+<div class="overlay" id="leaveAsk" hidden role="dialog" aria-modal="true" aria-labelledby="leaveTitle">
+  <div class="panel small">
+    <h2 id="leaveTitle">Leave race?</h2>
+    <div class="btnrow"><button class="cta" type="button" id="bLeaveNo">Keep Racing</button><button class="ghost" type="button" id="bLeaveYes">Leave</button></div>
   </div>
 </div>
 <div class="overlay" id="homeAsk" hidden role="dialog" aria-modal="true" aria-labelledby="homeTitle">

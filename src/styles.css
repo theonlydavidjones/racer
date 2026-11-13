@@ -1333,3 +1333,22 @@ button.t-av.dim:hover{opacity:.8}
 .drillpage .dgo{padding:10px 20px;font-size:14px}
 #drillSide{display:flex;flex-direction:column;gap:12px}
 #drillView #raceFromRow,#drillView #raceFromNote{display:none}
+/* The pause menu and the results (the owner OK'd design/pause-menu, 13 Nov 2026): one narrow column of actions,
+   grouped, Exit set apart at the bottom; a debrief or the results beside it, not under it */
+#pause .panel.menu2,#results .panel.menu2{max-width:none;width:auto;display:grid;grid-template-columns:260px minmax(0,640px);gap:28px;align-items:start;padding:22px 24px;max-height:calc(100vh - 48px)}
+#pause .panel.menu2.nodeb{grid-template-columns:260px}
+.mcol{display:flex;flex-direction:column;gap:6px}
+.mcol h2{margin:0 0 8px}
+.mcol .eyebrow{margin:0}
+.mgrp{display:flex;flex-direction:column;gap:6px;padding-bottom:12px;margin-bottom:6px;border-bottom:1px solid var(--rule)}
+.mgrp:last-child{border-bottom:0;padding-bottom:0;margin-bottom:0}
+.mgrp.apart{margin-top:22px}
+.mgrp:has(+ .apart){border-bottom:0}
+.mgrp button{width:100%;text-align:left;padding:11px 14px;font-size:13px}
+.mgrp button[hidden]{display:none}
+.mgrp button.cta{text-align:center;font-size:15px;padding:13px 14px}
+.mgrp .mexit{color:var(--muted)}
+.menu2 .mbody{margin:0;max-height:calc(100vh - 92px);overflow:auto;min-width:0}
+.menu2 .mbody>:first-child{margin-top:0}
+#leaveAsk .panel{max-width:300px}
+#leaveAsk{z-index:10}
