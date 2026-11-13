@@ -1,5 +1,5 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { anyShoreDist, anyShoreDistNear, onLand, wharfDist, wharfShelter } from '../geo/shore';
+import { PILE_FACE, flowShoreDist, flowShoreDistNear, inPilePier, onLand, wharfDist, wharfShelter } from '../geo/shore';
 import { BREAKWATER_W, HARBORS, SHORE_W, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import type { Wind } from './wind';
 
@@ -31,8 +31,15 @@ export function currentVector(c: CurrentPreset): Vec {
  * here fits, and the ebb's is stronger than the water does. Near a station the station's own prediction wins
  * (tide.ts atShore fades this out within 600 m of one), so PCT0286 already carries that asymmetry off Crissy Field.
  */
+/**
+ * Under a pier on open piles (Fort Mason's: geo/shore.ts PILE_PIERS) the stream runs on, a little slowed by the piles
+ * (about 0.6 m concrete columns some 5 m apart in the owner's photo: a tenth or so of the way blocked). The 0.85 is an
+ * estimate: no measurement of the flow under these piers was found.
+ */
+export const PILE_FLOW = 0.85;
 export const shoreRelief = (p: Vec, lattice = false): number => {
-  const k = clamp(0.25 + 0.75 * (lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 350, 0.25, 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
+  // (the distance to the real bank: the coastline's run round a pile pier isn't shore to the water, which runs under it)
+  const k = clamp(0.25 + 0.75 * (lattice ? flowShoreDistNear(p) : flowShoreDist(p)) / 350, 0.25, 1) * (inPilePier(p) ? PILE_FLOW : 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
   return w > 0 ? Math.min(k, 1 - w * (1 - clamp(0.25 + 0.75 * wharfDist(p, 350) / 350, 0.25, 1))) : k;
 };
 
@@ -186,10 +193,14 @@ function calmIn(c: Calm, p: Vec): number {
 /** How much of the stream reaches p (1 in open water): the most open of the harbor grids it's on. */
 /** As basinCalm, for drawing only: undefined where the grid isn't built yet (it never builds one). */
 export function basinCalmIfBuilt(p: Vec): number | undefined {
+  if (inPilePier(p, PILE_FACE)) return 1;
   for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return g.calm ? calmIn(g.calm, p) : undefined;
   return 1;
 }
 export function basinCalm(p: Vec): number {
+  // (under a pier on open piles the stream runs on, as the shore relief has it: the harbor beside it keeps its still water,
+  // the pier's piles and its shed between them: geo/shore.ts PILE_PIERS)
+  if (inPilePier(p, PILE_FACE)) return 1;
   for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return calmIn(calmOf(g), p);
   return 1;
 }

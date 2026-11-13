@@ -2,6 +2,7 @@ import { inPoly, segPt, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
+import pilePiers from './data/pile-piers.json';
 import wharf from './data/wharf.json';
 import eastPiers from './data/east-piers.json';
 import bridgePiers from './data/bridge-piers.json';
@@ -638,6 +639,57 @@ export function anyShoreDistNear(p: Vec): number {
   const a = i - ti * SG_TILE, b = j - tj * SG_TILE, k = b * (SG_TILE + 1) + a, n = SG_TILE + 1;
   return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
 }
+/**
+ * Piers that stand on open piles with a shed on top (Fort Mason's Piers 1–3: geo/data/pile-piers.json, OSM, with the
+ * sheds' heights). The coastline runs round them, so to a boat (onLand) and to the wind they're solid; the tidal current
+ * runs under them (the owner, 13 Nov 2026, at the Gashouse Cove exit), so for the current they aren't shore.
+ */
+export const PILE_PIERS: { name: string; height: number; pts: Vec[] }[] = (pilePiers as unknown as { piers: { name: string; height: number; pts: [number, number][] }[] }).piers.map(q => ({ name: q.name, height: q.height, pts: q.pts.map(([la, lo]) => LL(la, lo)) }));
+/** Inside a pile pier's shed outline, or within `pad` m of it. */
+export function inPilePier(p: Vec, pad = 0): boolean {
+  for (const P of PILE_PIERS) { if (inPoly(p, P.pts)) return true; if (pad > 0) for (let i = 0; i < P.pts.length; i++) if (segPt(p, P.pts[i], P.pts[(i + 1) % P.pts.length]) < pad) return true; }
+  return false;
+}
+/** The coastline's run round each pile pier: its deck's edge, within 15 m of the shed's walls. */
+export const PILE_FACE = 15;
+const FLOW = (() => {
+  const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), ys = PILE_PIERS.flatMap(P => P.pts.map(q => q.y));
+  const box = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  // (only the shore within 350 m matters to the current's relief: the segments up to 750 m from the piers, for points up
+  // to 380 m from them; further off, the faces are beyond 350 m and the shore distance is anyShoreDist's own)
+  const segs: [Vec, Vec][] = [];
+  for (let k = 1; k < SHORE.length; k++) {
+    const a = SHORE[k - 1], b = SHORE[k], m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    if (Math.max(a.x, b.x) < box.x0 - 750 || Math.min(a.x, b.x) > box.x1 + 750 || Math.max(a.y, b.y) < box.y0 - 750 || Math.min(a.y, b.y) > box.y1 + 750) continue;
+    if (inPilePier(m, PILE_FACE)) continue;
+    segs.push([a, b]);
+  }
+  return { box, segs };
+})();
+/**
+ * The distance to the nearest shore for the current: anyShoreDist, but where the coastline runs round a pile pier its
+ * outline isn't shore (the water runs under). Under and beside Fort Mason's piers it's the distance to the real bank.
+ */
+export function flowShoreDist(p: Vec): number {
+  const B = FLOW.box;
+  if (p.x < B.x0 - 380 || p.x > B.x1 + 380 || p.y < B.y0 - 380 || p.y > B.y1 + 380) return anyShoreDist(p);
+  let m = landDist(p);
+  for (const [a, b] of FLOW.segs) { const d = segPt(p, a, b); if (d < m) m = d; }
+  return m;
+}
+/** flowShoreDist off its own 10 m lattice (as anyShoreDistNear), for a boat's current every step. */
+export function flowShoreDistNear(p: Vec): number {
+  const B = FLOW.box;
+  if (p.x < B.x0 - 380 || p.x > B.x1 + 380 || p.y < B.y0 - 380 || p.y > B.y1 + 380) return anyShoreDistNear(p);
+  if (!shoreGridOn || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return flowShoreDist(p);
+  const fx = p.x / SG_STEP, fy = p.y / SG_STEP, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+  const ti = Math.floor(i / SG_TILE), tj = Math.floor(j / SG_TILE), key = ti * 65536 + tj;
+  let t = flowTiles.get(key);
+  if (!t) { const n = SG_TILE + 1; t = new Float64Array(n * n); for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) t[b * n + a] = flowShoreDist({ x: (ti * SG_TILE + a) * SG_STEP, y: (tj * SG_TILE + b) * SG_STEP }); flowTiles.set(key, t); }
+  const a = i - ti * SG_TILE, b = j - tj * SG_TILE, k = b * (SG_TILE + 1) + a, n = SG_TILE + 1;
+  return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
+}
+const flowTiles = new Map<number, Float64Array>();
 const SG_STEP = 10, SG_TILE = 32, sgTiles = new Map<number, Float64Array>();
 let shoreGridOn = true;
 /** Read the shore distance off the lattice (the default) or work it out exactly every time (for the tests). */
