@@ -251,6 +251,12 @@ What's planned, roughly in order. Done work is described in the README.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
+   intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
+   Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
+   really lies: rolled or flaked into a long, narrow sausage along the foredeck from the stemhead aft, its luff still on
+   the forestay at its forward end (so the stay meets it, not passes through), tied with a sail tie or two. Check from
+   both sides.
 8p. **Bug: with the sails down, the jib cars show as loaded** (owner, 13 November; <1 h): "with sails down, neither jib
    car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
 8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
