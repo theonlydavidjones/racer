@@ -93,6 +93,7 @@ export class BoatPanel {
       case 'companionway': this.set(b => { b.companionway = v === 'closed' ? 'closed' : 'open'; }); return;
       case 'nameColor': this.set(b => { if (/^#[0-9a-f]{6}$/i.test(v)) b.nameColor = v; else delete b.nameColor; }); return;
       case 'sailColor': this.set(b => { b.sails.color = v as 'white' | 'black'; }); return;
+      case 'numberColor': case 'insigniaColor': { const k = t.dataset.act as 'numberColor' | 'insigniaColor'; this.set(b => { if (/^#[0-9a-f]{6}$/i.test(v)) b.sails[k] = v; else delete b.sails[k]; }); return; }
       case 'mainAge': this.set(b => { b.perf.mainAge = v as SailAge; }); return;
       case 'jibAge': this.set(b => { b.perf.jibAge = v as SailAge; }); return;
       case 'mast': this.set(b => { b.perf.mast = v as 'wood' | 'aluminium'; }); return;
@@ -224,6 +225,8 @@ export class BoatPanel {
       </section>
       <section><h3>Sails</h3>
         <div class="field"><span>Sailcloth</span>${seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)}</div>
+        <div class="field"><span>Sail numbers</span>${seg('numberColor', [['', 'Auto'], ...NUMBER_INKS], b.sails.numberColor ?? '')}</div>
+        <div class="field"><span>Class letter F</span>${seg('insigniaColor', [['', 'Like the numbers'], ...NUMBER_INKS], b.sails.insigniaColor ?? '')}<small>${SAIL_INK_NOTE}</small></div>
       </section>
       <section><h3>Lines <em>· their colours in the sail controls band</em></h3>
         ${LINE_ROWS.map(([k, n]) => `<div class="field"><span>${n} · ${name(ROPE_COLORS, lineColor(b, k)) || 'custom'}</span><div class="swatches">${ROPE_COLORS.map(([cn, c]) => `<button type="button" class="sw" style="background:${c}" data-act="lineColor" data-line="${k}" data-v="${c}" aria-pressed="${lineColor(b, k) === c}" title="${cn}" aria-label="${n}: ${cn}"></button>`).join('')}</div></div>`).join('')}
@@ -312,3 +315,12 @@ function rigTuneFields(b: BoatSpec, seg: Seg): string {
     <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}
     <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band (under the traveller): the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
 }
+
+/** Colours for the sail numbers and the F: the usual sailmakers' vinyls. */
+const NUMBER_INKS: [string, string][] = [['#16181b', 'Black'], ['#1f2c4f', 'Navy'], ['#2456a8', 'Blue'], ['#b3202a', 'Red'], ['#1e5236', 'Green'], ['#f4f4f0', 'White']];
+/**
+ * The rule, under the choices. The class rule is read from its text (NFIA 2025–2028, March 2026 update, 9.14); the racing
+ * rules' Appendix G on colour (letters and numbers in one colour, contrasting with the sail) is from secondary sources:
+ * its text couldn't be reached to quote. Nothing in either limits the F's colour.
+ */
+const SAIL_INK_NOTE = 'Auto: black on white sails, white on black. The class places the F and the numbers as the racing rules\' Appendix G lays down (CR 9.14: at least 300 mm high, 200 wide, 40 thick, 60 apart); Appendix G asks for letters and numbers in one colour that contrasts with the sail. Nothing limits the F\'s colour.';

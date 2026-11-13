@@ -33,9 +33,10 @@ export interface Outlook {
 /** The lee of the land changes slowly in space and with the wind's direction: cached on a 200 m grid, per 5°. */
 const leeCache = new Map<string, number>();
 function leeAt(p: Vec, from: number): number {
-  const k = `${Math.round(p.x / 200)},${Math.round(p.y / 200)},${Math.round(from / 5) % 72}`;
+  // (the angle worked out from the key itself, so 0° and 360° share a slot and its value both ways)
+  const a = ((Math.round(from / 5) % 72) + 72) % 72, k = `${Math.round(p.x / 200)},${Math.round(p.y / 200)},${a}`;
   let v = leeCache.get(k);
-  if (v == null) { v = landLee({ x: Math.round(p.x / 200) * 200, y: Math.round(p.y / 200) * 200 }, Math.round(from / 5) * 5); leeCache.set(k, v); if (leeCache.size > 60000) leeCache.clear(); }
+  if (v == null) { v = landLee({ x: Math.round(p.x / 200) * 200, y: Math.round(p.y / 200) * 200 }, a * 5); leeCache.set(k, v); if (leeCache.size > 60000) leeCache.clear(); }
   return v;
 }
 
