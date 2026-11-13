@@ -154,16 +154,17 @@ export const targetFor = (b: { ww: { kt: number }; sea: SeaHere }, twa: number):
  * the waves (linear strip theory, in the time domain: Journée & Massie, Offshore Hydromechanics, TU Delft 2001, ch. 6;
  * Faltinsen, Sea Loads on Ships and Offshore Structures, 1990, ch. 3).
  *
- * - **The restoring forces** are her own hydrostatics, measured from the drawn hull (render/hull.ts, sliced at the
- *   waterline where she floats her sailing displacement, tests/seakeeping.test.ts keeps them in step): waterplane area
- *   8.57 m² (heave: ρ·g·Awp, 86 kN/m) and its moment of inertia about the centre of flotation 15.8 m⁴ (pitch: ρ·g·I_L,
- *   taking GM_L ≈ BM_L = I_L/∇ = 7 m, the 0.3 m between G and B being nothing beside it). The centre of flotation is
- *   0.19 m aft of the middle of her length.
+ * - **The restoring forces** are her own hydrostatics, measured from the drawn hull (render/hull.ts's sections, sliced
+ *   at its drawn waterline; tests/seakeeping.test.ts keeps them in step): waterplane area 8.9 m² (heave: ρ·g·Awp,
+ *   89 kN/m) and its moment of inertia about the centre of flotation 17.2 m⁴ (pitch: ρ·g·I_L, taking GM_L ≈ BM_L =
+ *   I_L/∇ ≈ 7.6 m, the 0.3 m between G and B being nothing beside it). The centre of flotation is 0.22 m aft of the
+ *   middle of her length. (Whether the drawn hull floats her sailing displacement at that line isn't settled: its
+ *   volume doesn't slice reliably. A few centimetres either way changes these by a few percent.)
  * - **The added mass** of the water she moves with her, from strip theory: each section's two-dimensional heave added
  *   mass ρ·π/8·B²·C, C from its Lewis form (Lewis 1929; Journée & Massie ch. 6, the conformal mapping by the section's
  *   beam/draft ratio and area coefficient), integrated along her length for heave and with the square of the distance
- *   from the centre of flotation for pitch: 4,950 kg (2.1 × her mass: shallow, beamy sections carry a lot of water) and
- *   7,300 kg·m². These are the high-frequency limits, and strip theory leaves out the ends' three-dimensional relief, a
+ *   from the centre of flotation for pitch: 5,240 kg (2.3 × her mass: shallow, beamy sections carry a lot of water) and
+ *   8,120 kg·m². These are the high-frequency limits, and strip theory leaves out the ends' three-dimensional relief, a
  *   real effect on a hull only 2.9 beams long: estimates, until the Delft series' seakeeping tests can replace them.
  * - **Her pitch inertia:** a radius of gyration of a quarter of her length overall (1.91 m), the usual figure for a yacht
  *   with her rig: an estimate.
@@ -174,7 +175,7 @@ export const targetFor = (b: { ww: { kt: number }; sea: SeaHere }, twa: number):
  *   meets her every 1.7–2.1 s: on them, which is the hobby-horsing of a Folkboat in the Cityfront chop (her pitch, for
  *   the waves' slope, peaks in a 3 s chop at 1.3 times what a long sea gives: tests/seakeeping.test.ts).
  * - **The waves' push** (Froude–Krylov: the undisturbed wave's pressure on her bottom, the diffraction left out) on a
- *   rectangle with her waterplane's area and moment of inertia (4.70 × 1.82 m), worked out in closed form for each wave
+ *   rectangle with her waterplane's area and moment of inertia (4.82 × 1.85 m), worked out in closed form for each wave
  *   component: along her length a sinc for the force and the yaw lever's 2(sin q − q·cos q)/a² for the moment, across her
  *   beam a sinc, and the pressure fading with depth as e^(−k·T), T her mean draft (∇/Awp, 0.27 m; the Smith effect). A
  *   wave much longer than she is lifts and tilts her with it (she follows the surface: force C33·ζ, moment C55·slope);
@@ -183,9 +184,9 @@ export const targetFor = (b: { ww: { kt: number }; sea: SeaHere }, twa: number):
  *   into them, slower running with them) needs no formula of its own.
  */
 const WM = {
-  awp: 8.57, il: 15.8, cfAft: 0.19, a33: 4950, a55: 7300, gyr: 0.25 * 7.64, zeta: 0.25,
+  awp: 8.9, il: 17.2, cfAft: 0.22, a33: 5240, a55: 8120, gyr: 0.25 * 7.64, zeta: 0.25,
   /** The equivalent rectangle's length and beam (m): L·B = Awp, B·L³/12 = I_L. */
-  le: Math.sqrt(12 * 15.8 / 8.57), be: 8.57 / Math.sqrt(12 * 15.8 / 8.57),
+  le: Math.sqrt(12 * 17.2 / 8.9), be: 8.9 / Math.sqrt(12 * 17.2 / 8.9),
 };
 const WM_T = HULL.displacement / RHO / WM.awp; // her mean draft for the Smith effect, m
 const C33 = RHO * G * WM.awp, C55 = RHO * G * WM.il;

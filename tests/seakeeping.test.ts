@@ -31,9 +31,9 @@ function sail(f: WaveField, h: number, v: number, secs = 120) {
 }
 
 describe('her hydrostatics, from the drawn hull', () => {
-  it('the waterplane seaway.ts uses is the drawn hull\'s, sliced where she floats her sailing displacement', () => {
-    // (slice the hull 3 cm below its drawn waterline: there she displaces about her ORC sailing displacement)
-    const g = hullGeometry(), p = g.attributes.position.array as ArrayLike<number>, idx = g.index!.array, y0 = -0.03, dz = 0.02, Z0 = -3.9;
+  it('the waterplane seaway.ts uses is the drawn hull\'s, sliced at its waterline', () => {
+    // (sliced at its drawn waterline)
+    const g = hullGeometry(), p = g.attributes.position.array as ArrayLike<number>, idx = g.index!.array, y0 = -1e-6, dz = 0.02, Z0 = -3.9;
     const row = new Array(Math.round(7.8 / dz) + 1).fill(-1);
     for (let t = 0; t < idx.length; t += 3) for (let a = 0; a < 3; a++) {
       const A = idx[t + a] * 3, B = idx[t + (a + 1) % 3] * 3;
@@ -45,7 +45,38 @@ describe('her hydrostatics, from the drawn hull', () => {
     for (let k = 0; k < got.length - 1; k++) for (let i = got[k] + 1; i < got[k + 1]; i++) row[i] = row[got[k]] + (row[got[k + 1]] - row[got[k]]) * (i - got[k]) / (got[k + 1] - got[k]);
     let A = 0, M = 0; row.forEach((hb, i) => { if (hb > 0) { A += 2 * hb * dz; M += 2 * hb * dz * (Z0 + i * dz); } });
     const zc = M / A; let IL = 0; row.forEach((hb, i) => { if (hb > 0) IL += 2 * hb * dz * (Z0 + i * dz - zc) ** 2; });
-    expect(A).toBeCloseTo(8.57, 1); expect(IL).toBeGreaterThan(15.3); expect(IL).toBeLessThan(16.3); expect(zc).toBeCloseTo(0.19, 1);
+    expect(A).toBeCloseTo(8.9, 1); expect(IL).toBeGreaterThan(16.7); expect(IL).toBeLessThan(17.7); expect(zc).toBeCloseTo(0.22, 1);
+  });
+
+  it('the added mass is strip theory\'s from her own sections, each by its Lewis form (Journée & Massie ch. 6)', () => {
+    const g = hullGeometry(), p = g.attributes.position.array as ArrayLike<number>, idx = g.index!.array;
+    const dz = 0.02, dy = 0.02, NY = 62, Z0 = -3.9, NZ = Math.round(7.8 / dz), RHO = 1025;
+    const grid: number[][] = Array.from({ length: NY + 1 }, () => new Array(NZ + 1).fill(-1));
+    for (let t = 0; t < idx.length; t += 3) for (let j = 0; j <= NY; j++) {
+      const y0 = -j * dy - 1e-6;
+      for (let a = 0; a < 3; a++) { const A = idx[t + a] * 3, B = idx[t + (a + 1) % 3] * 3;
+        if ((p[A + 1] - y0) * (p[B + 1] - y0) > 0 || p[A + 1] === p[B + 1]) continue;
+        const s = (y0 - p[A + 1]) / (p[B + 1] - p[A + 1]), x = Math.abs(p[A] + s * (p[B] - p[A])), z = p[A + 2] + s * (p[B + 2] - p[A + 2]), i = Math.round((z - Z0) / dz);
+        grid[j][i] = Math.max(grid[j][i], x); }
+    }
+    for (const row of grid) { const got = row.map((v, i) => v >= 0 ? i : -1).filter(i => i >= 0);
+      for (let k = 0; k < got.length - 1; k++) for (let i = got[k] + 1; i < got[k + 1]; i++) row[i] = row[got[k]] + (row[got[k + 1]] - row[got[k]]) * (i - got[k]) / (got[k + 1] - got[k]);
+      for (let i = 0; i < row.length; i++) if (row[i] < 0) row[i] = 0; }
+    // each section: its waterline beam B, the canoe body's draft T (down to where it narrows to the keel) and area
+    // coefficient σ; Lewis's mapping coefficients from B/2T and σ, and the 2-D heave added mass ρ·π/8·B²·C
+    const rows: { z: number; m: number }[] = []; let Awp = 0, Mz = 0;
+    for (let i = 0; i <= NZ; i++) {
+      const b0 = grid[0][i], z = Z0 + i * dz; if (b0 < 0.01) continue;
+      let T = 0, Ac = 0; for (let j = 1; j <= NY; j++) { const h = grid[j][i]; if (h >= 0.12) { T = j * dy; Ac += 2 * h * dy; } }
+      const B = 2 * b0, H0 = B / (2 * Math.max(0.02, T)), sig = Math.min(0.95, Math.max(0.3, Ac / (B * Math.max(0.02, T))));
+      const C1 = (3 + 4 * sig / Math.PI) + (1 - 4 * sig / Math.PI) * ((H0 - 1) / (H0 + 1)) ** 2;
+      const a3 = (-C1 + 3 + Math.sqrt(9 - 2 * C1)) / C1, a1 = (1 + a3) * (H0 - 1) / (H0 + 1);
+      const C = ((1 + a1) ** 2 + 3 * a3 * a3) / (1 + a1 + a3) ** 2;
+      rows.push({ z, m: RHO * Math.PI / 8 * B * B * C }); Awp += B * dz; Mz += B * dz * z;
+    }
+    const zc = Mz / Awp; let a33 = 0, a55 = 0; for (const r of rows) { a33 += r.m * dz; a55 += r.m * (r.z - zc) ** 2 * dz; }
+    expect(a33).toBeGreaterThan(5240 * 0.95); expect(a33).toBeLessThan(5240 * 1.05);
+    expect(a55).toBeGreaterThan(8120 * 0.95); expect(a55).toBeLessThan(8120 * 1.05);
   });
 
   it('natural periods: heave about 1.8 s, pitch about 2.0 s (roll is balance.ts\'s, about 3.5 s)', () => {
@@ -100,7 +131,7 @@ describe('the waves move her', () => {
     let Mmax = 0; for (let t = 0; t < T; t += 0.01) Mmax = Math.max(Mmax, Math.abs(waveForces(f, b, 0, t, 1, 1).M));
     const w = 2 * Math.PI / T, wn = 2 * Math.PI / NATURAL.pitch, zeta = 0.25;
     // (amplitude for unit inertia I: M/I over √((wn² − w²)² + (2ζ wn w)²); I from the natural period and the restoring ρ g I_L)
-    const C55 = 1025 * G * 15.8, I = C55 / (wn * wn);
+    const C55 = 1025 * G * 17.2, I = C55 / (wn * wn);
     const want = Mmax / I / Math.sqrt((wn * wn - w * w) ** 2 + (2 * zeta * wn * w) ** 2);
     const r = sail(f, 0, 0);
     expect(r.th / want).toBeGreaterThan(0.95); expect(r.th / want).toBeLessThan(1.05);
