@@ -270,7 +270,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // so the leeway she steers for is the slip she makes)
   const Fside = F * Math.cos((b.heelMag ?? 0) * D2R), kLat = 0.5 * 1025 * HOVE.latArea, lwAt = (v: number) => {
     if (twa >= 150) return 0;
-    const u = Math.max(0.8, v), lift = Math.PI * HOVE.aspect / 2 * u, sw = (-lift + Math.sqrt(lift * lift + 4 * HOVE.crossCd * (Fside + Fwind) / kLat)) / (2 * HOVE.crossCd);
+    const u = Math.max(0.8, v), lift = Math.PI * HOVE.aspect / 2 * u, sw = (-lift + Math.sqrt(lift * lift + 4 * HOVE.crossCd * Math.max(0, Fside + Fwind) / kLat)) / (2 * HOVE.crossCd);
     return clamp(Math.atan2(sw, u) / D2R, 0, 12);
   };
   // (her steady leeway, over a few seconds: what a helmsman allows for, and the polar's frame; the instant slip is b.sway.
