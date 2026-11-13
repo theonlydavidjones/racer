@@ -103,6 +103,17 @@ The researcher's findings:
   because the ship gave no five blasts and made no complaint. Competitors can't protest under Rule 9; only the race
   committee can.
 
+Sources:
+- RYC Intraclub SI 2025, section 16: https://www.regattanetwork.com/clubmgmt/regatta_uploads/29818/2025IntraclubSIsv21.pdf
+- RYC Lipton Cup SI 2025, section 21: https://www.regattanetwork.com/clubmgmt/regatta_uploads/29400/2025LiptonCupSIscomplete.pdf
+- YRA Appeal 08-02: http://www.yra.org/appeals/docs/Appeal_2008-02.pdf
+- The Sausalito-area "narrow channel" template (a protest, heard even without a valid hail, DNE):
+  https://www.regattanetwork.com/clubmgmt/regatta_uploads/30452/20252026ChiliMidwintersSI.pdf
+
+Gaps (the hosts were blocked, so these are unread, not absent): the per-event YRA SIs on jibeset.net; the StFYC, CYC,
+SFYC, GGYC and Encinal YC SIs; and 33 CFR 161/165. A CYC snippet says five blasts make a boat "presumed to have
+impeded", which fits Template B, but it isn't verified.
+
 So it's the same hearing panel. The protestor is the race committee, the alleged rule is "Inland Rule 9 (SI)", and a
 replay tile shows the ship. It depends on the ships the Navigator session sails (src/sim/navigator.ts), which sound
 five blasts when a boat impedes them in the channel. That trigger is theirs to agree.
