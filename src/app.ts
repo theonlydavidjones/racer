@@ -886,11 +886,13 @@ function tacPlanNow(): ReturnType<typeof planLegs> {
   if (tacPlan?.w !== w) { try { tacPlan = { w, legs: planLegs(w, outlookFor(w)) }; } catch (e) { console.warn('the tactical debrief: no ideal', e); tacPlan = { w, legs: [] }; } }
   return tacPlan.legs;
 }
+/** A planned leg's time, s: its sailing time and the rounding at its end (an island's, or 10 s at a mark: strategist.legEnds). */
+const idealS = (P: ReturnType<typeof planLegs>, k: number) => !P[k] ? null : ((P[k + 1] ? P[k + 1].t0 - P[k].t0 : P[k].minutes) * 60);
 function tacticsNow(): Tactics | null {
   const log = w.log; if (!log || w.track.length < 2 || w.drill) return null;
   tacPlanNow();
   const C = w.C, u = w.user.id, V0 = vsInput(log);
-  const legs = V0.legs.map((L, k) => ({ name: L.name, from: k === 0 ? C.center : V0.legs[k - 1].to, to: L.to, kind: L.kind, ideal: tacPlan!.legs[k] ? tacPlan!.legs[k].minutes * 60 : null }));
+  const legs = V0.legs.map((L, k) => ({ name: L.name, from: k === 0 ? C.center : V0.legs[k - 1].to, to: L.to, kind: L.kind, ideal: idealS(tacPlan!.legs, k) }));
   // what the race log measured for you, by leg: past the layline, and each tack or gybe's cost. A moment goes to the leg
   // it happened in: a tack at its turn (the moment opens 3 s before it), a spell at its middle; the first leg from the gun
   const ends = [0, ...C.marks.map((_, k) => log.boatMarks[u]?.[k] ?? null), w.user.finished ? w.user.finishT : null];
