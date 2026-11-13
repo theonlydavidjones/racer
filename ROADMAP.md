@@ -285,6 +285,16 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The pause menu redesigned** (owner, 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
+     too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
+     Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
+     Proposed: one narrow column (about a third of the screen's width), grouped by what you're doing:
+     1. Resume.
+     2. On the water: Change the conditions.
+     3. Start again: Restart this cruise, Back to setup.
+     4. The game: Settings, Sound.
+     5. Exit to the start page, set apart.
+     The same pattern for every menu in the game. A mock-up to the owner first.
    - **The inset map's flag and layer icons off the game surface** (owner, 13 November; 1–2 h): "the little flag icon and
      layer icon on the inset map doesn't belong on the game surface. those should be toggles in the full map view, with
      the inset remembering my choices." The layer choices (and the flag index) move into the full chart. The inset shows
