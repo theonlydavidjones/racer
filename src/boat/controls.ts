@@ -94,14 +94,16 @@ export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.m
 /**
  * Josephine's jib cars, the one source for the lead (render/boatMesh.ts draws them from it): the athwartships bar's
  * middle hole `centre` m off the centreline, its holes `pin` m apart, and the middle fore–aft hole `aft` m behind the
- * forestay's pin on the deck (as drawn from the owner's photos, Boat Detail; ESTIMATE until the owner measures her).
- * North Sails' Nordic Folkboat tuning guide puts the car 58 cm out and 2.65 m aft: 12.3°, a hole and a half inboard of
- * the middle. (reference/design/sheet-geometry.md, Rigging.)
+ * forestay's pin on the deck. The centre and the aft are North Sails' Nordic Folkboat tuning guide's ("the jib-lead
+ * track is placed with its centre 58 cm from the boat's centreline"; "2.65 m from the pin in the forestay"): 12.3° at the
+ * middle hole, which puts the jib at its best trim close-hauled (the beat's apparent wind, about 30°, less trim.ts's 18°).
+ * Until the owner measures Josephine: the drawing (Boat Detail, from a photo) reads 0.66 m, within a photo's error of
+ * it; the holes' 24 mm is the drawing's. (reference/design/sheet-geometry.md, Rigging.)
  */
 export const JOSEPHINE_CAR = { centre: 0.58, pin: 0.024, aft: 2.65 };
 /**
  * The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins` (0 inboard
- * .. CAR_IN_PINS−1 outboard): atan(out / aft), 13.0° to 15.0°, 14.0° at the middle hole, half a degree a hole.
+ * .. CAR_IN_PINS−1 outboard): atan(out / aft), 11.3° to 13.3°, 12.3° at the middle hole, half a degree a hole.
  */
 export const carLead = (ins: number) => Math.atan((JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2)) / JOSEPHINE_CAR.aft) * 180 / Math.PI;
 /** The outermost athwartships pin whose lead is no wider than `angle` deg (the innermost if none is). */
