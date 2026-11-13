@@ -1026,13 +1026,12 @@ body.showroom #crewPop{visibility:hidden}
 /* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
 .maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
 #mapHint{display:none}
-/* the inset's views, cruising: the map, or the navigator's passage (ui/hud.ts insetView), just under the circle */
-#mapViews{position:fixed;top:calc(env(safe-area-inset-top,0px) + 292px);right:max(16px,env(safe-area-inset-right,0px));width:210px;display:flex;justify-content:center;gap:2px}
-#mapViews[hidden]{display:none}
-#mapViews button{font:700 10px var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#cfe0e8;background:rgba(9,22,33,.82);border:1px solid rgba(150,196,218,.35);padding:4px 10px;cursor:pointer}
-#mapViews button:first-child{border-radius:12px 0 0 12px} #mapViews button:last-child{border-radius:0 12px 12px 0}
-#mapViews button[aria-checked="true"]{background:#ffb627;color:#0c2534;border-color:#ffb627}
-body.showroom #mapViews{display:none}
+/* the inset's navigator view, cruising (ui/hud.ts insetView): a quiet round button on the circle's rim, top right,
+   mirroring the layers button (the owner: no new buttons on the game surface outside the map) */
+#bMapNav.maplayers{right:calc(max(16px,env(safe-area-inset-right,0px)) + 14px)!important}
+#bMapNav[hidden]{display:none!important}
+#bMapNav[aria-pressed="true"]{background:#ffb627;color:#0c2534;border-color:#ffb627}
+body.showroom #bMapNav{display:none!important}
 /* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
 #sigPanel #sigText{display:none}
 /* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */

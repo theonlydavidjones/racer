@@ -705,15 +705,15 @@ $('map').addEventListener('click', () => {
   if (w.cruising && hud.insetView === 'nav') { navView.toggle(w); return; } // (the navigator's view: its passage plan)
   releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook();
 });
-/** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
- * not a button of its own; racing, the Course button stays with the helm's. */
+/** Cruising, the navigator is one of the inset map's views, toggled by a quiet button on its rim (the owner: "It should
+ * just be a view in the inset map", and no new buttons outside it); racing, the Course button stays with the helm's. */
 function insetViews(): void {
-  const cruising = !!w?.cruising, el = $('mapViews');
-  el.hidden = !cruising; $('bCourse').hidden = cruising;
+  const cruising = !!w?.cruising, b = $('bMapNav');
+  b.hidden = !cruising; $('bCourse').hidden = cruising;
   if (!cruising) hud.insetView = 'map';
-  for (const b of el.querySelectorAll<HTMLButtonElement>('[data-iv]')) b.setAttribute('aria-checked', String(b.dataset.iv === hud.insetView));
+  b.setAttribute('aria-pressed', String(hud.insetView === 'nav'));
 }
-for (const b of document.querySelectorAll<HTMLButtonElement>('#mapViews [data-iv]')) b.addEventListener('click', () => { hud.insetView = b.dataset.iv as 'map' | 'nav'; insetViews(); });
+$('bMapNav').addEventListener('click', e => { e.stopPropagation(); hud.insetView = hud.insetView === 'nav' ? 'map' : 'nav'; insetViews(); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
 /* ---------------- message log ---------------- */
