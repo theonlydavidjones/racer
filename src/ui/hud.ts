@@ -15,6 +15,7 @@ import { youTackPays, type World } from '../sim/world';
 import { $ } from './dom';
 import { routeAround } from '../sim/routing';
 import { passageNow, type PassageNow } from '../sim/navigator';
+import { clockOf } from '../sim/outlook';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
@@ -83,6 +84,21 @@ export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) =>
 export class Hud {
   private acc = 0;
   mapZoom = false;
+  /** What the inset shows, cruising: the water round her (the map), or the navigator's passage (her course to the
+   * destination, whole, north up; a tap opens the passage plan). The owner: "It should just be a view in the inset map." */
+  insetView: 'map' | 'nav' = 'map';
+  /** The passage the navigator view shows: worked out again each minute of the clock, or 300 m on (it takes a moment). */
+  private insetPlan: PassageNow | null = null;
+  private navMemo: { pn: PassageNow; t: number; x: number; y: number; dest: unknown } | null = null;
+  navPassage(wd: World): PassageNow | null {
+    if (!wd.dest) return null;
+    const u = wd.user, m = this.navMemo;
+    if (!m || m.dest !== wd.dest || wd.clockUtc - m.t >= 1 || Math.hypot(u.x - m.x, u.y - m.y) > 300) {
+      const pn = passageNow(wd); if (!pn) return null;
+      this.navMemo = { pn, t: wd.clockUtc, x: u.x, y: u.y, dest: wd.dest };
+    }
+    return this.navMemo!.pn;
+  }
   /** Label of the key bound to Hail (set by main, which owns the key map). */
   hailKey: () => string = () => 'H';
   private dialC = $<HTMLCanvasElement>('dial');
@@ -515,9 +531,15 @@ export class Hud {
   private map(wd: World, u: Boat): void {
     const [ctx, w, h] = fitCanvas(this.mapC);
     ctx.clearRect(0, 0, w, h);
-    const W = insetRotation(wd);
+    const nav = this.insetView === 'nav' && wd.cruising ? this.navPassage(wd) : null;
+    const W = nav ? 0 : insetRotation(wd);
     let tf: Tf, scale: number, ctr = { x: u.x, y: u.y };
-    if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
+    if (nav) { // the navigator's view: her course to the destination, whole, north up, round the circle's middle
+      const pts = [{ x: u.x, y: u.y }, ...nav.track.map(q => q.p), wd.dest!.p], xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+      ctr = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
+      const span = Math.max(400, Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1.15);
+      scale = Math.min(w, h) / span; tf = makeTf(ctr.x, ctr.y, 0, scale, w, h);
+    } else if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
     else if (wd.freeSail) { scale = Math.min(w, h) / 2800; tf = makeTf(u.x, u.y, W, scale, w, h); } // just sailing: the water around you, about 1.5 nm across
     else {
       const pts = [wd.pin, wd.committee].concat(wd.C.marks.map(m => m.p));
@@ -529,12 +551,14 @@ export class Hud {
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
+    this.insetPlan = nav; // (chartBody draws her course with it: drawSailing)
     this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
+    this.insetPlan = null;
     const day = (wd.settings.chartPal ?? 'day') === 'day', I = INK[day ? 'day' : 'dusk'];
     // the map's own words, each on a halo so it reads over the chart
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
-    const lab = W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
+    const lab = nav ? 'NAVIGATOR' : W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
     // (the inset is a circle: the label and the north arrow go at its top middle, inside the rim, where it's widest
     // enough for them, clear of the layers button on its upper left)
     const tw = ctx.measureText(lab).width, lx0 = w / 2 - (tw + 22) / 2, ly0 = 26;
@@ -550,7 +574,12 @@ export class Hud {
     if (fog) say(fog, w / 2, h - 10, 'center');
     // with the wind or the current on: what's on the water where you are, the layer's own first (as the chart's readout)
     const kind = this.drawn.inset?.kind;
-    if (kind) {
+    if (nav) { // the navigator's view: how far she has to sail, and when she'd get there
+      const y = h - 34 - (fog ? 12 : 0), turns = nav.tacks.length + nav.gybes.length;
+      ctx.font = '700 11px "Saira Semi Condensed", sans-serif';
+      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} GYBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
+      ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say('TAP FOR THE PASSAGE PLAN', w / 2, y + 12, 'center');
+    } else if (kind) {
       const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif'; say(a.toUpperCase(), w / 2, y, 'center');
       ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say(b.toUpperCase(), w / 2, y + 12, 'center');
@@ -695,7 +724,7 @@ export class Hud {
     this.drawn[detail] = { tf, w, h, scale, kind };
     // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
     // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
-    const plan = wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
+    const plan = detail === 'inset' && this.insetPlan ? this.insetPlan : wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
     const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
     const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key
