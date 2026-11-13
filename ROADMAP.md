@@ -158,17 +158,37 @@ What's planned, roughly in order. Done work is described in the README.
    and destination picked on the chart; Change the conditions mid-sail, physics-reviewed; "Move her here" without
    ending the cruise; Home: back to her slip when cruising, retire and head home when racing). The showroom's own time
    of day and conditions are done too.
-   Follow-up (owner, 12 November; polish; next; 2–3 h): "on cruise configuration, I need to be able to open up a larger
+   ~~Follow-up~~ (done: both planned on one big chart) (owner, 12 November; polish; 2–3 h): "on cruise configuration, I need to be able to open up a larger
    view of the map to select start and end. I should be able to select both in the same map and not have to bounce from
    one to another." One large chart, opened from the cruise setup, where you place both the start and the destination
    (and move either), then return to the setup with both set.
-   Also (owner, 12 November; polish; queued, not to interrupt running work; 1–2 h): "the navigator button is at
+   ~~Also~~ (done: the navigator is a view of the inset map, toggled on the map's rim) (owner, 12 November; polish; 1–2 h): "the navigator button is at
    bottom-right atm. it should just be a view in the inset map." The navigator becomes one of the inset map's views
    (its route and advice there), and its button leaves the bottom-right cluster.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8h. **Now — the chart's Wind shadow layer shows nothing** (bug; 1–2 h): owner, "also on chart: toggling wind shadow
+   doesn't do anything that I can see." Find out whether it draws nothing (a bug), draws only near other boats or only
+   while racing (then say so on the chart when there's nothing to show), or draws too faintly (as with Waves). The
+   shadows to show: boats' dirty air, ships, the committee boat, the lee of the land and of the bridge piers, all already
+   in the physics. With 8f and 8g: the same layer row.
+8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
+   small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
+   chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
+   swell's direction) plainly where it matters, without cluttering the chart. Options to the owner if the look changes
+   much.
+8f. **Now — the map layer buttons need two clicks** (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
+   OFF, the long visibility note above it), "these buttons are requiring two clicks for some reason". One click should
+   switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
+   re-render under the pointer swallows it. Check every chip row with the same pattern (the map layers, the setup's
+   choices). A test that one click switches.
+8e. **Now — a crew member's arms are on backwards** (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
+   arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
+   past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
+   the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
 8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
@@ -188,15 +208,33 @@ What's planned, roughly in order. Done work is described in the README.
      racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
      The on-screen label is the owner's choice.
-8b. **A UI audit with real rigour** (owner, 13 November; next): "a UI audit on the roadmap to focus on real rigor on these
+8b. **A UI audit with real rigour** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
    navigation in place of "< Start page"; and the Yacht Club's Everyone / Skippers / Crew / Yours toggle, which confuses
    the owner. Proposals go to the owner before building; the screen rule above applies.
    Also filed with it:
-   - The setup builds the World only on Start (owner: the configurator lags because it rebuilds the play surface
+   - ~~The setup builds the World only on Start~~ (done: one World per change, the scene once at Start) (owner: the configurator lags because it rebuilds the play surface
      behind it).
-   - Bug: the flag index doesn't scroll.
+   - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
+   - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
+   - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
+     between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
+     no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
+     One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
+     some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
+     first.
+   - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
+     index.html line 369; minutes).
+   - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
+     OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
+     of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
+     the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
+     the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
+     these.
+   - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
+     there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
@@ -211,6 +249,19 @@ rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Buildi
 showroom's time and conditions, the swinging lantern); Sam's; accounts for other players; real slip numbers and nicer
 moored boats; the sea inside the marinas; the desktop release; the phone layout (on hold). The Bay East work carries on
 as it is.
+
+**Built 12–13 November beyond the ranked list** (to v174):
+- **Ghost races:** sail against your own recorded race, checked end to end. This is the first step to multiplayer.
+- **Real past races:** the replay against the real fleet, for a real past race; a race whose course is uncertain is
+  flagged.
+- **Training drills:** a start drill, and a mark-rounding drill with each rounding scored.
+- **The tactical debrief:** leg by leg against the fleet's middle, the leg's best and the ideal; seconds by cause; sail
+  numbers on the chips.
+- **Air temperature:** each day's own, from Fort Point and the NWS, for the crew's kit (shorts from 68 °F, the owner's).
+- **The ensign:** keeps its hours, 0800 to sunset; the burgee as the fleet flies it.
+- **The cabin instrument:** the Tacktick-style unit at the hatch garage's forward end, key 6. This begins the tactical
+  compass item.
+- **A racing season:** a proposal for the owner (docs), built from the real 2025–26 Seaweed Soup.
 
 **Owner's decisions, 12 November (morning)**, via the Coordinator:
 - Blanketing is not a foul: "stealing wind is a significant part of the strategy of tacking". Rules removes it as
@@ -288,7 +339,7 @@ is now "much better" (owner).
    pitch and heave, its light following) (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
-6. **True-to-life rigging, the owner's most important boat item** (12 November, from the owner's boat review; Rigging,
+6. ~~**True-to-life rigging, the owner's most important boat item**~~ (done: rigging-gear #159 and rigging-deck; the piano in the band's order, the halyard tackles, the jib sheet as Josephine has it) (12 November, from the owner's boat review; Rigging,
    after its current PRs; a big job, about 8–14 h): the blocks for the jib and main at the mast and the boom's junction,
    the Cunninghams, and the lines visible along the traveller, each led as on Josephine (the Full sail controls
    tables, reference/photos).
@@ -297,7 +348,7 @@ is now "much better" (owner).
      the cabin's front by the mast foot.
    - Winching (Crew Figures; 1–2 h): the jib winch handle sits under the deck, beneath the winch, which passes through
      the deck; and the crew winch in short pulls of at most 45°, not full circles.
-   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; the whisker pole stowed
+   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; ~~the whisker pole stowed~~ (done: its real 2.85 m, on the side deck)
      farther forward on the bow; cleats amidships.
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
@@ -822,6 +873,17 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
+  East Bay landmarks you navigate by (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
+  Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
+  sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
+  the university's and the hotel's own figures) and they belong in the landmark set used for transits, like Coit
+  Tower and the Transamerica Pyramid.
+  **Sutro Tower, properly built** (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
+  landmark already in the transit set, src/sim/transits.ts; 3–5 h). Today (render/landscape.ts) it's three banded legs
+  to 298 m with crossarms at two levels and thin masts on top. Find why it reads as cut off: the masts too thin to
+  see, the top lost to the far clipping plane or the fog, or the base sunk in the terrain. Build it to its real form,
+  sourced: the three-legged frame with its two levels of crossarms, the antenna masts on top, its red and white bands,
+  and its aircraft warning lights at night.
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
@@ -831,10 +893,10 @@ Owner: "As part of the training tools suite, let's build a sort of midair wind i
 arrows floating in the air showing where the wind is. Ideally we could also build a second view showing how the wind is
 traveling over the hull and sails to help players learn about sail shape and laminar flow."
 
-- **1. A midair wind indicator** (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
+- ~~**1. A midair wind indicator**~~ (done: true and apparent wind in the air beside her at three heights, key `, physics-reviewed) (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
   wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
   the rig (already in the physics) can be seen.
-- **2. A flow view** (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+- ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modelled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labelled where it's illustrative.
 

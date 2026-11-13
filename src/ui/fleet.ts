@@ -6,7 +6,7 @@ import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
-import { applyMemberInput, memberPage, membersGrid, type MemberFilter } from './members';
+import { applyMemberInput, memberPage, membersGrid } from './members';
 import { morph } from './morph';
 
 /**
@@ -50,7 +50,6 @@ export class Fleet {
   /** The season shown (null: the one under way). */
   private seasonId: string | null = null;
   private memberId: string | null = null;
-  private filter: MemberFilter = 'all';
   private confirmMemberDel = false;
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
@@ -127,7 +126,6 @@ export class Fleet {
       }
       case 'tab': this.tab = v === 'members' ? 'members' : v === 'season' ? 'season' : 'boats'; this.memberId = null; this.drawList(); return;
       case 'season': { const [id, no] = v.split('|'); this.close(); this.hooks.sailSeason(id, Number(no)); return; }
-      case 'mfilter': this.filter = (['all', 'skipper', 'crew', 'yours'] as const).find(x => x === v) ?? 'all'; this.drawList(); return;
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
       case 'mback': this.memberId = null; this.drawList(); return;
       case 'mnew': { const m = newMember(this.hooks.members(), { h: 1.75, w: 75 }, 'New member'); this.hooks.membersChanged(); this.memberId = m.id; this.drawList(); return; }
@@ -168,7 +166,7 @@ export class Fleet {
       morph(this.list, `<div class="panel wide fleetpanel">
         ${m ? '' : `<button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>`}
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats, this.filter)}</div>`);
+        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats)}</div>`);
       return;
     }
     morph(this.list, `<div class="panel wide fleetpanel">
@@ -242,7 +240,7 @@ export class Fleet {
       <section><h3>Crew history</h3>
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
           : '<small>Nobody has sailed her yet.</small>'}
-        <small>Skippers and crews come with the Yacht Club; until then, when she isn't sailed by you she has a generic AI skipper and crew.</small></section>
+        <small>When you don't sail her, a generic AI skipper does.</small></section>
       </div>`);
   }
 
