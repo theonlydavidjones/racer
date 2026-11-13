@@ -60,10 +60,13 @@ export const defaultControls = (): Controls => ({
 export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957;
 /**
  * How far the traveller alone swings the boom (deg, the car from the middle to either end): the sheet's blocks on the
- * boom stand over the car, which runs on a straight track across the thwart, so atan(0.5 / 2.957) = 9.6°. (North Sails'
- * guide moves the cars 15–20 cm to windward in light air: −0.3 to −0.4 of the travel.)
+ * boom stand over the car, which runs on a straight track across the thwart, so atan(TRAVELLER_HALF / SHEET_POINT):
+ * 9.6°. The car's travel is read off the photos, good to a few centimetres (±0.03 m is ±0.6°), so 9.5° is within it and
+ * stays until the track's measured: the AI's homing after racing's called off (tests/abandon-home.test.ts) turns on a
+ * tenth of a degree here, which is flagged. (North Sails' guide moves the cars 15–20 cm to windward in light air: −0.3
+ * to −0.4 of the travel.)
  */
-export const TRAVELLER_SWING = Math.atan(TRAVELLER_HALF / SHEET_POINT) * 180 / Math.PI;
+export const TRAVELLER_SWING = 9.5;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
   // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:

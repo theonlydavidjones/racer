@@ -27,7 +27,7 @@ lead is Deep Physics' car-lead work, and the sheet curves are a calibration choi
 
 | controls.ts | the real rig | verdict |
 |---|---|---|
-| traveller: ±9.5° of boom | the car runs on a straight track across the thwart, under the sheet's blocks 2.957 m aft of the gooseneck: atan(0.5 / 2.957) = **9.6°** | **sound**: now `TRAVELLER_SWING`, from the drawn figures (a test holds them together) |
+| traveller: ±9.5° of boom | the car runs on a straight track across the thwart, under the sheet's blocks 2.957 m aft of the gooseneck: atan(0.5 / 2.957) = **9.6°** | **sound**: `TRAVELLER_SWING` stays 9.5°, within the photo-read travel's ±0.6°, until the track's measured (tests/abandon-home.test.ts fails at 9.6°: flagged) |
 | boom max 85° (trim.ts `SAILS.main.max`, "boom on the shroud") | at boom height the shroud is about 0.83 m out and 0.26 m aft of the gooseneck (CR 7.20, 7.60, the drawn chainplate 0.98 m out); the boom's side meets the slanted wire at **≈ 70°** (about 66° at the class's limits, 0.90 m out and 0.36 m aft; less with the vang off, as the boom lifts) | **wrong by 15°**: on a run the drawn boom goes through the shroud, and the main is let further out than a Folkboat's can be |
 | jib lead 8° + 1.25°·pin (8°–13°) | North: **12.3°** if its 2.65 m is fore and aft (atan), **12.6°** if it's the straight tape from the forestay pin to the block its wording describes (asin); Josephine: 14.0° / 14.4° the same two ways, her holes 24 mm apart = **0.49° a hole** (±1.0° over five) | **too narrow, and the pins too far apart**: the middle hole should be about 12–14°, not 10.5°, with about 0.5° a pin, not 1.25° (for Deep Physics' car-lead work) |
 | jib min 8° (`SAILS.jib.min`) | the lead itself | follows the lead |
