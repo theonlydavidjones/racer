@@ -45,6 +45,28 @@ describe('Rule 18.2(c) and (d) · mark-room after 18.2(a) has ended', () => {
   });
 });
 
+describe('Rule 18.2(d) · an overlap obtained by tacking, not by gybing', () => {
+  //   Red ↙ (gybes) ... Blue ↙        Red changes tack and the overlap begins at once
+  function overlapAfter(passedHeadToWind: boolean) {
+    const blue = boat('Blue', { at: [0, 0], heading: 190 });
+    const red = boat('Red', { at: [-6, 20], heading: 190 });
+    const p = pair(blue, red);
+    p.at(100);
+    red.lastTackT = 100.5; if (passedHeadToWind) red.headToWindT = 100.5;
+    moveTo(red, [-6, 1]); // now overlapped
+    p.at(101);
+    return { red, p };
+  }
+  it('a gybe that brings an overlap does not make her the tacking boat', () => {
+    const { p } = overlapAfter(false);
+    expect(p.rec.ovStart).toMatchObject({ tacker: null });
+  });
+  it('a tack that brings an overlap does', () => {
+    const { red, p } = overlapAfter(true);
+    expect(p.rec.ovStart).toMatchObject({ tacker: red.id });
+  });
+});
+
 describe('Rule 18.4 · gybing in the zone', () => {
   // Leeward mark at the origin; the next leg is a reach to the east-north-east (port tack), so a boat on starboard
   // must gybe at the mark.

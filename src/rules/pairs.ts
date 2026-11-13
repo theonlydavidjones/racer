@@ -10,7 +10,7 @@ export const CONTACT_GAP = 2.2;
 const htw = (b: { headToWindT?: number }) => b.headToWindT ?? -Infinity;
 /** Rule 15: how long a boat that just acquired right of way must give the other boat room, s. */
 export const RULE15_GRACE = 3.5;
-/** A boat counts as having "just tacked" (rule 15) for this long after a change of tack, tack or gybe (lastTackT), s. */
+/** How long a boat counts as having "just tacked", s: after any change of tack for rule 15, after passing head to wind for 18.2(d). */
 export const JUST_TACKED = 2;
 /** After an incident, the same pair can't foul again for this long, s. */
 export const INCIDENT_COOLDOWN = 6;
