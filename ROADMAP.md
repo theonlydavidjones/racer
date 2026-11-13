@@ -194,6 +194,28 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+   the owner first):
+   - "all sail stuff together, all hull stuff together, etc." Proposed groups:
+     - **Her:** name, sail number and country, club.
+     - **Hull:** material, topsides, boot stripe, bottom paint and its finish, bottom last cleaned, name lettering, weight
+       over the class minimum.
+     - **Deck and cabin:** deck, cabin top, forehatch, companionway, whisker pole stowage, navigation lights, outboard.
+     - **Rig:** mast, boom, rig tune.
+     - **Sails:** sailcloth, mainsail, jib, sail number color, class letter F color.
+     - **Lines:** each line's color.
+   - The skipper, and the home marina and slip: "not sure skipper assignment belongs here. also not sure about marina and
+     slip assignment. help me decide." Recommendation (owner to decide): the skipper moves to the Yacht Club, which is
+     already where crew are assigned to boats; the boat page shows the skipper read-only, with a link there. The home
+     marina and slip stay with the boat, as her "Home berth" at the end, since a berth is where the boat lives, not a
+     person's attribute.
+   - Color: "I don't like the little color chips, or the fact that some elements use a kind of toggle array for color.
+     I'd like a color picker for everything ideally, with ability to add hex codes, and some smarts to save a few custom
+     color chips (like in Google Docs) so I don't have to re-enter them for each different thing." One color picker for
+     every color on the boat (hull, boot stripe, bottom, deck, cabin top, lettering, sail numbers, the F, each line): a
+     full picker, a hex field, the class's usual colors as presets, and a row of your own saved custom colors shared by
+     every picker and kept with your account. Where a choice is a material rather than a color (teak or fiberglass,
+     sailcloth), it stays a choice.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
