@@ -101,20 +101,36 @@ export const WAKE = {
 /** the peak of η·exp(−ln2·η²), at η = 1/√(2·ln2) */
 const ODD_PEAK = Math.exp(-0.5) / Math.sqrt(2 * Math.LN2);
 
+/** Each pier's stream (speed and direction) and its outline seen along it, worked out once for a set of flows (they
+ * change every half minute, World.pierFlows; asked every step for every boat): the same sums as at each look, so the
+ * same wakes. Piers in slack water (under 2 cm/s) left out. Kept by the flows array itself, so another World's (or a
+ * test's) flows get their own. */
+let wakeFlows: Vec[] | null = null, wakeList: { P: Pier; c: Vec; U: number; e: Vec; W: number; back: number }[] = [];
+function wakesFor(flows: Vec[]): typeof wakeList {
+  if (flows === wakeFlows) return wakeList;
+  wakeFlows = flows; wakeList = [];
+  for (let i = 0; i < WAKE_PIERS.length; i++) {
+    const { P, c } = WAKE_PIERS[i], f = flows[i], U = Math.hypot(f.x, f.y);
+    if (U < 0.02) continue;
+    const e = { x: f.x / U, y: f.y / U }, { W, back } = extent(P, c, e);
+    wakeList.push({ P, c, U, e, W, back });
+  }
+  return wakeList;
+}
+
 /**
  * The current at p with the piers' wakes in it: `here` the current at p without them, `flows[i]` the stream meeting
  * WAKE_PIERS[i] (m/s), `t` the time (s) for the eddies.
  */
 export function withPierWakes(p: Vec, here: Vec, flows: Vec[], t: number): Vec {
   let ox = here.x, oy = here.y;
-  for (let i = 0; i < WAKE_PIERS.length; i++) {
-    const { P, c } = WAKE_PIERS[i], f = flows[i], U = Math.hypot(f.x, f.y);
-    if (U < 0.02) continue;
+  const R2 = (WAKE.reach + 100) ** 2;
+  for (const { P, c, U, e, W, back } of wakesFor(flows)) {
     const dx = p.x - c.x, dy = p.y - c.y;
-    if (dx * dx + dy * dy > (WAKE.reach + 100) ** 2) continue;
-    const e = { x: f.x / U, y: f.y / U }, along = dx * e.x + dy * e.y;
+    if (dx * dx + dy * dy > R2) continue;
+    const along = dx * e.x + dy * e.y;
     if (along < 0) continue;
-    const { W, back } = extent(P, c, e), x = along - back;
+    const x = along - back;
     if (x < 0 || x > WAKE.reach) continue;
     const y = dx * e.y - dy * e.x, cdD = WAKE.CD * W;
     const half = Math.max(W / 2, Math.sqrt(2 * WAKE.S * WAKE.K * cdD * Math.max(x, 1e-3)));
