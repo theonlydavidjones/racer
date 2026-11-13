@@ -48,7 +48,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 88 | 205 | 10 | P passes 2 ft astern after S luffed hard: P broke 10 (keeping clear isn't just avoiding contact) | partly (only as a forced swerve) |
 | 92 | 213 | 16.1, 16.2 | S keeps bearing away onto P passing astern: S broke 16.2, then 16.1 | covered |
 | 99 | 226 | 10, 14, 44.1(b) | P broaches into S: P broke 10 (and retires) | partly (retirement as penalty) |
-| 105 | 235 | 10, 15, 16.1 | Running, S luffs after a long parallel course and P doesn't respond: P broke 10, S didn't break 16.1 (P had room) | **finding 2** |
+| 105 | 235 | 10, 15, 16.1 | Running, S luffs after a long parallel course and P doesn't respond: P broke 10, S didn't break 16.1 (P had room) | covered (finding 2, fixed) |
 | 107 | 238 | 10, 14 | Head-on before the start: Jupa (P) broke 10 | partly (lookout, 14 for S) |
 | 123 | 274 | 10, 14 | S holds her course, P doesn't clear her: P broke 10 | partly (S's own 14 not modelled) |
 | 134 | 293 | 17 | Proper course depends on the sails set | not modelled |
@@ -71,7 +71,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
-| 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | **finding 1** |
+| 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered (finding 1, fixed) |
 | 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | partly (the mark touch's exoneration) |
 | 114 | 253 | 16.1, 18.2(a)(1), 31 | Room owed through a middle boat; at a starting mark L luffs W onto it: L broke 16.1 | partly (three-boat chains; Q3 buildable) |
 | 118 | 260 | 18.2(a)(1) | "Room to sail to the mark" at a leeward mark: no breach | partly |
@@ -119,9 +119,9 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tally
 
-- Covered, the test reaching the Case's answer: 16 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 101).
-- Findings, the engine answering differently: 2 (93, 105). Findings 3 (the gybe, found while checking Case 2) and 4–6
-  (Cases 27, 53, 101) are fixed.
+- Covered, the test reaching the Case's answer: 18 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 93, 101, 105).
+- Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the gybe, found while checking
+  Case 2) and 4–6 (Cases 27, 53, 101) are fixed.
 - Partly: 42.
 - Not modelled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
@@ -135,18 +135,20 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
 
 ### Findings
 
-1. **Case 93 (rule 18.3): the engine makes the boat that tacked in the zone keep clear, where 18.3 only asks her to give
-   mark-room.** W tacks from port to starboard in the zone; L, on starboard and fetching, gets a leeward overlap from clear astern and
-   luffs straight into W. The Case: L broke 15 and 16.1 (and 14); W broke 11 but is exonerated, and gave L mark-room, so didn't break
-   18.3. The engine: W, under 18.3 (src/rules/rightOfWay.ts: once the tacking boat is overlapped with the fetching boat it returns
-   her as the keep-clear boat, `{ kc: T, rule: '18.3' }`). 18.3(b) obliges her to give mark-room if the other gets inside her, and
-   18.3(a) not to make her sail above close-hauled; neither makes her keep clear of a luff that isn't for mark-room. A fix would let
-   rules 11, 15 and 16 govern the pair while the fetching boat's course isn't one mark-room protects (luffing above close-hauled
-   toward the tacker, not sailing to or round the mark). Two more parts of it: rule 15 isn't applied when the right of way changes to
-   or from 18.3 (src/rules/pairs.ts), though this Case turns on rule 15; and 18.3(b) is about an inside overlap only, where the
-   engine makes the tacker keep clear for an overlap on either side. Test: tests/rules-cases.test.ts, Case 93 (`it.fails`; the
-   engine's present answer is pinned in "Case 93 (the setup)").
-2. **Case 105 (rule 16.1): the engine calls any turn toward the other boat a 16.1 breach, without asking whether she had room to
+1. **Fixed. Case 93 (rule 18.3): the engine made the boat that tacked in the zone keep clear, where 18.3 only gives her
+   duties.** W tacks from port to starboard in the zone; L, on starboard and fetching, gets a leeward overlap from clear astern and
+   luffs straight into W. The Case: L broke 15 and 16.1 (and 14); W broke 11 but is exonerated, and gave L mark-room, so didn't
+   break 18.3. The engine had returned the tacker as the keep-clear boat under 18.3 whenever they were overlapped, and skipped rule
+   15 for it. Now (src/rules/rightOfWay.ts, pairs.ts): 18.2 is off between them, as before; the tacker keeps clear under '18.3' only
+   with the fetching boat to windward of her, where rule 11 alone would have that boat luff above close-hauled; otherwise the basic
+   rules, 15 and 16 govern. At an incident, 18.3(a) is the tacker's breach when the fetching boat, at or above close-hauled and not
+   turning toward her, was overlapped to windward of her; a fetching boat that bears away into her broke 11, and one clear astern
+   is under 12 as usual (made to luff above close-hauled from there isn't modelled: it needs ROOM-TO-RESPOND's escapes()).
+   Not modelled: 18.3(b)'s mark-room as exoneration under 43.1(b) (as for 18.2). Tests: Case 93 in tests/rules-cases.test.ts,
+   "Rule 18.3" in tests/rules.test.ts.
+2. **Fixed** (src/rules/pairs.ts leftRoom, from each pair's pose history, with src/boat/arcs.ts escapes(): could the other
+   boat, reacting in 1 s, have turned away from where they were when the luff began? docs/ROOM-TO-RESPOND.md. 16.2 stays
+   stricter: on a beat any bear-away that makes the ducking boat respond at once). **Case 105 (rule 16.1): the engine calls any turn toward the other boat a 16.1 breach, without asking whether she had room to
    keep clear.** Running on opposite tacks after a long time side by side, starboard luffs; port doesn't respond, though she could
    have kept clear (by gybing), and they touch. The Case: port broke 10; starboard didn't break 16.1, because port had room. The
    engine (src/rules/pairs.ts `turnedToward`): a right-of-way boat that turned 12° or more toward the other within 3 s before the
