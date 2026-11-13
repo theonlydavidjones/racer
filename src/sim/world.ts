@@ -160,8 +160,6 @@ export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'cho
 export const AI_EVERY = 3;
 /** Close quarters (m): four of her lengths (LOA 7.64 m), a length beyond the zone's three (RRS Definitions, Zone). */
 export const CLOSE_M = 4 * LOA;
-/** Within this (m), two lengths, another boat is close quarters whether closing or not. */
-export const CLOSE_IN = 2 * LOA;
 
 export class World {
   readonly C: Course;
@@ -772,8 +770,8 @@ export class World {
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
-    // boat answers her helm every step); in close quarters (World.closeQuarters: a boat within two lengths, or within four and
-    // closing; a mark within four; about to touch; or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
+    // boat answers her helm every step); in close quarters (World.closeQuarters: a boat or a mark within four lengths, about to
+    // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
     for (const b of this.boats) if (!b.isUser) {
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
@@ -1001,13 +999,7 @@ export class World {
   private closeQuarters(b: Boat): boolean {
     if (b.ai?.urgent || b.penalty > 0) return true;
     const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
-    // another boat within two lengths; or within four and closing on her (two boats parting, or holding their distance
-    // side by side, need no quicker eye than twenty times a second's: there's nothing about to happen between them)
-    for (const o of this.boats) {
-      if (o === b) continue;
-      const dx = o.x - b.x, dy = o.y - b.y, d2 = dx * dx + dy * dy;
-      if (d2 < CLOSE_IN * CLOSE_IN || d2 < r2 && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0) return true;
-    }
+    for (const o of this.boats) if (o !== b && near(o)) return true;
     for (const m of this.C.marks) if (near(m.p)) return true; // (a mark: the rounding's timing is close work, coming or going)
     const cb = this.committeeHull; // (the committee boat by her whole hull, as avoidMarks steers round it)
     return near(this.C.pin) || (!!cb && (cb.q ? segPt(b, cb.p, cb.q) : dist(b, cb.p)) < CLOSE_M);
