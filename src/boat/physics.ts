@@ -756,13 +756,13 @@ function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number)
   b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
 
-/** Fort Mason's piers stand on close-set concrete piles under a deck lower than her masthead: a boat set onto one by the
- * stream or the wind, with no way on to steer off, or set sideways onto it, goes in among the piles, her rig comes down on
- * the deck's edge and her hull's ground on the concrete. A wreck (the owner, 13 Nov 2026), not a bump. Struck bow first
- * under way she bounces off its face, as off any pier. */
-function wreck(b: Boat, pier: string, emit: Emit): void {
-  b.wrecked = pier; b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0;
-  if (b.isUser) emit({ type: 'toast', ms: 9000, msg: `Wrecked: she's been set in under ${pier}, among the piles. Rig down, hull holed: in real life, the end of your boat. Esc to go ashore.` });
+/** Fort Mason's piers stand on close-set concrete piles under a deck lower than her masthead: set onto them by the
+ * stream or the wind with no way on to steer off, or set sideways onto them, she's caught among them, and in real life
+ * that's very likely the end of the boat (the owner, 13 Nov 2026). What a wreck means in the sim is still to be worked out
+ * (docs/WRECK-PROPOSAL.md); for now she's stopped dead against them, and told so. */
+function onPiles(b: Boat, pier: string, emit: Emit, groundToast: { t: number }, t: number): void {
+  b.v = 0; b.sway = 0; b.astern = 0;
+  if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', ms: 6000, msg: `Set onto the piles of ${pier}: in real life, likely the end of your boat.` }); }
 }
 /** Below this speed through the water (m/s) her rudder barely bites: she goes where the stream and wind set her. */
 const STEERAGE = 0.5;
@@ -785,9 +785,9 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
     const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
     const piles = underPier(hit);
-    if (piles && b.v < STEERAGE && !b.motor?.running) { wreck(b, piles.name, emit); return; }
+    if (piles && b.v < STEERAGE && !b.motor?.running) { b.x -= u.x * 0.6; b.y -= u.y * 0.6; onPiles(b, piles.name, emit, groundToast, t); return; }
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
-    bump(piles ? `Collision: you hit the piles of ${piles.name}. Bear away and give it room: set in under it, she's a wreck.` : pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+    bump(piles ? `Collision: you hit the piles of ${piles.name}. Bear away and give it room.` : pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {
     const hit = stern(b), pier = pierNear(hit, 6);
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
@@ -801,7 +801,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   if (!b.pushing && Math.abs(side) > 0.005 && Math.abs(side) > 0.5 * Math.abs(ahead)) {
     const sgn = Math.sign(side), hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
     const piles = hit && underPier(hit);
-    if (piles) { wreck(b, piles.name, emit); return; }
+    if (piles) { b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; onPiles(b, piles.name, emit, groundToast, t); return; }
     if (hit) {
       const pier = pierNear(hit, 6);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;

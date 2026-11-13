@@ -306,6 +306,6 @@ function raceRow(e: LogEntry): string {
   return `<tr><td>${dayLabel(e)}</td><td>${esc(e.title)}<small>${esc(e.wind)}</small></td><td>${place}</td><td>${e.elapsed != null ? mmss(e.elapsed) : '—'}</td><td>${e.skipper === 'you' ? 'You' : 'AI'}</td></tr>`;
 }
 function crewRow(e: LogEntry): string {
-  const what = e.kind === 'race' ? `Race: ${esc(e.title)}` : `Cruise: ${esc(e.title)}${e.nm != null ? `, ${e.nm.toFixed(1)} nm` : ''}${e.arrived ? ' ✓' : ''}${e.wreck ? `, wrecked under ${esc(e.wreck)}` : ''}`;
+  const what = e.kind === 'race' ? `Race: ${esc(e.title)}` : `Cruise: ${esc(e.title)}${e.nm != null ? `, ${e.nm.toFixed(1)} nm` : ''}${e.arrived ? ' ✓' : ''}`;
   return `<tr><td>${dayLabel(e)}</td><td>${what}</td><td>${e.skipper === 'you' ? 'You' : 'AI (generic)'}</td><td>${esc(e.crew)}</td></tr>`;
 }

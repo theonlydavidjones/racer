@@ -400,7 +400,6 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
 /** The one thing to say when nothing needs fixing. */
 function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   const base = { id: 'ok', who: 'you', gain: 0, kind: 'ok' as const };
-  if (b.wrecked) return { ...base, kind: 'info', head: `Wrecked under ${b.wrecked}. Esc to go ashore.`, why: '', look: '' };
   if (b.docked) return { ...base, head: 'In her slip. Push off when you\'re ready.', why: '', look: '' };
   // pushed off with no sail up and stopped in a harbor: no way on, so the rudder can't turn her (8m, the owner at Gashouse
   // Cove). The ways out a sailor has: a sail up for way (the jib goes up at any angle but head to wind), the main hoisted at
@@ -408,8 +407,8 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && Math.hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
     return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way; next time, hoist the main at the dock, head to wind.', why: '', look: 'which way the wind is setting her' };
   // set toward Fort Mason's piers with little way on (the Gashouse Cove entrance, 8n): the stream or the wind carries her
-  // in among the piles in seconds, and under the deck she's a wreck (physics.ts wreck); way on, and steer off
-  { const set = !b.wrecked && !b.docked && (b.v ?? 0) < 1 ? setOntoPier(b, b.vx ?? 0, b.vy ?? 0) : null;
+  // onto the piles in seconds (physics.ts piles); way on, and steer off
+  { const set = !b.docked && (b.v ?? 0) < 1 ? setOntoPier(b, b.vx ?? 0, b.vy ?? 0) : null;
     if (set) return { ...base, kind: 'info', head: `Being set onto ${set.pier.name}: ${Math.max(1, Math.round(set.s))} s to the piles. Get way on and steer off.`, why: '', look: 'the pier\'s piles against the water: is the gap closing?' }; }
   if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: 'Sails going up (or down): the coach waits until they\'re set.', why: '', look: '' };
   if (b.luff) return { ...base, kind: 'info', head: 'Sails eased right out: she\'s slowing.', why: 'Easing both sails until they flog is the brake: she coasts to a stop.', look: 'the speedo; trim back in to go' };

@@ -872,7 +872,6 @@ export class World {
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
-      if (b.wrecked) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; continue; } // (held among the piles: nothing more she can do)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
       const x0 = b.x, y0 = b.y;
@@ -882,8 +881,6 @@ export class World {
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
-      if (b.wrecked && b.motor?.running) b.motor.running = false; // (her outboard drowned or fouled among the piles)
-      if (b.wrecked && b.isUser && !this.freeSail) this.retire(`, wrecked under ${b.wrecked}`);
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
       if (b.mooring) this.mooringStep(b, dt); // (coming in: the hand at the shrouds, waiting to step)

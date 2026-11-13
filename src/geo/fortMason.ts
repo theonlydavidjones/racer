@@ -4,8 +4,9 @@ import { LL } from './geo';
 /**
  * Fort Mason's three piers, as pile fields (ROADMAP 8n; the owner, 13 Nov 2026): each a deck on rows of massive concrete
  * piles (reference/photos/fort-mason-pier-piles-gashouse-exit.jpg), with the long pier shed on top. The water runs under
- * them; a boat doesn't: set in among the piles she's a wreck ("that means bye bye to your boat; you would just churn
- * around under there in all the decades-old concrete and rebar and barnacles"), not a bounce off a dock.
+ * them; a boat doesn't: set in among the piles, in real life, "that means bye bye to your boat; you would just churn
+ * around under there in all the decades-old concrete and rebar and barnacles". In the sim, for now, she's stopped dead on
+ * them and told so (boat/physics.ts onPiles); what a wreck means is still to be worked out (docs/WRECK-PROPOSAL.md).
  *
  * The outlines are the piers' own, from the OpenStreetMap coastline the sim's Marina shore is drawn from
  * (src/geo/data/marina-coast.json, natural=coastline, fetched 11 Nov 2026), each from the bulkhead along the waterfront

@@ -427,7 +427,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     place(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK), end - back * Math.cos(r) / 111320, lon - back * Math.sin(r) / 88000, brg, 0);
   }
   // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
-  // through: in under there a boat's a wreck (boat/physics.ts). The deck's height and the piles' size and spacing are
+  // through: a boat set onto them is caught (boat/physics.ts onPiles). The deck's height and the piles' size and spacing are
   // ESTIMATES (no survey found): a deck about 3 m above the water, piles 0.6 m across about 4.5 m apart each way.
   {
     const deckMat = lam(0x9d968a), pileMat = lam(0x6f6a60), PITCH = 4.5, R = 0.3, D = 0.7;
