@@ -182,6 +182,19 @@ export const AI_EVERY = 3;
 /** Close quarters (m): four of her lengths (LOA 7.64 m), a length beyond the zone's three (RRS Definitions, Zone). */
 export const CLOSE_M = 4 * LOA;
 
+
+/**
+ * The numbers a boat is built with as whole numbers that later hold fractions (her last tack's time, her penalty's turning),
+ * made doubles from the start: stored once as a fraction and put back, the value unchanged. V8 keeps a field that has only
+ * held small integers as one, and changes the boats' hidden class when it first holds a fraction; mid-race, that left the
+ * rules' hottest functions (checkPairs, assessPair) compiling and discarding the result some 800 times in the first race
+ * after load (14 s of the browser's compiler threads: found by Capacity). weatherHeld and carOff, given later and starting
+ * at 0, are declared undefined in makeBoat for the same reason. (A V8 matter: Safari's engine keeps shapes its own way, and
+ * this costs it nothing.)
+ */
+const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT'] as const;
+function asDoubles(b: Boat): Boat { const o = b as unknown as Record<string, number>; for (const k of LATER_FRACTIONS) { const v = o[k]; o[k] = 0.5; o[k] = v; } return b; }
+
 export class World {
   readonly C: Course;
   settings: Settings;
@@ -453,7 +466,7 @@ export class World {
       h = n360(lineH + (r() < 0.5 ? 0 : 180));
     }
     const spec = isUser ? this.settings.boat : oppSpec; // your boat as you've set her up (or a rival you've set up)
-    return {
+    return asDoubles({
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
@@ -466,7 +479,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser && this.settings.manualTrim === 2, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (the waves' motion, there from the start so a boat keeps one shape: added later, the hot functions reading her slowed)
-      heave: 0, heaveRate: 0, pitch: 0, pitchRate: 0, waveU: 0, waveV: 0, waveDU: 0, waveRoll: 0, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      heave: 0, heaveRate: 0, pitch: 0, pitchRate: 0, waveU: 0, waveV: 0, waveDU: 0, waveRoll: 0, weatherHeld: undefined, carOff: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -479,7 +492,7 @@ export class World {
           mode: 'hold' as const, wp: wp as 0 | 1, f, depth, aggr, width, aware, kn: legacyKnobs(aware), clearing: false, plan: { leave: NaN, tReach: Infinity, coast: 0, back: false }, turnCommit: 0, commitFor: 0, duckUntil: -Infinity, lastHail: -Infinity
         };
       })()
-    };
+    });
   }
 
   /* ---------- queries used by AI, HUD and rendering ---------- */
