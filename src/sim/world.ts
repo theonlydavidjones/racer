@@ -1122,10 +1122,11 @@ export class World {
   /** The AI boats think every step (for the tests): otherwise every AI_EVERY steps, staggered, and every step in close quarters. */
   exactAI = false;
   /** Close quarters for an AI boat: another boat or a mark within CLOSE_M, about to touch (Rule 14), keeping clear of a
-   * boat (ai.ts keepClear: her escape judged from where the boats are now, not where they were a few steps back), or
+   * boat, steering or easing to do it (ai.ts keepClear: her escape judged from where the boats are now, not where they
+   * were a few steps back; only watching one, she thinks at her usual rate), or
    * taking a penalty. */
   private closeQuarters(b: Boat): boolean {
-    if (b.ai?.urgent || b.ai?.esc || b.penalty > 0) return true;
+    if (b.ai?.urgent || b.ai?.esc?.heading != null || b.ai?.esc?.luff || b.penalty > 0) return true;
     const r2 = CLOSE_M * CLOSE_M, near = (p: Vec) => (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < r2;
     for (const o of this.boats) if (o !== b && near(o)) return true;
     for (const m of this.C.marks) if (near(m.p)) return true; // (a mark: the rounding's timing is close work, coming or going)
