@@ -17,7 +17,7 @@ import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
 import type { Boat } from '../boat/boat';
 import { P3 } from './coords';
-import { addLandscape, bridgeLights } from './landscape';
+import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
 import { updateNight } from './night';
 import { REFLECTIVE, RIG } from './boatMesh';
 import type { Terrain } from './terrain';
@@ -709,6 +709,8 @@ export class SceneView {
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
     (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up * (1 - 0.9 * murk));
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
+    { const on = ((performance.now() / 1000) % 2) < 0.33; // Sutro Tower's beacons: 30 flashes a minute (landscape.ts sutroBeacons)
+      if (sutroBeacons.red) sutroBeacons.red.visible = on && el < 3; if (sutroBeacons.white) sutroBeacons.white.visible = on && el >= 3; }
     if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
     const fogAmt = fog === 'real' ? fogBankAmount(tMin) : 0; // set fog replaces the summer fog bank
