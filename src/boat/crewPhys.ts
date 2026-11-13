@@ -611,8 +611,8 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // change of place for the trim, waits until it has lasted, and the dwell
     // (in light air, across the boat to leeward waits for a lull that has lasted, HOLD.leeLast: one of a few seconds had
     // them across and, the wind back through 6 kt, straight back out again)
-    // (not for the helm where helmLight's own wait has been served)
-    const leeCross = !out && k.tws < 8 && !helmLight(i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+    // (not for the helm where helmLight's own wait has been served, nor on a run, where the run rule's has)
+    const leeCross = !out && k.tws < 8 && k.twa <= 120 && !helmLight(i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
     const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= (leeCross ? HOLD.leeLast : HOLD.last) && (out || h.since >= HOLD.dwell));
     if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; return; } // (moved: the waits start afresh)
     stay(i, h, t);
