@@ -120,7 +120,27 @@ them), `crossOriginIsolated`, a 64 KB transfer round trip, a fleet-sized structu
 test's reference workload in the worker against the page's own thread. It saves each run to its db (`runs`). Locally
 in headless Chromium, all three Worker kinds started; the transfer round trip took 0.1 ms and the clone round trip
 1.0 ms (so pack the snapshot into typed arrays and transfer it). The reference workload took the same time in the
-worker as on the page (110.6 against 110.8 ms). The host's own result is pending until the owner opens the page.
+worker as on the page (110.6 against 110.8 ms). **The owner's result** (13 Nov 2026, two runs, Safari 27 on an 8-core Mac, inside claude.ai):
+
+| check | result |
+|---|---|
+| Worker from a blob URL, classic | starts, answers |
+| Worker from a blob URL, module (Vite `?worker&inline`) | starts, answers |
+| Worker from a data: URL (Vite's fallback) | **refused** (the frame's CSP) |
+| crossOriginIsolated / SharedArrayBuffer | false / absent (as §1.5 predicted) |
+| 64 KB transfer and the clone round trip | both "0 ms": under Safari's 1 ms clock resolution |
+| reference workload: worker / page | 35 / 34–37 ms (this container's headless Chromium: 110.6) |
+
+What follows for the build:
+- **Go.** The blob module worker is exactly what the plan needs.
+- The fallback must be the in-process World, **not** Vite's data: URL. Vite falls back to data: only when the blob
+  worker throws, and that would fail here too, so our code catches the failure and runs in-process.
+- The owner sails in **Safari** (JavaScriptCore). The perf numbers in this doc are V8's, so the worker step is to be
+  checked in Safari as well. Safari's `performance.now()` resolution is 1 ms, which the `` ` `` meter has to average
+  over frames.
+- The owner's machine runs the reference about 3.2× faster than this container's headless page. So their 4× sim today
+  is likely nearer 1–1.5 ms a frame than the 2.2–3 ms estimated for a typical laptop, and the budget mainly protects
+  slower machines. The worker's headroom on their machine is correspondingly larger.
 
 ### 1.6 What a snapshot costs
 
