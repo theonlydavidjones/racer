@@ -162,6 +162,20 @@ describe('Rule 18.3 · the boat that tacked, with the fetching boat inside her',
     expect(p.at(103, { swerve: true }).foul).toMatchObject({ by: 'Jagga', rule: '11', kind: 'swerve' });
   });
 
+  it('18.3(b): L gets the inside overlap from clear astern and holds her course to the mark; contact in her rule 15 time is W\'s (11): L, within her mark-room, is exonerated for 15 (43.1(b))', () => {
+    const M = mark('p', true);
+    const W = boat('W', { at: [6.9, -0.9], heading: 45 }), L = boat('L', { at: [14, -8], heading: 315 });
+    const p = pair(W, L, [M]);
+    p.at(44);
+    W.lastTackT = 45.5; W.headToWindT = 45.5; moveTo(W, [6.9, -0.9], 315);
+    p.at(46);
+    moveTo(L, off([6.9, -0.9], 315, -2, -3), 315); // overlapped to leeward from clear astern, holding her course
+    p.at(48);
+    expect(p.rec.r183).toMatchObject({ tacker: W.id, binds: true });
+    moveTo(L, off([6.9, -0.9], 315, -1.6, -1.8), 315, 315); // still on her course; the gap closes
+    expect(p.at(48.5).foul).toMatchObject({ by: 'W', rule: '11' });
+  });
+
   it('Case 93 (the other half): L, overlapped inside, holds her course; W sags down onto her: W broke 11 (she still owes room, 18.3(b))', () => {
     const M = mark('p', true);
     const W = boat('W', { at: [6.9, -0.9], heading: 45 }), L = boat('L', { at: [14, -8], heading: 315 });

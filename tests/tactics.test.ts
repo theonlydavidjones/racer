@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '../src/replay/recorder';
 import { tactics, type TacIn } from '../src/replay/tactics';
+import { manoeuvreS } from '../src/sim/routing';
 
 /** Three boats on one beat due north, 1000 m: each straight up at her own speed, x offset, current (north +) and headed shift. */
 function race(b: { v: number; x: number; cur: number; shift: number; start: number; air?: number; tackEvery?: number }[]): TacIn {
@@ -37,7 +38,7 @@ describe('the tactical debrief', () => {
     const T = tactics(race([{ v: 3, x: 0, cur: 0, shift: 0, start: 1, air: 0.8, tackEvery: 60 }, { v: 3, x: 0, cur: 0, shift: 0, start: 1, air: 0.8 }, { v: 3, x: 0, cur: 0, shift: 0, start: 1, air: 0.8 }]));
     const L = T.rows[1];
     expect(Math.abs(L.causes.clearAir ?? 0)).toBeLessThan(0.5);
-    expect(L.causes.manoeuvres!).toBeCloseTo(5 * 3.3, 0); // five tacks (at 60, 120 … 300 s on a 333 s leg) at a good tack's 3.3 s in 12 kt (routing.ts)
+    expect(L.causes.manoeuvres!).toBeCloseTo(5 * manoeuvreS('tack', 12), 0); // five tacks (at 60, 120 … 300 s on a 333 s leg) at a good tack's cost in 12 kt (routing.ts's table)
   });
 
   it('left and right are looking up the course, on a run too', () => {
