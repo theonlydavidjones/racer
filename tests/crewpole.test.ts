@@ -4,14 +4,16 @@ import { crewPoleCall } from '../src/ai/ai';
 import { settleTrim } from '../src/boat/physics';
 import { n360 } from '../src/core/math';
 import { allToCrew } from '../src/boat/physics';
-import { World } from '../src/sim/world';
-import { DEFAULT_SETTINGS } from '../src/settings';
+import { DT, World } from '../src/sim/world';
+import { COURSES } from '../src/courses/registry';
+import { SLIPS, inBasin } from '../src/geo/marina';
+import { applyCommand } from '../src/sim/commands';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
 import { testBoat } from './helpers/testBoat';
 
-// The crew's call on the whisker pole (ai.ts crewPoleCall): theirs on the AI boats, and on yours until you take it
-// (the sail controls band's Pole tab), back with Auto-trim (owner, 12 Nov 2026).
+// The crew's call on the whisker pole (ai.ts crewPoleCall): theirs on the AI boats only; yours is your call (below).
 const world = (t = 60) => ({ t, nextMark: () => null }) as unknown as World;
 
 describe('The crew calls the whisker pole', () => {
@@ -33,15 +35,54 @@ describe('The crew calls the whisker pole', () => {
     b.twa = 170; crewPoleCall(world(-30), b); expect(b.poleWant).toBe(false);
     b.rig = { main: 1, jib: 0, mainUp: true, jibUp: false }; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
   });
-  it('your crew sets it in a race, unless the pole is yours (World.step)', () => {
-    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS }, 1), u = w.user;
-    w.t = 60; u.twa = 170; u.poleMine = false; w.step(0.05); expect(u.poleWant).toBe(true);
-    u.poleWant = false; u.poleMine = true; w.t = 60; w.step(0.05); expect(u.poleWant).toBe(false);
+  it('an AI crew never sets it inside a harbor\'s basin', () => {
+    const b = testBoat({ heading: 0, kt: 4 }); b.twa = 170; Object.assign(b, SLIPS[0].p);
+    crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
   });
-  it('Auto-trim hands the pole back to the crew', () => {
-    const b = testBoat({ heading: 0, kt: 4 });
-    b.poleMine = true; allToCrew(b); expect(b.poleMine).toBe(false);
-  });
+});
+
+// Your boat's pole goes out only on your call (the owner, 13 Nov 2026: "pole-out should only ever be on my command"):
+// your crew never sets it, on Auto or Auto-trim, deep downwind or in a marina; they stow it only when it must come in.
+describe('your pole: your call only', () => {
+  /** Your boat cruising, the wind west 12 kt, everything on Auto, held `twa` off the wind for `secs`. */
+  function deep(twa: number, secs: number, at?: { x: number; y: number }) {
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack' } as Settings, 3, { freeSail: true }), u = w.user;
+    w.step(DT); allToCrew(u); if (u.crew) u.crew.place = undefined;
+    if (at) { u.x = at.x; u.y = at.y; }
+    let ever = false;
+    for (let i = 0; i < secs * 60; i++) { u.h = n360(u.ww.from + twa); w.step(DT); if (u.poleWant || u.pole !== 'down') ever = true; }
+    return { w, u, ever };
+  }
+  it('a long run in open water on Auto: the crew never set it; then you call it, and it goes out', () => {
+    const { w, u, ever } = deep(170, 120);
+    expect(ever).toBe(false);
+    applyCommand(w, { k: 'pole', want: true });
+    for (let i = 0; i < 40 * 60; i++) { u.h = n360(u.ww.from + 170); w.step(DT); }
+    expect(u.pole).toBe('set');
+    // (Auto-trim leaves it yours: out it stays)
+    allToCrew(u); for (let i = 0; i < 10 * 60; i++) { u.h = n360(u.ww.from + 170); w.step(DT); }
+    expect(u.poleWant).toBe(true); expect(u.pole).toBe('set');
+  }, 60_000);
+  it('inside a marina\'s basin, running: never set, and called out there, the crew bring it straight back in, saying why', () => {
+    const { w, u, ever } = deep(170, 30, SLIPS[0].p);
+    expect(ever).toBe(false);
+    // (held where only the basin stops it: running deep, the jib up, no penalty, not at the dock)
+    Object.assign(u, SLIPS[0].p); u.h = n360(u.ww.from + 170); u.twa = 170; u.penalty = 0; u.docked = undefined;
+    expect(inBasin(u)).toBe(true); expect(u.rig?.jib ?? 1).toBe(1);
+    w.drainEvents(); applyCommand(w, { k: 'pole', want: true }); w.step(DT);
+    expect(u.poleWant).toBe(false);
+    expect(w.drainEvents().some(e => e.type === 'toast' && /harbor/.test(e.msg))).toBe(true);
+  }, 60_000);
+  it('out at 150 true, where the old crew call stowed it, it stays out: your call; at 140, aback, the crew bring it in', () => {
+    const { w, u } = deep(170, 5);
+    applyCommand(w, { k: 'pole', want: true });
+    for (let i = 0; i < 40 * 60; i++) { u.h = n360(u.ww.from + 170); w.step(DT); }
+    expect(u.pole).toBe('set');
+    for (let i = 0; i < 30 * 60; i++) { u.h = n360(u.ww.from + 150); w.step(DT); }
+    expect(u.poleWant).toBe(true); expect(u.pole).toBe('set');
+    for (let i = 0; i < 30 * 60; i++) { u.h = n360(u.ww.from + 140); w.step(DT); }
+    expect(u.poleWant).toBe(false); expect(u.pole).toBe('down');
+  }, 60_000);
 });
 
 describe('Boats start trimmed for their heading (UI session, 12 Nov 2026)', () => {

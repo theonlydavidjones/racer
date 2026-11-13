@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { seasonHtml } from '../src/ui/season';
+import { DEFAULT_BOAT } from '../src/boat/spec';
 import { keepSeasonRace, seasonResults, seasons, standings, throwouts, type SeasonResult, type Series } from '../src/club/season';
 import results from '../src/boat/data/sf-folkboat-results.json';
 
@@ -53,6 +55,15 @@ describe('the season', () => {
     const res = { 1: real(1), 2: { at: '', scores: real(2).scores.filter(s => s.name !== 'POLPERRO') } };
     const p = standings(S, res).rows.find(r => r.name === 'POLPERRO')!;
     expect(p.races[2]).toEqual({ points: 9, code: 'DNC', out: false });
+  });
+  it('results follow a boat\'s listed club (the owner): edit her club, and every race she\'s sailed shows it; Josephine\'s is BVBC', () => {
+    expect(DEFAULT_BOAT.club).toBe('bvbc');
+    const res = { 1: real(1), 2: real(2) }; // (Polperro, USA 113 in the real fleet: as if she were yours)
+    let club = 'bvbc'; const live = (sail: string) => sail === '113' ? { club, name: 'POLPERRO', hull: '#123456' } : undefined;
+    const row = () => standings(S, res, live).rows.find(r => r.sail === '113')!;
+    expect(row().club).toBe('bvbc'); expect(row().hull).toBe('#123456');
+    club = 'stfyc'; expect(row().club).toBe('stfyc');
+    expect(seasonHtml(S, res, [S], live)).toContain('STFYC');
   });
   it('keeps your races (sailing one again replaces it)', () => {
     keepSeasonRace(S.id, 1, real(1)); keepSeasonRace(S.id, 1, real(5));
