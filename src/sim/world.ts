@@ -379,6 +379,9 @@ export class World {
 
   private emit = (e: SimEvent) => { this.events.push(e); };
   drainEvents(): SimEvent[] { const e = this.events; this.events = []; return e; }
+  /** Every rule incident, between any two boats, as it's judged (the AI's among themselves too, which raise no event):
+   * for the foul census (tests/calib/census.ts, npm run census). Not used by the game. */
+  onIncident?: (A: Boat, B: Boat, incident: Incident<Boat>) => void;
 
   private makeBoat(i: number): Boat {
     const isUser = i === 0, r = this.rng;
@@ -1087,6 +1090,7 @@ export class World {
       }
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, this.t); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
+      this.onIncident?.(A, B, incident);
       if (A.isUser || B.isUser) {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
