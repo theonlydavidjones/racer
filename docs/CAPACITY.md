@@ -450,6 +450,43 @@ settings and seed, and never stepped.
   twice: once for the mirror and once for the worker. One copy would do if the page could `import()` a blob URL
   (the worker and the page sharing a module). The probe didn't test that, so a second probe would settle it.
 
+## 7. One copy of the sim's code (13 Nov 2026)
+
+The owner's second probe (runs/20261113174553925, Safari 27 on macOS, inside claude.ai): the page imports a module from a
+blob URL, a blob module imports another, a module worker imports a blob module, and the import map reaches blob modules.
+So the page and its worker share one copy of the sim's code.
+
+| | before | after |
+|---|---|---|
+| The page (HTML) | **9,430 KB** | **5,253 KB** |
+| the sim's code the page and the worker share | in it twice (page 5,256 KB, worker 4,276 KB) | once: `sync`, 4,214 KB |
+| the page's own code (UI, drawing) | (in the page's script) | `app`, 900 KB |
+| start-up, saves, the worker's loop | (in the page's script) | `main`, `cloud`, `worker`: 5 KB together |
+
+- **The build** (vite.artifact.config.ts): the page (src/main.ts) and the worker (src/sim/worker.ts) are two entries of one
+  build, so the bundler puts the code they share in one chunk. It imports nothing (no three.js) and uses no `import.meta`.
+- **The page** (scripts/make-artifact.mjs, scripts/artifact-boot.js): each chunk sits in a script element that isn't run.
+  The start-up script makes each a module from a blob URL, with its imports of the others pointed at their blob URLs,
+  and imports the page's entry. The order is as before: the saves first (`hydrate`), then the app.
+- **The worker** is one classic script, with no imports, from a blob URL: its chunk and the shared one put together
+  (each chunk a function returning its exports, its imports of the others calls to them). A module worker importing the
+  page's blob URLs works on an https page, but Chromium won't start a module worker from a blob at all on a page opened
+  as a file. A classic blob worker starts anywhere it ever did.
+- **If blob modules are refused** (the host's rules change, or a browser won't), the page's chunks are put together the
+  same way as one module, inserted inline. The race then sails in the page's own thread, as whenever its worker can't
+  start. That's exact as long as no module reassigns an export: the build refuses `export let`, `export var` and a local
+  `export { }` anywhere in src/. Which way it went is in `document.documentElement.dataset.simLoad` (`blob` or
+  `fallback`) and the console.
+- **Checked at build time**, failing it otherwise, with rolldown's own parser (`rolldown/parseAst`, installed with vite):
+  each chunk's imports are the manifest's, and each chunk's name appears only at those imports; the forms the
+  put-together rewrites (imports first, one export list last); the worker's chunks don't import three.js (a worker has
+  no import map); and nothing in a chunk that the HTML parser would change. The page now declares its charset first:
+  the put-together edits go by position in the chunks' text, which holds non-ASCII.
+- **smoke.cjs** runs both ways: from the file (blob modules, the race in its worker, the mirror checked), and from an
+  https origin whose content security policy refuses `blob:` (the fallback, the race in the page, its clock running).
+- The same CPU as before: the page and the worker each still compile the sim's code. What's saved is about 4 MB of page
+  to download and to hold as text.
+
 ## Method (to repeat these numbers)
 
 - The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line: the median of three races, each one's after it).
