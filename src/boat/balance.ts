@@ -87,11 +87,21 @@ export const CE_ABOVE_WL = 4.29;
 export const LEVER = { main: -0.538, jib: 1.342 };
 /** Chord of each sail at its centre of effort (m). */
 const CHORD = { main: 2.4, jib: 2.0 };
-/** Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m). */
+/**
+ * Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m). Unsourced. The class rules
+ * give the blade's shape (NFIA Class Rules 2025–2028, 5.20: breadths 105 mm at the heel, 490 mm at most about 1.22 m up,
+ * 415 mm at the waterline 1.53 m up). Summed below the waterline, that is about 0.56 m² over a 1.53 m span, a geometric
+ * aspect ratio of about 4.2. The area here is a quarter smaller, and the aspect (used for the rudder's induced drag) a
+ * third of the geometric one. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
+ */
 export const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
 /** Full helm (deg of rudder) for the sim's fastest turn. */
 export const FULL_RUDDER = 30;
-/** Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. */
+/**
+ * Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. Sailing texts put it at about 3–5°
+ * (Dellenbaugh, Steering; Sailing World), and Keuning's downwash measurements give the least drag at about 3° (as
+ * Lester Gilbert's weather-helm article cites them). So 2.5° is at the low end of that range.
+ */
 export const IDEAL_HELM = 2.5;
 
 export interface SailForce { heel: number; drive: number; ceAft?: number }
