@@ -752,11 +752,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   //    block on the halyard's end about 0.4 m up, its standing part and fall at the foot block (estimates).
   const mastLines: Lines['mastLines'] = [], deckAt = (x: number, z: number) => deckY(uAtZ(z), Math.abs(x));
   // (a line lying on the boat from a to b: straight in plan, following the cabin top, over its forward edge and down its
-  // face to the deck; a point every 20 cm, and points at the edge, so it lies on the surface)
+  // face to the deck; a point every 5 cm, so it follows the cabin's curved nose and crown, and points at the edge)
   const zFront = -L / 2 + CABIN.u0 * L;
   const surf = (x: number, z: number) => { const u = uAtZ(z); return (u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u) ? cabinTopAt(u, x) : deckY(u, Math.abs(x))) + 0.012; };
   const lay = (a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3[] => {
-    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.2)), out: THREE.Vector3[] = [];
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.05)), out: THREE.Vector3[] = [];
     for (let i = 1; i <= n; i++) {
       const t = i / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, zPrev = a.z + (b.z - a.z) * (i - 1) / n;
       // (crossing the cabin's forward edge: a point on the edge, so the line goes over it and down the face)
@@ -1341,9 +1341,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
     for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(13 + k, x, restOn(x, z) + 0.012, z); }
     at(17, fl.x, fl.y + 0.035, fl.z);
     const wv = L2.winches[tk]; at(18, wv.x, wv.y, wv.z);
-    // (the tail: off the winch's top, over the coaming and down onto the cockpit seat)
-    const u = uAtZ(wv.z), ci = cockpitHalf(u);
-    at(19, side * (ci - 0.01), wv.y + 0.02, wv.z + 0.04);
+    // (the tail: off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down
+    // onto the cockpit seat)
+    const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
+    at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
     at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
   }
   q.needsUpdate = true;
