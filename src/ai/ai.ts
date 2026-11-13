@@ -180,12 +180,12 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
 /**
  * Where she stands off the harbour (h: its entrance): open water within 800 m of it, reached from it straight, with no
  * land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
- * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 40 m apart along the wind's line
+ * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 80 m apart along the wind's line
  * across, so the fleet isn't all on one point.
  */
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
   const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
-  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
+  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 80;
   let best: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
     const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r }, p = { x: c.x + across.x * spread, y: c.y + across.y * spread };
@@ -657,7 +657,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         continue;
       }
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
-      if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
+      // (racing called off, the boat she must keep clear of lying to, stopped: she sails round her with way on, as a
+      // sailor would, not luffs and eases alongside, where she'd stop and drift down onto her)
+      if (w.cancelled && o.v + (o.astern ?? 0) < 0.5) { desired = away; luff = false; }
+      else if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') {
         // head up from her heading, but no more than 35° above her course: turned up afresh from wherever she'd got to
         // each time she thought, she ratcheted on up to close-hauled with her sails eased, and stalled
