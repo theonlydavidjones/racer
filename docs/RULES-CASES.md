@@ -36,7 +36,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 17 | 102 | 13 | Rule 13 ends when she's on a close-hauled course, whatever her speed | partly (the physics decides when she's close-hauled) |
 | 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered |
 | 24 | 111 | 11, 12, 15 | B overlaps to leeward from astern close to A's stern: A must luff promptly; contact then is B's (15) | partly (whether A responded promptly) |
-| 27 | 117 | 13, 15 | AS tacks right in front of BP: AS broke 13 and 15 | covered (finding 4, fixed) |
+| 27 | 117 | 13, 15 | AS tacks right in front of BP: AS broke 13 and 15 | covered (D's obstruction ends with L's leeward overlap: the engine's boat obstruction needs both to keep clear of her) |
 | 30 | 123 | 12, 19 | B astern blankets A, A gybes unintentionally: B broke 12 | partly (the unintended gybe) |
 | 43 | 142 | 10, 13, 15, 19.2(b) | S tacks near a bank, P sails on: P broke 10; 19.2(b) and 20 don't apply | covered |
 | 46 | 147 | 11, 16.1, 17 | L luffs to her proper course after a leeward overlap from astern: W broke 11 | partly (proper course) |
@@ -119,12 +119,12 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tally
 
-Order of work: no published counts of protests by rule exist (US Sailing, RYA, World Sailing, club logs searched, 13 Nov 2026); judges' guidance puts port-tackers tacking into the zone at the windward mark (18.3, 13), mark-room at leeward marks (18.2) and the start (11, 15, 16) first, then obstructions (19). The Cases added in that order: 25, 95, 14, 125.
+Order of work: no published counts of protests by rule exist (US Sailing, RYA, World Sailing, club logs searched, 13 Nov 2026); judges' guidance puts port-tackers tacking into the zone at the windward mark (18.3, 13), mark-room at leeward marks (18.2) and the start (11, 15, 16) first, then obstructions (19). The Cases added in that order: 25, 95, 14, 125, 117.
 
-- Covered, the test reaching the Case's answer: 22 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 43, 53, 59, 81, 92, 93, 95, 101, 105, 125).
+- Covered, the test reaching the Case's answer: 23 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 43, 53, 59, 81, 92, 93, 95, 101, 105, 117, 125).
 - Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the gybe, found while checking
   Case 2) and 4–6 (Cases 27, 53, 101) are fixed.
-- Partly: 38.
+- Partly: 37.
 - Not modelled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
 

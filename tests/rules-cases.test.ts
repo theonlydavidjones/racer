@@ -363,6 +363,15 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     expect(p.at(51).foul).toMatchObject({ by: 'PL', rule: '19', part: '19.2(b)' });
   });
 
+  it('Case 117: before the start, L overlaps to leeward of D in a row of boats holding below the line: D is no longer an obstruction between L and W (L has right of way over her), so no 19.2(b); W, to windward of L, keeps clear (11)', () => {
+    const D = boat('D', { at: [0, 0], heading: 315, speed: 0.3, started: false });
+    const L = boat('L', { at: off([0, 0], 315, -3, -3), heading: 315, started: false }), W = boat('W', { at: off([0, 0], 315, -8.5, -0.5), heading: 315, started: false });
+    const p = pair(L, W, [], fleetCtx([D, L, W], -15));
+    expect(clean(p, -15)).toMatchObject({ keepsClear: 'W', rule: '11' });
+    moveTo(W, off([0, 0], 315, -8.5, -1.9)); // W sags down onto L
+    expect(p.at(-14).foul).toMatchObject({ by: 'W', rule: '11' });
+  });
+
   it('Case 23: running, a starboard boat passes between two port boats: they keep clear of her (10), and rule 19 doesn\'t come into it', () => {
     // port tack at 170°: the windward boat is the one to the east
     const S = boat('S', { at: [0, 0], heading: 190 }), PW = boat('PW', { at: [4, -1], heading: 170 }), PL = boat('PL', { at: [-4, -1], heading: 170 });
