@@ -7,6 +7,7 @@ import { COURSES, courseFile } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
 import { place } from './sim/places';
 import { OUTBOARDS } from './boat/motor';
+import { ghostGap, ghostsFor, keepGhost, loadGhost, setupKey, trackOf, type Ghost } from './replay/ghost';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { addLog, loadLog, type LogEntry, type RaceSetup } from './boat/logbook';
@@ -172,6 +173,9 @@ let showSaved: Partial<Settings> | null = null;
 const hhmm = (m: number) => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 /** The conditions panel open from the pause menu: its changes go to the sail that's running, not a new one. */
 let condLive = false;
+/** Ghost races (replay/ghost.ts): the ghost chosen in Run a past race, the one being raced now (while the race is the
+ * ghost's very race), and your run of the race just logged (kept as a ghost if you save it). */
+let ghostNext: Ghost | null = null, activeGhost: Ghost | null = null, pendingGhost: Ghost | null = null;
 function newGame(seed = randomSeed()): void {
   incidentClips = []; // (a new race: its own rule incidents)
   if (condLive && w?.running) { saveSettings(S); void host.ask({ k: 'conditions', settings: S }).then(() => view.conditionsChanged(w)); return; } // (redrawn once the race has them: the committee boat to the new wind) // (the owner: at once, without a restart)
@@ -198,6 +202,9 @@ function newGame(seed = randomSeed()): void {
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint(); insetViews();
   view.setWorld(w);
+  // a ghost race: the run chosen in Run a past race, shown only while the race is that very race (its setup's key: the same
+  // course, seed, start time and conditions); any other race has none
+  activeGhost = ghostNext && S.mode === 'race' && setupKey(raceSetup()) === ghostNext.key ? ghostNext : null; view.setGhost(w, activeGhost?.pts ?? null);
   labels.build(w);
 }
 
@@ -627,6 +634,13 @@ function pilotTick(dt: number): void {
   }
   if (txt !== pilotShown) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
+}
+/** The ghost race's pacing: how far ahead or behind your ghost you are, in seconds (replay/ghost.ts ghostGap). */
+function ghostNote(): void {
+  const el = $('ghostNote'), g = activeGhost, gap = g && w.running && w.t > -30 ? ghostGap(g.pts, w.user, w.t) : null;
+  const txt = !g || !w.running ? '' : gap == null ? 'Ghost: off its line' : Math.abs(gap) < 1 ? 'Ghost: level with you' : `Ghost: ${Math.round(Math.abs(gap))} s ${gap > 0 ? 'ahead' : 'behind'}`;
+  if (el.hidden !== !txt) el.hidden = !txt;
+  if (el.textContent !== txt) el.textContent = txt;
 }
 /* ---------------- her outboard (boat/motor.ts): the Motor button and its control head ---------------- */
 let motorOpen = false;
@@ -1431,8 +1445,11 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
   rows.forEach(b => {
     const spec = b.isUser ? S.boat : b.spec && S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
     const dsq = b.scoring === 'UFD' || b.scoring === 'BFD';
-    out.push({ ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
-      ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) });
+    const entry: LogEntry = { ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
+      ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) };
+    out.push(entry);
+    // your run, kept as a ghost for this race if you save it (her own track from the race's, once a second)
+    if (b.isUser && entry.setup) pendingGhost = { at: entry.at, key: setupKey(entry.setup), elapsed: entry.elapsed, place: entry.place, of: entry.of, code: entry.code, pts: trackOf(w.track, b.id) };
   });
   stage(out);
 }
@@ -1474,6 +1491,7 @@ function settleLog(next: () => void): void {
   const done = (keep: boolean) => {
     $('keepAsk').hidden = true; pending = null;
     if (keep) addLog(p);
+    if (keep && pendingGhost) keepGhost(pendingGhost); pendingGhost = null;
     toast(keep ? 'Saved to her logbook.' : 'Discarded.', 2200);
     next();
   };
@@ -1541,7 +1559,7 @@ function frame(now: number): void {
   if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1725,6 +1743,20 @@ function realResults(): string {
 let pastList: LogEntry[] = [];
 const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id === e.setup!.course) ? e.setup.course
   : COURSES.slice().sort((a, b) => b.title.length - a.title.length).find(c => e.title.startsWith(c.title))?.id ?? null;
+/**
+ * A ghost to race against, when there's a run of this very race kept (replay/ghost.ts): your best (the fastest finish), this
+ * run if it's another, or none. Sailing it again, the ghost sails its run beside you.
+ */
+function ghostPick(e: LogEntry, i: number): string {
+  const gs = ghostsFor(setupKey(e.setup)); if (!gs.length) return '';
+  const mm = (s?: number) => s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+  const what = (g: typeof gs[0]) => g.code ? 'not finished' : `${g.place != null ? ordinal(g.place) + ', ' : ''}${mm(g.elapsed)}`;
+  const best = gs[0], mine = gs.find(g => g.at === e.at);
+  const opts = [`<option value="${best.at}">Ghost: your best (${what(best)})</option>`]
+    .concat(mine && mine !== best ? [`<option value="${mine.at}">Ghost: this run (${what(mine)})</option>`] : [])
+    .concat(['<option value="">No ghost</option>']);
+  return `<select class="pick sm ghostpick" data-ghost="${i}" aria-label="Race against your ghost: your own earlier run of this race">${opts.join('')}</select>`;
+}
 function pastRaces(): void {
   realRaceRows();
   pastList = loadLog().filter(e => e.kind === 'race' && e.skipper === 'you').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
@@ -1734,12 +1766,16 @@ function pastRaces(): void {
     const boat = S.boats.find(b => b.id === e.boatId), ok = !!courseOfEntry(e);
     const day = new Date(e.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     return `<div class="pastrow"><div><b>${esc(e.title)}</b><small>${day}, ${e.time} · ${esc(e.wind)} · ${esc(boat?.name || 'a boat since deleted')} · ${result(e)}${e.setup ? '' : ' · fleet and settings as they are now'}</small></div>`
+      + ghostPick(e, i)
       + `<button type="button" class="ghost sm" data-past="${i}"${ok ? '' : ' disabled title="That course is no longer in the sim"'}>Sail it again</button></div>`;
   }).join('') : '<p class="lede">No races in your logbook yet. Race one, save it, and it appears here to sail again.</p>';
 }
 $('pastRows').addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-past]'); if (!b || b.disabled) return;
   const en = pastList[Number(b.dataset.past)], course = en && courseOfEntry(en); if (!en || !course) return;
+  // the ghost chosen beside it (only ever a run of this same race)
+  const gsel = b.closest('.pastrow')?.querySelector<HTMLSelectElement>('select[data-ghost]'), g = gsel?.value ? loadGhost(gsel.value) : null;
+  ghostNext = g && en.setup && g.key === setupKey(en.setup) ? g : null;
   // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
   // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
   if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
@@ -1793,4 +1829,5 @@ newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRo
 requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
+if (import.meta.env.DEV) Object.assign(window, { __ghost: (pts: Ghost['pts'] | null) => { activeGhost = pts ? { at: 'dev', key: 'dev', pts } : null; view.setGhost(w, pts); } }); // (a ghost on any race, for checking how it's drawn)
 if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
