@@ -48,7 +48,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 88 | 205 | 10 | P passes 2 ft astern after S luffed hard: P broke 10 (keeping clear isn't just avoiding contact) | partly (only as a forced swerve) |
 | 92 | 213 | 16.1, 16.2 | S keeps bearing away onto P passing astern: S broke 16.2, then 16.1 | covered |
 | 99 | 226 | 10, 14, 44.1(b) | P broaches into S: P broke 10 (and retires) | partly (retirement as penalty) |
-| 105 | 235 | 10, 15, 16.1 | Running, S luffs after a long parallel course and P doesn't respond: P broke 10, S didn't break 16.1 (P had room) | covered **?** (the engine's 16.1 is "turned toward her within 3 s", which may call S) |
+| 105 | 235 | 10, 15, 16.1 | Running, S luffs after a long parallel course and P doesn't respond: P broke 10, S didn't break 16.1 (P had room) | covered: **finding 2** |
 | 107 | 238 | 10, 14 | Head-on before the start: Jupa (P) broke 10 | partly (lookout, 14 for S) |
 | 123 | 274 | 10, 14 | S holds her course, P doesn't clear her: P broke 10 | partly (S's own 14 not modelled) |
 | 134 | 293 | 17 | Proper course depends on the sails set | not modelled |
@@ -139,3 +139,10 @@ found.
    18.3(a) not to make her sail above close-hauled; neither makes her keep clear of a luff that isn't for mark-room. A fix would let
    rules 11, 15 and 16 govern the pair while the fetching boat's course isn't one mark-room protects (luffing above close-hauled
    toward the tacker, not sailing to or round the mark). Test: tests/rules-cases.test.ts, Case 93 (`it.fails`).
+2. **Case 105 (rule 16.1): the engine calls any turn toward the other boat a 16.1 breach, without asking whether she had room to
+   keep clear.** Running on opposite tacks after a long time side by side, starboard luffs; port doesn't respond, though she could
+   have kept clear (by gybing), and they touch. The Case: port broke 10; starboard didn't break 16.1, because port had room. The
+   engine (src/rules/pairs.ts `turnedToward`): a right-of-way boat that turned 12° or more toward the other within 3 s before the
+   contact broke 16.1, whatever the other boat could have done. 16.1 asks only that she "give the other boat room to keep clear":
+   a fix would judge that room (the keep-clear boat's distance and time to respond against how fast she could turn or gybe away),
+   not the turn alone. Test: Case 105 (`it.fails`).
