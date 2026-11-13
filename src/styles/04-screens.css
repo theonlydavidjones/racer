@@ -62,9 +62,9 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .protests .pHead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .protests .pTiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .protests .pTile{background:var(--panel2,rgba(255,255,255,.05));border-radius:6px;padding:6px 8px;font-size:12px;color:var(--muted)}
-.protests .pTile b{display:block;font-size:15px;color:var(--ink,inherit)}
+.protests .pTile b{display:block;font-size:15px;color:var(--text)}
 .protests .pDec{border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-weight:600}
-.protests .pDec.bad{border-color:var(--accent)}
+.protests .pDec.bad{border-color:#e05050}
 .protests canvas.pClip{width:100%;height:220px;background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
 .protests .ok{color:#5fbf7a}.protests .no{color:var(--accent)}
 
