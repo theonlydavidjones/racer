@@ -6,7 +6,7 @@ import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
-import { applyMemberInput, memberPage, membersGrid, type MemberFilter } from './members';
+import { applyMemberInput, memberPage, membersGrid } from './members';
 import { morph } from './morph';
 
 /**
@@ -45,7 +45,6 @@ export class Fleet {
   /** The Yacht Club's tab (docs/YACHT-CLUB.md): your boats, or the members; the member open, and the roster's filter. */
   private tab: 'boats' | 'members' = 'boats';
   private memberId: string | null = null;
-  private filter: MemberFilter = 'all';
   private confirmMemberDel = false;
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
@@ -119,7 +118,6 @@ export class Fleet {
         this.hooks.changed(); this.hooks.back(); return;
       }
       case 'tab': this.tab = v === 'members' ? 'members' : 'boats'; this.memberId = null; this.drawList(); return;
-      case 'mfilter': this.filter = (['all', 'skipper', 'crew', 'yours'] as const).find(x => x === v) ?? 'all'; this.drawList(); return;
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
       case 'mback': this.memberId = null; this.drawList(); return;
       case 'mnew': { const m = newMember(this.hooks.members(), { h: 1.75, w: 75 }, 'New member'); this.hooks.membersChanged(); this.memberId = m.id; this.drawList(); return; }
@@ -147,13 +145,13 @@ export class Fleet {
       : `<div class="ftable"><table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Club</th><th>Marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
           `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${slipById(b.slip)?.label ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
     // the Yacht Club's tabs (docs/YACHT-CLUB.md): your boats, the members; the club's sliders and seasons to come
-    const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button><span class="later">Club · Seasons: later</span></div>`;
+    const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button></div>`;
     if (this.tab === 'members') {
       const ms = this.hooks.members(), m = this.member();
       morph(this.list, `<div class="panel wide fleetpanel">
         ${m ? '' : `<button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>`}
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats, this.filter)}</div>`);
+        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats)}</div>`);
       return;
     }
     morph(this.list, `<div class="panel wide fleetpanel">
@@ -227,7 +225,7 @@ export class Fleet {
       <section><h3>Crew history</h3>
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
           : '<small>Nobody has sailed her yet.</small>'}
-        <small>Skippers and crews come with the Yacht Club; until then, when she isn't sailed by you she has a generic AI skipper and crew.</small></section>
+        <small>When you don't sail her, a generic AI skipper does.</small></section>
       </div>`);
   }
 

@@ -1191,3 +1191,7 @@ body.showroom #flowPanel{display:none}
    which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
 body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
 body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}
+/* the Members tab: two plain lists, you and your crew, then the club (docs/UI-AUDIT.md §4.8); New member at the right */
+.mtools{justify-content:flex-end}
+.mgroup{font:600 11px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
+.mgrid + .mgroup{margin-top:20px}
