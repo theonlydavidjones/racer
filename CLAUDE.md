@@ -113,3 +113,8 @@ them across agents makes conflicting edits.
 - Sail pictures (render/boatMesh.ts `sailTexture`) are in the cloth's own uv (u luff→leech, v foot→head): draw
   everything where it physically is; only the starboard set of figures runs back to front.
 - Comments explain the sailing or physics reason, in plain words.
+- The page's styles are src/styles/NN-<part>.css, joined in that order by src/styles.css: the order is the cascade, so a
+  rule goes in its part's file, and a new part's file at the end.
+- src/app.ts's parts are src/app/*.ts (setup, results and the pause screen, drills, dev handles), each a `mount…(app)`
+  function run where its code used to be. They reach app.ts's own state through its `ctx`: a getter for each binding,
+  and a setter where a part changes it. A part never keeps its own copy of `w` or `host`.

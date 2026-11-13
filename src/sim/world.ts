@@ -1555,13 +1555,15 @@ export class World {
    * The sea the wave field's heights are set for (environment/waveField.ts), which each boat's own sea scales: in a
    * race the sea at the course's middle, so every boat in the fleet rides the same waves wherever your own boat is (in
    * her slip, or off at the far end); sailing free, your boat is the only one, and the sea at her is the reference.
-   * Worked out twice a second.
+   * The swell's direction is always the course's middle's: one direction for the whole field (where it's turned by the
+   * bar and the channel shows in its local height, not by turning the field: turning it as she sailed swept the swell's
+   * pattern past everywhere but her, the owner's "rushing water" in v176). Worked out twice a second.
    */
   private waveRefSea: SeaHere | null = null;
   waveRef(): SeaHere {
     if (this.waveRefSea) return this.waveRefSea;
-    const s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : this.seaHere(this.C.center);
-    return this.waveRefSea = { ...s, wake: undefined };
+    const mid = this.seaHere(this.C.center), s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : mid;
+    return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */
