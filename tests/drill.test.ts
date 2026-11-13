@@ -186,4 +186,26 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     }
     void b; void d;
   });
+
+  it('a tack then a pinch (sailing a few degrees above close-hauled) still scores, and so does the tack back', () => {
+    const tws = 8, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    run(b, d, 50); startTack(b);
+    let t = 0, flipT = -1; run(b, d, 30, () => { t += 1 / 60; if (flipT < 0 && b.tack === 'P') flipT = t; if (flipT >= 0 && t - flipT > 8) b.h = (b.ww.from + ang - 8 + 360) % 360; });
+    startTack(b); run(b, d, 60);
+    expect(d.list.filter(x => x.scored && x.kind === 'tack').length, d.list.map(x => x.coach).join(' | ')).toBe(2);
+  });
+  it('a slow tack is shown at its own rate (not faster than it turned)', () => {
+    const tws = 8, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    run(b, d, 50); b.handsOff = true; let h = b.h, done = false;
+    run(b, d, 80, () => { if (!done) { h = (h + 3 / 60) % 360; b.h = h; if (wrap(b.ww.from - b.h) < -ang) done = true; } });
+    const s = d.list.find(x => x.scored || /slow|irons/i.test(x.coach));
+    expect(s, d.list.map(x => x.coach).join(' | ')).toBeTruthy();
+    if (s!.scored) expect(s!.rate).toBeLessThan(4.5);
+  });
+  it('sitting in irons and wagging the tiller tells it once, not on every flip', () => {
+    const tws = 6, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    run(b, d, 40); b.handsOff = true; b.tiller = -0.08; run(b, d, 110);
+    let t = 0; run(b, d, 100, () => { t += 1 / 60; b.h = (b.ww.from + 4 * Math.sin(t / 3) + 360) % 360; b.v = Math.min(b.v, 0.2); });
+    expect(d.list.filter(x => /irons|Too slow/.test(x.coach)).length, d.list.map(x => x.coach).join(' | ')).toBeLessThanOrEqual(1);
+  });
 });
