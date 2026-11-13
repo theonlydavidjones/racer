@@ -28,7 +28,7 @@ const TAGS = ['#7fe0c4', '#ffc58a', '#b7a6ff', '#ff9fd0', '#8fdcff', '#dff07a', 
 /** Generic boat `gen:k`'s map and label colour (the same in setup and on the water). */
 export const genericTag = (id: string): string => TAGS[(Math.max(1, +id.slice(GENERIC_PREFIX.length) || 1) - 1) % TAGS.length];
 /** Sail numbers the five stock club boats carry (boat/boat.ts FLEET), so a generic boat never shares one. */
-const STOCK_NUMBERS = new Set(['87', '104', '92', '120', '63', '110']);
+const STOCK_NUMBERS = new Set(['87', '104', '92', '120', '63', '122']);
 
 /**
  * Generic boat number k (1, 2, ...). `taken`: sail numbers already in the fleet (your boats), which she avoids.
