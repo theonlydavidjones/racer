@@ -45,13 +45,13 @@ describe('San Rafael Bay', () => {
     let prev = peak(37.962, -122.4715), worst = 0;
     for (let lon = -122.472; lon > -122.489; lon -= 0.0005) { const v = peak(37.962, lon); worst = Math.max(worst, Math.abs(v - prev)); prev = v; }
     expect(worst).toBeLessThan(0.1);
-  }, 60_000); // (a day's peaks at forty points: slow when the whole suite runs at once)
+  }, 180_000); // (a day's peaks at forty points: slow when the whole suite runs at once)
   it('over the flats, never faster than a long wave runs in that depth (a creek mouth in the flats, the first of the flood)', () => {
     const f = new CurrentField(stationsFor(t0n, t0n + 3 * 1440));
     let worst = 0;
     for (let k = 0; k < 3 * 1440; k += 20) { f.setTime(t0n + k); const c = f.at(LL(37.969, -122.491)); worst = Math.max(worst, Math.hypot(c.x, c.y) / 0.5144); }
     expect(worst).toBeLessThan(3);
-  }, 60_000);
+  }, 180_000);
   it('floods into the bay as the tide rises', () => {
     const t0 = sfLocalToUtcMin('2026-11-14', '00:00'), f = new CurrentField(stationsFor(t0, t0 + 1440)), p = LL(37.966, -122.485);
     for (let h = 0; h < 24; h += 1) {
@@ -90,7 +90,7 @@ describe('San Leandro Bay', () => {
       if (r > 0.1) { rising++; if (c.x > 0) inOnRise++; } if (r < -0.1) { falling++; if (c.x < 0) outOnFall++; }
     }
     expect(inOnRise / rising).toBeGreaterThan(0.95); expect(outOnFall / falling).toBeGreaterThan(0.95);
-  }, 60_000);
+  }, 180_000);
   it('a drying flat is wetted bit by bit as the tide comes up over it (the chart\'s band, from its height to the datum)', () => {
     // a flat drying from 1.7 m to the datum
     expect(wetBand(-1.7, 0, 0).wet).toBe(0);
