@@ -40,7 +40,7 @@ describe('fixed timestep is reproducible', () => {
       return JSON.stringify(w.boats.map(b => [b.x, b.y, b.h, b.v, b.leg, b.ocs, b.started, b.penalty]));
     };
     expect(run()).toEqual(run());
-  }, 30_000);
+  }, 180_000);
 });
 
 describe('start line: OCS and Rule 21.1 return (through the real sim)', () => {

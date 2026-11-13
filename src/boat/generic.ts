@@ -18,7 +18,7 @@ export const isGeneric = (id: string): boolean => /^gen:[1-9]\d?$/.test(id);
 const NAMES = ['Freya', 'Kittiwake', 'Solveig', 'Tern', 'Saga', 'Skua', 'Ingrid', 'Vega', 'Fulmar', 'Marit', 'Havørn', 'Sea Smoke',
   'Linnea', 'Petrel', 'Aurora', 'Sjøblomst', 'Gannet', 'Astrid', 'Nordlys', 'Wren'];
 /** Hull colours a club fleet shows: mostly white and cream glassfibre, some dark or bright, a few varnished wooden boats. */
-const HULLS = ['Snow white', 'Pearl', 'Cream', 'Navy', 'Flag blue', 'Hunter green', 'Burgundy', 'Light grey', 'Signal red', 'Black', 'Sky blue', 'Buff'];
+const HULLS = ['Snow white', 'Pearl', 'Cream', 'Navy', 'Flag blue', 'Hunter green', 'Burgundy', 'Light gray', 'Signal red', 'Black', 'Sky blue', 'Buff'];
 const BOTTOMS = ['#2a2d33', '#1f2a44', '#7a2420', '#2b4f8f', '#9a5a2e'];
 const DECKS = ['#cdbb94', '#e8e3d6', '#c9ccd0', 'teak-silver', '#8e9f7c'];
 /** Bay clubs with Folkboat sailors (render/burgees.ts ids). */
@@ -28,7 +28,7 @@ const TAGS = ['#7fe0c4', '#ffc58a', '#b7a6ff', '#ff9fd0', '#8fdcff', '#dff07a', 
 /** Generic boat `gen:k`'s map and label colour (the same in setup and on the water). */
 export const genericTag = (id: string): string => TAGS[(Math.max(1, +id.slice(GENERIC_PREFIX.length) || 1) - 1) % TAGS.length];
 /** Sail numbers the five stock club boats carry (boat/boat.ts FLEET), so a generic boat never shares one. */
-const STOCK_NUMBERS = new Set(['87', '104', '92', '120', '63', '110']);
+const STOCK_NUMBERS = new Set(['87', '104', '92', '120', '63', '122']);
 
 /**
  * Generic boat number k (1, 2, ...). `taken`: sail numbers already in the fleet (your boats), which she avoids.
