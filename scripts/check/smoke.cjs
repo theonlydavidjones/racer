@@ -26,6 +26,9 @@ const root = path.resolve(__dirname, '../..'), out = process.argv[2] || root;
   await page.click('#bGo'); await page.waitForTimeout(2500);
   await page.screenshot({ path: path.join(out, 'smoke.png') });
   console.log(await page.evaluate(() => ['clock', 'spd', 'linebox'].map(i => document.getElementById(i).textContent).join(' | ')));
+  // (the race sails in its worker: sim/host.ts WorkerHost; 'local' would mean the worker didn't start)
+  const mode = await page.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode);
+  if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
   console.log('ERRORS:', errs.join('\n') || 'none'); await browser.close();
   if (errs.length) process.exit(1);
 })();

@@ -42,6 +42,8 @@ export interface Packet {
   nodes: Node[];
   /** New recorded frames and track points (by number: their contents are among the nodes), and how many each list holds. */
   rec: { add: Val[]; len: number }; track: { add: Val[]; len: number };
+  /** The race's events since the last packet (sim/events.ts), by number. */
+  events: Val[];
 }
 
 /**
@@ -87,10 +89,13 @@ function numberAll(w: World, see: (v: object, id: number) => void): number {
 export class SyncSource {
   private ids = new WeakMap<object, number>();
   private next: number;
-  /** One reference per number, made once: compared by identity, so an unchanged field costs nothing. */
-  private refs: { r: number }[] = [];
-  /** What each object held when last sent, kept up to date in place: fields, list items, or a copy of a typed array. */
-  private last = new Map<number, Val[] | Record<string, Val> | ArrayBufferView>();
+  /** One reference per object, made once: compared by identity, so an unchanged field costs nothing. */
+  private refs = new WeakMap<object, { r: number }>();
+  /**
+   * What each object held when last sent, kept up to date in place: fields, list items, or a copy of a typed array.
+   * (Held weakly, as the numbers are: the World makes new objects every step, a new wind for one, and drops the old.)
+   */
+  private last = new WeakMap<object, Val[] | Record<string, Val> | ArrayBufferView>();
   private lastTop = new Map<string, unknown>();
   private lastTopVal = new Map<string, Val>();
   private lastRec: unknown = null; private lastTrack = 0;
@@ -100,7 +105,7 @@ export class SyncSource {
     const all: [object, number][] = [];
     this.next = numberAll(w, (v, id) => { this.ids.set(v, id); all.push([v, id]); });
     // (what the mirror holds to begin with: the same World, built the same way)
-    for (const [v, id] of all) this.last.set(id, this.contents(v));
+    for (const [v] of all) this.last.set(v, this.contents(v));
     const o = w as unknown as Record<string, unknown>;
     for (const k of Object.keys(o)) { this.lastTop.set(k, o[k]); this.lastTopVal.set(k, this.ref(o[k])); }
     this.lastRec = w.rec[w.rec.length - 1] ?? null; this.lastTrack = w.track.length;
@@ -108,8 +113,9 @@ export class SyncSource {
   /** A value as sent, without walking: primitives as they are, objects by number. */
   private ref(v: unknown): Val {
     if (!isObj(v)) return typeof v === 'function' ? undefined : v as Val;
-    let id = this.ids.get(v); if (id == null) { id = this.next++; this.ids.set(v, id); }
-    return this.refs[id] ??= { r: id };
+    let r = this.refs.get(v);
+    if (!r) { let id = this.ids.get(v); if (id == null) { id = this.next++; this.ids.set(v, id); } r = { r: id }; this.refs.set(v, r); }
+    return r;
   }
   /** A value as sent, walking into an object (its changes go into this capture's nodes). */
   private val(v: unknown): Val {
@@ -131,21 +137,21 @@ export class SyncSource {
   /** Compare one object with what was last sent, record its changes, and walk on into its children. */
   private walk(v: object, id: number): void {
     if (this.done.has(id)) return; this.done.add(id);
-    const was = this.last.get(id);
+    const was = this.last.get(v);
     if (fixedList(v) && was) return;
     const k = kind(v);
     if (k === 't') {
       const a = v as unknown as ArrayLike<number>, b = was as unknown as ArrayLike<number> | undefined;
       let eq = !!b && b.length === a.length && (was as object).constructor === v.constructor;
       for (let i = 0; eq && i < a.length; i++) eq = Object.is(a[i], b![i]);
-      if (!eq) { const c = (v as unknown as { slice(): ArrayBufferView }).slice(); this.nodes.push({ i: id, t: c }); this.last.set(id, (c as unknown as { slice(): ArrayBufferView }).slice()); }
+      if (!eq) { const c = (v as unknown as { slice(): ArrayBufferView }).slice(); this.nodes.push({ i: id, t: c }); this.last.set(v, (c as unknown as { slice(): ArrayBufferView }).slice()); }
       return;
     }
     if (k === 'a') {
       const a = v as unknown[], b = Array.isArray(was) ? was as Val[] : undefined;
       let eq = !!b && b.length === a.length;
       for (let i = 0; i < a.length; i++) { const x = this.val(a[i]); if (eq && !Object.is(x, b![i])) eq = false; }
-      if (!eq) { const c = a.map(x => this.ref(x)); this.nodes.push({ i: id, a: c }); this.last.set(id, c); }
+      if (!eq) { const c = a.map(x => this.ref(x)); this.nodes.push({ i: id, a: c }); this.last.set(v, c); }
       return;
     }
     if (k === 'm' || k === 's') {
@@ -157,13 +163,13 @@ export class SyncSource {
       for (let i = 0; eq && i < flat.length; i++) eq = Object.is(flat[i], b![i]);
       if (!eq) {
         this.nodes.push(k === 's' ? { i: id, s: flat } : { i: id, m: Array.from({ length: flat.length / 2 }, (_, j) => [flat[2 * j], flat[2 * j + 1]] as [Val, Val]) });
-        this.last.set(id, flat);
+        this.last.set(v, flat);
       }
       return;
     }
     const o = v as Record<string, unknown>;
     let b = (was && !Array.isArray(was) && !ArrayBuffer.isView(was) ? was : undefined) as Record<string, Val> | undefined;
-    const fresh = !b; if (!b) { b = {}; this.last.set(id, b); }
+    const fresh = !b; if (!b) { b = {}; this.last.set(v, b); }
     let set: Record<string, Val> | null = fresh ? {} : null, keys = 0;
     for (const key in o) {
       if (!Object.prototype.hasOwnProperty.call(o, key)) continue;
@@ -181,8 +187,8 @@ export class SyncSource {
       this.nodes.push({ i: id, ...(fresh && ctor && ctor !== Object && ctor.name ? { c: ctor.name } : {}), o: set ?? {}, ...(del ? { d: del } : {}) });
     }
   }
-  /** What changed since the last packet. */
-  capture(): Packet {
+  /** What changed since the last packet, and the race's events since then (their boats by number: the mirror's own). */
+  capture(events: readonly object[] = []): Packet {
     const w = this.w, o = w as unknown as Record<string, unknown>;
     this.done.clear(); this.nodes = [];
     const top: Record<string, Val> = {};
@@ -197,34 +203,45 @@ export class SyncSource {
     const grown = (list: unknown[], last: unknown) => { const i = last == null ? -1 : list.lastIndexOf(last); return list.slice(i + 1); };
     const rec = { add: grown(w.rec, this.lastRec).map(x => this.val(x)), len: w.rec.length }; this.lastRec = w.rec[w.rec.length - 1] ?? null;
     const track = { add: w.track.slice(this.lastTrack).map(x => this.val(x)), len: w.track.length }; this.lastTrack = w.track.length;
-    return { top, nodes: this.nodes, rec, track };
+    const ev = events.map(e => this.val(e));
+    return { top, nodes: this.nodes, rec, track, events: ev };
   }
 }
 
 /** The page's side: the mirror World, kept in step by each packet. */
 export class SyncMirror {
-  private objs = new Map<number, object>();
+  /**
+   * The mirror's objects by number, held weakly: an object the World has dropped is dropped here too (the worker never
+   * sends a number again once its World has let go of the object).
+   */
+  private objs = new Map<number, WeakRef<object>>();
+  private gone = new FinalizationRegistry<number>(id => { if (!this.objs.get(id)?.deref()) this.objs.delete(id); });
+  private get(id: number): object | undefined { return this.objs.get(id)?.deref(); }
+  private put(id: number, v: object): void { this.objs.set(id, new WeakRef(v)); this.gone.register(v, id); }
   private protos = new Map<string, object>();
   constructor(readonly w: World) {
     numberAll(w, (v, id) => {
-      this.objs.set(id, v);
+      this.put(id, v);
       const ctor = (v as { constructor?: { name?: string } }).constructor;
       if (ctor && ctor !== Object && ctor !== Array && ctor.name && !this.protos.has(ctor.name)) this.protos.set(ctor.name, Object.getPrototypeOf(v));
     });
   }
-  private val(v: Val): unknown { return isObj(v) ? this.objs.get((v as { r: number }).r) : v; }
-  /** Write a packet onto the mirror. */
-  apply(p: Packet): void {
+  private val(v: Val): unknown { return isObj(v) ? this.get((v as { r: number }).r) : v; }
+  /** Write a packet onto the mirror; its events come back as the mirror's own objects. */
+  apply(p: Packet): unknown[] {
+    // (the new objects are held here until they're in the mirror's graph: until then only the weak map has them)
+    const hold: object[] = [];
     // new objects first (the changed ones can refer to them), then every changed object's contents
     for (const n of p.nodes) {
-      const cur = this.objs.get(n.i), want = 't' in n ? 't' : 'a' in n ? 'a' : 'm' in n ? 'm' : 's' in n ? 's' : 'o';
+      const cur = this.get(n.i), want = 't' in n ? 't' : 'a' in n ? 'a' : 'm' in n ? 'm' : 's' in n ? 's' : 'o';
       if (cur && kind(cur) === want && (want !== 't' || (cur as ArrayBufferView).constructor === (n as { t: ArrayBufferView }).t.constructor)) continue;
       const proto = 'c' in n && n.c ? this.protos.get(n.c) : undefined;
-      this.objs.set(n.i, want === 'a' ? [] : want === 'm' ? new Map() : want === 's' ? new Set() : want === 't' ? (n as { t: ArrayBufferView }).t : proto ? Object.create(proto) : {});
+      const made = want === 'a' ? [] : want === 'm' ? new Map() : want === 's' ? new Set() : want === 't' ? (n as { t: ArrayBufferView }).t as unknown as object : proto ? Object.create(proto) as object : {};
+      this.put(n.i, made); hold.push(made);
     }
     for (const n of p.nodes) {
-      const cur = this.objs.get(n.i)!;
-      if ('t' in n) { const t = cur as unknown as { length: number; set(a: ArrayBufferView): void }; if (t !== n.t as unknown) { if (t.length === (n.t as unknown as { length: number }).length) t.set(n.t); else this.objs.set(n.i, n.t); } }
+      const cur = this.get(n.i)!;
+      if ('t' in n) { const t = cur as unknown as { length: number; set(a: ArrayBufferView): void }; if (t !== n.t as unknown) { if (t.length === (n.t as unknown as { length: number }).length) t.set(n.t); else { this.put(n.i, n.t as unknown as object); hold.push(n.t as unknown as object); } } }
       else if ('a' in n) { const a = cur as unknown[]; a.length = n.a.length; for (let i = 0; i < n.a.length; i++) a[i] = this.val(n.a[i]); }
       else if ('m' in n) { const m = cur as Map<unknown, unknown>; m.clear(); for (const [k, x] of n.m) m.set(this.val(k), this.val(x)); }
       else if ('s' in n) { const s = cur as Set<unknown>; s.clear(); for (const x of n.s) s.add(this.val(x)); }
@@ -237,5 +254,6 @@ export class SyncMirror {
       for (const x of part.add) list.push(this.val(x));
       while (list.length > part.len) list.shift();
     }
+    return p.events.map(e => this.val(e));
   }
 }

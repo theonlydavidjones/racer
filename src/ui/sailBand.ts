@@ -2,7 +2,7 @@ import type { Boat, LineKey } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
 import { byHand } from '../boat/physics';
 import type { BoatView } from '../sim/host';
-import type { Command, CommandResult } from '../sim/commands';
+import type { Command } from '../sim/commands';
 import { CAR, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
@@ -29,7 +29,7 @@ import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 export interface BandHost {
   world(): { readonly user: BoatView; readonly running: boolean; readonly paused: boolean };
   /** Change the race (sim/commands.ts): the band never writes to the boat itself. */
-  send(c: Command): CommandResult;
+  send(c: Command): void;
   /** Hold a line moving (+1 / −1 in the line's own value) or let it go (null): the app's held-button commands. */
   hold(k: CtlKey, d: number | null): void;
   /** Something changed hands: the trim panel's line. */

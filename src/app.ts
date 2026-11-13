@@ -27,7 +27,8 @@ import { fillFleet, genericSpec, genericTag, isGeneric } from './boat/generic';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, World, describeTide } from './sim/world';
-import { LocalHost, type SimView } from './sim/host';
+import { LocalHost, WorkerHost, type SimHost, type SimView, type WorldArgs } from './sim/host';
+import { spawnSimWorker } from './sim/spawn';
 import type { Command, CtlKey } from './sim/commands';
 import { POLE, byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
@@ -84,7 +85,9 @@ const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
-let host!: LocalHost;
+let host!: SimHost;
+/** The race in the page's own thread (?inproc): for the dev handles and check scripts that change the World directly. */
+const SIM_INPROC = /[?&]inproc\b/.test(location.search);
 /** Development only: the view refuses writes (sim/host.ts guarded), to find any the compiler can't see. */
 const SIM_GUARD = import.meta.env.DEV && /[?&]simguard\b/.test(location.search);
 let w!: SimView;
@@ -181,9 +184,16 @@ function newGame(seed = randomSeed()): void {
   const WS = shown ? { ...WS1, ...(showCond ?? {}), ...(showMin != null ? { tideTime: hhmm(showMin + WS1.seq) } : {}) } : WS1;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
-  host = new LocalHost(new World(rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), WS, seed,
-    S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) }), SIM_GUARD);
-  w = host.view; drillShown = false;
+  const args: WorldArgs = { file: rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), settings: WS, seed,
+    opts: S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
+  host?.dispose();
+  // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
+  // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
+  const wk = SIM_INPROC ? null : spawnSimWorker();
+  host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); })
+    : new LocalHost(new World(args.file, args.settings, args.seed, args.opts), SIM_GUARD);
+  w = host.view; shownDest = w.dest; drillShown = false;
+  document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint();
   view.setWorld(w);
@@ -556,12 +566,12 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
   const c = w.user.crew, pl = c?.place;
   if (!c || !pl || pl.fore !== bt.dataset.cf) { setPlace('fore', bt.dataset.cf as PlaceFore); return; }
   send({ k: 'crewPlace', place: pl.across == null ? null : { across: pl.across, fore: null } });
-  showCrewPlace(); toast(c.place ? 'Fore and aft back to the crew; where they sit across stays yours.' : 'Crew back on auto: they place their own weight again.', 2500);
+  showCrewPlace(); toast(pl.across != null ? 'Fore and aft back to the crew; where they sit across stays yours.' : 'Crew back on auto: they place their own weight again.', 2500);
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const u = w.user; send({ k: 'pole', want: !u.poleWant }); // (yours now, until Auto-trim)
-  toast(u.poleWant ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  const want = !w.user.poleWant; send({ k: 'pole', want }); // (yours now, until Auto-trim)
+  toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it
@@ -632,7 +642,8 @@ $('bMotor').onclick = () => { motorOpen = !motorOpen; motorUi(); };
 function motorStartUi(): void {
   const m = w.user.motor; if (!m) return;
   if (m.running || m.pulling) { send({ k: 'motor', op: 'stop' }); return; }
-  if (send({ k: 'motor', op: 'start', retireFirst: false }) === 'racing') { send({ k: 'pause', on: true }); $('motorAsk').hidden = false; ($('bMotorNo') as HTMLButtonElement).focus(); }
+  // (racing, the motor means retiring (RRS 42.1): ask first)
+  void host.ask({ k: 'motor', op: 'start', retireFirst: false }).then(r => { if (r === 'racing') { send({ k: 'pause', on: true }); $('motorAsk').hidden = false; ($('bMotorNo') as HTMLButtonElement).focus(); } });
 }
 for (const b of $('motorHead').querySelectorAll<HTMLButtonElement>('[data-mo]')) b.onclick = () => {
   const k = b.dataset.mo;
@@ -649,10 +660,12 @@ function goHome(): void {
   if (!w.running) return;
   if (!w.homeSlip) { toast('She has no home slip: give her one in the Fleet.', 3500); return; }
   if (!w.freeSail && !w.user.finished && !w.user.retired) { send({ k: 'pause', on: true }); $('homeAsk').hidden = false; ($('bHomeNo') as HTMLButtonElement).focus(); return; }
-  if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); }
+  homeNow();
 }
+/** Home: the course to her slip (when she has one), the Navigator's button and keys for cruising. */
+function homeNow(): void { void host.ask({ k: 'sendHome' }).then(ok => { if (ok) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); } }); }
 $('bHome').onclick = goHome;
-$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); } };
+$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); homeNow(); };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
 /** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
 function homeButton(): void {
@@ -696,7 +709,7 @@ function ensignButton(): void {
   word('bEnsign', u.ensignStruck ? 'Hoist ensign' : 'Strike ensign');
   el.classList.toggle('on', !!u.ensignStruck);
 }
-$('bEnsign').onclick = () => { const u = w.user; send({ k: 'ensign', struck: !u.ensignStruck }); toast(u.ensignStruck ? 'Ensign struck: down and stowed below till the breeze eases.' : 'Ensign hoisted again.', 2500); };
+$('bEnsign').onclick = () => { const struck = !w.user.ensignStruck; send({ k: 'ensign', struck }); toast(struck ? 'Ensign struck: down and stowed below till the breeze eases.' : 'Ensign hoisted again.', 2500); };
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
@@ -753,7 +766,7 @@ const planChart = new PlanChart(hud, cruisePicks, () => setupChart?.sync(true));
 $('bPlanOpen').onclick = () => { planChart.open(); openChartHook(); };
 let openChartHook = () => {}; // (the field picker, set to the layers in force when the chart opens)
 const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCourse(w); },
-  pal => { S.chartPal = pal; send({ k: 'settings', patch: { chartPal: pal } }); saveSettings(S); }, send);
+  pal => { S.chartPal = pal; send({ k: 'settings', patch: { chartPal: pal } }); saveSettings(S); }, { send: c => host.send(c), ask: c => host.ask(c) });
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
@@ -880,7 +893,7 @@ addEventListener('keydown', e => {
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
     case 'pushOff': pushOff(); break;
-    case 'navLights': send({ k: 'lights', off: !w.user.lightsOff }); toast(w.user.lightsOff ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break;
+    case 'navLights': { const off = !w.user.lightsOff; send({ k: 'lights', off }); toast(off ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break; }
     case 'jibHalyard': halyard('jib'); break;
     case 'mainHalyard': halyard('main'); break;
     case 'viewCockpit': setView(0); break;
@@ -1427,24 +1440,25 @@ addEventListener('resize', resize); resize();
 let last = performance.now();
 /** The showroom's point of sail: a close reach, port tack (the wind 55° on her port bow); negative: starboard tack. */
 let showroomTwa = 55;
+/** The destination the course on the water was last drawn to. */
+let shownDest: SimView['dest'] = null;
 const perf = new PerfMeter();
 function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  let simMs = 0;
+  // the steps due (sim/host.ts: here, or in the worker): racing at the race's speed; with nothing running (the start
+  // page, setup, the showroom) she still sails, in the real wind and physics, so her sails, heel and flags agree; in the
+  // showroom on a close reach
+  const showing = boatPanel.open || fleet.boatOpen;
+  const simMs = host.advance(dt, showing ? showroomTwa : undefined);
   if (w.running && !w.paused) {
-    host.frame(dt);
-    simMs = performance.now() - t0;
     if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
-  } else if (!w.running) {
-    // nothing running (the start page, setup, the showroom): she still sails, in the real wind and physics, so her sails,
-    // heel and flags agree; in the showroom on a close reach
-    const showing = boatPanel.open || fleet.boatOpen;
-    host.idle(dt, showing ? showroomTwa : undefined);
   }
   for (const e of host.drainEvents()) handle(e);
+  // (a new destination, from the chart or a command's answer: the course drawn to it)
+  if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick();
   const t1 = performance.now();

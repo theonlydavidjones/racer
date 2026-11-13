@@ -62,18 +62,27 @@ function questions(w: World, heavy: boolean): string {
 }
 
 /** Sail a World and its mirror together: the real one steps (n steps a frame, as at different speeds); the mirror is fed. */
-function sailBoth(make: () => World, frames: number, stepsOf: (i: number) => number, every: number, poke?: (w: World, i: number) => void): void {
+function sailBoth(make: () => World, frames: number, stepsOf: (i: number) => number, every: number, poke?: (w: World, i: number) => void): number {
   const A = make(), M = make(), src = new SyncSource(A), mirror = new SyncMirror(M);
+  let events = 0;
   for (let i = 0; i < frames; i++) {
     poke?.(A, i);
     for (let s = stepsOf(i); s > 0; s--) A.step(DT);
-    A.drainEvents();
-    mirror.apply(structuredClone(src.capture()));
+    // (the race's events go with the packet: the page gets them with its own boats in them)
+    const evA = A.drainEvents(), evM = mirror.apply(structuredClone(src.capture(evA))) as typeof evA;
+    expect(evM.length).toBe(evA.length);
+    evA.forEach((e, k) => {
+      const m = evM[k]; expect(m.type).toBe(e.type);
+      if (e.type === 'incident' && m.type === 'incident') { expect(m.a).toBe(M.boats[e.a.id]); expect(m.b).toBe(M.boats[e.b.id]); expect(m.incident.fouler).toBe(M.boats[e.incident.fouler.id]); expect(m.frames.length).toBe(e.frames.length); }
+      else expect(JSON.stringify(m)).toBe(JSON.stringify(e));
+    });
+    events += evA.length;
     if (i % every === 0 || i === frames - 1) {
       const d = firstDifference(A, M); expect(d, `frame ${i}, t ${A.t.toFixed(1)}`).toBeNull();
       expect(questions(M, i % (every * 5) === 0), `the questions at frame ${i}`).toBe(questions(A, i % (every * 5) === 0));
     }
   }
+  return events;
 }
 
 const S = (o: Partial<Settings>): Settings => ({ ...DEFAULT_SETTINGS, tideDate: '2026-11-14', ...o }) as Settings;
@@ -81,8 +90,9 @@ const S = (o: Partial<Settings>): Settings => ({ ...DEFAULT_SETTINGS, tideDate: 
 describe('the mirror World is the real one over again', () => {
   it('a race of eight in 22 kt, through the start, at 1× and 4×', () => {
     const opponents = ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'];
-    sailBoth(() => new World(ss10 as unknown as CourseFile, S({ windKind: 'west', windKt: 22, current: 'real', opponents, fleet: 7 }), 3),
+    const events = sailBoth(() => new World(ss10 as unknown as CourseFile, S({ windKind: 'west', windKt: 22, current: 'real', opponents, fleet: 7 }), 3),
       1500, i => (i < 400 ? 1 : i % 9 === 0 ? 12 : 4), 50);
+    expect(events).toBeGreaterThan(0); // (horns and messages at least: the events did go through)
   }, 900_000);
 
   it('a cruise with a destination, the user at the helm through commands', () => {

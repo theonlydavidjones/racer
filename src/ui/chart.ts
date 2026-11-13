@@ -27,8 +27,8 @@ export class Chart {
   private cursor: [number, number] | null = null;
   private raf = 0;
 
-  /** send: how the chart changes the race (sim/commands.ts): pausing it while open, a destination, a new start. */
-  constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void, private send: (c: Command) => CommandResult) {
+  /** race: how the chart changes the race (sim/host.ts): pausing it while open, a destination, a new start. */
+  constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void, private race: { send(c: Command): void; ask(c: Command): Promise<CommandResult> }) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
     this.c.addEventListener('pointermove', e => {
@@ -57,14 +57,13 @@ export class Chart {
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
       if (!this.w || !this.pick) return;
-      this.send({ k: 'dest', p: this.pick.p, name: this.pick.name });
+      this.race.send({ k: 'dest', p: this.pick.p, name: this.pick.name });
       this.close();
     };
     // cruising: a new start, without ending the cruise (she's put there, stopped; the clock and the log carry on)
     $('bChartMove').onclick = () => {
       if (!this.w || !this.pick) return;
-      if (!this.send({ k: 'moveHere', p: this.pick.p, name: this.pick.name })) { this.info('She can\'t be put there: pick a spot on open water.'); return; }
-      this.close();
+      void this.race.ask({ k: 'moveHere', p: this.pick.p, name: this.pick.name }).then(ok => { if (ok) this.close(); else this.info('She can\'t be put there: pick a spot on open water.'); });
     };
     addEventListener('resize', () => { if (this.isOpen) this.draw(); });
   }
@@ -73,7 +72,7 @@ export class Chart {
 
   open(w: SimView): void {
     this.w = w; this.pick = null;
-    this.wasPaused = w.paused; this.send({ k: 'pause', on: true });
+    this.wasPaused = w.paused; this.race.send({ k: 'pause', on: true });
     this.cx = w.user.x; this.cy = w.user.y;
     this.scale = Math.min(innerWidth, innerHeight) / 6000; // about 3 nm across to begin with
     $('chart').hidden = false;
@@ -98,7 +97,7 @@ export class Chart {
   close(): void {
     if (!this.isOpen) return;
     $('chart').hidden = true;
-    if (this.w && !this.wasPaused) this.send({ k: 'pause', on: false });
+    if (this.w && !this.wasPaused) this.race.send({ k: 'pause', on: false });
     this.onClose();
   }
 
