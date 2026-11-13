@@ -357,8 +357,9 @@ export class Hud {
       // a hail for room to tack trumps everything else
       const key = this.hailKey();
       if (hail.replyAt != null) {
-        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now: they must give you room.`;
-        el.className = hail.by === o.id ? 'kc' : 'row';
+        // (the room passes, not right of way: WS Case 101. So the colour follows who keeps clear, as everywhere else)
+        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now and keep clear of them: they must give you room to do it.`;
+        el.className = kc ? 'kc' : 'row';
       } else if (hail.by === o.id && hail.passedOn) {
         // Rule 20.3: you passed the hail on to the boat to windward of you
         const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';

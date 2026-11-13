@@ -116,7 +116,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
     case '20':
       if (e.kind !== 'hail') {
         // contact or swerve after a "You tack" reply
-        what = you ? `${o} hailed for room to tack and you replied "You tack". That meant giving them room to tack and get clear of you, and you didn't.` : `You hailed ${o} for room to tack. They replied "You tack", which obliged them to give you room to tack and keep clear, and they didn't.`;
+        what = you ? `${o} hailed for room to tack and you replied "You tack". That meant giving them room to tack and get clear of you, and you didn't.` : `You hailed ${o} for room to tack. They replied "You tack", which obliged them to give you room to tack and avoid them, and they didn't.`;
         tip = you ? 'Reply "You tack" only when you can easily let them tack and pass behind you, typically when you are well ahead. Otherwise just tack.' : 'After a "You tack" reply, tack straight away and pass behind them; they must give you room to do it.';
         break;
       }

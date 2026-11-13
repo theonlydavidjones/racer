@@ -551,8 +551,9 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
+    p.at(50.6);
     red.lastTackT = 51; moveTo(red, [-3, 9], 45); // Red tacks onto port, toward Blue's stern
-    moveTo(blue, [-4.5, 10.5], 315); // Blue slowed down and is still in the way
+    moveTo(blue, [-4.5, 10.5], 315); blue.vx *= 0.2; blue.vy *= 0.2; // Blue slowed down and is still in the way
     expect(p.at(53).foul).toMatchObject({ by: 'Blue', rule: '20', kind: 'contact' });
   });
 

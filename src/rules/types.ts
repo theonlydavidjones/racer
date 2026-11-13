@@ -129,6 +129,8 @@ export interface Hail {
   by: number; at: number; kind: 'room' | 'starboard';
   /** Rule 20.2(c): the hailed boat replied "You tack" at this time, and now owes the hailing boat room to tack and avoid her. */
   replyAt?: number;
+  /** Her speed when she replied (taken at the first look after it): slowing down into the hailing boat's way is not giving room. */
+  replyV?: number;
   /** When the hailed boat responded (tacked, or replied "You tack"). Rule 20.2(d): the hailing boat must then tack as soon as possible. */
   respondedAt?: number;
   /** When the hailed boat was through head to wind (or replied "You tack"): clear of her, the hailing boat can tack, and
