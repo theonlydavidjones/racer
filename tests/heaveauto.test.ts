@@ -46,9 +46,16 @@ describe('hove to, Auto keeps her hove to', () => {
     sail(b, 20);
     const made = b.ctl.jibsheetW, tack = b.tack;
     b.ww.from = (b.ww.from + 270) % 360; // (the wind backs 90 degrees: it's on her other side now)
-    sail(b, 6);
+    // (the crew take a couple of seconds to settle the sheets on the new side; from then the made-fast sheet holds, the
+    // jib filling on it, until they ease it for the course she bears away onto, at about six seconds: so it's held
+    // through the window between, not sampled at one moment after it)
+    sail(b, 2.5);
     expect(b.tack).not.toBe(tack);
-    expect(b.ctl.jibsheet, 'the sheet that was made fast, leeward now').toBeCloseTo(made, 2);
+    sail(b, 2.5, () => {
+      expect(b.ctl.jibsheet, 'the sheet that was made fast, leeward now').toBeCloseTo(made, 2);
+      expect(b.jibBacked).toBe(0);
+    });
+    sail(b, 1);
     expect(b.jibBacked).toBe(0); expect(b.hove).toBe(false);
   }, 180_000);
   it('then let the lashing go and steer off: the crew let the windward sheet fly, and she sails', () => {
