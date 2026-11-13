@@ -321,10 +321,10 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   { const zA = -L / 2 + COCKPIT.u1 * L, { y, len, out, rail: rw } = FOOTREST, N = 10, rails: THREE.BufferGeometry[] = [];
     for (const sx of [-1, 1]) {
       const pts: THREE.Vector3[] = [];
-      for (let i = 0; i <= N; i++) { const z = zA - out + (len + out) * i / N; pts.push(new THREE.Vector3(sx * (footrestWall(z) - rw / 2), y - 0.006, z)); }
-      rails.push(wall(pts, () => 0.006, rw).toNonIndexed());
+      for (let i = 0; i <= N; i++) { const z = zA - out + (len + out) * i / N; pts.push(new THREE.Vector3(sx * (footrestWall(z) - rw / 2), y - 0.016, z)); }
+      rails.push(wall(pts, () => 0.016, rw).toNonIndexed()); // (a dark metal track, about 16 mm deep, its top the plank's underside: the owner's photo)
     }
-    grp.add(new THREE.Mesh(mergeGeometries(rails), TRACK_ALU));
+    grp.add(new THREE.Mesh(mergeGeometries(rails), FOOTREST_RAIL));
     // (the plank in plan, x across and z along, where it lies slid out: the hull's shape where it slides back to, `out` aft)
     const ring: THREE.Vector2[] = [];
     for (let i = 0; i <= N; i++) { const z = zA - out + len * i / N; ring.push(new THREE.Vector2(footrestEdge(z + out), z)); }
@@ -451,6 +451,7 @@ const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.
 const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
+const FOOTREST_RAIL = new THREE.MeshPhongMaterial({ color: 0x2e3033, specular: 0x444444, shininess: 40, side: THREE.DoubleSide }); // (the footrest's rails: dark metal, Josephine's photo)
 /** The mast's foot on deck (m): the stainless plate's radius, the rubber boot's height, and the horseshoe's radius round the mast, its height at the top (aft of the mast, about 6 in), and how far round it reaches from aft (rad: its ends on the deck either side just forward of the mast). The lines thread under it or are made fast to it. */
 export const MAST_RING = { plate: 0.17, boot: 0.4, r: 0.14, h: 0.152, ends: 150 * Math.PI / 180 };
 /** The jib winch's handle below the side deck (m): its spindle's drop under the deck, the crank arm's length (about 10 in, the owner), the grip's length. */
