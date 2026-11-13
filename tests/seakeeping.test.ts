@@ -140,6 +140,31 @@ describe('the waves move her', () => {
   });
 });
 
+describe('phase 2: the waves surge her and heel her', () => {
+  const B = { x: 0, y: 0, h: 0, sea: SEA } as unknown as Boat;
+  it('a long swell abeam tilts her with its slope (the heel she settles to follows the water across her)', () => {
+    const T = 12, a = 0.5, k = (2 * Math.PI / T) ** 2 / G, f = regular(T, a, 90); // travelling east, she heads north: beam on
+    let m = 0; for (let t = 0; t < T; t += 0.05) m = Math.max(m, Math.abs(waveForces(f, B, 0, t, 1, 1).S));
+    expect(m).toBeGreaterThan(k * a * 0.95); expect(m).toBeLessThan(k * a * 1.01);
+    // and head on, no slope across her
+    let h = 0; const g = regular(T, a, 0); for (let t = 0; t < T; t += 0.05) h = Math.max(h, Math.abs(waveForces(g, B, 0, t, 1, 1).S));
+    expect(h).toBeLessThan(1e-6);
+  });
+  it('the surge push is the wave slope along her times her weight, and nothing on average', () => {
+    const T = 12, a = 0.5, k = (2 * Math.PI / T) ** 2 / G, f = regular(T, a, 0); // from astern
+    let mx = 0, sum = 0, n = 0; for (let t = 0; t < T; t += 0.01) { const X = waveForces(f, B, 0, t, 1, 1).X; mx = Math.max(mx, Math.abs(X)); sum += X; n++; }
+    const want = G * HULL.displacement * k * a;
+    expect(mx / want).toBeGreaterThan(0.95); expect(mx / want).toBeLessThan(1.01);
+    expect(Math.abs(sum / n)).toBeLessThan(want * 0.01);
+  });
+  it('a ripple much shorter than she is cancels along her and across her: no surge, no heel', () => {
+    const f = regular(1.0, 0.1, 45); let mx = 0, ms = 0;
+    for (let t = 0; t < 2; t += 0.01) { const r = waveForces(f, B, 0, t, 1, 1); mx = Math.max(mx, Math.abs(r.X)); ms = Math.max(ms, Math.abs(r.S)); }
+    const k = (2 * Math.PI) ** 2 / G;
+    expect(mx).toBeLessThan(0.1 * G * HULL.displacement * k * 0.1); expect(ms).toBeLessThan(0.1 * k * 0.1);
+  });
+});
+
 describe('the field is the World\'s', () => {
   it('fifteen components, all deterministic from the sea (no randomness, no clock but the one it is given)', () => {
     const s: SeaHere = { ...SEA, hsW: 0.6, tpW: 2.8, hsS: 0.3 };

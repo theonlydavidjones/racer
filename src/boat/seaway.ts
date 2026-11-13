@@ -202,11 +202,26 @@ const RA = WM.a33 / C33, RB = B33 / C33;
 export const NATURAL = { heave: 2 * Math.PI * Math.sqrt(M33 / C33), pitch: 2 * Math.PI * Math.sqrt(I55 / C55) };
 const sinc = (x: number) => Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x;
 
-/** The waves' heave force (N) and pitch moment (N·m, bow up) on her at point p, heading h (deg), at wave time t. */
-export function waveForces(f: WaveField, p: { x: number; y: number }, h: number, t: number, kW: number, kS: number): { F: number; M: number } {
+/**
+ * The waves' heave force (N) and pitch moment (N·m, bow up) on her at point p, heading h (deg), at wave time t; and,
+ * from the same waves (phase 2), the surge force X (N, + forward) and the effective slope across her S (rad, + the water
+ * higher to starboard).
+ * - **Surge:** the Froude–Krylov push along her, −ρ·g·∇ × the wave's slope along her averaged over her length and beam
+ *   (with the Smith factor): a wave's back slope ahead of her pushes her back, its front slope behind her pushes her on.
+ *   Zero on average: the mean loss in waves is seaDrag's (the second-order drift), so nothing's counted twice. Running
+ *   before a chop that travels at about her own speed (a 2.5 s wave runs at 3.9 m/s, her hull speed's 3.1), the push
+ *   lasts and she rides a face for a while; a 12 s swell runs at 19 m/s and only rocks her. (The water's added mass in
+ *   surge, 5–10% of hers, and the orbit's own speed past her hull are left out.)
+ * - **Roll:** the same slope across her beam: a wave tilts the water under her and she heels to follow it, a moment
+ *   ρ·g·∇·GM × that effective slope (the standard beam-sea simplification: Journée & Massie ch. 6; IMO's weather
+ *   criterion uses the same r·s). It goes to the heel balance (balance.ts rollStep) as a change in the heel she settles
+ *   to. Her roll period, about 3.5 s, is longer than the Bay's chop, so a beam chop rocks her little; a long swell tilts
+ *   her with its slope, gently.
+ */
+export function waveForces(f: WaveField, p: { x: number; y: number }, h: number, t: number, kW: number, kS: number): { F: number; M: number; X: number; S: number } {
   const fx = Math.sin(h * D2R), fy = Math.cos(h * D2R); // forward
   const cx = p.x - fx * WM.cfAft, cy = p.y - fy * WM.cfAft; // the centre of flotation
-  let F = 0, M = 0;
+  let F = 0, M = 0, X = 0, S = 0;
   for (let i = 0; i < N_WAVES; i++) {
     const a = f.amp[i] * (f.swell[i] ? kS : kW); if (a < 1e-5) continue;
     const k = f.k[i], sd = f.sd[i], cd = f.cd[i];
@@ -220,14 +235,17 @@ export function waveForces(f: WaveField, p: { x: number; y: number }, h: number,
     const w = f.w[i], inPhase = 1 - RA * w * w, quad = RB * w, s = Math.sin(th), c = Math.cos(th);
     F += A * WM.le * sinc(q) * (inPhase * s - quad * c);
     M += A * (Math.abs(q) < 1e-3 ? ax * WM.le ** 3 / 12 : 2 * (Math.sin(q) - q * Math.cos(q)) / (ax * ax)) * (inPhase * c + quad * s);
+    // the slopes along and across her, averaged over her waterplane (the Froude–Krylov parts only)
+    const sl = A * sinc(q) * c; X += ax * sl; S += ay * sl;
   }
-  return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M };
+  return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M, X: -G * HULL.displacement * X, S };
 }
 
 /** Step her heave and pitch `dt` seconds on the waves of field `f` at wave time t (semi-implicit Euler: stable at the sim's step). */
 export function waveMotion(b: Boat, f: WaveField, t: number, dt: number): void {
   const s = b.sea; if (!s) return;
-  const { kW, kS } = f.scaleFor(s), { F, M } = waveForces(f, b, b.h, t, kW, kS);
+  const { kW, kS } = f.scaleFor(s), { F, M, X, S } = waveForces(f, b, b.h, t, kW, kS);
+  b.waveX = X; b.waveRoll = S / D2R; // (for physics.ts: the surge force, and the heel the slope across her asks, deg + to port)
   let z = b.heave ?? 0, zr = b.heaveRate ?? 0, th = b.pitch ?? 0, thr = b.pitchRate ?? 0;
   zr += (F - C33 * z - B33 * zr) / M33 * dt; z += zr * dt;
   thr += (M - C55 * th - B55 * thr) / I55 * dt; th += thr * dt;
