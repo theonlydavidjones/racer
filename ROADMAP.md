@@ -247,6 +247,12 @@ What's planned, roughly in order. Done work is described in the README.
       - getting set under it is a real wreck, with damage and the sail over, not a bounce;
       - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
         of the pier, and pick the tide.
+   4. Eddies in the entrance (owner: "There are also frequent eddies in the entry. Have the physics session model the
+      water there carefully"): the tidal stream separating off the breakwater's end and the pier's corner sheds eddies
+      into the gap, which turn the current across the entrance and back on itself. Deep Physics models the water there
+      carefully, from the flood and ebb past the breakwater and through the pier's piles, sourced where it can be
+      (NOAA's SFBOFS currents, shallow-water eddy shedding behind a breakwater). The eddies should be visible on the
+      water as the other eddies are.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
