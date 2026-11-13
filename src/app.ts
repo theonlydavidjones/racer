@@ -55,6 +55,7 @@ import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from '.
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
+import { FlowPanel } from './ui/flowPanel';
 import type { PilotMode } from './boat/autopilot';
 
 const S: Settings = loadSettings();
@@ -91,7 +92,7 @@ const send = (c: Command) => host.send(c);
 let replayPin: number | null = null;
 let viewMode = 0;
 /** Where you're looking, relative to the bow: yaw + is to port (radians), pitch + is up. Never affects steering. */
-const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
+const look: { yaw: number; pitch: number; aft: number; chase?: number; shift: number; panelShift: number; spin: boolean; fov?: number } = { yaw: 0, pitch: 0, aft: 6.5, chase: undefined, shift: 0, panelShift: 0, spin: true }; // (chase: unset is the framed distance, design/chase-layout.html)
 /* Cockpit eye: how far aft of the boat's middle you sit, m (the transom is at 3.8). Scroll or +/− moves it. */
 const EYE_MIN = 2.6, EYE_MAX = 10;
 try { const v = Number(localStorage.getItem('fbsim-eye')); if (v >= EYE_MIN && v <= EYE_MAX) look.aft = v; } catch { /* storage unavailable */ }
@@ -442,6 +443,17 @@ function chaseFrame(): void {
   view.setChaseFrame({ top: 0, bottom: wx && wx.height > 0 ? wx.top - gl.top : r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
 }
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
+/* The flow view (ui/flowPanel.ts): her sails cut across at three heights, beside the 3D view; off until you open it. The
+ * picture moves left by half the panel, so she stays in the middle of what's left of the view. */
+const flowPanel = new FlowPanel(document.body, () => openFlow(false));
+function openFlow(open = !flowPanel.open): void {
+  flowPanel.show(open);
+  $('bFlow').classList.toggle('on', open); $('bFlow').setAttribute('aria-pressed', String(open));
+  document.body.classList.toggle('flow-open', open);
+  look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
+}
+$('bFlow').onclick = () => openFlow();
+addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 /* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
@@ -855,6 +867,7 @@ addEventListener('keydown', e => {
     case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'sailBand': openLines(); break;
     case 'lookInstrument': toggleInstrumentLook(); break;
+    case 'flowView': openFlow(); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': pilotOff('Pilot on standby.'); unlash(); centreTiller(); break;
     case 'lashTiller': lash(); break;
@@ -1427,6 +1440,7 @@ function frame(now: number): void {
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
   hud.update(w, dt);
+  if (w.running) flowPanel.update(w.user, now, { preStart: !w.freeSail && w.t < 0 }); // (as the coach has it)
   if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer);
 }
 
