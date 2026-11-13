@@ -529,20 +529,20 @@ function roundTick(): void {
   if (list.length === roundSeen) { if (!list.length) el.hidden = true; return; }
   for (let i = roundSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by mark and wind band)
     const s = list[i], k = roundingKey(s), b = S.practiceBest?.[k];
-    if (!s.scored || s.lostM < 0) continue;
+    if (!s.scored || s.lostM < 0 || s.provisional) continue; // (a provisional score is no best)
     if (!b || Math.max(0, s.lostM) < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(S); }
   }
   roundSeen = list.length;
   const s = list[list.length - 1], best = S.practiceBest?.[roundingKey(s)];
   el.hidden = false;
   if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
-  el.innerHTML = `<b>${roundName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
+  el.innerHTML = `<b>${roundName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b>${s.provisional ? ' (provisional: first lap)' : ''} (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
   el.querySelector('.tp-dcoach')!.textContent = s.coach;
 }
 /** The Pause screen's list for the rounding drill: every rounding, its numbers, and your bests. */
 function roundHtml(): string {
   const list = w.rounding?.list ?? [], f = (v: number | null, d = 0) => (v == null ? '—' : v.toFixed(d));
-  const bestOf = (k: 'windward' | 'leeward') => list.reduce((bi, x, i) => (x.kind === k && x.scored && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
+  const bestOf = (k: 'windward' | 'leeward') => list.reduce((bi, x, i) => (x.kind === k && x.scored && !x.provisional && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
   const lit = new Set([bestOf('windward'), bestOf('leeward')]);
   const row = (s: RoundingScore, i: number) => {
     const head = `<td>${i + 1}. ${roundName(s.kind)}</td><td>${Math.round(s.tws)} kt</td>`;
@@ -550,12 +550,12 @@ function roundHtml(): string {
     // approach: the tacks inside the zone (windward) or the pole down before the mark (leeward); exit: how close onto the new course
     const approach = s.kind === 'windward' ? `${s.tacks} tack${s.tacks === 1 ? '' : 's'}${s.pinchS > 2 ? `, pinched ${f(s.pinchS)} s` : s.freeS > 2 ? `, free ${f(s.freeS)} s` : ''}` : `in ${Math.round(s.entryD)} m`;
     const pole = s.kind === 'windward' ? (s.poleS == null ? 'no pole' : `+${f(s.poleS)} s`) : (s.dropS == null ? '—' : `−${f(Math.max(0, s.dropS))} s`);
-    return `<tr${lit.has(i) ? ' class="best"' : ''}>${head}<td><b>${Math.max(0, Math.round(s.lostM))} m</b> / ${Math.round(s.goodM)} m</td><td>${approach}</td><td>${pole}</td><td>${Math.round(s.exitD)} m</td></tr><tr class="dcoach"><td colspan="7">${s.coach.replace(/</g, '&lt;')}</td></tr>`;
+    return `<tr${lit.has(i) ? ' class="best"' : ''}>${head}<td><b>${Math.max(0, Math.round(s.lostM))} m</b>${s.provisional ? '*' : ''} / ${Math.round(s.goodM)} m</td><td>${approach}</td><td>${pole}</td><td>${Math.round(s.exitD)} m</td></tr><tr class="dcoach"><td colspan="7">${s.coach.replace(/</g, '&lt;')}</td></tr>`;
   };
   const rows = list.map(row).join('');
   const bests = Object.entries(S.practiceBest ?? {}).filter(([k]) => /^(wmark|lmark)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'wmark' ? 'Windward' : 'Leeward'} mark, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
   return `<h3>Mark roundings</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Approach</th><th>Pole</th><th>Exit off mark</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No roundings yet: beat up to the windward mark, round it to port and set the pole for the run down to the pin; round the pin to port and beat up again.</p>'}`
-    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on from 100 m off the mark until you were 100 m past it, measured through the water (the tide doesn't count). The twin sails each leg at your own pace on that point of sail, from your last steady leg of it. Good crew: the sim's own crew, measured the same way in this wind, in flat water. Approach: tacks inside 100 m of the windward mark, and whether you reached in (free) or pinched in the last 60 m; for the leeward mark, how far off it you began the turn. Pole: for the windward mark, seconds from rounding to the pole set; for the leeward mark, seconds the pole was down before the mark. Exit off mark: at the leeward mark, how far the mark was to windward of your new close-hauled track as you came onto the wind (wide in, close out), against the good crew's. Only the windward mark and the pin (the leeward mark), each left to port, are scored.</p>`
+    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on from 100 m off the mark until you were 100 m past it, measured through the water: a stream doesn't score a clean rounding, though a mistake costs a little more in a strong one, as it does on the water. Your first rounding of each kind is provisional (marked *): your pace on the new leg isn't measured yet. The twin sails each leg at your own pace on that point of sail, from your last steady leg of it. Good crew: the sim's own crew, measured the same way in this wind, in flat water. Approach: tacks inside 100 m of the windward mark, and whether you reached in (free) or pinched in the last 60 m; for the leeward mark, how far off it you began the turn. Pole: for the windward mark, seconds from rounding to the pole set; for the leeward mark, seconds the pole was down before the mark. Exit off mark: at the leeward mark, how far the mark was to windward of your new close-hauled track as you came onto the wind (wide in, close out), against the good crew's. Only the windward mark and the pin (the leeward mark), each left to port, are scored.</p>`
     + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
 }
 /** The Pause screen's list: every manoeuvre so far, with its numbers, and your bests. */

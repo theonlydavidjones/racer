@@ -14,15 +14,18 @@ import type { Course, CourseMark } from '../courses/course';
  * How it measures, as the tack and gybe drill does (sim/drill.ts), against a twin that sails on:
  * - from the moment she's GATE_IN (100 m) off the mark until she's GATE_OUT (100 m) past its level along the next leg
  *   (over the ground: that only sets the window), what she makes good through the water (her velocity less the
- *   current's) along the wind as it is each moment: up (or down) the wind until she rounds, then the other way. A boat
- *   that overstands above the mark's level makes ground she then gives back;
+ *   current's) along the wind as it is each moment: up (or down) the wind until she rounds, then the other way, folded
+ *   at the mark's level, so ground she makes past the level before turning she gives back (it counts twice against her);
  * - the twin's, over the same seconds: her own share (η) of the polar's best VMG on each point of sail (measured over the
  *   steady seconds before the gate on her last leg of that kind: the leg in for the leg in, her last beat for the beat
  *   out of the leeward mark, her last run for the run away from the windward mark), times the polar's best VMG in the
  *   wind as it is (reached with the boat's own lag, TWIN_LAG), turning for the new leg as it reaches the mark's level
  *   (which the stream carries along in the water's frame), with no loss at the mark.
- * Both are through the water, so the tide doesn't score her; both are along the wind as it is, so a shift (the wind's
- * swing about the course's axis, a few degrees either way over a minute or two) reaches both alike.
+ * Both are through the water, so a stream doesn't score a clean rounding (a scripted boat sailing the same water track
+ * scores the same in slack and in 2.5 kt); a mistake costs a little more in a strong stream than in slack (a stop 90 m
+ * short of the mark, 22 m in slack, 32 m in a 2.5 kt foul stream), as on the water, where a boat stopped in a foul tide
+ * is swept back further still. Both are along the wind as it is, so a shift (the wind's swing about the course's axis,
+ * a few degrees either way over a minute or two) reaches both alike.
  * What she loses against it is the rounding: the approach, the turn, the sails' work through it and getting going on
  * the new leg. A good crew loses some of that too: SIM_CREW is the sim's own crew (ai.ts, with its crew on the pole,
  * crewPoleCall) measured by this tracker, and tests keep it in step.
@@ -61,6 +64,9 @@ export interface RoundingScore {
   slackS: number | null;
   /** She touched the mark. */
   touched: boolean;
+  /** Her pace on the new leg's point of sail wasn't measured yet (her first rounding of this kind): the twin's leg out
+   * sailed at a typical crew's pace, so the score is provisional (within about ±9 m). */
+  provisional?: boolean;
   /** One plain line on what to change (or that it was good, or why it wasn't scored). */
   coach: string;
 }
@@ -160,7 +166,7 @@ export class RoundingTracker {
   private get hist(): Sample[] { let h = HIST.get(this); if (!h) HIST.set(this, h = []); return h; }
   private cur: null | {
     kind: RoundingKind; t0: number; dIn: number; uIn: Vec; etaIn: number; etaOut: number; v0: number; tws0: number; hs: number;
-    twin: number; twTws: number; prog: number; made: number; dInW: number; drift: number; roundT: number | null; tacks: number; lastTack: Boat['tack']; lastTackT: number;
+    twin: number; twTws: number; prog: number; made: number; dInW: number; drift: number; twinOut: boolean; guessed: boolean; roundT: number | null; tacks: number; lastTack: Boat['tack']; lastTackT: number;
     freeS: number; pinchS: number; stallS: number | null; poleT: number | null; poleWas: Boat['pole']; dropT: number | null; poleOutIn: boolean;
     turnFrom: number | null; entryD: number; exitD: number | null; exitT: number | null; slowSince: number | null; closest: number; peakRate: number; minV: number; slackS: number | null; touched: boolean;
   } = null;
@@ -206,7 +212,9 @@ export class RoundingTracker {
     const uIn = unit(sub(m.p, other.p)); // (along the course toward this mark: upwind to W, down to the pin)
     // her share of the polar's VMG on the leg in: over the steady seconds of the last 30 on that point of sail
     const up = kind === 'windward', H = this.hist;
-    const pre = H.filter(q => s.t - q.t <= 30 && q.rate < STEADY_RATE && (up ? Math.abs(q.twa) < 60 : Math.abs(q.twa) > 130));
+    // (sailing, not stopped or stalled: a stop just before the gate is a mistake to score, not her pace, or the twin
+    // would be as slow as she was; under 60% of the polar's speed for her angle, below any trim's loss, isn't counted)
+    const pre = H.filter(q => s.t - q.t <= 30 && q.rate < STEADY_RATE && (up ? Math.abs(q.twa) < 60 : Math.abs(q.twa) > 130) && q.v >= 0.6 * FOLKBOAT.speedKt(q.tws, Math.abs(q.twa)) * KT);
     const secs = pre.length * (H.length > 1 ? (H[H.length - 1].t - H[0].t) / (H.length - 1) : 0);
     const mean = (f: (q: Sample) => number) => pre.reduce((a, q) => a + f(q), 0) / Math.max(1, pre.length);
     const tws0 = pre.length ? mean(q => q.tws) : b.ww.kt;
@@ -219,7 +227,7 @@ export class RoundingTracker {
     const dInW = k * dot(sub(m.p, s), uW); // (the mark's level along the wind, from her at the gate)
     this.cur = {
       kind, t0: s.t, dIn, uIn, etaIn, etaOut, v0: pre.length ? mean(q => q.v) : b.v, tws0, hs,
-      twin: 0, twTws: tws0, prog: 0, made: 0, dInW, drift: 0, roundT: null, tacks: 0, lastTack: b.tack, lastTackT: -1e9,
+      twin: 0, twTws: tws0, prog: 0, made: 0, dInW, drift: 0, twinOut: false, guessed: this.eta[up ? 'down' : 'up'] == null, roundT: null, tacks: 0, lastTack: b.tack, lastTackT: -1e9,
       freeS: 0, pinchS: 0, stallS: byHand(b, 'mainsheet') ? 0 : null, poleT: null, poleWas: b.pole, dropT: null, poleOutIn: b.pole === 'set',
       turnFrom: null, entryD: s.md, exitD: null, exitT: null, slowSince: null, closest: s.md, peakRate: 0, minV: Infinity,
       slackS: byHand(b, 'mainsheet') || byHand(b, 'jibsheet') || byHand(b, 'jibsheetW') ? 0 : null, touched: false
@@ -228,7 +236,13 @@ export class RoundingTracker {
 
   private account(b: Boat, s: Sample, dt: number, rounded: boolean): void {
     const c = this.cur!, m = this.marks[c.kind === 'windward' ? 0 : 1], up = c.kind === 'windward';
-    if (rounded) c.roundT = s.t;
+    const kIn = up ? 1 : -1;
+    if (rounded) {
+      c.roundT = s.t;
+      // folded at the mark's level, not where she crossed its ray: ground she made past the level (she kept on before
+      // turning) she has to give back on the new leg, so it counts against her twice, as it costs her on the water
+      c.made -= 2 * kIn * dot(sub(s, m.p), V(s.from));
+    }
     const after = c.roundT != null;
     // distance to the rounding mark itself (s.md follows the current target, which flips once she's rounded)
     const md = markDist(s, m);
@@ -237,8 +251,8 @@ export class RoundingTracker {
     const y = dot(sub(s, m.p), c.uIn);
     c.prog = after ? c.dIn - y : c.dIn - Math.abs(y);
     // what she makes good, through the water along the wind as it is: toward the mark (up or down the wind) until she
-    // rounds, then the other way (overstanding above the mark's level she makes and then gives back)
-    const kIn = up ? 1 : -1, kNow = after ? -kIn : kIn;
+    // rounds, then the other way (folded at the mark's level when she rounds, above)
+    const kNow = after ? -kIn : kIn;
     c.made += kNow * upwind(s) * dt;
     // the twin: her own pace on each point of sail (η) times the polar's best VMG in the wind as it is (with the boat's
     // lag), through the water, turning for the new leg as it reaches the mark's level (which the stream carries along
@@ -247,7 +261,9 @@ export class RoundingTracker {
     // (in the water's frame the fixed mark moves against the stream: a stream down the wind carries the water away from
     // a windward mark, so its level lies further up the wind through the water as time goes on, and the reverse)
     const uW = V(s.from); c.drift += kIn * (s.cx * uW.x + s.cy * uW.y) * dt;
-    const twinIn = c.twin < c.dInW - c.drift;
+    // (once turned it stays turned: its count is folded, and a stream could otherwise carry the level back past it)
+    if (!c.twinOut && c.twin >= c.dInW - c.drift) c.twinOut = true;
+    const twinIn = !c.twinOut;
     c.twin += (twinIn ? c.etaIn * legVmg(up, c.twTws) : c.etaOut * legVmg(!up, c.twTws)) * dt;
     c.closest = Math.min(c.closest, md);
     c.minV = Math.min(c.minV, s.v);
@@ -293,7 +309,7 @@ export class RoundingTracker {
     const sc: RoundingScore = {
       kind: c.kind, scored: true, tws: c.tws0, hs: c.hs, lostM: c.twin - c.made, goodM: g.lostM, tacks: c.tacks, freeS: c.freeS, pinchS: c.pinchS, stallS: c.stallS,
       poleS: up && c.poleT != null ? c.poleT - c.roundT : null, dropS: !up && c.poleOutIn ? (c.dropT == null ? null : c.roundT - c.dropT) : null,
-      entryD: c.entryD, exitD: c.exitD ?? Math.abs(cross(V(s.h), sub(this.marks[c.kind === 'windward' ? 0 : 1].p, s))), closest: c.closest, peakRate: c.peakRate, minSpeed: c.minV / Math.max(0.1, c.v0), slackS: c.slackS, touched: c.touched, coach: ''
+      entryD: c.entryD, exitD: c.exitD ?? Math.abs(cross(V(s.h), sub(this.marks[c.kind === 'windward' ? 0 : 1].p, s))), closest: c.closest, peakRate: c.peakRate, minSpeed: c.minV / Math.max(0.1, c.v0), slackS: c.slackS, touched: c.touched, provisional: c.guessed, coach: ''
     };
     sc.coach = roundingCoach(sc, g, c.poleOutIn);
     this.list.push(sc);
@@ -304,7 +320,7 @@ export class RoundingTracker {
 export function roundingCoach(s: RoundingScore, g: CrewRounding, poleWasOut = true): string {
   const lost = Math.max(0, Math.round(s.lostM)), good = Math.round(s.goodM), n = (v: number) => Math.round(v);
   const ok = s.lostM <= s.goodM + 10; // (within about the crew's own spread: a single rounding varies ±10 m)
-  if (s.touched) return `You touched the mark: in a race that's a one-turn penalty (rule 31). Give it a little more room.`;
+  if (s.touched) return `You touched the mark: in a race that breaks rule 31, and you'd take a One-Turn Penalty (rule 44.1). Give it a little more room.`;
   if (s.kind === 'windward') {
     if (s.pinchS > 4 || s.tacks >= 3) return `Short of the layline: you had to ${s.tacks >= 3 ? 'tack again' : `pinch for ${n(s.pinchS)} s`} to make the mark. Lost ${lost} m (a good crew ${good}). Go a little past the layline before you tack for it: a touch over is cheaper than short.`;
     if (s.freeS > g.freeS + 8) return `Overstood: you reached in to the mark for ${n(s.freeS)} s. Lost ${lost} m (a good crew ${good}). Tack for it closer to the layline.`;

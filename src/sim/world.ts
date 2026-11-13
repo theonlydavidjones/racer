@@ -934,7 +934,7 @@ export class World {
       if (touching && b.markTouch !== touching.name && !this.racing(b)) {
         // Rule 31 is "while racing": before her preparatory signal or once racing's called off, no penalty
         b.v *= 0.6;
-        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: this.rounding ? `You touched ${touching.name}. In a race that's a one-turn penalty (rule 31); here it's practice, so no penalty.` : `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
+        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: this.rounding ? `You touched ${touching.name}. In a race that breaks rule 31, and you'd take a One-Turn Penalty (rule 44.1); here it's practice.` : `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
       } else if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
         // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
