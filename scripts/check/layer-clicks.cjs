@@ -2,7 +2,7 @@
 /**
  * One click switches a map layer (the owner: "these buttons are requiring two clicks"). With the race in its worker
  * (the default, not ?inproc: the bug was the maps drawing from the mirror before the race had the change), each chip
- * of the full chart's field picker, each row of the Layers menus (the inset's and the chart's) and the Dusk colours
+ * of the full chart's field picker, each row of its Layers menu (the inset's choices are there too) and the Dusk colours
  * button is clicked once, and what's drawn is checked: the chart's field, the menu's ticks, the palette.
  * Needs the dev server (npm run dev) on :5173.
  *
@@ -48,18 +48,9 @@ const out = process.argv[2] || '.';
     console.log(`palette → ${want}: race has ${pal}, button says "${label}"`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`palette ${want}`);
   }
   await p.click('#bChartClose'); await p.waitForTimeout(800);
-  // the inset map's Layers menu: each row once
-  await p.click('#bMapLayers'); await p.waitForTimeout(600);
-  const irows = await p.evaluate(() => [...document.querySelectorAll('#mapLayersPop input')].filter(i => !i.dataset.view).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
-  for (const r of irows) {
-    const [kind, v] = r.split(':'), sel = kind === 'field' ? `#mapLayersPop [data-field="${v}"]` : `#mapLayersPop [data-layer="${v}"]`;
-    const before = await p.evaluate(s => document.querySelector(s).checked, sel);
-    await p.click(sel); await settle();
-    const after = await p.evaluate(s => document.querySelector(s)?.checked, sel);
-    const race = await p.evaluate(([k, v]) => { const m = sim().settings.mapLayers ?? {}; return k === 'field' ? (v === 'off' ? ['wind', 'current', 'sea', 'fog'].every(f => m[f] === false) : m[v] === true) : m[v]; }, [kind, v]);
-    const ok = kind === 'field' ? after === true && race === true : after === !before && race === after;
-    console.log(`inset menu ${r}: ${before} → ${after}, the race has it: ${race}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`inset menu ${r}`);
-  }
+  // the inset map has no buttons of its own (its choices are the chart's menu's: the owner)
+  const insetButtons = await p.evaluate(() => !!document.getElementById('bMapLayers') || !!document.getElementById('bMapNav'));
+  console.log('buttons on the inset:', insetButtons ? 'SOME' : 'none'); if (insetButtons) fails.push('inset buttons');
   console.log('ERRORS:', errs.join(' | ') || 'none'); console.log('FAILED CLICKS:', fails.join(', ') || 'none');
   await b.close(); process.exit(errs.length || fails.length ? 1 : 0);
 })();
