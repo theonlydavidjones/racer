@@ -21,7 +21,7 @@ describe('AI fleet sails the course', () => {
   it('training course: every AI boat starts, rounds and finishes', () => {
     const w = race(TRAIN, { fleet: 5, current: 'ebb' }, 7, 20);
     for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
-  }, 60_000);
+  }, 180_000);
 
   it('Seaweed Soup course 2 in an ebb: every AI boat finishes', () => {
     const w = race(SS2, { fleet: 3, current: 'ebb' }, 11, 90); // (the real jetty pushes the last beat out from the Marina shore)

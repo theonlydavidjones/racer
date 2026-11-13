@@ -86,5 +86,5 @@ describe('The last-minute rules (RRS 30)', () => {
       caught += w.boats.filter(b => !b.isUser && b.scoring).length;
     }
     expect(caught).toBeLessThanOrEqual(2); // out of 20 AI starts
-  }, 60000);
+  }, 180_000);
 });

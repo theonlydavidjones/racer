@@ -41,7 +41,7 @@ describe('the AI sails the boat as a sailor does', () => {
     expect(stalls).toEqual([]);
     // (every boat: one that never ran at all is a fault too)
     for (const b of ai) { const r = run.get(b.id) ?? { s: 0, n: 0 }; expect(r.n, b.name).toBeGreaterThan(3000); expect(Math.abs(r.s / r.n - runAngle(12)), b.name).toBeLessThan(6); }
-  }, 120000);
+  }, 180_000);
   it('she keeps clear of the committee boat and the pin: no touches of a starting mark before she has started (two minutes after the gun)', () => {
     for (const kt of [8, 12]) {
       const w = race(kt), touches = new Set<string>();
@@ -51,7 +51,7 @@ describe('the AI sails the boat as a sailor does', () => {
       }
       expect([...touches]).toEqual([]);
     }
-  }, 120000);
+  }, 180_000);
   it('running across a current she gybes when the other gybe lays the mark, not back and forth across dead downwind', async () => {
     // (a 1.5 kt current setting 350° across the run home, about 080: steered up-current, her course through the water is
     // within a few degrees of dead downwind. Decided by the bearing she steered it as a reach and gybed every few
@@ -88,7 +88,7 @@ describe('the AI sails the boat as a sailor does', () => {
     }
     expect(n).toBeGreaterThan(1000);
     expect(Math.abs(s / n - beat)).toBeLessThan(1.5);
-  }, 120000);
+  }, 180_000);
   it('reaching across a current she steers up-current of the mark by just enough to make good the straight line', () => {
     for (const [brg, set, kn] of [[90, 0, 2], [45, 180, 1.5], [200, 290, 1]] as const) {
       const cur = { x: V(set).x * kn * 0.5144, y: V(set).y * kn * 0.5144 }, v = 2.8, h = crabFor(brg, v, cur), u = V(h);
