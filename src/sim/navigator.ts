@@ -4,7 +4,7 @@ import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
 import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
-import type { World } from './world';
+import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
 import { groundLaylines, landDist, routeAround, sailLeg, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
@@ -83,8 +83,8 @@ export interface PassageNow {
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
-const nowMemo = new WeakMap<World, { key: string; refs: unknown[]; v: PassageNow }>();
-export function passageNow(w: World): PassageNow | null {
+const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
+export function passageNow(w: SimView): PassageNow | null {
   const dest = w.dest; if (!dest) return null;
   const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
   const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
@@ -111,7 +111,7 @@ export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
   ? 'the planner\'s course runs ashore on the way (its tacks or gybes don\'t fit between the shores there): pick a spot a little further out, or sail that part by eye'
   : 'it takes too long, becalmed or against a foul tide somewhere on the way';
 
-export function passagePlan(w: World): PassagePlan | null {
+export function passagePlan(w: SimView): PassagePlan | null {
   const dest = w.dest; if (!dest) return null;
   const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
   const from = { x: u.x, y: u.y }, to = dest.p;

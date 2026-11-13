@@ -1,12 +1,14 @@
 import type { Boat, LineKey } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
-import { byHand, moveLazyCar, takeLine } from '../boat/physics';
+import { byHand } from '../boat/physics';
+import type { BoatView } from '../sim/host';
+import type { Command, CommandResult } from '../sim/commands';
 import { CAR, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
 import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
-import { JUMPER_HALF_TURN_S, wantJumpers } from '../boat/condition';
+import { JUMPER_HALF_TURN_S } from '../boat/condition';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 
 /**
@@ -25,7 +27,9 @@ import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 
 /** The bits of the app the band needs. */
 export interface BandHost {
-  world(): { user: Boat; running: boolean; paused: boolean };
+  world(): { readonly user: BoatView; readonly running: boolean; readonly paused: boolean };
+  /** Change the race (sim/commands.ts): the band never writes to the boat itself. */
+  send(c: Command): CommandResult;
   /** Hold a line moving (+1 / −1 in the line's own value) or let it go (null): the app's held-button commands. */
   hold(k: CtlKey, d: number | null): void;
   /** Something changed hands: the trim panel's line. */
@@ -237,11 +241,11 @@ export class SailBand {
   private ok(): boolean { const w = this.host.world(); return w.running && !w.paused; }
   /** Touching any control stops a line that's running to its end (the double-click), other than the one touched. */
   private stopRun(except: CtlKey | null): void {
-    if (this.runKey && this.runKey !== except) { const u = this.host.world().user; if (u.ctlTarget) delete u.ctlTarget[this.runKey]; this.runKey = null; }
+    if (this.runKey && this.runKey !== except) { this.host.send({ k: 'ctlTargetClear', keys: [this.runKey] }); this.runKey = null; }
   }
   /** Move a line toward a value at its own rate (the sim does the moving): it's yours from now. */
   private target(k: CtlKey, v: number): void {
-    const u = this.host.world().user; (u.ctlTarget ??= {})[k] = clamp(v, lo(k), lo(k) + range(k)); takeLine(u, k); this.host.changed();
+    this.host.send({ k: 'ctlTarget', key: k, v: clamp(v, lo(k), lo(k) + range(k)) }); this.host.changed();
   }
   /** One small step: from where it's going (or where it is), a twentieth of its travel. */
   private step(k: CtlKey, dv: number): void {
@@ -270,7 +274,7 @@ export class SailBand {
     e.preventDefault();
     t.closest<HTMLElement>('[data-act]')!.setPointerCapture(e.pointerId); // (the release comes back here, wherever it is)
     // a press on a line that's running to its end stops it where it is first: the step is from there, not from the end
-    if (this.runKey === k) { const u = this.host.world().user; if (u.ctlTarget) delete u.ctlTarget[k]; this.runKey = null; }
+    if (this.runKey === k) { this.host.send({ k: 'ctlTargetClear', keys: [k] }); this.runKey = null; }
     const dv = this.dirOf(k, act), id = `${d.dataset.line}|${d.dataset.side ?? ''}|${act}`, now = performance.now();
     // a second press soon after the first: the double-click, all the way (the first press has already stepped)
     if (this.last && this.last.key === id && now - this.last.t < DBL_MS) {
@@ -280,7 +284,7 @@ export class SailBand {
     this.step(k, dv);
     // held: after a moment it keeps going at the line's rate, until you let go
     clearTimeout(this.holdT);
-    this.holdT = window.setTimeout(() => { this.holding = k; const u = this.host.world().user; if (u.ctlTarget) delete u.ctlTarget[k]; this.host.hold(k, dv); }, HOLD_MS);
+    this.holdT = window.setTimeout(() => { this.holding = k; this.host.send({ k: 'ctlTargetClear', keys: [k] }); this.host.hold(k, dv); }, HOLD_MS);
   }
   private move(e: PointerEvent): void {
     const t = e.target as HTMLElement, a = t.closest<HTMLElement>('[data-act="drag"]');
@@ -301,8 +305,8 @@ export class SailBand {
     if (act !== 'name' || !d) return;
     const u = this.host.world().user, k = this.keyOf(d) as LineKey | null; if (!k) return;
     // the name: amber (yours) hands it back; grey (the crew's) takes it where it is
-    if (byHand(u, k)) { takeLine(u, k, false); this.host.toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
-    else { takeLine(u, k); this.host.toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap its name.`, 3000); }
+    if (byHand(u, k)) { this.host.send({ k: 'line', key: k, mine: false }); this.host.toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
+    else { this.host.send({ k: 'line', key: k, mine: true }); this.host.toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap its name.`, 3000); }
     this.host.changed();
   }
   /** Drag a rope (down or outboard is on), the boom marker, or the traveller's car. */
@@ -327,7 +331,7 @@ export class SailBand {
     // takes the load off it (it's then the windward car, and yours to set for the tack after)
     if (side !== windSide(u)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
-    const from = u.carCmd ?? u.ctl.car[side]; takeLine(u, 'car'); moveLazyCar(u, row - from.fore, ins - from.ins); this.host.changed();
+    const from = u.carCmd ?? u.ctl.car[side]; this.host.send({ k: 'lazyCar', fore: row - from.fore, ins: ins - from.ins }); this.host.changed();
     this.carAsked = u.carCmd ? { side, ...u.carCmd } : null; this.carNote(u);
   }
   /** The Coach card's word on the jib car you've asked for: the crew going forward, moving it (and about how long), set. */
@@ -352,7 +356,7 @@ export class SailBand {
   private jumpersNow(u: Boat): number { return (u.tune ?? guideTune(u.ww.kt)).jumperTurns; }
   /** Ask the crew for a half turn more or less on the jumpers, from where they're going (or where they are). */
   private turnJumpers(d: number): void {
-    const u = this.host.world().user; wantJumpers(u, (u.jumperTarget ?? this.jumpersNow(u)) + d); this.host.changed();
+    const u = this.host.world().user; this.host.send({ k: 'jumpers', turns: (u.jumperTarget ?? this.jumpersNow(u)) + d }); this.host.changed();
   }
   /** The jumpers' dials: shown only if her Rig tune has them adjusted under way. */
   private jumpers(u: Boat): void {
@@ -418,7 +422,7 @@ export class SailBand {
     if (!this.open) return;
     // a tack ends a jib sheet's run: the sheets change roles (physics.ts carries your targets across), and a sheet still
     // winching after it would back the jib with nothing in the band to stop it
-    if (this.lastTack && u.tack !== this.lastTack && (this.runKey === 'jibsheet' || this.runKey === 'jibsheetW') && u.ctlTarget) { delete u.ctlTarget.jibsheet; delete u.ctlTarget.jibsheetW; this.runKey = null; }
+    if (this.lastTack && u.tack !== this.lastTack && (this.runKey === 'jibsheet' || this.runKey === 'jibsheetW') && u.ctlTarget) { this.host.send({ k: 'ctlTargetClear', keys: ['jibsheet', 'jibsheetW'] }); this.runKey = null; }
     this.lastTack = u.tack;
     if (this.runKey && u.ctlTarget?.[this.runKey] == null) this.runKey = null; // (arrived)
     this.el.classList.toggle('off', !w.running);

@@ -7,7 +7,7 @@ import { inBasin, slipPlace } from '../geo/marina';
 import { chartPoint } from './chart';
 import { brg, dist, wrap, type Vec } from '../core/math';
 import type { SetupPicks } from './setupChart';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { passageNow, whyNot } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
 import { mins } from '../sim/brief';
@@ -21,7 +21,7 @@ export type Drop = { id: string; p: Vec; name: string } | { err: string; p: Vec 
  * place by its name if one's within a finger's width on the screen (`px`: how far p is from the drop, in px), or that
  * spot on open water; not on land, nor inside a harbor (her slip is the way into one).
  */
-export function dropAt(w: World, q: Vec, px: (p: Vec) => number): Drop {
+export function dropAt(w: SimView, q: Vec, px: (p: Vec) => number): Drop {
   const slip = w.homeSlip;
   if (slip && (px(slip.p) < 16 || dist(slip.p, q) < 60)) return { id: 'slip', p: slip.p, name: `her slip (${slipPlace(slip)})` };
   let best: (typeof PLACES)[number] | null = null, bd = 16;

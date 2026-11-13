@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { setVisibility } from '../environment/weather';
 import { D2R, V, ZONE } from '../core/math';
 import type { Vec } from '../core/math';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import type { MarkShape } from '../courses/course';
 import { PLACES } from '../sim/places';
 import { Puffs, TerrainGrid } from '../environment/wind';
@@ -159,7 +159,7 @@ export type Orient = 'north' | 'bow' | 'wind';
 export interface Overhead { orient: Orient; height: number; off: { x: number; y: number } }
 export const ORIENT_LABEL: Record<Orient, string> = { north: 'North up', bow: 'Bow up', wind: 'Wind up' };
 /** Which compass direction is at the top of the overhead view. */
-export function overheadUp(o: Overhead, w: World): number {
+export function overheadUp(o: Overhead, w: SimView): number {
   return o.orient === 'north' ? 0 : o.orient === 'bow' ? w.user.h : w.C.base;
 }
 
@@ -172,6 +172,8 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
+  get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
   private courseObjs: THREE.Object3D[] = [];
   private camLocal = new THREE.Vector3();
   private camSide = 1;
@@ -373,7 +375,7 @@ export class SceneView {
   }
 
   /** Laylines for the user's target mark, 900 m long, refreshed twice a second. */
-  private updateLaylines(w: World, dt: number): void {
+  private updateLaylines(w: SimView, dt: number): void {
     this.laylineAcc += dt; if (this.laylineAcc < 0.5) return; this.laylineAcc = 0;
     const L = w.settings.aids ? laylinesFor(w, w.user) : null;
     this.laylines.forEach((line, i) => {
@@ -394,7 +396,7 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
-  setWorld(w: World): void {
+  setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
@@ -454,9 +456,9 @@ export class SceneView {
   }
 
   /** The course or destination changed (a new destination picked on the chart): build its marks again. */
-  refreshCourse(w: World): void { this.buildCourse(w); }
-  /** New conditions mid-sail (World.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
-  conditionsChanged(w: World): void {
+  refreshCourse(w: SimView): void { this.buildCourse(w); }
+  /** New conditions mid-sail (SimView.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
+  conditionsChanged(w: SimView): void {
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     this.ripAngle = -w.windModel.base * D2R; // (the ripples lie across the new wind at once, not swept round to it)
     this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12, w.t + 600); // (wave time: see sync)
@@ -466,12 +468,12 @@ export class SceneView {
     this.buildCourse(w); // (the committee boat swung to the new wind)
   }
 
-  private buildCourse(w: World): void {
+  private buildCourse(w: SimView): void {
     const old = this.courseObjs;
     this.placeCourse(w);
     disposeUnused(old, this.scene); // (the last course's marks, freed once the new ones are in)
   }
-  private placeCourse(w: World): void {
+  private placeCourse(w: SimView): void {
     this.courseObjs.forEach(o => this.scene.remove(o)); this.courseObjs = [];
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.courseObjs.push(o); return o; };
     const C = w.C, aids = !!w.settings.aids;
@@ -529,7 +531,7 @@ export class SceneView {
   }
 
   /** The sea map: how big the chop and swell are around `at`, relative to the sea at the focus, and the whitecaps. */
-  private updateSeaMap(w: World, at: { x: number; y: number }, span: number): void {
+  private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void {
     const ref = this.seaRef!, cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
     for (let j = 0; j < SEA_N; j++) for (let i = 0; i < SEA_N; i++) {
       const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
@@ -550,7 +552,7 @@ export class SceneView {
   }
 
   /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
-  private drawWindOnWater(w: World, at: { x: number; y: number }, span: number): void {
+  private drawWindOnWater(w: SimView, at: { x: number; y: number }, span: number): void {
     const PUFF_SPAN = span, cell = span / PUFF_N, x0 = Math.round((at.x - PUFF_SPAN / 2) / cell) * cell, y0 = Math.round((at.y - PUFF_SPAN / 2) / cell) * cell;
     const sum = this.puffSum.fill(0), g = w.puffs.gustiness;
     for (const p of w.puffs.cells) {
@@ -686,7 +688,7 @@ export class SceneView {
 
   /** Rain (the conditions adjuster): streaks falling round the camera, slanting with the wind. */
   private rain: { mesh: THREE.LineSegments; drops: Float32Array } | null = null;
-  private updateRain(w: World, dt: number, camera: THREE.Camera): void {
+  private updateRain(w: SimView, dt: number, camera: THREE.Camera): void {
     const level = w.settings.rain ?? 0;
     if (!level) { if (this.rain) this.rain.mesh.visible = false; return; }
     const N = 7200, R = 45, H = 30; // (heavy rain at all of them; light at a sixth)
@@ -719,7 +721,7 @@ export class SceneView {
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
   /** The showroom camera's angle round the boat (it turns slowly unless paused). */
   private showroomA = 0;
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number; spin?: boolean }, over: Overhead): void {
+  render(w: SimView, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number; panelShift?: number; spin?: boolean; fov?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     { const d = Math.atan2(Math.sin(-w.windModel.base * D2R - this.ripAngle), Math.cos(-w.windModel.base * D2R - this.ripAngle)); // the short way round
@@ -796,7 +798,7 @@ export class SceneView {
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     this.userHeading = u.h; this.userHeel = u.heel;
     camera.up.set(0, 1, 0);
-    const fov = viewMode === 0 ? 72 : this.baseFov;
+    const fov = viewMode === 0 ? look.fov ?? 72 : this.baseFov; // (narrower while you look at the cabin-top instrument: app.ts)
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     if (viewMode === 0) {
       // sit on the windward side, like a helm hiking
@@ -847,8 +849,9 @@ export class SceneView {
     const dc = import.meta.env.DEV ? (window as unknown as { __cam?: { pos: number[]; at: number[] } }).__cam : undefined;
     if (dc) { camera.up.set(0, 1, 0); if (Math.hypot(dc.pos[0] - dc.at[0], dc.pos[1] - dc.at[1]) < 1) camera.up.set(0, 0, -1); // straight down: north at the top
        camera.position.copy(P3(dc.pos[0], dc.pos[1], dc.pos[2])); camera.lookAt(P3(dc.at[0], dc.at[1], dc.at[2])); }
-    // the showroom shifts the picture right, clear of the panel on the left
-    const shift = viewMode === 3 ? (look.shift ?? 0) : 0, size = this.renderer.getSize(new THREE.Vector2());
+    // the showroom shifts the picture right, clear of the panel on the left; a panel docked beside the view in any view
+    // (the flow view, on the right) shifts it the other way
+    const shift = (viewMode === 3 ? (look.shift ?? 0) : 0) + (look.panelShift ?? 0), size = this.renderer.getSize(new THREE.Vector2());
     if (shift) camera.setViewOffset(size.x, size.y, -shift, 0, size.x, size.y); else if (camera.view?.enabled) camera.clearViewOffset();
     this.lastView = viewMode;
     this.updateRain(w, dt, camera);

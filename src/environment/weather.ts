@@ -217,20 +217,28 @@ const waterShare = (cells: Vec[]) => WATER ??= cells.map(c => { let n = 0; for (
 /** A forecast day: the NWS grid's wind across the race area (2.5 km cells), relative to the reference cell, plus the shore. */
 function forecastField(date: string) {
   const g = R.grid.days[date], cells = R.grid.cells.map(([la, lo]) => LL(la, lo)), water = waterShare(cells);
+  // each water cell's wind at a time (its east and north parts, kt, and its place), and the reference cell's blend:
+  // the same for every point at that time, so worked out once for it (the field's asked at many points at once)
+  let at = NaN, live: { x: number; y: number; e: number; n: number; s: number }[] = [], ref: ReturnType<typeof uvOf> = null;
+  function uvOf(q: Vec) {
+    let u = 0, v = 0, w = 0;
+    for (const c of live) { const wt = c.s / ((q.x - c.x) ** 2 + (q.y - c.y) ** 2 + 1200 * 1200) ** 1.5; u += c.e * wt; v += c.n * wt; w += wt; }
+    return w > 0 ? { kt: Math.hypot(u, v) / w, from: (Math.atan2(u, v) * 180 / Math.PI + 360) % 360 } : null;
+  }
   return (p: Vec, tMin: number) => {
-    const hf = clamp(localMin(tMin) / 60 - R.grid.hours[0], 0, R.grid.hours.length - 1), h0 = Math.floor(hf), h1 = Math.min(R.grid.hours.length - 1, h0 + 1), f = hf - h0;
-    const uv = (q: Vec) => {
-      let u = 0, v = 0, w = 0;
+    if (tMin !== at) {
+      const hf = clamp(localMin(tMin) / 60 - R.grid.hours[0], 0, R.grid.hours.length - 1), h0 = Math.floor(hf), h1 = Math.min(R.grid.hours.length - 1, h0 + 1), f = hf - h0;
+      live = [];
       cells.forEach((c, i) => {
         const k0 = g.kt[i]?.[h0], k1 = g.kt[i]?.[h1], d0 = g.from[i]?.[h0], d1 = g.from[i]?.[h1];
         if (k0 == null || k1 == null || d0 == null || d1 == null) return;
         if (water[i] === 0) return;
-        const kt = k0 + (k1 - k0) * f, d = (d0 + wrap(d1 - d0) * f) * Math.PI / 180, wt = water[i] / ((q.x - c.x) ** 2 + (q.y - c.y) ** 2 + 1200 * 1200) ** 1.5;
-        u += Math.sin(d) * kt * wt; v += Math.cos(d) * kt * wt; w += wt;
+        const kt = k0 + (k1 - k0) * f, d = (d0 + wrap(d1 - d0) * f) * Math.PI / 180;
+        live.push({ x: c.x, y: c.y, e: Math.sin(d) * kt, n: Math.cos(d) * kt, s: water[i] });
       });
-      return w > 0 ? { kt: Math.hypot(u, v) / w, from: (Math.atan2(u, v) * 180 / Math.PI + 360) % 360 } : null;
-    };
-    const a = uv(p), r = uv(REF);
+      at = tMin; ref = uvOf(REF);
+    }
+    const a = uvOf(p), r = ref;
     if (!a || !r || r.kt < 0.5) return { k: shoreFactor(p), turn: 0 };
     // (the limits only guard against a broken forecast: across the whole world the water's cells turn up to about 75°
     // from the reference cell's wind along the Berkeley flats, and blow from a fifth to twice as hard)

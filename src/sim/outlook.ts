@@ -3,7 +3,7 @@ import { CURRENTS, currentAt, currentVector, windOnWater } from '../environment/
 import type { SeaHere } from '../environment/sea';
 import { CurrentField, events, sfClock, type TideStation } from '../environment/tide';
 import { landLee, type Wind } from '../environment/wind';
-import type { World } from './world';
+import type { SimView } from './host';
 
 /**
  * The day ahead, as a forecaster would look at it: the wind, the current and the sea at any place and time, from the
@@ -33,14 +33,15 @@ export interface Outlook {
 /** The lee of the land changes slowly in space and with the wind's direction: cached on a 200 m grid, per 5°. */
 const leeCache = new Map<string, number>();
 function leeAt(p: Vec, from: number): number {
-  const k = `${Math.round(p.x / 200)},${Math.round(p.y / 200)},${Math.round(from / 5) % 72}`;
+  // (the angle worked out from the key itself, so 0° and 360° share a slot and its value both ways)
+  const a = ((Math.round(from / 5) % 72) + 72) % 72, k = `${Math.round(p.x / 200)},${Math.round(p.y / 200)},${a}`;
   let v = leeCache.get(k);
-  if (v == null) { v = landLee({ x: Math.round(p.x / 200) * 200, y: Math.round(p.y / 200) * 200 }, Math.round(from / 5) * 5); leeCache.set(k, v); if (leeCache.size > 60000) leeCache.clear(); }
+  if (v == null) { v = landLee({ x: Math.round(p.x / 200) * 200, y: Math.round(p.y / 200) * 200 }, a * 5); leeCache.set(k, v); if (leeCache.size > 60000) leeCache.clear(); }
   return v;
 }
 
 /** The outlook for a World's day, with its settings (a set wind strength or direction, a practice current) as it sails them. */
-export function outlookFor(w: World): Outlook {
+export function outlookFor(w: SimView): Outlook {
   const S = w.settings, wx = w.weather, gun = w.gunUtc;
   const fixedFrom = w.windModel.base, fixedKt = S.windKt;
   const breeze = (t: number) => {

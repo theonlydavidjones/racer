@@ -1,6 +1,6 @@
 import { D2R, LOA, wrap } from '../core/math';
 import type { Finding, Moment } from '../sim/debrief';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { drawCourse, drawHull, drawLand, fitCanvas, hexA, makeTf } from '../ui/draw2d';
 import type { BoatSnap, Frame } from './recorder';
 import { ReplayView, type ReplayClip } from './replayView';
@@ -61,7 +61,7 @@ export class RaceReplay {
   private cv!: HTMLCanvasElement;
   private tl!: HTMLCanvasElement;
   private D: RaceReplayData | null = null;
-  private w: World | null = null;
+  private w: SimView | null = null;
   private t = 0;
   private playing = false;
   private speed = 30;
@@ -87,7 +87,7 @@ export class RaceReplay {
 
   get isOpen(): boolean { return !this.root.hidden; }
 
-  open(w: World, D: RaceReplayData): void {
+  open(w: SimView, D: RaceReplayData): void {
     this.w = w; this.D = D;
     this.rank = new Map(D.findings.map((f, i) => [f.key, i + 1]));
     const worst = new Map<string, Moment>();
