@@ -100,8 +100,8 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
  * The closest she'd come (m) in the next 12 s to any boat within 40 m (or to `only`) if she steered heading h at her
  * speed and they held their courses.
  */
-function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
-  const u = V(h), v = Math.max(b.v, 1.2), hu = V(b.h);
+function clearanceOn(w: World, b: Boat, h: number, only?: Boat, slow = 1): number {
+  const u = V(h), v = Math.max(b.v, 1.2) * slow, hu = V(b.h);
   const me = { x: b.x, y: b.y, vx: b.vx - hu.x * b.v + u.x * v, vy: b.vy - hu.y * b.v + u.y * v }; // (keeping her drift with the current)
   let m = Infinity;
   for (const o of only ? [only] : w.boats) {
@@ -312,6 +312,39 @@ export function bestApproach(w: World, b: Boat): { h: number; along: number } {
     if (tack === 'P' && twa > 100) t += 4;
     if (Math.abs(cross) > half) t += 30 + (Math.abs(cross) - half) / 2; // would miss the line: strongly discouraged
     if (t < bestT) { bestT = t; best = { h, along: uN }; }
+  }
+  return best;
+}
+
+/** Boats within this distance (m) that make a crowd: two or more, and she steers by crowdHeading. */
+const CROWD_M = 30;
+/** Room she keeps, at the closest approach, from a boat she must keep clear of (m between centres: about two beams of
+ * water side by side), scaled by her nerve (ai/skipper.ts keepClearM: a timid skipper keeps more). */
+const CROWD_KC = 6.5;
+/** ...and from a boat she has right of way over, which still mustn't be hit (Rule 14) nor left without room to keep
+ * clear when she changes course (Rule 16.1). */
+const CROWD_ROW = 4.5;
+/**
+ * Her heading (and whether to ease) in a crowd: of the headings near the one she wants, the one that best keeps her
+ * clear of every boat she must keep clear of together, then gives room to those she has right of way over, then stays
+ * near what she wants and where she's heading. (Moving clear of one boat at a time, the last one she thought about
+ * set her course, and in a crowd one boat's move put her into another: nearly all the AI's fouls were contacts in two-
+ * and three-boat tangles at the marks and after the start, about 0.75 penalties a boat a race against a real club
+ * fleet's rare one.) Only in a crowd: a lone encounter keeps the simple moves. ~15 headings × the boats within 40 m.
+ */
+function crowdHeading(w: World, b: Boat, want: number, near: { o: Boat; r: ReturnType<World['rights']> }[], kcScale: number): { h: number; luff: boolean; cost: number } {
+  let best = { h: want, luff: false, cost: Infinity };
+  const kcNeed = CROWD_KC * kcScale;
+  for (const slow of [1, 0.5]) for (const k of [0, -10, 10, -20, 20, -30, 30, -45, 45, -60, 60, -80, 80, -100, 100]) {
+    const h = sailable(b, want + k);
+    let cost = Math.abs(wrap(h - want)) * 0.05 + Math.abs(wrap(h - b.h)) * 0.02 + (slow < 1 ? 1.5 : 0); // (easing costs speed: a last resort)
+    for (const { o, r } of near) {
+      if (dist(o, b) > 40 || o.finished) continue;
+      const c = clearanceOn(w, b, h, o, slow);
+      if (r.kc === b) { if (c < kcNeed) cost += 100 * (kcNeed - c); }
+      else if (c < CROWD_ROW) cost += 40 * (CROWD_ROW - c);
+    }
+    if (cost < best.cost) best = { h, luff: slow < 1, cost };
   }
   return best;
 }
@@ -699,6 +732,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ht = ai.hailTack;
   if (ht && ((b.tack === ht.to && !b.tacking) || w.t - ht.at > 30)) ai.hailTack = null;
   else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
+  // In a crowd (two or more boats within CROWD_M), one heading for all of them together, from what the moves above
+  // made of it: not while a hail is being answered or answered by a tack, which the rules have in hand
+  if (!holdForHail && !tackNow && !ai.hailTack && b.started !== undefined && near.filter(n => !n.o.finished && dist(n.o, b) < CROWD_M).length >= 2) {
+    const c = crowdHeading(w, b, desired, near, ai.kn.keepClearM / 14);
+    if (c.cost < Infinity) { desired = c.h; luff = c.luff; }
+  }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired));
