@@ -166,6 +166,13 @@ export class WorkerHost implements SimHost {
   faults = 0;
   /** Checks made. */
   checks = 0;
+  /**
+   * The answers that reached the page since its last frame, and the steps they carried (for the checks and the dev
+   * handles: one a frame as a rule; none, then two, when the worker's frame ran long). And how often each count came up.
+   */
+  packetsLastFrame = 0; stepsLastFrame = 0;
+  readonly packetsPerFrame = [0, 0, 0, 0];
+  private packetsNow = 0; private stepsNow = 0;
   /** After a failure: the mirror, sailing in the page's thread. */
   private local: LocalHost | null = null;
   constructor(private worker: Worker, args: WorldArgs, private guard = false, private onFail?: (why: string) => void) {
@@ -180,6 +187,7 @@ export class WorkerHost implements SimHost {
     if (this.local) return;
     if (m.k === 'failed') { this.fail(m.msg); return; }
     this.inflight--;
+    this.packetsNow++; this.stepsNow += m.steps;
     const frame = this.sent.shift();
     if (m.resync != null && frame) {
       // new conditions: the same commands to the mirror, up to them (the mirror is the race as the worker had it before
@@ -216,6 +224,8 @@ export class WorkerHost implements SimHost {
     this.onFail?.(why);
   }
   advance(dt: number, twa?: number): number {
+    this.packetsLastFrame = this.packetsNow; this.stepsLastFrame = this.stepsNow; this.packetsNow = this.stepsNow = 0;
+    this.packetsPerFrame[Math.min(3, this.packetsLastFrame)]++;
     if (this.local) return this.local.advance(dt, twa);
     this.due = Math.min(0.1, this.due + dt);
     const now = performance.now();
