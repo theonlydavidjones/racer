@@ -539,7 +539,7 @@ function syncCompanionway(c: Companionway, b: Boat): void {
 /**
  * Non-skid on a painted deck and cabin top, as Josephine's (the owner): a paint with crushed walnut shells in it, laid in
  * a field that stops about 2 in (5 cm) short of every edge, leaving the smooth fiberglass, a warm white gelcoat that isn't
- * painted, along the toerail, round the cabin's foot and the cockpit's coamings, round the forehatch and the mast; on the
+ * painted, along the toerail, round the cabin's foot and the cockpit's coamings, and round the mast (not round the forehatch: the field runs flush up to its frame, the owner); on the
  * cabin top in from its edges and round the sliding hatch. Two textures, shared by every boat (colors go in as uniforms):
  * the field's shape in plan (nsMask: x across, z fore and aft, planUV), with its edge antialiased so it reads crisp; and
  * the grit, a fine tile repeated every NS_GRIT_REP m (nsGrit), its grain set by the GRIT style.
@@ -556,7 +556,6 @@ function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
   const hit = nsMasks.get(which); if (hit) return hit;
   const W = 1024, H = 3072, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
   const img = c.createImageData(W, H), d = img.data, m = NS_MARGIN, px = (NS_PLAN.x1 - NS_PLAN.x0) / W;
-  const hz = -1.75, hh = 0.25 + 0.045; // (the forehatch's frame: its middle, half its size)
   for (let j = 0; j < H; j++) {
     const z = NS_PLAN.z0 + (NS_PLAN.z1 - NS_PLAN.z0) * (j + 0.5) / H, u = uAtZ(z);
     // the field's extent across this row: [lo, hi] in |x|, or none
@@ -566,7 +565,7 @@ function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
       const near = (ua: number, ub: number) => u > ua - m / L && u < ub + m / L;
       if (near(CABIN.u0, CABIN.u1)) lo = Math.max(lo, cabinHalf(Math.min(CABIN.u1, Math.max(CABIN.u0 + 0.001, u))) + m);
       if (near(COCKPIT.u0, COCKPIT.u1)) lo = Math.max(lo, cockpitHalf(Math.min(COCKPIT.u1, Math.max(COCKPIT.u0, u))) + COAMING_T + m);
-      if (Math.abs(z - hz) < hh + m) lo = Math.max(lo, hh + m);
+      // (no smooth margin round the forehatch: the non-skid runs right up to its frame, flush, the owner)
       const dm = Math.abs(z - MAST_Z); if (dm < 0.16) lo = Math.max(lo, Math.sqrt(0.16 * 0.16 - dm * dm)); // (a smooth pad round the mast's foot)
     } else if (u > CABIN.u0 && u < CABIN.u1) {
       hi = cabinHalf(u) - CABIN_LEAN - m;
