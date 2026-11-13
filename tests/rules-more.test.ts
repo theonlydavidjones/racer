@@ -117,6 +117,18 @@ describe('Rule 23 · interfering with another boat', () => {
     expect(p.at(52).foul).toMatchObject({ by: 'Red', rule: '23', part: '23.2' });
   });
 
+  it('16.1 after the start: a right-of-way boat turning onto a boat taking a penalty, or returning to start, gives her no room: her foul', () => {
+    for (const kind of ['penalty', 'returning'] as const) {
+      const red = boat('Red', { at: [0, -8], heading: 320 });
+      const blue = boat('Blue', { at: [-8, -6], heading: 45, ...(kind === 'penalty' ? { penalty: 1 } : { started: false }) });
+      if (kind === 'returning') blue.returning = true;
+      const p = pair(red, blue);
+      p.at(50);
+      moveTo(red, [0, 0], 350, 320); moveTo(blue, [-0.5, 2.5]); // Red turns onto Blue, on her proper course (not above it)
+      expect(p.at(52).foul, kind).toMatchObject({ by: 'Red', rule: '16.1' });
+    }
+  });
+
   it('23.2 after the start: turning toward a boat on another leg while on her proper course (rounding her mark) is not 23.2', () => {
     // Red, rounding her mark, turns onto her new course; Blue, on another leg, is there and must keep clear (port)
     const red = boat('Red', { at: [0, -8], heading: 270, leg: 2 });

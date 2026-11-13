@@ -308,7 +308,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // boat she must give room to is still rule 16.1's, below). Before the start there's no proper course: a turn onto her
     // is the sign.
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
-  } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {
+  } else if (['10', '11', '12', '13', '21.1', '21.2', '21.3'].includes(r.rule) && (turned = turnedToward(row, r.kc)) > 0) {
+    // (rule 16.1 whatever gave her right of way: the basic rules, or a tacking boat, or one returning, taking a penalty or
+    // backing a sail keeping clear of her under 13 or 21)
     // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond.
     // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is passing astern of her.
     fouler = row; rule = r.rule === '10' && boreAwayOnBeat(row, ctx) ? '16.2' : '16.1';
