@@ -169,6 +169,11 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8h. **Now — the chart's Wind shadow layer shows nothing** (bug; 1–2 h): owner, "also on chart: toggling wind shadow
+   doesn't do anything that I can see." Find out whether it draws nothing (a bug), draws only near other boats or only
+   while racing (then say so on the chart when there's nothing to show), or draws too faintly (as with Waves). The
+   shadows to show: boats' dirty air, ships, the committee boat, the lee of the land and of the bridge piers, all already
+   in the physics. With 8f and 8g: the same layer row.
 8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
    small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
    chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
