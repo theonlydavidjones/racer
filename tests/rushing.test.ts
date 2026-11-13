@@ -6,6 +6,8 @@ import { waveTime } from '../src/environment/waveField';
 import { foamDrift } from '../src/environment/sea';
 import { KT } from '../src/core/math';
 import { packWaves } from '../src/render/waves';
+import { LL } from '../src/geo/geo';
+import { HARBORS, harborAt } from '../src/geo/marina';
 
 /**
  * "Rushing water" (the owner, v146, v158 and again v176): the water's pattern running past a still boat faster than the
@@ -69,6 +71,25 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
       }
     }
     expect(worst).toBeLessThan(1e-3);
+  });
+  it('inside the South Beach breakwater by its corner (the owner\'s second report): every wave at its own speed, the water near slack', () => {
+    const corner = LL(37.7815, -122.3855); // (3–5 ft of water, just inside the breakwater's corner, heading NE along the shore)
+    const boat = { ...DEFAULT_SETTINGS.boat, slip: 'south-beach:C12' };
+    const w0 = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00' } as Settings, 1);
+    expect(harborAt(corner)?.id).toBe('south-beach');
+    const c = w0.currentAt(corner);
+    expect(Math.hypot(c.x, c.y) / KT).toBeLessThan(0.08); // (0.26 kt before: the open stream ran into the basin)
+    const r = run('basin corner', { mode: 'sail', sailFrom: 'slip', sailTo: '', boat, boats: [boat], boatId: boat.id } as Partial<Settings>, { freeSail: true }, 60 * 600);
+    expect(r.worst).toBeLessThan(0.05);
+  }, 400_000);
+  it('in every harbor\'s basin the water is near slack away from the mouth, and the stream fades in through it', () => {
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00', current: 'bigebb' } as Settings, 1);
+    const kt = (p: { x: number; y: number }) => Math.hypot(w.currentAt(p).x, w.currentAt(p).y) / KT;
+    for (const h of HARBORS) for (const p of h.basin) {
+      const d = Math.min(...h.exits.map(e => Math.hypot(p.x - e.x, p.y - e.y)));
+      const q = { x: p.x + (h.exits[0].x - p.x) * 0.02, y: p.y + (h.exits[0].y - p.y) * 0.02 }; // (a hair inside the edge)
+      if (d > 150 && harborAt(q) === h) expect(kt(q), `${h.id}`).toBeLessThan(0.3); // (2.5 kt outside at most)
+    }
   });
   it('the foam drifts with the surface water: the current and 3% of the wind, no more', () => {
     for (const kt of [5, 15, 25]) for (const cur of [{ x: 0, y: 0 }, { x: 1.5, y: -0.5 }]) {

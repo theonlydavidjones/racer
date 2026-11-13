@@ -9,7 +9,7 @@ import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReac
 import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
-import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
+import { CURRENTS, basinCalm, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
@@ -593,7 +593,8 @@ export class World {
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
-    return withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t);
+    const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
+    return k === 1 ? c : { x: c.x * k, y: c.y * k };
   }
   /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
    * every step, where the same places come up again and again; the sea map, the chart and the arrows, which sample the

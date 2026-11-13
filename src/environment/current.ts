@@ -1,5 +1,6 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
 import { anyShoreDist, anyShoreDistNear, wharfDist, wharfShelter } from '../geo/shore';
+import { harborAt } from '../geo/marina';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -34,6 +35,23 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
   const k = clamp(0.25 + 0.75 * (lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 350, 0.25, 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
   return w > 0 ? Math.min(k, 1 - w * (1 - clamp(0.25 + 0.75 * wharfDist(p, 350) / 350, 0.25, 1))) : k;
 };
+
+/**
+ * How much of the stream outside reaches a point inside a harbor's basin (1 outside any basin). A basin behind a
+ * breakwater doesn't carry the tidal stream: water enters and leaves only through its mouth, at the rate the tide fills
+ * and empties it (its tidal prism). A 300 × 300 m basin 3 m deep, with the tide's 0.9 m amplitude over 12.42 h, takes in
+ * at most about 11 m³/s: about 1 cm/s across the basin, a few tenths of a knot in a 30 m mouth. The stream running past
+ * the mouth also stirs a slow eddy (gyre) inside (USACE Coastal Engineering Manual, EM 1110-2-1100, Part II ch. 7;
+ * Nece, Falconer & Tsutsumi 1976 on the exchange). BASIN_EDDY (that eddy as a fraction of the stream outside) and
+ * BASIN_MOUTH (how far the stream reaches in past the mouth, m) are estimates: no measured figure for either was found,
+ * for these harbors or in general.
+ */
+export const BASIN_EDDY = 0.1, BASIN_MOUTH = 30;
+export function basinCalm(p: Vec): number {
+  const h = harborAt(p); if (!h) return 1;
+  let d = Infinity; for (const e of h.exits) d = Math.min(d, Math.hypot(p.x - e.x, p.y - e.y));
+  return BASIN_EDDY + (1 - BASIN_EDDY) * Math.exp(-d / BASIN_MOUTH);
+}
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
