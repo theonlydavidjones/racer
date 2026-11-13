@@ -507,6 +507,14 @@ export class SceneView {
     if (w.freeSail) {
       // just sailing: no race course, only the buoys that are really out there
       this.signal = null;
+      // the mark-rounding drill: its two marks (the windward mark and the pin), each with its three-length zone ring
+      if (w.rounding) for (const m of w.rounding.marks) {
+        this.addMark(add, m.p, m.shape, m.look);
+        if (aids) {
+          const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.25, ZONE + 0.25, 64), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+          ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(m.p.x, m.p.y, 0.3)); add(ring);
+        }
+      }
       for (const pl of PLACES) if (pl.buoy) this.addMark(add, pl.p, pl.buoy.shape, pl.buoy.look ?? 'Y');
       if (w.dest && !PLACES.some(pl => pl.buoy && pl.p === w.dest!.p) && aids) {
         // a spot rather than a buoy: a faint ring on the water where you're heading
