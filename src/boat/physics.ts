@@ -870,6 +870,12 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const c = b.ctl, tws = b.ww.kt;
   // working a line takes that line, and only that line, off the crew
   if (b.isUser) for (const k of [...Object.keys(b.ctlCmd), ...Object.keys(b.ctlTarget ?? {})] as Ctl[]) if (b.ctlCmd[k] || b.ctlTarget?.[k] != null) takeLine(b, k);
+  // hove to, the tiller lashed: a crew told "we're hove to" keep her so, the jib's windward sheet made fast with the jib
+  // backed and the main left eased where it is, whoever had the lines before (the owner: Auto, crew or trim, while she's
+  // hove to should keep her hove to). Only the helm sails her off, by letting the lashing go; then the crew let the
+  // windward sheet fly and trim for sailing. (Lines you take yourself are yours as ever.)
+  const keepHove = b.isUser && !!b.hove && b.lashed != null;
+  const held = (k: 'jibsheetW' | 'mainsheet') => byHand(b, k) || keepHove;
   // the crew work the lines they have one job at a time, each person at their own pace (crewWork.ts): `on` is filled in
   // below, once the crew's targets are known
   let on: Partial<Record<Ctl, { pace: number; to: number }>> = {};
@@ -919,7 +925,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
       for (const k of FIXABLE_LINES) if (byHand(b, k)) fixed[k] = c[k];
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
-    if (b.isUser && byHand(b, 'mainsheet')) fixed.mainsheet = c.mainsheet;
+    if (b.isUser && held('mainsheet')) fixed.mainsheet = c.mainsheet;
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
@@ -934,13 +940,13 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;
   // what the crew would do with each line they have; then who gets to it, and when (crewWork.ts)
-  const backing0 = byHand(b, 'jibsheetW') && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
+  const backing0 = held('jibsheetW') && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
   const want: Partial<Record<Ctl, number>> = {};
   // (a line is moved only if it's worth the trip: a skilled crew sees smaller gains, ~0.1% of drive; a novice ~0.4%)
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
   for (const k of CREW_LINES_T) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
-  if (!byHand(b, 'mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
-  if (!byHand(b, 'jibsheetW')) want.jibsheetW = 1;
+  if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
+  if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
   // the lazy (windward) jib car: the crew's plan for it (they move it only when it's worth it), or yours
   if (byHand(b, 'car')) b.carPlan = null; else if (!b.carPlan || b.carPlan.fore !== t.carFore || b.carPlan.ins !== t.carIn) b.carPlan = { fore: t.carFore, ins: t.carIn };
@@ -959,7 +965,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   { const dir = byHand(b, 'traveller') ? (b.ctlCmd.traveller ?? (b.ctlTarget?.traveller != null ? b.ctlTarget.traveller - c.traveller : 0)) : (on.traveller ? on.traveller.to : want.traveller!) - c.traveller;
     const rate = travellerRate(dir > 0, tws);
     if (byHand(b, 'traveller')) hand('traveller', rate); else move('traveller', want.traveller!, rate); }
-  if (byHand(b, 'mainsheet')) hand('mainsheet'); else move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
+  if (held('mainsheet')) hand('mainsheet'); else move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
   // the jib sheets, one on each winch: hauling in on a winch is slow in a breeze, easing is quick
   const going = (k: 'jibsheet' | 'jibsheetW') => b.ctlCmd[k] ?? (b.ctlTarget?.[k] != null ? b.ctlTarget[k]! - c[k] : 0);
   // a windward sheet you've hauled and then eased right off again is the crew's lazy sheet once more
@@ -967,7 +973,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (c.jibsheetW < 0.9) b.wHauled = true;
     else if (b.wHauled && c.jibsheetW > 0.95 && !b.ctlCmd.jibsheetW && b.ctlTarget?.jibsheetW == null) { b.hand.jibsheetW = false; b.wHauled = false; }
   } else b.wHauled = false;
-  const wMine = byHand(b, 'jibsheetW');
+  const wMine = held('jibsheetW');
   // (until it comes tight a lazy sheet is just slack, taken in hand over hand in a second or two; only the last of it
   // needs the winch)
   const wSlack = jibClew({ ...c, jibsheet: 1 }, b.tack) > jibAngle(c, b.tack) + 3;
