@@ -1,6 +1,6 @@
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
-import { LessonTracker } from './lessons';
+import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -378,7 +378,7 @@ export class World {
       this.updateTide();
     }
     const r = this.rng;
-    this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
+    this.windModel = { base: this.C.base, kt: this.lessonKt(settings.windKt || 12), phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
     // cruising: from a place on the water or her slip in her marina, to another place or back to her slip
     if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(this.homeSlip)}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
     { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
@@ -815,6 +815,9 @@ export class World {
   }
   private seaNodes?: { d: number; u: number }[];
 
+  /** A lesson's mean wind held to the standard's range (sim/lessons.ts LESSON_WIND); any other sail's as it is. */
+  private lessonKt(kt: number): number { return this.settings.mode === 'lesson' ? clamp(kt, LESSON_WIND[0], LESSON_WIND[1]) : kt; }
+
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
     const b = this.breeze = this.weather.at(this.clockUtc);
@@ -823,7 +826,7 @@ export class World {
       return;
     }
     this.windModel.steady = b.steady;
-    this.windModel.base = this.settings.windDir ?? b.from; this.windModel.kt = b.kt;
+    this.windModel.base = this.settings.windDir ?? b.from; this.windModel.kt = this.lessonKt(b.kt);
     this.puffs.setGust(b.gust);
   }
 

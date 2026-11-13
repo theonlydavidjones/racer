@@ -26,6 +26,11 @@ export const LESSONS: { id: LessonId; no: number; title: string; icon: string; b
 /** The lessons that start by a buoy (the tiller's, steered for; stop, go and irons', stopped by). */
 export const BUOY_LESSONS: ReadonlySet<LessonId> = new Set(['tiller', 'irons']);
 
+/** A lesson's wind (kt): the course-wide mean held to the Basic Keelboat standard's range, "a wind range of 5 to 15
+ * knots" (US Sailing, the page above; the owner, 13 Nov 2026: clamp it, keeping the real direction and gusts). The puffs
+ * and gusts ride on the mean as they do on any day, so a gust can reach a little past 15. */
+export const LESSON_WIND: [number, number] = [5, 15];
+
 /** The pass marks (proposals for the owner to tune: see above). */
 export const LESSON_MARKS = {
   /** The tiller: reach the buoy within this (m); then hold the given course within HOLD_DEG for HOLD_S. */

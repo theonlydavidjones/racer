@@ -98,4 +98,10 @@ describe('Learn to sail: the lessons\' checks', () => {
     for (let k = 0; k < 3; k++) { startTack(b); sail(b, 90, tick); }
     expect(L.good).toBe(3); expect(L.passed).toBe(true);
   });
+
+  it('a lesson\'s wind is held to the standard\'s 5–15 kt; a race\'s isn\'t', () => {
+    expect(new World(COURSES[0], S({ windKt: 25 }), 3, { freeSail: true }).wind.kt).toBeLessThanOrEqual(15.01);
+    expect(new World(COURSES[0], S({ windKt: 3 }), 3, { freeSail: true }).wind.kt).toBeGreaterThanOrEqual(4.99);
+    expect(new World(COURSES[0], S({ windKt: 25, mode: 'sail' }), 3, { freeSail: true }).wind.kt).toBeGreaterThan(20);
+  });
 });
