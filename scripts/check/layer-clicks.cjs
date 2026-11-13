@@ -30,7 +30,7 @@ const out = process.argv[2] || '.';
   }
   // the chart's own Layers menu: each row once
   await p.click('#bChartLayers'); await p.waitForTimeout(600);
-  const rows = await p.evaluate(() => [...document.querySelectorAll('#chartLayersPop input')].map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
+  const rows = await p.evaluate(() => [...document.querySelectorAll('#chartLayersPop input')].filter(i => i.dataset.field || i.dataset.layer).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
   for (const r of rows) {
     const [kind, v] = r.split(':'), sel = kind === 'field' ? `#chartLayersPop [data-field="${v}"]` : `#chartLayersPop [data-layer="${v}"]`;
     const before = await p.evaluate(s => document.querySelector(s).checked, sel);
