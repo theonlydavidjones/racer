@@ -1,0 +1,117 @@
+/**
+ * How she turns: the moments about her keel, one model at every speed (docs/TURNING-PROPOSAL.md, the owner's approval
+ * 13 Nov 2026). Her rudder's lift and drag at the angle the water meets it, her hull and keel's resistance to turning
+ * (strip by strip, as the hove-to model has it), the sails' own turning moment (balance.ts sailYaw) and the wind on her
+ * topsides, rig and crew, against her yaw inertia. Nothing here is a turn rate set by hand: her turning circle, how
+ * fast she answers, what a turn costs in speed and which way her bow goes under bare poles all come out of the forces.
+ *
+ * Frame: everything "toward the wind" (+: her bow turning toward the wind; sway + to leeward), as heaveTo works it.
+ */
+import orc from './data/nordic-folkboat-orc.json';
+import { D2R, clamp } from '../core/math';
+import { FULL_RUDDER, RUDDER } from './balance';
+import { HULL } from './dynamics';
+import { HOVE } from './physics';
+
+const RHO = 1025;
+
+/**
+ * The rudder's stall (rad): about 15° for a blade of this aspect ratio. An estimate: Whicker & Fehlner's (DTMB 933,
+ * 1958) all-movable rudders of aspect ratio 2–3 stall at 20–25°, higher aspect ratios nearer 15–18°, and a rudder hung
+ * on a keel (a flap, no gap: CR 4.70, 5.40) keeps lifting to larger blade angles than a free blade; their report itself
+ * was not reached (DTIC refuses automated downloads). Past it the blade is a plate broadside-on: its force square to
+ * it, Cn rising from the stall's to 1.2 at 90° (Hoerner, Fluid-Dynamic Drag, 3-16: a flat plate; as the backed jib).
+ */
+export const RUDDER_STALL = 15 * D2R;
+/** Section drag of the blade, unstalled (a faired wooden blade at Reynolds numbers near 10⁶: about 0.01–0.02; Hoerner 6-2). */
+const RUDDER_CD0 = 0.015;
+
+/** The blade's lift and drag coefficients at angle of attack `a` (rad, signed): lift with the sign of `a`. */
+export function rudderCoef(a: number): { cl: number; cd: number } {
+  const s = Math.abs(a);
+  if (s <= RUDDER_STALL) { const cl = RUDDER.slope * a; return { cl, cd: RUDDER_CD0 + cl * cl / (Math.PI * RUDDER.aspect) }; }
+  // stalled: a plate, its force square to it. Continuous with the lift at the stall
+  const clS = RUDDER.slope * RUDDER_STALL, cdS = RUDDER_CD0 + clS * clS / (Math.PI * RUDDER.aspect);
+  const cn0 = Math.hypot(clS, cdS), t = Math.min(1, (s - RUDDER_STALL) / (Math.PI / 2 - RUDDER_STALL)), cn = cn0 + (1.2 - cn0) * t;
+  return { cl: Math.sign(a) * cn * Math.cos(s), cd: Math.max(cdS, cn * Math.sin(s)) };
+}
+
+/**
+ * The rudder's side force and drag (N). `u` her speed through the water (m/s, + ahead, − astern), `d` her sway to
+ * leeward (m/s), `r` her turn toward the wind (rad/s), `delta` the blade's angle (rad, + turning her toward the wind).
+ * The water at the blade: her own speed, and across it her sway and her stern's swing (r × arm), half straightened by
+ * the long keel ahead of it (HOVE.rudderFlow, an estimate). Going astern the water meets it from aft: the same blade
+ * angle pushes the other way, and less well (0.7: a blade trailing-edge first; an estimate).
+ * Returns y: the side force at the stern, + pushing the stern to leeward (turning her toward the wind); x: the drag,
+ * against her motion (negative ahead).
+ */
+export function rudderForce(u: number, d: number, r: number, delta: number): { y: number; x: number } {
+  const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
+  const aoa = (back ? -delta : delta) - Math.atan2(vy, Math.max(0.01, uf));
+  const c = rudderCoef(clamp(aoa, -Math.PI / 2, Math.PI / 2)), q = 0.5 * RHO * v2 * RUDDER.area, k = back ? 0.7 : 1;
+  return { y: q * c.cl * k, x: -q * c.cd * (back ? -1 : 1) };
+}
+
+const STRIPS = 8;
+/**
+ * Her hull and keel against the water sideways, strip by strip along the waterline: each strip's lift (with way on,
+ * either way: trailing edge first about half of it, an estimate) and its broadside drag (Hoerner's cross-flow, more of
+ * it aft: HOVE.dragAft). Returns y: the side force (+ to leeward: negative, it resists her sway), m: the moment (+
+ * turning her toward the wind): what damps her turn, and what swings her as she slides.
+ */
+export function hullSide(u: number, d: number, r: number): { y: number; m: number } {
+  const L = orc.boat.imsL, A = HOVE.latArea, aL = Math.PI * HOVE.aspect / 2, N = STRIPS;
+  const x2 = (L * L / 12) * (1 - 1 / (N * N)), kD = -HOVE.dragAft / x2, uEff = u >= 0 ? u : 0.5 * -u;
+  let y = 0, m = 0;
+  for (let i = 0; i < N; i++) {
+    const x = -L / 2 + (i + 0.5) * L / N, vy = d - r * x; // (x + forward) the water's sideways speed past the strip
+    const f = -0.5 * RHO * (A / N) * (aL * uEff * vy + HOVE.crossCd * (1 + kD * x) * vy * Math.abs(vy));
+    y += f; m -= f * x; // a push to windward ahead of the centre turns her toward the wind
+  }
+  return { y, m };
+}
+
+/** Her moment of inertia in yaw with the water she carries round with her, kg·m² (HOVE.gyration, yawAdded: estimates). */
+export const yawInertia = (disp: number = HULL.displacement) => disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
+
+/**
+ * What a turn costs her in drag beyond the rudder's own (N): to go round, the water must push her sideways toward the
+ * centre of the turn, m·u·r, and her keel makes that as lift, with its induced drag: D = F²/(½ρ·πT²·u²)·½ =
+ * m²r²/(ρ·πT²) (the slender wing of her leeway, Newman §5.12). It goes as the square of the turn rate, so a helmsman's
+ * small corrections cost next to nothing and a hard turn brakes her, at any speed.
+ */
+export function turnDragN(r: number, disp: number = HULL.displacement): number {
+  const m = disp * (1 + 0.1); // (a little of the water goes round with her fore and aft: HANDLING.mass's share)
+  return m * m * r * r / (RHO * Math.PI * orc.boat.draft ** 2);
+}
+
+/**
+ * The blade angle (rad, toward the wind) that gives her rudder the moment `want` (N·m, toward the wind) in this flow, as
+ * a helmsman who feels the blade would hold it: never past the stall (more helm than that only brakes her), nor past
+ * hard over. Solved on the unstalled lift, which is a straight line in the angle.
+ */
+export function helmForMoment(want: number, u: number, d: number, r: number): number {
+  const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
+  const q = 0.5 * RHO * v2 * RUDDER.area * RUDDER.slope * RUDDER.arm * (back ? 0.7 : 1);
+  const inflow = Math.atan2(vy, Math.max(0.01, uf));
+  const aoa = q > 1e-6 ? clamp(want / q, -RUDDER_STALL, RUDDER_STALL) : Math.sign(want) * RUDDER_STALL;
+  return clamp((aoa + inflow) * (back ? -1 : 1), -FULL_RUDDER * D2R, FULL_RUDDER * D2R);
+}
+
+/**
+ * The steady turn she can hold at speed `u` (m/s, ahead) with the blade just short of its stall and no help from her
+ * sails: rad/s. Her turning circle, u / r, comes out near constant: about 9 m, 1.2 boat lengths (the hull's damping and
+ * the rudder's moment both go with her speed). Solved once per speed asked (bisection on the moments), cached by 0.05 m/s.
+ */
+const steadyCache = new Map<number, number>();
+export function steadyTurnRate(u: number): number {
+  const key = Math.round(Math.max(0, u) * 20); if (key === 0) return 0;
+  const hit = steadyCache.get(key); if (hit != null) return hit;
+  const v = key / 20;
+  // (the moment left over at turn rate r, the blade held at the stall's angle of attack: falls as r grows)
+  const left = (r: number) => { const vy = HOVE.rudderFlow * r * RUDDER.arm, c = rudderCoef(RUDDER_STALL); return 0.5 * RHO * (v * v + vy * vy) * RUDDER.area * c.cl * RUDDER.arm + hullSide(v, 0, r).m; };
+  let lo = 0, hi = 3;
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (left(mid) > 0) lo = mid; else hi = mid; }
+  const r = (lo + hi) / 2; steadyCache.set(key, r);
+  return r;
+}
