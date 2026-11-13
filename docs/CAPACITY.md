@@ -341,19 +341,40 @@ settings and seed, and never stepped.
     new destination is a new object.
   - Functions, the random streams and the events aren't part of the state. The events travel in the packet, with the
     mirror's own boats in them.
-  - **Memos stay local to each side** (the `LOCAL` table: the World's `kcMemo` and the tide field's memos). The
-    page's questions fill the mirror's memos, so sending the worker's would mix one side's key with the other's answer.
+  - **Memos stay local to each side** (the `LOCAL` table: the World's `kcMemo`, the tide field's memos, and the
+    sea's fetch memo). The page's questions fill the mirror's memos, so sending the worker's would mix one side's key
+    with the other's answer. Each of them gives the same answer whoever fills it. The piers' wakes are an exception:
+    they refresh every 30 s from whenever they're first asked for, so they're sent, as the worker's.
+  - **Classes are matched by their place in both sides' first walk, not by name.** The page's and the worker's code
+    are minified separately, so the same class has different names in the two.
   - The course, the weather and the wind field are sent only when they're replaced. The tide stations' long
     prediction lists are sent once. The recorded frames and the track send only what's new.
 - **The published page** carries the worker's code (built by Vite as one classic script) in a script element that
   isn't run, and starts the worker from a blob URL of it. The owner's probe showed the host allows blob workers.
+- **New conditions mid-sail** (from the pause menu) replace the weather, the tide and the sea with new objects, and
+  turn the course's legs.
+  - The worker numbers its World afresh after the change and sends everything.
+  - The page does the same frame's commands to its mirror up to the change. `applyConditions` is the same on both
+    sides, so the new objects come with their functions.
+  - The page then numbers the mirror afresh and takes the packet.
+- **Sweep**: both sides forget the objects their World no longer holds, every 300 frames.
+- **A check in the published page**: every 20 frames the worker sends a fingerprint of the race. It covers every
+  boat's place, heading, speed and heel, the clock, the wind, and the current, field and wind at the course's middle.
+  The mirror's own must match to the last bit. A difference is counted and reported, and the smoke check and the
+  write guard require none.
 - **Fallback**:
   - With `?inproc`, or where a worker can't start, the race sails in the page as before (`LocalHost`).
-  - If a running worker fails, the mirror (a whole World, in step to the last frame) sails on in the page, and the
-    player sees a short message.
+  - If a running worker fails, the mirror sails on in the page from the race as of the worker's last answer, and the
+    player sees a short message. The commands of the unanswered frames are done again on the mirror.
+  - A worker that stays unanswered through 30 of the page's frames and 5 seconds is taken for stuck.
+  - The race carries on, but not exactly as the worker would have sailed it: the random streams (the puffs', the
+    AI's) belong to each side, and the mirror's never ran.
 - **The answers the page needs** (the motor's start while racing, home, move her here) come back as promises, at
   most a frame later.
 - **Two-frame rule**: at most two frames are in flight. Past that the page's time waits, as a slow frame's does now.
+  While the worker keeps up, the race is bit-identical to `LocalHost`'s. When it falls behind, a held-back frame's
+  time is added to the next, which can round differently, so the race is still repeatable but no longer bit-identical
+  to `LocalHost`'s.
 
 ### Checks
 
@@ -366,6 +387,11 @@ settings and seed, and never stepped.
     bit, whether the worker answers within the frame or a frame late. The worker runs as `RaceWorker` behind a stand-in
     Worker, with every message cloned.
   - The mirror equals the worker's World.
+  - The page's own questions asked of the mirror (field, current, sea, puffs, laylines, right of way, the passage)
+    give the same answers as with the race in the page.
+  - New conditions mid-race (the wind turned 60° to 20 kt, then a slack tide made real) leave the mirror equal to the
+    worker's World. The page's questions are asked of it every frame, and the course's legs turn with the wind.
+  - With the worker answering only every third frame, through four sweeps, the mirror is still the race.
   - Answers come back.
   - A failing worker leaves the mirror sailing.
 - **tests/host.test.ts** still holds: the commands sail as the page's old direct writes did.
@@ -380,16 +406,16 @@ settings and seed, and never stepped.
 | | in the page (before) | with the worker |
 |---|---|---|
 | The page's JS a frame, race of eight at 4× (software GL, 480×300) | 52 ms | 40 ms |
-| The sim on the page's thread at 4× | 4 steps, about 5.8 CPU ms | none: applying the mirror, about 0.9 CPU ms |
-| The worker's frame at 4× | — | 4 steps (5.8 ms) plus finding what changed and cloning it (3.5 CPU ms) |
+| The sim on the page's thread at 4× | 4 steps, about 5.8 CPU ms | none: applying the mirror, about 0.5 CPU ms |
+| The worker's frame at 4× | — | 4 steps (5.8 ms) plus finding what changed and cloning it (3.1 CPU ms) |
 | The page (HTML) | 5.0 MB | **8.9 MB** (the worker's code, 3.9 MB, travels alongside the page's) |
 
 - **Headroom for the physics**: the worker's frame can take about 12 of the 16.7 ms at 60 fps. Less the sync's
   fixed part, that's about 3.5× today's step at 4× on a laptop, and about 14× at 1×. It's less than §2's estimate of
   4–5×, because finding what changed walks the World's state every frame. Making that walk cheaper is the next lever
   (most of it: about 180 new small objects a step, the 170 puffs and the boats).
-- **At 1×** the page's thread saves little: the mirror's apply and the message cost about as much as one step. The gain
-  at 1× is the room for the physics, not the page's frame.
+- **At 1×** the page's thread saves about half a step a frame: the mirror's apply and the message cost about half
+  what a step does. The gain at 1× is mostly the room for the physics, not the page's frame.
 - **The page's size**: 8.9 MB is under the host's 16 MB, but heavier to load. The sim's code and data are in it
   twice: once for the mirror and once for the worker. One copy would do if the page could `import()` a blob URL
   (the worker and the page sharing a module). The probe didn't test that, so a second probe would settle it.
