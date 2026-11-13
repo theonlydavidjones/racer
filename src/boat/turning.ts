@@ -71,6 +71,21 @@ export function hullSide(u: number, d: number, r: number): { y: number; m: numbe
   return { y, m };
 }
 
+/**
+ * hullSide's moment alone, for every boat every step: the strips summed in closed form where the water passes them all
+ * the same way (her sway more than her ends' swing, as it is sailing; S2 and S4 the strips' Σx² and Σx⁴), strip by
+ * strip otherwise. The same numbers as hullSide's.
+ */
+let S2 = 0, S4 = 0;
+export function hullYawM(u: number, d: number, r: number): number {
+  const L = orc.boat.imsL, N = STRIPS;
+  if (!S2) for (let i = 0; i < N; i++) { const x = -L / 2 + (i + 0.5) * L / N; S2 += x * x; S4 += x * x * x * x; }
+  if (Math.abs(d) <= Math.abs(r) * L / 2) return hullSide(u, d, r).m;
+  const k = 0.5 * RHO * HOVE.latArea / N, aL = Math.PI * HOVE.aspect / 2, uEff = u >= 0 ? u : 0.5 * -u, kD = -HOVE.dragAft / (S2 / N);
+  // Σ f·x with f = −k·(aL·u·vy + Cd·(1 + kD·x)·vy·|vy|), vy = d − r·x of one sign throughout: m = −Σ f·x
+  return k * (aL * uEff * -r * S2 + Math.sign(d) * HOVE.crossCd * (-2 * d * r * S2 + kD * (d * d * S2 + r * r * S4)));
+}
+
 /** Her moment of inertia in yaw with the water she carries round with her, kg·m² (HOVE.gyration, yawAdded: estimates). */
 export const yawInertia = (disp: number = HULL.displacement) => disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
 
@@ -101,22 +116,30 @@ export function helmForMoment(want: number, u: number, d: number, r: number): nu
 /**
  * The steady turn she can hold at speed `u` (m/s, ahead) with the blade just short of its stall and no help from her
  * sails: rad/s. Her turning circle, u / r, comes out near constant: about 9 m, 1.2 boat lengths (the hull's damping and
- * the rudder's moment both go with her speed). Solved once per speed asked (bisection on the moments), cached by 0.05 m/s.
+ * the rudder's moment both go with her speed). Solved once (bisection on the moments).
  */
-const steadyCache = new Map<number, number>();
+let turnK = 0;
 export function steadyTurnRate(u: number): number {
-  const key = Math.round(Math.max(0, u) * 20); if (key === 0) return 0;
-  const hit = steadyCache.get(key); if (hit != null) return hit;
-  const v = key / 20;
-  // (the moment left over at turn rate r, the blade held at the stall's angle of attack: falls as r grows)
-  const left = (r: number) => { const vy = HOVE.rudderFlow * r * RUDDER.arm, c = rudderCoef(RUDDER_STALL); return 0.5 * RHO * (v * v + vy * vy) * RUDDER.area * c.cl * RUDDER.arm + hullSide(v, 0, r).m; };
-  let lo = 0, hi = 3;
-  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (left(mid) > 0) lo = mid; else hi = mid; }
-  const r = (lo + hi) / 2; steadyCache.set(key, r);
-  return r;
+  if (!turnK) {
+    // (every term goes as her speed squared when the turn rate goes as her speed, so one solution serves: at 1 m/s. The
+    // moment left over at turn rate r, the blade held at the stall's angle of attack: it falls as r grows)
+    const cl = RUDDER.slope * RUDDER_STALL;
+    const left = (r: number) => { const vy = HOVE.rudderFlow * r * RUDDER.arm; return 0.5 * RHO * (1 + vy * vy) * RUDDER.area * cl * RUDDER.arm + hullSide(1, 0, r).m; };
+    let lo = 0, hi = 3;
+    for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (left(mid) > 0) lo = mid; else hi = mid; }
+    turnK = (lo + hi) / 2;
+  }
+  return turnK * Math.max(0, u);
 }
 
 /** The steady turn her rudder can hold at speed `v` (m/s), deg/s: nothing without way on. */
 export const flowTurnRate = (v: number): number => steadyTurnRate(Math.max(0, v)) / D2R;
 /** The fastest she can be turned at speed `v`, deg/s: by her rudder, or sculled when that's faster (HANDLING.minTurnRate). */
 export const maxTurnRate = (v: number): number => Math.max(HANDLING.minTurnRate, flowTurnRate(v));
+
+/** The blade's drag sailing straight with the little weather helm the polar's speeds have in them (N), at speed u (m/s). */
+let cdIdeal = 0;
+export function rudderDragIdeal(u: number, idealDeg: number): number {
+  if (!cdIdeal) cdIdeal = rudderCoef(idealDeg * D2R).cd;
+  return 0.5 * RHO * u * u * RUDDER.area * cdIdeal;
+}

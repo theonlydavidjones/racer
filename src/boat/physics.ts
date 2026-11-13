@@ -3,7 +3,7 @@ import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
-import { hullSide, helmForMoment, rudderCoef, rudderForce, steadyTurnRate, turnDragN, yawInertia } from './turning';
+import { hullSide, hullYawM, helmForMoment, rudderCoef, rudderDragIdeal, rudderForce, steadyTurnRate, turnDragN, yawInertia } from './turning';
 import { HANDLING, HULL, airDrag, windFore, windSide, windTurn, driveExponent, flogAmount, hullResistance, luffDriveFactor, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce } from './motor';
@@ -150,7 +150,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (the hull's and keel's part: damping her turn, and swinging her as she slides sideways with little way on. The
   // rudder's own angle of attack is from the blade's angle and her stern's swing only: her steady leeway's flow past
   // keel and rudder together is what the centre of lateral resistance already is, balance.ts LEVER's origin)
-  const hull = hullSide(u0, d0, r0), mFree = toWind * (b.turnM ?? 0) + hull.m;
+  const mFree = toWind * (b.turnM ?? 0) + hullYawM(u0, d0, r0);
   /** The blade angle (rad, toward the wind) a helmsman holds to bring her turn to `want` deg/s (+ to starboard). */
   const helmFor = (want: number) => helmForMoment(I * (toWind * want * D2R - r0) * (1 - Math.exp(-dt / tau)) / dt - mFree, u0, 0, r0);
   let delta: number, floor = 0; // floor: a turn she's given whatever the rudder does (sculled, or spun by backed sails), deg/s
@@ -218,7 +218,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
   // (what the turn costs her way: the blade's drag beyond what it has sailing straight with a little weather helm, which
   // the polar's speeds have in them, and her keel's drag making the side force that takes her round: turning.ts)
-  const turnDrag = Math.max(0, Math.abs(rud.x) - Math.abs(rudderForce(u0, 0, 0, IDEAL_HELM * D2R).x)) + turnDragN(r1);
+  const turnDrag = Math.max(0, Math.abs(rud.x) - rudderDragIdeal(u0, IDEAL_HELM)) + turnDragN(r1);
   b.turnRate = toWind * r1 / D2R;
   let rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
