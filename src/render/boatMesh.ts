@@ -698,17 +698,18 @@ const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Ve
  * about an eighth of the boom from its end (0.42 m of E: Josephine hauled out, from starboard), so the sheet comes straight down to the
  * car upwind. And the vang's block under the boom, about a quarter of the way out (the same photo).
  */
-const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
+const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z;
 /** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
 const MS_GAP = 0.15;
 /** The vang's lower block: shackled at the base of the mast, abaft it, its sheave 5 cm above whatever the mast stands
  * out of there (the owner's photo: the block at the mast base, with the jammer on it). */
 const VANG_FOOT = new THREE.Vector3(0, Math.max(DECK_AT_MAST, cabinTopAt(uAtZ(MAST_AFT_Z + 0.04), 0) * (uAtZ(MAST_AFT_Z + 0.04) > CABIN.u0 ? 1 : 0)) + 0.05, MAST_AFT_Z + 0.04);
-/** The vang's top block, hung on its wire span under the boom (in the boom's frame, from the gooseneck): on the line from
- * where the old single block was (VANG_R along) toward the foot, 0.4 m down it; the span's two legs to the boom at
- * VANG_LEGS (m from the gooseneck). Estimates from the photo. */
-const VANG_LEGS = [0.45, 1.2];
-const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R - 0.05, VANG_R), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.4); })();
+/** Where the vang's span meets the boom (m aft of the gooseneck): about 1.0 m, scaled off the owner's side photo against
+ * the boom's 1.0 m over the deck, the tackle rising at about 45° from the mast's foot. The span's two legs reach the
+ * boom either side of it (VANG_LEGS), and its block hangs 0.3 m down the line toward the foot (VANG_SPAN, in the boom's
+ * frame). Estimates from the photos. */
+const VANG_BOOM = 1.0, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
+const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
