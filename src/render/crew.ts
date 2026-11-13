@@ -590,9 +590,15 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   local(p.look, _h).applyQuaternion(_tq).sub(f.head.position);
   f.head.rotation.set(Math.max(-0.6, Math.min(0.5, Math.atan2(_h.y - 0.1, Math.hypot(_h.x, _h.z)))), Math.max(-1.3, Math.min(1.3, Math.atan2(-_h.x, -_h.z))), 0);
   // the feet set down on what's under them, and the hands' angle at the wrist
-  f.foot[0].quaternion.identity(); f.foot[1].quaternion.identity(); f.hand[0].quaternion.identity(); f.hand[1].quaternion.identity();
+  // (each worked out from the pose with the foot and the hand at rest, then eased there over about a third of a second:
+  // set straight from each frame's pose they rocked with every small move of the knee, tests/crewcruise: up to 46 rad a
+  // minute at the ankles of a crew sat still)
+  const was = [f.foot[0], f.foot[1], f.hand[0], f.hand[1]].map(b => b.quaternion.clone());
+  for (const b of [f.foot[0], f.foot[1], f.hand[0], f.hand[1]]) b.quaternion.identity();
   f.root.updateMatrixWorld(true);
   for (const i of [0, 1]) { footDown(f, i); wrist(f, i); }
+  const ea = ikDt >= 0.5 ? 1 : 1 - Math.exp(-ikDt / 0.3);
+  [f.foot[0], f.foot[1], f.hand[0], f.hand[1]].forEach((b, j) => b.quaternion.copy(was[j].slerp(b.quaternion, ea)));
 }
 
 const _pw = new THREE.Quaternion(), _gq = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _up = V(0, 0, 0), _fw = V(0, 0, 0), _an = V(0, 0, 0), _bx = V(0, 0, 0), _by = V(0, 0, 0), _bz = V(0, 0, 0), _mb = new THREE.Matrix4();
