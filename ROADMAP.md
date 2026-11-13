@@ -200,7 +200,7 @@ What's planned, roughly in order. Done work is described in the README.
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
    tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
    remember the conditions it happened in, so the check covers every pose and wind.
-8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
+8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
@@ -288,14 +288,14 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~The setup builds the World only on Start~~ (done: one World per change, the scene once at Start) (owner: the configurator lags because it rebuilds the play surface
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
-   - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
+   - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
      no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
      One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
      some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
      first.
-   - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
+   - ~~Remove the line~~ (done) "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
@@ -365,6 +365,16 @@ as it is.
 - **The cabin instrument:** the Tacktick-style unit at the hatch garage's forward end, key 6. This begins the tactical
   compass item.
 - **A racing season:** a proposal for the owner (docs), built from the real 2025–26 Seaweed Soup.
+
+**Built 13 November, also** (to v178):
+- Josephine as she really is: sail number USA 122 (the 2026–27 Seaweed Soup results), and her club BVBC.
+- The 2026–27 Seaweed Soup season under way: its race 1 (7 November 2026) as a real past race, with 2025–26 a pick
+  away. Real skippers appear as anonymous ids, with no names in the shipped page.
+- The published page is down from 9.4 MB to 5.3 MB (one copy of the sim's code).
+- The Crew button back on the surface, opening on where the crew can sit (owner).
+- Your whisker pole goes out only on your call (owner).
+- The rest of the site map (UI audit): the Yacht Club as one name, Past races a screen of its own, Settings in two tabs.
+- For the owner to review: the boat editor mock-up (8i), and a design note for real docking (docs).
 
 **Owner's decisions, 12 November (morning)**, via the Coordinator:
 - Blanketing is not a foul: "stealing wind is a significant part of the strategy of tacking". Rules removes it as
@@ -984,12 +994,12 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colors, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colors are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
-  East Bay landmarks you navigate by (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
+  ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
   the university's and the hotel's own figures) and they belong in the landmark set used for transits, like Coit
   Tower and the Transamerica Pyramid.
-  **Sutro Tower, properly built** (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
+  ~~**Sutro Tower, properly built**~~ (done: the legs drawn in to a waist and out, to its real form) (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
   landmark already in the transit set, src/sim/transits.ts; 3–5 h). Today (render/landscape.ts) it's three banded legs
   to 298 m with crossarms at two levels and thin masts on top. Find why it reads as cut off: the masts too thin to
   see, the top lost to the far clipping plane or the fog, or the base sunk in the terrain. Build it to its real form,
