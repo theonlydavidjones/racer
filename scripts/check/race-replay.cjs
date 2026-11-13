@@ -25,6 +25,11 @@ const out = process.argv[2];
   console.log(JSON.stringify(info, null, 1));
   await page.evaluate(() => { document.getElementById('bPause').click(); });
   await page.waitForTimeout(500);
+  // the debrief on the pause screen: its section against the leader
+  await page.evaluate(() => { const e = [...document.querySelectorAll('#pauseDebrief .eyebrow')].find(x => /^Against/i.test(x.textContent)); e?.scrollIntoView(); });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: out + '/pause-vs.png' });
+  console.log('debrief vs:', await page.evaluate(() => { const d = document.getElementById('pauseDebrief'); const i = d.innerHTML.indexOf('Against'); return i < 0 ? '(none)' : d.innerText.slice(d.innerText.indexOf('Against')).slice(0, 1500); }));
   await page.evaluate(() => { document.getElementById('bWatch2')?.click(); });
   await page.waitForTimeout(3000);
   await page.screenshot({ path: out + '/rr-whole.png' });
