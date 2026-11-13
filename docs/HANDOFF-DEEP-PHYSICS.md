@@ -11,17 +11,18 @@
 
 Merged: `boat-wakes` (#226), `standoff` (#232), `legs-multiseed` (#197), `rules-gybe` (through #201).
 
-## The car-lead bisect
+## The car-lead bisect: result
 
-Running in worktrees `/home/user/bisect-739ae07` and `/home/user/bisect-5f2b93d` (approx "sixteen races"). Results go to the scratchpad files `bis-*.txt`; see the Coordinator's message for the outcome if this container is gone.
+**Both car-lead commits pass the yardstick on their own (older) main base.** That's 739ae07 (lead geometry, car pick) and 5f2b93d (all of car-lead's content, including jib aoa 16.5 and crewWork `!big`). Only cff4f0e fails, which is car-lead with newer main merged in (44335f9): 38 penalties against 25, bound 34.5. Main alone passes.
 
-Note: those commits sit on an **older main**, from before the merge commit 44335f9. If both pass, the culprit is the interaction with newer main. Then test car-lead's merge against main's head directly, or reapply car-lead's diff piece by piece on current main:
-1. jib aoa;
-2. crewWork `!big`;
-3. lead geometry;
-4. boom stop.
+So the failure is an **interaction** between car-lead's content and something that landed on main between fbeda3c and 44335f9. Likely candidates are Skipper Model's AI work, or anything else that changes close quarters. A 20 Hz-against-every-step penalty gap is sensitive to small trim and timing differences.
 
-Prime suspects: the crewWork `!big` line, which changes crew timing, and the jib aoa or lead, which changes AI trim.
+Next step:
+1. List main's commits in that range (`git log fbeda3c..44335f9 --first-parent`).
+2. Reapply car-lead's diff on main's head piece by piece (jib aoa; crewWork `!big`; lead geometry; boom stop), running approx on each.
+3. Or ask the owner of the main change that interacts.
+
+Each approx run takes about 20 min alone; run two at once in separate worktrees.
 
 ## Open owner asks (through the Coordinator)
 
