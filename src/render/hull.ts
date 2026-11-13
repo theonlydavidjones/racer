@@ -404,11 +404,18 @@ export function cabinHalf(u: number): number {
 /** How far the cabin sides lean in over their height (m). */
 export const CABIN_LEAN = 0.015;
 /**
- * The long cabin light each side (as on Josephine; portholes' shape is free, CR 3.19): centred at station uc, `len` m
- * long, from h0 to h1 above the deck at the cabin side. Its glass is cut through the cabin side between hole0 and hole1
- * (short of its rounded ends, which the frame covers), so the cabin's inside is seen through it.
+ * The long cabin light each side, as on Josephine (the owner's answers and photos; portholes' shape is free, CR 3.19):
+ * about 1 m of glass from about half a metre aft of the cabin's front edge to just forward of the name (z0..z1), its
+ * bottom edge straight, h0 above the deck at the cabin side, and its top tapering down toward the bow, the glass hAft
+ * tall at its after end and hFwd at its forward end; both ends rounded; in a brushed aluminium frame about 3/4 in wide
+ * (frame), riveted all round. The glass's heights are read off the owner's side photo (an estimate, within a cm).
+ * Its opening is cut through the cabin side between hole0 and hole1 (the frame covers its rounded ends), and the
+ * cabin's inside is seen through it. h1 is the glass's top at its tallest, the after end.
  */
-export const WINDOW = { uc: zU(-0.05), len: 0.95, h0: CABIN.h * 0.32, h1: CABIN.h * 0.72, hole0: zU(-0.05) - (0.95 / 2 - 0.045) / L, hole1: zU(-0.05) + (0.95 / 2 - 0.045) / L };
+const WIN = { z0: -0.35, z1: 0.65, h0: 0.085, hAft: 0.095, hFwd: 0.06, frame: 0.019 };
+export const WINDOW = { ...WIN, uc: zU((WIN.z0 + WIN.z1) / 2), len: WIN.z1 - WIN.z0, h1: WIN.h0 + WIN.hAft, hole0: zU(WIN.z0 + 0.025), hole1: zU(WIN.z1 - 0.03) };
+/** The window glass's top edge (m above the deck at the cabin side) at station u: tapering down toward the bow. */
+export const winTop = (u: number) => WIN.h0 + WIN.hFwd + (WIN.hAft - WIN.hFwd) * Math.min(1, Math.max(0, (u - zU(WIN.z0)) / (zU(WIN.z1) - zU(WIN.z0))));
 
 /** Height of the cabin sides' top edge at station u. */
 /**
@@ -419,7 +426,23 @@ export const WINDOW = { uc: zU(-0.05), len: 0.95, h0: CABIN.h * 0.32, h1: CABIN.
 export const CABIN_RISE = 0.18;
 export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + cabinSideH(u);
 /** The cabin side's height above the deck at station u. */
-export const cabinSideH = (u: number) => (CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)))) * cabinNose(u);
+export const cabinSideH = (u: number) => { const h = rawSideH(u), c = AFT_ROUND.coaming; return h <= c ? h : c + (h - c) * aftRound(u, 1); };
+/** The cabin side's height before its after corner is rounded off (below). */
+const rawSideH = (u: number) => (CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)))) * cabinNose(u);
+/**
+ * The cabin's after outboard corners are rounded off, down to the coaming (Josephine, the owner's photo from the
+ * starboard quarter): seen from the cockpit, the after end's outline sweeps down from the roof in a big curve to the
+ * coaming's top; seen from the side, the cabin side's top edge bends down into the coaming the same way as it reaches the
+ * after end. A rounded corner: across it reaches about `across` m in from the side; fore and aft, about `along` m forward
+ * of the after end (both read off the photo, estimates); the coaming itself is unchanged. aftRound(u, b) is how much of
+ * the height over the coaming is left (1 untouched … 0 down to the coaming), b how far across the rounding (0 at its
+ * inner edge … 1 at the side).
+ */
+const AFT_ROUND = { across: 0.2, along: 0.3, coaming: 0.22 };
+function aftRound(u: number, b: number): number {
+  const a = Math.min(1, Math.max(0, 1 - (CABIN.u1 - u) * L / AFT_ROUND.along)), bb = Math.min(1, Math.max(0, b));
+  return Math.sqrt(Math.max(0, 1 - (a * bb) ** 2));
+}
 /**
  * The cabin's front is a raked face, not an upright one (Josephine: the owner's side photo, as Rigging measured it,
  * about 700 px/m; CR 3.11 agrees, the roof at least 1785 mm long against at least 1850 mm at the deck line): from the
@@ -432,15 +455,21 @@ function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
 /**
  * The cabin top is a slice of a cone lying on its side, its point toward the bow (the owner, of Josephine): each section
- * across it is a circular arc, and as on a cone the arc's radius goes with the roof's width, so as the trunk narrows
- * forward the arch narrows and lowers with it, in the same proportion. CONE_K is the radius over the half-width (an
- * estimate, set so the arch is about 0.17 m high at the after end, as before).
+ * across it is a circular arc whose radius goes with the roof's width (CONE_K the radius over the half-width), so it
+ * narrows with the trunk forward. How high the arc stands over the sides' top edges grows from nothing at the cabin's
+ * front to about 13 cm halfway aft and stays so: the roof's outline, seen from the side, falls away forward in one long
+ * slope (Josephine's profile photo, the roof's outline measured over the deck at about 147 px/m: 19, 27, 34, 42, 46 and
+ * 51 cm at 0.1, 0.38, 0.65, 1.0, 1.3 and 1.8 m aft of its front; within a few cm, the photo being a little oblique).
  */
 const CONE_K = 1.9;
+const CROWN = fairCurve([[-0.847, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
 export const cabinTopAt = (u: number, x: number) => {
-  const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w);
-  const arch = Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w); // (the arc's height over the side's top edge at x)
-  return cabinTopY(u) + arch * cabinNose(u);
+  const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w), full = r - Math.sqrt(r * r - w * w);
+  const arch = (Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w)) / full; // (0 at the sides' top edges … 1 on the centreline)
+  const deck = deckY(u, cabinHalf(u)), raw = deck + rawSideH(u) + arch * Math.max(0, CROWN(zAt(u)));
+  // (the after corners rounded off down to the coaming: no higher than the rounding allows there)
+  const c = deck + AFT_ROUND.coaming, cap = c + (deck + rawSideH(u) + arch * Math.max(0, CROWN(zAt(u))) - c) * aftRound(u, (xc - (w - AFT_ROUND.across)) / AFT_ROUND.across);
+  return raw <= c ? raw : Math.min(raw, cap);
 };
 
 /** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
@@ -456,7 +485,7 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   // four rows up each side: from below the deck, the window's sill and head, the top edge; the window's band is open
   const R = 4;
   for (const o of ring) {
-    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, Math.min(d + WINDOW.h0, t), Math.min(d + WINDOW.h1, t), t]; // (where the nose is lower than the window's band, the rows close up under the top)
+    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, Math.min(d + WINDOW.h0, t), Math.min(d + winTop(o.u), t), t]; // (where the nose is lower than the window's band, the rows close up under the top)
     for (const y of hs) { const f = t - d > 1e-4 ? Math.max(0, (y - d) / (t - d)) : 1; sides.push(o.x - Math.sign(o.x) * CABIN_LEAN * f, y, zAt(o.u)); }
   }
   // (all round but the after end: that's the bulkhead, with the companionway in it)
@@ -471,7 +500,7 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3)); sg.setIndex(sIdx); sg.computeVertexNormals();
   // the top, open over the companionway aft of where the sliding hatch's opening begins (its edges are grid lines)
-  const top: number[] = [], tIdx: number[] = [], NX = 8, hw = COMPANIONWAY.hw, uSlot = CABIN.u1 - COMPANIONWAY.len / L;
+  const top: number[] = [], tIdx: number[] = [], NX = 24, hw = COMPANIONWAY.hw, uSlot = CABIN.u1 - COMPANIONWAY.len / L;
   const rows = [...outline.map(o => o.u), uSlot].sort((a, b) => a - b), NC = NX + 2;
   for (const u of rows) {
     const w = cabinHalf(u) - CABIN_LEAN, h = Math.min(hw, w * 0.99);
@@ -488,8 +517,8 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   // the after end: from the deck up the sides and over the arch of the top, facing aft into the cockpit
   const u1 = CABIN.u1, w1 = cabinHalf(u1), z1 = zAt(u1) + 0.002, rim: THREE.Vector2[] = [new THREE.Vector2(w1, COCKPIT.sole)];
   // over the arch, with the companionway's opening cut down from the top to its sill
-  for (let j = 0; j <= 16; j++) {
-    const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 16), xn = (w1 - CABIN_LEAN) * (1 - 2 * (j + 1) / 16);
+  for (let j = 0; j <= 48; j++) {
+    const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 48), xn = (w1 - CABIN_LEAN) * (1 - 2 * (j + 1) / 48);
     if (Math.abs(x) >= hw) rim.push(new THREE.Vector2(x, cabinTopAt(u1, x)));
     if (x > hw && xn <= hw) rim.push(new THREE.Vector2(hw, cabinTopAt(u1, hw)), new THREE.Vector2(hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, cabinTopAt(u1, -hw)));
   }
