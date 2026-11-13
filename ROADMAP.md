@@ -288,6 +288,11 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
+     save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
+     commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
+     stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
+     editor, the Yacht Club's boats) in the audit. Open for the owner: leaving without saving, discard the edits, or ask?
    - **The pause menu redesigned** (owner, 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
      too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
      Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
