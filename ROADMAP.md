@@ -197,6 +197,7 @@ What's planned, roughly in order. Done work is described in the README.
    - The setup builds the World only on Start (owner: the configurator lags because it rebuilds the play surface
      behind it).
    - Bug: the flag index doesn't scroll.
+   - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
