@@ -57,7 +57,8 @@ npm run test:fast        # ~40 s: everything but the whole-race runs; use while 
 npm test                 # ~23 min: the full suite (run before publishing)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
-node scripts/check/smoke.cjs <out-dir>        # ~2 min: the built page in headless Chromium, fails on page errors
+node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headless Chromium, both ways it loads (blob modules,
+                                              # and the fallback with blob: refused); fails on page errors
 node scripts/check/spelling.cjs              # US spelling in what the player reads (strings, index.html, README, docs); --fix changes them
 npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost races end to end (sail, save, sail it again with its ghost)
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
@@ -100,7 +101,7 @@ Use them; they're cheaper than doing it all yourself and catch what the author m
   class rules, RRS text, places. It returns facts with sources. Run several in parallel for independent questions.
 - **visual-checker** (lighter model): after any change to what's drawn, before publishing. It renders both tacks from
   both sides and checks against a sailor's checklist.
-- **physics-reviewer** (strongest model, read-only): before publishing any change under src/boat, src/environment,
+- **physics-reviewer** (Fable 5.2, the strongest model; trial from 13 Nov 2026, owner; read-only): before publishing any change under src/boat, src/environment,
   src/sim, src/ai or src/rules. An independent review against the science and the RRS; fix what it confirms.
 
 Keep the core simulation work (physics, world, main loop) in the main session: those files are shared, so splitting

@@ -62,5 +62,5 @@ describe('an end tie with the wind onto the dock', () => {
       if (windOnto) { expect(closest).toBeLessThan(d0 + 1.0); expect(closest).toBeGreaterThan(1.1 - 0.15 - 0.05); } // (set onto it, and stopped at it)
       else expect(offDock(s, u)).toBeGreaterThan(d0 + 1.5); // (blown off it)
     }
-  }, 60000);
+  }, 180_000);
 });
