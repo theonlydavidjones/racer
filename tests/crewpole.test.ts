@@ -63,18 +63,24 @@ describe('your pole: your call only', () => {
     allToCrew(u); for (let i = 0; i < 10 * 60; i++) { u.h = n360(u.ww.from + 170); w.step(DT); }
     expect(u.poleWant).toBe(true); expect(u.pole).toBe('set');
   }, 60_000);
-  it('inside a marina\'s basin, running: never set, and called out there, the crew bring it straight back in', () => {
+  it('inside a marina\'s basin, running: never set, and called out there, the crew bring it straight back in, saying why', () => {
     const { w, u, ever } = deep(170, 30, SLIPS[0].p);
-    expect(inBasin(u)).toBe(true); expect(ever).toBe(false);
-    applyCommand(w, { k: 'pole', want: true }); w.step(DT);
+    expect(ever).toBe(false);
+    // (held where only the basin stops it: running deep, the jib up, no penalty, not at the dock)
+    Object.assign(u, SLIPS[0].p); u.h = n360(u.ww.from + 170); u.twa = 170; u.penalty = 0; u.docked = undefined;
+    expect(inBasin(u)).toBe(true); expect(u.rig?.jib ?? 1).toBe(1);
+    w.drainEvents(); applyCommand(w, { k: 'pole', want: true }); w.step(DT);
     expect(u.poleWant).toBe(false);
+    expect(w.drainEvents().some(e => e.type === 'toast' && /harbor/.test(e.msg))).toBe(true);
   }, 60_000);
-  it('the crew stow it when she comes up past where it pays', () => {
+  it('out at 150 true, where the old crew call stowed it, it stays out: your call; at 140, aback, the crew bring it in', () => {
     const { w, u } = deep(170, 5);
     applyCommand(w, { k: 'pole', want: true });
     for (let i = 0; i < 40 * 60; i++) { u.h = n360(u.ww.from + 170); w.step(DT); }
     expect(u.pole).toBe('set');
-    for (let i = 0; i < 30 * 60; i++) { u.h = n360(u.ww.from + 120); w.step(DT); }
+    for (let i = 0; i < 30 * 60; i++) { u.h = n360(u.ww.from + 150); w.step(DT); }
+    expect(u.poleWant).toBe(true); expect(u.pole).toBe('set');
+    for (let i = 0; i < 30 * 60; i++) { u.h = n360(u.ww.from + 140); w.step(DT); }
     expect(u.poleWant).toBe(false); expect(u.pole).toBe('down');
   }, 60_000);
 });

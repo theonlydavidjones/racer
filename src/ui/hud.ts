@@ -337,12 +337,14 @@ export class Hud {
       this.hinted.deep = true;
       toast('Running deep: the main is blanketing the jib. Pole it out to windward and go wing-on-wing (the band\'s Pole tab, or O).', 4500);
     }
-    const aback = u.pole === 'set' && u.twa < 140;
+    // (poled out up where it doesn't pay: from 154.5 true down to 145 the jib does less than it would to leeward; below
+    // that the crew bring it in themselves, ai.ts poleMustCome)
+    const aback = u.pole === 'set' && u.twa < 154.5;
     this.abackT = aback ? this.abackT + 0.1 : 0;
     if (!aback) this.hinted.aback = false;
     if (this.abackT > 3 && !this.hinted.aback) {
       this.hinted.aback = true;
-      toast('The poled-out jib is aback on this course. Stow the pole (the band\'s Pole tab, or O).', 4000);
+      toast('Up here the poled-out jib does less than it would to leeward. Stow the pole (the band\'s Pole tab, or O), or bear away.', 4000);
     }
   }
 

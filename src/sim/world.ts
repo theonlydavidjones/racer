@@ -865,8 +865,8 @@ export class World {
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
     }
-    // your pole: out only on your call; your crew brings it in only when it must come in (ai.ts poleMustCome)
-    if (this.user.poleWant && poleMustCome(this.user)) this.user.poleWant = false;
+    // your pole: out only on your call; your crew brings it in only when it must come in, and says why (ai.ts poleMustCome)
+    if (this.user.poleWant) { const why = poleMustCome(this.user); if (why) { this.user.poleWant = false; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }

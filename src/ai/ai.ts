@@ -798,10 +798,16 @@ export function crewPoleCall(w: World, b: Boat): void {
 }
 /**
  * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come
- * in: she's come up past where it pays (under 140 true the poled-out jib is aback), the jib is down, penalty turns, a
- * harbor's basin, or the dock. (Gybing it end for end with her, as she gybes, is still your pole going across.)
+ * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts
+ * jibEfficiency; between there and 154.5 it does less than the jib would to leeward, and that's your call, with the
+ * coach's cue), the jib is down, penalty turns, a harbor's basin, or the dock. Null when it may stay out. (Gybing it end
+ * for end with her, as she gybes, is still your pole going across.)
  */
-export function poleMustCome(b: Boat): boolean {
-  const jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp);
-  return b.twa < 140 || jibDown || !!b.docked || b.penalty > 0 || inBasin(b);
+export function poleMustCome(b: Boat): string | null {
+  if (b.docked) return 'at the dock';
+  if (inBasin(b)) return 'not in the harbor: no room to pole out in a marina';
+  if (b.penalty > 0) return 'in for the penalty turns';
+  if (!!b.rig && (b.rig.jib < 1 || !b.rig.jibUp)) return 'the jib is down';
+  if (b.twa <= 145) return 'she\'s too high for it: the poled-out jib is aback';
+  return null;
 }
