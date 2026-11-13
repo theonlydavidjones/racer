@@ -229,6 +229,17 @@ What's planned, roughly in order. Done work is described in the README.
    - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
      Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
      Gashouse Cove with the wind on the beam both ways.
+8o. **Hoisting by the halyards** (owner, 13 November; next; 2–3 h): "when sails are down, hoisting the halyards does not
+   hoist the sail. I would think it would. we can probably use the lines instead of the hoist buttons, no? tell me if
+   that's a bad idea." Agreed: it's how a real boat does it. The main halyard (its tackle) and the jib halyard in the
+   sail band become the way to hoist and lower, and the separate hoist buttons go. That's one fewer control on the
+   screen, per the standing rule.
+   - One control, two regimes: from down to fully up it hoists, at a real rate, by a crew member or you, taking the
+     time a hoist takes; past fully up it tensions the luff, as today.
+   - A clear stop at "fully up", so easing for luff tension never lowers the sail by accident. Lowering is a deliberate
+     ease past the stop. Letting the halyard run (a douse) brings the sail down fast.
+   - The sails, flags, telltales and physics answer the hoist as it happens: half-hoisted sails draw badly, luff and
+     flog.
 8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
