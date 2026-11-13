@@ -7,8 +7,8 @@ import { sunTimes } from '../environment/sun';
  * sunset … also when entering or leaving port, by day or night"; the Seattle Yacht Club the same for a boat at anchor or
  * moored (https://www.seattleyachtclub.org/syc-flag-etiquette). Under way out on the water after dark, flying it is
  * optional by those sources (the CCA: when there's light enough to identify the yacht); here it comes down at sunset and
- * goes up again only for coming into or out of a harbour. "Entering or leaving port" is taken as under way inside a
- * harbour's basin (geo/marina.ts inBasin). Racing she flies none at all (sim/world.ts), as now.
+ * goes up again only for coming into or out of a harbour. "Entering or leaving port" is taken as under way (COLREGS Rule
+ * 3(i): not made fast to the shore, not at anchor) inside a harbour's basin (geo/marina.ts inBasin). Racing she flies none at all (sim/world.ts), as now.
  */
 
 const DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
