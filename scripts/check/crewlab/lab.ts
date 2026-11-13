@@ -26,8 +26,11 @@ sea.rotation.x = -Math.PI / 2; scene.add(sea);
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 2000);
 let b: Boat, m: BoatMesh | null = null, t = 0, cam = { yaw: 90, pitch: 15, dist: 5, at: [0, 0.8, 1.6] as number[] };
 
+// (the sun's shadows, as in the game: render/scene.ts, every boat mesh casting and receiving)
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 200 }); sun.shadow.bias = -0.0004; scene.add(sun.target);
 function render(): void {
   syncBoatMesh(m!, b, t);
+  sun.target.position.copy(m!.grp.position); sun.position.copy(m!.grp.position).add(new THREE.Vector3(-30, 50, 20));
   sea.position.set(m!.grp.position.x, 0, m!.grp.position.z);
   m!.grp.updateMatrixWorld(true);
   // the camera in the boat's own (unheeled) frame: yaw about her
@@ -52,6 +55,7 @@ const lab = {
     if (o.pole) b.poleWant = true;
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
+    m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)
     (lab as any).hold = h; render();
   },
   /** Sail on for `s` seconds (holding her heading unless a tack is under way), then draw. */
@@ -69,6 +73,7 @@ const lab = {
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */
   wind(kt: number) { b.ww = { ...b.ww, kt }; },
+  fov(f: number) { camera.fov = f; camera.updateProjectionMatrix(); render(); },
   cam(yaw: number, pitch: number, dist: number, at?: number[]) { cam = { yaw, pitch, dist, at: at ?? cam.at }; render(); },
   /** Night (a moonless sky's faint light, as the game's night: render/scene.ts) or day. */
   night(on: boolean) { hemi.intensity = (on ? 0.12 : 0.85) * Math.PI; sun.intensity = (on ? 0.05 : 0.75) * Math.PI; scene.background = new THREE.Color(on ? 0x0b1220 : 0x9cc3dc); (sea.material as THREE.MeshLambertMaterial).color.set(on ? 0x0a1a24 : 0x2f6f8f); render(); },
