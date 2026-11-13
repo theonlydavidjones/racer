@@ -73,7 +73,7 @@ const ZC_FWD = COCK0 + 0.3, ZC_AFT = Math.min(BENCH_AFT - 0.09, THWART.z - THWAR
 // wants one on the rail forward of it, and one, with a little less room, aft of it), the pedestal's radius and half a
 // hip's width clear; not on top of it)
 const DECK_FWD = COCK0 + 0.29, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.13, THW_B = THWART.z + THWART.half + 0.13;
-const WIN_A = JIB_WINCH_Z - 0.25, WIN_B = Math.min(JIB_WINCH_Z + 0.22, THW_A);
+const WIN_A = JIB_WINCH_Z - 0.24, WIN_B = Math.min(JIB_WINCH_Z + 0.24, THW_A); // (its pedestal 0.12 m in radius fore and aft at the deck (Boat Detail), and half a hip)
 const deckZ = (z: number) => {
   let q = Math.min(DECK_AFT, Math.max(DECK_FWD, z));
   if (q > WIN_A && q < WIN_B) q = q < JIB_WINCH_Z + 0.1 ? WIN_A : WIN_B; // (forward of it unless clearly aft: the seat aft is the tighter, the thwart at the shins)
