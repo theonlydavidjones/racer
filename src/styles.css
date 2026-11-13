@@ -1119,3 +1119,6 @@ body.showroom #flowPanel{display:none}
 #realRows:not(:empty){margin-bottom:10px}
 #realRows .warn,#resReal .warn{color:#ffb08a}
 #resReal tr.you td{color:var(--accent);font-weight:700}
+/* the field: one of several, as radio rows boxed together apart from the switches (ui/layers.ts) */
+.layerpop .lp-field{display:flex;flex-direction:column;padding:2px 6px;margin:0 -4px;border:1px solid var(--rule);border-radius:5px;background:rgba(255,255,255,.03)}
+.layerpop .lp-sub{text-transform:none;letter-spacing:0}
