@@ -137,3 +137,32 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   }
   return out;
 }
+
+/**
+ * Coming in to a berth (sim/world.ts mooringStep): the crew (or you, sailing alone) ready the lines, step off at the shrouds
+ * when she's close and slow enough, snub the line round a dock cleat, and make her fast with the rest.
+ */
+export interface Mooring {
+  /** ready: the lines coiled, the hand at the shrouds; ashore: the first line held round a cleat; stern, springs: the rest
+   * going on; fast: made fast where she lies */
+  phase: 'ready' | 'ashore' | 'stern' | 'springs' | 'fast';
+  /** the berth she's coming in to (a slip's id: geo/marina.ts), and the side the dock's on (+1 starboard, −1 port) */
+  berth: string; side: 1 | -1;
+  /** seconds in this phase */
+  t: number;
+  lines: DockLine[];
+  /** sailing alone: you step off with the midships line, and nobody's on the tiller */
+  solo: boolean;
+  /** the one-word cue by the boat: Closer, Too fast, Step, Made fast, Lost her, Bump */
+  cue?: string; cueT?: number;
+}
+
+/**
+ * How far a hand steps from her rail to the dock, and how fast she may be going: ESTIMATES (no source gives a number: the
+ * seamanship advice is to step, never jump, and from the shrouds, the widest and steadiest point; Spinsheet's crew briefing,
+ * PBO): a long stride, 0.6 m, a little more for a skilled hand (to 0.9 m); and no faster than a slow walk, 0.5 m/s (1 kn).
+ */
+export const stepGap = (skill: number): number => 0.6 + 0.3 * Math.max(0, Math.min(1, skill));
+export const STEP_SPEED = 0.5;
+/** A bump against the dock harder than a walk's pace (ESTIMATE, as above: no hull-damage speed was found). */
+export const HARD_BUMP = 0.5;

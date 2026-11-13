@@ -4,7 +4,7 @@ import type { Boat } from '../src/boat/boat';
 
 /** Dock lines as damped springs, with the capstan equation's hold round a cleat (boat/dockLines.ts). */
 const boat = (v = 0, h = 0): Boat => ({ x: 0, y: 0, h, v, astern: 0, sway: 0, turnRate: 0, vx: 0, vy: 0 } as unknown as Boat);
-const still = { x: 0, y: 0 }, calm = { from: 0, kt: 0 }, open = () => false;
+const still = { x: 0, y: 0 }, calm = { from: 0, kt: 0 }, open = (_p: { x: number; y: number }) => false;
 const run = (b: Boat, lines: DockLine[], wind = calm, secs = 20, solid = open) => { let lost: DockLine | undefined, bump = 0; for (let i = 0; i < secs * 60; i++) { const o = dockStep(b, lines, wind, still, 1 / 60, solid); lost ??= o.lost; bump = Math.max(bump, o.bump ?? 0); } return { lost, bump }; };
 
 describe('dock lines', () => {
