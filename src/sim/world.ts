@@ -97,6 +97,22 @@ const JAM_MAX = 2 * TANGLE_MAX;
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
 const COMPELLED_WINDOW = 3;
+/**
+ * RRS 60.2(a)(1): a boat protesting an incident she saw "shall hail 'Protest' and ... conspicuously display a red flag, at
+ * the first reasonable opportunity for each". The time after an incident she was in that the sim offers the hail, s
+ * (game time; the race is paused while the incident is shown). Not a number from the rules: "first reasonable
+ * opportunity" is usually at once, and a hail a minute later would be found too late.
+ */
+export const PROTEST_HAIL = 10;
+
+/** A protest a boat made on the water (RRS 60.2(a)(1)): who protests whom, the incident (as the engine called it at the
+ * time), and when she hailed and flew her flag. For the hearing after the race. */
+export interface Protest {
+  by: number; vs: number;
+  /** The incident: when, and the engine's call (null when the engine found no foul by the protestee). */
+  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | null;
+  hailT: number; flagT: number | null;
+}
 /* Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
  * boat is exonerated for her breach." Causal: compelled when, by the time it was clear the other boat had broken a rule,
  * she could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). The sim's
@@ -264,6 +280,10 @@ export class World {
   startReport: StartReport | null = null;
   fouls = 0;
   fouledBy = 0;
+  /** Protests made on the water (RRS 60), in order. */
+  protests: Protest[] = [];
+  /** The last incident the user was in: the boat, when, and the engine's call (for the Protest hail). */
+  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail' } | null = null;
   finishShown = false;
   /** This outing's gone into the boats' logbooks (boat/logbook.ts). */
   logged = false;
@@ -911,6 +931,7 @@ export class World {
     for (const b of this.boats) {
       const wasReturning = !!b.returning;
       b.returning = false;
+      if (b.protestFlag && !this.racing(b)) b.protestFlag = false; // (flown "until she is no longer racing", 60.2(a)(1))
       if (b.retired) continue; // (no longer racing: no start, finish, recall or rounding for her; her destination is checkArrival's)
       const bw = bow(b), d = this.lineD(bw), a = this.lineA(b);
       // Rule 21.1: after her starting signal, not yet started (over early, round an end under the I flag, or simply on the
@@ -1210,6 +1231,8 @@ export class World {
       if (A.isUser || B.isUser) {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
+        const other = A.isUser ? B : A;
+        this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind };
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
       } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.assignPenalty(f); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
     }
@@ -1856,7 +1879,30 @@ export class World {
    * boat to windward when you're close-hauled nearing an obstruction (Rule 20); "Starboard!" to a port-tacker on a
    * collision course. The band shows a Hail tab only while there is one.
    */
-  hailOption(): { kind: 'reply' | 'room' | 'starboard'; to: Boat; words: string } | null {
+  /** Protests: the boat you could protest now, just after an incident you were in, if you haven't (RRS 60.2(a)(1)). */
+  protestOption(): Boat | null {
+    const ui = this.userIncident;
+    if (!this.protestsOn || !ui || this.t - ui.t > PROTEST_HAIL || !this.racing(this.user)) return null;
+    if (this.protests.some(p => p.by === this.user.id && p.vs === ui.vs && p.t === ui.t)) return null;
+    return this.boats.find(o => o.id === ui.vs) ?? null;
+  }
+
+  /** Is the fleet policing itself (a race, judged by protests), rather than umpired? */
+  get protestsOn(): boolean { // (a club's race: the practice area, a course with no club, is umpired, like the drills)
+    return this.settings.mode === 'race' && this.settings.judging === 'protests' && !!this.file.group; }
+
+  /** `by` hails "Protest!" at `vs` over the incident just now, and flies the red flag (RRS 60.2(a)(1): a Folkboat is over
+   * 6 m). Recorded for the hearing. */
+  protest(by: Boat, vs: Boat): void {
+    const ui = by.isUser ? this.userIncident : null;
+    const inc = ui && ui.vs === vs.id ? ui : null;
+    this.protests.push({ by: by.id, vs: vs.id, t: inc?.t ?? this.t, rule: inc && inc.fouler === vs.id ? inc.rule : null, fouler: inc?.fouler ?? null, kind: inc?.kind ?? null, hailT: this.t, flagT: this.t });
+    by.protestFlag = true;
+    if (by.isUser) this.emit({ type: 'toast', ms: 3500, msg: `"Protest!" Your red flag's up (Rule 60.2).` });
+    else if (vs.isUser) this.emit({ type: 'toast', ms: 4500, msg: `${by.name}: "Protest!" (${by.no.replace(/^US\s+/, 'USA ')})` });
+  }
+
+  hailOption(): { kind: 'reply' | 'room' | 'starboard' | 'protest'; to: Boat; words: string } | null {
     const u = this.user, hailer = this.pendingRoomHail(u);
     if (hailer) {
       // Rule 20.3: with a boat to windward stopping you tacking, and not clear ahead of the hailing boat, pass the hail on
@@ -1866,6 +1912,8 @@ export class World {
     }
     const blocker = this.roomBlocker(u);
     if (blocker) return { kind: 'room', to: blocker, words: 'Room to tack!' };
+    const pr = this.protestOption();
+    if (pr) return { kind: 'protest', to: pr, words: 'Protest!' };
     if (u.tack === 'S') {
       const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
         .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
@@ -1886,6 +1934,7 @@ export class World {
       this.replyYouTack(u, hailer); return;
     }
     const h = this.hailOption();
+    if (h?.kind === 'protest') { this.protest(u, h.to); return; }
     if (h) { this.hail(u, h.to, h.kind as 'room' | 'starboard'); return; }
     const why = this.whyNoRoomHail(u);
     if (why) { this.emit({ type: 'toast', ms: 6000, msg: why }); return; }

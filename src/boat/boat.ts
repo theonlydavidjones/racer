@@ -257,6 +257,9 @@ export interface Boat {
   burgee?: string;
   /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */
   ensign?: string; special?: string;
+  /** The red protest flag flying (RRS 60.2(a)(1): over 6 m, "conspicuously display a red flag" with the hail, until she
+   * is no longer racing): tied on the backstay. */
+  protestFlag?: boolean;
   /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
   ensignStruck?: boolean;
   /** The ensign down for its hours: outside 0800–sunset, unless she's entering or leaving a harbour (boat/colours.ts). */
