@@ -38,6 +38,8 @@ export interface Ink {
   // its own (cyan), the course and the destination in vivid orange: neither is used by the chart (its magenta, the
   // buoys' red, green and yellow, the blue depth tints)
   halo: string; edge: string; you: string; markHi: string; starboard: string; port: string; shipHalo: string; fog: (a: number) => string; fogText: string; sea: (a: number) => string; seaText: string;
+  /** the sea state's marks (ui/mapLayers.ts drawSea): a teal the chart itself doesn't use */
+  seaMark: string;
 }
 export const INK: Record<ChartPalette, Ink> = {
   // US Chart No. 1 on paper: buff land, white deep water, blue shoal tints, green where it dries, magenta for regulated areas
@@ -47,7 +49,7 @@ export const INK: Record<ChartPalette, Ink> = {
     current: 'rgba(0,96,170,.8)', lull: a => `rgba(196,140,50,${a})`, lullHatch: true, puff: a => `rgba(20,60,110,${a})`, windTick: 'rgba(20,40,60,.35)', ship: 'rgba(30,30,34,.95)', shipText: 'rgba(30,30,34,.95)', text: '#1d2328',
     boatEdge: '#000000', pick: '#000000', mark: '#ff6a00', markPass: '#ffa45c', line: '#ff6a00',
     halo: 'rgba(255,255,255,.92)', edge: '#111111', you: '#00d8ff', markHi: '#ff3d00', starboard: '#00b050', port: '#e8112d', shipHalo: 'rgba(255,255,255,.9)',
-    fog: a => `rgba(120,128,138,${a})`, fogText: '#2b3238', sea: a => `rgba(20,90,160,${a})`, seaText: '#0d3a66'
+    fog: a => `rgba(120,128,138,${a})`, fogText: '#2b3238', sea: a => `rgba(20,90,160,${a})`, seaText: '#0d3a66', seaMark: '#007d74'
   },
   // the ECDIS night-time look: dark water, deeper is darker
   dusk: {
@@ -56,7 +58,7 @@ export const INK: Record<ChartPalette, Ink> = {
     current: 'rgba(111,208,255,.55)', lull: a => `rgba(200,230,245,${a})`, windTick: 'rgba(232,238,246,.28)', ship: 'rgba(230,230,225,.9)', shipText: 'rgba(230,230,225,.85)', text: '#e9f2f5',
     boatEdge: '#ffffff', pick: '#ffffff', mark: '#ff6a00', markPass: '#ffa45c', line: '#ff7a1a',
     halo: 'rgba(0,0,0,.85)', edge: '#000000', you: '#00e5ff', markHi: '#ff5a1f', starboard: '#2ee67a', port: '#ff4d5e', shipHalo: 'rgba(0,0,0,.85)',
-    fog: a => `rgba(120,132,145,${a * 0.8})`, fogText: '#e6ecf1', sea: a => `rgba(120,200,255,${a})`, seaText: '#bfe6ff'
+    fog: a => `rgba(120,132,145,${a * 0.8})`, fogText: '#e6ecf1', sea: a => `rgba(120,200,255,${a})`, seaText: '#bfe6ff', seaMark: '#3ff0d8'
   }
 };
 
