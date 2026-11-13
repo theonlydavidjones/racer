@@ -194,6 +194,11 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
+   sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
+   it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
+   beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
+   dial under the inset map, 8b), and a test that it's on screen.
 8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
    the owner first):
    - "all sail stuff together, all hull stuff together, etc." Proposed groups:
