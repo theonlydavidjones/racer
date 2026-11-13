@@ -1,0 +1,112 @@
+/* ---------- start screens: start page, Race, Create a race / Cruise (one screen: your choices left, the day right) ---------- */
+.modes.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.homefoot{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.homefoot .linkbtn{background:none;border:0;padding:0;color:var(--muted);font:600 13px/1 var(--f-inst);letter-spacing:.04em;cursor:pointer}
+.homefoot .savenote{margin-left:auto;color:var(--muted);font-size:12px}
+.ghost.sm{padding:8px 10px;font-size:12px}
+.pastnote{border:1px solid var(--rule);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--ink)}
+.panel.setup{max-width:1120px;gap:10px;padding:16px 20px}
+.sethead{display:flex;flex-direction:column;gap:6px}
+.setgrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+.steps{counter-reset:step;display:flex;flex-direction:column}
+.step{border-top:1px solid var(--rule);padding:10px 0}
+.step:first-child{border-top:0;padding-top:2px}
+.step>span:first-child{counter-increment:step}
+.step>span:first-child::before{content:counter(step);color:var(--accent);margin-right:8px}
+.step .seg button{padding:7px 8px}
+.step details summary,.side details summary,#keysView details summary{cursor:pointer;list-style:none;color:var(--muted)}
+.step details summary::-webkit-details-marker,.side details summary::-webkit-details-marker{display:none}
+details summary u{color:var(--accent);text-decoration:none;font-weight:700;margin-left:4px}
+.sibody{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--rule);border-radius:8px}
+.crewbox .crewrows{margin-top:6px}
+/* your crew in the race setup (app.ts crewRows): you, then a pick for each seat; set up in the Yacht Club */
+.crewline{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.crewline .crewyou{color:var(--text)}
+.crewline select{background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit}
+.crewline .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0}
+.boatsum .ghost.sm{white-space:nowrap}
+.step .coursecard{padding:8px 10px;gap:4px}
+.step .coursecard .rcpick{margin-bottom:4px}
+.step .opps .opp{padding:5px 8px}
+.step .tiderow{margin:2px 0 0}
+.side{position:sticky;top:0;background:var(--ink);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.condhead{display:flex;justify-content:space-between;align-items:baseline;font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.condhead b{color:var(--row)} .condhead b.adj{color:var(--caution)}
+.cond{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:13px;line-height:1.35}
+.cond dt{color:var(--muted);font:600 11px/1.6 var(--f-inst);letter-spacing:.08em;text-transform:uppercase}
+.cond dd{margin:0;color:var(--text)}
+.side small{color:var(--muted);font-size:12px;line-height:1.4}
+.side #tideGraph{height:104px;margin:0}
+.gobtns{display:flex;flex-wrap:wrap;gap:8px}
+.gobtns .ghost{flex:1 1 140px;padding:10px 12px;font-size:13px}
+.gobtns .cta{flex:1 1 100%}
+#keysView .help{margin-top:8px}
+@media (max-width:860px){.setgrid{grid-template-columns:1fr}.modes.three{grid-template-columns:1fr}}
+.pastrows{display:flex;flex-direction:column;max-height:50vh;overflow-y:auto}
+.pastrow{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--rule)}
+.pastrow:first-child{border-top:0}
+.pastrow>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pastrow b{font:600 14px/1.3 var(--f-inst);letter-spacing:.02em}
+.pastrow small{color:var(--muted);font-size:12px}
+.pastrow .ghost{flex:none}
+.knote:empty{display:none}
+
+/* the map's layers (ui/layers.ts): a small button on the inset map's corner, and the list of switches it opens */
+.maplayers{position:fixed;top:calc(env(safe-area-inset-top,0px) + 78px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 104px);z-index:6;
+  width:24px;height:24px;padding:0;display:grid;place-items:center;border-radius:5px;border:1px solid var(--rule);background:var(--pod);color:var(--muted);cursor:pointer}
+.maplayers:hover,.maplayers[aria-expanded="true"]{color:var(--text);border-color:currentColor}
+@media (min-width:760px){.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 172px)}}
+.layerpop{position:fixed;z-index:60;min-width:150px;padding:8px 10px;border-radius:6px;border:1px solid var(--rule);background:var(--pod);
+  box-shadow:0 6px 18px rgba(0,0,0,.35);font:600 12px/1.2 var(--f-inst)}
+#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 106px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 140px)}
+@media (min-width:760px){#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 114px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}}
+.layerpop[hidden]{display:none}
+.layerpop .lp-h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.layerpop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;white-space:nowrap}
+.layerpop input{accent-color:#ff6a1a}
+.layerpop .lp-k{font:600 10px/1 var(--f-inst);color:var(--muted);margin-left:4px;padding:1px 4px;border:1px solid var(--rule);border-radius:3px} /* (a training view's key) */
+.lp-wrap{position:relative}
+#chartLayersPop{position:absolute;top:calc(100% + 6px);left:0}
+
+/* ---------- the button clusters (owner, Nov 2026): small icons with a word under each, each kind where it belongs ---------- */
+.ibar{display:flex;gap:6px;pointer-events:auto}
+.ibar.col{flex-direction:column}
+.ib{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:52px;height:46px;padding:4px 6px;
+  background:var(--pod);border:1px solid var(--rule);border-radius:8px;color:var(--text);cursor:pointer}
+.ib[hidden]{display:none}
+.ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ib .w{font:600 9.5px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.ib:hover{border-color:var(--accent)}
+.ib:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ib.on{border-color:var(--accent);color:var(--accent)}
+.ib .mute{display:none} .ib.muted .mute{display:inline} .ib.muted .wave{display:none}
+#appBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:max(16px,env(safe-area-inset-right,0px))}
+#appBar .ib{min-width:46px;height:40px;opacity:.6}
+#appBar .ib:hover,#appBar .ib:focus-visible{opacity:1}
+#mapBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 82px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}
+#viewBar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}
+/* the keys line: over the view buttons, while the pointer is on a button cluster (K lists every key) */
+#keysHint{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 66px);
+  pointer-events:none;opacity:0;transition:opacity .2s}
+body:has(.ibar:hover) #keysHint{opacity:1}
+/* the trim panel's own line: who has the lines, in plain words */
+.tp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 12px/1.2 var(--f-inst);color:var(--muted)}
+.tp-head.mine{color:var(--text)}
+/* the sheets' Auto pills, as the crew's: lit while the crew trims, dark once the line is yours */
+/* the lashed tiller, on the tiller guide: a quiet marker where it's lashed, and what to do */
+body.lashed #tillerGuide{display:block}
+body.lashed:not(.tiller-held) #tillerGuide .tg-l,body.lashed:not(.tiller-held) #tillerGuide .tg-r,body.lashed:not(.tiller-held) #tillerGuide .tg-hard{display:none}
+body.lashed:not(.tiller-held) #tillerGuide .tg-line{opacity:.35}
+body.lashed .tg-cur{background:#c9a36a}
+.tg-lash{display:none;position:absolute;top:calc(74% + 6px);left:50%;transform:translateX(-50%);padding:5px 10px;border-radius:6px;
+  background:rgba(9,22,33,.78);border:1px dashed #c9a36a;color:#f0dcb8;font:600 11px/1.2 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+body.lashed .tg-lash{display:block}
+/* the map's key (ui/legend.ts), under the layer switches */
+.layerpop{max-height:calc(100vh - 240px);overflow-y:auto}
+#chartLayersPop{max-height:calc(100vh - 120px);width:290px}
+#mapLayersPop{width:280px}
+.layerpop .lp-kh{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule)}
+.lp-key .lk-h{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 3px}
+.lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}
+.lp-key .lk-row canvas{flex:none;border-radius:2px;border:1px solid var(--rule)}
+
