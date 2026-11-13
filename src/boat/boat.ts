@@ -229,8 +229,8 @@ export interface Boat {
   heelRate?: number;
   /** The waves' motion (boat/seaway.ts waveMotion): heave (m, up) and its rate (m/s), pitch (rad, bow up) and its rate (rad/s). */
   heave?: number; heaveRate?: number; pitch?: number; pitchRate?: number;
-  /** The waves' surge force on her (N, + forward) and the heel the wave's slope across her asks (deg, + to port): seaway.ts waveForces. */
-  waveX?: number; waveRoll?: number;
+  /** The water's orbital velocity under her (m/s, along her + forward, across her + to starboard) and the heel the wave's slope across her asks (deg, + to port): seaway.ts waveForces. */
+  waveU?: number; waveV?: number; waveRoll?: number;
   /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
   seaShare?: number; seaShareT?: number;
   /** Her push against the polar crew's, a share of the drive (physics.ts powerFactor), and seconds until it's worked out again. */

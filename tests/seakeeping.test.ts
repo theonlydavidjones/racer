@@ -150,18 +150,35 @@ describe('phase 2: the waves surge her and heel her', () => {
     let h = 0; const g = regular(T, a, 0); for (let t = 0; t < T; t += 0.05) h = Math.max(h, Math.abs(waveForces(g, B, 0, t, 1, 1).S));
     expect(h).toBeLessThan(1e-6);
   });
-  it('the surge push is the wave slope along her times her weight, and nothing on average', () => {
-    const T = 12, a = 0.5, k = (2 * Math.PI / T) ** 2 / G, f = regular(T, a, 0); // from astern
-    let mx = 0, sum = 0, n = 0; for (let t = 0; t < T; t += 0.01) { const X = waveForces(f, B, 0, t, 1, 1).X; mx = Math.max(mx, Math.abs(X)); sum += X; n++; }
-    const want = G * HULL.displacement * k * a;
+  it('a long swell from astern carries her to and fro with its orbit (a·ω), and nowhere on average', () => {
+    const T = 12, a = 0.5, f = regular(T, a, 0); // travelling north, she heads north
+    let mx = 0, sum = 0, n = 0, mv = 0; for (let t = 0; t < T; t += 0.01) { const r = waveForces(f, B, 0, t, 1, 1); mx = Math.max(mx, Math.abs(r.U)); mv = Math.max(mv, Math.abs(r.V)); sum += r.U; n++; }
+    const want = a * 2 * Math.PI / T;
     expect(mx / want).toBeGreaterThan(0.95); expect(mx / want).toBeLessThan(1.01);
-    expect(Math.abs(sum / n)).toBeLessThan(want * 0.01);
+    expect(Math.abs(sum / n)).toBeLessThan(want * 0.01); expect(mv).toBeLessThan(1e-9);
   });
-  it('a ripple much shorter than she is cancels along her and across her: no surge, no heel', () => {
+  it('a stopped boat in steep chop, sails down: the orbit carries her to and fro but not along (no creeping ahead)', async () => {
+    const { DEFAULT_SETTINGS } = await import('../src/settings');
+    const { World, DT } = await import('../src/sim/world');
+    const { COURSES } = await import('../src/courses/registry');
+    const drift = (orbit: boolean) => {
+      const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'gate', sailTo: '', tideDate: '2026-11-14', windKt: 22, chop: 2, current: 'none', traffic: 0 } as never, 1, { freeSail: true });
+      const u = w.user; u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false } as never;
+      let orbitMax = 0; for (let i = 0; i < 60 * 20; i++) { w.step(DT); if (!orbit) { u.waveU = 0; u.waveV = 0; } }
+      const x0 = u.x, y0 = u.y;
+      for (let i = 0; i < 60 * 120; i++) { w.step(DT); orbitMax = Math.max(orbitMax, Math.hypot(u.waveU ?? 0, u.waveV ?? 0)); if (!orbit) { u.waveU = 0; u.waveV = 0; } }
+      return { dx: u.x - x0, dy: u.y - y0, orbitMax };
+    };
+    const a = drift(true), b = drift(false);
+    expect(a.orbitMax).toBeGreaterThan(0.3); // (a lively orbit: 0.3 m/s and more)
+    // the same drift over two minutes, to within a few metres (a creep of 0.3 kt would be 18 m)
+    expect(Math.hypot(a.dx - b.dx, a.dy - b.dy)).toBeLessThan(4);
+  });
+  it('a ripple much shorter than she is cancels along her and across her: no orbit felt, no heel', () => {
     const f = regular(1.0, 0.1, 45); let mx = 0, ms = 0;
-    for (let t = 0; t < 2; t += 0.01) { const r = waveForces(f, B, 0, t, 1, 1); mx = Math.max(mx, Math.abs(r.X)); ms = Math.max(ms, Math.abs(r.S)); }
+    for (let t = 0; t < 2; t += 0.01) { const r = waveForces(f, B, 0, t, 1, 1); mx = Math.max(mx, Math.abs(r.U)); ms = Math.max(ms, Math.abs(r.S)); }
     const k = (2 * Math.PI) ** 2 / G;
-    expect(mx).toBeLessThan(0.1 * G * HULL.displacement * k * 0.1); expect(ms).toBeLessThan(0.1 * k * 0.1);
+    expect(mx).toBeLessThan(0.1 * 0.1 * 2 * Math.PI); expect(ms).toBeLessThan(0.1 * k * 0.1);
   });
 });
 

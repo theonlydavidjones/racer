@@ -221,7 +221,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
   // the wind the sails see: at their height, in the plane of the heeled mast (sailWind), as the crew trims to it
   // (going astern head to wind she moves downwind, so she sees less of it; slipping to leeward, the wind comes a little more abeam: leeway)
-  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0) + rigSurge(b), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0) + rigSurge(b) + orbitU(b), (b.sway ?? 0) + rigSway(b) + orbitV(b), b.heel ?? 0);
   // (the sails, their trim and their forces, in the wind across her course through the water (sailFrame): the frame the
   // sail model was calibrated in before she had leeway, when heading and course were one. A calibration choice, not
   // something ORC's documentation is shown to say: the wind's angle to the hull itself is her leeway less (ap, for the
@@ -229,7 +229,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // frame is on the ROADMAP)
   stepFrame(b, dt);
   const fr = sailFrame(b), slip = fr.rot;
-  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0) + rigSurge(b), fr.across + rigSway(b), b.heel ?? 0) : ap;
+  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0) + rigSurge(b) + orbitU(b), fr.across + rigSway(b) + orbitV(b), b.heel ?? 0) : ap;
   trimSails(b, apF.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
@@ -306,7 +306,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let sweep = 0;
   const sway = rigSway(b), surge = rigSurge(b);
   if ((Math.abs(sway) > 0.02 || Math.abs(surge) > 0.02) && !b.luff) {
-    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across, b.heel ?? 0); // (as sf's, without the roll and the pitch: her sternway in both)
+    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0) + orbitU(b), fr.across + orbitV(b), b.heel ?? 0); // (as sf's, without the roll and the pitch: her sternway in both)
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
@@ -317,7 +317,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // zone, where she stops (the flogging cloth only as much as is hoisted; struck, the bare rig's windage at any angle
   // forward of the beam)
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) - (b.waveX ?? 0) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
@@ -485,7 +485,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
   // (her surge signed: + ahead, − astern. In irons, backing the jib is the way out: she's often going astern as she does)
   const u0 = b.v - (b.astern ?? 0), uf = Math.abs(u0), d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.yawRate ?? 0) * D;
-  const ap = sailWind(ww.from, ww.kt, b.h, u0 + rigSurge(b), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, u0 + rigSurge(b) + orbitU(b), (b.sway ?? 0) + rigSway(b) + orbitV(b), b.heel ?? 0);
   trimSails(b, ap.awa, 'jib', dt);
   const q = 0.5 * RHO_A * ap.aws * ap.aws, awaR = ap.awa * D;
   const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
@@ -537,7 +537,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const sails = { main, jib };
   // (the seaway's added resistance as when sailing; the turning drag the polar model adds is here in the strips' damping)
   // (going astern, the water's drag on her is travel's, ASTERN_DRAG, as when she's driven astern sailing)
-  const X = main.drive + jib.drive + windX - hullResistance(Math.max(0, u0)) + inducedX + rudX - (u0 > 0 ? seaDrag(b.sea, b.h, u0) + (cond ? foulingDrag(cond, u0) : 0) : 0) + (b.waveX ?? 0);
+  const X = main.drive + jib.drive + windX - hullResistance(Math.max(0, u0)) + inducedX + rudX - (u0 > 0 ? seaDrag(b.sea, b.h, u0) + (cond ? foulingDrag(cond, u0) : 0) : 0);
   const Y = main.heel + jib.heel + windY + hullY + rudY;
   const M = sailYaw(sails, b.heelMag!, b.sheets.main, smAll.ceh) - windY * HOVE.windLever + hullM + rudY * RUDDER.arm + F * clrShift(cs.trim);
   const mx = HANDLING.mass * disp / HULL.displacement, my = disp * (1 + HOVE.swayAdded), I = disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
@@ -559,6 +559,9 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
 const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
 /** ... and its speed forward through the air from her pitching (m/s, + forward): bow up, the rig swings aft, the pitch rate
  * times the same height (pitching about her centre of flotation, at the waterline: seaway.ts waveMotion). */
+/** The waves' orbit under her, along her (+ forward) and across her (+ to starboard), m/s: the water carries her with it,
+ * as the current does, so her sails meet the wind across her motion over the ground (seaway.ts waveForces). */
+const orbitU = (b: Boat) => b.waveU ?? 0, orbitV = (b: Boat) => b.waveV ?? 0;
 const rigSurge = (b: Boat) => -(b.pitchRate ?? 0) * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
 /** The waves' added resistance at speed v as a share of the calm-water resistance (for the trim: hullTrim.ts). */
 const seaShare = (b: Boat, v: number) => { const r = hullResistance(Math.max(0.5, v)); return r > 0 ? seaDrag(b.sea, b.h, Math.max(0.5, v)) / r : 0; };
@@ -768,7 +771,9 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   if (ast > 0) b.astern = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
   // sideways too, while she's slipping (hove to)
   const sw = b.sway ?? 0, stb = V(b.h + 90);
-  b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;
+  // (and the waves' orbit carries her as the current does: seaway.ts waveForces)
+  const wu = b.waveU ?? 0, wv = b.waveV ?? 0;
+  b.vx = u.x * (b.v - ast + wu) + stb.x * (sw + wv) + b.cur.x; b.vy = u.y * (b.v - ast + wu) + stb.y * (sw + wv) + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
@@ -798,7 +803,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // so the flags, the windex and the crew see what the sails see)
   // (in the frame the sails are trimmed in, the wind across her course through the water: step(), apF)
   const fr = sailFrame(b);
-  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0) + rigSurge(b), fr.across + rigSway(b), b.heel ?? 0);
+  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0) + rigSurge(b) + orbitU(b), fr.across + rigSway(b) + orbitV(b), b.heel ?? 0);
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
@@ -1049,7 +1054,7 @@ function windAtZ(from: number, windKt: number, h: number, v: number, g: number, 
  * `from`: the bearing each comes from (deg).
  */
 export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; air: { kt: number; from: number }; aw: { kt: number; awa: number } } {
-  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0) + rigSurge(b) * z / CE_ABOVE_WL, across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
+  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0) + rigSurge(b) * z / CE_ABOVE_WL + orbitU(b), across = fr.across + rigSway(b) * z / CE_ABOVE_WL + orbitV(b);
   const level = windAtZ(ww.from, ww.kt, h, along, g, across, 0), plane = windAtZ(ww.from, ww.kt, h, along, g, across, b.heel ?? 0);
   return { tw: { kt: ww.kt * g, from: ww.from }, air: { kt: level.aws / KT, from: n360(h + level.arel) }, aw: { kt: plane.aws / KT, awa: plane.awa } };
 }
