@@ -731,8 +731,20 @@ function watchRace(): void {
   raceReplay.open(w, {
     frames: w.track, moments: log.moments(w), findings: log.findings(w), wind: w.gun?.windFrom ?? w.wind.from,
     marks: log.places().filter(p => p.t != null).map(p => ({ name: p.name, t: p.t! })), clips: incidentClips,
-    vs: versus(vsInput(log))
+    vs: versus(vsInput(log)), real: realLine()
   });
+}
+/**
+ * A real past race (Charts' sim/realRaces.ts): in a line, where your time would have placed among the real fleet on the
+ * day, the gap to its winner and that per mile, with the doubt about the course's length beside the per-mile figure
+ * when the published distance and the course sheet disagree. (The results page has the full table: realResults.)
+ */
+function realLine(): string | undefined {
+  const r = S.realRace ? realRace(S.realRace) : undefined; if (!r || w.userFinishT == null) return undefined;
+  const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!); if (!fin.length) return undefined;
+  const you = w.userFinishT, { place, of } = placeAmong(r, you), gap = you - fin[0].elapsedS!, per = gap / Math.max(0.1, r.distanceNm);
+  const day = new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `On ${day} (${r.event}, race ${r.raceNo}) you'd have placed ${ordinal(place)} of ${of}: ${gap <= 0 ? `${mmss(-gap)} ahead of ${titleCase(fin[0].boat)}, who won` : `${mmss(gap)} behind ${titleCase(fin[0].boat)}, who won, ${Math.round(per)} s a mile over its ${r.distanceNm} nm`}.${r.doubt && gap > 0 ? ` ${r.doubt}` : ''}`;
 }
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; send({ k: 'pause', on: false }); };
