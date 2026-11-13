@@ -90,7 +90,9 @@ export function beatInChop(kt: number, hs: number, tp: number): number {
   const key = (Math.round(kt * 4) * 1048576 + Math.round(hs * 50)) * 1048576 + Math.round(tp * 10);
   let a = beatCache.get(key);
   if (a === undefined) {
-    a = beatSearch(kt, hs, tp);
+    // (worked out at the key's own rounded values, so the angle remembered for a key is the same whoever asks first:
+    // otherwise a plan could come out differently depending on what was worked out before it)
+    a = beatSearch(Math.round(kt * 4) / 4, Math.round(hs * 50) / 50, Math.round(tp * 10) / 10);
     if (beatCache.size > 20000) beatCache.clear();
     beatCache.set(key, a);
   }

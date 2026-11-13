@@ -201,9 +201,14 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       else if (onTo()) flip = true; // (she'd cross the other tack's layline in this step: on to it, and tack there)
       // closing the shore: tack (or gybe) off it toward the side with more room, as a skipper does before the shallows
       else if (!near && sd < 400 && room(tack) < 80 && room(other) > room(tack) + 40 && t - lastTurnT > 1) flip = true; // (a minute on a board at least)
+      // the land close ahead on this board and no better on the other (a corner, a narrowing channel): she tacks (or
+      // gybes) off it all the same, as a skipper does before the shallows, rather than sail on into it
+      else if (!near && room(tack) < 30 && room(other) >= room(tack) && t - lastTurnT > 0.25) flip = true;
       else if (plan === 'middle') {
-        const xt = cross(legU, sub(p, a)); // + left of the straight course
-        if (((tack === 'S' && xt > lim) || (tack === 'P' && xt < -lim)) && t - lastTurnT > 0.5) flip = true; // (half a minute on a board at least)
+        // the lane either side of the course: she turns back when she's beyond it on the side this board is taking her
+        // (her track over the ground: on a run the gybes go to the opposite sides from a beat's tacks)
+        const xt = cross(legU, sub(p, a)), go = cross(legU, gnd(tack)); // (+ left of the straight course, looking from start to mark)
+        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5) flip = true; // (half a minute on a board at least)
       }
       if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt, ch.hs); }
       h = hd(tack); v = vb;

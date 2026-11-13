@@ -117,3 +117,15 @@ describe('passages along a shore', () => {
       expect(pn.ok, pn.why).toBe(true);
     }, 30_000);
 });
+
+import { beatInChop } from '../src/boat/seaway';
+describe('the same plan whatever was planned before it', () => {
+  it("beatInChop remembers the angle for its rounded key, not for whoever asked first (the review's survey: a plan changed with the order)", () => {
+    const a = beatInChop(8.13, 0.211, 2.43), b = beatInChop(8.11, 0.209, 2.41); // (the same key: 8.25 kt... 0.2 m, 2.4 s)
+    expect(a).toBe(b);
+  });
+  it('Berkeley to Belvedere in 8 kt in the real sea gets there (it ran ashore depending on what came before)', () => {
+    const pn = passageNow(at({ sailFrom: 'berkeley', sailTo: 'belvedere', windKt: 8, tideTime: '15:00', sea: 'real' }))!;
+    expect(pn.ok, pn.why).toBe(true);
+  }, 30_000);
+});
