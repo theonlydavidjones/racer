@@ -943,13 +943,26 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     // teak: a wooden frame and a varnished teak cover; acrylic: an anodised aluminium frame round a smoked acrylic lid
     const acrylic = b.paint?.hatch === 'acrylic';
     const frameMat = acrylic ? STEEL : new THREE.MeshLambertMaterial({ color: b.spec?.deck?.startsWith('#') ? b.spec.deck : 0xb0a58f });
-    for (const [w, d, x, z] of [[out, wall, 0, (open + wall) / 2], [out, wall, 0, -(open + wall) / 2], [wall, open, (open + wall) / 2, 0], [wall, open, -(open + wall) / 2, 0]]) {
+    if (!acrylic) for (const [w, d, x, z] of [[out, wall, 0, (open + wall) / 2], [out, wall, 0, -(open + wall) / 2], [wall, open, (open + wall) / 2, 0], [wall, open, -(open + wall) / 2, 0]]) {
       const f = new THREE.Mesh(new THREE.BoxGeometry(w, rise + 0.03, d), frameMat); f.position.set(x, (rise - 0.03) / 2, z); hatch.add(f); // (its foot set into the deck's camber)
     }
-    const cover = new THREE.Mesh(new THREE.BoxGeometry(out + 0.02, acrylic ? 0.02 : 0.032, out + 0.02), acrylic ? ACRYLIC : MAT.wood); cover.position.y = rise + (acrylic ? 0.01 : 0.016); hatch.add(cover);
-    if (acrylic) { const rim = new THREE.Mesh(new THREE.BoxGeometry(out + 0.04, 0.012, out + 0.04), STEEL); rim.position.y = rise + 0.004; hatch.add(rim); } // the lid's aluminium rim
-    for (const x of [-0.17, 0.17]) { const hg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.012, 0.05), STEEL); hg.position.set(x, rise + 0.034, -(out / 2) + 0.02); hatch.add(hg); } // hinges, forward
-    const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.04), STEEL); hasp.position.set(0, rise + 0.034, out / 2 - 0.01); hatch.add(hasp); // the hasp, aft
+    if (acrylic) {
+      // Josephine's (the owner's foredeck photo and answers): a low-profile hatch nearly flush with the deck, its
+      // anodised aluminium frame square with rounded corners round the class's largest opening (CR 3.31: 500 mm), a smoked
+      // acrylic lid with four raised aluminium bars running fore and aft, hinged along its forward edge, a latch aft
+      const rr = (hw: number, r: number) => { const sh = new THREE.Shape(); sh.moveTo(-hw + r, -hw); sh.lineTo(hw - r, -hw); sh.quadraticCurveTo(hw, -hw, hw, -hw + r); sh.lineTo(hw, hw - r); sh.quadraticCurveTo(hw, hw, hw - r, hw); sh.lineTo(-hw + r, hw); sh.quadraticCurveTo(-hw, hw, -hw, hw - r); sh.lineTo(-hw, -hw + r); sh.quadraticCurveTo(-hw, -hw, -hw + r, -hw); return sh; };
+      const fh = 0.03, outer = rr(open / 2 + 0.045, 0.07), hole = rr(open / 2, 0.05); outer.holes.push(hole);
+      const frame = new THREE.Mesh(new THREE.ExtrudeGeometry(outer, { depth: fh + 0.02, bevelEnabled: false, curveSegments: 6 }).rotateX(-Math.PI / 2).translate(0, -0.02, 0), STEEL); hatch.add(frame); // (its foot down into the deck's camber)
+      const lid = new THREE.Mesh(new THREE.ExtrudeGeometry(rr(open / 2 + 0.02, 0.06), { depth: 0.012, bevelEnabled: false, curveSegments: 6 }).rotateX(-Math.PI / 2).translate(0, fh, 0), ACRYLIC); hatch.add(lid);
+      for (let k = 0; k < 4; k++) { const x = -open / 2 + open * (k + 0.5) / 4; const bar = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.012, open + 0.02), STEEL); bar.position.set(x, fh + 0.018, 0); hatch.add(bar); } // the bars, fore and aft
+      for (const x of [-0.16, 0.16]) { const hg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.04), STEEL); hg.position.set(x, fh + 0.008, -(open / 2 + 0.04)); hatch.add(hg); } // the hinges, forward
+      const latch = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.014, 0.03), MAT.dark); latch.position.set(0, fh + 0.014, open / 2 + 0.03); hatch.add(latch); // the latch, aft
+    }
+    if (!acrylic) {
+      const cover = new THREE.Mesh(new THREE.BoxGeometry(out + 0.02, 0.032, out + 0.02), MAT.wood); cover.position.y = rise + 0.016; hatch.add(cover);
+      for (const x of [-0.17, 0.17]) { const hg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.012, 0.05), STEEL); hg.position.set(x, rise + 0.034, -(out / 2) + 0.02); hatch.add(hg); } // hinges, forward
+      const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.04), STEEL); hasp.position.set(0, rise + 0.034, out / 2 - 0.01); hatch.add(hasp); // the hasp, aft
+    }
   }
   grp.add(stowed);
   // sails down: the main flaked along the boom (tied with sail ties) and the jib in its bag on the foredeck

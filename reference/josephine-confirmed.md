@@ -45,6 +45,11 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   the top board. They are a pain to get on and off.
 - Opening: the hatch first, then the washboards. Closing: the reverse.
 
+## Foredeck
+- The forehatch: about half a metre forward of the mast on the centreline, square, big enough for a person or the
+  anchor (drawn at the class's largest opening, 500 mm, CR 3.31); low, nearly flush with the deck, an aluminium frame
+  with rounded corners, a smoked acrylic lid with four aluminium bars running fore and aft, hinged on its forward edge.
+
 ## Cockpit
 - The lazarettes are solid lockers, not benches.
 - The jib winches stand on the side deck about a third of the way along the cockpit, with room for a crew to sit on the

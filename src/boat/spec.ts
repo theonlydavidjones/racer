@@ -89,6 +89,7 @@ export const DEFAULT_BOAT: BoatSpec = {
   id: 'josephine', name: 'JOSEPHINE',
   hull: { material: 'fiberglass', upper: '#f4f1e8', lower: '#2a2d33', stripe: '#24324f' },
   deck: '#8e9f7c',
+  hatch: 'acrylic', // (Josephine's forehatch: a low aluminium-framed smoked acrylic one, the owner)
   sails: { country: 'USA', number: '110', color: 'white' },
   club: 'stfyc', skipper: 'you',
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
@@ -135,7 +136,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
     navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
-    hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
+    hatch: x.hatch === 'acrylic' || x.hatch === 'teak' ? x.hatch : d.hatch ?? 'teak',
     companionway: x.companionway === 'closed' ? 'closed' : 'open',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
