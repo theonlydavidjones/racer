@@ -71,7 +71,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
-| 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | **finding 1** |
+| 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered (finding 1, fixed) |
 | 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | partly (the mark touch's exoneration) |
 | 114 | 253 | 16.1, 18.2(a)(1), 31 | Room owed through a middle boat; at a starting mark L luffs W onto it: L broke 16.1 | partly (three-boat chains; Q3 buildable) |
 | 118 | 260 | 18.2(a)(1) | "Room to sail to the mark" at a leeward mark: no breach | partly |
@@ -119,9 +119,9 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tally
 
-- Covered, the test reaching the Case's answer: 16 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 101).
-- Findings, the engine answering differently: 2 (93, 105). Findings 3 (the gybe, found while checking Case 2) and 4–6
-  (Cases 27, 53, 101) are fixed.
+- Covered, the test reaching the Case's answer: 17 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 93, 101).
+- Findings, the engine answering differently: 1 (105). Findings 1 (Case 93), 3 (the gybe, found while checking Case 2) and
+  4–6 (Cases 27, 53, 101) are fixed.
 - Partly: 42.
 - Not modelled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
@@ -135,7 +135,8 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
 
 ### Findings
 
-1. **Case 93 (rule 18.3): the engine makes the boat that tacked in the zone keep clear, where 18.3 only asks her to give
+1. **Fixed:** 18.3 makes the tacker keep clear only with the fetching boat to windward of her (18.3(a)); with it inside, to
+   leeward, the basic rules and 15/16 govern, and 18.2 stays off. **Case 93 (rule 18.3): the engine makes the boat that tacked in the zone keep clear, where 18.3 only asks her to give
    mark-room.** W tacks from port to starboard in the zone; L, on starboard and fetching, gets a leeward overlap from clear astern and
    luffs straight into W. The Case: L broke 15 and 16.1 (and 14); W broke 11 but is exonerated, and gave L mark-room, so didn't break
    18.3. The engine: W, under 18.3 (src/rules/rightOfWay.ts: once the tacking boat is overlapped with the fetching boat it returns

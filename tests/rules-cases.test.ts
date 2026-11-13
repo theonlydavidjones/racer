@@ -113,10 +113,26 @@ describe('Rule 18 · mark-room', () => {
     const r = case93();
     expect(r.before).toMatchObject({ keepsClear: 'W', rule: '10' });
     expect(r.tacked).toMatchObject({ keepsClear: 'L', rule: '12' });
-    expect(r.contact.foul).toMatchObject({ by: 'W', rule: '18.3' }); // what the engine says today: finding 1
   });
-  it.fails('Case 93: after a boat tacks in the zone, one that gets a leeward overlap from clear astern and luffs at once into her breaks 15 and 16.1; the boat that tacked gave mark-room (18.3)', () => {
+  it('Case 93: after a boat tacks in the zone, one that gets a leeward overlap from clear astern and luffs at once into her breaks 15 and 16.1; the boat that tacked gave mark-room (18.3)', () => {
     expect(case93().contact.foul).toMatchObject({ by: 'L', rule: expect.stringMatching(/^(15|16\.1)$/) });
+  });
+});
+
+describe('Rule 18.3 · the boat that tacked, with the fetching boat inside her', () => {
+  it('Case 93 (the other half): L, overlapped inside, holds her course; W sags down onto her: W broke 11 (she still owes room, 18.3(b))', () => {
+    const M = mark('p', true);
+    const W = boat('W', { at: [6.9, -0.9], heading: 45 }), L = boat('L', { at: [14, -8], heading: 315 });
+    const p = pair(W, L, [M]);
+    p.at(44);
+    W.lastTackT = 45.5; W.headToWindT = 45.5; moveTo(W, [6.9, -0.9], 315);
+    p.at(46);
+    moveTo(L, off([6.9, -0.9], 315, -2, -3), 315);
+    p.at(48);
+    expect(p.at(52)).toMatchObject({ keepsClear: 'W', rule: '11', foul: null }); // past L's rule 15 time
+    expect(p.rec.r183).not.toBeNull();
+    moveTo(W, off([6.9, -0.9], 315, 1, -1.8), 300, 315); moveTo(L, off([6.9, -0.9], 315, 1, -3.2)); // W bears away onto L
+    expect(p.at(53).foul).toMatchObject({ by: 'W', rule: '11' });
   });
 });
 
