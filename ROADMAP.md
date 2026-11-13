@@ -194,6 +194,11 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
+   sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
+   it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
+   beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
+   dial under the inset map, 8b), and a test that it's on screen.
 8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
    the owner first):
    - "all sail stuff together, all hull stuff together, etc." Proposed groups:
@@ -225,6 +230,19 @@ What's planned, roughly in order. Done work is described in the README.
      Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
      fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
      Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
+8k. **Drop and raise the anchor** (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
+   later cruising mode's anchoring challenge):
+   - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
+     anchor: haul in the rode, break it out, stow it. Each takes the time it takes, by crew and skill.
+   - The physics, sourced: the holding force against the wind and current on her hull and rig; the scope (rode out
+     against depth, from the NOAA chart, with the tide's height); she swings to whichever wins, wind or current, as the
+     moored boats already do; and she drags if the scope is short, the bottom poor (the chart's bottom types) or the
+     load too high.
+   - Racing: on the Bay, kedging is a real tactic. In no wind against a foul tide, anchoring keeps the ground a drifting
+     boat would lose. The racing rules allow anchoring, but she must recover the anchor before she continues (check
+     the 2025–2028 text, rule 45). The strategist and the smart crew should know when to call it.
+   - At anchor: the anchor light at night (built, Rule 30) and the anchor ball by day (Rule 30(a)).
+   - On the screen rule: the call goes inside an existing element (the sail band's crew tab, a key), not a new button.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
@@ -259,6 +277,13 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The inset map's flag and layer icons off the game surface** (owner, 13 November; 1–2 h): "the little flag icon and
+     layer icon on the inset map doesn't belong on the game surface. those should be toggles in the full map view, with
+     the inset remembering my choices." The layer choices (and the flag index) move into the full chart. The inset shows
+     whatever was last chosen there, saved with the player's settings. The standing screen rule applies.
+   - **The on-screen tiller instructions out** (owner, 13 November; minutes): the keys line across the screen (#keysHint,
+     "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
+     The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
    - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
@@ -930,6 +955,27 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modeled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labeled where it's illustrative.
+
+- **3. The tack and gybe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+  the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
+  "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
+  also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
+  maybe even some on-water tracks or something. this doesn't feel different from regular cruise mode."
+  - **Cues where you're looking, in a word or two:** beside or above the boat, not in the Coach card: "Build speed",
+    "Tack now", "Hold", "Ease", "Trim". The full advice moves to after each rep.
+  - **On-water guides:** a lane or track drawn on the water showing the line to sail, where to start the turn, and the
+    new course after it; a target heading mark; and her wake shown against the ideal turn afterwards. All drawn from
+    the sim's own polar and turn model.
+  - **A drill's own shape,** so it doesn't feel like cruising: a set course in open water, numbered reps, a short
+    score after each (speed lost, distance lost, the turn's rate and the tiller's), and a best-of summary.
+  - On the screen rule: the cues live on the water and on the boat, not as new buttons.
+
+- **4. A learn-to-sail mode** (owner, 13 November: the on-screen tiller instructions don't need to be there, "except maybe
+  in a 'learn to sail' mode, which we haven't even roadmapped yet"; not ranked; a design to the owner first). For
+  someone who has never sailed: the parts of the boat, steering with the tiller, the points of sail, trimming to the
+  telltales, tacking and gybing, heaving to and docking, each as a short guided lesson on the water, with the
+  instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
+  coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
 
 ## Next up
 

@@ -45,6 +45,9 @@ come later, once the physics and racing are dialed in.
 - Ask before big design changes. Desktop only (no phone layout).
 - Keep building through everything they've asked for. Don't install npm packages without asking.
 - Don't relabel things they've named (e.g. the S/P labels).
+- No blocks of explanatory copy on the player's screens (owner, 13 Nov 2026: "these blocks of tiny copy are useless.
+  nobody will ever read this."). At most one short line where the player needs it to act; methods and caveats go
+  behind one hover or link, or are cut. Prefer visuals (tiles, charts, icons) to words.
 - Be extremely conservative about new buttons and distractions on the game surface (owner, 13 Nov 2026): put new controls inside existing elements (the inset map, the sail band, menus, Keys), not as new on-screen buttons.
 
 ## Workflow
