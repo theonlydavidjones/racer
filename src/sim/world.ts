@@ -11,6 +11,8 @@ import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMar
 import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
+import { WaveField, waveTime } from '../environment/waveField';
+import { waveMotion } from '../boat/seaway';
 import { dayWeather, turnWeather, type DayWeather } from '../environment/weather';
 import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
 import { ShiftField, shiftStats } from '../environment/shifts';
@@ -212,6 +214,8 @@ export class World {
   private warned = new Map<number, number>();
   /** The waves: chop from the wind and current, swell through the Gate (or flat water). */
   sea: SeaField;
+  /** The waves on the water: one field for the boats' heave and pitch and the water you see (environment/waveField.ts). */
+  waves: WaveField;
 
   t: number; // race time, s; negative before the start signal
   steps = 0;
@@ -324,6 +328,7 @@ export class World {
       const sw = this.weather.swell(settings.swellDay ?? 1);
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs, total: undefined } : sw, settings.chop ?? 1);
       this.sea.duration = this.seaDurationAt(this.clockUtc);
+      this.waves = new WaveField(this.sea.swell?.tp ?? 12);
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -825,6 +830,10 @@ export class World {
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
     }
+    // the waves: the field eased to the sea at your boat (turning with the course's wind about her), and every boat's
+    // heave and pitch on it (boat/seaway.ts waveMotion)
+    this.waves.update(this.user.sea ?? FLAT_SEA, this.windModel.base, dt, this.user);
+    { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.log?.step(this, dt);
@@ -1576,6 +1585,7 @@ export class World {
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; // (the piers' wakes from the new stream at once)
     this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
+    this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();

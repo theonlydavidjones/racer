@@ -1,5 +1,7 @@
 import { D2R, KT, wrap } from '../core/math';
 import type { SeaHere } from '../environment/sea';
+import { N_WAVES, type WaveField } from '../environment/waveField';
+import type { Boat } from './boat';
 import { HULL, driveFrom, hullResistance, type DriveCurve } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { beatAngle as beatAngleCalm, polar } from './polar';
@@ -144,3 +146,78 @@ export const KNOTS = (v: number) => v / KT;
 export const beatFor = (b: { ww: { kt: number }; sea: SeaHere }): number => b.sea.hsW < 0.02 ? beatAngleCalm(b.ww.kt) : beatInChop(b.ww.kt, b.sea.hsW, b.sea.tpW);
 /** This boat's target speed (m/s) at a true wind angle, in the chop she's in (the swell barely matters). */
 export const targetFor = (b: { ww: { kt: number }; sea: SeaHere }, twa: number): number => speedInChop(b.ww.kt, twa, b.sea.hsW, b.sea.tpW);
+
+/* ---------- heave and pitch: the waves under her, wave by wave ---------- */
+
+/**
+ * Heave and pitch, from the shared wave field (environment/waveField.ts) under her, as two damped oscillators forced by
+ * the waves (linear strip theory, in the time domain: Journée & Massie, Offshore Hydromechanics, TU Delft 2001, ch. 6;
+ * Faltinsen, Sea Loads on Ships and Offshore Structures, 1990, ch. 3).
+ *
+ * - **The restoring forces** are her own hydrostatics, measured from the drawn hull (render/hull.ts, sliced at the
+ *   waterline where she floats her sailing displacement, tests/seakeeping.test.ts keeps them in step): waterplane area
+ *   8.57 m² (heave: ρ·g·Awp, 86 kN/m) and its moment of inertia about the centre of flotation 15.8 m⁴ (pitch: ρ·g·I_L,
+ *   taking GM_L ≈ BM_L = I_L/∇ = 7 m, the 0.3 m between G and B being nothing beside it). The centre of flotation is
+ *   0.19 m aft of the middle of her length.
+ * - **The added mass** of the water she moves with her, from strip theory: each section's two-dimensional heave added
+ *   mass ρ·π/8·B²·C, C from its Lewis form (Lewis 1929; Journée & Massie ch. 6, the conformal mapping by the section's
+ *   beam/draft ratio and area coefficient), integrated along her length for heave and with the square of the distance
+ *   from the centre of flotation for pitch: 4,950 kg (2.1 × her mass: shallow, beamy sections carry a lot of water) and
+ *   7,300 kg·m². These are the high-frequency limits, and strip theory leaves out the ends' three-dimensional relief, a
+ *   real effect on a hull only 2.9 beams long: estimates, until the Delft series' seakeeping tests can replace them.
+ * - **Her pitch inertia:** a radius of gyration of a quarter of her length overall (1.91 m), the usual figure for a yacht
+ *   with her rig: an estimate.
+ * - **Damping:** the waves she makes as she heaves and pitches carry energy away. A damping ratio of 0.25 in each, an
+ *   estimate (of the order the radiation damping of ship sections gives near resonance; to be replaced by her sections'
+ *   own wave damping, or the Delft tests).
+ * - That gives natural periods of about 1.8 s in heave and 2.0 s in pitch. Close-hauled at 5 kt, the Bay's 2.5–3 s chop
+ *   meets her every 1.7–2.1 s: on them, which is the hobby-horsing of a Folkboat in the Cityfront chop (her pitch, for
+ *   the waves' slope, peaks in a 3 s chop at 1.3 times what a long sea gives: tests/seakeeping.test.ts).
+ * - **The waves' push** (Froude–Krylov: the undisturbed wave's pressure on her bottom, the diffraction left out) on a
+ *   rectangle with her waterplane's area and moment of inertia (4.70 × 1.82 m), worked out in closed form for each wave
+ *   component: along her length a sinc for the force and the yaw lever's 2(sin q − q·cos q)/a² for the moment, across her
+ *   beam a sinc, and the pressure fading with depth as e^(−k·T), T her mean draft (∇/Awp, 0.27 m; the Smith effect). A
+ *   wave much longer than she is lifts and tilts her with it (she follows the surface: force C33·ζ, moment C55·slope);
+ *   one much shorter cancels along her and leaves her still.
+ * - Worked out where she is, every step, as she sails through the field: the frequency she meets the waves at (faster
+ *   into them, slower running with them) needs no formula of its own.
+ */
+const WM = {
+  awp: 8.57, il: 15.8, cfAft: 0.19, a33: 4950, a55: 7300, gyr: 0.25 * 7.64, zeta: 0.25,
+  /** The equivalent rectangle's length and beam (m): L·B = Awp, B·L³/12 = I_L. */
+  le: Math.sqrt(12 * 15.8 / 8.57), be: 8.57 / Math.sqrt(12 * 15.8 / 8.57),
+};
+const WM_T = HULL.displacement / RHO / WM.awp; // her mean draft for the Smith effect, m
+const C33 = RHO * G * WM.awp, C55 = RHO * G * WM.il;
+const M33 = HULL.displacement + WM.a33, I55 = HULL.displacement * WM.gyr ** 2 + WM.a55;
+const B33 = 2 * WM.zeta * Math.sqrt(M33 * C33), B55 = 2 * WM.zeta * Math.sqrt(I55 * C55);
+/** Natural periods (s) of heave and pitch. */
+export const NATURAL = { heave: 2 * Math.PI * Math.sqrt(M33 / C33), pitch: 2 * Math.PI * Math.sqrt(I55 / C55) };
+const sinc = (x: number) => Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x;
+
+/** The waves' heave force (N) and pitch moment (N·m, bow up) on her at point p, heading h (deg), at wave time t. */
+export function waveForces(f: WaveField, p: { x: number; y: number }, h: number, t: number, kW: number, kS: number): { F: number; M: number } {
+  const fx = Math.sin(h * D2R), fy = Math.cos(h * D2R); // forward
+  const cx = p.x - fx * WM.cfAft, cy = p.y - fy * WM.cfAft; // the centre of flotation
+  let F = 0, M = 0;
+  for (let i = 0; i < N_WAVES; i++) {
+    const a = f.amp[i] * (f.swell[i] ? kS : kW); if (a < 1e-5) continue;
+    const k = f.k[i], sd = f.sd[i], cd = f.cd[i];
+    const ax = k * (sd * fx + cd * fy), ay = k * (sd * fy - cd * fx); // the wavenumber along her and across her
+    const th = k * (sd * cx + cd * cy) - f.w[i] * t + f.phase[i];
+    const A = a * Math.exp(-k * WM_T) * sinc(ay * WM.be / 2), q = ax * WM.le / 2;
+    F += A * WM.le * sinc(q) * Math.sin(th);
+    M += A * (Math.abs(q) < 1e-3 ? ax * WM.le ** 3 / 12 : 2 * (Math.sin(q) - q * Math.cos(q)) / (ax * ax)) * Math.cos(th);
+  }
+  return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M };
+}
+
+/** Step her heave and pitch `dt` seconds on the waves of field `f` at wave time t (semi-implicit Euler: stable at the sim's step). */
+export function waveMotion(b: Boat, f: WaveField, t: number, dt: number): void {
+  const s = b.sea; if (!s) return;
+  const { kW, kS } = f.scaleFor(s), { F, M } = waveForces(f, b, b.h, t, kW, kS);
+  let z = b.heave ?? 0, zr = b.heaveRate ?? 0, th = b.pitch ?? 0, thr = b.pitchRate ?? 0;
+  zr += (F - C33 * z - B33 * zr) / M33 * dt; z += zr * dt;
+  thr += (M - C55 * th - B55 * thr) / I55 * dt; th += thr * dt;
+  b.heave = z; b.heaveRate = zr; b.pitch = th; b.pitchRate = thr;
+}

@@ -221,7 +221,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
   // the wind the sails see: at their height, in the plane of the heeled mast (sailWind), as the crew trims to it
   // (going astern head to wind she moves downwind, so she sees less of it; slipping to leeward, the wind comes a little more abeam: leeway)
-  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0) + rigSurge(b), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
   // (the sails, their trim and their forces, in the wind across her course through the water (sailFrame): the frame the
   // sail model was calibrated in before she had leeway, when heading and course were one. A calibration choice, not
   // something ORC's documentation is shown to say: the wind's angle to the hull itself is her leeway less (ap, for the
@@ -229,7 +229,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // frame is on the ROADMAP)
   stepFrame(b, dt);
   const fr = sailFrame(b), slip = fr.rot;
-  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0) : ap;
+  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0) + rigSurge(b), fr.across + rigSway(b), b.heel ?? 0) : ap;
   trimSails(b, apF.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
@@ -302,9 +302,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // measured on dinghies (Schutt & Williamson, Cornell) only adds to it), scaled to the hull as the force model scales
   // the sails' push (driveCalibration). Kogure et al. (Japan J. Coaching Studies 27(1), 2013) measured a Laser
   // Radial's roll tacks 5.3% faster than flat ones through the tack in 2–4 m/s, 2.8% in 4–6 m/s.
+  // (and as she pitches: the rig swinging fore and aft through the air, seaway.ts waveMotion, rigSurge)
   let sweep = 0;
-  const sway = rigSway(b);
-  if (Math.abs(sway) > 0.02 && !b.luff) {
+  const sway = rigSway(b), surge = rigSurge(b);
+  if ((Math.abs(sway) > 0.02 || Math.abs(surge) > 0.02) && !b.luff) {
     const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along, fr.across, b.heel ?? 0); // (as sf's, without the roll)
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
@@ -484,7 +485,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
   // (her surge signed: + ahead, − astern. In irons, backing the jib is the way out: she's often going astern as she does)
   const u0 = b.v - (b.astern ?? 0), uf = Math.abs(u0), d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.yawRate ?? 0) * D;
-  const ap = sailWind(ww.from, ww.kt, b.h, u0, (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, u0 + rigSurge(b), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
   trimSails(b, ap.awa, 'jib', dt);
   const q = 0.5 * RHO_A * ap.aws * ap.aws, awaR = ap.awa * D;
   const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
@@ -556,6 +557,9 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
 /** The rig's sideways speed through the air at the sails' centre of effort (m/s, + to starboard) from her rolling: the
  * roll rate times the centre of effort's height above the roll axis, taken at the waterline (balance.ts CE_ABOVE_WL). */
 const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
+/** ... and its speed forward through the air from her pitching (m/s, + forward): bow up, the rig swings aft, the pitch rate
+ * times the same height (pitching about her centre of flotation, at the waterline: seaway.ts waveMotion). */
+const rigSurge = (b: Boat) => -(b.pitchRate ?? 0) * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
 /** The waves' added resistance at speed v as a share of the calm-water resistance (for the trim: hullTrim.ts). */
 const seaShare = (b: Boat, v: number) => { const r = hullResistance(Math.max(0.5, v)); return r > 0 ? seaDrag(b.sea, b.h, Math.max(0.5, v)) / r : 0; };
 /** (Worked out twice a second, as the sea is refreshed.) */
@@ -793,7 +797,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // so the flags, the windex and the crew see what the sails see)
   // (in the frame the sails are trimmed in, the wind across her course through the water: step(), apF)
   const fr = sailFrame(b);
-  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0);
+  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0) + rigSurge(b), fr.across + rigSway(b), b.heel ?? 0);
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
@@ -1044,7 +1048,7 @@ function windAtZ(from: number, windKt: number, h: number, v: number, g: number, 
  * `from`: the bearing each comes from (deg).
  */
 export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; air: { kt: number; from: number }; aw: { kt: number; awa: number } } {
-  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0), across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
+  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0) + rigSurge(b) * z / CE_ABOVE_WL, across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
   const level = windAtZ(ww.from, ww.kt, h, along, g, across, 0), plane = windAtZ(ww.from, ww.kt, h, along, g, across, b.heel ?? 0);
   return { tw: { kt: ww.kt * g, from: ww.from }, air: { kt: level.aws / KT, from: n360(h + level.arel) }, aw: { kt: plane.aws / KT, awa: plane.awa } };
 }
