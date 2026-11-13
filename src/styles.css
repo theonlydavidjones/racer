@@ -473,6 +473,15 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief .dbHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
 .debrief .dbLost{font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap}
 .debrief li p{font-size:14px}
+/* protest hearings (results): validity ticks, the facts as tiles, the decision */
+.protests .pHead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.protests .pTiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.protests .pTile{background:var(--panel2,rgba(255,255,255,.05));border-radius:6px;padding:6px 8px;font-size:12px;color:var(--muted)}
+.protests .pTile b{display:block;font-size:15px;color:var(--ink,inherit)}
+.protests .pDec{border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-weight:600}
+.protests .pDec.bad{border-color:var(--accent)}
+.protests canvas.pClip{width:100%;height:220px;background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
+.protests .ok{color:#5fbf7a}.protests .no{color:var(--accent)}
 .debrief .dbTip{color:var(--muted)}
 
 /* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */

@@ -26,7 +26,7 @@ import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './ren
 import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V, brg, dist, wrap } from './core/math';
-import { EXONERATION, RULES, explain, ptsText, raceScores, scoreOrder, type Incident, type ScoreOut } from './rules';
+import { EXONERATION, RULES, explain, hearings, ptsText, raceScores, scoreOrder, type Decision, type Incident, type ScoreOut } from './rules';
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
 import { currentSeason, keepSeasonRace, seasonById, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
@@ -206,7 +206,7 @@ let still = false, unshown = false;
 /** How many Worlds the page has built (for the checks: a setup change builds one, after the debounce). */
 let prepared = 0;
 function prepare(seed = randomSeed()): void {
-  incidentClips = []; // (a new race: its own rule incidents)
+  incidentClips = []; answered.clear(); // (a new race: its own rule incidents and protests)
   pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
@@ -278,7 +278,10 @@ function handle(e: SimEvent): void {
 
 let lastClip: ReplayClip | null = null;
 /** This race's rule incidents, for the race replay (by Moment.ref). */
-let incidentClips: { clip: ReplayClip; title: string; what: string }[] = [];
+let incidentClips: { clip: ReplayClip; title: string; what: string; t?: number }[] = [];
+/** Protests against you you've answered after the race: retired (RET) or chose the hearing. */
+const answered = new Map<string, 'retire' | 'hearing'>();
+let hearingView: ReplayView | null = null;
 function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): void {
   setControlsIdle();
   const user = A.isUser ? A : B, other = A.isUser ? B : A, youFault = inc.fouler.isUser;
@@ -311,7 +314,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   if (w.log) {
     const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
     send({ k: 'logNote', note: { key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length } });
-    incidentClips.push({ clip, title, what: ex.what });
+    incidentClips.push({ clip, title, what: ex.what, t: w.t });
   }
   $('replay').hidden = false;
   replayView.play(w, clip);
@@ -1708,7 +1711,7 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
   const title = `${w.C.title}${w.courseSignal ? ` (course ${w.courseSignal.no})` : ''}`, out: LogEntry[] = [];
   rows.forEach(b => {
     const spec = b.isUser ? S.boat : b.spec && S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
-    const dsq = b.scoring === 'UFD' || b.scoring === 'BFD';
+    const dsq = b.scoring === 'UFD' || b.scoring === 'BFD' || sc.get(b.id)?.code === 'DSQ';
     const entry: LogEntry = { ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
       ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) };
     out.push(entry);
@@ -1768,11 +1771,51 @@ function settleLog(next: () => void): void {
 onSaveTrouble(msg => toast(msg, 6000));
 
 /** The race's scores (Low Point, with the Z flag's 20% added in points: rules/scoring.ts), by boat id. */
+/**
+ * The results' Protests section (the owner's design, 13 Nov 2026): each protest you're a party to. One against you:
+ * Retire (RET) or go to the hearing. Heard: the validity ticks (RRS 60.2), the facts found as tiles, and the decision.
+ */
+function protestSection(): void {
+  const el = $('resProtests'), u = w.user, nm = (id: number) => id === u.id ? 'You' : `${w.boats[id].name} <span style="color:var(--muted)">${w.boats[id].no.replace(/^US\s+/, 'USA ')}</span>`;
+  const mine = heard().decisions.filter(d => d.protest.by === u.id || d.protest.vs === u.id);
+  el.hidden = !mine.length; if (!mine.length) { el.innerHTML = ''; return; }
+  const tick = (ok: boolean, what: string) => `<span class="${ok ? 'ok' : 'no'}">${ok ? '✔' : '✘'}</span> ${what}`;
+  const OUT: Record<Decision['outcome'], string> = { invalid: 'Protest invalid: not hailed and flagged at the first reasonable opportunity (Rule 60.4)', dismissed: 'Dismissed: no rule broken', exonerated: 'No penalty: exonerated (Rule 43.1)', penaltyTaken: 'Penalty taken: no further penalty (Rule 60.5(c)(2))', DSQ: 'Disqualified (Rule 60.5(c))', pending: 'Still racing: her turns still to do', retired: 'Retired (RET): nothing to decide' };
+  el.innerHTML = '<h3>Protests</h3>' + mine.map((d, i) => {
+    const p = d.protest, key = `${p.vs}@${p.t}`, rule = d.rule && d.rule in RULES ? RULES[d.rule as keyof typeof RULES][0] : d.rule ? `Rule ${d.rule}` : 'no rule found';
+    const head = `<div class="pHead"><span>${nm(p.by)} protest${p.by === u.id ? '' : 's'} ${p.vs === u.id ? 'you' : nm(p.vs)} · ${rule}</span></div>`;
+    if (p.vs === u.id && !answered.has(key) && d.outcome !== 'retired') return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
+    const clip = incidentClips.find(c => c.t != null && Math.abs(c.t - p.t) < 1.5);
+    const turns = p.owed == null ? '–' : !p.owed ? 'Declined' : p.turnsT != null ? 'Taken' : 'Not taken';
+    const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
+    return head + `<div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}${clip ? ` &nbsp; <a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</div>`
+      + `<div class="pTiles">${tiles.map(([k, v]) => `<div class="pTile">${k}<b>${v}</b></div>`).join('')}</div>`
+      + `<div class="pDec${d.outcome === 'DSQ' ? ' bad' : ''}">${d.outcome === 'DSQ' ? `${p.vs === u.id ? 'You' : w.boats[p.vs].name}: ` : ''}${OUT[d.outcome]}</div>`;
+  }).join('');
+  el.querySelectorAll<HTMLButtonElement>('[data-pr]').forEach(b => b.onclick = () => {
+    const key = b.dataset.key!, how = b.dataset.pr as 'retire' | 'hearing'; answered.set(key, how);
+    if (how === 'retire') { send({ k: 'retire', why: ', answering a protest', afterFinish: true }); setTimeout(showResults, 300); } else protestSection();
+  });
+  el.querySelectorAll<HTMLAnchorElement>('[data-pclip]').forEach(a => a.onclick = e => {
+    e.preventDefault(); const d = mine[Number(a.dataset.pclip)], c = incidentClips.find(k => k.t != null && Math.abs(k.t - d.protest.t) < 1.5);
+    // (in its own small canvas in the section: the incident overlay's Continue would let the finished race run on)
+    let cv = el.querySelector<HTMLCanvasElement>('canvas.pClip');
+    if (!cv) { cv = document.createElement('canvas'); cv.className = 'pClip'; a.closest('div')!.after(cv); }
+    if (c) { hearingView?.stop(); hearingView = new ReplayView(cv); hearingView.play(w, c.clip); }
+  });
+}
+
+/** The protest hearings, on the facts as they are now (rules/hearing.ts): the decisions and the boats disqualified. */
+function heard(): ReturnType<typeof hearings> {
+  return hearings(w.protests, id => { const b = w.boats[id]; return { id, racing: w.racing(b), retired: !!b.retired }; });
+}
+
 function scores(): Map<number, ScoreOut> {
   // the boats still racing, in the order they're in now (most marks rounded, then nearest the next), to project them
   const C = w.C, toGo = (b: Boat) => { const m = w.nextMark(b); return dist(b, m ? m.p : C.center); };
   const out = w.boats.filter(b => !b.finished && !b.retired).sort((a, b) => b.leg - a.leg || toGo(a) - toGo(b));
-  return new Map(raceScores(w.boats.map(b => ({ id: b.id, finishT: b.finished ? b.finishT : null, code: b.retired ? 'RET' : b.scoring ?? null, ahead: out.indexOf(b) }))).map(s => [s.id, s]));
+  const dsq = heard().dsq;
+  return new Map(raceScores(w.boats.map(b => ({ id: b.id, finishT: b.finished ? b.finishT : null, code: b.retired ? 'RET' : dsq.has(b.id) ? 'DSQ' : b.scoring ?? null, ahead: out.indexOf(b) }))).map(s => [s.id, s]));
 }
 
 function showResults(): void {
@@ -1783,15 +1826,16 @@ function showResults(): void {
   const mine = sc.get(w.user.id)!, place = mine.rank ?? rows.indexOf(w.user) + 1, tied = rows.filter(b => sc.get(b.id)!.rank === place && sc.get(b.id)!.points === mine.points).length > 1;
   const nth = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
   // a Z-flag place waits on the boats still racing: any of them finishing on fewer points beats her (44.3(c))
-  $('resTitle').textContent = mine.code === 'UFD' || mine.code === 'BFD' ? 'You were disqualified'
+  $('resTitle').textContent = mine.code === 'UFD' || mine.code === 'BFD' || mine.code === 'DSQ' ? 'You were disqualified'
     : !mine.final ? `On points, you're likely ${nth(place)}: boats still racing can finish ahead of your ${ptsText(mine.points!)}`
     : place === 1 ? (tied ? 'You tied for first' : 'You won the race') : `You finished ${tied ? 'equal ' : ''}${nth(place)}`;
   const sr = w.startReport;
   $('resStart').textContent = sr ? `Your start: crossed ${sr.delay.toFixed(1)} s after the gun at ${sr.kt.toFixed(1)} kt, ${Math.round(sr.frac * 100)}% of the way from ${w.C.pinLabel} to ${w.C.committeeLabel}.` : 'No clean start recorded.';
   const code = (b: Boat) => { const s = sc.get(b.id)!; return b.scoring === 'ZFP' ? ` · ZFP: ${Number.isInteger(s.across!) ? nth(s.across!) : `tied ${nth(Math.floor(s.across!))}`} across the line, +${ptsText(s.penalty)} points (Rule 30.2, 44.3(c))${s.final ? '' : '; her place waits on the boats still racing'}` : b.scoring ? ` · ${b.scoring}: disqualified (Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'})` : ''; };
-  const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
+  const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' || s.code === 'DSQ' ? 'DSQ' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
   $('resBody').innerHTML = rows.map(b => `<tr><td>${rankOf(b)}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no.replace(/^US\s+/, 'USA ')}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td><td>${sc.get(b.id)!.points != null ? ptsText(sc.get(b.id)!.points!) : ''}</td></tr>`).join('');
   $('resFouls').textContent = `Fouls you committed: ${w.fouls}. Fouls against you: ${w.fouledBy}.`;
+  protestSection();
   { const rr = realResults(); $('resReal').innerHTML = rr; $('resReal').hidden = !rr; }
   { const sl = seasonLine(); $('resSeason').innerHTML = sl; $('resSeason').hidden = !sl; }
   const db = debriefHtml('Your race, debriefed');

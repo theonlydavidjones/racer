@@ -42,8 +42,9 @@ describe('Protests: the hail and the red flag (RRS 60.2(a)(1))', () => {
     expect(w.hailOption()?.kind).not.toBe('protest');
   });
 
-  it('umpired (the default for now), and in the practice area, there is no protest hail', () => {
-    const um = new World(SS2, settings(), 3); racing(um); incident(um, 'them');
+  it('protests are the default for a race (the owner); umpired, and in the practice area, there is no protest hail', () => {
+    expect(new World(SS2, settings(), 3).protestsOn).toBe(true);
+    const um = new World(SS2, settings({ judging: 'umpired' }), 3); racing(um); incident(um, 'them');
     expect(um.hailOption()?.kind).not.toBe('protest');
     const pr = new World(TRAIN, settings({ judging: 'protests' }), 3); racing(pr); incident(pr, 'them');
     expect(pr.protestsOn).toBe(false);
