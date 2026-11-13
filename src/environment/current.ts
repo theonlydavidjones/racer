@@ -51,6 +51,9 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
  * BASIN_MOUTH meters to BASIN_EDDY of itself in a harbor with breakwaters, or BASIN_OPEN among docks that lie open to
  * an estuary with no breakwater (more of the stream gets in among their piles and hulls). All four are estimates: no
  * measured figure was found for these harbors, or in general.
+ * Known limits of the 4 m grid it's worked out on: land thinner than about 2 m on a slant can be slipped through (one
+ * strip by Fortmann Marina); water is open or not by a sharp 30 m cutoff, so a dead-end slip just over 60 m wide (Fort
+ * Mason's) would carry the stream at 1 m resolution and doesn't here; slots under ~10 m between solid piers read closed.
  */
 export const BASIN_EDDY = 0.1, BASIN_OPEN = 0.3, BASIN_MOUTH = 30, BASIN_CLEAR = 30;
 /** The raster each harbor's calm is worked out on: cell size and margin round its works (m). */
@@ -139,7 +142,8 @@ function calmIn(c: Calm, p: Vec): number {
   const u = fx - i, v = fy - j; let s = 0, w = 0;
   const nearWall = [0, 1].some(a => [0, 1].some(b => c.d[(j + b) * c.nx + i + a] < 0));
   const seen = (I: number, J: number) => { if (!nearWall) return true; const q = { x: c.x0 + I * CELL, y: c.y0 + J * CELL };
-    for (const f of [0.25, 0.5, 0.75]) { const r = { x: p.x + (q.x - p.x) * f, y: p.y + (q.y - p.y) * f }; if (hitsWall(r) || onLand(r)) return false; } return true; };
+    const L = Math.hypot(q.x - p.x, q.y - p.y), n = Math.max(1, Math.ceil(L / 0.5)); // (every half meter: a thin wall a meter off is still seen)
+    for (let m = 1; m < n; m++) { const r = { x: p.x + (q.x - p.x) * m / n, y: p.y + (q.y - p.y) * m / n }; if (hitsWall(r) || onLand(r)) return false; } return true; };
   for (const [a, b, ww] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]] as const) {
     const d = c.d[(j + b) * c.nx + i + a]; if (d < 0 || ww <= 0 || !seen(i + a, j + b)) continue;
     const f = c.floor[(j + b) * c.nx + i + a]; s += ww * (f + (1 - f) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
@@ -151,7 +155,8 @@ function calmIn(c: Calm, p: Vec): number {
     const d = c.d[J * c.nx + I]; if (d < 0 || !seen(I, J)) continue;
     const ww = 1 / (0.01 + (I - fx) ** 2 + (J - fy) ** 2), f = c.floor[J * c.nx + I]; s += ww * (f + (1 - f) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
   }
-  return w > 0 ? s / w : inBasin(p) ? c.floor[Math.max(0, Math.min(c.ny - 1, j)) * c.nx + Math.max(0, Math.min(c.nx - 1, i))] : 1;
+  // (nothing in sight: a sliver of water walled in on the grid, so calm)
+  return w > 0 ? s / w : c.floor[Math.max(0, Math.min(c.ny - 1, j)) * c.nx + Math.max(0, Math.min(c.nx - 1, i))];
 }
 /** How much of the stream reaches p (1 in open water): the most open of the harbor grids it's on. */
 export function basinCalm(p: Vec): number {
