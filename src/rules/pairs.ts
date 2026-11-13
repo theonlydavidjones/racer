@@ -477,6 +477,12 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   const r183T = r3?.binds && r.rule === '18.3' ? (r3.tacker === A.id ? A : B) : null;
   const r183O = r183T ? (r183T === A ? B : A) : null;
   const r183a = !!r183T && !!r183O && turnedToward(r183O, r183T) === 0 && twaOf(r183O, ctx) <= (ctx.beat ?? 42) + 3;
+  // Rule 18.3(b): the boat that tacked shall give mark-room to the fetching boat if she becomes overlapped inside her, and
+  // a boat sailing within the mark-room she's entitled to is exonerated for breaking rule 15 (43.1(b)). So the fetching
+  // boat that gets the inside (leeward) overlap from clear astern and holds her course to the mark isn't the one at fault
+  // for not giving the tacker time: the tacker keeps clear (11). (Luffing at once is not sailing within mark-room: WS
+  // Case 93, she broke 15 and 16.1.)
+  const r183b = !!r3?.binds && r.rule === '11' && kc.id === r3.tacker && rec.by === row.id && turnedToward(row, kc) === 0;
   if (notRacing(kc) && !notRacing(row)) {
     // Rule 23.1: a boat not racing (she has retired, or finished and cleared the line) shall not interfere with a boat that is racing
     rule = '23'; part = '23.1';
@@ -486,7 +492,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // the fetching boat to windward bore away into the boat that tacked: 18.3 gave her no right of way, and 18.2 is off,
     // so rounding the mark she still had to keep clear (rule 11)
     fouler = r183O; rule = '11';
-  } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
+  } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id && !r183b) {
     // Rule 15: she only just got right of way
     fouler = rec.by === A.id ? A : B; rule = '15'; byWhy = rec.byWhy;
   } else if (youTack && (kc === youTack.hailed || turnedToward(youTack.hailed, youTack.hailer) > 0 || Math.hypot(youTack.hailed.vx, youTack.hailed.vy) < 0.6 * youTack.v0)) {
