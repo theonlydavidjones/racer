@@ -83,8 +83,14 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
  * TANGLE_MAX. A touch after she has sailed clear of both is a new incident however soon it comes.
  */
 const ENGAGED = 2 * LOA;
-/** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
+/** Rule 44.1: a tangle after a foul (the boats still together, not a length apart since) counts as one incident for at most this long from its first contact, s. */
 const TANGLE_MAX = 30;
+/** "Jammed": both boats under this speed through the water, m/s (about 1 kt), and closing on each other at under
+ * JAM_CLOSING: drifting together, at a mark in the ebb, with little flow over either rudder (flowTurnRate(0.5) is about
+ * 3°/s) and nothing either can do in the seconds between touches. A modelling choice, no source gives a figure. */
+const STEERAGE = 0.5, JAM_CLOSING = 0.4;
+/** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modelling cap). */
+const JAM_MAX = 2 * TANGLE_MAX;
 
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
@@ -247,6 +253,16 @@ export class World {
   private lastFoul = new Map<number, { t: number; x: number; y: number; vs: number }>();
   /** Rule 44.1: each boat's last penalized foul, against whom, and whether she has since been clear of that boat. */
   private lastFoulVs = new Map<number, { vs: number; t: number; clear: boolean }>();
+  /** Rule 44.1's tangle, pair by pair (pairKey): the last contact between the two, and whether they've since been a
+   * length clear of each other, opened by a foul that carried a penalty (`fouler` owes it). A jam of three or four boats
+   * is several pairs; each pair's contacts while it lasts are one incident (US Appeal 65: "the inevitable result of the
+   * first") by the same fouler, until her turns begin (then rules 44.2 and 21.2: a new breach), for TANGLE_MAX from the
+   * first contact. The other boat touching back is her own breach, except while the two are jammed (see STEERAGE) or
+   * haven't parted at all since (`parted`: never a metre wider than just after the last touch, `g0`, its push apart
+   * included: one collision going on, the boats swinging against each other, whoever's right of way it is at each
+   * touch). Not for the user once her turns have begun: locked against the boat she fouled, she isn't "well clear"
+   * (44.2), and her turns there don't excuse the touches; the AI gets clear before it turns. */
+  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }>();
   private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
   private fouledAt = new Map<number, { by: number; t: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
@@ -1094,6 +1110,8 @@ export class World {
       const rec = this.pairs[key] ??= newPairRecord();
       // (Rule 44.1's tangle: once a boat that fouled has been a length clear of the boat she fouled, it's over)
       for (const [X, Y] of [[A, B], [B, A]] as const) { const lf = this.lastFoulVs.get(X.id); if (lf && lf.vs === Y.id && !lf.clear && hullGap(X, Y) > LOA) lf.clear = true; }
+      const tg = this.tangles.get(key);
+      if (tg && !tg.clear) { const g = hullGap(A, B); if (g > LOA) tg.clear = true; if (g > tg.g0 + 1) tg.parted = true; }
       if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
       const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
@@ -1103,7 +1121,9 @@ export class World {
         if (h2?.kind === 'room' && h2.by === mid.id && h2.at >= po.at) { if (h2.clearAt != null) po.respondedAt = h2.clearAt; }
         else po.failed = true; // that hail lapsed unanswered (a breach was called on it)
       }
-      const { incident } = assessPair(rec, A, B, ctx, { swerve: A.forced14 === B.id || B.forced14 === A.id });
+      // (a forced swerve counts unless both boats are all but stopped: two near-stationary boats close together, in a jam
+      // at a mark in the ebb, isn't one boat forcing the other off her course; contact still counts)
+      const { incident } = assessPair(rec, A, B, ctx, { swerve: (A.forced14 === B.id || B.forced14 === A.id) && Math.max(A.v, B.v) >= STEERAGE });
       const h = rec.hail;
       if (h && h.kind === 'room' && !answered && h.clearAt != null && h.replyAt == null) {
         // the hailed boat is through the wind: now the hailing boat must tack too (Rule 20.2(d))
@@ -1114,6 +1134,9 @@ export class World {
     }
     // who fouled whom this step, before deciding penalties (Rule 43.1(a) needs the whole picture)
     for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
+    // (each boat's speed, and her velocity, before any contact this step takes her way off: a jam is judged on how they
+    // were sailing, not on what the touch did to them)
+    const pre = found.length ? new Map(this.boats.map(b => [b.id, { v: b.v, vx: b.vx, vy: b.vy }])) : null; // (only when there's something to judge)
     for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
@@ -1127,21 +1150,31 @@ export class World {
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
       if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
+      const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
+      const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
       // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
-      // from that foul (she hasn't been a length clear of her since, nor begun her turns), is that same incident: no
-      // second foul, and her turns aren't restarted. Once she has started turning she must keep clear of everyone
-      // (rule 21.2) and should have got well clear first (rule 44.2), so a contact then is a new breach.
-      const prior = this.lastFoulVs.get(f.id);
-      if (incident.kind !== 'hail' && prior && prior.vs === victim.id && !prior.clear && f.penalty > 0 && !f.penaltyDir && this.t - prior.t < TANGLE_MAX) { // (penaltyDir: her turns have begun, 30° one way)
-        prior.t = this.t; // (the tangle goes on)
+      // from that foul (not a length clear of each other since), and before her turns have begun, is that same incident: no
+      // second foul. (The AI gets clear before turning, and again if a new penalty comes mid-turns: rule 44.2.)
+      // (a boat new to the tangle, or one she has got clear of, is a new incident)
+      const pk = pairKey(A, B), prior = this.tangles.get(pk);
+      // (how long: TANGLE_MAX from the first contact; but while the two are jammed (in the ebb at a mark a fleet can sit at a
+      // few tenths of a knot inside a length of each other for minutes) neither can do anything new, and it runs on from
+      // the last contact, up to JAM_MAX from the first)
+      // (and not once her turns have begun: rule 44.2 has her take them "after getting well clear of other boats", and while
+      // taking a penalty rule 21.2 has her keep clear of all others; a contact then, next to the boat she fouled, is her own
+      // choice, not "the inevitable result of the first" (US Appeal 65): a new breach, the user's or the AI's alike. Unless
+      // both are jammed below steerage way: drifting together in the ebb, neither can choose anything)
+      if (incident.kind !== 'hail' && prior && !prior.clear && (!f.penaltyDir || jammed || (!prior.parted && !f.isUser)) && (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX) && (prior.fouler === f.id || jammed || !prior.parted)) {
+        prior.t = this.t; prior.parted = false; prior.g0 = hullGap(A, B); // (the tangle goes on)
         if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).` });
         continue;
       }
+      if (incident.kind !== 'hail' && incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B) });
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       if (A.isUser || B.isUser) {
