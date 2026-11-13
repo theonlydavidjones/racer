@@ -1300,7 +1300,9 @@ $('dOpts').addEventListener('click', e => {
 /** The run of attempts this session: each start's numbers, the best marked, to see the trend. */
 function drillTable(): void {
   if (drillRuns.length < 2) { $('dRuns').innerHTML = ''; return; }
-  const score = (r: typeof drillRuns[number]) => r.grade === 'ocs' ? Infinity : Math.abs(r.lateS) + (100 - r.pct) / 10;
+  // (a start is as good as it is on time and at speed: each 10% of speed short counts as about 5 s late, the time it
+  // takes a Folkboat to build that speed back)
+  const score = (r: typeof drillRuns[number]) => r.grade === 'ocs' ? Infinity : Math.abs(r.lateS) + (100 - r.pct) / 2;
   const best = drillRuns.reduce((a, r) => score(r) < score(a) ? r : a);
   const endW = (e: string) => e === 'pin' ? w.C.pinLabel : e === 'committee' ? w.C.committeeLabel : 'middle';
   const rows = drillRuns.slice(-10).map(r => `<tr${r === best ? ' class="best"' : ''}><td>${r.n}</td><td>${r.grade === 'ocs' ? `over, ${Math.round(-r.behindM)} m` : r.behindM < 0 ? `past, ${Math.round(-r.behindM)} m` : `${Math.round(r.behindM)} m · ${Math.round(r.lateS)} s`}</td><td>${r.pct}%</td><td>${esc(endW(r.end))}${r.fav ? (r.onFav ? ' ✓' : '') : ''}</td><td>${r.grade}</td></tr>`).join('');

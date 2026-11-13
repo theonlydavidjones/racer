@@ -99,8 +99,8 @@ export function startDebrief(w: SimView): StartDebrief {
   const offSq = Math.abs(wrap(gw - brg(w.N.x, w.N.y))), kind: 'up' | 'down' | 'reach' = offSq < 45 ? 'up' : offSq > 135 ? 'down' : 'reach';
   const kk = dot(sub(w.pin, w.committee), V(gw)) / w.lineLen, k = kind === 'down' ? -kk : kk, bias = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
   const favEnd = k > 0 ? C.pinLabel : C.committeeLabel, gain = w.lineLen * Math.abs(k);
-  if (kind === 'reach') facts.push(`In this wind the line is ${Math.round(offSq)}° off square: the first leg is a reach, so neither end is favoured as on a beat. Start where you can sail fast for the first mark in clear air.`);
-  else if (bias >= 2) facts.push(`The ${favEnd} end was favored by ${bias.toFixed(0)}°${kind === 'down' ? ' (a downwind start: the end further downwind)' : ''}: starting there is worth about ${Math.round(gain)} m ${kind === 'down' ? 'downwind' : 'upwind'} over the other end.`);
+  if (kind === 'reach') facts.push(`In this wind the line is ${Math.round(offSq)}° off square: the first leg is a reach, so neither end is favoured as on a beat. Start where you can sail fast for the first mark in clear air. (A line fixed ashore, like the club's, is only as square as the day's wind makes it; to practise judging the favoured end, choose the practice area's course, whose line is laid to the wind.)`);
+  else if (bias >= 2) facts.push(`The ${favEnd} end was favoured by ${bias.toFixed(0)}°${kind === 'down' ? ' (a downwind start: the end further downwind)' : ''}: starting there is worth about ${Math.round(gain)} m ${kind === 'down' ? 'downwind' : 'upwind'} over the other end.`);
   else facts.push('The line was nearly square to the wind: neither end gained much.');
 
   // grade and tips
@@ -127,7 +127,7 @@ export function startDebrief(w: SimView): StartDebrief {
     tips.push(grade === 'great' ? 'On the line at the gun at full speed. That is the whole game.' : 'Close. Next time try to be within a boat length of the line at the gun, at full speed.');
   }
   const favoredThird = k > 0 ? me.frac < 1 / 3 : me.frac > 2 / 3;
-  if (kind !== 'reach' && bias >= 5 && !favoredThird && grade !== 'ocs') tips.push(`The ${favEnd} end was favored by ${bias.toFixed(0)}°. Starting nearer that end would have put you about ${Math.round(gain * (k > 0 ? me.frac : 1 - me.frac))} m farther up the course.`);
+  if (kind !== 'reach' && bias >= 5 && !favoredThird && grade !== 'ocs') tips.push(`Starting nearer the ${favEnd} end would have put you about ${Math.round(gain * (k > 0 ? me.frac : 1 - me.frac))} m farther up the course.`);
   if (me.penalty) tips.push('You were doing penalty turns at the gun. Keep clear before the start too: the rules apply from the preparatory signal.');
 
   // time on distance: your run in, against what full speed on the same line would have taken. Full speed for the
