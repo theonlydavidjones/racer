@@ -173,7 +173,7 @@ const hhmm = (m: number) => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60
 let condLive = false;
 function newGame(seed = randomSeed()): void {
   incidentClips = []; // (a new race: its own rule incidents)
-  if (condLive && w?.running) { send({ k: 'conditions', settings: S }); saveSettings(S); view.conditionsChanged(w); return; } // (the owner: at once, without a restart)
+  if (condLive && w?.running) { saveSettings(S); void host.ask({ k: 'conditions', settings: S }).then(() => view.conditionsChanged(w)); return; } // (redrawn once the race has them: the committee boat to the new wind) // (the owner: at once, without a restart)
   pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
@@ -192,7 +192,7 @@ function newGame(seed = randomSeed()): void {
   const wk = SIM_INPROC ? null : spawnSimWorker();
   host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); })
     : new LocalHost(new World(args.file, args.settings, args.seed, args.opts), SIM_GUARD);
-  w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false;
+  w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false; resultsShown = false;
   document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint();
@@ -720,6 +720,8 @@ $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
 /** The speed of time you've set (kept here: the race's own reaches the page a frame later, and two quick presses must make 4×). */
 let speedSet = 1;
+/** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
+let resultsShown = false;
 $('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 $('bPause').onclick = () => {
@@ -1412,7 +1414,7 @@ function scores(): Map<number, ScoreOut> {
 }
 
 function showResults(): void {
-  send({ k: 'shown', finishShown: true });
+  send({ k: 'shown', finishShown: true }); resultsShown = true;
   // in order of points (RRS A4, 44.3(c)), then of time across the line for the boats still racing
   const sc = scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
   logRace(rows, sc);
@@ -1455,10 +1457,11 @@ function frame(now: number): void {
   const showing = boatPanel.open || fleet.boatOpen;
   const simMs = host.advance(dt, showing ? showroomTwa : undefined);
   if (w.running && !w.paused) {
-    if (w.userFinishT != null && !w.finishShown && w.t - w.userFinishT > 3) showResults();
+    if (w.userFinishT != null && !w.finishShown && !resultsShown && w.t - w.userFinishT > 3) showResults();
     if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
   }
   for (const e of host.drainEvents()) handle(e);
+  if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)

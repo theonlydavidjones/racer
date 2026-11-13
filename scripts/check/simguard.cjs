@@ -27,6 +27,7 @@ const out = process.argv[2] || '.';
   const st = await selfTest(); console.log('guard self-test:', st); if (st !== 'refused') errs.push('the guard is off: ' + st);
   // (the race sails in its worker, the page reading its mirror: sim/host.ts WorkerHost)
   const mode = await p.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode); if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
+  const faultsNow = () => p.evaluate(() => document.documentElement.dataset.syncFaults);
   await step('speed', async () => { await click('#bFast'); await click('#bFast'); });
   await step('steer', async () => { await key('a', 600); await key('d', 600); });
   await step('sheets', async () => { for (const k of ['z', 'x', ',', '.', 's', ';', "'", ']', ';']) await key(k, 300); });
@@ -51,6 +52,7 @@ const out = process.argv[2] || '.';
   await step('pause', async () => { await click('#bPause'); await p.waitForTimeout(800); await click('#bResume'); });
   await p.waitForTimeout(8000); // (racing on, at 4×)
   await p.screenshot({ path: `${out}/simguard_race.png` });
+  { const f = await faultsNow(); console.log('the mirror\'s checks failed (race):', f); if (f !== '0') errs.push(`the page's mirror differs from the race (${f} checks failed)`); }
   // a cruise
   await step('to cruise', async () => { await click('#bPause'); await p.waitForTimeout(500); await click('#bSettings'); await p.waitForTimeout(800); });
   await p.goto('http://localhost:5173/?simguard'); await p.waitForTimeout(4000);
@@ -66,6 +68,7 @@ const out = process.argv[2] || '.';
   await step('home', async () => { await click('#bHome'); await p.waitForTimeout(500); });
   await p.waitForTimeout(5000);
   await p.screenshot({ path: `${out}/simguard_cruise.png` });
+  { const f = await p.evaluate(() => document.documentElement.dataset.syncFaults); console.log('the mirror\'s checks failed (cruise):', f); if (f !== '0') errs.push(`the page's mirror differs from the race in the cruise (${f} checks failed)`); }
   console.log('ERRORS:', errs.join('\n---\n') || 'none'); await b.close();
   process.exit(errs.length ? 1 : 0);
 })();

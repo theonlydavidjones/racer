@@ -10,38 +10,14 @@ import type { CourseFile } from '../src/courses/course';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { LOCAL, SyncMirror, SyncSource } from '../src/sim/sync';
+import { SyncMirror, SyncSource } from '../src/sim/sync';
+import { firstDifference } from './helpers/worlds';
 import { applyCommand } from '../src/sim/commands';
 import { laylinesFor } from '../src/sim/laylines';
 import { startDebrief } from '../src/sim/startDebrief';
 import { passageNow, passagePlan } from '../src/sim/navigator';
 import { raceBrief } from '../src/sim/strategist';
 
-const NEVER = new Set(['rng', 'motorRng', 'emit', 'keepsClearOf', 'obstacle', 'events']);
-
-/** The first place two Worlds differ, walking both together (objects must correspond one to one), or null. */
-function firstDifference(A: World, M: World): string | null {
-  const pair = new Map<object, object>();
-  const go = (a: unknown, b: unknown, path: string): string | null => {
-    if (typeof a === 'function') return null; // (each side has its own)
-    if (a === null || typeof a !== 'object') return Object.is(a, b) ? null : `${path}: ${String(a)} ≠ ${String(b)}`;
-    if (b === null || typeof b !== 'object') return `${path}: an object ≠ ${String(b)}`;
-    const p = pair.get(a); if (p) return p === b ? null : `${path}: not the same object as elsewhere`;
-    pair.set(a, b);
-    if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b) && a.constructor.name !== b.constructor.name) return `${path}: ${a.constructor.name} ≠ ${b.constructor.name}`;
-    if (ArrayBuffer.isView(a)) { const x = a as unknown as ArrayLike<number>, y = b as unknown as ArrayLike<number>; if (x.length !== y.length) return `${path}: length`; for (let i = 0; i < x.length; i++) if (!Object.is(x[i], y[i])) return `${path}[${i}]`; return null; }
-    if (a instanceof Map) { const e = [...a], f = [...(b as Map<unknown, unknown>)]; if (e.length !== f.length) return `${path}: size`; for (let i = 0; i < e.length; i++) { const d = go(e[i][0], f[i][0], `${path}<key ${i}>`) ?? go(e[i][1], f[i][1], `${path}<${i}>`); if (d) return d; } return null; }
-    if (a instanceof Set) { const e = [...a], f = [...(b as Set<unknown>)]; if (e.length !== f.length) return `${path}: size`; for (let i = 0; i < e.length; i++) { const d = go(e[i], f[i], `${path}<${i}>`); if (d) return d; } return null; }
-    // (each side's own memos aside: sim/sync.ts LOCAL)
-    const mine = (o: object, k: string) => typeof (o as Record<string, unknown>)[k] === 'function' || (LOCAL[o.constructor?.name ?? '']?.has(k) ?? false);
-    const ka = Object.keys(a).filter(k => !mine(a, k)), kb = Object.keys(b).filter(k => !mine(b, k));
-    if (ka.length !== kb.length) return `${path}: keys ${ka.filter(k => !kb.includes(k)).concat(kb.filter(k => !ka.includes(k))).join(',')}`;
-    for (const k of ka) { const d = go((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}.${k}`); if (d) return d; }
-    return null;
-  };
-  for (const k of Object.keys(A)) { if (NEVER.has(k) || LOCAL.World.has(k)) continue; const d = go((A as unknown as Record<string, unknown>)[k], (M as unknown as Record<string, unknown>)[k], k); if (d) return d; }
-  return null;
-}
 
 /** The page's questions, asked of a World: everything it reads through SimView's methods and the analyses it runs. */
 function questions(w: World, heavy: boolean): string {
@@ -49,7 +25,7 @@ function questions(w: World, heavy: boolean): string {
   const out: unknown[] = [];
   for (const p of pts) out.push(w.currentAt(p), w.currentAt(p, true), w.windHere(p), w.seaHere(p), w.fieldAt(p), w.fieldExtra(p), w.puffs.at(p), w.lineD(p));
   for (const b of w.boats) {
-    out.push(w.nextMark(b)?.name ?? null, w.racing(b), w.windHere(b, b), laylinesFor(w, b));
+    out.push(w.nextMark(b)?.name ?? null, w.racing(b), laylinesFor(w, b)); // (not windHere(b, b): it notes the shadow on the boat, and the page never asks it)
     for (const o of w.boats) if (o !== b) out.push(w.rights(b, o).kc.id, w.rights(b, o).rule, w.pairRecord(b, o) ?? null, w.canPassOn(b, o)?.id ?? null);
   }
   const h = w.hailOption(); out.push(h ? [h.kind, h.to.id, h.words] : null);

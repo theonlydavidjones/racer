@@ -6,7 +6,7 @@
  * that, and draws and asks its questions of the mirror.
  */
 import { applyCommand, type Command, type CommandResult } from './commands';
-import { SyncSource, type Packet } from './sync';
+import { CHECK_EVERY, SyncSource, checkOf, type Packet } from './sync';
 import { DT, World, type WorldOptions } from './world';
 import type { CourseFile } from '../courses/course';
 import type { Settings } from '../settings';
@@ -18,7 +18,11 @@ export type ToWorker =
   | { k: 'frame'; dt: number; twa?: number; cmds: { c: Command; id?: number }[] };
 /** What the worker sends back after each frame. */
 export type FromWorker =
-  | { k: 'state'; packet: Packet; results: { id: number; r: CommandResult }[]; ms: number; steps: number }
+  /**
+   * After a frame. `resync`: the frame's commands up to that one (new conditions) were done before the World was numbered
+   * afresh: the page does the same commands to its mirror, numbers it afresh, and then takes the packet (sent whole).
+   */
+  | { k: 'state'; packet: Packet; results: { id: number; r: CommandResult }[]; ms: number; steps: number; resync?: number; check?: number[] }
   | { k: 'failed'; msg: string };
 
 /** The worker's side of the race: the World, what it last sent, and the time not yet stepped. */
@@ -26,6 +30,7 @@ export class RaceWorker {
   private w: World | null = null;
   private src: SyncSource | null = null;
   private acc = 0;
+  private frames = 0;
   /** A message from the page; the answer to send back, if any. */
   handle(m: ToWorker): FromWorker | null {
     try {
@@ -38,7 +43,13 @@ export class RaceWorker {
   /** One frame, as LocalHost and the page's own loop did it: commands first, then the steps due. */
   private frame(m: Extract<ToWorker, { k: 'frame' }>): FromWorker {
     const t0 = performance.now(), world = this.w!, results: { id: number; r: CommandResult }[] = [];
-    for (const { c, id } of m.cmds) { const r = applyCommand(world, c); if (id != null) results.push({ id, r }); }
+    let resync: number | undefined;
+    m.cmds.forEach(({ c, id }, j) => {
+      const r = applyCommand(world, c); if (id != null) results.push({ id, r });
+      // new conditions replace the weather, the tide, the sea and the wind's parts with new objects, functions and all,
+      // and turn the course's legs: the mirror builds its own, the same way, and both sides number their Worlds afresh
+      if (c.k === 'conditions') { this.src = new SyncSource(world, true); resync = j; }
+    });
     const steps0 = world.steps;
     if (world.running && !world.paused) {
       this.acc += m.dt * world.speed;
@@ -47,7 +58,8 @@ export class RaceWorker {
       this.acc += m.dt; while (this.acc >= DT) { world.idle(DT, m.twa); this.acc -= DT; }
     }
     const ms = performance.now() - t0;
-    return { k: 'state', packet: this.src!.capture(world.drainEvents()), results, ms, steps: world.steps - steps0 };
+    const packet = this.src!.capture(world.drainEvents());
+    return { k: 'state', packet, results, ms, steps: world.steps - steps0, ...(resync != null ? { resync } : {}), ...(++this.frames % CHECK_EVERY === 0 ? { check: checkOf(world) } : {}) };
   }
   /** (tests: the World sailing here) */
   get world(): World | null { return this.w; }

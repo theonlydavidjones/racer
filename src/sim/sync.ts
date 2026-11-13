@@ -17,6 +17,8 @@
  * The race's events go separately (SimHost.drainEvents), so they're not part of the World's state here.
  */
 import type { World } from './world';
+import { CurrentField } from '../environment/tide';
+import { SeaField } from '../environment/sea';
 
 /** The World's own members changed only by being replaced: walked only when replaced. */
 const BY_IDENTITY = new Set(['C', 'file', 'sequence', 'weather', 'field', 'opts', 'traffic']);
@@ -24,12 +26,28 @@ const BY_IDENTITY = new Set(['C', 'file', 'sequence', 'weather', 'field', 'opts'
 const NEVER = new Set(['rng', 'motorRng', 'emit', 'keepsClearOf', 'obstacle', 'events']);
 /** Grown at the end, with the oldest dropped from the front: only what's new is sent. */
 const APPEND = new Set(['rec', 'track']);
+/**
+ * The mirror's check (every CHECK_EVERY frames, in the published page too): a few numbers from the worker's World and
+ * the same worked out on the mirror must agree to the last bit: every boat's place, heading, speed and heel, the clock,
+ * the wind, and the answers to three of the page's questions (the current, the wind field, the wind) at the course's
+ * middle. A difference is counted and reported (sim/host.ts): the mirror isn't the race.
+ */
+export const CHECK_EVERY = 20;
+export function checkOf(w: World): number[] {
+  const out: number[] = [w.t, w.steps, w.wind.from, w.wind.kt];
+  for (const b of w.boats) out.push(b.x, b.y, b.h, b.v, b.heel);
+  const p = w.C.center, c = w.currentAt(p), f = w.fieldAt(p), h = w.windHere(p);
+  out.push(c.x, c.y, f.k, f.turn, f.extra, h.from, h.kt);
+  return out;
+}
+/** How often (frames) both sides forget the objects the World no longer holds. */
+export const SWEEP_EVERY = 300;
 
 /** A field's value as sent: a primitive, or another object by its number. */
 type Val = string | number | boolean | null | undefined | bigint | { r: number };
-/** One object whose contents changed: its number, its class the first time, and what changed. */
+/** One object whose contents changed: its number, its class the first time (by its place in both sides' list), and what changed. */
 export type Node =
-  | { i: number; c?: string; o: Record<string, Val>; d?: string[] } // fields set (and deleted)
+  | { i: number; c?: number; o: Record<string, Val>; d?: string[] } // fields set (and deleted)
   | { i: number; a: Val[] } // an array, whole
   | { i: number; m: [Val, Val][] } // a Map, whole
   | { i: number; s: Val[] } // a Set, whole
@@ -44,6 +62,10 @@ export interface Packet {
   rec: { add: Val[]; len: number }; track: { add: Val[]; len: number };
   /** The race's events since the last packet (sim/events.ts), by number. */
   events: Val[];
+  /** Both sides forget the objects their World no longer holds, after this packet. */
+  sweep?: true;
+  /** After a rebuild (new conditions): how many objects the worker numbered, for the mirror to check its own count. */
+  count?: number;
 }
 
 /**
@@ -51,44 +73,53 @@ export interface Packet {
  * inputs it was worked out for (tests/independence.test.ts: a memo holds only what its key says), so the mirror working
  * out its own gives the same answers. They must stay local: the page's questions fill the mirror's memos, so the mirror's
  * differ from what the worker last sent, and an update of half a memo (a new key over an old answer) would be wrong.
- * By class (constructor name) and field; 'World' for the World's own.
+ * By class (the class itself, not its name: the page's and the worker's code are minified apart) and field.
+ * (Not every memo can be local: the piers' wakes, World.flows, are refreshed every 30 s of race from whenever they're
+ * first asked for, so their value depends on who asks first; they're sent, as the worker's.)
  */
-export const LOCAL: Record<string, ReadonlySet<string>> = {
-  World: new Set(['kcMemo']),
-  CurrentField: new Set(['vecs', 'stamp', 'bayFlow', 'cells', 'lastKey', 'lastList'])
-};
-const local = (v: object, key: string) => LOCAL[(v as { constructor?: { name?: string } }).constructor?.name ?? '']?.has(key) ?? false;
+const LOCAL_WORLD = new Set(['kcMemo']);
+const LOCAL = new Map<object, ReadonlySet<string>>([
+  [CurrentField.prototype, new Set(['vecs', 'stamp', 'bayFlow', 'cells', 'lastKey', 'lastList'])],
+  // (the fetch on a 150 m grid by wind direction, worked out at the grid's node: the same whoever asks first)
+  [SeaField.prototype, new Set(['cache'])]
+]);
+/** (tests: each side's own memos, by class) */
+export const localOf = (v: object, key: string): boolean => LOCAL.get(Object.getPrototypeOf(v))?.has(key) ?? false;
+export const LOCAL_WORLD_KEYS: ReadonlySet<string> = LOCAL_WORLD;
+const local = localOf;
 const isObj = (v: unknown): v is object => v !== null && typeof v === 'object';
 /**
  * Long lists of numbers (the tide stations' predictions, thousands of points each) are replaced, never changed in place
- * (CurrentField.cover): sent once, then known by their identity, not compared number by number every frame. The
- * mirror test (tests/sync.test.ts) would show it if one were ever changed in place.
+ * (CurrentField.cover): sent once, then known by their identity (and their length, in case one ever grows), not compared
+ * number by number every frame.
  */
 const LONG = 1000;
 const fixedList = (v: object) => Array.isArray(v) && v.length >= LONG && typeof v[0] === 'number';
 const kind = (v: object) => ArrayBuffer.isView(v) ? 't' : Array.isArray(v) ? 'a' : v instanceof Map ? 'm' : v instanceof Set ? 's' : 'o';
+/** A class's prototype, if the object is an instance of one (not a plain object, array, Map, Set or typed array). */
+const classOf = (v: object): object | null => { const p = Object.getPrototypeOf(v); return p && p !== Object.prototype && kind(v) === 'o' ? p : null; };
 
-/** Number every object in a World, in a fixed order: the same on both sides for Worlds built the same way. */
-function numberAll(w: World, see: (v: object, id: number) => void): number {
-  let next = 1;
+/** Walk every object in a World's state, in a fixed order: the same on both sides for Worlds built the same way. */
+function walkAll(w: World, see: (v: object) => void): void {
   const ids = new WeakSet<object>();
   const visit = (v: unknown): void => {
     if (!isObj(v) || ids.has(v)) return;
-    ids.add(v); see(v, next++);
+    ids.add(v); see(v);
     if (ArrayBuffer.isView(v)) return;
     if (v instanceof Map) { for (const [k, x] of v) { visit(k); visit(x); } return; }
     if (v instanceof Set) { for (const x of v) visit(x); return; }
     for (const k of Object.keys(v)) { const x = (v as Record<string, unknown>)[k]; if (typeof x !== 'function' && !local(v, k)) visit(x); }
   };
   const o = w as unknown as Record<string, unknown>;
-  for (const k of Object.keys(o)) if (!NEVER.has(k) && !LOCAL.World.has(k)) visit(o[k]);
-  return next;
+  for (const k of Object.keys(o)) if (!NEVER.has(k) && !LOCAL_WORLD.has(k)) visit(o[k]);
 }
 
 /** The worker's side: what changed since the last packet. */
 export class SyncSource {
   private ids = new WeakMap<object, number>();
-  private next: number;
+  private next = 1;
+  /** The classes met in the first walk, in order: both sides' lists match, so a class is sent as its place in the list. */
+  private protoAt = new Map<object, number>();
   /** One reference per object, made once: compared by identity, so an unchanged field costs nothing. */
   private refs = new WeakMap<object, { r: number }>();
   /**
@@ -96,18 +127,28 @@ export class SyncSource {
    * (Held weakly, as the numbers are: the World makes new objects every step, a new wind for one, and drops the old.)
    */
   private last = new WeakMap<object, Val[] | Record<string, Val> | ArrayBufferView>();
+  /** The sweep each object was last seen alive in (SWEEP_EVERY): one the World let go of and took back is sent afresh. */
+  private seen = new WeakMap<object, number>();
+  private sweepNo = 0; private frames = 0;
   private lastTop = new Map<string, unknown>();
   private lastTopVal = new Map<string, Val>();
   private lastRec: unknown = null; private lastTrack = 0;
   /** This capture's walk: the objects seen, and the nodes made. */
   private done = new Set<number>(); private nodes: Node[] = [];
-  constructor(private w: World) {
-    const all: [object, number][] = [];
-    this.next = numberAll(w, (v, id) => { this.ids.set(v, id); all.push([v, id]); });
+  /** How many objects were numbered to begin with; and whether the first packet is to send them all (after a rebuild). */
+  readonly count: number; private fresh: boolean;
+  /**
+   * `fresh`: the mirror is to be sent everything (after new conditions, when both sides have rebuilt their World's
+   * conditions and numbered afresh): the mirror's own sums of the moment may differ from the worker's.
+   */
+  constructor(private w: World, fresh = false) {
+    const all: object[] = [];
+    walkAll(w, v => { this.ids.set(v, this.next++); all.push(v); const p = classOf(v); if (p && !this.protoAt.has(p)) this.protoAt.set(p, this.protoAt.size); });
+    this.count = all.length; this.fresh = fresh;
     // (what the mirror holds to begin with: the same World, built the same way)
-    for (const [v] of all) this.last.set(v, this.contents(v));
+    if (!fresh) for (const v of all) this.last.set(v, this.contents(v));
     const o = w as unknown as Record<string, unknown>;
-    for (const k of Object.keys(o)) { this.lastTop.set(k, o[k]); this.lastTopVal.set(k, this.ref(o[k])); }
+    for (const k of Object.keys(o)) { this.lastTop.set(k, o[k]); if (!fresh || BY_IDENTITY.has(k)) this.lastTopVal.set(k, this.ref(o[k])); }
     this.lastRec = w.rec[w.rec.length - 1] ?? null; this.lastTrack = w.track.length;
   }
   /** A value as sent, without walking: primitives as they are, objects by number. */
@@ -137,8 +178,10 @@ export class SyncSource {
   /** Compare one object with what was last sent, record its changes, and walk on into its children. */
   private walk(v: object, id: number): void {
     if (this.done.has(id)) return; this.done.add(id);
-    const was = this.last.get(v);
-    if (fixedList(v) && was) return;
+    // (an object the World let go of before the last sweep, and holds again: the mirror forgot it, so it's sent afresh)
+    const ep = this.seen.get(v); this.seen.set(v, this.sweepNo);
+    const was = ep !== undefined && ep < this.sweepNo ? undefined : this.last.get(v);
+    if (fixedList(v) && was && (was as Val[]).length === (v as unknown[]).length) return;
     const k = kind(v);
     if (k === 't') {
       const a = v as unknown as ArrayLike<number>, b = was as unknown as ArrayLike<number> | undefined;
@@ -183,8 +226,10 @@ export class SyncSource {
       for (const key of Object.keys(b)) if (!Object.prototype.hasOwnProperty.call(o, key) || typeof o[key] === 'function' || local(v, key)) { (del ??= []).push(key); delete b[key]; }
     }
     if (set || del) {
-      const ctor = (v as { constructor?: { name?: string } }).constructor;
-      this.nodes.push({ i: id, ...(fresh && ctor && ctor !== Object && ctor.name ? { c: ctor.name } : {}), o: set ?? {}, ...(del ? { d: del } : {}) });
+      const p = fresh ? classOf(v) : null;
+      let c: number | undefined;
+      if (p) { c = this.protoAt.get(p); if (c == null) console.error('sim/sync: a class the mirror has never met; it gets a plain object', v.constructor?.name); }
+      this.nodes.push({ i: id, ...(c != null ? { c } : {}), o: set ?? {}, ...(del ? { d: del } : {}) });
     }
   }
   /** What changed since the last packet, and the race's events since then (their boats by number: the mirror's own). */
@@ -193,7 +238,7 @@ export class SyncSource {
     this.done.clear(); this.nodes = [];
     const top: Record<string, Val> = {};
     for (const key of Object.keys(o)) {
-      if (NEVER.has(key) || APPEND.has(key) || LOCAL.World.has(key)) continue;
+      if (NEVER.has(key) || APPEND.has(key) || LOCAL_WORLD.has(key)) continue;
       const v = o[key];
       if (BY_IDENTITY.has(key) && v === this.lastTop.get(key)) continue; // (unchanged: not walked)
       const s = this.val(v);
@@ -201,47 +246,46 @@ export class SyncSource {
       this.lastTop.set(key, v);
     }
     const grown = (list: unknown[], last: unknown) => { const i = last == null ? -1 : list.lastIndexOf(last); return list.slice(i + 1); };
-    const rec = { add: grown(w.rec, this.lastRec).map(x => this.val(x)), len: w.rec.length }; this.lastRec = w.rec[w.rec.length - 1] ?? null;
-    const track = { add: w.track.slice(this.lastTrack).map(x => this.val(x)), len: w.track.length }; this.lastTrack = w.track.length;
+    // (after a rebuild the mirror's lists are its own: all of them are sent, the mirror's emptied first)
+    const recAdd = this.fresh ? w.rec : grown(w.rec, this.lastRec), trackAdd = this.fresh ? w.track : w.track.slice(this.lastTrack);
+    const rec = { add: recAdd.map(x => this.val(x)), len: w.rec.length }; this.lastRec = w.rec[w.rec.length - 1] ?? null;
+    const track = { add: trackAdd.map(x => this.val(x)), len: w.track.length }; this.lastTrack = w.track.length;
     const ev = events.map(e => this.val(e));
-    return { top, nodes: this.nodes, rec, track, events: ev };
+    const p: Packet = { top, nodes: this.nodes, rec, track, events: ev };
+    if (this.fresh) { p.count = this.count; this.fresh = false; }
+    // the sweep: every object the World still holds is marked alive (the course and the weather too, though not walked
+    // every frame); the mirror does the same after this packet, and both forget the rest
+    if (++this.frames % SWEEP_EVERY === 0) { this.sweepNo++; walkAll(w, v => this.seen.set(v, this.sweepNo)); p.sweep = true; }
+    return p;
   }
 }
 
 /** The page's side: the mirror World, kept in step by each packet. */
 export class SyncMirror {
-  /**
-   * The mirror's objects by number, held weakly: an object the World has dropped is dropped here too (the worker never
-   * sends a number again once its World has let go of the object).
-   */
-  private objs = new Map<number, WeakRef<object>>();
-  private gone = new FinalizationRegistry<number>(id => { if (!this.objs.get(id)?.deref()) this.objs.delete(id); });
-  private get(id: number): object | undefined { return this.objs.get(id)?.deref(); }
-  private put(id: number, v: object): void { this.objs.set(id, new WeakRef(v)); this.gone.register(v, id); }
-  private protos = new Map<string, object>();
+  /** The mirror's objects by number (forgotten at the sweeps, when the World no longer holds them). */
+  private objs = new Map<number, object>();
+  /** The classes met in the first walk, in order (as the worker's list). */
+  private protos: object[] = [];
+  readonly count: number;
   constructor(readonly w: World) {
-    numberAll(w, (v, id) => {
-      this.put(id, v);
-      const ctor = (v as { constructor?: { name?: string } }).constructor;
-      if (ctor && ctor !== Object && ctor !== Array && ctor.name && !this.protos.has(ctor.name)) this.protos.set(ctor.name, Object.getPrototypeOf(v));
-    });
+    let id = 1; const seenP = new Set<object>();
+    walkAll(w, v => { this.objs.set(id++, v); const p = classOf(v); if (p && !seenP.has(p)) { seenP.add(p); this.protos.push(p); } });
+    this.count = id - 1;
   }
-  private val(v: Val): unknown { return isObj(v) ? this.get((v as { r: number }).r) : v; }
+  private val(v: Val): unknown { return isObj(v) ? this.objs.get((v as { r: number }).r) : v; }
   /** Write a packet onto the mirror; its events come back as the mirror's own objects. */
   apply(p: Packet): unknown[] {
-    // (the new objects are held here until they're in the mirror's graph: until then only the weak map has them)
-    const hold: object[] = [];
+    if (p.count != null && p.count !== this.count) console.error(`sim/sync: the mirror numbered ${this.count} objects, the worker ${p.count}: the two Worlds weren't built alike`);
     // new objects first (the changed ones can refer to them), then every changed object's contents
     for (const n of p.nodes) {
-      const cur = this.get(n.i), want = 't' in n ? 't' : 'a' in n ? 'a' : 'm' in n ? 'm' : 's' in n ? 's' : 'o';
-      if (cur && kind(cur) === want && (want !== 't' || (cur as ArrayBufferView).constructor === (n as { t: ArrayBufferView }).t.constructor)) continue;
-      const proto = 'c' in n && n.c ? this.protos.get(n.c) : undefined;
-      const made = want === 'a' ? [] : want === 'm' ? new Map() : want === 's' ? new Set() : want === 't' ? (n as { t: ArrayBufferView }).t as unknown as object : proto ? Object.create(proto) as object : {};
-      this.put(n.i, made); hold.push(made);
+      const cur = this.objs.get(n.i), want = 't' in n ? 't' : 'a' in n ? 'a' : 'm' in n ? 'm' : 's' in n ? 's' : 'o';
+      const proto = 'c' in n && n.c != null ? this.protos[n.c] : undefined;
+      if (cur && kind(cur) === want && (want !== 't' || (cur as ArrayBufferView).constructor === (n as { t: ArrayBufferView }).t.constructor) && (!proto || Object.getPrototypeOf(cur) === proto)) continue;
+      this.objs.set(n.i, want === 'a' ? [] : want === 'm' ? new Map() : want === 's' ? new Set() : want === 't' ? (n as { t: ArrayBufferView }).t as unknown as object : proto ? Object.create(proto) as object : {});
     }
     for (const n of p.nodes) {
-      const cur = this.get(n.i)!;
-      if ('t' in n) { const t = cur as unknown as { length: number; set(a: ArrayBufferView): void }; if (t !== n.t as unknown) { if (t.length === (n.t as unknown as { length: number }).length) t.set(n.t); else { this.put(n.i, n.t as unknown as object); hold.push(n.t as unknown as object); } } }
+      const cur = this.objs.get(n.i)!;
+      if ('t' in n) { const t = cur as unknown as { length: number; set(a: ArrayBufferView): void }; if (t !== n.t as unknown) { if (t.length === (n.t as unknown as { length: number }).length) t.set(n.t); else this.objs.set(n.i, n.t as unknown as object); } }
       else if ('a' in n) { const a = cur as unknown[]; a.length = n.a.length; for (let i = 0; i < n.a.length; i++) a[i] = this.val(n.a[i]); }
       else if ('m' in n) { const m = cur as Map<unknown, unknown>; m.clear(); for (const [k, x] of n.m) m.set(this.val(k), this.val(x)); }
       else if ('s' in n) { const s = cur as Set<unknown>; s.clear(); for (const x of n.s) s.add(this.val(x)); }
@@ -251,9 +295,15 @@ export class SyncMirror {
     for (const [k, v] of Object.entries(p.top)) w[k] = this.val(v);
     for (const [k, part] of [['rec', p.rec], ['track', p.track]] as const) {
       const list = w[k] as unknown[];
+      if (p.count != null) list.length = 0;
       for (const x of part.add) list.push(this.val(x));
       while (list.length > part.len) list.shift();
     }
-    return p.events.map(e => this.val(e));
+    const events = p.events.map(e => this.val(e));
+    if (p.sweep) {
+      const alive = new WeakSet<object>(); walkAll(this.w, v => alive.add(v));
+      for (const [id, v] of this.objs) if (!alive.has(v)) this.objs.delete(id);
+    }
+    return events;
   }
 }

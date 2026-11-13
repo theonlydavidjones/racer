@@ -12,6 +12,8 @@ import { World } from '../src/sim/world';
 import { LocalHost, WorkerHost, type WorldArgs } from '../src/sim/host';
 import { RaceWorker, type FromWorker, type ToWorker } from '../src/sim/worker';
 import type { Command } from '../src/sim/commands';
+import { SWEEP_EVERY } from '../src/sim/sync';
+import { firstDifference } from './helpers/worlds';
 import { laylinesFor } from '../src/sim/laylines';
 import { passageNow } from '../src/sim/navigator';
 
@@ -104,4 +106,46 @@ describe('the race in its worker sails as in the page', () => {
     for (let i = 0; i < 60; i++) W.advance(1 / 60);
     expect(W.view.t).toBeGreaterThan(t0 + 0.9); // (the mirror sails on: a second more)
   }, 300_000);
+
+  it('new conditions mid-race (the wind turned, a slack tide made real): the mirror rebuilds its own and stays the race', () => {
+    // (the conditions panel from the pause menu: World.applyConditions makes a new weather, tide, sea and wind field,
+    // functions and all, and turns the course's legs; the mirror must have them too, not plain copies)
+    const args: WorldArgs = { file: ss2 as unknown as CourseFile, settings: S({ fleet: 3, current: 'slack' }), seed: 8, opts: {} };
+    const fake = new FakeWorker(true), W = new WorkerHost(fake as unknown as Worker, args);
+    const L = new LocalHost(new World(args.file, args.settings, args.seed, args.opts));
+    const turn = (s: Partial<Settings>) => ({ ...args.settings, ...s }) as Settings;
+    const script = at([[0, { k: 'running', on: true }], [3, { k: 'speed', v: 4 }], [150, { k: 'helm', steer: 1, luff: false, ctl: {} }],
+      [151, { k: 'conditions', settings: turn({ windKt: 20, windTurn: 60, current: 'real' }) }], [152, { k: 'helm', steer: 0, luff: false, ctl: {} }],
+      [400, { k: 'conditions', settings: turn({ windKt: 9, windTurn: -30, current: 'real', sea: 'flat' }) }]]);
+    for (let i = 0; i < 700; i++) {
+      for (const c of script.get(i) ?? []) { L.send(c); W.send(c); }
+      L.advance(frameDt(i)); W.advance(frameDt(i)); fake.deliver();
+      // (the page asks its questions every frame, filling the mirror's memos, as the moorings and the maps do)
+      questions(W.world);
+      if (i % 50 === 0 || i === 152 || i === 401) {
+        expect(firstDifference(fake.race.world!, W.world), `frame ${i}`).toBeNull();
+        expect(questions(W.world), `the questions at frame ${i}`).toBe(questions(L.world));
+        expect(state(fake.race.world!), `the race at frame ${i}`).toBe(state(L.world));
+      }
+    }
+    expect(W.world.C.marks.map(m => m.leg).join()).toBe(L.world.C.marks.map(m => m.leg).join()); // (the legs turned with the wind)
+    expect(W.faults).toBe(0);
+    expect(W.world.tide).not.toBeNull(); // (the real tide, with its functions: currentAt above would have thrown)
+  }, 600_000);
+
+  it('the worker behind (two frames in flight, the page\'s time held back) and past the sweeps: the mirror is still the race', () => {
+    const fake = new FakeWorker(true), W = new WorkerHost(fake as unknown as Worker, race());
+    W.send({ k: 'running', on: true }); W.send({ k: 'speed', v: 4 });
+    for (let i = 0; i < 2.5 * SWEEP_EVERY * 3; i++) {
+      if (i % 120 === 30) W.send({ k: 'tiller', v: i % 240 === 30 ? 0.5 : 0 });
+      W.advance(frameDt(i));
+      if (i % 3 === 2) fake.deliver(); // (the worker answering only every third frame)
+    }
+    fake.deliver(); W.advance(1 / 60); fake.deliver();
+    expect(firstDifference(fake.race.world!, W.world)).toBeNull();
+    expect(state(W.world)).toBe(state(fake.race.world!));
+    expect(questions(W.world)).toBe(questions(fake.race.world!));
+    expect(W.faults).toBe(0);
+    expect(W.world.t).toBeGreaterThan(-180 + 60); // (it sailed: past a minute of race)
+  }, 600_000);
 });

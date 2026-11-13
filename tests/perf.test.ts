@@ -16,10 +16,10 @@ import { SyncMirror, SyncSource } from '../src/sim/sync';
 /** A fixed workload like the sim's (trig, square roots, small arrays). */
 /**
  * The mirror's budgets (ratios against the reference workload, as the step's; the second test). Measured 13 Nov 2026,
- * three runs: the page's part 38.4–40.8, the worker's 149–155 (about 0.9 and 3.5 CPU ms a frame in this container).
- * About a fifth above: room for the noise, not for a creep.
+ * after the review's fixes (the sea's fetch memo kept on each side): the page's part 20.9–21.6, the worker's 133.5–134.2
+ * (about 0.5 and 3.1 CPU ms a frame in this container). About a fifth above: room for the noise, not for a creep.
  */
-const PAGE_BUDGET = 48, WORKER_BUDGET = 185;
+const PAGE_BUDGET = 26, WORKER_BUDGET = 160;
 const scratch = new Float64Array(256);
 let sink = 0;
 /** The process's own CPU time, ms: unlike the clock on the wall, it doesn't run while the process waits for a core. */
@@ -82,8 +82,8 @@ describe('performance budget: the sim', () => {
     if (!Number.isFinite(sink)) throw new Error('unreachable');
     const ref = refMs / pieces, worker = workerMs * 1000 / frames / ref, page = pageMs * 1000 / frames / ref;
     console.log(`mirror: the worker's part ${(workerMs * 1000 / frames).toFixed(0)} CPU µs a frame (ratio ${worker.toFixed(1)}), the page's ${(pageMs * 1000 / frames).toFixed(0)} (ratio ${page.toFixed(1)}), reference ${ref.toFixed(1)} CPU ms`);
-    // (13 Nov 2026, this container: the worker's part about 2 ms a frame, the page's about 0.5 ms. The budgets give room
-    // for the noise and no more: a creep past them is the sync sending, or the page applying, more than it should)
+    // (the budgets give room for the noise and no more: a creep past them is the sync sending, or the page applying,
+    // more than it should)
     expect(page).toBeLessThan(PAGE_BUDGET);
     expect(worker).toBeLessThan(WORKER_BUDGET);
   }, 180_000);

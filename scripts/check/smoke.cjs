@@ -29,6 +29,11 @@ const root = path.resolve(__dirname, '../..'), out = process.argv[2] || root;
   // (the race sails in its worker: sim/host.ts WorkerHost; 'local' would mean the worker didn't start)
   const mode = await page.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode);
   if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
+  // (sailing on at 4× until the mirror has been checked against the race a few times: sim/sync.ts checkOf, every 20 frames)
+  await page.evaluate(() => { document.getElementById('bFast').click(); document.getElementById('bFast').click(); });
+  await page.waitForFunction(() => Number(document.documentElement.dataset.syncChecks) >= 3, null, { timeout: 240000 }).catch(() => errs.push('the mirror was never checked'));
+  console.log('the mirror\'s checks made:', await page.evaluate(() => document.documentElement.dataset.syncChecks));
+  const faults = await page.evaluate(() => document.documentElement.dataset.syncFaults); console.log('the mirror\'s checks failed:', faults); if (faults !== '0') errs.push(`the page's mirror differs from the race (${faults} checks failed)`);
   console.log('ERRORS:', errs.join('\n') || 'none'); await browser.close();
   if (errs.length) process.exit(1);
 })();

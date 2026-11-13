@@ -21,7 +21,7 @@ import type { Boat } from '../boat/boat';
 import type { SimEvent } from './events';
 import { applyCommand, type Command, type CommandResult } from './commands';
 import { DT, World, type WorldOptions } from './world';
-import { SyncMirror } from './sync';
+import { SyncMirror, checkOf } from './sync';
 import type { FromWorker, ToWorker } from './worker';
 import type { CourseFile } from '../courses/course';
 import type { Settings } from '../settings';
@@ -156,9 +156,16 @@ export class WorkerHost implements SimHost {
   readonly view: SimView;
   private mirror: SyncMirror;
   private queue: { c: Command; id?: number }[] = [];
+  /** The frames sent and not yet answered: their commands, and when each was sent (ms, the page's clock). */
+  private sent: { cmds: { c: Command; id?: number }[]; at: number; frame: number }[] = [];
+  private frames = 0;
   private asks = new Map<number, (r: CommandResult) => void>();
   private nextAsk = 1; private inflight = 0; private due = 0; private lastMs = 0;
   private events: SimEvent[] = [];
+  /** Checks the mirror failed (sim/sync.ts checkOf): 0, or the mirror isn't the race. */
+  faults = 0;
+  /** Checks made. */
+  checks = 0;
   /** After a failure: the mirror, sailing in the page's thread. */
   private local: LocalHost | null = null;
   constructor(private worker: Worker, args: WorldArgs, private guard = false, private onFail?: (why: string) => void) {
@@ -173,7 +180,20 @@ export class WorkerHost implements SimHost {
     if (this.local) return;
     if (m.k === 'failed') { this.fail(m.msg); return; }
     this.inflight--;
+    const frame = this.sent.shift();
+    if (m.resync != null && frame) {
+      // new conditions: the same commands to the mirror, up to them (the mirror is the race as the worker had it before
+      // the frame), then both Worlds numbered afresh, and the packet with everything in it
+      for (const { c } of frame.cmds.slice(0, m.resync + 1)) applyCommand(this.world, c);
+      this.world.drainEvents(); // (the mirror's own toasts: the worker's come in the packet)
+      this.mirror = new SyncMirror(this.world);
+    }
     this.events.push(...(this.mirror.apply(m.packet) as SimEvent[]));
+    if (m.check) {
+      this.checks++;
+      const mine = checkOf(this.world), k = mine.findIndex((x, i) => !Object.is(x, m.check![i]));
+      if (k >= 0 || mine.length !== m.check.length) { this.faults++; console.error(`sim/sync: the mirror differs from the race (check number ${k}: ${mine[k]} against ${m.check[k]})`); }
+    }
     for (const { id, r } of m.results) { this.asks.get(id)?.(r); this.asks.delete(id); }
     this.lastMs = m.ms;
   }
@@ -182,22 +202,31 @@ export class WorkerHost implements SimHost {
     console.error('The race\'s worker failed; it sails on in the page:', why);
     this.worker.terminate();
     this.local = new LocalHost(this.world, this.guard); this.mode = 'local';
-    // (what wasn't yet sent is done here: the mirror is the race as of the worker's last answer. What was sent with the
-    // frame that failed is lost with it, the command that broke the worker perhaps among them)
-    for (const { c, id } of this.queue) {
+    // (the mirror is the race as of the worker's last answer: the commands of the frames sent since, and those not yet
+    // sent, are done here, in order; one that throws (perhaps what broke the worker) is left out. The race sails on from
+    // where it was, but not exactly as the worker would have sailed it: the random streams (the puffs', the AI's) are
+    // each side's own, and the mirror's never ran)
+    for (const { c, id } of [...this.sent.flatMap(f => f.cmds), ...this.queue]) {
       let r: CommandResult;
       try { r = applyCommand(this.world, c); } catch (e) { console.error('A command failed after the worker did:', c, e); }
       if (id != null) { this.asks.get(id)?.(r); this.asks.delete(id); }
     }
     for (const [, res] of this.asks) res(undefined);
-    this.queue = []; this.asks.clear();
+    this.queue = []; this.sent = []; this.asks.clear();
     this.onFail?.(why);
   }
   advance(dt: number, twa?: number): number {
     if (this.local) return this.local.advance(dt, twa);
     this.due = Math.min(0.1, this.due + dt);
+    const now = performance.now();
+    // (a worker that's stopped answering, stuck or gone: the race carries on in the page. Its answers come between the
+    // page's frames, so a frame waiting through 30 of the page's frames and 5 seconds wasn't answered; a slow page alone
+    // (a frame of seconds) isn't taken for a stuck worker)
+    this.frames++;
+    if (this.sent.length && now - this.sent[0].at > 5000 && this.frames - this.sent[0].frame > 30) { this.fail('the worker stopped answering'); return this.local!.advance(dt, twa); }
     if (this.inflight >= 2) return this.lastMs;
     const cmds = this.queue, due = this.due; this.queue = []; this.due = 0; this.inflight++;
+    this.sent.push({ cmds, at: now, frame: this.frames });
     this.worker.postMessage({ k: 'frame', dt: due, twa, cmds } satisfies ToWorker);
     return this.lastMs;
   }
