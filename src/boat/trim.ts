@@ -10,6 +10,8 @@
  *
  * The polar is the boat's speed with perfect trim, so trim efficiency scales the target speed.
  */
+import { BOOM_STOP, carLead } from './controls';
+
 export type SailName = 'main' | 'jib';
 export type Flow = 'good' | 'luffing' | 'stalled';
 
@@ -23,8 +25,8 @@ export interface SailSpec {
 }
 
 export const SAILS: Record<SailName, SailSpec> = {
-  main: { aoa: 22, min: 2, max: 85, crewRate: 9, handRate: 12, share: 0.7 },
-  jib: { aoa: 18, min: 8, max: 68, crewRate: 14, handRate: 16, share: 0.3 },
+  main: { aoa: 22, min: 2, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
+  jib: { aoa: 18, min: carLead(0), max: 68, crewRate: 14, handRate: 16, share: 0.3 }, // (min: the car's innermost lead, controls.ts)
 };
 
 /** Luffing starts this far (deg) below the best angle of attack and is complete 10° further on. */
