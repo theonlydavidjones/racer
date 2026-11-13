@@ -17,7 +17,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { RULE16_WINDOW, assessPair, couldAvoid, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -73,22 +73,24 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
  * Rule 44.1(a): a Part 2 breach and a rule 31 touch "in the same incident" need only the Part 2 penalty. "Incident" isn't
  * defined; US Sailing Appeal 65: "The test of whether two occurrences were one or two incidents is whether the second
  * occurrence was the inevitable result of the first. Times, distances, the actions of each boat and the prevailing
- * conditions are all relevant." The sim's sign of it: the touch came while she was still caught up in that foul, within
- * ENGAGED of the boat she fouled, or at the mark where the foul happened (the foul within ENGAGED of it), and within
- * TANGLE_MAX. A touch after she has sailed clear of both is a new incident however soon it comes.
+ * conditions are all relevant." The sim's sign of it: the touch came while she was still caught up in that foul (not yet
+ * a length clear of the boat she fouled since, the tangle's own test), or at the mark where the foul happened (the foul
+ * within ENGAGED of it), before her turns began and within TANGLE_MAX. A touch after she has sailed clear is a new
+ * incident however soon it comes.
  */
 const ENGAGED = 2 * LOA;
 /** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
 const TANGLE_MAX = 30;
 
-/** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
- * and about 2 s to turn: a modelling choice). */
-const COMPELLED_WINDOW = 3;
-/* Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
- * boat is exonerated for her breach." Causal: compelled when, by the time it was clear the other boat had broken a rule,
- * she could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). The sim's
- * sign of it: the boat that broke a rule against her is still within ENGAGED of her when she breaks hers (she's still
- * dealing with that boat: swerving from her, or pushed by her), within COMPELLED_WINDOW. */
+/**
+ * Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
+ * boat is exonerated for her breach." Compelled when, by the time it was clear the other boat had broken a rule, she
+ * could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). Judged as
+ * that: from where the boats were when the other's breach came, could she, reacting promptly, have turned to keep
+ * clear of both the boat she then fouled and the one that fouled her (src/rules/pairs.ts couldAvoid, escapes())?
+ * Looked at within COMPELLED_LOOKBACK of that first breach (the boats' pose history reaches back 8 s).
+ */
+const COMPELLED_LOOKBACK = 8;
 
 export interface StartReport { delay: number; frac: number; kt: number }
 
@@ -105,6 +107,8 @@ export interface GunSnap {
 export interface WorldOptions {
   /** Begin this many seconds before the start signal instead of at the warning signal (start practice). */
   startAt?: number;
+  /** The start-line drill alone: no other boats, the line and course laid as for the fleet (its length is set for it). */
+  solo?: boolean;
   /** Just sail: no race, no other boats, no start sequence. */
   freeSail?: boolean;
   /** Fly your flags even though it's a race (to see them while setting up your boat). */
@@ -344,7 +348,7 @@ export class World {
     this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
-    for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
@@ -422,6 +426,14 @@ export class World {
     } else if (isUser && this.startAt < 120) {
       // start practice: somewhere below the line, reaching along it, with a minute or so to go
       p = place(55 + r() * 45, (r() - 0.5) * this.lineLen * 0.6); h = n360(lineH + (r() < 0.5 ? 0 : 180));
+    } else if (isUser && this.settings.mode === 'drill') {
+      // the start-line drill from 2 or 3 minutes: farther below the line, as far as a minute's run and some to spare
+      // (about 150–230 m), reaching along it; moved in toward the line where that would be ashore (the Cityfront)
+      let d = 60 + this.startAt * 0.7 + r() * 40; const a = (r() - 0.5) * this.lineLen * 0.6;
+      p = place(d, a);
+      while (onLand(p) && d > 60) { d -= 20; p = place(d, a); }
+      if (onLand(p)) p = place(100, -this.lineLen * 0.1); // (as a race's start, if even that's ashore)
+      h = n360(lineH + (r() < 0.5 ? 0 : 180));
     } else if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
     else {
       let tries = 0;
@@ -822,7 +834,8 @@ export class World {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
-    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
+    // (the start-line drill keeps its whole short sequence, for the debrief's look at your run to the line)
+    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
   }
 
   private checkLines(prevT: number): void {
@@ -1085,11 +1098,9 @@ export class World {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
-      // (within the time a helmsman needs to react and turn once the other boat's breach is plain, COMPELLED_WINDOW, and
-      // with that boat still on her: a later breach, or one with the other gone, she could have avoided, Appeal 2.
-      // A fuller test would ask escapes(), src/boat/arcs.ts, whether any turn could have kept her clear)
+      // (unless, from when that boat's breach against her came, she could still have turned to keep clear: Appeal 2)
       const byBoat = by ? this.boats.find(o => o.id === by.by) : undefined;
-      if (incident.kind !== 'hail' && by && byBoat && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW && hullGap(f, byBoat) < ENGAGED) incident.exoneratedBy = by.by;
+      if (incident.kind !== 'hail' && by && byBoat && by.by !== victim.id && this.t - by.t < COMPELLED_LOOKBACK && !couldAvoid(f, victim, byBoat, by.t, ctx)) incident.exoneratedBy = by.by;
       // Part 2 preamble: the rules of Part 2 still apply between boats that intend to race, are racing or have been racing,
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)

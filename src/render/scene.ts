@@ -14,6 +14,8 @@ import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
 import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
+import { ghostAt, type GhostPoint } from '../replay/ghost';
+import type { Boat } from '../boat/boat';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights } from './landscape';
 import { updateNight } from './night';
@@ -164,6 +166,14 @@ export function overheadUp(o: Overhead, w: SimView): number {
 }
 
 
+/** A material, see-through and pale: a ghost's (it doesn't hide what's behind it, or write the depth). */
+function ghostly(m: THREE.Material): THREE.Material {
+  const g = m.clone() as THREE.Material & { opacity: number; color?: THREE.Color; emissive?: THREE.Color };
+  g.transparent = true; g.opacity = 0.32 * (m.transparent ? (m as unknown as { opacity: number }).opacity : 1); g.depthWrite = false;
+  if (g.emissive) g.emissive = new THREE.Color(0x000000);
+  return g;
+}
+
 export class SceneView {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -174,6 +184,22 @@ export class SceneView {
   private boatMeshes: BoatMesh[] = [];
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
   get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
+  /** A ghost race's ghost: your earlier run of this race, drawn translucent on its track (replay/ghost.ts). Not in the race. */
+  private ghost: { mesh: BoatMesh; pts: GhostPoint[] } | null = null;
+  /** Race against this track (null: none). Built from your own boat as she is now, see-through, and not lit at night. */
+  setGhost(w: SimView, pts: GhostPoint[] | null): void {
+    if (this.ghost) { this.scene.remove(this.ghost.mesh.grp); disposeUnused([this.ghost.mesh.grp], this.scene); this.ghost = null; }
+    if (!pts || pts.length < 2) return;
+    const mesh = buildBoatMesh({ ...w.user, id: 98, isUser: false } as Boat);
+    mesh.grp.traverse(o => {
+      const m = o as THREE.Mesh; if (!m.isMesh && !(o as THREE.Line).isLine) return;
+      o.castShadow = false; o.receiveShadow = false;
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      m.material = (Array.isArray(m.material) ? mats.map(ghostly) : ghostly(mats[0])) as THREE.Material;
+    });
+    mesh.grp.renderOrder = 5; this.scene.add(mesh.grp);
+    this.ghost = { mesh, pts };
+  }
   private courseObjs: THREE.Object3D[] = [];
   private camLocal = new THREE.Vector3();
   private camSide = 1;
@@ -789,6 +815,15 @@ export class SceneView {
       this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
       syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
+    // the ghost: where its run was at this moment of the race, on the same waves (no heel: its track doesn't have it)
+    if (this.ghost) {
+      const g = ghostAt(this.ghost.pts, w.t), gm = this.ghost.mesh; gm.grp.visible = !!g;
+      if (g) {
+        const gb = { ...w.user, id: 98, isUser: false, x: g.x, y: g.y, h: g.h, tack: g.tack, boom: g.boom, heel: 0, flags: [], burgee: undefined, ensign: undefined } as unknown as Boat;
+        syncBoatMesh(gm, gb, t, boatOnWaves(this.waves, g, g.h, tw, 1, 1));
+        gm.crew.group.visible = false; // (no crew aboard the ghost: its track doesn't know where they sat, and a see-through crew is clutter)
+      }
+    }
     this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => this.waves.height(p, tw, 0.7, 0.4));
     this.wildlife.setMonth(+w.raceDate.slice(5, 7) || new Date().getMonth() + 1);
     this.wildlife.update(w.running && !w.paused ? dt * w.speed : 0, tw, w.user, w.boats, (x, y) => this.waves.height({ x, y }, tw, 1, 1));
