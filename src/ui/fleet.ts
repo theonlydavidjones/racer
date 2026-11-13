@@ -33,8 +33,8 @@ export interface FleetHooks {
   members(): Member[];
   membersChanged(): void;
   /** The Season tab's contents (ui/season.ts), and sailing one of its races. */
-  seasonHtml(): string;
-  sailSeason(raceNo: number): void;
+  seasonHtml(id: string | null): string;
+  sailSeason(seasonId: string, raceNo: number): void;
 }
 
 const VIEW_KEY = 'fbsim-fleet-view';
@@ -47,6 +47,8 @@ export class Fleet {
   private confirmDelete = false;
   /** The Yacht Club's tab (docs/YACHT-CLUB.md): your boats, or the members; the member open, and the roster's filter. */
   private tab: 'boats' | 'members' | 'season' = 'boats';
+  /** The season shown (null: the one under way). */
+  private seasonId: string | null = null;
   private memberId: string | null = null;
   private confirmMemberDel = false;
   constructor(private S: Settings, private hooks: FleetHooks) {
@@ -61,7 +63,9 @@ export class Fleet {
     });
     // (a member's page: their name, build, skill and ratings)
     this.list.addEventListener('change', e => {
-      const t = e.target as HTMLInputElement, m = this.member(); if (!m || !t.dataset.m) return;
+      const t = e.target as HTMLInputElement;
+      if (t.dataset.f === 'sseason') { this.seasonId = t.value; this.drawList(); return; } // (the Season tab's season)
+      const m = this.member(); if (!m || !t.dataset.m) return;
       if (applyMemberInput(m, t.dataset.m, t.value, t.dataset.a, t.checked)) { this.hooks.membersChanged(); this.drawList(); }
     });
     this.list.addEventListener('input', e => {
@@ -121,7 +125,7 @@ export class Fleet {
         this.hooks.changed(); this.hooks.back(); return;
       }
       case 'tab': this.tab = v === 'members' ? 'members' : v === 'season' ? 'season' : 'boats'; this.memberId = null; this.drawList(); return;
-      case 'season': this.close(); this.hooks.sailSeason(Number(v)); return;
+      case 'season': { const [id, no] = v.split('|'); this.close(); this.hooks.sailSeason(id, Number(no)); return; }
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
       case 'mback': this.memberId = null; this.drawList(); return;
       case 'mnew': { const m = newMember(this.hooks.members(), { h: 1.75, w: 75 }, 'New member'); this.hooks.membersChanged(); this.memberId = m.id; this.drawList(); return; }
@@ -154,7 +158,7 @@ export class Fleet {
       morph(this.list, `<div class="panel wide fleetpanel">
         <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${this.hooks.seasonHtml()}</div>`);
+        ${this.hooks.seasonHtml(this.seasonId)}</div>`);
       return;
     }
     if (this.tab === 'members') {
@@ -224,10 +228,10 @@ export class Fleet {
         ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
         ${row('Bottom', `${colour(BOTTOM_COLORS, b.hull.lower)}, ${p.cleanedWeeks ? `cleaned ${p.cleanedWeeks} wk ago` : 'just cleaned'}`)}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
-        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminium frame' : 'Teak')}
+        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
         ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}
         ${row('Sails', `${b.sails.color === 'black' ? 'Black' : 'White'}; main ${ages[p.mainAge]}, jib ${ages[p.jibAge]}`)}
-        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminium mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminium'} boom`)}
+        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminum mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminum'} boom`)}
       </table></section>
       <section><h3>Race record</h3>
         ${rec.races ? `<p class="frec"><b>${rec.races}</b> race${rec.races === 1 ? '' : 's'} · <b>${rec.wins}</b> win${rec.wins === 1 ? '' : 's'} · <b>${rec.podiums}</b> in the top three${rec.avg != null ? ` · average place <b>${rec.avg.toFixed(1)}</b>` : ''}</p>

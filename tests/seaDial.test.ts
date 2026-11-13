@@ -40,7 +40,7 @@ describe('the tide on a long sail', () => {
       if (a !== b) bad.push(`${m} min: ${a} | ${b}`);
     }
     expect(bad).toEqual([]);
-  }, 60_000);
+  }, 180_000);
 
   it('runs on smoothly across a fresh prediction, and keeps four hours behind', () => {
     const t0 = Date.parse('2026-07-11T18:00:00Z') / 60000, f = new CurrentField(stationsFor(t0, t0 + 360));

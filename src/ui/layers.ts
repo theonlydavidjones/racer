@@ -6,8 +6,8 @@ import type { Settings } from '../settings';
  */
 export type LayerKey = 'wind' | 'current' | 'sea' | 'fog' | 'ships' | 'laylines' | 'shadows';
 export const LAYERS: { key: LayerKey; name: string; what: string }[] = [
-  { key: 'wind', name: 'Wind', what: 'The wind\'s speed in colour (kt, on the scale) with streaks the way it blows, and the puffs and lulls' },
-  { key: 'current', name: 'Current', what: 'The tidal current\'s speed in colour (kt, on the scale) with streaks the way it sets' },
+  { key: 'wind', name: 'Wind', what: 'The wind\'s speed in color (kt, on the scale) with streaks the way it blows, and the puffs and lulls' },
+  { key: 'current', name: 'Current', what: 'The tidal current\'s speed in color (kt, on the scale) with streaks the way it sets' },
   { key: 'sea', name: 'Sea state', what: 'The height of the waves (the wind\'s chop and the ocean swell) from the sim\'s own sea' },
   { key: 'fog', name: 'Fog', what: 'Visibility from the National Weather Service forecast, or as observed, for this day and hour' },
   { key: 'ships', name: 'Ships', what: 'Ships, ferries and tour boats, with where they\'ll be in a minute' },
@@ -48,7 +48,7 @@ export function layerMenu(button: HTMLElement, pop: HTMLElement, get: () => Sett
     // the field (what colours the water) is one of several, or none: radio rows under their own heading, apart from the
     // switches, so it reads as a choice (the owner, 13 Nov 2026: a checkbox acting as a radio button was confusing)
     const f = fieldLayer(s), fields = LAYERS.filter(l => isField(l.key)), rest = LAYERS.filter(l => !isField(l.key));
-    pop.innerHTML = '<div class="lp-h">Colour the water <span class="lp-sub">· the full chart</span></div><div class="lp-field" role="radiogroup" aria-label="Colour the water">'
+    pop.innerHTML = '<div class="lp-h">Color the water <span class="lp-sub">· the full chart</span></div><div class="lp-field" role="radiogroup" aria-label="Color the water">'
       + [...fields.map(l => ({ v: l.key as string, name: l.name, what: l.what })), { v: 'off', name: 'Off', what: 'The plain chart' }].map(o =>
         `<label title="${o.what}"><input type="radio" name="lp-field" data-field="${o.v}"${(f ?? 'off') === o.v ? ' checked' : ''}><span>${o.name}</span></label>`).join('') + '</div>'
       + '<div class="lp-h lp-kh">Show</div>' + rest.map(l =>

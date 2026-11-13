@@ -910,6 +910,14 @@ button.sb-tab:hover{color:var(--text)!important}
   background:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px)}
 .mine .sb-rope{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-mark{position:absolute;left:-1px;right:-1px;height:2px;background:#fff;opacity:.9;pointer-events:none}
+/* the rope's inches (the owner's "middle way"): faint hairlines in the well, over the rope, under the marks */
+.sb-tk{position:absolute;inset:0;pointer-events:none}
+.sb-tk i{position:absolute;left:0;right:0;height:1px;background:rgba(220,232,240,.22)}
+.sb-h .sb-tk i{top:0;bottom:0;width:1px;height:auto}
+.sb-trk .sb-rin{grid-column:1;grid-row:2;text-align:right;font:600 8px/1 var(--f-inst);color:var(--muted);white-space:nowrap}
+.sb-trk .sb-rtk{grid-column:4;grid-row:2;position:relative;height:9px;pointer-events:none}
+.sb-rtk i{position:absolute;top:0;width:1px;height:3px;background:rgba(220,232,240,.3)}
+.sb-rtk i[data-l]::after{content:attr(data-l);position:absolute;top:3px;left:50%;transform:translateX(-50%);font:600 7px/1 var(--f-inst);color:var(--muted);opacity:.95;white-space:nowrap}
 /* the backstay's ends: pulled outboard */
 .sb-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--rule);padding-top:5px}
 .sb-h{display:flex;flex-direction:column;gap:2px;align-items:center;border-radius:5px;padding:1px 2px}
@@ -1238,6 +1246,7 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .standings tr.you td{background:rgba(255,182,39,.09)}.standings tr.you .no,.standings tr.you .nett{color:var(--accent)}
 .standings .sp{width:96px;padding:2px 6px}.spark text{font:600 9px var(--f-inst);fill:var(--muted)}
 .standings tbody tr:hover .spark polyline:not(.halo){stroke-width:3}
+.standings .sclub{color:var(--muted);font:500 11px var(--f-inst);letter-spacing:.06em;margin-left:6px}
 .bchip{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--f-inst);letter-spacing:.04em}
 .bchip i{width:11px;height:11px;border-radius:50%;border:2.5px solid;box-sizing:border-box;flex:none;box-shadow:0 0 0 1px rgba(233,242,245,.28)}
 .spark .halo{stroke:rgba(233,242,245,.22);stroke-width:3.4}
@@ -1352,3 +1361,7 @@ button.t-av.dim:hover{opacity:.8}
 .menu2 .mbody>:first-child{margin-top:0}
 #leaveAsk .panel{max-width:300px}
 #leaveAsk{z-index:10}
+/* The wind angle dial, when it's on: on the right, directly under the inset map, centred on it (the owner, ROADMAP 8b:
+   "on the … side under the inset map", "I meant right side"). The map is 210 px across at the top right. */
+#dial{position:fixed!important;left:auto!important;top:calc(env(safe-area-inset-top,0px) + 76px + 210px + 12px)!important;
+  right:calc(max(16px,env(safe-area-inset-right,0px)) + (210px - 96px) / 2)!important;width:96px!important;height:96px!important}
