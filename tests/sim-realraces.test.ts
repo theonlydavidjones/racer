@@ -8,9 +8,10 @@ import { DT, World } from '../src/sim/world';
  * The sim against the real fleet (docs/VISION-ROADMAP.md near term 7: "the strongest validation of criterion 1"): each
  * real past race sailed by the AI as the real boats, on the real day, course and start, and the AI's finishing times set
  * beside the published ones. Reported, not tuned to: the test only checks the race runs and the sim's median is the
- * same order as the real one (within a factor of two); the numbers go to the log for the record.
+ * same order as the real one (within a factor of two); the numbers go to the log for the record. A long run (each race
+ * is sailed to the last boat in, 15-30 minutes a race): only with VALIDATE=1 (VALIDATE=1 npx vitest run tests/sim-realraces.test.ts).
  */
-describe('the sim against the real fleet, race by race', () => {
+describe.skipIf(!(globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.VALIDATE)('the sim against the real fleet, race by race', () => {
   for (const r of realRaces()) it(`${r.date} course ${r.courseNo}: the AI fleet's times beside the real ones`, () => {
     const real = r.boats.filter(b => b.elapsedS != null && b.code == null);
     const ids = real.map(b => `real:${r.id}:${b.key}`);
@@ -24,5 +25,5 @@ describe('the sim against the real fleet, race by race', () => {
     console.log(`${r.date} course ${r.courseNo} (${r.distanceNm} nm): real ${realT.map(t => (t / 60).toFixed(1)).join(' ')} min · sim ${sim.map(t => (t / 60).toFixed(1)).join(' ')} min · median sim/real ${(med(sim) / med(realT)).toFixed(2)}`);
     expect(sim.length).toBeGreaterThan(0);
     expect(med(sim) / med(realT)).toBeGreaterThan(0.5); expect(med(sim) / med(realT)).toBeLessThan(2);
-  }, 900_000);
+  }, 3_600_000);
 });
