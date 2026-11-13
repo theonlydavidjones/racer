@@ -1,8 +1,8 @@
 import type { Boat } from '../boat/boat';
 import { FOLKBOAT } from '../boat/polar';
-import { byHand } from '../boat/physics';
+import { POLE, byHand } from '../boat/physics';
 import { beatFor } from '../boat/seaway';
-import { D2R, KT, LOA, ZONE, dot, markDist, sub, unit, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, ZONE, cross, dot, markDist, sub, unit, wrap, type Vec } from '../core/math';
 import type { Course, CourseMark } from '../courses/course';
 
 /**
@@ -12,13 +12,17 @@ import type { Course, CourseMark } from '../courses/course';
  * figures a coach would watch (the layline, the pole, wide in and close out) and one line on what to change.
  *
  * How it measures, as the tack and gybe drill does (sim/drill.ts), against a twin that sails on:
- * - from GATE_IN (100 m) off the mark to GATE_OUT (100 m) down (or up) the next leg past the mark's level, her
- *   progress along the course (W–pin, laid to the wind at the gun): toward the mark's level, then away from it on the
- *   new leg (a boat that overstands above the mark's level has that much to come back);
- * - the twin's, from the same moment: her own share (η) of the polar's best VMG on the leg in (measured over the
- *   steady seconds before the gate), times the polar's best VMG upwind or down in the wind as it is (reached with the
- *   boat's own lag, TWIN_LAG, as in the tack drill), switching leg the moment it reaches the mark's level, with no loss
- *   at the mark; plus the current along its way, so the tide doesn't score her.
+ * - from the moment she's GATE_IN (100 m) off the mark until she's GATE_OUT (100 m) past its level along the next leg
+ *   (over the ground: that only sets the window), what she makes good through the water (her velocity less the
+ *   current's) along the wind as it is each moment: up (or down) the wind until she rounds, then the other way. A boat
+ *   that overstands above the mark's level makes ground she then gives back;
+ * - the twin's, over the same seconds: her own share (η) of the polar's best VMG on each point of sail (measured over the
+ *   steady seconds before the gate on her last leg of that kind: the leg in for the leg in, her last beat for the beat
+ *   out of the leeward mark, her last run for the run away from the windward mark), times the polar's best VMG in the
+ *   wind as it is (reached with the boat's own lag, TWIN_LAG), turning for the new leg as it reaches the mark's level
+ *   (which the stream carries along in the water's frame), with no loss at the mark.
+ * Both are through the water, so the tide doesn't score her; both are along the wind as it is, so a shift (the wind's
+ * swing about the course's axis, a few degrees either way over a minute or two) reaches both alike.
  * What she loses against it is the rounding: the approach, the turn, the sails' work through it and getting going on
  * the new leg. A good crew loses some of that too: SIM_CREW is the sim's own crew (ai.ts, with its crew on the pole,
  * crewPoleCall) measured by this tracker, and tests keep it in step.
@@ -34,7 +38,7 @@ export interface RoundingScore {
   scored: boolean;
   /** The true wind (kt) and the sea (m) it was in. */
   tws: number; hs: number;
-  /** Metres of progress along the course lost against the twin; and what a good crew (the sim's own) loses the same way. */
+  /** Metres made good (through the water, along the wind) lost against the twin; and what a good crew (the sim's own) loses the same way. */
   lostM: number; goodM: number;
   /** Tacks she made inside GATE_IN of the windward mark (on the way in). */
   tacks: number;
@@ -45,9 +49,11 @@ export interface RoundingScore {
   stallS: number | null;
   /** Windward: seconds from rounding to the pole set (null: not set by the end of the measure). */
   poleS: number | null;
-  /** Leeward: seconds before rounding the pole came off (the crew starting to stow it; negative: after; null: it wasn't out). */
+  /** Leeward: seconds before rounding the crew started stowing the pole (a gybe takes it end for end, not off; null: it was
+   * set on the way in and wasn't stowed before she rounded, or it wasn't out: see the coach's `poleWasOut`). */
   dropS: number | null;
-  /** Leeward: her distance off the mark (m) as the final turn began (wide in), as she came onto the wind (close out), and her closest. */
+  /** Leeward: her distance off the mark (m) as the final turn began (wide in); how far the mark was to windward of her new
+   * close-hauled track as she came onto the wind (close out: within a length is good); and her closest. */
   entryD: number; exitD: number; closest: number;
   /** The turn's peak rate (°/s) and her lowest speed as a share of her speed in. */
   peakRate: number; minSpeed: number;
@@ -67,8 +73,12 @@ const MAX_S = 240;
 const STEADY_RATE = 1.5, TURNING = 3, SMOOTH_S = 2, QUICK_S = 0.5;
 /** How long the twin takes to answer a change of wind (s): as the tack drill's (the sim's Folkboat takes 8–13 s). */
 const TWIN_LAG = 10;
-/** Her share of the polar's VMG when there were too few steady seconds to measure it (about the sim crew's own). */
+/** Her share of the polar's VMG on a point of sail she hasn't sailed steadily yet (about the sim crew's own: an estimate). */
 const ETA_GUESS = 0.92;
+/** A late drop: the pole still coming off this close to the mark (s). Stowing takes the crew POLE.stow (5 s) at a
+ * good crew's pace, about 9 s at a slow one's (physics.ts crewPole), so under about this the jib isn't drawing for the beat
+ * as she rounds. */
+const DROP_LATE = POLE.stow + 4;
 
 /** The polar's best VMG (m/s) upwind (a beat) or down (a run), in `tws` kt. */
 export function legVmg(up: boolean, tws: number): number {
@@ -89,7 +99,9 @@ export function lapMarks(C: Course): [CourseMark, CourseMark] {
   return [W, pin];
 }
 
-interface Sample { t: number; x: number; y: number; h: number; v: number; twa: number; tws: number; cx: number; cy: number; vwx: number; vwy: number; rate: number; quick: number; md: number }
+interface Sample { t: number; x: number; y: number; h: number; v: number; twa: number; tws: number; from: number; cx: number; cy: number; vwx: number; vwy: number; rate: number; quick: number; md: number }
+/** Her velocity through the water along the wind as it is: + upwind. */
+const upwind = (q: Sample) => { const u = V(q.from); return q.vwx * u.x + q.vwy * u.y; };
 const HIST = new WeakMap<RoundingTracker, Sample[]>();
 
 /** The sim crew's own roundings, measured by this tracker (tests/roundings.test.ts keeps them in step): by true wind (kt),
@@ -138,11 +150,14 @@ export class RoundingTracker {
   rounded = 0;
   readonly marks: [CourseMark, CourseMark];
   private prevAng: number | null = null;
+  /** Her share of the polar's VMG on each point of sail, as last measured on the leg in to a mark: the twin sails the
+   * leg out at her own pace on that point of sail (a beat's η says nothing of how she runs, nor a run's of how she beats). */
+  private eta: { up: number | null; down: number | null } = { up: null, down: null };
   private nearMin = 1e9;
   private get hist(): Sample[] { let h = HIST.get(this); if (!h) HIST.set(this, h = []); return h; }
   private cur: null | {
-    kind: RoundingKind; t0: number; dIn: number; uIn: Vec; eta: number; etaGuess: boolean; v0: number; tws0: number; hs: number;
-    twin: number; twTws: number; prog: number; roundT: number | null; tacks: number; lastTack: Boat['tack']; lastTackT: number;
+    kind: RoundingKind; t0: number; dIn: number; uIn: Vec; etaIn: number; etaOut: number; v0: number; tws0: number; hs: number;
+    twin: number; twTws: number; prog: number; made: number; dInW: number; drift: number; roundT: number | null; tacks: number; lastTack: Boat['tack']; lastTackT: number;
     freeS: number; pinchS: number; stallS: number | null; poleT: number | null; poleWas: Boat['pole']; dropT: number | null; poleOutIn: boolean;
     turnFrom: number | null; entryD: number; exitD: number | null; exitT: number | null; slowSince: number | null; closest: number; peakRate: number; minV: number; slackS: number | null; touched: boolean;
   } = null;
@@ -158,7 +173,7 @@ export class RoundingTracker {
     const back = H[k], rate = back && t > back.t ? Math.abs(wrap(b.h - back.h)) / (t - back.t) : 0;
     let q = H.length - 1; while (q > 0 && t - H[q - 1].t <= QUICK_S) q--;
     const qb = H[q], quick = qb && t > qb.t ? Math.abs(wrap(b.h - qb.h)) / (t - qb.t) : 0;
-    const s: Sample = { t, x: b.x, y: b.y, h: b.h, v: b.v, twa, tws: b.ww.kt, cx: b.cur.x, cy: b.cur.y, vwx: b.vx - b.cur.x, vwy: b.vy - b.cur.y, rate, quick, md };
+    const s: Sample = { t, x: b.x, y: b.y, h: b.h, v: b.v, twa, tws: b.ww.kt, from: b.ww.from, cx: b.cur.x, cy: b.cur.y, vwx: b.vx - b.cur.x, vwy: b.vy - b.cur.y, rate, quick, md };
     H.push(s); while (H.length && t - H[0].t > 40) H.shift();
     if (!this.cur && md < GATE_IN) this.begin(b, s, hs);
     const rounded = this.roundingCheck(b, m, md);
@@ -192,13 +207,17 @@ export class RoundingTracker {
     const secs = pre.length * (H.length > 1 ? (H[H.length - 1].t - H[0].t) / (H.length - 1) : 0);
     const mean = (f: (q: Sample) => number) => pre.reduce((a, q) => a + f(q), 0) / Math.max(1, pre.length);
     const tws0 = pre.length ? mean(q => q.tws) : b.ww.kt;
-    const etaGuess = secs < 6;
-    const eta = etaGuess ? ETA_GUESS : Math.min(1.0, Math.max(0.6, mean(q => q.vwx * uIn.x + q.vwy * uIn.y) / Math.max(0.05, legVmg(up, tws0))));
-    const dIn = dot(sub(m.p, s), uIn);
+    // (through the water, along the wind as it was each moment, as the twin sails: the tide and the wind's swing about
+    // the course's axis don't come into it)
+    const k = up ? 1 : -1;
+    if (secs >= 6) this.eta[up ? 'up' : 'down'] = Math.min(1.05, Math.max(0.6, mean(q => k * upwind(q)) / Math.max(0.05, legVmg(up, tws0))));
+    const etaIn = this.eta[up ? 'up' : 'down'] ?? ETA_GUESS, etaOut = this.eta[up ? 'down' : 'up'] ?? ETA_GUESS;
+    const dIn = dot(sub(m.p, s), uIn), uW = V(b.ww.from);
+    const dInW = k * dot(sub(m.p, s), uW); // (the mark's level along the wind, from her at the gate)
     this.cur = {
-      kind, t0: s.t, dIn, uIn, eta, etaGuess, v0: pre.length ? mean(q => q.v) : b.v, tws0, hs,
-      twin: 0, twTws: tws0, prog: 0, roundT: null, tacks: 0, lastTack: b.tack, lastTackT: -1e9,
-      freeS: 0, pinchS: 0, stallS: byHand(b, 'mainsheet') ? 0 : null, poleT: null, poleWas: b.pole, dropT: null, poleOutIn: b.pole === 'set' || b.pole === 'setting',
+      kind, t0: s.t, dIn, uIn, etaIn, etaOut, v0: pre.length ? mean(q => q.v) : b.v, tws0, hs,
+      twin: 0, twTws: tws0, prog: 0, made: 0, dInW, drift: 0, roundT: null, tacks: 0, lastTack: b.tack, lastTackT: -1e9,
+      freeS: 0, pinchS: 0, stallS: byHand(b, 'mainsheet') ? 0 : null, poleT: null, poleWas: b.pole, dropT: null, poleOutIn: b.pole === 'set',
       turnFrom: null, entryD: s.md, exitD: null, exitT: null, slowSince: null, closest: s.md, peakRate: 0, minV: Infinity,
       slackS: byHand(b, 'mainsheet') || byHand(b, 'jibsheet') || byHand(b, 'jibsheetW') ? 0 : null, touched: false
     };
@@ -210,13 +229,21 @@ export class RoundingTracker {
     const after = c.roundT != null;
     // distance to the rounding mark itself (s.md follows the current target, which flips once she's rounded)
     const md = markDist(s, m);
-    // her progress along the course: toward the mark's level, then past it along the new leg
+    // where she is along the course (over the ground): toward the mark's level, then past it on the new leg; it only
+    // decides when the measure ends (GATE_OUT past the mark)
     const y = dot(sub(s, m.p), c.uIn);
     c.prog = after ? c.dIn - y : c.dIn - Math.abs(y);
-    // the twin: her share of the best VMG on the leg it's on, in the wind as it is (with the boat's lag), plus the current along it
+    // what she makes good, through the water along the wind as it is: toward the mark (up or down the wind) until she
+    // rounds, then the other way (overstanding above the mark's level she makes and then gives back)
+    const kIn = up ? 1 : -1, kNow = after ? -kIn : kIn;
+    c.made += kNow * upwind(s) * dt;
+    // the twin: her own pace on each point of sail (η) times the polar's best VMG in the wind as it is (with the boat's
+    // lag), through the water, turning for the new leg as it reaches the mark's level (which the stream carries along
+    // the wind in the water's frame: drift)
     c.twTws += (s.tws - c.twTws) * Math.min(1, dt / TWIN_LAG);
-    const twinUp = c.twin < c.dIn ? up : !up, uTw = c.twin < c.dIn ? 1 : -1;
-    c.twin += (c.eta * legVmg(twinUp, c.twTws) + uTw * (s.cx * c.uIn.x + s.cy * c.uIn.y)) * dt;
+    const uW = V(s.from); c.drift += kIn * (s.cx * uW.x + s.cy * uW.y) * dt;
+    const twinIn = c.twin < c.dInW + c.drift;
+    c.twin += (twinIn ? c.etaIn * legVmg(up, c.twTws) : c.etaOut * legVmg(!up, c.twTws)) * dt;
     c.closest = Math.min(c.closest, md);
     c.minV = Math.min(c.minV, s.v);
     if (b.markTouch) c.touched = true;
@@ -225,19 +252,21 @@ export class RoundingTracker {
       // the way in
       if (b.tack !== c.lastTack && a < 90) { c.tacks++; c.lastTackT = s.t; }
       c.lastTack = b.tack;
-      if (up && md < 60 && md > LOA && s.t - c.lastTackT > 4) {
+      if (up && md < 60 && md > LOA && s.t - c.lastTackT > 4 && c.turnFrom == null && s.quick < TURNING) { // (not the bear-away itself)
         if (a > beat + 8) c.freeS += dt;
         else if (a < beat - 4 && s.v < 0.9 * c.v0) c.pinchS += dt;
       }
       // the final turn's start: the last moment she wasn't turning, near the mark
       if (md < 3 * ZONE) { if (s.quick < TURNING) c.turnFrom = null; else if (c.turnFrom == null) { c.turnFrom = s.t; c.entryD = md; } }
-      if (!up && c.poleWas === 'set' && b.pole !== 'set' && c.dropT == null) c.dropT = s.t;
-      if (!up && (b.pole === 'set' || b.pole === 'setting')) c.poleOutIn = true;
+      // the drop: the crew starting to stow it (a gybe takes it 'setting', end for end: not a drop); set again, it's out again
+      if (!up && b.pole === 'stowing' && c.poleWas !== 'stowing') c.dropT = s.t;
+      if (!up && b.pole === 'set') { c.poleOutIn = true; c.dropT = null; }
     } else {
       if (up && c.poleT == null && b.pole === 'set') c.poleT = s.t;
       if (!up && c.exitT == null) {
         // onto the wind: within 10° of close-hauled and steady for a second
-        if (a <= beat + 10 && s.rate < STEADY_RATE) { c.slowSince ??= s.t; if (s.t - c.slowSince >= 1) { c.exitT = s.t; c.exitD = md; } } else c.slowSince = null;
+        // close out: how far the mark is to windward of her new close-hauled track (not how far she's sailed on since)
+        if (a <= beat + 10 && s.rate < STEADY_RATE) { c.slowSince ??= s.t; if (s.t - c.slowSince >= 1) { c.exitT = s.t; c.exitD = Math.abs(cross(V(s.h), sub(m.p, s))); } } else c.slowSince = null;
       }
       if (!up && c.exitT != null && c.slackS != null && s.t - c.exitT < 15 && (b.trim.main.flow === 'luffing' && byHand(b, 'mainsheet') || b.trim.jib?.flow === 'luffing' && (byHand(b, 'jibsheet') || byHand(b, 'jibsheetW')))) c.slackS += dt;
     }
@@ -257,9 +286,9 @@ export class RoundingTracker {
     if (c.roundT == null) { this.note(c.kind, c.tws0, c.hs, 'Not scored: she never rounded the mark in the time.'); return; }
     const up = c.kind === 'windward', g = simCrew(c.kind, c.tws0);
     const sc: RoundingScore = {
-      kind: c.kind, scored: true, tws: c.tws0, hs: c.hs, lostM: c.twin - c.prog, goodM: g.lostM, tacks: c.tacks, freeS: c.freeS, pinchS: c.pinchS, stallS: c.stallS,
+      kind: c.kind, scored: true, tws: c.tws0, hs: c.hs, lostM: c.twin - c.made, goodM: g.lostM, tacks: c.tacks, freeS: c.freeS, pinchS: c.pinchS, stallS: c.stallS,
       poleS: up && c.poleT != null ? c.poleT - c.roundT : null, dropS: !up && c.poleOutIn ? (c.dropT == null ? null : c.roundT - c.dropT) : null,
-      entryD: c.entryD, exitD: c.exitD ?? markDist(s, this.marks[c.kind === 'windward' ? 0 : 1]), closest: c.closest, peakRate: c.peakRate, minSpeed: c.minV / Math.max(0.1, c.v0), slackS: c.slackS, touched: c.touched, coach: ''
+      entryD: c.entryD, exitD: c.exitD ?? Math.abs(cross(V(s.h), sub(this.marks[c.kind === 'windward' ? 0 : 1].p, s))), closest: c.closest, peakRate: c.peakRate, minSpeed: c.minV / Math.max(0.1, c.v0), slackS: c.slackS, touched: c.touched, coach: ''
     };
     sc.coach = roundingCoach(sc, g, c.poleOutIn);
     this.list.push(sc);
@@ -279,8 +308,8 @@ export function roundingCoach(s: RoundingScore, g: CrewRounding, poleWasOut = tr
     if (g.poleS > 5 && (s.poleS == null || s.poleS > g.poleS + 8)) return `${s.poleS == null ? 'No pole on the run' : `Pole set ${n(s.poleS)} s after the mark (a good crew: about ${n(g.poleS)} s)`}. Bear away to a run (160° or so) and call for it as soon as she's settled: wing-on-wing is the faster way down.`;
     return ok ? `A good rounding: ${lost} m lost (a good crew ${good}).` : `Lost ${lost} m (a good crew ${good}): the bear-away and getting the pole out are where it goes.`;
   }
-  if (poleWasOut && (s.dropS == null || s.dropS < Math.min(g.dropS, 8) / 2)) return `Pole down late: ${s.dropS == null ? 'it was still out as you rounded' : `it came off ${n(Math.max(0, s.dropS))} s before the mark`} (a good crew: about ${n(g.dropS)} s). Take it in early, so the jib's trimmed for the beat as you round.`;
-  if (s.exitD > g.exitD + 1.5 * LOA) return `Wide out: ${n(s.exitD)} m off the mark as you came onto the wind (a good crew ${n(g.exitD)}). Start the turn wide and finish it close, with the mark right by you to windward: wide in, close out.`;
+  if (poleWasOut && (s.dropS == null || s.dropS < DROP_LATE)) return `Pole down late: ${s.dropS == null ? 'it was still out as you rounded' : `it came off ${n(Math.max(0, s.dropS))} s before the mark`} (a good crew: about ${n(g.dropS)} s). Take it in early, so the jib's trimmed for the beat as you round.`;
+  if (s.exitD > g.exitD + LOA) return `Wide out: the mark was ${n(s.exitD)} m to windward of your track as you came onto the wind (a good crew ${n(g.exitD)}). Start the turn wide and finish it close, with the mark right by you to windward: wide in, close out.`;
   if (s.peakRate > 1.6 * g.peakRate && s.minSpeed < g.minSpeed - 0.08) return `Turned too hard: she slowed to ${n(100 * s.minSpeed)}% of her speed. Turn smoothly, trimming in as you come up.`;
   if (s.slackS != null && s.slackS > 4) return `Trim in as you turn up: your sheets were luffing for ${n(s.slackS)} s after she came onto the wind.`;
   return ok ? `A good rounding: ${lost} m lost (a good crew ${good}).` : `Lost ${lost} m (a good crew ${good}): wide in, close out, and the sheets in as you come up.`;

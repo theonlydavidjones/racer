@@ -504,8 +504,9 @@ const drillName = (k: 'tack' | 'gybe') => (k === 'tack' ? 'Tack' : 'Gybe');
 const drillKey = (s: ManoeuvreScore) => `${s.kind}-${windBand(s.tws)}`;
 function drillTick(): void {
   const el = $('tpDrill'), list = w.drill?.list;
-  if (!list) { if (!el.hidden) { el.hidden = true; drillSeen = 0; } return; }
-  if (list.length === drillSeen) return;
+  if (!list) { if (w.rounding) return; if (!el.hidden) { el.hidden = true; drillSeen = 0; } return; } // (the rounding drill shares the card)
+  if (list.length < drillSeen) drillSeen = 0; // (a restart: a new, empty list)
+  if (list.length === drillSeen) { if (!list.length) el.hidden = true; return; }
   for (let i = drillSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by manoeuvre and wind band)
     const s = list[i], k = drillKey(s), b = S.practiceBest?.[k];
     if (!s.scored || s.lostM < 0) continue; // (a turn noted, not scored, is no best; nor a reading below nothing, the measure's own wander)
@@ -524,7 +525,8 @@ let roundSeen = 0;
 function roundTick(): void {
   const el = $('tpDrill'), list = w.rounding?.list;
   if (!list) { if (w.drill) return; if (!el.hidden) { el.hidden = true; roundSeen = 0; } return; }
-  if (list.length === roundSeen) return;
+  if (list.length < roundSeen) roundSeen = 0; // (a restart: a new, empty list)
+  if (list.length === roundSeen) { if (!list.length) el.hidden = true; return; }
   for (let i = roundSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by mark and wind band)
     const s = list[i], k = roundingKey(s), b = S.practiceBest?.[k];
     if (!s.scored || s.lostM < 0) continue;
@@ -553,7 +555,7 @@ function roundHtml(): string {
   const rows = list.map(row).join('');
   const bests = Object.entries(S.practiceBest ?? {}).filter(([k]) => /^(wmark|lmark)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'wmark' ? 'Windward' : 'Leeward'} mark, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
   return `<h3>Mark roundings</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Approach</th><th>Pole</th><th>Exit off mark</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No roundings yet: beat up to the windward mark, round it to port and set the pole for the run down to the pin; round the pin to port and beat up again.</p>'}`
-    + `<p class="drillnote">Lost: progress along the course you gave away against a twin sailing on from ${100} m off the mark to ${100} m past it, measured through the water (the tide doesn't count). Good crew: the sim's own crew, measured the same way in this wind, in flat water. Approach: tacks in the last few lengths, and whether you reached in (free) or pinched. Pole: for the windward mark, seconds from rounding to the pole set; for the leeward mark, seconds the pole was down before the mark. Exit off mark: how far off the mark you were as you came onto the new course (wide in, close out). Only the windward mark and the pin (the leeward mark), each left to port, are scored.</p>`
+    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on from 100 m off the mark until you were 100 m past it, measured through the water (the tide doesn't count). The twin sails each leg at your own pace on that point of sail, from your last steady leg of it. Good crew: the sim's own crew, measured the same way in this wind, in flat water. Approach: tacks inside 100 m of the windward mark, and whether you reached in (free) or pinched in the last 60 m; for the leeward mark, how far off it you began the turn. Pole: for the windward mark, seconds from rounding to the pole set; for the leeward mark, seconds the pole was down before the mark. Exit off mark: at the leeward mark, how far the mark was to windward of your new close-hauled track as you came onto the wind (wide in, close out: within a length is good). Only the windward mark and the pin (the leeward mark), each left to port, are scored.</p>`
     + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
 }
 /** The Pause screen's list: every manoeuvre so far, with its numbers, and your bests. */

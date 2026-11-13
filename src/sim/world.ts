@@ -895,7 +895,7 @@ export class World {
   touchableMarks(b: Boat): Touchable[] {
     const C = this.C, n = C.marks.length, out: Touchable[] = [];
     if (b.finished || b.retired) return out; // (no longer racing)
-    if (this.rounding) return b === this.user ? this.rounding.marks.map(m => ({ name: m.name, p: m.p, r: m.key === 'pin' ? 0.9 : MARK_R[m.shape] })) : out; // (the rounding drill: its two marks)
+    if (this.rounding) return b === this.user ? this.rounding.marks.map(m => ({ name: m.name, p: m.p, r: MARK_R[m.shape] })) /* (as drawn: scene.ts addMark) */ : out; // (the rounding drill: its two marks)
     const pinMark = C.marks.find(m => dist(m.p, C.pin) < 1);
     const pin: Touchable | null = C.pinKind === 'buoy' ? { name: C.pinLabel, p: C.pin, r: 0.9 }
       : pinMark ? { name: pinMark.name, p: C.pin, r: pinMark.shape === 'sphere' ? 1.2 : 1.0 } : null;
@@ -915,7 +915,7 @@ export class World {
     for (const b of this.boats) {
       const bw = bow(b), st = stern(b);
       let touching: Touchable | null = null;
-      const marks = this.touchableMarks(b), solids = cb && !marks.some(m => m.q) ? [...marks, { ...cb, rule31: false }] : marks;
+      const marks = this.touchableMarks(b), solids = cb && !this.rounding && !marks.some(m => m.q) ? [...marks, { ...cb, rule31: false }] : marks; // (the rounding drill has no committee boat on the water)
       for (const m of solids) {
         const gap = solidGap(bw, st, m) - m.r - HULL_HALF_BEAM;
         if (gap < 0) {
@@ -934,7 +934,7 @@ export class World {
       if (touching && b.markTouch !== touching.name && !this.racing(b)) {
         // Rule 31 is "while racing": before her preparatory signal or once racing's called off, no penalty
         b.v *= 0.6;
-        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
+        if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg: this.rounding ? `You touched ${touching.name}. In a race that's a one-turn penalty (rule 31); here it's practice, so no penalty.` : `You touched ${touching.name}. You aren't racing${this.cancelled ? ' (racing is called off)' : ' yet'}, so there's no penalty: rule 31 applies while racing.` });
       } else if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
         // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
