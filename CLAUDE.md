@@ -4,6 +4,33 @@ A Nordic Folkboat racing simulator (Vite + TypeScript + three.js) for learning r
 Sailing 2025–2028, and racing on San Francisco Bay. The owner is learning to race. See README.md for controls and
 ROADMAP.md for what's planned.
 
+## The mission (the owner's words, 13 Nov 2026)
+
+We're building a true-to-life sailing simulator. It's meant to help users learn to sail, improve their sailing
+techniques, expand their sailing knowledge, and become a better racer. And it's meant to be as good as actually sailing,
+to the maximum reasonable extent.
+
+Toward those aims, there are two modes: racing and cruising. Racing makes you a better sailor, and its main focuses are
+tactics, seamanship, helmsmanship, teamwork, and knowledge of conditions and one's boat. Cruising also makes you a better
+sailor, but it doesn't have the competitive element in the same way. It's you against yourself, or you and your crew
+against yourselves, in an effort to improve while also enjoying the beauty and magic of sailing.
+
+And all of this takes place on the San Francisco Bay, because almost anyone who sails will list it at or near the top of
+the best, most interesting and most challenging places to sail. There's no place like it, with its complexity and
+variability. It's also beautiful, and both racing and cruising should capitalize as much as possible on the sheer
+staggering beauty of this place.
+
+All of this takes place on a Folkboat, because it's arguably the most authentic and pure sailing vessel that a normal
+human can own: fully analog, durable, single-handleable, versatile, beautiful and storied. It can be a family weekend
+cruiser, or it can cross the Pacific single-handed.
+
+Sailors say two things: if you can sail the Bay, you can sail anywhere; and if you can sail a Folkboat, you can sail
+anything. That's what this game amounts to. Our mission is to bring those two truths to anyone who wants them.
+
+Priority (the owner, 13 Nov 2026): physics and racing first. "Physics is the key to the true-to-life element of the
+simulator. If it's not real and accurate, then it's not a simulator." The Bay's beauty and a robust open-Bay cruising mode
+come later, once the physics and racing are dialed in.
+
 ## The owner's standing rules
 
 - **Science is prime. Physics should always be real.** Wind, current, tide and sea state come from real records and
@@ -13,6 +40,7 @@ ROADMAP.md for what's planned.
 - Ask before big design changes. Desktop only (no phone layout).
 - Keep building through everything they've asked for. Don't install npm packages without asking.
 - Don't relabel things they've named (e.g. the S/P labels).
+- Be extremely conservative about new buttons and distractions on the game surface (owner, 13 Nov 2026): put new controls inside existing elements (the inset map, the sail band, menus, Keys), not as new on-screen buttons.
 
 ## Workflow
 
