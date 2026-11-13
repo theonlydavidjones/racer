@@ -8,6 +8,9 @@
  */
 const { chromium } = require('playwright');
 const out = process.argv[2] || '.';
+// (headless, a frame takes a second or two: the streaks' trails are stepped through 2.5 s of 60 fps frames before a
+// picture, as a real browser draws them)
+const warm = (p, which) => p.evaluate(w => { const h = __hud; for (let i = 0; i < 150; i++) { if (w === 'inset') h.insetStreaks(1 / 60); else h.chartFx(document.getElementById(w === 'plan' ? 'planFx' : 'chartFx'), sim(), 1 / 60, null); } }, which);
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const errs = [];
@@ -18,7 +21,7 @@ const out = process.argv[2] || '.';
     await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(3000);
     await p.screenshot({ path: `${out}/${name}-setup.png` });
     await p.evaluate(() => document.getElementById('bPlanOpen').click()); await p.waitForTimeout(5000);
-    await p.screenshot({ path: `${out}/${name}-plan.png` });
+    await warm(p, 'plan'); await p.screenshot({ path: `${out}/${name}-plan.png` });
     console.log(name, await p.evaluate(() => document.getElementById('planInfo').innerText.replace(/\n+/g, ' | ')));
     await p.close();
   };
