@@ -14,8 +14,8 @@ import { D2R, KT, V, wrap } from '../core/math';
  * - her progress through the water (her velocity less the current's, so the tide doesn't score her) along the wind's
  *   axis as it is each moment (upwind for a tack, downwind for a gybe);
  * - the twin's, in the same wind: her own share (η) of the polar's best VMG, measured over the steady seconds before the
- *   turn, times the polar's best VMG in the wind as it is each moment. A puff or a shift reaches both alike, so tacking
- *   on a header isn't scored as a loss, nor a lift as a gain;
+ *   turn, times the polar's best VMG in the wind as it is each moment, reached with the boat's own lag (TWIN_LAG). A puff
+ *   or a shift reaches both alike, so tacking on a header isn't scored as a loss, nor a lift or a lull as a gain;
  * - taken once she's back to speed (BACK: 90% of her speed before for a tack, 98% for a gybe), 75 s after the turn
  *   began, or at your next turn, whichever is first.
  * Only a real manoeuvre is scored: from a steady course (her heading steady for BEFORE_S), close-hauled or near it for a
@@ -50,10 +50,15 @@ export interface ManoeuvreScore {
   coach: string;
 }
 
-interface Sample { t: number; h: number; v: number; twa: number; jib: number; boom: number; wx: number; wy: number; from: number; tws: number; rate: number }
+/** One step: `rate` her rate of turn over the last SMOOTH_S (°/s: a wave's yaw, a few °/s at its peak in the Bay's chop,
+ * averages out over a couple of seconds, seaway.ts waveYaw), `dh` the step's own signed change of heading. */
+interface Sample { t: number; h: number; v: number; twa: number; jib: number; boom: number; wx: number; wy: number; from: number; tws: number; rate: number; dh: number }
 
 /** Steady before a turn: her rate of turn under STEADY_RATE (°/s) for BEFORE_S seconds. */
-const STEADY_RATE = 1.5, BEFORE_S = 4, MAX_S = 75, MIN_V = 1 * KT;
+const STEADY_RATE = 1.5, BEFORE_S = 4, MAX_S = 75, MIN_V = 1 * KT, SMOOTH_S = 2;
+/** How long the twin takes to answer a change of wind (s): the sim's own Folkboat takes 8–13 s to make 63% of the change
+ * in speed after a puff or a lull (measured close-hauled, 10–16 kt), so the twin carries her way as she does. */
+const TWIN_LAG = 10;
 /** Back to speed: a tack's when she's at 90% of her speed before (as a crew would call it); a gybe barely slows her, so 98%. */
 const BACK: Record<DrillKind, number> = { tack: 0.9, gybe: 0.98 };
 /** The polar's best VMG (m/s) along the wind's axis, upwind or down, in `tws` kt. */
@@ -62,6 +67,8 @@ function bestVmg(kind: DrillKind, tws: number): number {
   return FOLKBOAT.speedKt(tws, a) * KT * Math.abs(Math.cos(a * D2R));
 }
 /** Her velocity through the water along the wind's axis as it is (+ toward where she's making: upwind, or downwind). */
+/** The polar's best speed (m/s) for the manoeuvre's point of sail in `tws` kt (for 'back to speed' in the wind as it is now). */
+const bestSpeed = (kind: DrillKind, tws: number) => FOLKBOAT.speedKt(tws, kind === 'tack' ? FOLKBOAT.beatAngle(tws) : FOLKBOAT.runAngle(tws)) * KT;
 const along = (kind: DrillKind, q: Sample) => { const u = V(q.from), k = kind === 'tack' ? 1 : -1; return k * (q.wx * u.x + q.wy * u.y); };
 
 /** Each tracker's last 30 s of samples: kept off the tracker itself, so the race's copy on the page (sim/sync.ts, which
@@ -75,8 +82,8 @@ export class DrillTracker {
   private lastTack: Boat['tack'] | null = null;
   private lastSide = 0; // which side of dead downwind she's on (sign of twa), for a gybe
   private cur: null | {
-    kind: DrillKind; t0: number; tFlip: number; v0: number; twa0: number; eta: number; tws: number; hs: number; ref: number;
-    made: number; twin: number; minV: number; peakRate: number; turnEnd: number | null; slowSince: number | null; turned: number; deadS: number;
+    kind: DrillKind; valid: boolean; why: string; t0: number; tFlip: number; v0: number; twa0: number; tws0: number; eta: number; tws: number; hs: number; ref: number;
+    made: number; twin: number; twinRate: number; minV: number; peakRate: number; turnEnd: number | null; slowSince: number | null; turned: number; deadS: number;
     overshoot: number; across: number | null; jibSign: number; boomSign: number; backAt: number | null; jibMine: boolean; backed: number; abackS: number;
   } = null;
 
@@ -85,16 +92,25 @@ export class DrillTracker {
     // not hers to score: in her slip or being walked out, under power, on the tiller pilot (hove to: see finish)
     if (b.docked || b.pushing || b.motor?.running || b.pilotSteers) { this.cur = null; this.hist.length = 0; this.lastTack = b.tack; this.lastSide = 0; return; }
     const H = this.hist, prev = H[H.length - 1], twa = wrap(b.ww.from - b.h); // (+: the wind on her starboard side)
-    const rate = prev ? Math.abs(wrap(b.h - prev.h)) / Math.max(1e-3, t - prev.t) : 0;
-    const s: Sample = { t, h: b.h, v: b.v, twa, jib: b.jib, boom: b.boom, wx: b.vx - b.cur.x, wy: b.vy - b.cur.y, from: b.ww.from, tws: b.ww.kt, rate };
+    // her rate of turn over the last couple of seconds (so a wave's yaw doesn't read as turning, nor still a turn)
+    let k = H.length - 1; while (k > 0 && t - H[k - 1].t <= SMOOTH_S) k--;
+    const back = H[k], rate = back && t > back.t ? Math.abs(wrap(b.h - back.h)) / (t - back.t) : 0;
+    const s: Sample = { t, h: b.h, v: b.v, twa, jib: b.jib, boom: b.boom, wx: b.vx - b.cur.x, wy: b.vy - b.cur.y, from: b.ww.from, tws: b.ww.kt, rate, dh: prev ? wrap(b.h - prev.h) : 0 };
     H.push(s); while (H.length && t - H[0].t > 30) H.shift();
     // a tack: the tack flips through head to wind; a gybe: her stern crosses the wind (twa through ±180)
     const side = Math.sign(twa) || this.lastSide;
     const tacked = this.lastTack != null && b.tack !== this.lastTack && Math.abs(twa) < 90;
     const gybed = this.lastSide !== 0 && side !== this.lastSide && Math.abs(twa) > 120;
     this.lastTack = b.tack; this.lastSide = side;
-    // (a new turn before the last is scored: the last is scored where it stands)
-    if (this.cur && (tacked || gybed)) this.finish(s);
+    if (this.cur && (tacked || gybed)) {
+      // back through the wind before the turn was done: an aborted tack (or gybe), she's on her old tack again: neither scored
+      if (this.cur.turnEnd == null && this.cur.kind === (tacked ? 'tack' : 'gybe')) {
+        const k = this.cur.kind; this.cur = null;
+        this.note(k, b.ww.kt, hs, `${k === 'tack' ? 'Tack' : 'Gybe'} not completed: she went back onto her old ${k === 'tack' ? 'tack' : 'gybe'}. Commit to the turn once you start it.`);
+        return;
+      }
+      this.finish(s); // (a new turn before the last is scored: the last is scored where it stands)
+    }
     if (tacked || gybed) this.begin(tacked ? 'tack' : 'gybe', b, hs);
     else if (this.cur) this.follow(b, s, dt);
   }
@@ -111,27 +127,29 @@ export class DrillTracker {
     const start = ok ? steadyFrom : H.length - 1, pre = ok ? H.slice(j, steadyFrom + 1) : [];
     const mean = (f: (q: Sample) => number) => pre.reduce((a, q) => a + f(q), 0) / Math.max(1, pre.length);
     const v0 = mean(q => q.v), twa0 = mean(q => Math.abs(q.twa)), tws0 = mean(q => q.tws);
-    const note = (why: string) => this.list.push({ kind, scored: false, tws: b.ww.kt, hs, lostM: 0, goodM: 0, turnS: 0, rate: 0, peakRate: 0, deadS: 0, overshoot: 0, acrossS: null, jibBacked: false, minSpeed: 1, backS: null, coach: why });
-    if (!ok) { note(`${kind === 'tack' ? 'Tack' : 'Gybe'} not scored: hold a steady course for a few seconds first, so there's a speed to measure it against.`); return; }
-    if (v0 < MIN_V) { note(`${kind === 'tack' ? 'Tack' : 'Gybe'} not scored: get her moving first (she was under 1 kt).`); return; }
-    if (kind === 'tack' && twa0 > 70) { note('Tack not scored: start it from close-hauled (it began from a reach). Come up to close-hauled, settle, then tack.'); return; }
-    if (kind === 'gybe' && twa0 < 120) { note('Gybe not scored: bear away to a run first and settle there (it began from a reach or the wind), then gybe.'); return; }
+    if (ok && v0 < MIN_V) return; // (drifting: not a manoeuvre, and not worth a word)
+    // a turn that didn't start right is followed all the same, and noted only if it proves a real manoeuvre (finish)
+    const why = !ok ? `${kind === 'tack' ? 'Tack' : 'Gybe'} not scored: hold a steady course for a few seconds first, so there's a speed to measure it against.`
+      : kind === 'tack' && twa0 > 70 ? 'Tack not scored: start it from close-hauled (it began from a reach). Come up to close-hauled, settle, then tack.'
+      : kind === 'gybe' && twa0 < 120 ? 'Gybe not scored: bear away to a run first and settle there (it began from a reach or the wind), then gybe.' : '';
     // her share of the polar's best VMG before the turn: the twin sails on at it, in whatever wind comes
-    const eta = mean(q => along(kind, q)) / Math.max(0.05, bestVmg(kind, tws0));
+    const eta = ok ? mean(q => along(kind, q)) / Math.max(0.05, bestVmg(kind, tws0)) : 0;
     // the new course to measure past: the crew's own close-hauled heading after a tack (physics.ts tackTarget: the
     // chop's beat angle less her leeway, or her old angle if she tacked from a close reach), the mirror of her run after a gybe
     const ref = kind === 'tack' ? Math.max(beatFor(b) - (b.leeway ?? 0), Math.min(twa0, 60)) : twa0;
-    const c = this.cur = { kind, t0: H[start].t, tFlip, v0, twa0, eta, tws: b.ww.kt, hs, ref, made: 0, twin: 0, minV: Infinity, peakRate: 0, turnEnd: null as number | null,
+    const c = this.cur = { kind, valid: !why, why, t0: H[start].t, tFlip, v0: ok ? v0 : b.v, twa0, tws0: ok ? tws0 : b.ww.kt, eta, tws: b.ww.kt, hs, ref, made: 0, twin: 0, twinRate: eta * bestVmg(kind, ok ? tws0 : b.ww.kt), minV: Infinity, peakRate: 0, turnEnd: null as number | null,
       slowSince: null as number | null, turned: 0, deadS: 0, overshoot: 0, across: null as number | null, jibSign: Math.sign(H[start].jib), boomSign: Math.sign(H[start].boom), backAt: null as number | null,
       jibMine: byHand(b, 'jibsheet') || byHand(b, 'jibsheetW'), backed: 0, abackS: 0 };
     // the turn so far, from its start to the flip
     for (let k = start + 1; k < H.length; k++) this.account(c, H[k], H[k].t - H[k - 1].t, b);
   }
   private account(c: NonNullable<DrillTracker['cur']>, s: Sample, dt: number, b: Boat): void {
-    c.made += along(c.kind, s) * dt; c.twin += c.eta * bestVmg(c.kind, s.tws) * dt;
+    // the twin: her share of the best VMG in the wind as it is, reached with the boat's own lag
+    c.twinRate += (c.eta * bestVmg(c.kind, s.tws) - c.twinRate) * Math.min(1, dt / TWIN_LAG);
+    c.made += along(c.kind, s) * dt; c.twin += c.twinRate * dt;
     c.minV = Math.min(c.minV, s.v);
     if (c.turnEnd == null) {
-      c.peakRate = Math.max(c.peakRate, s.rate); c.turned += s.rate * dt;
+      c.peakRate = Math.max(c.peakRate, s.rate); c.turned += s.dh; // (net: a wave's yaw cancels out)
       // the turn's over once she's held her heading for a second after the flip (a wave's yaw can still it for a moment)
       if (s.t > c.tFlip && s.rate < STEADY_RATE) { c.slowSince ??= s.t; if (s.t - c.slowSince >= 1) c.turnEnd = c.slowSince; } else c.slowSince = null;
     }
@@ -142,7 +160,13 @@ export class DrillTracker {
     if (s.t > c.tFlip && s.t - c.tFlip < 15) c.overshoot = Math.max(c.overshoot, c.kind === 'tack' ? Math.abs(s.twa) - c.ref : c.ref - Math.abs(s.twa));
     // the jib (a tack) or the boom (a gybe) across: its side flips
     if (c.across == null) { const x = c.kind === 'tack' ? s.jib : s.boom, was = c.kind === 'tack' ? c.jibSign : c.boomSign; if (was && Math.sign(x) === -was && Math.abs(x) > 3) c.across = s.t - c.tFlip; }
-    if (c.backAt == null && c.turnEnd != null && s.v >= BACK[c.kind] * c.v0) c.backAt = s.t;
+    // back to speed: to BACK of her speed before, as the wind is now (a lull after the tack doesn't hold her 'slow', nor a puff hurry her)
+    if (c.backAt == null && c.turnEnd != null && s.v >= BACK[c.kind] * c.v0 * bestSpeed(c.kind, s.tws) / Math.max(0.1, bestSpeed(c.kind, c.tws0))) c.backAt = s.t;
+  }
+
+  /** A turn noted, not scored: why (it shows in the Coach card and the list). */
+  private note(kind: DrillKind, tws: number, hs: number, why: string): void {
+    this.list.push({ kind, scored: false, tws, hs, lostM: 0, goodM: 0, turnS: 0, rate: 0, peakRate: 0, deadS: 0, overshoot: 0, acrossS: null, jibBacked: false, minSpeed: 1, backS: null, coach: why });
   }
 
   private follow(b: Boat, s: Sample, dt: number): void {
@@ -156,14 +180,16 @@ export class DrillTracker {
     // a wind shift that flipped the tack (or the run) with hardly a turn, or a gybe in which the boom never crossed:
     // not a manoeuvre (a gybe from a dead run is a small turn, about 12° in a breeze: the boom crossing is what counts)
     // (a tack stuck in irons turns little but sits head to wind: that's scored, and told so)
-    if (c.kind === 'tack' ? c.turned < 40 && c.deadS < 5 : c.turned < 6 || c.across == null) return;
+    const turned = Math.abs(c.turned);
+    if (c.kind === 'tack' ? turned < 40 && c.deadS < 5 : turned < 6 || c.across == null) return;
     // the jib left aback after the tack: hove to, not a tack to score (physics.ts heaveTo)
-    if (c.kind === 'tack' && c.abackS >= 5) return;
+    if (c.kind === 'tack' && c.abackS >= 5) { this.note('tack', c.tws, c.hs, 'Hove to: the jib stayed aback on the new side, so it isn\'t scored as a tack. To tack, let the old jib sheet go as she passes head to wind.'); return; }
+    if (!c.valid) { this.note(c.kind, c.tws, c.hs, c.why); return; }
     // (drifting slowly through the eye, she may hold a steady heading either side of it: the turn lasts at least as long as she sat head to wind)
     const turnS = Math.max((c.turnEnd ?? s.t) - c.t0, c.deadS);
     const sc: ManoeuvreScore = {
       kind: c.kind, scored: true, tws: c.tws, hs: c.hs, lostM: c.twin - c.made, goodM: simCrew(c.kind, c.tws).lostM,
-      turnS, rate: c.turned / Math.max(0.1, turnS), peakRate: c.peakRate, deadS: c.deadS, overshoot: Math.max(0, c.overshoot),
+      turnS, rate: turned / Math.max(0.1, turnS), peakRate: c.peakRate, deadS: c.deadS, overshoot: Math.max(0, c.overshoot),
       acrossS: c.across, jibBacked: c.backed > 0.05, minSpeed: c.minV / Math.max(0.1, c.v0), backS: c.backAt != null ? c.backAt - c.tFlip : null, coach: ''
     };
     sc.coach = coachLine(sc, c.jibMine);
@@ -183,8 +209,8 @@ export class DrillTracker {
  * Part I – The Turn").
  */
 export const SIM_CREW: Record<DrillKind, [number, number, number, number, number, number][]> = {
-  tack: [[3, 7.9, 4.5, 0.65, 75, 8.2], [4, 5.8, 6.0, 0.64, 60, 9.0], [6, 4.1, 8.1, 0.67, 36, 7.5], [8, 3.5, 9.3, 0.67, 24, 5.9], [12, 3.0, 10.6, 0.66, 16, 4.6], [16, 2.8, 11.1, 0.62, 15, 5.4], [20, 2.8, 11.1, 0.58, 14, 5.7], [25, 3.0, 10.4, 0.46, 16, 9.0]],
-  gybe: [[3, 0, 3.2, 0.89, 57, 2.0], [4, 0, 4.1, 0.89, 48, 2.3], [6, 0, 5.6, 0.89, 33, 2.5], [8, 0, 6.6, 0.91, 25, 2.4], [12, 0, 7.5, 0.92, 18, 2.2], [16, 0, 6.4, 0.94, 13, 1.5], [20, 0, 7.1, 0.95, 11, 1.4], [25, 0, 7.4, 0.95, 10, 1.4]]
+  tack: [[3, 7.9, 4.5, 0.65, 75, 8.6], [4, 5.8, 5.8, 0.64, 60, 9.2], [6, 4.1, 7.6, 0.67, 37, 7.7], [8, 3.5, 8.5, 0.67, 24, 6.0], [12, 3.0, 9.4, 0.66, 16, 4.6], [16, 2.8, 9.9, 0.62, 15, 5.4], [20, 2.8, 9.9, 0.58, 14, 5.8], [25, 3.0, 9.4, 0.46, 16, 9.1]],
+  gybe: [[3, 0, 3.2, 0.89, 55, 2.0], [4, 0, 4.0, 0.89, 47, 2.3], [6, 0, 5.1, 0.89, 33, 2.5], [8, 0, 5.7, 0.91, 25, 2.4], [12, 0, 5.5, 0.92, 18, 2.2], [16, 0, 3.6, 0.94, 13, 1.5], [20, 0, 3.9, 0.95, 11, 1.4], [25, 0, 3.9, 0.95, 10, 1.4]]
 };
 /** The sim crew's figures at `tws`, between the winds measured. */
 export function simCrew(kind: DrillKind, tws: number): { dead: number; rate: number; minSpeed: number; back: number; lostM: number } {

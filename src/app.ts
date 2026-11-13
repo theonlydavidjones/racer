@@ -491,7 +491,7 @@ function drillTick(): void {
   if (list.length === drillSeen) return;
   for (let i = drillSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by manoeuvre and wind band)
     const s = list[i], k = drillKey(s), b = S.practiceBest?.[k];
-    if (!s.scored) continue; // (a turn noted, not scored, is no best)
+    if (!s.scored || s.lostM < 0) continue; // (a turn noted, not scored, is no best; nor a reading below nothing, the measure's own wander)
     if (!b || Math.max(0, s.lostM) < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(S); }
   }
   drillSeen = list.length;

@@ -87,7 +87,7 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     expect(g.length).toBeGreaterThan(0);
     expect(g.every(x => !x.scored)).toBe(true);
     expect(g[0].coach).toMatch(/Gybe not scored/);
-    expect(d.list.every(x => x.lostM >= -3)).toBe(true);
+    expect(d.list.filter(x => x.scored).every(x => x.lostM >= -2.5)).toBe(true);
   });
   it('a tack from a reach is noted, not scored', () => {
     const tws = 12, b = testBoat({ heading: 270, kt: 5, windKt: tws }) as Boat, d = new DrillTracker();
@@ -123,5 +123,40 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
   it("a good tack with the jib sheets yours is still a good tack (no 'too early' line without an honest signal for it)", () => {
     const s = drill('tack', 12)!;
     expect(coachLine(s, true)).toMatch(/^A good tack/);
+  });
+
+  it('an aborted tack (back onto the old tack before the turn is done) is noted, not scored, and makes no best', () => {
+    const tws = 12, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    run(b, d, 40);
+    // head up through the wind by 10°, then fall back onto the old tack
+    b.handsOff = true; b.tiller = -0.6; let backAgain = false;
+    run(b, d, 30, () => { const a = wrap(b.ww.from - b.h); if (!backAgain && a < -10) { backAgain = true; b.tiller = 0.6; } if (backAgain && a > ang - 2) b.tiller = 0; });
+    b.handsOff = false; run(b, d, 40);
+    expect(d.list.some(x => x.scored)).toBe(false);
+    expect(d.list.some(x => /not completed/.test(x.coach))).toBe(true);
+  });
+  it("in a Bay chop the crew's own tack is still scored, over the turn itself (a wave's yaw isn't turning)", () => {
+    const tws = 14, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    b.sea = { ...b.sea, hsW: 0.6, tpW: 2.5, fromW: b.ww.from, steep: 0.06 };
+    run(b, d, 60); startTack(b); run(b, d, 90);
+    const s = d.list.find(x => x.scored);
+    expect(s, d.list.map(x => x.coach).join(' | ')).toBeTruthy();
+    expect(s!.turnS).toBeLessThan(14);
+    expect(s!.rate).toBeGreaterThan(0.6 * simCrew('tack', tws).rate);
+  });
+  it('drifting, and wallowing on a run with no gybe, make no notes', () => {
+    const tws = 6, b = testBoat({ heading: 180, kt: 0.3, windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    b.handsOff = true; b.tiller = 0;
+    let t = 0; run(b, d, 300, () => { t += 1 / 60; b.ww = { ...b.ww, from: (360 + 6 * Math.sin(t / 7)) % 360 }; });
+    expect(d.list.length, d.list.map(x => x.coach).join(' | ')).toBe(0);
+  });
+  it('a lull right after the tack is not read as a gain (back to speed is judged in the wind as it is)', () => {
+    const tws = 10, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    run(b, d, 60); startTack(b);
+    let flipT = -1, t = 0;
+    run(b, d, 90, () => { t += 1 / 60; if (flipT < 0 && b.tack === 'P') flipT = t; if (flipT >= 0 && t - flipT > 2 && b.ww.kt === tws) b.ww = { ...b.ww, kt: tws - 4 }; });
+    const s = d.list.find(x => x.scored)!;
+    expect(s.backS).not.toBeNull();
+    expect(s.lostM).toBeGreaterThan(0.5 * s.goodM);
   });
 });
