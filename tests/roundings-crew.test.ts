@@ -23,7 +23,7 @@ function crewLaps(windKt: number, laps = 6, seed = 12345, current = 'slack'): Ro
 }
 const med = (xs: number[]) => { const a = [...xs].sort((p, q) => p - q); return a.length ? a[a.length >> 1] : NaN; };
 function crewLoss(windKt: number, kind: 'windward' | 'leeward', current = 'slack'): number {
-  const xs = [12345, 777].flatMap(seed => crewLaps(windKt, 6, seed, current)).filter(s => s.kind === kind);
+  const xs = [12345, 777, 4242].flatMap(seed => crewLaps(windKt, 8, seed, current)).filter(s => s.kind === kind && !s.touched);
   return med(xs.map(s => s.lostM));
 }
 
@@ -32,9 +32,9 @@ describe('The mark-rounding drill, against the sim crew (full World; excluded fr
     for (const tws of [12, 16]) for (const kind of ['windward', 'leeward'] as const) {
       const lost = crewLoss(tws, kind), good = simCrew(kind, tws).lostM;
       expect(Number.isFinite(lost), `${tws} kt ${kind}: some roundings`).toBe(true);
-      expect(Math.abs(lost - good), `${tws} kt ${kind}: lost ${lost.toFixed(0)}, table ${good}`).toBeLessThan(Math.max(22, 0.6 * good));
+      expect(Math.abs(lost - good), `${tws} kt ${kind}: lost ${lost.toFixed(0)}, table ${good}`).toBeLessThan(15); // (about the spread of a median of a dozen roundings)
     }
-  }, 120000);
+  }, 300000);
 
   it('a lap gives a windward rounding then a leeward one, alternating, both to port', () => {
     const kinds = crewLaps(12, 6).map(s => s.kind);
@@ -42,8 +42,6 @@ describe('The mark-rounding drill, against the sim crew (full World; excluded fr
     for (let i = 1; i < kinds.length; i++) expect(kinds[i], `rounding ${i} after ${kinds[i - 1]}`).not.toBe(kinds[i - 1]);
   }, 90000);
 
-  it('the tide does not score her: a flood current barely changes the loss', () => {
-    const slack = crewLoss(12, 'windward', 'slack'), flood = crewLoss(12, 'windward', 'flood');
-    expect(Math.abs(flood - slack), `windward slack ${slack.toFixed(0)} vs flood ${flood.toFixed(0)}`).toBeLessThan(22);
-  }, 120000);
+  // (that the tide doesn't score her is shown with a scripted boat in tests/roundings.test.ts: the sim crew itself sails
+  // worse in a strong stream, overstanding with the set, which the drill rightly charges)
 });

@@ -53,7 +53,7 @@ export interface RoundingScore {
    * set on the way in and wasn't stowed before she rounded, or it wasn't out: see the coach's `poleWasOut`). */
   dropS: number | null;
   /** Leeward: her distance off the mark (m) as the final turn began (wide in); how far the mark was to windward of her new
-   * close-hauled track as she came onto the wind (close out: within a length is good); and her closest. */
+   * close-hauled track as she came onto the wind (close out); and her closest. */
   entryD: number; exitD: number; closest: number;
   /** The turn's peak rate (°/s) and her lowest speed as a share of her speed in. */
   peakRate: number; minSpeed: number;
@@ -107,27 +107,30 @@ const HIST = new WeakMap<RoundingTracker, Sample[]>();
 /** The sim crew's own roundings, measured by this tracker (tests/roundings.test.ts keeps them in step): by true wind (kt),
  * metres lost, and the figures the coaching compares with. */
 export interface CrewRounding { lostM: number; freeS: number; poleS: number; dropS: number; exitD: number; peakRate: number; minSpeed: number }
-// Measured by the test harness (tests/roundings.test.ts drives the sim's own crew round the practice course and reads
-// this tracker; the median over several laps and seeds in flat water). No published figure exists for any of it. The
-// loss grows with the wind: a fresh-breeze rounding disrupts the same seconds at a higher speed, so more metres go. The
-// columns are {lostM, freeS, poleS, dropS, exitD, peakRate, minSpeed}; freeS/poleS matter for the windward mark, dropS/
-// exitD for the leeward; exitD at the windward mark is the far gate (not used).
+// Measured by driving the sim's own crew round the practice course with this tracker (tests/roundings-crew.test.ts has
+// the harness), in slack water and flat seas: the median over five seeds and about two dozen roundings at each wind,
+// roundings where it touched the mark left out (13 Nov 2026). No published figure exists for any of it. A single
+// rounding varies a good deal (the middle half spans about ±8 m at the leeward mark, ±10–20 m at the windward, mostly
+// how many tacks she made inside 100 m), so the medians are lightly smoothed across the winds. The windward mark costs more
+// as the wind rises (the bear-away and the pole at a higher speed); the leeward costs about 10 m in any wind. Columns:
+// {lostM, freeS, poleS, dropS, exitD, peakRate, minSpeed}; freeS and poleS are the windward mark's (poleS 0: the crew
+// leaves the jib to leeward, in light air), dropS and exitD the leeward's.
 export const SIM_CREW: Record<RoundingKind, [number, CrewRounding][]> = {
   windward: [
-    [6, { lostM: 6, freeS: 7, poleS: 0, dropS: 0, exitD: 100, peakRate: 11.4, minSpeed: 0.67 }],
-    [8, { lostM: 20, freeS: 5, poleS: 14, dropS: 0, exitD: 100, peakRate: 12.7, minSpeed: 0.69 }],
-    [12, { lostM: 35, freeS: 6, poleS: 15, dropS: 0, exitD: 100, peakRate: 14.4, minSpeed: 0.71 }],
-    [16, { lostM: 51, freeS: 10, poleS: 15, dropS: 0, exitD: 100, peakRate: 17.6, minSpeed: 0.64 }],
-    [20, { lostM: 64, freeS: 12, poleS: 15, dropS: 0, exitD: 100, peakRate: 17.5, minSpeed: 0.55 }],
-    [25, { lostM: 77, freeS: 11, poleS: 15, dropS: 0, exitD: 100, peakRate: 17.5, minSpeed: 0.45 }]
+    [6, { lostM: 20, freeS: 8, poleS: 0, dropS: 0, exitD: 11, peakRate: 12.0, minSpeed: 0.69 }],
+    [8, { lostM: 17, freeS: 5, poleS: 16, dropS: 0, exitD: 10, peakRate: 12.9, minSpeed: 0.73 }],
+    [12, { lostM: 18, freeS: 8, poleS: 15.5, dropS: 0, exitD: 14, peakRate: 15.1, minSpeed: 0.72 }],
+    [16, { lostM: 36, freeS: 9, poleS: 15, dropS: 0, exitD: 13, peakRate: 17.2, minSpeed: 0.63 }],
+    [20, { lostM: 38, freeS: 5, poleS: 15, dropS: 0, exitD: 14, peakRate: 17.6, minSpeed: 0.55 }],
+    [25, { lostM: 48, freeS: 10, poleS: 15, dropS: 0, exitD: 16, peakRate: 17.5, minSpeed: 0.46 }]
   ],
   leeward: [
-    [6, { lostM: 9, freeS: 0, poleS: 0, dropS: 12, exitD: 16, peakRate: 9.9, minSpeed: 0.70 }],
-    [8, { lostM: 29, freeS: 0, poleS: 0, dropS: 29, exitD: 17, peakRate: 11.7, minSpeed: 0.86 }],
-    [12, { lostM: 25, freeS: 0, poleS: 0, dropS: 28, exitD: 18, peakRate: 13.8, minSpeed: 0.83 }],
-    [16, { lostM: 48, freeS: 0, poleS: 0, dropS: 23, exitD: 19, peakRate: 17.1, minSpeed: 0.77 }],
-    [20, { lostM: 45, freeS: 0, poleS: 0, dropS: 20, exitD: 19, peakRate: 18.7, minSpeed: 0.66 }],
-    [25, { lostM: 66, freeS: 0, poleS: 0, dropS: 29, exitD: 19, peakRate: 19.1, minSpeed: 0.56 }]
+    [6, { lostM: 13, freeS: 0, poleS: 0, dropS: 26, exitD: 16, peakRate: 9.9, minSpeed: 0.73 }],
+    [8, { lostM: 14, freeS: 0, poleS: 0, dropS: 26, exitD: 16, peakRate: 11.3, minSpeed: 0.82 }],
+    [12, { lostM: 10, freeS: 0, poleS: 0, dropS: 28, exitD: 18, peakRate: 14.3, minSpeed: 0.84 }],
+    [16, { lostM: 9, freeS: 0, poleS: 0, dropS: 22, exitD: 17, peakRate: 17.1, minSpeed: 0.76 }],
+    [20, { lostM: 6, freeS: 0, poleS: 0, dropS: 20, exitD: 18, peakRate: 19.1, minSpeed: 0.67 }],
+    [25, { lostM: 9, freeS: 0, poleS: 0, dropS: 19, exitD: 18, peakRate: 20.2, minSpeed: 0.52 }]
   ]
 };
 export function simCrew(kind: RoundingKind, tws: number): CrewRounding {
@@ -241,8 +244,10 @@ export class RoundingTracker {
     // lag), through the water, turning for the new leg as it reaches the mark's level (which the stream carries along
     // the wind in the water's frame: drift)
     c.twTws += (s.tws - c.twTws) * Math.min(1, dt / TWIN_LAG);
+    // (in the water's frame the fixed mark moves against the stream: a stream down the wind carries the water away from
+    // a windward mark, so its level lies further up the wind through the water as time goes on, and the reverse)
     const uW = V(s.from); c.drift += kIn * (s.cx * uW.x + s.cy * uW.y) * dt;
-    const twinIn = c.twin < c.dInW + c.drift;
+    const twinIn = c.twin < c.dInW - c.drift;
     c.twin += (twinIn ? c.etaIn * legVmg(up, c.twTws) : c.etaOut * legVmg(!up, c.twTws)) * dt;
     c.closest = Math.min(c.closest, md);
     c.minV = Math.min(c.minV, s.v);
@@ -298,7 +303,7 @@ export class RoundingTracker {
 /** The one thing to change (or that it was good): the commonest costly mistakes first. */
 export function roundingCoach(s: RoundingScore, g: CrewRounding, poleWasOut = true): string {
   const lost = Math.max(0, Math.round(s.lostM)), good = Math.round(s.goodM), n = (v: number) => Math.round(v);
-  const ok = s.lostM <= Math.max(3, 1.2 * s.goodM);
+  const ok = s.lostM <= s.goodM + 10; // (within about the crew's own spread: a single rounding varies ±10 m)
   if (s.touched) return `You touched the mark: in a race that's a one-turn penalty (rule 31). Give it a little more room.`;
   if (s.kind === 'windward') {
     if (s.pinchS > 4 || s.tacks >= 3) return `Short of the layline: you had to ${s.tacks >= 3 ? 'tack again' : `pinch for ${n(s.pinchS)} s`} to make the mark. Lost ${lost} m (a good crew ${good}). Go a little past the layline before you tack for it: a touch over is cheaper than short.`;
