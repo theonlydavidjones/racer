@@ -8,7 +8,9 @@ series*, not just a race.
 
 *The mock-up, redrawn after the owner's feedback (13 Nov). It's the Yacht Club's layout (Boats · Members · Season),
 and every boat list shows country and sail number beside the name, since sailors in a fleet go by sail numbers. Boat
-chips are in the boats' colours, and each row has a place-by-race sparkline, 1st at the top. The points are real: the
+chips each get a colour of their own in a series: a boat's hull colour where it's distinct, otherwise one from a fixed
+palette (FREYA violet, KITTIWAKE pink, yours teal). Your boat's row highlight (amber) stays apart from the palette.
+Each row has a place-by-race sparkline, 1st at the top. The points are real: the
 2025–26 Seaweed Soup Folkboat fleet's published race points (Jibeset, saved in
 src/boat/data/sf-folkboat-results.json), scored as a series, and shown on the sim's fleet. Polperro's are on Red,
 Faith's on Blue, Josephine's on yours (JOSEPHINE, USA 110), Circle Sea's on Green, Thea's on Black, Shanty's on Varnish,
