@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RIG } from '../src/render/boatMesh';
 import { sailArea, sailEdges } from '../src/render/sails';
 import { CABIN, COCKPIT, L, deckY, halfBeam, sheer, uAtZ } from '../src/render/hull';
-import { carLead } from '../src/boat/controls';
+import { carLead, SHEET_POINT, TRAVELLER_HALF } from '../src/boat/controls';
 
 /** The drawn boat against the class rules (NFIA CR 2025–2028) and FRIDA's ORC certificate (EST F51, 2026). */
 describe('the drawn rig and hull', () => {
@@ -56,5 +56,12 @@ describe('the drawn rig and hull', () => {
     expect(st(6) - z(CABIN.u1)).toBeGreaterThanOrEqual(0); expect(st(6) - z(CABIN.u1)).toBeLessThanOrEqual(0.30);
     expect(z(CABIN.u0)).toBeGreaterThan(RIG.MAST_FRONT_Z + 0.133); // aft of the mast
     expect(z(COCKPIT.u1)).toBeCloseTo(st(3), 3);
+  });
+});
+
+describe('the traveller: the physics and the drawing agree', () => {
+  it('the car\'s travel and the sheet\'s point on the boom are the drawn ones (controls.ts TRAVELLER_SWING)', () => {
+    expect(TRAVELLER_HALF).toBeCloseTo(RIG.TRAV_HALF, 6);
+    expect(SHEET_POINT).toBeCloseTo(RIG.MS_R, 2);
   });
 });

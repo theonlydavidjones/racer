@@ -112,7 +112,7 @@ const JIB_DEF: SailDef = (() => {
   };
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
-export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) };
+export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 
 /** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
