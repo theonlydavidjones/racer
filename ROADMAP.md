@@ -18,6 +18,13 @@ menus, the Keys), not as new buttons on the screen. Every item below that adds a
 **The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
 then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
 - **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
+  Scenery for it (owner, 13 November; later, with the Bay's beauty):
+  - **Oracle Park** (6–10 h): the ballpark on the shore by McCovey Cove, with its pennants waving during games, the
+    lights on for night games and concerts, the scoreboard lit during games, and kayakers in the cove waiting for splash
+    hits. Driven by the Giants' real home schedule and the park's events for the sim's date, where it can be sourced.
+  - **Alcatraz, properly built out** (6–10 h): the cellhouse, the lighthouse, the water tower, the guardhouse and
+    dock, the ruins, at real scale and in significant detail.
+  - **The Palace of Fine Arts, refined** (2–4 h).
 - **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
@@ -162,6 +169,25 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
+   tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
+   should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
+   what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
+   released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
+   you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
+   one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
+   - One crew member fetches the boom crutch from the cabin (it takes the time it takes), and paddles on the side
+     you call, port or starboard, which turns her as well as pushing her.
+   - Smart crew start on their own when she's in a jam: no wind, the current setting her onto a pier, a mark or the
+     shore, or stuck in irons by the dock.
+   - The physics, sourced: what one person can sustain with a short blade (watts), against her own low-speed resistance
+     already in the sim, so a 2-tonne keelboat makes a fraction of a knot, not a dinghy's speed.
+   - Racing: RRS 42 allows only the wind and water to propel her. Its exception lets a boat get clear after grounding or
+     a collision, using her crew's force. Check the 2025–2028 text for the exact wording. Otherwise, paddling while
+     racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
+   - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
+     The on-screen label is the owner's choice.
 8b. **A UI audit with real rigour** (owner, 13 November; next): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
