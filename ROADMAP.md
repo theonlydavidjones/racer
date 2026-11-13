@@ -169,6 +169,11 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8e. **Now — a crew member's arms are on backwards** (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
+   arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
+   past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
+   the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
 8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
