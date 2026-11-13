@@ -1,4 +1,4 @@
-import { boomAngle, carLead, jibAngle, jibsheetFor, loadedCar, type Controls } from '../boat/controls';
+import { carLead, jibAngle, jibsheetFor, loadedCar, type Controls } from '../boat/controls';
 import type { Tack } from '../boat/boat';
 import { D2R } from '../core/math';
 
@@ -58,4 +58,4 @@ export function jibsheetAtIn(inches: number, c: Controls, tack: Tack): number {
 /** The jib sheet's whole run, hard in to 68°, inches. */
 export const jibsheetTotal = (c: Controls, tack: Tack) => { const lead = carLead(loadedCar(c, tack).ins); return (jibSpan(68, lead) - jibSpan(lead, lead)) / IN; };
 /** Where the boom is for the controls (the band's marker): re-exported for the ticks' own use. */
-export { boomAngle };
+export { boomAngle } from '../boat/controls';

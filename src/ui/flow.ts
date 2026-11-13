@@ -60,7 +60,7 @@ export function readout(w: SimView, kind: FlowKind, p: Vec, wind?: { kt: number;
 }
 
 /** The affine map tf is (a turn, a scale and a shift): its matrix, and its inverse (screen to sim metres). */
-function affine(tf: Tf): { m: [number, number, number, number, number, number]; inv: (sx: number, sy: number) => Vec } {
+export function affine(tf: Tf): { m: [number, number, number, number, number, number]; inv: (sx: number, sy: number) => Vec } {
   const o = tf(0, 0), ex = tf(1, 0), ey = tf(0, 1);
   const a = ex[0] - o[0], b = ex[1] - o[1], c = ey[0] - o[0], d = ey[1] - o[1], det = a * d - b * c;
   return { m: [a, b, c, d, o[0], o[1]], inv: (sx, sy) => { const X = sx - o[0], Y = sy - o[1]; return { x: (d * X - c * Y) / det, y: (-b * X + a * Y) / det }; } };

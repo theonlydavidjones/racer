@@ -5,13 +5,20 @@ import { N_WAVES, type WaveField } from '../environment/waveField';
  * The waves you see: the World's wave field (environment/waveField.ts), the same one the boats' heave and pitch come
  * from (boat/seaway.ts waveMotion), drawn as Gerstner waves on the GPU (the water surface, below).
  */
-export { N_WAVES };
+export { N_WAVES } from '../environment/waveField';
 
-/** Uniform arrays for the water shader: (dir x, dir y, k, amp) and (ω, phase, Q, swell?). */
-export function packWaves(f: WaveField, a: Float32Array, b: Float32Array): void {
+/**
+ * Uniform arrays for the water shader: (dir x, dir y, k, amp) and (ω, phase at the origin `o` now, Q, swell?).
+ * The phase k·(d·p) − ωt + φ is worked out here, in double precision, at a local origin `o` near the camera (its
+ * k·(d·o) − ωt + φ, wrapped to one turn), so the shader adds only k·(d·(p − o)): small numbers. Out at South Beach
+ * (6 km from the sim's origin) after an hour, the full phase of the shortest wave is ~50,000 rad, where float32 keeps
+ * a few thousandths of a radian and a GPU's sin() isn't promised to be accurate at all.
+ */
+export function packWaves(f: WaveField, a: Float32Array, b: Float32Array, t: number, o: Vec): void {
   for (let i = 0; i < N_WAVES; i++) {
     a[i * 4] = f.sd[i]; a[i * 4 + 1] = f.cd[i]; a[i * 4 + 2] = f.k[i]; a[i * 4 + 3] = f.amp[i];
-    b[i * 4] = f.w[i]; b[i * 4 + 1] = f.phase[i]; b[i * 4 + 2] = f.q[i]; b[i * 4 + 3] = f.swell[i];
+    const th = f.k[i] * (f.sd[i] * o.x + f.cd[i] * o.y) - f.w[i] * t + f.phase[i];
+    b[i * 4] = f.w[i]; b[i * 4 + 1] = th - 2 * Math.PI * Math.floor(th / (2 * Math.PI)); b[i * 4 + 2] = f.q[i]; b[i * 4 + 3] = f.swell[i];
   }
 }
 
@@ -38,6 +45,7 @@ export const WAVE_GLSL = /* glsl */`
 uniform vec4 uWaveA[${N_WAVES}];
 uniform vec4 uWaveB[${N_WAVES}];
 uniform float uTime;
+uniform vec2 uWaveO; // the local origin the phases in uWaveB are for (packWaves)
 // p: sim coords (x east, y north); kW, kS: local scale; dist: from the camera (m)
 // A wave moves the mesh only where the mesh is fine enough to draw it (the grid spacing at that distance is under a
 // third of its wavelength): finer waves are left to the shading, or they alias into rings round the camera.
@@ -48,7 +56,7 @@ vec3 waveDisp(vec2 p, float kW, float kS, float dist) {
     vec4 A = uWaveA[i], B = uWaveB[i];
     float L = 6.2832 / A.z, fade = 1.0 - smoothstep(L * 0.18, L * 0.33, grid);
     float a = A.w * mix(kW, kS, B.w) * fade;
-    float th = A.z * dot(A.xy, p) - B.x * uTime + B.y;
+    float th = A.z * dot(A.xy, p - uWaveO) + B.y;
     d.xy += B.z * a * A.xy * cos(th);
     d.z += a * sin(th);
   }
@@ -71,7 +79,7 @@ vec3 waveSlope(vec2 p, float kW, float kS, float foot) {
     vec2 along = A.xy, across = vec2(-A.y, A.x);
     float env = B.w > 0.5 ? 1.0 : 0.25 + 1.5 * wgNoise(vec2(dot(p, along) - 0.5 * B.x / A.z * uTime, dot(p, across) * 0.4) / (L * 4.0) + float(i) * 7.31);
     float a = A.w * mix(kW, kS, B.w) * fade * env;
-    float th = A.z * dot(A.xy, p) - B.x * uTime + B.y;
+    float th = A.z * dot(A.xy, p - uWaveO) + B.y;
     s.xy += a * A.z * A.xy * cos(th);
     s.z += a * sin(th);
   }
