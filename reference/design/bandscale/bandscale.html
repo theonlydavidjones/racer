@@ -63,7 +63,7 @@ function band(m,mode){ const mid=mode==='mid'; if(mid) mode='feel';
   h+='</div><div class="trk"><div class="nm">Mainsheet · boom marker (to leeward →)</div>';
   const t=s.boom,pos=mode==='true'?rope(t)/TOT:Math.sin(t*Math.PI/180);
   h+=`<div class="rail"><span class="mid"></span><span class="boom" style="left:${pos*100}%"></span></div>`;
-  if(mode==='true'){h+='<div class="scale">'+[0,48,96,192,300,400,Math.round(TOT)].map(i=>`<i style="left:${i/TOT*100}%">${i} in</i>`).join('')+'</div>';
+  if(mode==='true'){h+='<div class="scale">'+[0,48,96,192,300,Math.round(TOT)].map(i=>`<i style="left:${i/TOT*100}%">${i} in</i>`).join('')+'</div>';
     h+='<div class="scale deg">'+[10,15,20,30,45,60,70].map(d=>`<i style="left:${rope(d)/TOT*100}%">${d}°${d===70?' shroud':''}</i>`).join('')+'</div>';
     h+=`<div class="note">${rope(t).toFixed(0)} in eased (${(rope(t)/TOT*100).toFixed(0)}% of ${TOT.toFixed(0)} in) · boom ${t}°</div>`;}
   else if(mid){h+='<div class="scale">'+[6,12,24,48,96,192,300,400].map(i=>`<i style="left:${Math.sin(angleAt(i)*Math.PI/180)*100}%">${i}″</i>`).join('')+'</div>';h+=`<div class="note">boom ${t}° · today's marker, with inches of sheet eased marked under the track: ${rope(t).toFixed(0)} in out now</div>`;}
