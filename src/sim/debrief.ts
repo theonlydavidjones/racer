@@ -1,4 +1,5 @@
 import { byHand } from '../boat/physics';
+import { poleMustCome } from '../ai/ai';
 import { D2R, V, clamp, cross, dist, dot, sub, unit, wrap } from '../core/math';
 import type { Boat } from '../boat/boat';
 import { beatAngle, polar, runAngle } from '../boat/polar';
@@ -244,8 +245,8 @@ export class RaceLog {
       const best = runAngle(ww.kt), vmg = (a: number) => polar(ww.kt, a) * -Math.cos(a * D2R), r = vmg(best) > 0 ? vmg(u.twa) / vmg(best) : 1;
       let lost = 0, poleLost = 0;
       if (r < 0.97) { this.down.t += dt; this.down.lost += dt * clamp(1 - r, 0, 0.5); lost += dt * clamp(1 - r, 0, 0.5); }
-      // (only while the pole is yours: while it's the crew's, setting it and gybing it end-for-end are their time)
-      if (u.twa > 156 && u.pole !== 'set' && u.poleMine) {
+      // (only while the pole could be out: not with the jib down, in penalty turns, in a harbor; ai.ts poleMustCome)
+      if (u.twa > 156 && u.pole !== 'set' && u.poleMine && !poleMustCome(u)) {
         const jib = polar(ww.kt, u.twa, 'jib'), wing = polar(ww.kt, u.twa, 'wing');
         if (wing > jib * 1.02) { this.pole.t += dt; this.pole.lost += dt * (1 - jib / wing); lost += dt * (1 - jib / wing); poleLost = dt * (1 - jib / wing); }
       }
@@ -300,7 +301,7 @@ export class RaceLog {
       tip: 'Downwind, sail the best angle for the wind (the downwind laylines show it): heat up a little in the lulls, sail lower in the puffs. Running deep, pole the jib out to windward.' });
     if (this.heel.lost > 0.5) out.push({ key: 'heel', title: 'Heel', lost: this.heel.lost,
       detail: `${mmss(this.heel.t)} heeled past about 22°.`,
-      tip: 'In the puffs, depower before she lays over: backstay on, traveller down, ease the main a little. A Folkboat is fastest at about 15–20° of heel.' });
+      tip: 'In the puffs, depower before she lays over: backstay on, traveler down, ease the main a little. A Folkboat is fastest at about 15–20° of heel.' });
     if (this.trim.lost > 1) out.push({ key: 'trim', title: 'Sail trim', lost: this.trim.lost,
       detail: 'Your sheets and controls, against the best trim for the conditions.',
       tip: 'Watch the telltales, and open the Trim coach for what to change.' });

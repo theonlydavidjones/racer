@@ -36,7 +36,7 @@ const flowSample = (g: CanvasRenderingContext2D, w: number, h: number, ramp: typ
 
 const SIM: { key: SimKey; name: string; draw: Draw }[] = [
   { key: 'you', name: 'You', draw: (g, I, w, h) => boat(g, w / 2, h / 2, 4, I.you, I, true) },
-  { key: 'boats', name: 'Other boats (in their colours)', draw: (g, I, w, h) => { boat(g, w / 2 - 8, h / 2, 3.4, '#c8302a', I, false); boat(g, w / 2 + 8, h / 2, 3.4, '#f3f1ea', I, false); } },
+  { key: 'boats', name: 'Other boats (in their colors)', draw: (g, I, w, h) => { boat(g, w / 2 - 8, h / 2, 3.4, '#c8302a', I, false); boat(g, w / 2 + 8, h / 2, 3.4, '#f3f1ea', I, false); } },
   { key: 'start', name: 'Start and finish line', draw: (g, I, w, h) => line(g, w, h, PEN.start, I.line, I.halo) },
   { key: 'marks', name: 'Course marks (the zone ring with the aids)', draw: (g, I, w, h) => dot(g, w / 2, h / 2, 4, I.mark, I) },
   { key: 'next', name: 'Your next mark', draw: (g, I, w, h) => dot(g, w / 2, h / 2, 5, I.markHi, I) },
@@ -45,12 +45,12 @@ const SIM: { key: SimKey; name: string; draw: Draw }[] = [
   { key: 'track', name: 'The course she\'d sail leaving now (tacks ▲, gybes ○)', draw: (g, I, w, h) => { const y = h / 2; g.lineJoin = 'round'; const z = () => { g.beginPath(); g.moveTo(3, y + 3); g.lineTo(w * 0.35, y - 4); g.lineTo(w * 0.65, y + 4); g.lineTo(w - 3, y - 3); }; g.strokeStyle = I.halo; g.lineWidth = PEN.track.halo; z(); g.stroke(); g.strokeStyle = I.you; g.lineWidth = PEN.track.w; z(); g.stroke(); } },
   { key: 'laylines', name: 'Laylines over the ground, allowing for the current: starboard tack (green), port tack (red)', draw: (g, I, w, h) => { line(g, w / 2 - 1, h, PEN.layline, I.starboard, I.halo); g.save(); g.translate(w / 2 + 1, 0); line(g, w / 2 - 1, h, PEN.layline, I.port, I.halo); g.restore(); } },
   { key: 'ships', name: 'Ship, and where she\'ll be in a minute', draw: (g, I, w, h) => { const y = h / 2; g.lineCap = 'round'; g.strokeStyle = I.shipHalo; g.lineWidth = 6.5; g.beginPath(); g.moveTo(4, y); g.lineTo(16, y); g.stroke(); g.strokeStyle = I.ship; g.lineWidth = 3.5; g.stroke(); g.lineCap = 'butt'; g.globalAlpha = PEN.ahead.alpha; g.lineWidth = PEN.ahead.w; g.setLineDash(PEN.ahead.dash); g.beginPath(); g.moveTo(16, y); g.lineTo(w - 3, y); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; } },
-  { key: 'current', name: 'Current: its speed in colour (kt: the scale on the chart), streaks the way it sets', draw: (g, _I, w, h) => flowSample(g, w, h, CURRENT_RAMP, 3) },
-  { key: 'wind', name: 'Wind: its speed in colour, the puffs and lulls with it (kt: the scale on the chart), streaks the way it blows', draw: (g, _I, w, h) => flowSample(g, w, h, WIND_RAMP, 30) },
+  { key: 'current', name: 'Current: its speed in color (kt: the scale on the chart), streaks the way it sets', draw: (g, _I, w, h) => flowSample(g, w, h, CURRENT_RAMP, 3) },
+  { key: 'wind', name: 'Wind: its speed in color, the puffs and lulls with it (kt: the scale on the chart), streaks the way it blows', draw: (g, _I, w, h) => flowSample(g, w, h, WIND_RAMP, 30) },
   { key: 'puffs', name: 'Puffs (dark) and lulls (pale) drifting down the course', draw: (g, _I, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2.5); gr.addColorStop(0, 'rgba(8,22,40,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); } },
-  { key: 'sea', name: 'Sea state: more dots, higher waves (m)', draw: (g, I, w, h) => { g.fillStyle = I.seaText; let r = 7; for (let k = 0; k < 18; k++) { r = r * 16807 % 2147483647; const x = 3 + (r % 1000) / 1000 * (w - 6); r = r * 16807 % 2147483647; g.fillRect(x, 2 + (r % 1000) / 1000 * (h - 4), 1.4, 1.4); } } },
-  { key: 'fog', name: 'Fog: grey where visibility is low (real readings)', draw: (g, I, w, h) => { g.fillStyle = I.fog(0.45); g.fillRect(2, 1, w - 4, h - 2); } },
-  { key: 'shadows', name: 'A boat\'s wind shadow (dirty air)', draw: (g, _I, w, h) => { const gr = g.createLinearGradient(3, 0, w - 3, 0); gr.addColorStop(0, 'rgba(10,20,30,.35)'); gr.addColorStop(1, 'rgba(10,20,30,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(3, h / 2 - 2); g.lineTo(w - 3, 1); g.lineTo(w - 3, h - 1); g.lineTo(3, h / 2 + 2); g.closePath(); g.fill(); } }
+  { key: 'sea', name: 'Sea state: wave height (chop and swell together), the arrow the way the swell runs', draw: (g, I, w, h) => { g.lineCap = 'round'; for (const [lw, c] of [[4, I.halo], [1.8, I.seaMark]] as const) { g.strokeStyle = c; g.lineWidth = lw; g.beginPath(); g.moveTo(4, h / 2); g.lineTo(w - 5, h / 2); g.moveTo(w - 5, h / 2); g.lineTo(w - 10, h / 2 - 3.5); g.moveTo(w - 5, h / 2); g.lineTo(w - 10, h / 2 + 3.5); g.stroke(); } } },
+  { key: 'fog', name: 'Fog: gray where visibility is low (real readings)', draw: (g, I, w, h) => { g.fillStyle = I.fog(0.45); g.fillRect(2, 1, w - 4, h - 2); } },
+  { key: 'shadows', name: 'Wind shadow: lighter wind behind land, boats, ships, piers (darker = lighter wind)', draw: (g, _I, w, h) => { const gr = g.createLinearGradient(3, 0, w - 3, 0); gr.addColorStop(0, 'rgba(74,32,140,.85)'); gr.addColorStop(0.8, 'rgba(74,32,140,.3)'); gr.addColorStop(1, 'rgba(235,228,250,.35)'); g.fillStyle = gr; g.fillRect(3, 2, w - 6, h - 4); } }
 ];
 
 /** The chart's line kinds, in the order the key lists them (what US Chart No. 1 shows in magenta first). */

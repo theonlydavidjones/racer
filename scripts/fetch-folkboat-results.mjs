@@ -15,12 +15,14 @@
  *    Resin Regatta. One-design races there carry finish places and the fleet's start time; finish times are almost
  *    never entered, so these races give places only.
  *
- * What's kept: public results only (sail number, boat, skipper as published, club, places, times, scoring codes).
+ * What's kept: public results only (sail number, boat, club, places, times, scoring codes; the skipper as an anonymous id,
+ * the names kept apart in reference/skipper-keys.json, which the app never imports: scripts/skipper-keys.mjs).
  * No contact details.
  *
  * Output: src/boat/data/sf-folkboat-results.json
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { anonymise } from './skipper-keys.mjs';
 import { analyse } from './analyse-folkboat-results.mjs';
 
 const OUT = new URL('../src/boat/data/sf-folkboat-results.json', import.meta.url);
@@ -29,6 +31,12 @@ const DISCOVER = process.argv.includes('--discover');
 const JIBESET = 'https://www.jibeset.net';
 /** Races scored on a course whose distance disagrees with the 2026–27 sheet's (src/courses/data); the 2025–26 sheet unread. */
 const SHEET_UNVERIFIED = { 'GGYC_T008047221-r1': 1, 'GGYC_T008047221-r3': 1, 'GGYC_T008047221-r4': 1 };
+/**
+ * Courses the results don't give, from someone who sailed the race (the scorer left "Course: ---"): the course number,
+ * and who says so. Seaweed Soup 2026–27 race 1 (7 Nov 2026): the owner, who sailed it, "it was a last minute course
+ * change. we sailed course #2" (the results sheet: reference/results/seaweed-soup-2026-27-race1-2026-11-07.png).
+ */
+const COURSE_FROM_SAILOR = { 'GGYC_T00227699-r1': { course: '2', by: 'the owner, who sailed it: "it was a last minute course change. we sailed course #2" (the results give no course)' } };
 const RN = 'https://www.regattanetwork.com';
 
 /** Jibeset regattas with a Folkboat fleet (club code, regatta id), found by --discover on 2026-11-11. */
@@ -138,6 +146,7 @@ async function fetchJibesetEvent(ev) {
   }
   // the races whose published distance disagrees with the 2026–27 sheet the sim draws them from (the 2025–26 sheet unread)
   for (const r of races) if (SHEET_UNVERIFIED[`${ev.club}_${ev.rg}-r${r.raceNo}`]) r.sheet = 'unverified';
+  for (const r of races) { const c = COURSE_FROM_SAILOR[`${ev.club}_${ev.rg}-r${r.raceNo}`]; if (c && !r.course) { r.course = c.course; r.courseFrom = c.by; } }
   console.log(`Jibeset ${ev.name}: ${races.length} Folkboat races`);
   return { source: 'jibeset', id: `${ev.club}_${ev.rg}`, name: ev.name, host: ev.host, url: fhUrl, races };
 }
@@ -254,11 +263,12 @@ const out = {
       'Those three races carry sheet: "unverified". sim/realRaces.ts says so beside the race.',
     'Distances are the scorer\'s nominal course lengths, not sailed distances.',
     'Regatta Network gives every 2023 SYC Classic race the date 2023-06-11 although the event ran June–October; treat those dates as unsure.',
-    'Skippers are as published, tidied to one spelling; a boat can have several skippers over the years.',
+    'skipper is an anonymous id (k001…), one per skipper however the name was typed; the names are in reference/skipper-keys.json, which the app never imports (no real skippers\' names in the game). A boat can have several skippers over the years.',
   ],
   gated,
   events,
 };
 const real = JSON.parse(await readFile(new URL('../src/environment/data/sf-real-days.json', import.meta.url), 'utf8'));
+anonymise(out); // (before anything is written: the names go to reference/skipper-keys.json only)
 await writeFile(OUT, JSON.stringify(analyse(out, real), null, 1) + '\n');
 console.log('Wrote', OUT.pathname, events.reduce((n, e) => n + e.races.length, 0), 'races');

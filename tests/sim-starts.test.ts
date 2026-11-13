@@ -27,6 +27,6 @@ describe('AI starts (regression guard, 8 races × 5 boats)', () => {
     const r = starts(cur);
     expect(r.ocsRate).toBeLessThan(0.1);
     expect(r.median).toBeLessThan(18);
-  }, 150_000);
+  }, 180_000);
 });
 

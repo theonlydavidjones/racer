@@ -201,6 +201,9 @@ const RA = WM.a33 / C33, RB = B33 / C33;
 /** Natural periods (s) of heave and pitch. */
 export const NATURAL = { heave: 2 * Math.PI * Math.sqrt(M33 / C33), pitch: 2 * Math.PI * Math.sqrt(I55 / C55) };
 const sinc = (x: number) => Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x;
+/** Each component's Smith decay at her draft, exp(−k·T): kept by component, worked out again only when its wavelength
+ *  changes (a new day's swell), not every boat every step. The same numbers, a few exp calls fewer a step. */
+const DECAY_K = new Float64Array(N_WAVES).fill(NaN), DECAY = new Float64Array(N_WAVES);
 
 /** The waves' heave force (N) and pitch moment (N·m, bow up) on her at point p, heading h (deg), at wave time t. */
 export function waveForces(f: WaveField, p: { x: number; y: number }, h: number, t: number, kW: number, kS: number): { F: number; M: number } {
@@ -212,14 +215,15 @@ export function waveForces(f: WaveField, p: { x: number; y: number }, h: number,
     const k = f.k[i], sd = f.sd[i], cd = f.cd[i];
     const ax = k * (sd * fx + cd * fy), ay = k * (sd * fy - cd * fx); // the wavenumber along her and across her
     const th = k * (sd * cx + cd * cy) - f.w[i] * t + f.phase[i];
-    const A = a * Math.exp(-k * WM_T) * sinc(ay * WM.be / 2), q = ax * WM.le / 2;
+    if (DECAY_K[i] !== k) { DECAY_K[i] = k; DECAY[i] = Math.exp(-k * WM_T); }
+    const A = a * DECAY[i] * sinc(ay * WM.be / 2), q = ax * WM.le / 2, sq = Math.sin(q); // (sin q once, for both terms)
     // the diffraction's two parts (see above), at the wave's own frequency: the water's acceleration is the orbit's,
     // ω²ζ, whatever her speed. (The relative-motion form's ωe², her speed through the wave counted in, grows without
     // bound in short head seas, where strip theory's high-frequency added mass is least right; the forward-speed terms,
     // Salvesen–Tuck–Faltinsen's, are left out with it)
     const w = f.w[i], inPhase = 1 - RA * w * w, quad = RB * w, s = Math.sin(th), c = Math.cos(th);
-    F += A * WM.le * sinc(q) * (inPhase * s - quad * c);
-    M += A * (Math.abs(q) < 1e-3 ? ax * WM.le ** 3 / 12 : 2 * (Math.sin(q) - q * Math.cos(q)) / (ax * ax)) * (inPhase * c + quad * s);
+    F += A * WM.le * (Math.abs(q) < 1e-4 ? 1 - q * q / 6 : sq / q) * (inPhase * s - quad * c); // (sinc q)
+    M += A * (Math.abs(q) < 1e-3 ? ax * WM.le ** 3 / 12 : 2 * (sq - q * Math.cos(q)) / (ax * ax)) * (inPhase * c + quad * s);
   }
   return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M };
 }

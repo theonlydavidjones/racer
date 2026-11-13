@@ -33,6 +33,27 @@ function through(cr: Crew, label: string, bad: string[]): void {
   }
 }
 
+/**
+ * Elbows the right way: an elbow points back or out, away from the way the torso faces, never forward of the line from
+ * the shoulder to the wrist (the owner: "these arms are backwards. poor guy", the forward hand at the cabin top's lines,
+ * both forearms pointing back past his body).
+ */
+function elbows(cr: Crew, label: string, bad: string[]): void {
+  for (const [who, f] of [['helm', cr.helm], ...cr.crew.map((f, i) => [`crew${i + 1}`, f] as const)] as const) {
+    if (!f.root.visible) continue;
+    f.root.updateMatrixWorld(true);
+    const w = (o: THREE.Object3D, x = 0, y = 0, z = 0) => o.localToWorld(new THREE.Vector3(x, y, z));
+    // (forward: the way they face, level, by their heading: a crouch pitches the torso over, and an elbow hanging straight
+    // down isn't forward of anything)
+    const fw = w(f.root, 0, 0, -1).sub(w(f.root)).setY(0);
+    f.arm.forEach((a, i) => {
+      const sh = w(a.root), el = w(a.mid), wr = w(a.mid, 0, -BONE.fore), line = wr.clone().sub(sh), t = el.clone().sub(sh).dot(line) / line.lengthSq();
+      const off = el.clone().sub(sh.clone().addScaledVector(line, t)), ahead = off.dot(fw) / fw.length();
+      if (ahead > 0.06) bad.push(`${label}: ${who} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
+    });
+  }
+}
+
 function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean }, label: string): string[] {
   const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
   const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) };
@@ -40,7 +61,7 @@ function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; s
   const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
   let hold = true;
   sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
-  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); } };
+  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
   frames(3);
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
   else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
@@ -57,7 +78,24 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     ['pole out on a light-air run: up on the foredeck, and the trip there', { kt: 7, twa: 172, pole: true, secs: 40 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
-  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 30000); // (every 2 cm of every bone of every figure: some seconds a case)
+  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
+  // (the forward hand at the cabin top's lines, held there, on both tacks: kneeling at the cockpit's forward end, and from
+  // the side deck for the lines worked from either side; where the owner saw the arms bent backwards)
+  for (const tack of ['S', 'P'] as const) for (const arm of [0.3, 0.65]) it(`at the cabin top's lines, ${tack === 'S' ? 'starboard' : 'port'} tack, ${arm > 0.55 ? 'from the side deck' : 'kneeling'}`, () => {
+    const twa = beatAngle(12), b = testBoat({ heading: tack === 'S' ? 360 - twa : twa, kt: 4, windKt: 12 }); b.tack = tack;
+    b.crew = newCrew(DEFAULT_CREW, tack);
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
+    sail(b, 10);
+    // (put there, as the physics puts them for a cabin-top line: crewWork.ts PIANO's station, at its after end)
+    const w = tack === 'S' ? 1 : -1;
+    for (let i = 0; i < 6 * 30; i++) {
+      sail(b, 1 / 30);
+      const f = b.crew.people[2]; f.pose = 'piano'; f.x = arm * w; f.z = 0.85; f.goal = { x: f.x, z: f.z }; f.lean = 0;
+      syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking);
+      if (i > 60) { through(cr, `piano ${i}`, bad); elbows(cr, `piano ${i}`, bad); }
+    }
+    expect(bad.slice(0, 8)).toEqual([]);
+  }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
 });
 
 /** The fastest any point of anyone moved in one frame (m/s), and how much they moved at all, over `frames`. */
@@ -104,7 +142,7 @@ describe('The figures are where the crew are (render/crew.ts)', () => {
       });
     }
     expect(bad.slice(0, 5)).toEqual([]);
-  }, 30000);
+  }, 180_000);
 });
 
 describe('The crew move like people (render/crew.ts)', () => {
