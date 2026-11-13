@@ -252,6 +252,46 @@ export function hullClear(c: Vec, h: number): boolean {
   return true;
 }
 
+
+/**
+ * The boats lying in the marinas' slips: which slips have one, and the boat (kind, length, colours). Chosen here, once, the
+ * same way for the sim and the drawing (render/marina.ts), so a slip that looks empty is empty: she can berth in it, and her
+ * hull can't pass through a boat that's drawn. Drawn from a fixed seed per harbor, so every session has the same boats.
+ *
+ * How many slips are taken: the San Francisco Marina "only about 87% occupied" (Latitude 38, "With Expansion of San
+ * Francisco Marina Now Scrapped, the Financial Futures of East and West Harbor Are Uncertain", 2024, from the city's Budget
+ * and Legislative Analyst's report of January 2024); elsewhere 78%, an estimate (no figure found). The share of powerboats is
+ * an estimate too (the harbors' own figures weren't found: the city's fee analysis on sfbos.org wasn't reachable).
+ */
+const OCCUPIED: Record<string, number> = { 'west-harbor': 0.87, 'gashouse-cove': 0.87 };
+const POWER_SHARE = 0.2;
+export type MooredKind = 'sail' | 'power';
+export interface MooredBoat { slip: Slip; kind: MooredKind; len: number; colour: number; cover: number }
+const mooredCache = new Map<string, MooredBoat[]>();
+function seeded(seed: number) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+/** The boats in a harbor's slips (bow in, a little under the finger's length; hulls mostly white, some dark). */
+export function mooredIn(harborId: string): MooredBoat[] {
+  let out = mooredCache.get(harborId); if (out) return out;
+  const H = harborOf(harborId); out = [];
+  if (H) {
+    const r = seeded(11 + HARBORS.indexOf(H));
+    const HULLS = [0xf6f4ee, 0xf6f4ee, 0xf6f4ee, 0xefece2, 0xefece2, 0xe4e0d4, 0x1f3550, 0x2b4a3a, 0x8a2a24], COVERS = [0x1f4f7a, 0x1f4f7a, 0x16314f, 0xb59a6a, 0x6e2a2a, 0x3d5c47];
+    for (const s of SLIPS) {
+      if (s.marina !== H.id) continue;
+      const keep = r() <= (OCCUPIED[H.id] ?? 0.78), len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = HULLS[Math.floor(r() * HULLS.length)], cover = COVERS[Math.floor(r() * COVERS.length)];
+      const kind: MooredKind = r() < POWER_SHARE ? 'power' : 'sail';
+      if (keep) out.push({ slip: s, kind, len, colour: kind === 'power' ? HULLS[Math.floor(r() * 6)] : colour, cover }); // (powerboats in white gelcoat)
+    }
+  }
+  mooredCache.set(harborId, out); return out;
+}
+const takenCache = new Map<string, Set<string>>();
+/** Whether a boat lies in this slip (her own home slip aside: that's hers, kept for her). */
+export function slipTaken(s: Slip): boolean {
+  let t = takenCache.get(s.marina); if (!t) takenCache.set(s.marina, t = new Set(mooredIn(s.marina).map(b => b.slip.id)));
+  return t.has(s.id);
+}
+
 /** Where the boat in another slip lies (a little under the length of its finger, as drawn: render/marina.ts), for keeping clear of her. */
 const boatIn = (o: Slip) => { const len = o.kind === 'alongside' ? 7 : Math.min(13, Math.max(7, o.finger * 1.05)); return { half: len / 2, beam: 0.17 * len }; }; // (as drawn, at their longest: render/marina.ts)
 /** The slips filed in 10 m cells, per harbor, each in its own cell and the eight round it (no boat reaches more than 7 m from her slip's middle). */
@@ -277,7 +317,10 @@ function cornersNear(q: Vec, marina: string): Vec[] {
   }
   return g.get(cellKey(q.x, q.y)) ?? [];
 }
-/** Clear of the boats lying in the other slips (all of them: most have a boat in them)? */
+/**
+ * Clear of the boats lying in the other slips? The push-off planner takes every other slip as full (most are: mooredIn), so
+ * she's never swung into a neighbor's berth, and never through a boat that's drawn.
+ */
 function clearOfBoats(q: Vec, except: Slip): boolean {
   for (const o of slipsNear(q, except.marina)) {
     if (o === except) continue;
