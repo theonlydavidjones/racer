@@ -59,7 +59,7 @@ export class SetupChart {
     const name = (id: string) => id === 'slip' ? (slip ? `her slip (${slipPlace(slip)})` : 'her slip') : id ? place(id)?.name ?? '?' : 'nowhere in particular';
     $('setupPins').innerHTML = `<b>Start:</b> ${name(this.picks.get('from'))} · <b>To:</b> ${name(this.picks.get('to'))}`;
     const s = $('bPinSlip') as HTMLButtonElement;
-    s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Fleet first';
+    s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
     s.textContent = this.which === 'from' ? 'Start from her slip' : 'Back to her slip';
     $('bPinNone').hidden = this.which !== 'to';
     $('setupChartHint').textContent = this.which === 'from' ? 'Tap the water, a place or her slip to start there.' : 'Tap the water, a place or her slip to sail there.';
