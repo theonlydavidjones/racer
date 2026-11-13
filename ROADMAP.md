@@ -7,6 +7,10 @@ your crew against yourselves, and the beauty and magic of sailing), on San Franc
 variability and staggering beauty, in a Folkboat, the purest sailing boat a normal person can own. "If you can sail the
 Bay, you can sail anywhere; if you can sail a Folkboat, you can sail anything." Every item below is weighed against it.
 
+**The vision roadmap** (adopted by the owner, 13 November): docs/VISION-ROADMAP.md, near, middle and long term. Its
+seven "dialled in" criteria are the bar for physics and racing. On its questions: the owner will try to get protest
+records (Skipper Model researches meanwhile); crew timings come from published sources until next season.
+
 **The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
 then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
 - **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
