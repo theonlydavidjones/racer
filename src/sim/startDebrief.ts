@@ -158,8 +158,11 @@ export function startDebrief(w: SimView): StartDebrief {
   if (kind === 'up') {
     const chk = lineCheck(w);
     if (chk) {
-      const right = chk.toward === favKey || (!chk.toward && !favKey);
-      facts.push(`At ${clockOf(chk.t)} you went head to wind ${Math.round(chk.atM)} m below the line: the wind came from ${chk.toward ? `${Math.round(chk.offDeg)}° toward the ${endName(chk.toward)} end` : 'square to the line'}${right ? ': the right read for the gun.' : favKey ? `. By the gun the ${endName(favKey)} end was favoured by ${bias.toFixed(0)}°: the wind shifted, or the read was off.` : '. By the gun the line was about square: the wind shifted, or the read was off.'}`);
+      // signed, + toward the pin: the read against the bias at the gun, within 3° (about the wind's own wobble) agreeing
+      const readS = chk.toward === 'pin' ? chk.offDeg : chk.toward === 'committee' ? -chk.offDeg : 0, gunS = k > 0 ? bias : -bias;
+      const right = Math.abs(readS - gunS) <= 3;
+      const gunWords = favKey ? `the ${endName(favKey)} end was favoured by ${bias.toFixed(0)}°` : 'the line was about square';
+      facts.push(`At ${clockOf(chk.t)} you went head to wind ${Math.round(chk.atM)} m below the line: the wind came from ${chk.toward ? `${Math.round(chk.offDeg)}° toward the ${endName(chk.toward)} end` : 'square to the line'}${Math.abs(chk.bowOff) > 4 ? ` (your bow was ${Math.round(Math.abs(chk.bowOff))}° off it: sit closer to head to wind for a true read)` : ''}${right ? `, and at the gun ${gunWords}: the right read.` : `. At the gun ${gunWords}: the wind where you were then differed from the wind at the line at the gun (a shift, or a puff's own direction), so check again nearer the gun.`}`);
     } else tips.push(`Check the line before the start: go head to wind near it for a few seconds and look where your bow points. Square to the line (90° to it), neither end is favoured; pointing toward an end, that end is upwind, and starting there gains about ${Math.round(w.lineLen / 57)} m for each degree.`);
   }
 
