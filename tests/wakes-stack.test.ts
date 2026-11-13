@@ -20,4 +20,13 @@ describe('wind shadows that overlap', () => {
     expect(k(ahead(11, 1), ahead(20, -1), ahead(30, 1))).toBeCloseTo(1 - rss, 2);
     expect(k(ahead(11, 1), ahead(20, -1), ahead(30, 1))).toBeGreaterThan(0.6); // (summed, 0.47)
   });
+  it('wakes pointing opposite ways cancel smoothly, as they would added (a ferry running faster than the wind)', () => {
+    const at = (a: number, b: number) => { const s = new WindSum(); s.addDeficit(1, 0, a); s.addDeficit(-1, 0, b); return s.result(270); };
+    // (wind from the west: a deficit along +x slows it, one along −x is air carried forward, more wind)
+    expect(at(0.30, 0.29).k).toBeCloseTo(1 - 0.01 * Math.hypot(0.3, 0.29) / 0.59, 3);
+    expect(at(0.30, 0.31).k).toBeCloseTo(1 + 0.01 * Math.hypot(0.3, 0.31) / 0.61, 3); // (no jump between the two)
+    expect(Math.abs(at(0.30, 0.30).k - 1)).toBeLessThan(1e-9);
+    const cross = new WindSum(); cross.addDeficit(1, 0, 0.3); cross.addDeficit(-0.9962, -0.0872, 0.3); // (toward 090° and toward 265°: nearly opposite)
+    expect(Math.abs(cross.result(270).shift)).toBeLessThan(5);
+  });
 });

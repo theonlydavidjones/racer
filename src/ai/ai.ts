@@ -160,7 +160,16 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
   if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
   else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = b.tack; }
-  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+  if (h.lying) {
+    // (another boat lying to, or stopped, within a couple of lengths: they'd drift down together side by side, stopped,
+    // for as long as they lay there. The one further from her own spot sails off clear before lying to again)
+    for (const o of w.boats) {
+      if (o === b || dist(o, b) > 15) continue;
+      const mine = dist(b, h.at), theirs = o.ai?.home ? dist(o, o.ai.home.at) : -1;
+      if (mine > theirs || (mine === theirs && b.id > o.id)) return { desired: sailable(b, brg(b.x - o.x, b.y - o.y)), luff: false, beating: false };
+    }
+    return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+  }
   // her way: each turn of it passed within 60 m, or the next in sight with clear water to it
   while (h.i < h.route.length - 1 && (dist(b, h.route[h.i]) < 60 || landAlong(b, h.route[h.i + 1]) === Infinity)) h.i++;
   const q = h.i < h.route.length - 1 ? h.route[h.i] : h.at, bq = brg(q.x - b.x, q.y - b.y), rel = Math.abs(wrap(from - bq));
@@ -620,8 +629,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // First, her right of way. Rule 16.1: a right-of-way boat changing course must give the other boat room to keep
   // clear, so if the turn she wants would close on a boat close by she turns only as far as still leaves it that room.
   // (Room: 8 m between centres, a little more than a Folkboat's length (7.6 m); with less than that already, she
-  // mustn't close it further.)
-  if (startArea) for (const { o, dx, dy, r, cp } of near) {
+  // mustn't close it further.) Rule 15 the same, anywhere on the course: a boat that has just got right of way by her
+  // own action (a gybe or tack onto the other tack, or an overlap made to leeward) must at first give the other boat
+  // room to keep clear, so she mustn't turn in on her either. (She needn't sail away: holding her course gives the room.
+  // Two boats running side by side zigzagged together and touched: the one keeping clear gybed away, became the
+  // leeward boat on the same tack, and at once steered back toward the boat that now had to keep clear of her.)
+  for (const { o, dx, dy, r, cp } of near) {
+    const rec = w.pairRecord(b, o), r15 = !!rec && rec.by === b.id && rec.grace > w.t;
+    if (!startArea && !r15) continue;
     if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
     const ROOM = 8, need = Math.min(ROOM, clearanceOn(w, b, b.h, o));
     if (clearanceOn(w, b, desired, o) >= need) continue;
@@ -683,13 +698,6 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
       // heading that opens the most room, nearest what she wanted
       if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
-    } else if (r.kc === o && (w.pairRecord(b, o)?.grace ?? -Infinity) > w.t && w.pairRecord(b, o)!.by === b.id && cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM) {
-      // Rule 15: she has just got right of way by her own action (a gybe or tack onto the other tack, or an overlap made
-      // to leeward) and must give the other boat room to keep clear, so she goes on opening the water herself rather
-      // than turning back in. (Two boats running side by side: the one keeping clear gybed away, became the leeward boat
-      // on the same tack, and at once steered back toward the boat that now had to keep clear of her; then, back on
-      // opposite tacks, away again, closing in a zigzag until they touched.)
-      desired = sailable(b, brg(-dx, -dy)); luff = false; if (o.id !== ai.hailTack?.with) avoiding = true;
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
