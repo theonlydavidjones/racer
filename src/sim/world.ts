@@ -400,7 +400,8 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
-    // a lesson: the tiller's buoy 250 m off, 20° to leeward of her heading (a broad reach to it), where there's water
+    // a lesson: its buoy (the tiller's, steered for; stop, go and irons', stopped by) 250 m off, 20° to leeward of her
+    // heading (TWA about 110°, just abaft the beam), where there's water
     this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
       const u = this.boats[0], lee = wrap(this.windModel.base - u.h) > 0 ? -20 : 20;
       for (const a of [lee, 0, -lee]) { const q = { x: u.x + V(u.h + a).x * 250, y: u.y + V(u.h + a).y * 250 }; if (!onLand(q)) return q; }
@@ -481,7 +482,7 @@ export class World {
         p = { ...at };
         const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
         // (the tack and gybe drill: close-hauled, ready to tack)
-        const off = this.settings.mode === 'manoeuvres' ? 45 : 90, a = n360(this.windModel.base + off), b = n360(this.windModel.base - off);
+        const off = this.settings.mode === 'manoeuvres' || (this.settings.mode === 'lesson' && (this.settings.lesson === 'tacking' || this.settings.lesson === 'heaveto')) ? 45 : 90, a = n360(this.windModel.base + off), b = n360(this.windModel.base - off);
         h = room(a) >= room(b) ? a : b;
       } else {
         p = place(-220, 0); h = n360(lineH + 180);
@@ -897,7 +898,7 @@ export class World {
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
-    this.lesson?.update(this.user, this.t, dt); // (a lesson: its check, on the boat as she sails)
+    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (a lesson: its check, on the boat as she sails)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);
