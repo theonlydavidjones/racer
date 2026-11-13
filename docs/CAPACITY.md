@@ -175,7 +175,7 @@ What follows for the build:
 ### 1.6 What a snapshot costs
 
 A structured clone of every cloneable field of all eight boats is ~5.1–5.8 KB a boat, 42 KB for the fleet, and takes
-**171 µs** to serialise in Node. A lean render-state is a fraction of that: positions, headings, heel, sail shapes,
+**171 µs** to serialize in Node. A lean render-state is a fraction of that: positions, headings, heel, sail shapes,
 crew poses and lines, packed in a `Float64Array` that is transferred, not copied. So the cost of sending the state each
 frame is a few tenths of a millisecond at most, on threads that have room for it.
 
@@ -237,7 +237,7 @@ the same order.
 
 **Risks.**
 1. The frame's CSP may forbid blob workers. The first step checks this. If it is forbidden, the fallback is today's
-   behaviour, and options B, C and D remain.
+   behavior, and options B, C and D remain.
 2. It's a large refactor of app.ts and the HUD: everything that reads `w.*` must read the snapshot. It touches files
    other sessions are working in (app.ts, ui/hud.ts, render/scene.ts), so it needs a quiet window from the Coordinator,
    or landing in slices (step 1 below lands in-process first and changes nothing visible).
@@ -325,7 +325,7 @@ The owner gave the go on 13 November 2026, through the Coordinator. Step 2 is on
 - **sim/commands.ts**: every change the page makes to the race, as plain data, each applied by the page's old code
   moved unchanged. That covers the helm and tiller, lashing, lines taken and given back, the band's targets and
   jumpers, the lazy car, the crew's place, the pole, the ensign and lights, the halyards, the pilot, the motor, a hail,
-  push-off and cast-off, the destination, home and move-here, retiring, a penalty, conditions, the chart's colours and
+  push-off and cast-off, the destination, home and move-here, retiring, a penalty, conditions, the chart's colors and
   layers, the log's notes, and running, pause and speed.
 - **sim/host.ts**: `SimView`, the World as the page may read it: read-only all the way down, with none of the methods
   that change the race. `SimHost` with `frame` (the old accumulator), `idle`, `send` and `drainEvents`, and
@@ -459,3 +459,29 @@ settings and seed, and never stepped.
   `w.step`, `view.render` and `__hud.update` wrapped with timers, CDP `Profiler` over 60 frames, the samples filtered
   to those under `frame()`.
 - The host: the response headers of the claude.ai artifact page (COOP, no COEP, CSP).
+
+## The compiler's thrown-away work (13 Nov 2026)
+
+Bay East's waves (phase 2) cost about +30% in perf.test's first race in a fresh process, and about +3% after. The
+step's own thread didn't show it: profiles and call counts matched. The cost was V8's optimizing compiler, on its own
+threads: in that first race it compiled the rules' two hottest functions, `checkPairs` 629 times and `assessPair` 196,
+and threw each one away ("Maps became deprecated during optimization"), 14 s of work (bay-east-11: 15 aborts, 0.4 s).
+
+- **The cause:** boat fields built holding a whole number that later hold a fraction (`lastTackT`: −999, then her first
+  tack's time; the penalty's fields; `poleT`; and `weatherHeld` and `carOff`, given later from 0). V8 keeps a field that
+  has only held small integers as one. When it first holds a fraction, the boats' hidden classes change (15–97 maps at
+  a time), and if that comes after the rules' functions have learned the old ones, their every recompile is discarded
+  until the old classes are collected. The waves only moved those first fractions later in the race. Any change to the
+  race could do the same.
+- **The fix** (world.ts `asDoubles`, makeBoat): those fields are made doubles as she's built (stored once as a fraction
+  and put back, the value unchanged), and `weatherHeld` and `carOff` are declared `undefined` from the start. On
+  bay-east-12: no aborts for either function, and the first race 1,023–1,085 CPU µs a step against 1,615–1,772 (bay-east-11:
+  1,122–1,177). The race is identical to the last digit, on that branch and on main.
+- **The guard:** `node scripts/check/deopt.cjs` (~30 s): the perf race, cold, under `node --trace-opt`, failing if any one
+  function's compiles are aborted more than 20 times. Main: about 10 in all, no function over 3. The unfixed
+  bay-east-12: `checkPairs` 608, `assessPair` 195 (fails). To find the field when it fails: `node --no-sparkplug
+  --trace-generalization`, looking for `s->d` (a whole number becoming a fraction) with `(+N maps)` after the hot
+  function is first marked for optimizing.
+- In the browser the compiler's threads are off the worker's, so this costs a player background CPU in the first race
+  rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
+  nothing.

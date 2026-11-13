@@ -15,7 +15,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'takeTiller', label: 'Take or let go of the tiller (then the cursor steers)', group: 'Helm' },
   { id: 'steerPort', label: 'Turn to port (push the tiller to starboard)', group: 'Helm' },
   { id: 'steerStbd', label: 'Turn to starboard (push the tiller to port)', group: 'Helm' },
-  { id: 'centreTiller', label: 'Centre the tiller', group: 'Helm' },
+  { id: 'centreTiller', label: 'Center the tiller', group: 'Helm' },
   { id: 'lashTiller', label: 'Lash the tiller where it is (heaving to) / unlash', group: 'Helm' },
   { id: 'luff', label: 'Luff (ease both sails, hold)', group: 'Sails' },
   { id: 'mainIn', label: 'Trim the main in', group: 'Sails' },

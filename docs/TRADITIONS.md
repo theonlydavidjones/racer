@@ -27,7 +27,7 @@ until the owner confirms it from the fleet.
 
 1. **The season championship and the Hall of Fame.** The SF Bay Folkboat fleet has named a season champion every year
    since 1958–59, skipper and boat, with no racing in 2020. Some skippers and boats have won it many times. The fleet
-   prospered on the Bay from 1950 to 1970, and the first fibreglass Folkboat was moulded from a wooden Bay boat in 1975.
+   prospered on the Bay from 1950 to 1970, and the first fibreglass Folkboat was molded from a wooden Bay boat in 1975.
    The Hall of Fame page jokes that you "may be quizzed at the bar after the race".
    - Sources: https://sfbayfolkboats.org/hall-of-fame/ and https://sfbayfolkboats.org/history/.
    - In the sim: a club Hall of Fame with every season's champion and boat, your own name added when you win. Real
@@ -52,14 +52,14 @@ until the owner confirms it from the fleet.
 4. **The Wednesday Night Series.** A separate award from the season championship, first to third. Source:
    https://sfbayfolkboats.org/racing/.
    - In the sim: short evening races in the summer westerly, at sunset.
-5. **Calling it off in a blow.** By the fleet's practice, a vote on cancelling at 23 kt (owner). The fleet's written,
+5. **Calling it off in a blow.** By the fleet's practice, a vote on canceling at 23 kt (owner). The fleet's written,
    proposed protocol says cancel above 25 kt, decided by the race chair and texted to the fleet. Source:
    https://sfbayfolkboats.org/racing/. Built: the committee calls racing off at 23 kt.
 6. **Burgees and flags.**
    - Sourced:
      - The burgee flies at the masthead, or from the starboard spreader, star up.
      - The ensign flies at the stern, or high on the aftermost sail's leech when under way.
-     - Colours are made at 0800 and struck at sunset.
+     - Colors are made at 0800 and struck at sunset.
      - By custom the ensign isn't flown while racing.
    - Sources: CCA, https://cruisingclub.org/article/cca-flag-and-burgee-etiquette; USPS,
      https://usps.org/national/fecom/faq/flag/gaffpole.html; Good Old Boat; Manhattan YC, https://myc.org/flag-etiquette/.
@@ -67,10 +67,10 @@ until the owner confirms it from the fleet.
    - The RRS themselves don't limit flags while racing, beyond advertising.
    - On the SF Folkboats (the owner, 13 Nov 2026): the burgee flies on the starboard side, at the jumper strut, and is
      struck for racing. Built that way.
-   - Built: the ensign keeps its hours (0800 to sunset, and entering or leaving harbour after dark: USPS, Seattle YC;
+   - Built: the ensign keeps its hours (0800 to sunset, and entering or leaving harbor after dark: USPS, Seattle YC;
      src/boat/colours.ts).
    - Not yet sourced: dipping the ensign, officers' flags, dressing ship.
-   - In the sim: the burgee at the masthead, the ensign struck at the preparatory signal (both partly in), and colours
+   - In the sim: the burgee at the masthead, the ensign struck at the preparatory signal (both partly in), and colors
      at the club.
 7. **The committee and protests.**
    - Sourced:

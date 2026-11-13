@@ -163,7 +163,7 @@ export class PlanChart {
     const w = this.picks.world(), slip = w.homeSlip;
     for (const b of $('planPinSeg').querySelectorAll<HTMLButtonElement>('[data-pin]')) b.setAttribute('aria-pressed', String(b.dataset.pin === this.which));
     const s = $('bPlanSlip') as HTMLButtonElement;
-    s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Fleet first';
+    s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
     s.textContent = this.which === 'from' ? 'Start from her slip' : 'Back to her slip';
     $('bPlanNone').hidden = this.which !== 'to' || !this.picks.get('to');
     const name = (id: string) => id === 'slip' ? (slip ? `her slip (${slipPlace(slip)})` : 'her slip') : id ? place(id)?.name ?? '?' : 'nowhere in particular';
