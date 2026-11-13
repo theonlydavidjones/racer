@@ -558,11 +558,23 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   // (the knees forward and a little up; or where the pose says, in the boat's frame: walking the side deck, out over it)
   f.leg.forEach((l, i) => ik(l, l.root.position, local(p.feet[i], _p), BONE.thigh, BONE.shin, kneeHint(p, i), 1));
   _tq.copy(f.torso.quaternion).invert();
-  // (the elbows down and back; but sat just by the thwart, down and away from it, whichever way they face: back, reaching
-  // up for the mainsheet, they went into the thwart behind)
-  const byThwart = inCockpit(Math.abs(p.hip.x), p.hip.z) && Math.abs(p.hip.z - THWART.z) < 0.5;
-  const away = byThwart ? _p2.set(0, -0.6, Math.sign(p.hip.z - THWART.z) || -1).applyQuaternion(_inv).applyQuaternion(_tq) : null;
-  f.arm.forEach((a, i) => ik(a, a.root.position, local(p.hands[i], _p).applyQuaternion(_tq), BONE.upper, BONE.fore, away ? V((i ? 1 : -1) * 0.4, 0, 0).add(away) : V((i ? 1 : -1) * 0.5, -0.3, 1), -1));
+  // (the elbows down and back, the one way an elbow bends; and where that puts one into what's beside them, the thwart
+  // behind a crewmate sat just forward of it, out to the side instead, at once. Pointed "away from the thwart" whichever
+  // way they faced, at the cabin top's lines it pointed forward, toward the hands, and both arms were bent backwards:
+  // the owner, "these arms are backwards. poor guy")
+  f.arm.forEach((a, i) => {
+    const tgt = local(p.hands[i], _p).applyQuaternion(_tq).clone();
+    ik(a, a.root.position, tgt, BONE.upper, BONE.fore, V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
+    const par = f.root.parent; if (!par) return;
+    f.root.updateMatrixWorld(true);
+    const sd = i ? 1 : -1, hints = [V(sd * 0.9, -0.2, 0.7), V(sd * 1, 0, 0.3)];
+    const bad = () => {
+      f.root.updateMatrixWorld(true);
+      const el = par.worldToLocal(a.mid.getWorldPosition(_h));
+      return el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z));
+    };
+    for (let h = 0; h < hints.length && bad(); h++) { a.root.userData.bend = undefined; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, hints[h], -1); }
+  });
   // the head turns to what they're watching (within a neck's reach)
   local(p.look, _h).applyQuaternion(_tq).sub(f.head.position);
   f.head.rotation.set(Math.max(-0.6, Math.min(0.5, Math.atan2(_h.y - 0.1, Math.hypot(_h.x, _h.z)))), Math.max(-1.3, Math.min(1.3, Math.atan2(-_h.x, -_h.z))), 0);

@@ -60,7 +60,7 @@ export function readout(w: SimView, kind: FlowKind, p: Vec, wind?: { kt: number;
 }
 
 /** The affine map tf is (a turn, a scale and a shift): its matrix, and its inverse (screen to sim metres). */
-function affine(tf: Tf): { m: [number, number, number, number, number, number]; inv: (sx: number, sy: number) => Vec } {
+export function affine(tf: Tf): { m: [number, number, number, number, number, number]; inv: (sx: number, sy: number) => Vec } {
   const o = tf(0, 0), ex = tf(1, 0), ey = tf(0, 1);
   const a = ex[0] - o[0], b = ex[1] - o[1], c = ey[0] - o[0], d = ey[1] - o[1], det = a * d - b * c;
   return { m: [a, b, c, d, o[0], o[1]], inv: (sx, sy) => { const X = sx - o[0], Y = sy - o[1]; return { x: (d * X - c * Y) / det, y: (-b * X + a * Y) / det }; } };
@@ -129,9 +129,20 @@ export class FlowField {
   }
 }
 
-/** Screen speed of the streaks (px/s per kt): the slot's run, the lee's crawl; the current's are scaled up, being slower. */
-const PX_PER_KT: Record<FlowKind, number> = { wind: 6, current: 40 };
-const HIST = 20, EVERY = 0.08; // a trail of 20 points, one every 0.08 s: a second and a half behind each, long and smooth (the mock-up's)
+/**
+ * How fast the streaks go: a time-lapse of the flow itself, the same at every zoom. A streak travels the water as the
+ * current (or the wind) does, TIMELAPSE times faster: for the current, 20× (3 seconds of the map are a minute of the
+ * tide); for the wind, 6×. So a streak moves in proportion to the flow where it is, and zoomed in close it crosses the
+ * water at the pace the water really moves, sped up by that much and no more (the owner, 13 Nov 2026: "rushing water"
+ * off South Beach). Before, a streak moved so many screen pixels a second per knot whatever the zoom: zoomed in on a
+ * marina, a third of a knot of current crossed the water dozens of times faster than the water. The chips' hover text
+ * says the time-lapse.
+ */
+export const TIMELAPSE: Record<FlowKind, number> = { wind: 6, current: 20 };
+/** Metres a streak goes in `dt` real seconds through flow of `kt` knots (its trail and its drift, on the sim's water). */
+export const streakMetres = (kind: FlowKind, kt: number, dt: number): number => kt * KT * TIMELAPSE[kind] * dt;
+/** A trail of HIST points, one every EVERY s: the current's slower, so its trail looks further back to read as long. */
+const HIST = 20, EVERY: Record<FlowKind, number> = { wind: 0.15, current: 0.4 };
 
 /**
  * The streaks: a pool of particles carried along the flow in the sim's metres, each with a short fading trail, put
@@ -149,21 +160,21 @@ export class Streaks {
   /** Move them on by dt (real seconds), then draw them through tf. */
   draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, field: FlowField, kind: FlowKind, dt: number, lineW = 1.3, color = '255,255,255'): void {
     if (!(w > 0 && h > 0 && scale > 0)) return;
-    const { inv } = affine(tf), step = Math.min(Math.max(dt, 0), 0.1), px = PX_PER_KT[kind];
+    const { inv } = affine(tf), step = Math.min(Math.max(dt, 0), 0.1);
     // a new view (zoomed, or moved a quarter of the way across): scatter them all over it afresh
     { const c = inv(w / 2, h / 2), v = this.view;
       if (Math.abs(Math.log(scale / (v.scale || 1e-9))) > 0.1 || Math.hypot(c.x - v.x, c.y - v.y) * scale > Math.min(w, h) / 4) { this.age.fill(Infinity); this.view = { x: c.x, y: c.y, scale }; } }
-    this.acc += step; const record = this.acc >= EVERY; if (record) this.acc = 0;
+    this.acc += step; const record = this.acc >= EVERY[kind]; if (record) this.acc = 0;
     for (let i = 0; i < this.n; i++) {
       if (this.age[i] > this.life[i]) { // a new one, somewhere on the water in view
         let p = inv(this.rnd() * w, this.rnd() * h);
         for (let t = 0; t < 4 && !field.at(p); t++) p = inv(this.rnd() * w, this.rnd() * h);
-        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 3 + this.rnd() * 3;
+        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 1.2 * HIST * EVERY[kind] + this.rnd() * 6; // (long enough to grow its whole trail)
         this.hx[i * HIST] = p.x; this.hy[i * HIST] = p.y; this.hn[i] = 1;
       }
       const p = { x: this.xs[i], y: this.ys[i] }, f = field.at(p);
       if (!f || f.kt < (kind === 'wind' ? 0.5 : 0.05)) { this.age[i] = Infinity; continue; }
-      const m = f.kt * px * step / scale; // (metres this frame: px on the screen, at the map's scale)
+      const m = streakMetres(kind, f.kt, step); // (metres on the water this frame: the flow's own pace, time-lapsed)
       const q = { x: p.x + f.ux * m, y: p.y + f.uy * m };
       const s = tf(q.x, q.y);
       if (!field.at(q) || s[0] < -20 || s[1] < -20 || s[0] > w + 20 || s[1] > h + 20) { this.age[i] = Infinity; continue; }
@@ -196,7 +207,7 @@ export function drawLegend(ctx: CanvasRenderingContext2D, kind: FlowKind, cx: nu
   ctx.save();
   ctx.fillStyle = 'rgba(9,22,33,.88)'; ctx.beginPath(); ctx.roundRect(x0 - 12, y - 30, W + 24, 58, 8); ctx.fill();
   ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillStyle = '#e9f2f5'; ctx.textAlign = 'left';
-  ctx.fillText(kind === 'wind' ? 'WIND SPEED · KT (with the puffs and lulls)' : 'CURRENT · KT (NOAA tide predictions)', x0, y - 14);
+  ctx.fillText(kind === 'wind' ? `WIND SPEED · KT (with the puffs and lulls) · streaks ${TIMELAPSE.wind}× real speed` : `CURRENT · KT (NOAA tide predictions) · streaks ${TIMELAPSE.current}× real speed`, x0, y - 14);
   for (let x = 0; x < W; x++) { const c = rampColor(R, x / W * max); ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.fillRect(x0 + x, y - 6, 1, 12); }
   ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#e9f2f5';
   for (const t of ticks) ctx.fillText(String(t), x0 + t / max * W, y + 20);

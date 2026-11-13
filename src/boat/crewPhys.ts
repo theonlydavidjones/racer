@@ -337,7 +337,7 @@ export const ROLL_HOLD = 2;
  *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
  *   Performance Sailing);
  * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
- * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time):
+ * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time), and for `last` s after, as the puff fills in, they carry on out to where it asks, not a second move:
  *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
  *   body, not a move.
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
@@ -369,7 +369,7 @@ export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle:
 // minutes, steadying the roll by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Not on a reach:
 // there the side they want changes with the breeze, and a puff needs them up to windward at once (the physics review).
 // Both numbers estimates.)
-interface Held { arm: number; z: number; since: number; off: number; cross?: number; helm?: number }
+interface Held { arm: number; z: number; since: number; off: number; cross?: number; helm?: number; /** sent out by a puff (the urgent move) */ push?: boolean }
 
 /**
  * Where the crew go now, at a human pace. Each free person goes where the weight is wanted (or where you've put them);
@@ -607,14 +607,19 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     } else h.helm = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
+    // (sent out by a puff that's still filling in: they keep going as it asks for more, out along the deck, rather than
+    // stop at the seat the puff's first moment called for and make a second move out a few seconds later. Carrying on
+    // with a move already started isn't a new one; their reaction time, placeCrew's reactTime, is still the only wait)
+    if (h.push && h.since < HOLD.last && out) { h.arm = t.arm; h.z = t.z; h.off = 0; return; }
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
     // change of place for the trim, waits until it has lasted, and the dwell
     // (in light air, across the boat to leeward waits for a lull that has lasted, HOLD.leeLast: one of a few seconds had
     // them across and, the wind back through 6 kt, straight back out again)
     // (not for the helm where helmLight's own wait has been served, nor on a run, where the run rule's has)
     const leeCross = !out && k.tws < 8 && k.twa <= 120 && !helmLight(i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
-    const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= (leeCross ? HOLD.leeLast : HOLD.last) && (out || h.since >= HOLD.dwell));
-    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; return; } // (moved: the waits start afresh)
+    const urgent = out && dArm > HOLD.urgent * dead;
+    const go = urgent || (worth && h.off >= (leeCross ? HOLD.leeLast : HOLD.last) && (out || h.since >= HOLD.dwell));
+    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; h.push = urgent; return; } // (moved: the waits start afresh)
     stay(i, h, t);
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch

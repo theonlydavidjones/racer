@@ -6,7 +6,7 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 - Test the PR merged with current origin/main: `npx tsc --noEmit -p .` and `npm run test:fast` (full `npm test` only for big physics PRs; the perf test is flaky under load, so rerun it alone).
 - Merge (GitHub MCP merge_pull_request with expectedHeadSha; stacked or conflicting PRs: merge locally and push to main).
 - `npm run build:artifact`, then `node scripts/check/smoke.cjs <dir>`, then publish artifact/folkboat-racing-sim.html to https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m **without passing capabilities** (db + user carry over; `{}` would switch saves off).
-- Live: v162 (13 Nov 2026 UTC: v158 tack loss #184, 23.2 #185; v159 shore tacks #187, inset nav #188, car note #186; v160 perf cut; v161 Layers toggles #190, vs winner #191, real past races #192, rules cases #193; v162 the worker #195. Earlier v157: v154 YC members #178 + seats #179, cruise planner #175, same incident #176; v155 flow view #177, line clash #180; v156 course estimate #181, crew fidget #161; v157 crew figures #182, sim/screen boundary #183 (Capacity step 2)). Earlier v153: wind indicator #172, jib sheets #173, YC members #174. Earlier v152: cabin instrument #170, World independence #168, abandonment AI #169, upwind hysteresis #164, pole and number colours #163, halyards #171; v150 rigging #159 + speed pass #160; v151 #162 #166 #167). Perf: main is over the 54.7 budget (about 55–58); Deep Physics is cutting it. A PR's perf failure within main's own range doesn't block it until then. Coordinator is now session_012Uu5Qi2mdDP9G1EYJvp2S4.
+- Live: v178 (13 Nov 2026 UTC). Recent: v178 US spelling #251, 2026–27 season #252; v177 rope ticks #245, dial under map #244, landmarks + Sutro #246, 7 Nov race #247, USA 122 #248, skipper names out #249; v176 Crew button #242, waves phase 1 #225, penalty cascade #239, makeBoat doubles #241, heave-to auto #238, season #240, site map #243; v175 mark-rounding drill #237, air temperature #235; v174 tactical debrief #233, Members #234, stand-off #232, perf units #231 (budget 43.1, main-thread median of 3). Earlier releases are in git log. Perf rule (owner): one rerun on code that doesn't touch the step. Coordinator: session_012Uu5Qi2mdDP9G1EYJvp2S4.
 
 - Only the Coordinator publishes the live artifact, plus the owner's daily real-weather refresh (scheduled task trig_01Jc4kpKT8RFLcqgBnHuBvUC, 04:41 Pacific), which now builds from main and commits its data first. (Before 12 Nov it built an old branch and overwrote the live page.)
 - No quiet window. Capacity step 3 (#195, the race in a Web Worker with a mirror World on the page) landed in v162 (13 Nov 07:00 UTC). New per-step World state syncs to the mirror automatically; tests/sync.test.ts names any miss. Page size 9.2 MB (worker 4.1 MB).
@@ -37,7 +37,16 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 
 ## Queued for idle sessions (see ROADMAP.md)
 - Crew Controls: original flag motion + "Strike ensign" button (cruise, high wind).
-- Later: desktop release, cruise start/destination on the chart, "Send her home", showroom conditions, boat card pictures, aluminium spars look like plastic.
+- Later: desktop release, cruise start/destination on the chart, "Send her home", showroom conditions, boat card pictures, aluminum spars look like plastic.
 
 ## Owner preferences
 CLAUDE.md has the standing rules (science is prime, ask before big design changes, desktop only, don't relabel). Refer to sessions by name. Plain, short updates.
+
+## Overnight plan (owner, 13 Nov 2026, late)
+1. Crew fidgeting (top): Crew Figures leads with Crew Model and Crew Art; crewsettle extended to cruising and all points of sail; no crew-animation merges until calm; live clips to the owner in the morning. crew-anim (owner-approved look) lands on top after.
+2. Skipper Model: clear air downwind (the real Nov 1 race), then the avoidance-redesign design note.
+3. Rules: findings 4–6; the gybe-as-tack bug with Deep Physics.
+4. Deep Physics: #165 after #196, stand-off spacing, then car-lead, 105–115°, z0.
+5. Owner feedback: two mid-air lines at the mast (Rigging); slower streaks, none on the inset, separate wind/current choice (Charts); race-setup buttons' feedback (UI).
+6. New tonight: start-line drill (Debrief), tack and gybe drill (Crew Controls), constants audit (Bay East), ghost races (Marinas).
+Morning for the owner: the second probe (https://claude.ai/artifact/MrGSH6p7nzwa2M2RV9kWpJ), the crew clips, the band's ▾, the vang.
