@@ -185,7 +185,7 @@ function newGame(seed = randomSeed()): void {
     S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) }), SIM_GUARD);
   w = host.view; drillShown = false;
   showTrimOwner(); showLash(); showCrewPlace();
-  word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint();
+  word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint(); insetViews();
   view.setWorld(w);
   labels.build(w);
 }
@@ -641,7 +641,7 @@ for (const b of $('motorHead').querySelectorAll<HTMLButtonElement>('[data-mo]'))
 };
 for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.onclick = () => { send({ k: 'motor', op: 'gear', gear: b.dataset.mg as 'F' | 'N' | 'R' }); motorUi(); };
 $('moThrottle').addEventListener('input', () => send({ k: 'motor', op: 'throttle', v: Number(($('moThrottle') as HTMLInputElement).value) / 100 }));
-$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); send({ k: 'motor', op: 'start', retireFirst: true }); word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); motorUi(); };
+$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); send({ k: 'motor', op: 'start', retireFirst: true }); word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); motorUi(); };
 $('bMotorNo').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); };
 
 /* ---------------- Home: send her back to her home slip (racing, it retires her first) ---------------- */
@@ -649,10 +649,10 @@ function goHome(): void {
   if (!w.running) return;
   if (!w.homeSlip) { toast('She has no home slip: give her one in the Fleet.', 3500); return; }
   if (!w.freeSail && !w.user.finished && !w.user.retired) { send({ k: 'pause', on: true }); $('homeAsk').hidden = false; ($('bHomeNo') as HTMLButtonElement).focus(); return; }
-  if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); }
+  if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); }
 }
 $('bHome').onclick = goHome;
-$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); view.refreshCourse(w); } };
+$('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); } };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
 /** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
 function homeButton(): void {
@@ -772,7 +772,20 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
   const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f)),
     layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
 }
-$('map').addEventListener('click', () => { if (!w.running || chart.isOpen) return; releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); });
+$('map').addEventListener('click', () => {
+  if (!w.running || chart.isOpen) return;
+  if (w.cruising && hud.insetView === 'nav') { navView.toggle(w); return; } // (the navigator's view: its passage plan)
+  releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook();
+});
+/** Cruising, the navigator is one of the inset map's views, toggled by a quiet button on its rim (the owner: "It should
+ * just be a view in the inset map", and no new buttons outside it); racing, the Course button stays with the helm's. */
+function insetViews(): void {
+  const cruising = !!w?.cruising, b = $('bMapNav');
+  b.hidden = !cruising; $('bCourse').hidden = cruising;
+  if (!cruising) hud.insetView = 'map';
+  b.setAttribute('aria-pressed', String(hud.insetView === 'nav'));
+}
+$('bMapNav').addEventListener('click', e => { e.stopPropagation(); hud.insetView = hud.insetView === 'nav' ? 'map' : 'nav'; insetViews(); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
 /* ---------------- message log ---------------- */
