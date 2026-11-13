@@ -439,7 +439,7 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
-body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #keysHint,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #keysHint,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,
 #showBar{display:none}
 body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-index:5;align-items:center;gap:10px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font:600 12px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 #showBar label{display:flex;align-items:center;gap:8px}
@@ -684,15 +684,9 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .pastrow .ghost{flex:none}
 .knote:empty{display:none}
 
-/* the map's layers (ui/layers.ts): a small button on the inset map's corner, and the list of switches it opens */
-.maplayers{position:fixed;top:calc(env(safe-area-inset-top,0px) + 78px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 104px);z-index:6;
-  width:24px;height:24px;padding:0;display:grid;place-items:center;border-radius:5px;border:1px solid var(--rule);background:var(--pod);color:var(--muted);cursor:pointer}
-.maplayers:hover,.maplayers[aria-expanded="true"]{color:var(--text);border-color:currentColor}
-@media (min-width:760px){.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 172px)}}
+/* the map's layers (ui/layers.ts): the full chart's Layers menu */
 .layerpop{position:fixed;z-index:60;min-width:150px;padding:8px 10px;border-radius:6px;border:1px solid var(--rule);background:var(--pod);
   box-shadow:0 6px 18px rgba(0,0,0,.35);font:600 12px/1.2 var(--f-inst)}
-#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 106px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 140px)}
-@media (min-width:760px){#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 114px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}}
 .layerpop[hidden]{display:none}
 .layerpop .lp-h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .layerpop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;white-space:nowrap}
@@ -737,7 +731,6 @@ body.lashed .tg-lash{display:block}
 /* the map's key (ui/legend.ts), under the layer switches */
 .layerpop{max-height:calc(100vh - 240px);overflow-y:auto}
 #chartLayersPop{max-height:calc(100vh - 120px);width:290px}
-#mapLayersPop{width:280px}
 .layerpop .lp-kh{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule)}
 .lp-key .lk-h{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 3px}
 .lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}
@@ -997,7 +990,6 @@ body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
 /* the inset chart: a circle, top right under the pods */
 #map{width:210px!important;height:210px!important;top:calc(env(safe-area-inset-top,0px) + 76px)!important;border-radius:50%;border:0;box-shadow:0 0 0 2px rgba(150,196,218,.35)}
 #mapHint{width:210px!important;top:calc(env(safe-area-inset-top,0px) + 292px)!important}
-.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 178px)!important}
 #mapBar{top:calc(env(safe-area-inset-top,0px) + 76px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 222px)}
 /* the flags tile: the flags flying now; click for the flag index */
 #sigPanel{top:calc(env(safe-area-inset-top,0px) + 172px);width:auto;min-width:120px;max-width:240px;pointer-events:auto;cursor:pointer;text-align:left;font:inherit;font-size:11px;color:var(--muted);display:block}
@@ -1080,15 +1072,8 @@ body.showroom #crewPop{visibility:hidden}
 /* the situation: a strip on top of the Coach card (the UI session, 12 Nov) */
 #trimPanel #situ{position:static;transform:none;width:auto;margin:-8px -10px 4px -10px;border-radius:7px 7px 0 0;box-sizing:border-box;flex-wrap:wrap;gap:4px 8px}
 #trimPanel #situ .msg{font-size:13px}
-/* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
-.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
+/* the chart hint is the map's hover text */
 #mapHint{display:none}
-/* the inset's navigator view, cruising (ui/hud.ts insetView): a quiet round button on the circle's rim, top right,
-   mirroring the layers button (the owner: no new buttons on the game surface outside the map) */
-#bMapNav.maplayers{right:calc(max(16px,env(safe-area-inset-right,0px)) + 14px)!important}
-#bMapNav[hidden]{display:none!important}
-#bMapNav[aria-pressed="true"]{background:#ffb627;color:#0c2534;border-color:#ffb627}
-body.showroom #bMapNav{display:none!important}
 /* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
 #sigPanel #sigText{display:none}
 /* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */
@@ -1198,7 +1183,7 @@ body.showroom #flowPanel{display:none}
 /* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
    which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
 body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
-body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}
+body.still #appBar,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}
 /* the tactical debrief (ui/tacticsView.ts): a chart a leg against the fleet's middle, the best and the ideal */
 .tac{display:flex;flex-direction:column;gap:8px}
 .tchips{display:flex;gap:6px;flex-wrap:wrap}

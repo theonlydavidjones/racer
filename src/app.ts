@@ -63,7 +63,7 @@ import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { onSaveTrouble } from './store/cloud';
-import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView, type MenuChoice } from './ui/layers';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
@@ -1034,39 +1034,47 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
-  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); };
+  // (the map's layers are the page's own settings, S: the race in its worker learns them by command, and its mirror,
+  // what the maps draw from, a frame or two later. So the chips and menus read S, and the maps redraw once the race
+  // has the change; drawn at once, from the mirror, a click showed nothing, and it took a second click: the owner's
+  // "these buttons are requiring two clicks")
+  const sendLayers = () => { send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); void host.ask({ k: 'settings', patch: {} }).then(() => { redraw(); menus.forEach(m => m()); }); };
+  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); sendLayers(); };
   const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
   const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button, #planField button')];
-  const syncField = () => { const f = fieldLayer(w?.settings ?? S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
+  const syncField = () => { const f = fieldLayer(S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
   for (const b of fieldBtns) b.addEventListener('click', () => {
     const f = b.dataset.field!;
-    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); }
+    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; sendLayers(); }
     else setLayer(f as LayerKey, true);
-    redraw(); setTimeout(() => menus.forEach(m => m()), 30); // (after the chart's redrawn, so the key lists what's on it now)
   });
   syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
   // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
   const views: MenuView[] = [
     { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
     { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
-  const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f), views),
-    layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
+  // (the inset map has no buttons of its own: the owner, "those should be toggles in the full map view, with the inset
+  // remembering my choices". Its layers, what it shows cruising, and the training views are all in the chart's menu)
+  const insetChoice: MenuChoice = {
+    heading: 'The inset map shows', shown: () => !!w?.cruising,
+    options: [{ v: 'map', name: 'The water round her', what: 'The chart round her, turned north up' }, { v: 'nav', name: 'The passage', what: 'The navigator\'s course to the destination, whole; tap the inset for the passage plan' }],
+    get: () => S.insetView ?? 'map', set: v => { S.insetView = v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews(); }
+  };
+  const menus = [layerMenu($('bChartLayers'), $('chartLayersPop'), () => S, setLayer, () => {}, (el, f) => hud.keyInto(el, 'chart', f), views, [insetChoice])];
 }
 $('map').addEventListener('click', () => {
   if (!w.running || chart.isOpen) return;
   if (w.cruising && hud.insetView === 'nav') { navView.toggle(w); return; } // (the navigator's view: its passage plan)
   releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook();
 });
-/** Cruising, the navigator is one of the inset map's views, toggled by a quiet button on its rim (the owner: "It should
- * just be a view in the inset map", and no new buttons outside it); racing, the Course button stays with the helm's. */
+/** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
+ * chosen in the full chart's Layers menu and remembered with your settings (no buttons on the inset: the owner). */
 function insetViews(): void {
-  const cruising = !!w?.cruising, b = $('bMapNav');
-  b.hidden = !cruising; $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
-  if (!cruising) hud.insetView = 'map';
-  b.setAttribute('aria-pressed', String(hud.insetView === 'nav'));
+  const cruising = !!w?.cruising;
+  $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
+  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in the full chart's Layers menu, and remembered)
 }
-$('bMapNav').addEventListener('click', e => { e.stopPropagation(); hud.insetView = hud.insetView === 'nav' ? 'map' : 'nav'; insetViews(); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
 /* ---------------- message log ---------------- */
