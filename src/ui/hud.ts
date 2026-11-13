@@ -175,7 +175,7 @@ export class Hud {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
       el.hidden = false;
       el.innerHTML = `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`;
-      $('nextCard').title = el.textContent ?? '';
+      $('nextCard').title = (el.textContent ?? '') + ' · Click for the course and the strategist';
       return;
     }
     const m = w.nextMark(u), L = laylinesFor(w, u);
@@ -185,7 +185,7 @@ export class Hud {
     const T = this.trCache.t; if (!T) { el.hidden = true; return; }
     el.hidden = false;
     el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
-    $('nextCard').title = el.textContent ?? '';
+    $('nextCard').title = (el.textContent ?? '') + ' · Click for the course and the strategist';
   }
 
   private sigKey = '';
@@ -307,8 +307,20 @@ export class Hud {
       // the Coach card's second line (the chase-view layout): the sails' state, heel and helm, where the crew are; a state
       // that isn't good in amber or red
       const st = (name: string, w: string, c: string) => `${name} <b class="tp-st ${c}">${w.toLowerCase()}</b>`;
-      const c = u.crew, crew = !c ? '' : ` · crew ${c.mode === 'hike' ? 'hiking' : c.mode === 'leeward' ? 'to leeward' : c.mode === 'foredeck' ? 'on the foredeck' : c.fore > 0.55 ? 'forward' : c.fore < 0.25 ? 'aft' : 'amidships'}`;
-      $('tpBalance').innerHTML = `${st('Main', mw, mc)} · ${st('Jib', jw, jc)} · Heel <b>${heel}°</b> · helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b>${crew}<span class="warn">${advice}</span>`; }
+      // where the crew are, the line's last word: a button that opens their places, in place of a Crew button (the
+      // surface audit, owner 13 Nov), amber once you've placed them as a line is in the band. It's built once and only its
+      // words change, so a click never straddles a rewrite of the line.
+      const c = u.crew, crewWhere = !c ? '' : `crew ${c.mode === 'hike' ? 'hiking' : c.mode === 'leeward' ? 'to leeward' : c.mode === 'foredeck' ? 'on the foredeck' : c.fore > 0.55 ? 'forward' : c.fore < 0.25 ? 'aft' : 'amidships'}`;
+      const box = $('tpBalance');
+      if (!box.querySelector('.tp-crew')) box.innerHTML = '<span class="tp-bal"></span><span class="tp-sep"> · </span><button type="button" class="tp-crew"></button><span class="tp-adv warn"></span>';
+      const bal = `${st('Main', mw, mc)} · ${st('Jib', jw, jc)} · Heel <b>${heel}°</b> · helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b>`;
+      if (bal !== this.balShown) { box.querySelector('.tp-bal')!.innerHTML = bal; this.balShown = bal; }
+      const cb = box.querySelector<HTMLButtonElement>('.tp-crew')!, placed = !!c?.place;
+      if (cb.textContent !== crewWhere) cb.textContent = crewWhere;
+      cb.hidden = !c; (box.querySelector('.tp-sep') as HTMLElement).hidden = !c;
+      cb.classList.toggle('mine', placed);
+      const tt = `Where the crew sit: click to place them (keys 7–0). ${placed ? 'Placed by you' : 'On auto'}`; if (cb.title !== tt) cb.title = tt;
+      const adv = box.querySelector('.tp-adv')!; if (adv.textContent !== advice) adv.textContent = advice; }
     // (the line under the sails' state is the trim coach's headline: app.ts coachTick)
   }
 
@@ -397,6 +409,8 @@ export class Hud {
   }
 
   private cardKey = '';
+  /** The Coach card's second line as last drawn. */
+  private balShown = '';
   /** The signal flags drawn into the card's sketch (as data URLs, made once). */
   private flagUrl: Partial<Record<'N' | 'AP' | 'A', string>> = {};
   /** The "where next" card's header, number and sketch (only rewritten when they change). */
@@ -453,8 +467,9 @@ export class Hud {
           + `<br><small>${speed}</small>`;
         return;
       }
-      this.card('', 'Sailing', (u.v / KT).toFixed(1), 'kt', `${T(75, 26, `${pct}% OF TARGET`, '#3fd197')}`);
-      el.textContent = speed + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
+      // no destination, no card (the owner, 13 Nov: it only repeated the boat speed)
+      if (!$('nextCard').hidden) { $('nextCard').hidden = true; this.cardKey = ''; }
+      void speed; void vmg;
       return;
     }
     // the committee has called racing off (AP or N over A, signals.ts cancelSignal): that's what's next, whatever the leg

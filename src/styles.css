@@ -1111,3 +1111,15 @@ body.showroom #bMapNav{display:none!important}
 #flowPanel .fp-story em.luff{color:#ffd34d}#flowPanel .fp-story em.stall{color:#ff6a5c}
 #flowPanel .fp-twist,#flowPanel .fp-slot,#flowPanel .fp-keel{color:var(--muted)}
 body.showroom #flowPanel{display:none}
+
+/* the surface audit (owner, 13 Nov): controls folded into what's already on screen */
+/* the where-next card opens the course (racing) or the navigator (cruising) */
+#nextCard{cursor:pointer}
+#nextCard:hover,#nextCard:focus-visible{border-color:var(--accent)}
+/* the Coach card's crew line opens the crew's places (in place of the Crew button); amber once you've placed them */
+.tp-crew{pointer-events:auto;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+.tp-crew:hover{color:var(--text)}
+.tp-crew.mine{color:var(--accent)}
+/* messages rest once they're stale: the card keeps only its header (and All, for the log) */
+#msgLog.rest #msgRecent{display:none}
+#nextCard{pointer-events:auto}

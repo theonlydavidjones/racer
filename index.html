@@ -34,7 +34,7 @@
 <!-- top left, under the pods: where next, the flags flying, (the wind-angle dial, a training aid) -->
 <div id="leftCol">
   <canvas id="dial" aria-label="Wind angle dial"></canvas>
-  <div id="nextCard" hidden title="Where next: the start line before the start, the next mark, the finish; cruising, the navigator. The last line is a transit: two things in line that tell you where you are."><div class="nc-h" id="ncHead"></div>
+  <div id="nextCard" hidden role="button" tabindex="0" title="Where next: the start line before the start, the next mark, the finish; cruising, the navigator. Click for the course and the strategist (cruising, the navigator)."><div class="nc-h" id="ncHead"></div>
     <div class="nc-row"><div class="nc-num" id="ncNum"></div><svg id="ncSketch" viewBox="0 0 150 46" aria-hidden="true" font-family="Saira Semi Condensed, sans-serif"></svg></div>
     <div class="nc-sub" id="linebox"></div><div class="nc-sub nc-tr" id="transit" hidden></div></div>
 <button type="button" id="sigPanel" hidden title="Flags flying now on the committee boat. Click for the flag index."><span class="sig-lab">Flags</span><span id="sigFlags"></span><span id="sigText"></span></button>
@@ -137,7 +137,7 @@
 </div>
 <!-- the view: bottom right, with the keys line over it on hover -->
 <div class="ibar" id="viewBar">
-  <button class="ib" id="bCrew" type="button" aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
+  <button class="ib" id="bCrew" type="button" hidden aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
   <button class="ib on" id="bBand" type="button" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
   <button class="ib" id="bEnsign" type="button" hidden title="Strike the ensign in a blow: the flag lowered and its staff stowed below, before it flogs itself to rags. Again hoists it."><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V3"/><path d="M5 4h9l-2 3 2 3H5"/><path class="dn" d="M15 12v6M12.5 15.5 15 18l2.5-2.5"/></svg><span class="w">Strike ensign</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>

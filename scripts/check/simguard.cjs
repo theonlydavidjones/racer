@@ -45,7 +45,7 @@ const out = process.argv[2] || '.';
   await step('hail', async () => { await key('h'); });
   await step('views', async () => { for (const k of ['1', '2', '3', '2']) { await key(k); await p.waitForTimeout(500); } });
   await step('map', async () => { await click('#map'); await p.waitForTimeout(1500); await p.keyboard.press('Escape'); });
-  await step('course', async () => { await click('#bCourse'); await p.waitForTimeout(1500); await p.keyboard.press('Escape'); });
+  await step('course', async () => { await click('#nextCard'); await p.waitForTimeout(1500); await p.keyboard.press('Escape'); });
   await step('pause', async () => { await click('#bPause'); await p.waitForTimeout(800); await click('#bResume'); });
   await p.waitForTimeout(8000); // (racing on, at 4×)
   await p.screenshot({ path: `${out}/simguard_race.png` });
