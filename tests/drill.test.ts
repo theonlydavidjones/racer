@@ -45,16 +45,16 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     expect(s.kind).toBe('gybe'); expect(s.lostM).toBeLessThan(6); expect(s.coach).toMatch(/^A good gybe/);
   });
   it('a timid tack (too little helm) sits head to wind too long, loses more, and is told to turn more firmly', () => {
+    // (so timid she creeps through the eye: told so, as a stalled tack, whether or not there was a speed to score it by)
     const good = drill('tack', 10)!, slow = drill('tack', 10, { tiller: -0.12 })!;
-    expect(slow.deadS).toBeGreaterThan(good.deadS * 1.6);
-    expect(slow.lostM).toBeGreaterThan(good.lostM);
-    expect(slow.coach).toMatch(/Too slow through the eye/);
+    expect(slow.coach).toMatch(/Too slow through the eye|Stuck in irons/);
+    if (slow.scored) { expect(slow.deadS).toBeGreaterThan(good.deadS * 1.6); expect(slow.lostM).toBeGreaterThan(good.lostM); }
   });
-  it('full helm through a tack turns faster, overshoots the new course, and costs at least the crew\'s tack', () => {
+  it('full helm through a tack turns at least as hard, overshoots the new course, and costs at least the crew\'s tack', () => {
     // (the sim's boat doesn't stall in a hard turn: its rudder's braking at full helm decides how much a spin costs,
     // and today it costs little more than the crew's tack)
     const good = drill('tack', 10)!, fast = drill('tack', 10, { tiller: -1 })!;
-    expect(fast.rate).toBeGreaterThan(good.rate);
+    expect(fast.peakRate).toBeGreaterThan(good.peakRate - 0.5); // (the crew already tack at about full helm)
     expect(fast.overshoot).toBeGreaterThan(good.overshoot + 3);
     expect(fast.lostM).toBeGreaterThanOrEqual(good.lostM * 0.98);
   });
@@ -158,5 +158,32 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     const s = d.list.find(x => x.scored)!;
     expect(s.backS).not.toBeNull();
     expect(s.lostM).toBeGreaterThan(0.5 * s.goodM);
+  });
+
+  it('an aborted tack that pauses just past the eye before falling back is still one aborted tack, not two scored', () => {
+    for (const pause of [1.5, 3, 5]) {
+      const tws = 8, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+      run(b, d, 40); b.handsOff = true; b.tiller = -0.6;
+      let phase = 0, t = 0, at = 0;
+      run(b, d, 40, () => { t += 1 / 60; const a = wrap(b.ww.from - b.h);
+        if (phase === 0 && a < -5) { phase = 1; at = t; b.tiller = 0; } else if (phase === 1 && t - at > pause) { phase = 2; b.tiller = 0.6; } else if (phase === 2 && a > ang - 2) { phase = 3; b.tiller = 0; } });
+      b.handsOff = false; run(b, d, 60);
+      expect(d.list.filter(x => x.scored).length, `${pause} s: ${d.list.map(x => x.coach).join(' | ')}`).toBe(0);
+    }
+  });
+  it('a dead run rocking in a quartering sea, with no gybe, makes no notes', () => {
+    const tws = 14, b = testBoat({ heading: 182, kt: 5, windKt: tws }) as Boat, d = new DrillTracker();
+    b.poleWant = true; b.sea = { ...b.sea, hsW: 0.6, tpW: 2.5, fromW: 20, steep: 0.06 };
+    let t = 0; run(b, d, 180, () => { t += 1 / 60; b.ww = { ...b.ww, from: (360 + 4 * Math.sin(t / 9)) % 360 }; b.h = 182; });
+    expect(d.list.length, d.list.map(x => x.coach).join(' | ')).toBe(0);
+  });
+  it('a tack that stops head to wind before she falls across is told it was stuck in irons', () => {
+    const tws = 6, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    for (const til of [-0.08, -0.15]) {
+      const b2 = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d2 = new DrillTracker();
+      run(b2, d2, 40); b2.handsOff = true; b2.tiller = til; run(b2, d2, 120); b2.handsOff = false; run(b2, d2, 40);
+      expect(d2.list.some(x => /Stuck in irons|Too slow through the eye/.test(x.coach)), `${til}: ${d2.list.map(x => x.coach).join(' | ')}`).toBe(true);
+    }
+    void b; void d;
   });
 });
