@@ -70,7 +70,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
-| 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered |
+| 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered: **finding 1** |
 | 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | partly (the mark touch's exoneration) |
 | 114 | 253 | 16.1, 18.2(a)(1), 31 | Room owed through a middle boat; at a starting mark L luffs W onto it: L broke 16.1 | partly (three-boat chains; Q3 buildable) |
 | 118 | 260 | 18.2(a)(1) | "Room to sail to the mark" at a leeward mark: no breach | partly |
@@ -131,4 +131,11 @@ found.
 
 ### Findings
 
-(none yet)
+1. **Case 93 (rule 18.3): the engine makes the boat that tacked in the zone keep clear, where 18.3 only asks her to give
+   mark-room.** W tacks from port to starboard in the zone; L, on starboard and fetching, gets a leeward overlap from clear astern and
+   luffs straight into W. The Case: L broke 15 and 16.1 (and 14); W broke 11 but is exonerated, and gave L mark-room, so didn't break
+   18.3. The engine: W, under 18.3 (src/rules/rightOfWay.ts: once the tacking boat is overlapped with the fetching boat it returns
+   her as the keep-clear boat, `{ kc: T, rule: '18.3' }`). 18.3(b) obliges her to give mark-room if the other gets inside her, and
+   18.3(a) not to make her sail above close-hauled; neither makes her keep clear of a luff that isn't for mark-room. A fix would let
+   rules 11, 15 and 16 govern the pair while the fetching boat's course isn't one mark-room protects (luffing above close-hauled
+   toward the tacker, not sailing to or round the mark). Test: tests/rules-cases.test.ts, Case 93 (`it.fails`).
