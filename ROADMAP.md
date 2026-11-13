@@ -150,9 +150,13 @@ What's planned, roughly in order. Done work is described in the README.
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
    Next for the rules (owner, 13 November):
-   - **Protests and hearings (RRS Part 5): approved.** Rules designs them for the owner first.
-   - **Penalties around commercial traffic: approved "if that's the rule".** Rules confirms the real Bay sailing
-     instructions first: what the SIs say about keeping clear of ships and the traffic lanes, and the penalty.
+   - **Protests and hearings (RRS Part 5): design approved** (docs/PROTESTS-PROPOSAL.md, branch rules-protests-design;
+     owner, 13 November):
+     - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
+     - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
+       option.
+   - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
+     committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
    Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
    (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
