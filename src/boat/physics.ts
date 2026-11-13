@@ -18,7 +18,11 @@ import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
-/** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. */
+/** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
+ * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
+ * (Seaweed Soup course 2, 12 kt, 13 Nov 2026) a two-turns penalty took 96-163 s from the call to done: about 60-80 s
+ * turning (turnDrag bleeds her speed through the turns, toward this floor) and 30-40 s sailing clear first. Bay East's
+ * audit puts a 720 in a small keelboat at more like 30-45 s in a breeze, also unconfirmed. The owner is to time one. */
 export const PENALTY_TURN_RATE = 10;
 /** Below this speed (m/s, ~2.5 kt) the AI won't try to tack: she'd stall head to wind. */
 export const SLOW_TACK = 1.3;
