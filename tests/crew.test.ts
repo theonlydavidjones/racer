@@ -228,13 +228,13 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
     // the bow hand's trips in for a big job (the Cunningham, the downhaul, the jib halyard), each second, by the change of
     // wind (or tack) they answer: a crew resets the luff for a new wind, as they should, and is done in a minute or so;
     // fussing is trips in the steady wind that follows
-    const trips: { leg: string; t: number }[] = []; let legNow = '';
+    const tripSecs: { leg: string; t: number }[] = []; let legNow = '';
     // every second, outside the tack itself: still yours, everyone free out on the rail, nobody off at the cabin top
     const check = (when: string) => {
       if (c.place?.across !== 'hike') bad.push(`${when}: place lost`);
       c.people.forEach((p, i) => {
         if (p.job?.station && PIANO.includes(p.job.line) && !p.job.big) bad.push(`${when}: #${i} left the rail for the ${p.job.line}`);
-        if (p.job?.big) trips.push({ leg: legNow, t: +when.split(' ').pop()!.replace('s', '') });
+        if (p.job?.big) tripSecs.push({ leg: legNow, t: +when.split(' ').pop()!.replace('s', '') });
         if (i > 0 && !p.job && c.tgt![i].pose !== 'hike' && !['piano', 'winch', 'car', 'mast'].includes(c.tgt![i].pose)) bad.push(`${when}: #${i} ${c.tgt![i].pose}`); // (a job just done: the plan catches up within 0.05 s)
       });
     };
@@ -252,8 +252,8 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
     // lull, which is right, not one that worked the lines through the steady stretches: Deep Physics and the
     // Coordinator, 13 Nov 2026. A trip made in the steady stretch fails it; the crew's own guards against fussing,
     // crewWork.ts LINE_GAP and PLACED_TRIP, held even with minGain 0 and the plan's Cunningham swung every 5 or 30 s.)
-    for (const L of ['puff', 'lull', 'after the tack']) expect(trips.filter(x => x.leg === L).length, `${L}: ${trips.filter(x => x.leg === L).map(x => x.t).join(' ')} s`).toBeLessThanOrEqual(20);
-    expect(trips.filter(x => x.leg === 'steady' || x.leg === 'after the tack' && x.t > 35).map(x => `${x.leg} ${x.t}s`), 'trips in the steady wind').toEqual([]);
+    for (const L of ['puff', 'lull', 'after the tack']) expect(tripSecs.filter(x => x.leg === L).length, `${L}: ${tripSecs.filter(x => x.leg === L).map(x => x.t).join(' ')} s`).toBeLessThanOrEqual(20);
+    expect(tripSecs.filter(x => x.leg === 'steady' || x.leg === 'after the tack' && x.t > 35).map(x => `${x.leg} ${x.t}s`), 'trips in the steady wind').toEqual([]);
     // the weight is on the new windward side (port), as far out as they reach
     expect(c.side).toBe('P'); expect(c.mode).toBe('hike');
     // Auto: in a drifter a good crew goes back to their own call (to leeward or the middle, not hiking)
