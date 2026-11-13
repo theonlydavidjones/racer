@@ -350,7 +350,8 @@ export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle:
 // only for a heel error from the crew's own (k.bestHeel) that the move takes off of more than helmHeel degrees, for
 // helmLast seconds, or at once for twice that in a puff that needs them out. Without it, the weight wanted about the
 // middle, the helm's own crossing swung her heel past what was wanted and back they came, across every few seconds
-// (Crew Figures' cruising probe: 6 kt, a beam reach). The crew's lighter moves make up the difference meanwhile. Not on a
+// (Crew Figures' cruising probe: 6 kt, a beam reach). The crew's lighter moves make up the difference meanwhile (alone,
+// the helm is the only weight there is to move: not then). Not on a
 // beat: there the extra heel costs her speed (probed: 6 kt at 45 true, 9.8 degrees mean against 5.6, 0.9% slower). Estimates.)
 // (crossHeel, crossLast: on a run (the crew's own `downwind`, past 120 true), a move across to the other side of the
 // boat, between gybes, waits until she has carried more than crossHeel degrees of heel that the move takes off, for
@@ -362,7 +363,7 @@ export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle:
 // minutes, steadying the roll by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Not on a reach:
 // there the side they want changes with the breeze, and a puff needs them up to windward at once (the physics review).
 // Both numbers estimates.)
-interface Held { arm: number; z: number; since: number; off: number; cross?: number }
+interface Held { arm: number; z: number; since: number; off: number; cross?: number; helm?: number }
 
 /**
  * Where the crew go now, at a human pace. Each free person goes where the weight is wanted (or where you've put them);
@@ -566,7 +567,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   const heelLee = k.heel ?? 0; // (+ to leeward: physics.ts heelMag)
   const helmLight = (i: number) => {
     const t = tgt[i], h = held[i];
-    return i === 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+    return i === 0 && c.spec.crew.length > 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
   };
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
@@ -594,10 +595,10 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // HOLD.helmHeel, helmLast)
     if (helmLight(i)) {
       const err = heelLee - (k.bestHeel ?? heelLee), fixes = out ? err : -err;
-      h.cross = fixes > HOLD.helmHeel ? (h.cross ?? 0) + step : Math.max(0, (h.cross ?? 0) - step);
+      h.helm = fixes > HOLD.helmHeel ? (h.helm ?? 0) + step : Math.max(0, (h.helm ?? 0) - step);
       const puff = out && fixes > 2 * HOLD.helmHeel && dArm > HOLD.urgent * dead;
-      if (!puff && h.cross < HOLD.helmLast) { h.off = 0; stay(i, h, t); return; }
-    }
+      if (!puff && h.helm < HOLD.helmLast) { h.off = 0; stay(i, h, t); return; }
+    } else h.helm = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
