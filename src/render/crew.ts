@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh }
 type Limb = Body['arm'][number];
@@ -734,14 +734,28 @@ function track(f: Figure, x: number, z: number, dt: number): number {
 function upright(f: Figure, want: number, dt: number): number { f.upr = f.upr == null || dt > 0.5 ? want : f.upr + (want - f.upr) * Math.min(1, dt * 4); return f.upr; }
 
 /**
+ * Aft of the thwart there's no seat in the middle, only the side decks: someone the physics has near the centreline there
+ * (on a run, weight about level, a little either side with each puff) sits on the side deck they're on, and goes across
+ * only when the physics puts them well over on the other side. Drawn by its sign alone, each small shift of weight across
+ * the middle had them get up, along the deck forward past the thwart, across and back aft again: the owner's "crawling
+ * along the rail" (v162, cruising downwind).
+ */
+const AFT_MID = 0.45;
+function aftSide(f: Figure, x: number, z: number): number {
+  if (!(z > THWART.z + 0.05 && z < COCK1 + 0.2) || f.aftSide == null || Math.abs(x) > AFT_MID) return x;
+  return f.aftSide * Math.abs(x);
+}
+
+/**
  * On their way somewhere: across the boat to the other side, or fore and aft to a job (where the physics is taking
  * them: crewPhys.ts goal), until they're nearly there. Moving out to hike, or in from it, on the same side is the body
  * leaning out and in, not a walk.
  */
 function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: number): boolean {
   const g = a?.goal; if (!a || !g) return false;
-  const across = Math.sign(g.x) !== Math.sign(x) && Math.abs(g.x - x) > 0.25, along = Math.abs(g.z - a.z) > 0.4;
-  if (f.going) return Math.abs(g.x - x) > 0.08 || Math.abs(g.z - a.z) > 0.08;
+  const gx = aftSide(f, g.x, g.z);
+  const across = Math.sign(gx) !== Math.sign(x) && Math.abs(gx - x) > 0.25, along = Math.abs(g.z - a.z) > 0.4;
+  if (f.going) return Math.abs(gx - x) > 0.08 || Math.abs(g.z - a.z) > 0.08;
   return across || along;
 }
 
@@ -786,6 +800,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const lean = a?.lean ?? 0, pose = a?.pose ?? 'sit';
     // (abreast, at one place fore and aft)
     const z = mid ? COCK0 + 0.62 : zs[i];
+    // (aft of the thwart, the side they're sitting on until the physics has them clearly on the other: aftSide)
+    if (a && !mid && a.z > THWART.z + 0.05 && a.z < COCK1 + 0.2) {
+      if (f.aftSide == null || Math.abs(x) > AFT_MID) f.aftSide = Math.sign(x) || windward;
+      x = aftSide(f, x, a.z);
+    } else f.aftSide = undefined;
     const dir = track(f, x, a?.z ?? z, dt);
     // (on the move from 0.22 m/s, settled again under 0.1: no flicker between walking and sitting)
     const go = f.going = travelling(f, a, x);

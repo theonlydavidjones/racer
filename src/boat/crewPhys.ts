@@ -335,13 +335,14 @@ export const ROLL_HOLD = 2;
  *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
  *   Performance Sailing);
  * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
+ * - `body`: out on the rail, how hard they hike follows the wind over about this long (s), not each wave;
  * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time):
  *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
  *   body, not a move.
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, body: 3 };
 interface Held { arm: number; z: number; since: number; off: number }
 
 /**
@@ -505,7 +506,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const settled: Pose = free ? (arm < leeAt ? 'lee' : a.lean > hikeAt ? 'hike' : 'sit') : t.pose;
     // (moving out to the rail or in from it on their own side, to a seat, is still sitting or hiking: not 'cross', the
     // crouch across under the boom, which had them bob up for a moment with every puff)
-    const outOrIn = !crossing && free && Math.abs(goal.z - a.z) <= 0.5;
+    const outOrIn = !crossing && (free || t.pose === 'helm') && Math.abs(goal.z - a.z) <= 0.5; // (the helm too: out to the rail and in again)
     a.pose = !outOrIn && (Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5) ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
@@ -541,7 +542,10 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
     // again, is the body, not a move)
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
-    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
+    // (but over a few seconds, not with each wave: a hiker settles to how hard the wind's blowing, held by their feet under
+    // the strap, while the trimmer plays the main for the seas. Followed instantly, the target's swing with every wave's
+    // heel had them flop out and in a body's length every few seconds: the owner's "flopping around", v162)
+    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm += (t.arm - h.arm) * Math.min(1, step / HOLD.body); h.z = t.z; t.arm = h.arm; return; }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
