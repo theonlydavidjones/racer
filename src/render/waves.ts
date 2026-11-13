@@ -5,7 +5,7 @@ import { N_WAVES, type WaveField } from '../environment/waveField';
  * The waves you see: the World's wave field (environment/waveField.ts), the same one the boats' heave and pitch come
  * from (boat/seaway.ts waveMotion), drawn as Gerstner waves on the GPU (the water surface, below).
  */
-export { N_WAVES };
+export { N_WAVES } from '../environment/waveField';
 
 /** Uniform arrays for the water shader: (dir x, dir y, k, amp) and (ω, phase, Q, swell?). */
 export function packWaves(f: WaveField, a: Float32Array, b: Float32Array): void {
