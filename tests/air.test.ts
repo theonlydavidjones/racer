@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { airTempC, warmAt } from '../src/environment/air';
+import { airTempC, warmDay } from '../src/environment/air';
 
 /** Local time on the Bay (Pacific) as minutes since epoch, UTC. */
 const at = (iso: string, offsetH: number) => (Date.parse(iso + 'Z') + offsetH * 3600000) / 60000;
@@ -18,24 +18,24 @@ describe('The air temperature on the race area (environment/air.ts, NOAA CO-OPS 
     expect(t(14)).toBeGreaterThan(t(6));
     expect(t(14)).toBeGreaterThan(t(22));
   });
-  it('on days with only the climate, warm about as often as Fort Point\'s afternoons are (the same day for everyone)', () => {
-    const share = (month: number, offsetH: number) => {
+  it("on days with only the climate, warm as often as Fort Point's days were (12:00–16:59), the same day for everyone", () => {
+    const share = (month: number) => {
       let warm = 0, n = 0;
-      for (let y = 2027; y < 2047; y++) for (let d = 1; d <= 28; d++) {
-        const date = `${y}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        if (warmAt(date, at(`${date}T14:00:00`, offsetH))) warm++; n++;
-      }
+      for (let y = 2030; y < 2080; y++) for (let d = 1; d <= 28; d++) { if (warmDay(`${y}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`)) warm++; n++; }
       return warm / n;
     };
-    const oct = share(10, 7), jul = share(7, 7), want = airTempC('2027-10-09', at('2027-10-09T14:00:00', 7)).warmShare;
-    console.log(`warm at 14:00: October ${(oct * 100).toFixed(0)}% of days (the station's hours: ${(want * 100).toFixed(0)}%), July ${(jul * 100).toFixed(0)}%`);
-    expect(Math.abs(oct - want)).toBeLessThan(0.05);
-    expect(jul).toBeLessThan(0.03);
-    expect(warmAt('2027-10-09', at('2027-10-09T14:00:00', 7))).toBe(warmAt('2027-10-09', at('2027-10-09T14:00:00', 7)));
+    const oct = share(10), jul = share(7);
+    console.log(`climate-only days warm: October ${(oct * 100).toFixed(0)}% (Fort Point 2021–2025: 17%), July ${(jul * 100).toFixed(0)}%`);
+    expect(Math.abs(oct - 0.174)).toBeLessThan(0.04);
+    expect(jul).toBe(0);
+  });
+  it('a day on record says for itself: 6 Sep 2022 (34 °C at Fort Point) warm; 11 Jul 2026 (the morning fog) not', () => {
+    expect(warmDay('2022-09-06')).toBe(true);
+    expect(warmDay('2026-07-11')).toBe(false);
   });
   it("a day on record reads what Fort Point saw (11 July 2026: 53–55 °F in the morning fog)", () => {
     const a = airTempC('2026-07-11', at('2026-07-11T11:00:00', 7));
-    expect(a.observed).toBe(true);
+    expect(a.real).toBe(true);
     expect(a.c).toBeGreaterThan(11); expect(a.c).toBeLessThan(14); // (54.9 °F is 12.7 °C, the station's own 11:00 reading)
   });
 });

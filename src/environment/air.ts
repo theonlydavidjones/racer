@@ -12,7 +12,7 @@ import real from './data/sf-real-days.json';
  * A day it has the record of (scripts/fetch-real-days.mjs): what Fort Point read that day, hourly 09:00–18:00; the coming
  * week: the NWS forecast grid's temperature at the Cityfront cell (MTR 84,107). Otherwise the climate.
  */
-interface Climate { mean: (number | null)[][]; p10: (number | null)[][]; p90: (number | null)[][]; warm: (number | null)[][]; warmC: number }
+interface Climate { mean: (number | null)[][]; p10: (number | null)[][]; p90: (number | null)[][]; warm: (number | null)[][]; warmDay: (number | null)[]; warmC: number }
 const C = climate as unknown as Climate;
 
 interface Real { airStation?: { hours: number[] }; airObs?: Record<string, string>; forecast?: Record<string, { air?: (number | null)[] }> }
@@ -49,16 +49,16 @@ export interface AirTemp {
   warmShare: number;
   /** where it comes from, said plainly */
   source: string;
-  /** the day's own (observed or forecast), not the climate's usual */
-  observed?: boolean;
+  /** the day's own (observed or forecast: `source` says which), not the climate's usual */
+  real?: boolean;
 }
 /** The air temperature at `tMin` (minutes since epoch, UTC) on `date` (the race day, YYYY-MM-DD). */
 export function airTempC(date: string, tMin: number): AirTemp {
   const { month, hour } = local(tMin), warmShare = at(C.warm, month, hour) ?? 0;
   const o = observed(date), hs = R.airStation?.hours;
-  if (o && hs) { const c = series(o, hs, hour); if (c != null) return { c, warmShare, observed: true, source: `observed at NOAA's Fort Point station (9414290) that day` }; }
+  if (o && hs) { const c = series(o, hs, hour); if (c != null) return { c, warmShare, real: true, source: `observed at NOAA's Fort Point station (9414290) that day` }; }
   const fc = R.forecast?.[date]?.air;
-  if (fc?.length) { const c = series(fc, fc.map((_, k) => k), hour); if (c != null) return { c, warmShare, observed: true, source: `the National Weather Service forecast for the Cityfront (grid cell MTR 84,107)` }; }
+  if (fc?.length) { const c = series(fc, fc.map((_, k) => k), hour); if (c != null) return { c, warmShare, real: true, source: `the National Weather Service forecast for the Cityfront (grid cell MTR 84,107)` }; }
   return { c: at(C.mean, month, hour) ?? 15, warmShare: at(C.warm, month, hour) ?? 0,
     source: `the usual for this month and hour at NOAA's Fort Point station (9414290, 2021–2025)` };
 }
@@ -72,15 +72,23 @@ function dayDraw(date: string): number {
   h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
   return (h >>> 0) / 4294967296;
 }
+/** The racing hours (local) a day's kit is decided over. */
+const RACE_HOURS = [12, 13, 14, 15, 16];
 /**
- * Whether it's warm (WARM_C or more) at `tMin` on `date`. Where the sim has the day's own temperature (observed or
- * forecast), that says. Where it has only the climate, the day is warm as often as Fort Point's hours are: the share of
- * hours at 20 °C or more in that month at that hour (NOAA CO-OPS 9414290, 2021–2025), against one number drawn from the
- * date (so a warm day is the same day for everyone, and warm all afternoon if it's warm at its warmest hour: one draw
- * for the whole day, the warmer hours' larger shares passing it first).
+ * Whether `date` is a warm day (WARM_C or more at any hour 12:00–16:59, the racing hours): decided once for the day, so
+ * nobody changes clothes in the middle of a race.
+ * - A day the sim has the temperature of (observed at Fort Point, or the NWS forecast): what that says.
+ * - A day it has only the climate for: warm as often as Fort Point's days were in that month (the share of days with a
+ *   reading at 20 °C or more 12:00–16:59, NOAA CO-OPS 9414290, 2021–2025: about 17% in October, 13% in September, 4% in
+ *   August, none in July), against one number drawn from the date (the same day for everyone).
+ * Not yet: in real life Fort Point's warm afternoons come with light wind and no fog (offshore or weak sea-breeze days:
+ * August–October's warm afternoons averaged 7 kt, the rest 9); on a climate-only day the draw here is independent of the
+ * day's wind and fog, and heat that comes for several days in a row comes here a day at a time.
  */
-export function warmAt(date: string, tMin: number): boolean {
-  const a = airTempC(date, tMin);
-  if (a.observed) return a.c >= WARM_C;
-  return dayDraw(date) < a.warmShare;
+export function warmDay(date: string): boolean {
+  const o = observed(date), hs = R.airStation?.hours, fc = R.forecast?.[date]?.air;
+  const vals: (number | null)[] = o && hs ? RACE_HOURS.map(h => series(o, hs, h)) : fc?.length ? RACE_HOURS.map(h => fc[h] ?? null) : [];
+  if (vals.some(v => v != null)) return vals.some(v => v != null && v >= WARM_C);
+  const month = +date.slice(5, 7) - 1;
+  return dayDraw(date) < (C.warmDay?.[month] ?? 0);
 }

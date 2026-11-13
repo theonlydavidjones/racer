@@ -163,7 +163,7 @@ console.log(`swell: ${Object.keys(swell).length} days`);
 const VIS_STATION = '9414296', VIS_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18], VIS_UNIT = 10;
 const sameFormat = prev?.visStation?.unit === VIS_UNIT;
 const visObs = { ...(sameFormat ? prev?.visObs ?? {} : {}) }, visRaw = new Map();
-const visStart = sameFormat ? start : new Date(Date.UTC(FROM_YEAR, 0, 1)); // (the first time, or a new format: the whole history)
+const visStart = sameFormat ? new Date(start.getTime() - 86400e3) : new Date(Date.UTC(FROM_YEAR, 0, 1)); // (the first time, or a new format: the whole history. An update starts a day early: `start` is UTC midnight, the afternoon of the local day before)
 for (let t = new Date(visStart); t <= yesterday;) {
   const end = new Date(Math.min(t.getTime() + 364 * 86400e3, yesterday.getTime() + 86400e3));
   const j = await fetchRetry(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=visibility&station=${VIS_STATION}&begin_date=${ymd(t)}&end_date=${ymd(end)}&interval=h&time_zone=gmt&units=metric&format=json&application=folkboat-sim`);
@@ -178,7 +178,12 @@ for (let t = new Date(visStart); t <= yesterday;) {
   console.log(`visibility ${ymd(t)}–${ymd(end)}: ${n} hours`);
   t = new Date(end.getTime() + 86400e3);
 }
-for (const [date, a] of visRaw) if (a.some(x => x !== 65535)) { const b = Buffer.alloc(a.length * 2); a.forEach((x, i) => b.writeUInt16BE(x, i * 2)); visObs[date] = b.toString('base64'); }
+// (merged hour by hour with what's on file: a day fetched in part keeps the hours it already had)
+const unpack16 = b64 => { const b = Buffer.from(b64, 'base64'); return Array.from({ length: b.length / 2 }, (_, i) => b.readUInt16BE(2 * i)); };
+for (const [date, a] of visRaw) {
+  const had = visObs[date] ? unpack16(visObs[date]) : null; if (had) a.forEach((x, i) => { if (x === 65535 && had[i] != null) a[i] = had[i]; });
+  if (a.some(x => x !== 65535)) { const b = Buffer.alloc(a.length * 2); a.forEach((x, i) => b.writeUInt16BE(x, i * 2)); visObs[date] = b.toString('base64'); }
+}
 console.log(`visibility: ${Object.keys(visObs).length} days`);
 
 // NOAA CO-OPS 9414290's air temperature (Fort Point, the wind's station), hourly on the hour, local; stored as base64 of
@@ -187,7 +192,7 @@ console.log(`visibility: ${Object.keys(visObs).length} days`);
 const AIR_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18], AIR_FMT = 'c+10x4';
 const airSame = prev?.airStation?.fmt === AIR_FMT;
 const airObs = { ...(airSame ? prev?.airObs ?? {} : {}) }, airRaw = new Map();
-const airStart = airSame ? start : new Date(Date.UTC(FROM_YEAR, 0, 1)); // (the first time, or a new format: the whole history)
+const airStart = airSame ? new Date(start.getTime() - 86400e3) : new Date(Date.UTC(FROM_YEAR, 0, 1)); // (the first time, or a new format: the whole history; an update a day early, as the visibility)
 for (let t = new Date(airStart); t <= yesterday;) {
   const end = new Date(Math.min(t.getTime() + 364 * 86400e3, yesterday.getTime() + 86400e3));
   const j = await fetchRetry(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=air_temperature&station=${WIND_STATION}&begin_date=${ymd(t)}&end_date=${ymd(end)}&interval=h&time_zone=gmt&units=metric&format=json&application=folkboat-sim`);
@@ -202,7 +207,11 @@ for (let t = new Date(airStart); t <= yesterday;) {
   console.log(`air temperature ${ymd(t)}–${ymd(end)}: ${n} hours`);
   t = new Date(end.getTime() + 86400e3);
 }
-for (const [date, a] of airRaw) if (a.some(x => x !== 255)) airObs[date] = Buffer.from(a).toString('base64');
+for (const [date, a] of airRaw) {
+  if (date < `${FROM_YEAR}-01-01`) continue; // (the first fetch's UTC start reaches back into the afternoon of the last day of the year before)
+  const had = airObs[date] ? Buffer.from(airObs[date], 'base64') : null; if (had) a.forEach((x, i) => { if (x === 255 && had[i] != null) a[i] = had[i]; });
+  if (a.some(x => x !== 255)) airObs[date] = Buffer.from(a).toString('base64');
+}
 console.log(`air temperature: ${Object.keys(airObs).length} days`);
 
 /* ---------- the NWS forecast, the coming week ---------- */
@@ -285,7 +294,7 @@ await writeFile(OUT, JSON.stringify({
   grid: { hours: GRID_HOURS, cells, days: gridDays, fogWords: FOG_WORDS },
   visStation: { id: VIS_STATION, name: 'Pier 17', lat: 37.8031, lon: -122.3971, hours: VIS_HOURS, unit: VIS_UNIT, cap: 10000, note: 'base64 of 16-bit big-endian values in tens of metres, 65535 missing; the sensor reads up to 10 km' },
   visObs: Object.fromEntries(Object.entries(visObs).sort()),
-  airStation: { id: WIND_STATION, name: 'Fort Point', hours: AIR_HOURS, fmt: AIR_FMT, note: 'base64 of bytes, (°C + 10) × 4, 255 missing; the forecast days\' air is in forecast[date].air, °C by local hour 0–23' },
+  airStation: { id: WIND_STATION, name: 'Fort Point', hours: AIR_HOURS, fmt: AIR_FMT, fetched: new Date(now).toISOString(), forecastIssued: g.temperature?.values?.length ? g.updateTime : null, note: 'base64 of bytes, (°C + 10) × 4, 255 missing; the forecast days\' air is in forecast[date].air, °C by local hour 0–23' },
   airObs: Object.fromEntries(Object.entries(airObs).sort())
 }) + '\n');
 console.log(`Wrote ${OUT.pathname}: ${Object.keys(wind).length} days of wind, ${Object.keys(swell).length} of swell, ${Object.keys(forecast).length} forecast days`);
