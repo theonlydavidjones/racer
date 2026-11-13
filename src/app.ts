@@ -1564,11 +1564,22 @@ function oppRows(): void {
     return `<button type="button" class="opp" data-opp="${id}" aria-pressed="${on}"${full ? ' disabled' : ''}><i style="background:${hull};box-shadow:0 0 0 2px ${colour}"></i><span>${name}</span><small>${no}</small></button>`;
   };
   const mine = S.boats.filter(b => b.id !== S.boatId);
-  $('oppList').innerHTML = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
+  const html = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
     // generic club Folkboats (boat/generic.ts), to fill out the fleet: tap one to drop her, + to add another
     + `<div class="opp-h">More club Folkboats</div>` + S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), sailNo(g), genericTag(id), g.hull.upper); }).join('')
     + (S.opponents.length < MAX_OPPONENTS ? `<button type="button" class="opp" data-fill="1"><span>+ Add one</span></button>` : '')
     + `<div class="opp-h">Your boats</div>` + (mine.length ? mine.map(b => chip(b.id, (b.name || 'Unnamed').replace(/</g, '&lt;'), sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more boats under Your boats…</small>');
+  // The same chips as shown: change only who's picked, in place, so the chip under the pointer keeps its hover and
+  // eases into its new look like every other choice; rebuild only when boats come or go.
+  const list = $('oppList'), next = document.createElement('div'); next.innerHTML = html;
+  const keys = (el: Element) => [...el.querySelectorAll<HTMLElement>('.opp')].map(b => b.dataset.opp ?? 'fill').join(',');
+  if (keys(list) === keys(next) && list.childElementCount === next.childElementCount) {
+    const now = list.querySelectorAll<HTMLButtonElement>('.opp');
+    next.querySelectorAll<HTMLButtonElement>('.opp').forEach((b, i) => {
+      const pr = b.getAttribute('aria-pressed'); if (pr !== null) now[i].setAttribute('aria-pressed', pr);
+      now[i].disabled = b.disabled;
+    });
+  } else list.innerHTML = html;
   $('oppCount').textContent = S.opponents.length ? `· ${S.opponents.length} boat${S.opponents.length > 1 ? 's' : ''}` : '· nobody (a solo race)';
 }
 $('oppList').addEventListener('click', e => {

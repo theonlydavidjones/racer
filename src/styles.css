@@ -1134,3 +1134,21 @@ body.showroom #flowPanel{display:none}
 /* the navigator's Sail home sits beside its Close (the owner: Home belongs in the navigator) */
 .cvhead .btnrow{flex-wrap:nowrap;align-items:flex-start}
 .cvhead .btnrow .ghost{width:auto;white-space:nowrap}
+/* One feedback for every menu button (the owner: some setup buttons didn't react). The cards already lit on hover;
+   the plain buttons, the segmented choices, the chips and the text links had no hover or pressed look at all.
+   Hover: the accent edge or brighter words. Press: the selected fill and a small give, as a real button does. */
+.cta,.ghost,.chip,.seg button,.opp,.yctabs button,.modecard,.fcard,.linkbtn,.tab,.sw,.pick{transition:background-color .12s,border-color .12s,color .12s,box-shadow .12s,filter .12s,transform .08s}
+.cta:hover{filter:brightness(1.1)}
+.cta:active{filter:brightness(.9);transform:scale(.98)}
+.ghost:hover,.chip:hover{border-color:var(--accent);background-color:rgba(255,255,255,.05)}
+.ghost:active,.chip:active{background-color:var(--btn-hi);border-color:var(--accent);transform:scale(.98)}
+.seg button:hover:not([aria-pressed="true"]),.opp:hover:not([aria-pressed="true"]):not(:disabled){color:var(--text);background-color:rgba(255,255,255,.06)}
+.opp:hover:not(:disabled){border-color:var(--accent)}
+.seg button:active,.opp:active:not(:disabled){background-color:var(--btn-hi);color:var(--text);transform:scale(.97)}
+.modecard:active,.fcard:active{transform:scale(.99)}
+.linkbtn:hover{filter:brightness(1.25)}
+.linkbtn:active{filter:brightness(.85)}
+.tab:active,.yctabs button:hover,.yctabs button:active{color:var(--text)}
+.sw:hover{box-shadow:0 0 0 2px var(--accent)}
+.pick:hover{border-color:var(--accent)}
+:is(.cta,.ghost,.chip,.seg button,.opp,.modecard,.fcard,.linkbtn):disabled{filter:none;transform:none;cursor:default}
