@@ -37,3 +37,14 @@ describe('the real past races', () => {
     expect(w.boats.slice(1).map(b => b.no.replace(/\D/g, ''))).toEqual(r.boats.filter(b => b.elapsedS != null).map(b => b.key));
   });
 });
+
+import { realFleetFor } from '../src/sim/realRaces';
+describe('realFleetFor (for the debrief)', () => {
+  it('gives the real fleet by the race id or a World sailing it, names and times, no skippers; null for any other race', () => {
+    const f = realFleetFor('GGYC_T008047221-r5')!;
+    expect(f.boats.some(b => b.elapsed != null)).toBe(true); expect(f.courseNm).toBe(3.4);
+    expect(JSON.stringify(f)).not.toMatch(/skipper/i);
+    expect(realFleetFor({ settings: { realRace: 'GGYC_T008047221-r5' } })).toEqual(f);
+    expect(realFleetFor({ settings: {} })).toBe(null); expect(realFleetFor('nope')).toBe(null);
+  });
+});

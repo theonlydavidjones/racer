@@ -73,3 +73,26 @@ export function placeAmong(race: RealRace, elapsedS: number): { place: number; o
   const times = race.boats.filter(b => b.elapsedS != null && b.code == null).map(b => b.elapsedS!);
   return { place: 1 + times.filter(t => t < elapsedS).length, of: times.length + 1 };
 }
+
+/**
+ * The real fleet of a real past race, for the debrief and the replay (the Debrief session's request): by the race's id,
+ * or a World (or SimView) sailing one (its settings.realRace). Each finisher's elapsed time is from her fleet's start (the
+ * gun) to her finish, as published: all on the same rating (time on time), so elapsed time decides, as in the sim. Boat
+ * names only, no skippers' (the owner). Null for a race that isn't a real one.
+ */
+export interface RealFleet {
+  boats: { name: string; sail: string; elapsed: number | null; place: number | null; code?: string }[];
+  /** the course sheet's distance (nm); what the scorer published, if it disagrees, in words */
+  courseNm: number; doubt: string | null;
+  /** where the times come from, in words, and the results page */
+  source: string; url: string;
+}
+export function realFleetFor(x: string | { settings: { realRace?: string } }): RealFleet | null {
+  const id = typeof x === 'string' ? x : x.settings.realRace; if (!id) return null;
+  const r = realRace(id); if (!r) return null;
+  const title = (t: string) => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  return {
+    boats: r.boats.map(b => ({ name: title(b.boat), sail: b.key, elapsed: b.elapsedS, place: b.place, ...(b.code ? { code: b.code } : {}) })),
+    courseNm: r.distanceNm, doubt: r.doubt, source: `${r.event}, race ${r.raceNo} (${r.date}), published results`, url: r.url
+  };
+}
