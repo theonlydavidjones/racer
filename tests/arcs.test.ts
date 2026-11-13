@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { escapes, straightOn } from '../src/boat/arcs';
-import { flowTurnRate } from '../src/boat/dynamics';
+import { flowTurnRate } from '../src/boat/turning';
 
 // Wind from the north (0°). Headings: 0 north, 90 east.
 const best = (c: { minGap: number }[]) => Math.max(...c.map(k => k.minGap));

@@ -33,16 +33,8 @@ export const HANDLING = {
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
    * edge-on to the wind: ~0.12 × 25.8 m² of main and jib. */
   flogCdA: 3,
-  /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). An uncited estimate: it sets
-   * the penalty turns' pace too (physics.ts PENALTY_TURN_RATE, where the sim's 720 is compared with a real one). */
-  turnRadius: 9,
   /** Turn rate when nearly stopped, by sculling (physics.ts: only toward close-hauled from above it, rule 42.3(d)), deg/s. An estimate. */
   minTurnRate: 4,
-  /** Hard limit on turn rate, deg/s. */
-  maxTurnRate: 22,
-  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). An uncited estimate (with turnRadius it
-   * sets how long penalty turns take: physics.ts PENALTY_TURN_RATE). */
-  turnDrag: 0.15,
   /** Drive while luffing (sails eased until they lift), as a fraction of normal target speed. */
   luffFactor: 0.12,
   /** How much the sails flog while luffing (fully eased: they flog, and the boat coasts to a stop). */
@@ -200,6 +192,28 @@ export function windSide(awa: number, crew = 3, bare = 0): number {
   return (WINDAGE.hullSide / hullDen(c, s) + bluffCdA(c, s, crew, bare)) * s;
 }
 
+/**
+ * Where her windage acts fore and aft: the turning moment of windSide's force about her centre of lateral resistance,
+ * as a moment area (m³; times ½ρV² it's N·m), + turning her bow away from the wind (its centre ahead of the keel's).
+ * Under bare poles this is what swings her.
+ *  - the hull: its side area's centre, 0.12 m ahead of the centre of lateral resistance (the drawn sheer and cabin,
+ *    render/hull.ts, from the class's construction plan: 5.6 m² centred 0.28 m ahead of amidships; the keel's centre
+ *    0.165 m ahead of amidships, where balance.ts LEVER puts it), moving toward whichever end the wind comes from by
+ *    0.18 × LOA a radian off the beam (Blendermann 1994's yaw moment, CN = (sL/LOA − 0.18(γ − π/2))·CY, by Fossen's
+ *    MSS code: 2.2 m forward with the wind on the bow, as far aft with it on the quarter; measured on ships);
+ *  - the mast and wire: at the mast, 0.79 m ahead (2.80 m from the stem, CR 7.21, 6.1.7);
+ *  - the crew: in the cockpit, about 2.4 m aft (crewPhys.ts Z: the helm 2.95 m and the crew 1.35–2.5 m aft of
+ *    amidships). With three aboard they're a quarter of her side windage and the furthest from the keel: an estimate
+ *    as their area is (ORC's 0.5 m² a head).
+ */
+const WIND_LEVER = { hull: 0.12, shift: 0.18 * 7.64, mast: 0.79, crew: -2.4 };
+export function windTurn(awa: number, crew = 3, bare = 0): number {
+  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a), ac = Math.abs(c);
+  const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s + WINDAGE.wire;
+  const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
+  return s * (WINDAGE.hullSide / hullDen(c, s) * (WIND_LEVER.hull + WIND_LEVER.shift * (Math.PI / 2 - a)) + mast * WIND_LEVER.mast + people * WIND_LEVER.crew);
+}
+
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */
 export function flogAmount(twa: number, beat: number, noGo: number, luffing: boolean): number {
   const byAngle = twa >= beat ? 0 : Math.min(1, (beat - twa) / (beat - noGo));
@@ -211,12 +225,6 @@ export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HUL
   return (drive(v, vt, k) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
 }
 
-/** Fastest the helm can turn the boat at speed v (m/s), deg/s. Rudder authority comes from water flow. */
-export function maxTurnRate(v: number): number {
-  return Math.min(HANDLING.maxTurnRate, Math.max(HANDLING.minTurnRate, v / HANDLING.turnRadius / D2R));
-}
-/** The turn rate the rudder alone gives at speed v (m/s) through the water, deg/s: none without water flowing past it. */
-export const flowTurnRate = (v: number): number => Math.min(HANDLING.maxTurnRate, Math.max(0, v) / HANDLING.turnRadius / D2R);
 
 /**
  * Time (s) to make `dist` metres of progress in some direction if the boat sheets in now and

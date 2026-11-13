@@ -9,7 +9,7 @@
 
 import { V, wrap } from '../core/math';
 import { hullGap } from '../rules/geometry';
-import { flowTurnRate } from './dynamics';
+import { flowTurnRate } from './turning';
 import { turnBleed, yawLag } from './physics';
 
 /** Where a boat is: position (m, x east, y north), heading (deg), speed through the water (m/s). */

@@ -3,7 +3,8 @@ import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
-import { HANDLING, windSide } from '../boat/dynamics';
+import { windSide } from '../boat/dynamics';
+import { flowTurnRate } from '../boat/turning';
 import { defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -1423,7 +1424,7 @@ export class World {
     // with no floor: nothing at rest). Swinging about the bow line, or pushed off sideways, the water crosses the blade
     // broadside: whichever way it's put over it only adds a little to the stern's resistance, the same both ways, so it
     // neither hurries nor slows the swing. Held head to wind, stopped: nothing.
-    const astern = (vWater: number) => -helm * 0.7 * Math.min(HANDLING.maxTurnRate, vWater / HANDLING.turnRadius / D2R);
+    const astern = (vWater: number) => -helm * 0.7 * flowTurnRate(vWater);
     if (P.kind === 'off') {
       // pushed out over about three seconds; then, if need be, her bow pushed off about her stern quarter
       if (H.s < 1) { H.s = Math.min(1, H.s + dt / 3); b.x = H.from.x + (P.out.x - H.from.x) * H.s; b.y = H.from.y + (P.out.y - H.from.y) * H.s; }

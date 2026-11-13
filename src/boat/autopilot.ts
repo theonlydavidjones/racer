@@ -1,5 +1,5 @@
 import type { Boat } from './boat';
-import { maxTurnRate } from './dynamics';
+import { maxTurnRate } from './turning';
 import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';

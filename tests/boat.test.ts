@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import orc from '../src/boat/data/nordic-folkboat-orc.json';
 import { FOLKBOAT, Polar, jibOnlyDeadRun, type OrcPolarData } from '../src/boat/polar';
-import { coastDistance, maxTurnRate, timeToCover } from '../src/boat/dynamics';
+import { coastDistance, timeToCover } from '../src/boat/dynamics';
+import { maxTurnRate } from '../src/boat/turning';
 import { D2R, KT, LOA } from '../src/core/math';
 import { kt, sail, startTack, testBoat, upwindProgress } from './helpers/testBoat';
 

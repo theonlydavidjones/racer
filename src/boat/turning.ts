@@ -10,7 +10,7 @@
 import orc from './data/nordic-folkboat-orc.json';
 import { D2R, clamp } from '../core/math';
 import { FULL_RUDDER, RUDDER } from './balance';
-import { HULL } from './dynamics';
+import { HANDLING, HULL } from './dynamics';
 import { HOVE } from './physics';
 
 const RHO = 1025;
@@ -115,3 +115,8 @@ export function steadyTurnRate(u: number): number {
   const r = (lo + hi) / 2; steadyCache.set(key, r);
   return r;
 }
+
+/** The steady turn her rudder can hold at speed `v` (m/s), deg/s: nothing without way on. */
+export const flowTurnRate = (v: number): number => steadyTurnRate(Math.max(0, v)) / D2R;
+/** The fastest she can be turned at speed `v`, deg/s: by her rudder, or sculled when that's faster (HANDLING.minTurnRate). */
+export const maxTurnRate = (v: number): number => Math.max(HANDLING.minTurnRate, flowTurnRate(v));
