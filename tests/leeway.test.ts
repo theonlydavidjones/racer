@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail, courseHeading } from './helpers/testBoat';
 import { beatAngle, polar } from '../src/boat/polar';
 import { D2R, KT } from '../src/core/math';
+import { HOVE, sailWind } from '../src/boat/physics';
+import { windSide } from '../src/boat/dynamics';
 
 /** Her slip angle (deg, to leeward on starboard tack: the boat frame's sway to port). */
 const slipOf = (b: { v: number; sway?: number }) => Math.atan2(-(b.sway ?? 0), b.v) / D2R;
@@ -39,6 +41,20 @@ describe('leeway (physics.ts: the keel\'s lift against the sails\' side force)',
   it('running, none: the sails push her along her heading', () => {
     const b = testBoat({ heading: 180 - 20, kt: 5, windKt: 12 });
     sail(b, 40, () => { b.h = 160; });
-    expect(Math.abs(slipOf(b))).toBeLessThan(0.5); expect(b.leeway ?? 0).toBe(0);
+    // Her steady slip (deg) under a side force F (N): where it meets her keel's lift and her hull broadside, physics.ts
+    // moveBoat's own balance, F = ½ρ·A·(πAR/2·u·v + Cd·v²)
+    const k = 0.5 * 1025 * HOVE.latArea, lift = Math.PI * HOVE.aspect / 2 * b.v;
+    const slipFor = (F: number) => Math.atan2((-lift + Math.sqrt(lift * lift + 4 * HOVE.crossCd * F / k)) / (2 * HOVE.crossCd), b.v) / D2R;
+    const sails = b.forces!.heel * Math.cos((b.heelMag ?? 0) * D2R), ap = sailWind(b.ww.from, b.ww.kt, b.h, b.v, b.sway ?? 0, b.heel ?? 0), wind = 0.5 * 1.225 * ap.aws ** 2 * windSide(ap.awa); // (the wind at her rig, as moveBoat takes it)
+    // (1) the sails' own: no leeway in the polar's sense (her course is her heading), and the little side force eased
+    // sails still make slips her under half a degree, as before
+    expect(b.leeway ?? 0).toBe(0);
+    expect(slipFor(sails)).toBeLessThan(0.5);
+    // (2) the rest is the wind on her topsides, mast and crew (dynamics.ts windSide: about 3 m² with the wind on her
+    // quarter): a tenth to a third of a degree more. Her whole slip is the two together, to within 3% (she's
+    // settled), and to leeward (she's on port tack here: slipOf reads negative)
+    expect(slipFor(wind)).toBeGreaterThan(0.1); expect(slipFor(wind)).toBeLessThan(0.3);
+    expect(-slipOf(b)).toBeGreaterThan(0);
+    expect(Math.abs(-slipOf(b) - slipFor(sails + wind))).toBeLessThan(0.03 * slipFor(sails + wind));
   });
 });
