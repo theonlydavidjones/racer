@@ -175,18 +175,18 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const lid = new THREE.Mesh(mergeGeometries([cockpitLid().toNonIndexed(), companionwayLid(), windowLids()], false)!, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
-  const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: paint.deck, side: THREE.DoubleSide });
+  const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map: nonSkidTexture('deck', paint.deck, glass ? '#ebe5d6' : paint.deck), side: THREE.DoubleSide }); // (painted: non-skid, with a smooth margin)
   // the cabin top: as chosen (paint or laid teak), or else like the deck (a teak-decked boat's: painted canvas)
   const ct = paint.cabinTop;
-  const cabinTopMat = ct ? (ct.startsWith('teak') ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(ct === 'teak-silver'), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: ct, side: THREE.DoubleSide }))
-    : teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : deckMat;
-  grp.add(new THREE.Mesh(deckGeometry(), deckMat));
+  const cabinTopMat = ct ? (ct.startsWith('teak') ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(ct === 'teak-silver'), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map: nonSkidTexture('top', ct, glass ? '#ebe5d6' : ct), side: THREE.DoubleSide }))
+    : teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map: nonSkidTexture('top', paint.deck, glass ? '#ebe5d6' : paint.deck), side: THREE.DoubleSide });
+  grp.add(new THREE.Mesh(planUV(deckGeometry(), 'deck'), deckMat));
   // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top
   const cab = cabinGeometry();
   const sideMat = glass ? MAT.cream : MAT.mahogany;
   grp.userData.sideMat = sideMat; // (the winches' pedestals, moulded with the coamings: buildLines)
   grp.add(new THREE.Mesh(cab.sides, sideMat));
-  grp.add(new THREE.Mesh(cab.top, cabinTopMat));
+  grp.add(new THREE.Mesh(planUV(cab.top, 'top'), cabinTopMat));
   grp.add(new THREE.Mesh(cab.aft, sideMat));
   const zc = (u: number) => -L / 2 + u * L;
   // the cabin window: one long, narrow light each side with rounded ends, set in an aluminium frame (as on Josephine;
@@ -511,6 +511,52 @@ function syncCompanionway(c: Companionway, b: Boat): void {
     const p = Math.max(0, Math.min(1, dT * 3 - k));
     g.visible = p < 1; g.position.y = p * (c.boardH * (3 - k) + 0.12);
   });
+}
+/**
+ * Non-skid on a painted deck and cabin top, as Josephine's (the owner): a paint with crushed walnut shells in it, a fine,
+ * irregular grit, laid in a field that stops about 2 in (5 cm) short of every edge, leaving a smooth gelcoat margin along
+ * the toerail, round the cabin's foot and the cockpit's coamings, round the forehatch; and on the cabin top in from its
+ * edges and round the sliding hatch. Drawn as a texture in plan (x across, z fore and aft: planUV), the margin and the
+ * field each a colour, the grit a fine speckle of lighter and darker grains over the field.
+ */
+const NS_MARGIN = 0.05, NS_PLAN = { x0: -1.15, x1: 1.15, z0: -L / 2, z1: L / 2 };
+const nsCache = new Map<string, THREE.CanvasTexture>();
+function nonSkidTexture(which: 'deck' | 'top', field: string, margin: string): THREE.CanvasTexture {
+  const key = `${which}${field}${margin}`, hit = nsCache.get(key); if (hit) return hit;
+  const W = 640, H = 2048, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
+  const rgb = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 }; }, fc = rgb(field), mc = rgb(margin), img = c.createImageData(W, H), d = img.data, m = NS_MARGIN;
+  const hz = -1.75, hh = 0.25 + 0.045; // (the forehatch's frame: its middle, half its size)
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let j = 0; j < H; j++) {
+    const z = NS_PLAN.z0 + (NS_PLAN.z1 - NS_PLAN.z0) * (j + 0.5) / H, u = uAtZ(z);
+    // the field's extent across this row: [lo, hi] in |x|, or none
+    let lo = 0, hi = -1;
+    if (which === 'deck') {
+      hi = halfBeam(u) - 0.045 - m; // (in from the toerail's inboard face)
+      const dm = Math.abs(z - MAST_Z); if (dm < 0.16) lo = Math.max(lo, Math.sqrt(0.16 * 0.16 - dm * dm)); // (a smooth pad round the mast's foot)
+      const near = (ua: number, ub: number) => u > ua - m / L && u < ub + m / L;
+      if (near(CABIN.u0, CABIN.u1)) lo = Math.max(lo, cabinHalf(Math.min(CABIN.u1, Math.max(CABIN.u0 + 0.001, u))) + m);
+      if (near(COCKPIT.u0, COCKPIT.u1)) lo = Math.max(lo, cockpitHalf(Math.min(COCKPIT.u1, Math.max(COCKPIT.u0, u))) + COAMING_T + m);
+      if (Math.abs(z - hz) < hh + m) lo = Math.max(lo, hh + m);
+    } else if (u > CABIN.u0 && u < CABIN.u1) {
+      hi = cabinHalf(u) - CABIN_LEAN - m;
+      if ((u - CABIN.u0) * L < m || (CABIN.u1 - u) * L < m) hi = -1;
+      if (u > CABIN.u1 - (2 * COMPANIONWAY.len + 0.1) / L) lo = COMPANIONWAY.hw + 0.045 + m; // (round the sliding hatch and its runners)
+    }
+    for (let i = 0; i < W; i++) {
+      const x = Math.abs(NS_PLAN.x0 + (NS_PLAN.x1 - NS_PLAN.x0) * (i + 0.5) / W), inField = x >= lo && x <= hi, k = (j * W + i) * 4;
+      const col = inField ? fc : mc, g = inField ? 1 + (rnd() - 0.5) * 0.22 + (rnd() < 0.08 ? (rnd() - 0.5) * 0.35 : 0) : 1 + (rnd() - 0.5) * 0.02;
+      d[k] = Math.min(255, col.r * 255 * g); d[k + 1] = Math.min(255, col.g * 255 * g); d[k + 2] = Math.min(255, col.b * 255 * g); d[k + 3] = 255;
+    }
+  }
+  c.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 8; nsCache.set(key, t); return t;
+}
+/** Plan texture coordinates (x across, z fore and aft) for the deck or the cabin top, matching nonSkidTexture. */
+function planUV(g: THREE.BufferGeometry, _which: 'deck' | 'top'): THREE.BufferGeometry {
+  const p = g.attributes.position, uv: number[] = [];
+  for (let i = 0; i < p.count; i++) uv.push((p.getX(i) - NS_PLAN.x0) / (NS_PLAN.x1 - NS_PLAN.x0), 1 - (p.getZ(i) - NS_PLAN.z0) / (NS_PLAN.z1 - NS_PLAN.z0));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
