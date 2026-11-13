@@ -6,7 +6,7 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 - Test the PR merged with current origin/main: `npx tsc --noEmit -p .` and `npm run test:fast` (full `npm test` only for big physics PRs; the perf test is flaky under load, so rerun it alone).
 - Merge (GitHub MCP merge_pull_request with expectedHeadSha; stacked or conflicting PRs: merge locally and push to main).
 - `npm run build:artifact`, then `node scripts/check/smoke.cjs <dir>`, then publish artifact/folkboat-racing-sim.html to https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m **without passing capabilities** (db + user carry over; `{}` would switch saves off).
-- Live: v152 (12 Nov 2026, evening: cabin instrument #170, World independence #168, abandonment AI #169, upwind hysteresis #164, pole and number colours #163, halyards #171; v150 rigging #159 + speed pass #160; v151 #162 #166 #167). Perf: main is over the 54.7 budget (about 55–58); Deep Physics is cutting it. A PR's perf failure within main's own range doesn't block it until then. Coordinator is now session_012Uu5Qi2mdDP9G1EYJvp2S4.
+- Live: v153 (12 Nov 2026, late: wind indicator #172, jib sheets #173, YC members #174. Earlier v152: cabin instrument #170, World independence #168, abandonment AI #169, upwind hysteresis #164, pole and number colours #163, halyards #171; v150 rigging #159 + speed pass #160; v151 #162 #166 #167). Perf: main is over the 54.7 budget (about 55–58); Deep Physics is cutting it. A PR's perf failure within main's own range doesn't block it until then. Coordinator is now session_012Uu5Qi2mdDP9G1EYJvp2S4.
 
 - Only the Coordinator publishes the live artifact, plus the owner's daily real-weather refresh (scheduled task trig_01Jc4kpKT8RFLcqgBnHuBvUC, 04:41 Pacific), which now builds from main and commits its data first. (Before 12 Nov it built an old branch and overwrote the live page.)
 
@@ -31,6 +31,7 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 | Rigging | session_012Uu5Qheec6yzUhFvm29AbD | Rig tuning and its physics (rake, shrouds, chocks, backstay, mast bend, forestay sag). Proposal to the owner before the player-facing build. |
 | Crew Art | session_012Uu5Qj44Huy8UKbWdRbcmp | The crew figures' bodies and clothing from scratch (owner rejected four rounds as uncanny); design sheets first, animation out of scope. |
 | Skipper Model | session_012Uu5QhdsE8mzR3eTig8z6T | The skipper model: calibration from real results, skipper attributes, acting on beliefs, Yacht Club sliders. Proposal first. |
+| Capacity | session_012Uu5Qmx1z6ZjLTAghb44YC | Owner (12 Nov): hold the budget, but find more capacity without lowering physics fidelity. Phase 1 is a measured design, docs/CAPACITY.md; building after the owner approves. |
 | Crew Model | session_012Uu5QmLu8ikoQmaAM5B6R4 | The crew model: roles and skills driving trim, puff calls, crew work, fatigue. Proposal first. |
 
 ## Queued for idle sessions (see ROADMAP.md)
