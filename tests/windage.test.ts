@@ -3,7 +3,7 @@ import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { ASTERN_DRAG, HOVE } from '../src/boat/physics';
-import { HANDLING } from '../src/boat/dynamics';
+import { HANDLING, windFore, windSide } from '../src/boat/dynamics';
 import { KT } from '../src/core/math';
 
 /**
@@ -20,28 +20,44 @@ const world = (kt: number) => {
 const hold = (w: World, h: number) => { const u = w.user; u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; };
 
 describe('the wind on her with no way on (bare poles)', () => {
-  it('head to wind she\'s driven astern, to where the wind on her rig (windageCdA) meets the water\'s drag astern (ASTERN_DRAG)', () => {
+  it('head to wind she\'s driven astern, to where the wind on her rig (windFore, bow-on) meets the water\'s drag astern (ASTERN_DRAG)', () => {
     const { w, u } = world(15);
     // (the wind gusts: her sternway answers its mean pressure over the last half minute, so the steady state is worked out
     // from that, and her sternway taken over the same time)
+    // (and its windage at the angle she's actually at: a few degrees off the bow in the shifts, where ORC's side area
+    // already counts, dynamics.ts windFore)
     let a2 = 0, as = 0, n = 0;
-    for (let i = 0; i < 60 * 90; i++) { hold(w, w.windHere(u, u).from); w.step(DT); if (i >= 60 * 60) { a2 += u.aws ** 2; as += u.astern ?? 0; n++; } }
+    for (let i = 0; i < 60 * 90; i++) { hold(w, w.windHere(u, u).from); w.step(DT); if (i >= 60 * 60) { a2 += u.aws ** 2 * windFore(u.awa); as += u.astern ?? 0; n++; } }
     // steady: the wind on her rig, ½·ρ·aws²·CdA (aws as she feels it: the sim's apparent wind, from her way ahead only), over
     // her mass, against the water's drag astern, c0 + c1·s
     // (the drag is on the wind at the rig's height, as the sails' is: the log profile, ORC VPP eq. 7.1, z0 = 0.005 m,
     // the centre of effort 4.29 m up: physics.ts sailWind)
     const V = Math.sqrt(a2 / n) * Math.log(4.29 / 0.005) / Math.log(10 / 0.005), mass = HANDLING.mass * 1.04; // (her mass for surge: HANDLING.mass, with her crew's few percent)
-    const s = (0.5 * 1.225 * V * V * HANDLING.windageCdA / mass - ASTERN_DRAG.c0) / ASTERN_DRAG.c1;
+    const s = (0.5 * 1.225 * V * V / mass - ASTERN_DRAG.c0) / ASTERN_DRAG.c1;
     expect(u.v).toBe(0); expect(as / n).toBeGreaterThan(0.7 * s); expect(as / n).toBeLessThan(1.3 * s);
     expect(s).toBeGreaterThan(0.4); expect(s).toBeLessThan(1.0); // (about 0.6 m/s in 15 kt)
   });
-  it('beam-on she\'s set to leeward, to where the wind on her side (windSide) meets her hull and keel broadside (crossCd)', () => {
+  it('beam-on she\'s set to leeward, to where the wind on her side (windSide, beam-on) meets her hull and keel broadside (crossCd)', () => {
     const { w, u } = world(15);
     for (let i = 0; i < 60 * 60; i++) { hold(w, w.windHere(u, u).from + 90); u.v = 0; u.astern = 0; w.step(DT); }
     const wind = w.windHere(u, u), V = wind.kt * KT;
-    const steady = Math.sqrt(0.5 * 1.225 * V * V * HOVE.windSide / (0.5 * 1025 * HOVE.latArea * HOVE.crossCd)); // (about 0.3 m/s in 15 kt)
+    const steady = Math.sqrt(0.5 * 1.225 * V * V * windSide(90) / (0.5 * 1025 * HOVE.latArea * HOVE.crossCd)); // (about 0.3 m/s in 15 kt)
     // the wind's from her port side (heading 90 degrees to the right of it): she's set to starboard
     expect(u.sway ?? 0).toBeGreaterThan(0.6 * steady); expect(u.sway ?? 0).toBeLessThan(1.4 * steady);
+  });
+  it('left alone with the wind on either beam and no current, she goes to leeward over the ground, never to windward (the owner, leaving a slip, 13 Nov 2026)', () => {
+    for (const side of [90, -90]) {
+      const { w, u } = world(12);
+      u.h = (w.windHere(u, u).from + side + 360) % 360;
+      const x0 = u.x, y0 = u.y; let worst = 0, down = 0;
+      for (let i = 0; i < 60 * 60; i++) {
+        u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT);
+        const from = w.windHere(u, u).from * Math.PI / 180; // (the wind blows toward −(sin, cos) of where it's from)
+        down = -((u.x - x0) * Math.sin(from) + (u.y - y0) * Math.cos(from)); worst = Math.min(worst, down);
+      }
+      expect(worst, `wind ${side > 0 ? 'to port' : 'to starboard'}: never to windward`).toBeGreaterThan(-0.05);
+      expect(down, 'a minute on: well to leeward').toBeGreaterThan(5); // (about 0.4 kt of leeway in 12 kt: some 12 m)
+    }
   });
   it('never ahead and astern at once: driven astern head to wind, then turned off it and blown ahead, it\'s one motion', () => {
     const { w, u } = world(15);
