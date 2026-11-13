@@ -258,8 +258,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
     // (an urgent one is set right through to where they want it now: set to the lagging wish it was still well off after,
-    // and they were back for it seconds later)
-    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}) };
+    // and they were back for it seconds later; and so is a big one, the trip off the rail of a crew you've told to hike,
+    // made only for a big change of wind: set to the lagging wish, it took two or three trips where one would do)
+    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo && !big ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}) };
     if (PIANO.has(k) && placed) (c.lineSet ??= {})[k] = c.clock ?? 0; // (placed by you: as before, from setting off)
   }
   // work: whoever's at their line works it

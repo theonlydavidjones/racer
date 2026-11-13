@@ -680,7 +680,9 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a crew good at trim. */
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const n = c.spec.crew.length; if (!n) return 0.5;
-  const v = Math.max(0.5, k.v), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
+  // (for the speed she's sailing at, over about a gust-lull cycle (c.vAvg), not a tack's slow few seconds: there it took
+  // them to the forward end, as in light air, and the dwell below kept them there for a minute back up to speed in 25 kt)
+  const v = Math.max(0.5, c.vAvg ?? k.v), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
   // Where along the cockpit is fastest, all told (physics review): the trim's effect on the hull's resistance
   // (hullTrim.ts trimSpeedFactor) and, sitting out to windward, the deck's half-breadth where they sit, narrower aft
   // (deckHalf), which is their righting arm. Hiking flat out they can't make that up, so it's heel: the moment lost over
