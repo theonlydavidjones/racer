@@ -129,7 +129,7 @@ export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 2
 export function windTerrain(p: Vec, from = 255, lattice = false): number {
   const slot = slotWeight(p) * slotFlow(from);
   // (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear, a few metres out at most, so
-  // under 0.05% of the wind here: for a boat's own wind every step, as for her current; the map keeps the exact one)
+  // under 0.3% of the wind here, typically 0.005% (the review's measure over the water within 420 m of a shore): for a boat's own wind every step, as for her current; the map keeps the exact one)
   const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
   return (1 + SLOT_BOOST * slot) * shore;
 }

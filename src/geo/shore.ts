@@ -599,12 +599,21 @@ export const anyShoreDist = (p: Vec): number => Math.min(shoreDist(p), landDist(
  * there's nothing it could meet, and the walk along it is skipped. Otherwise landAlong itself, so the answer is the same
  * (the margin, 30 m, is twice the terrain's distance error and the lattice's few metres: tests/landAlongNear.test.ts).
  */
+/** A box within 60 m of any edge of the Cityfront box (CF), across the edge's whole length. */
+function nearCfEdge(bb: Box): boolean {
+  const m = 60;
+  return overlaps(bb, { x0: CF.x0 - m, x1: CF.x0 + m, y0: CF.y0 - m, y1: CF.y1 + m }) || overlaps(bb, { x0: CF.x1 - m, x1: CF.x1 + m, y0: CF.y0 - m, y1: CF.y1 + m })
+    || overlaps(bb, { x0: CF.x0 - m, x1: CF.x1 + m, y0: CF.y0 - m, y1: CF.y0 + m }) || overlaps(bb, { x0: CF.x0 - m, x1: CF.x1 + m, y0: CF.y1 - m, y1: CF.y1 + m });
+}
 export function landAlongNear(a: Vec, b: Vec): number {
   const L = Math.hypot(b.x - a.x, b.y - a.y);
   if (Number.isFinite(L) && L <= 300 && anyShoreDistNear(a) > L + 30) {
     const bb: Box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
-    let built = false;
-    for (const G of PIER_GROUPS) if (overlaps(bb, G.box)) { built = true; break; }
+    // (and not where the land onGround finds isn't in anyShoreDist: Lime Point's coastline, which replaces the terrain
+    // there; the strips along the Cityfront box's edges, where the terrain's cells are left out of the distance; and
+    // the Cityfront land's closing edges just past them)
+    let built = overlaps(bb, { x0: LP.x0, x1: LP.x1, y0: LP.y0, y1: LP.y1 }) || nearCfEdge(bb);
+    if (!built) for (const G of PIER_GROUPS) if (overlaps(bb, G.box)) { built = true; break; }
     if (!built) for (const G of GROUPS) if (overlaps(bb, G.box)) { built = true; break; }
     if (!built) for (const { H } of HARBOR_BASINS) if (overlaps(bb, H.reach)) { built = true; break; }
     if (!built) return Infinity;
