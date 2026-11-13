@@ -75,15 +75,13 @@ const SHORT: Partial<Record<CtlKey, string>> = { downhaul: 'Main<br>hal.', jibHa
 const ROPE: Partial<Record<CtlKey | 'jib', string>> = { ...LINE_COLORS, jib: LINE_COLORS.jibsheet };
 /** The colour key of a band element's line ('jib' is both jib sheets; the traveller's car rides with the mainsheet). */
 const colorKey = (k: string): LineColorKey | null => (k === 'jib' ? 'jibsheet' : k === 'traveller' ? 'mainsheet' : k in LINE_COLORS ? (k as LineColorKey) : null);
-const CLEAT: Partial<Record<CtlKey, string>> = { cunningham: 'clam', downhaul: 'block', jibsheet: 'winch', jibsheetW: 'winch' };
 
-/** A vertical line: its name, ▲ eases, the cleat, the well with the rope showing how much is on, ▼ pulls on. */
+/** A vertical line: its name, ▲ eases, the well with the rope showing how much is on, ▼ pulls on. */
 const vert = (key: CtlKey | 'jib', side: Side) => {
   const k = key === 'jib' ? 'jibsheet' : key, col = ROPE[key] ?? '#ccc';
   return `<div class="sb-v" data-line="${key}" data-side="${side}" style="--rope:${col}">
   <button type="button" class="sb-nm" data-act="name">${SHORT[k]}</button>
   <button type="button" class="sb-a" data-act="ease" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: ease">${chev('u')}</button>
-  <span class="sb-cleat ${CLEAT[k] ?? 'cam'}"></span>
   <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span>
   <button type="button" class="sb-a" data-act="pull" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: pull on">${chev('d')}</button></div>`;
 };
@@ -332,7 +330,7 @@ export class SailBand {
     }
     let on: number;
     if (d.classList.contains('sb-h')) { const f = clamp((e.clientX - r.left) / r.width, 0, 1); on = d.dataset.side === 'P' ? 1 - f : f; } // outboard is on
-    else on = clamp((e.clientY - r.top) / r.height, 0, 1); // the rope below the cleat: down is on
+    else on = clamp((e.clientY - r.top) / r.height, 0, 1); // the rope below the arrow: down is on
     this.target(k, valOfOn(k, on));
   }
   /** Click a hole: the crossbar to that row, the car to that hole. The lazy car only: the crew moves the loaded one at the tack. */
@@ -491,8 +489,6 @@ export class SailBand {
       const horiz = d.classList.contains('sb-h'), pct = `${Math.round(on * 100)}%`;
       if (horiz) { rope.style.width = pct; rope.style[d.dataset.side === 'P' ? 'left' : 'right'] = '0'; } else rope.style.height = pct;
       d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === k);
-      // the dual-ended lines: the windward end's cleat is ringed
-      d.classList.toggle('ww', (k === 'vang' || k === 'outhaul' || k === 'jibCunningham' || k === 'backstay') && d.dataset.side === ws);
       this.ropeTicks(d, k, u, horiz);
       const iv = ideal?.[k as keyof typeof ideal] as number | undefined;
       mark.hidden = !mine || iv == null;
