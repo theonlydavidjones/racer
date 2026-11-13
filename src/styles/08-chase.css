@@ -15,7 +15,6 @@
 /* the inset chart: a circle, top right under the pods */
 #map{width:210px!important;height:210px!important;top:calc(env(safe-area-inset-top,0px) + 76px)!important;border-radius:50%;border:0;box-shadow:0 0 0 2px rgba(150,196,218,.35)}
 #mapHint{width:210px!important;top:calc(env(safe-area-inset-top,0px) + 292px)!important}
-.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 178px)!important}
 #mapBar{top:calc(env(safe-area-inset-top,0px) + 76px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 222px)}
 /* the flags tile: the flags flying now; click for the flag index */
 #sigPanel{top:calc(env(safe-area-inset-top,0px) + 172px);width:auto;min-width:120px;max-width:240px;pointer-events:auto;cursor:pointer;text-align:left;font:inherit;font-size:11px;color:var(--muted);display:block}
@@ -98,15 +97,8 @@ body.showroom #crewPop{visibility:hidden}
 /* the situation: a strip on top of the Coach card (the UI session, 12 Nov) */
 #trimPanel #situ{position:static;transform:none;width:auto;margin:-8px -10px 4px -10px;border-radius:7px 7px 0 0;box-sizing:border-box;flex-wrap:wrap;gap:4px 8px}
 #trimPanel #situ .msg{font-size:13px}
-/* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
-.maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
+/* the chart hint is the map's hover text */
 #mapHint{display:none}
-/* the inset's navigator view, cruising (ui/hud.ts insetView): a quiet round button on the circle's rim, top right,
-   mirroring the layers button (the owner: no new buttons on the game surface outside the map) */
-#bMapNav.maplayers{right:calc(max(16px,env(safe-area-inset-right,0px)) + 14px)!important}
-#bMapNav[hidden]{display:none!important}
-#bMapNav[aria-pressed="true"]{background:#ffb627;color:#0c2534;border-color:#ffb627}
-body.showroom #bMapNav{display:none!important}
 /* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
 #sigPanel #sigText{display:none}
 /* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */

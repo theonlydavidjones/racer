@@ -1,5 +1,6 @@
 /* start practice debrief */
 ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;line-height:1.45}
+ul.facts li.dmore{list-style:none;margin-left:-18px} /* (the start drill's "What happened", folded) */
 /* course view */
 .panel.wide{max-width:960px}
 .cvhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -35,7 +36,6 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .dot.gate{background:#6fd0ff} .dot.lane{background:#ff5d4c} .dot.wind{background:#e9f2f5}
 #navcanvas{width:100%;height:min(48vh,440px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
 .brief{display:flex;flex-direction:column;gap:18px}
-.brief .bf-key{font-size:12px;color:var(--muted);line-height:1.8}
 .bf-sec h3{font:700 17px/1.2 var(--f-inst);letter-spacing:.03em;margin:0 0 6px;color:var(--text)}
 .bf-sec .lede{font-size:14px;margin-bottom:8px}
 .bf-items{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}

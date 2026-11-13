@@ -55,7 +55,7 @@
 /* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
    which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
 body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
-body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}
+body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar,body.still #keysHint{display:none!important}
 /* the tactical debrief (ui/tacticsView.ts): a chart a leg against the fleet's middle, the best and the ideal */
 .tac{display:flex;flex-direction:column;gap:8px}
 .tchips{display:flex;gap:6px;flex-wrap:wrap}
@@ -103,6 +103,7 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .standings tr.you td{background:rgba(255,182,39,.09)}.standings tr.you .no,.standings tr.you .nett{color:var(--accent)}
 .standings .sp{width:96px;padding:2px 6px}.spark text{font:600 9px var(--f-inst);fill:var(--muted)}
 .standings tbody tr:hover .spark polyline:not(.halo){stroke-width:3}
+.standings .sclub{color:var(--muted);font:500 11px var(--f-inst);letter-spacing:.06em;margin-left:6px}
 .bchip{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--f-inst);letter-spacing:.04em}
 .bchip i{width:11px;height:11px;border-radius:50%;border:2.5px solid;box-sizing:border-box;flex:none;box-shadow:0 0 0 1px rgba(233,242,245,.28)}
 .spark .halo{stroke:rgba(233,242,245,.22);stroke-width:3.4}
@@ -125,3 +126,6 @@ body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .
    "on the … side under the inset map", "I meant right side"). The map is 210 px across at the top right. */
 #dial{position:fixed!important;left:auto!important;top:calc(env(safe-area-inset-top,0px) + 76px + 210px + 12px)!important;
   right:calc(max(16px,env(safe-area-inset-right,0px)) + (210px - 96px) / 2)!important;width:96px!important;height:96px!important}
+
+/* (the briefing: a point's rest on hover) */
+.bf-items li[title]{cursor:help}.bf-more{color:var(--muted)}

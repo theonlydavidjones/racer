@@ -174,7 +174,6 @@ function courseCard(): void {
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
 function tideBox(): void {
-  $('currentNote').hidden = app.S.current === 'real';
   $('windDaySeg').hidden = !app.w.seaBreeze || app.w.realWind;
   { // where the day's weather comes from, what the records say for the month, and what today is
     const mo = Number(app.w.raceDate.slice(5, 7)) - 1, f = windKindFreq(mo), month = new Date(app.w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' });
@@ -347,10 +346,10 @@ function beginRaceNow(seed?: number): void {
     return;
   }
   toast(app.S.mode === 'sail'
-    ? `Cruising${app.w.dest ? ` to ${app.w.dest.name}` : ''}: no race. ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Sea: ${describeSea(app.w.seaHere(app.w.user))}.${app.w.dest ? ' The navigator (M) has a passage plan.' : ' Try the tiller, the trim and the pole.'}`
+    ? `Cruising${app.w.dest ? ` to ${app.w.dest.name}` : ''}: no race. ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Sea: ${describeSea(app.w.seaHere(app.w.user))}.`
     : app.S.mode === 'drill'
-    ? `Start practice${app.w.boats.length === 1 ? ', alone' : ''}: ${app.w.startAt / 60 === 1 ? 'one minute' : `${app.w.startAt / 60} minutes`} to the gun. Check the line head to wind, time your run in, and be on the line at full speed when it goes. Current: ${app.w.cur.label}.`
-    : `${app.S.seq}-minute sequence.${app.w.courseSignal ? ` The committee is flying course ${app.w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${app.w.cur.label}. Sea: ${describeSea(app.w.seaHere(app.w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+    ? `Start practice${app.w.boats.length === 1 ? ', alone' : ''}: ${app.w.startAt / 60 === 1 ? 'one minute' : `${app.w.startAt / 60} minutes`} to the gun. Current: ${app.w.cur.label}.`
+    : `${app.S.seq}-minute sequence.${app.w.courseSignal ? ` The committee is flying course ${app.w.courseSignal.no}.` : ''} Current: ${app.w.cur.label}. Sea: ${describeSea(app.w.seaHere(app.w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
   if (app.w.courseSignal && app.S.mode !== 'sail') logMessage(`Course ${app.w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signaled by the warning signal). ${app.w.courseSignal.why}`);
 }
 

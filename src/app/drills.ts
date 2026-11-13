@@ -94,8 +94,10 @@ function showDrill(): void {
   drillOptions(); drillTable();
   $('dTitle').textContent = d.title;
   const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  $('dFacts').innerHTML = d.facts.map(f => `<li>${esc(f)}</li>`).join('');
-  $('dTips').innerHTML = d.tips.map(f => `<li>${esc(f)}</li>`).join('');
+  // one line to act on, the top tip; what happened, and the other tips, folded away (the owner: no paragraphs on the screen)
+  const more = [...d.facts, ...d.tips.slice(1)];
+  $('dTips').innerHTML = d.tips.length ? `<li>${esc(d.tips[0])}</li>` : '';
+  $('dFacts').innerHTML = more.length ? `<li class="dmore"><details class="thow"><summary>What happened</summary>${more.map(f => `<p>${esc(f)}</p>`).join('')}</details></li>` : '';
   $('dVerdict').className = 'verdict' + (d.grade === 'great' || d.grade === 'good' ? ' ok' : '');
   $('drill').hidden = false;
   drillClip = { frames: app.w.rec.slice(), focus: [app.w.user.id], wind: app.w.gun?.windFrom ?? app.w.wind.from, kind: 'start' };

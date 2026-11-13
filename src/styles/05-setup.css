@@ -51,15 +51,9 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .pastrow .ghost{flex:none}
 .knote:empty{display:none}
 
-/* the map's layers (ui/layers.ts): a small button on the inset map's corner, and the list of switches it opens */
-.maplayers{position:fixed;top:calc(env(safe-area-inset-top,0px) + 78px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 104px);z-index:6;
-  width:24px;height:24px;padding:0;display:grid;place-items:center;border-radius:5px;border:1px solid var(--rule);background:var(--pod);color:var(--muted);cursor:pointer}
-.maplayers:hover,.maplayers[aria-expanded="true"]{color:var(--text);border-color:currentColor}
-@media (min-width:760px){.maplayers{top:calc(env(safe-area-inset-top,0px) + 86px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 172px)}}
+/* the map's layers (ui/layers.ts): the full chart's Layers menu */
 .layerpop{position:fixed;z-index:60;min-width:150px;padding:8px 10px;border-radius:6px;border:1px solid var(--rule);background:var(--pod);
   box-shadow:0 6px 18px rgba(0,0,0,.35);font:600 12px/1.2 var(--f-inst)}
-#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 106px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 140px)}
-@media (min-width:760px){#mapLayersPop{top:calc(env(safe-area-inset-top,0px) + 114px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}}
 .layerpop[hidden]{display:none}
 .layerpop .lp-h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .layerpop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;white-space:nowrap}
@@ -85,10 +79,6 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 #appBar .ib:hover,#appBar .ib:focus-visible{opacity:1}
 #mapBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 82px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}
 #viewBar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}
-/* the keys line: over the view buttons, while the pointer is on a button cluster (K lists every key) */
-#keysHint{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 66px);
-  pointer-events:none;opacity:0;transition:opacity .2s}
-body:has(.ibar:hover) #keysHint{opacity:1}
 /* the trim panel's own line: who has the lines, in plain words */
 .tp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 12px/1.2 var(--f-inst);color:var(--muted)}
 .tp-head.mine{color:var(--text)}
@@ -104,7 +94,6 @@ body.lashed .tg-lash{display:block}
 /* the map's key (ui/legend.ts), under the layer switches */
 .layerpop{max-height:calc(100vh - 240px);overflow-y:auto}
 #chartLayersPop{max-height:calc(100vh - 120px);width:290px}
-#mapLayersPop{width:280px}
 .layerpop .lp-kh{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule)}
 .lp-key .lk-h{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 3px}
 .lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}

@@ -100,7 +100,6 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pl-lab{font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:2px}
 .pl-read{font:700 13px/1 var(--f-inst);letter-spacing:.04em;min-width:190px;padding:0 6px;color:var(--accent);white-space:nowrap}
 .pilot .tp-btn{padding:7px 8px}
-body.pilot-on #keysHint{display:none}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
 #controls .motorhead{flex-wrap:nowrap;width:max-content;margin-top:6px}
 #controls .motorhead .tp-btn{min-width:0;height:38px}
