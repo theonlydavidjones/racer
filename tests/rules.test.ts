@@ -292,6 +292,21 @@ describe('Rule 18.3 · tacking in the zone', () => {
     expect(p.at(103, { swerve: true }).foul).toMatchObject({ by: 'Red', rule: '18.3', kind: 'swerve' });
   });
 
+  it('18.3 is no right of way: Blue, to windward, bearing away into Red (to round the mark, say) broke 11', () => {
+    const { blue, p } = scene();
+    p.at(103);
+    moveTo(blue, ahead(4, 3.6), 290, 315); // Blue bears away 25° onto Red's windward side
+    expect(p.at(104).foul).toMatchObject({ by: 'Blue', rule: '11', kind: 'contact' });
+  });
+
+  it('18.3 is no right of way from clear ahead either: once Red\'s rule 15 time is over, Blue sailing into her stern broke 12 (she could bear away)', () => {
+    const { blue, p } = scene({ redAt: ahead(12, 0) }); // Red tacks dead ahead of Blue, a length and a half clear
+    expect(p.at(103)).toMatchObject({ keepsClear: 'Blue', rule: '12', foul: null });
+    p.at(107);
+    moveTo(blue, ahead(4.2, 0)); // Blue's bow into Red's stern, still clear astern
+    expect(p.at(107.5).foul).toMatchObject({ by: 'Blue', rule: '12' });
+  });
+
   it('tacking outside the zone is plain Rule 11 (after Rule 15 gives Blue time to respond)', () => {
     const far = (k: number): [number, number] => [blueAt[0] * k, blueAt[1] * k];
     const blue = boat('Blue', { at: far(2.2), heading: 315 });
