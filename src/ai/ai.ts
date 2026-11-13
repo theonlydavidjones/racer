@@ -683,6 +683,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
       // heading that opens the most room, nearest what she wanted
       if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
+    } else if (r.kc === o && (w.pairRecord(b, o)?.grace ?? -Infinity) > w.t && w.pairRecord(b, o)!.by === b.id && cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM) {
+      // Rule 15: she has just got right of way by her own action (a gybe or tack onto the other tack, or an overlap made
+      // to leeward) and must give the other boat room to keep clear, so she goes on opening the water herself rather
+      // than turning back in. (Two boats running side by side: the one keeping clear gybed away, became the leeward boat
+      // on the same tack, and at once steered back toward the boat that now had to keep clear of her; then, back on
+      // opposite tacks, away again, closing in a zigzag until they touched.)
+      desired = sailable(b, brg(-dx, -dy)); luff = false; if (o.id !== ai.hailTack?.with) avoiding = true;
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
