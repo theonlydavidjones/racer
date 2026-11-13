@@ -658,13 +658,17 @@ function goHome(): void {
   if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); }
 }
 $('bHome').onclick = goHome;
+// Home is part of the navigator (the owner, 13 Nov: "Home really belongs inside the nav experience"): its Sail home
+$('bNavHome').onclick = () => { navView.close(); goHome(); };
 $('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); if (send({ k: 'sendHome' })) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); } };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
 /** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
 function homeButton(): void {
-  const el = $('bHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
-  const hide = !w.running || !w.cruising || S.mode === 'drill' || !!u.docked || !!u.handled || home; // (not while racing: the surface audit)
+  // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden)
+  const el = $('bNavHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
+  const hide = !w.running || !w.cruising || S.mode === 'drill' || !!u.docked || !!u.handled || home;
   if (el.hidden !== hide) el.hidden = hide;
+  if (!$('bHome').hidden) $('bHome').hidden = true;
   el.classList.toggle('dim', !w.homeSlip);
   const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Fleet first)';
   if (el.title !== t) el.title = t;

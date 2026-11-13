@@ -233,7 +233,7 @@ body.pilot-on #keysHint{display:none}
 .mo-thr input{width:110px}
 #moGears .tp-btn[aria-pressed="true"],#motorHead .tp-btn.on{border-color:var(--accent);color:var(--accent)}
 #bMotor.on{border-color:var(--accent);color:var(--accent)}
-#bHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
+#bHome.dim,#bNavHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
 @media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)} }
 /* one line along the bottom: the helm's buttons, then the pilot's control head while it steers (clear of the view buttons) */
 #controls{flex-direction:row;align-items:flex-end;padding-right:calc(max(16px,env(safe-area-inset-right,0px)) + 96px)}
@@ -1123,3 +1123,6 @@ body.showroom #flowPanel{display:none}
 /* messages rest once they're stale: the card keeps only its header (and All, for the log) */
 #msgLog.rest #msgRecent{display:none}
 #nextCard{pointer-events:auto}
+/* the navigator's Sail home sits beside its Close (the owner: Home belongs in the navigator) */
+.cvhead .btnrow{flex-wrap:nowrap;align-items:flex-start}
+.cvhead .btnrow .ghost{width:auto;white-space:nowrap}
