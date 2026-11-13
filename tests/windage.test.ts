@@ -17,7 +17,7 @@ const world = (kt: number) => {
   u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.v = 0; u.astern = 0; u.sway = 0;
   return { w, u };
 };
-const hold = (w: World, h: number) => { const u = w.user; u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; };
+const hold = (w: World, h: number) => { const u = w.user; u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.turnRate = 0; }; // (held on a heading: her turn held too, now that it's a motion of its own)
 
 describe('the wind on her with no way on (bare poles)', () => {
   it('head to wind she\'s driven astern, to where the wind on her rig (windFore, bow-on) meets the water\'s drag astern (ASTERN_DRAG)', () => {
