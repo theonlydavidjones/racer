@@ -359,6 +359,7 @@ export class World {
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
@@ -830,9 +831,10 @@ export class World {
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
     }
-    // the waves: the field eased to the sea at your boat (turning with the course's wind about her), and every boat's
-    // heave and pitch on it (boat/seaway.ts waveMotion)
-    this.waves.update(this.user.sea ?? FLAT_SEA, this.windModel.base, dt, this.user);
+    // the waves: the field eased to its reference sea (waveRef) and turning with the course's mean wind about your boat,
+    // and every boat's heave and pitch on it (boat/seaway.ts waveMotion)
+    if (this.steps % 30 === 1) this.waveRefSea = null;
+    this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
@@ -1438,6 +1440,22 @@ export class World {
     this.steps++;
     moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
     u.h = h; // held there
+    // (the waves run on, and she rides them, as on the water: the setup's and the showroom's sea isn't glassy)
+    if (this.steps % 30 === 1) this.waveRefSea = null;
+    this.waves.update(this.waveRef(), this.windModel.base, dt, u); waveMotion(u, this.waves, waveTime(this.t), dt);
+  }
+
+  /**
+   * The sea the wave field's heights are set for (environment/waveField.ts), which each boat's own sea scales: in a
+   * race the sea at the course's middle, so every boat in the fleet rides the same waves wherever your own boat is (in
+   * her slip, or off at the far end); sailing free, your boat is the only one, and the sea at her is the reference.
+   * Worked out twice a second.
+   */
+  private waveRefSea: SeaHere | null = null;
+  waveRef(): SeaHere {
+    if (this.waveRefSea) return this.waveRefSea;
+    const s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : this.seaHere(this.C.center);
+    return this.waveRefSea = { ...s, wake: undefined };
   }
 
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */

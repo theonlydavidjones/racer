@@ -173,13 +173,17 @@ export const targetFor = (b: { ww: { kt: number }; sea: SeaHere }, twa: number):
  *   own wave damping, or the Delft tests).
  * - That gives natural periods of about 1.8 s in heave and 2.0 s in pitch. Close-hauled at 5 kt, the Bay's 2.5–3 s chop
  *   meets her every 1.7–2.1 s: on them, which is the hobby-horsing of a Folkboat in the Cityfront chop (her pitch, for
- *   the waves' slope, peaks in a 3 s chop at 1.3 times what a long sea gives: tests/seakeeping.test.ts).
- * - **The waves' push** (Froude–Krylov: the undisturbed wave's pressure on her bottom, the diffraction left out) on a
- *   rectangle with her waterplane's area and moment of inertia (4.82 × 1.85 m), worked out in closed form for each wave
- *   component: along her length a sinc for the force and the yaw lever's 2(sin q − q·cos q)/a² for the moment, across her
- *   beam a sinc, and the pressure fading with depth as e^(−k·T), T her mean draft (∇/Awp, 0.27 m; the Smith effect). A
- *   wave much longer than she is lifts and tilts her with it (she follows the surface: force C33·ζ, moment C55·slope);
- *   one much shorter cancels along her and leaves her still.
+ *   the waves' slope, peaks in a 3 s chop at about 1.2 times what a long sea gives, a broad peak: tests/seakeeping.test.ts).
+ * - **The waves' push** on a rectangle with her waterplane's area and moment of inertia (4.82 × 1.85 m), worked out in
+ *   closed form for each wave component: along her length a sinc for the force and the yaw lever's 2(sin q − q·cos q)/a²
+ *   for the moment, across her beam a sinc, and the pressure fading with depth as e^(−k·T), T her mean draft (∇/Awp,
+ *   0.26 m; the Smith effect). Strip theory's relative-motion form (Korvin-Kroukovsky; Journée & Massie ch. 6): each
+ *   strip feels c'·ζ* + a'·ζ̈* + b'·ζ̇*, ζ* the wave's (Smith-reduced) surface there as she meets it. So besides the
+ *   undisturbed wave's pressure (Froude–Krylov, c'·ζ*) the water's own acceleration and the waves she'd radiate push back
+ *   (diffraction): a factor (1 − a33·ω²/C33) on it, and a part in quadrature, b·ω/C33, ω the wave's frequency. For the
+ *   Bay's chop that's 0.6–0.85 of the pressure alone. (The section ratios a'/c', b'/c' taken uniform, as
+ *   the rectangle is; forward speed's own extra terms left out.) A wave much longer than she is lifts and tilts her with
+ *   it (she follows the surface: force C33·ζ, moment C55·slope); one much shorter cancels along her and leaves her still.
  * - Worked out where she is, every step, as she sails through the field: the frequency she meets the waves at (faster
  *   into them, slower running with them) needs no formula of its own.
  */
@@ -192,6 +196,8 @@ const WM_T = HULL.displacement / RHO / WM.awp; // her mean draft for the Smith e
 const C33 = RHO * G * WM.awp, C55 = RHO * G * WM.il;
 const M33 = HULL.displacement + WM.a33, I55 = HULL.displacement * WM.gyr ** 2 + WM.a55;
 const B33 = 2 * WM.zeta * Math.sqrt(M33 * C33), B55 = 2 * WM.zeta * Math.sqrt(I55 * C55);
+/** The strips' added mass and damping against their restoring (s², s): the diffraction's share of the push. */
+const RA = WM.a33 / C33, RB = B33 / C33;
 /** Natural periods (s) of heave and pitch. */
 export const NATURAL = { heave: 2 * Math.PI * Math.sqrt(M33 / C33), pitch: 2 * Math.PI * Math.sqrt(I55 / C55) };
 const sinc = (x: number) => Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x;
@@ -207,8 +213,13 @@ export function waveForces(f: WaveField, p: { x: number; y: number }, h: number,
     const ax = k * (sd * fx + cd * fy), ay = k * (sd * fy - cd * fx); // the wavenumber along her and across her
     const th = k * (sd * cx + cd * cy) - f.w[i] * t + f.phase[i];
     const A = a * Math.exp(-k * WM_T) * sinc(ay * WM.be / 2), q = ax * WM.le / 2;
-    F += A * WM.le * sinc(q) * Math.sin(th);
-    M += A * (Math.abs(q) < 1e-3 ? ax * WM.le ** 3 / 12 : 2 * (Math.sin(q) - q * Math.cos(q)) / (ax * ax)) * Math.cos(th);
+    // the diffraction's two parts (see above), at the wave's own frequency: the water's acceleration is the orbit's,
+    // ω²ζ, whatever her speed. (The relative-motion form's ωe², her speed through the wave counted in, grows without
+    // bound in short head seas, where strip theory's high-frequency added mass is least right; the forward-speed terms,
+    // Salvesen–Tuck–Faltinsen's, are left out with it)
+    const w = f.w[i], inPhase = 1 - RA * w * w, quad = RB * w, s = Math.sin(th), c = Math.cos(th);
+    F += A * WM.le * sinc(q) * (inPhase * s - quad * c);
+    M += A * (Math.abs(q) < 1e-3 ? ax * WM.le ** 3 / 12 : 2 * (Math.sin(q) - q * Math.cos(q)) / (ax * ax)) * (inPhase * c + quad * s);
   }
   return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M };
 }

@@ -15,9 +15,11 @@ import type { SeaHere } from './sea';
  * elsewhere on the water scales from this field's reference sea, by the sea there (SeaHere), as a sea map does.
  *
  * It belongs to the World and steps with it, on the race's clock, so the race (in its worker) and the page's mirror
- * hold the same field (sim/sync.ts) and every boat rides the waves you see. The reference sea is the sea at your boat,
- * eased in; the field turns with the course's mean wind about your boat (so turning it doesn't sweep the pattern past
- * you). Both are the World's own state, not the camera's.
+ * hold the same field (sim/sync.ts) and every boat rides the waves you see. The reference sea is the World's (World.waveRef:
+ * the course's middle in a race, so the fleet's waves don't depend on where your boat is), eased in; the field turns with
+ * the course's mean wind about your boat (so turning it doesn't sweep the pattern past you: the turn's slow, 5% of the
+ * difference a second, so a boat a few hundred metres off sees her waves' phase run a little fast or slow for a while).
+ * All of it is the World's own state, not the camera's.
  */
 
 const G = 9.81;
@@ -100,6 +102,8 @@ export class WaveField {
     if (Number.isNaN(this.windDir)) this.windDir = travel;
     this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
     const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
+    // (never quite flat: a reference sea in a lee would leave nothing for the rougher water elsewhere to scale up)
+    const hsW = Math.max(0.05, s.hsW), hsS = Math.max(0.05, s.hsS);
     // wind sea: heights shaped by the spectrum, scaled so the sum has the right significant height
     const tp = Math.max(1, s.tpW);
     let tot = 0; const raw = new Float64Array(N_WIND);
@@ -109,16 +113,16 @@ export class WaveField {
     }
     tot = tot || 1;
     for (let i = 0; i < N_WIND; i++) {
-      const target = Math.sqrt(2 * raw[i] / tot) * s.hsW / 4; // Σ a²/2 = (Hs/4)²
+      const target = Math.sqrt(2 * raw[i] / tot) * hsW / 4; // Σ a²/2 = (Hs/4)²
       this.amp[i] += (target - this.amp[i]) * ease;
       turn(i, this.windDir + WIND_SPREAD[i]);
       this.q[i] = 0.45; // sharpen the crests of the chop (less with more components, so the sum never loops)
     }
     for (let j = 0; j < SWELL_F.length; j++) {
-      const i = N_WIND + j, target = (j === 1 ? 0.75 : 0.47) * s.hsS / 4 * Math.SQRT2;
+      const i = N_WIND + j, target = (j === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
       this.amp[i] += (target - this.amp[i]) * ease; turn(i, s.fromS + 180 + SWELL_SPREAD[j]); this.q[i] = 0.3;
     }
-    this.refW += (s.hsW - this.refW) * ease; this.refS += (s.hsS - this.refS) * ease;
+    this.refW += (hsW - this.refW) * ease; this.refS += (hsS - this.refS) * ease;
   }
 
   /** How the field scales at a place whose sea is `s`: (wind sea, swell) multipliers on the reference. */

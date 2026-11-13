@@ -556,12 +556,12 @@ export class SceneView {
     }
   }
 
-  /** The sea map: how big the chop and swell are around `at`, relative to the sea at the focus, and the whitecaps. */
+  /** The sea map: how big the chop and swell are around `at`, against the wave field's reference sea (as each boat's are), and the whitecaps. */
   private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void {
-    const ref = this.seaRef!, cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
+    const cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
     for (let j = 0; j < SEA_N; j++) for (let i = 0; i < SEA_N; i++) {
       const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
-      v[o] = ref.hsW > 0.01 ? s.hsW / ref.hsW : 1; v[o + 1] = ref.hsS > 0.01 ? s.hsS / ref.hsS : 1; v[o + 2] = s.white;
+      const k = w.waves.scaleFor(s); v[o] = k.kW; v[o + 1] = k.kS; v[o + 2] = s.white;
     }
     this.seaGrid = { x0, y0, cell, v };
     // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s

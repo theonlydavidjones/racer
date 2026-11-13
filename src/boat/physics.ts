@@ -306,7 +306,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let sweep = 0;
   const sway = rigSway(b), surge = rigSurge(b);
   if ((Math.abs(sway) > 0.02 || Math.abs(surge) > 0.02) && !b.luff) {
-    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along, fr.across, b.heel ?? 0); // (as sf's, without the roll)
+    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across, b.heel ?? 0); // (as sf's, without the roll and the pitch: her sternway in both)
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
