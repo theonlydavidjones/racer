@@ -10,19 +10,23 @@ export interface ConductCtx {
   fouled: boolean;
   /** Seconds since the incident. */
   since: number;
-  /** Asked again after the race, with a protest against her (44.1: she may still take the penalty by retiring). */
+  /** Asked again after the race, with a protest against her: she may still retire (sportsmanship, the Basic Principle;
+   * scored RET, A5.2, the boats behind moving up, A6.1). */
   protested?: boolean;
 }
 
 /**
- * Does she take her penalty? The fallback: nine times in ten when she fouled. Real fleets mostly end a foul in turns
- * or nothing: disqualifications run at 0.15–0.32% of starts (Skipper Model's census, docs/SKIPPER-MODEL-PROPOSAL.md),
- * far fewer than incidents; and most refusals are honest disagreement, not cheating (rule 2), which the skipper's
- * perception will model. `rnd` is her draw, 0–1.
+ * Does she take her penalty? Disqualifications run at 0.15–0.32% of starts in real fleets (Skipper Model's census,
+ * docs/SKIPPER-MODEL-PROPOSAL.md). Here every AI boat fouled protests, and the hearing finds the facts exactly, so a
+ * declined penalty is a DSQ: the decline rate is that census divided by the sim's fouls per start, about one per boat a
+ * race (the physics-reviewer's probe, SS2, 8 boats, 13 Nov 2026): 0.25%, so she takes it 997 times in 1000. (Most real
+ * refusals are honest disagreement, not cheating, rule 2: the skipper's perception will model that.) The fallback
+ * stands by her choice after the race. `rnd` is her draw, 0–1.
  */
+export const TAKES_PENALTY = 0.997;
 export function takesPenalty(ctx: ConductCtx, rnd: number): boolean {
-  if (!ctx.fouled) return false;
-  return rnd < (ctx.protested ? 0.25 : 0.9);
+  if (!ctx.fouled || ctx.protested) return false;
+  return rnd < TAKES_PENALTY;
 }
 
 /** The fallback hail: this long after the incident, s (a sailor hails at once, before she knows if the other will turn;

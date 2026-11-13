@@ -79,13 +79,27 @@ describe('Protests: the AI boats take their turns, or not, and protest (ai/condu
   it('umpired, the same race has no protests', () => {
     expect(sailed('umpired').protests).toEqual([]);
   }, 120_000);
-  it('under protests, an AI boat takes her penalty about nine times in ten; umpired, always', () => {
+  it('under protests, an AI boat takes her penalty TAKES_PENALTY of the time (997 in 1000); umpired, always', () => {
     const w = new World(SS2, settings({ fleet: 1, judging: 'protests' }), 3); racing(w);
     const o = w.boats[1]; let took = 0;
-    for (let i = 0; i < 400; i++) { o.penalty = 0; w.penaltyFor(o, w.t); if (o.penalty > 0) took++; }
-    expect(took).toBeGreaterThan(330); expect(took).toBeLessThan(390);
-    const um = new World(SS2, settings({ fleet: 1 }), 3); racing(um);
+    for (let i = 0; i < 4000; i++) { o.penalty = 0; w.penaltyFor(o, w.t + i); if (o.penalty > 0) took++; }
+    expect(took).toBeGreaterThan(3970); expect(took).toBeLessThan(4000); // (about 12 declined)
+    const um = new World(SS2, settings({ fleet: 1, judging: 'umpired' }), 3); racing(um);
     um.penaltyFor(um.boats[1], um.t); expect(um.boats[1].penalty).toBeGreaterThan(0);
+  });
+  it('rule 23.1 (a boat not racing interfering) has no turns to take: none owed, so the protest stands (60.5(c))', () => {
+    const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
+    const o = w.boats[1], u = w.user;
+    w.protest(o, u, { vs: u.id, t: w.t, rule: '23', fouler: u.id, kind: 'contact', part: '23.1' });
+    w.step(DT); w.step(DT);
+    expect(w.protests[0]).toMatchObject({ owed: false, turnsT: null });
+  });
+  it('turns done after she has finished don\'t count (44.2: before she finishes)', () => {
+    const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
+    const o = w.boats[1], u = w.user;
+    w.penaltyFor(u, w.t); w.protest(o, u, { vs: u.id, t: w.t, rule: '10', fouler: u.id, kind: 'contact' });
+    u.finished = true; u.finishT = w.t; u.penalty = 0; w.step(DT);
+    expect(w.protests[0].turnsT).toBeNull();
   });
   it('a protest records whether the protested boat took her turns (RRS 60.5(c)(2): then no further penalty)', () => {
     const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
