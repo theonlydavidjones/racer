@@ -64,8 +64,9 @@ export interface RoundingScore {
   slackS: number | null;
   /** She touched the mark. */
   touched: boolean;
-  /** Her pace on the new leg's point of sail wasn't measured yet (her first rounding of this kind): the twin's leg out
-   * sailed at a typical crew's pace, so the score is provisional (within about ±9 m). */
+  /** Her pace on the new leg's point of sail wasn't measured yet (usually her first windward mark, before she's run):
+   * the twin's leg out sailed at a typical crew's pace, so the score is provisional (out by several metres either way,
+   * as her real pace differs from it). */
   provisional?: boolean;
   /** One plain line on what to change (or that it was good, or why it wasn't scored). */
   coach: string;
@@ -215,8 +216,13 @@ export class RoundingTracker {
     const up = kind === 'windward', H = this.hist;
     // (sailing, not stopped or stalled: a stop just before the gate is a mistake to score, not her pace, or the twin
     // would be as slow as she was; under 60% of the polar's speed for her angle, below any trim's loss, isn't counted)
-    const pre = H.filter(q => s.t - q.t <= 30 && q.rate < STEADY_RATE && (up ? Math.abs(q.twa) < 60 : Math.abs(q.twa) > 130) && q.v >= 0.6 * FOLKBOAT.speedKt(q.tws, Math.abs(q.twa)) * KT);
-    const secs = pre.length * (H.length > 1 ? (H[H.length - 1].t - H[0].t) / (H.length - 1) : 0);
+    // (but a boat sailed slowly the whole way in, every second of it under that, is measured as she sailed, at the 0.6
+    // floor, not given a typical crew's twin to lose to)
+    const dtH = H.length > 1 ? (H[H.length - 1].t - H[0].t) / (H.length - 1) : 0;
+    const onLeg = H.filter(q => s.t - q.t <= 30 && q.rate < STEADY_RATE && (up ? Math.abs(q.twa) < 60 : Math.abs(q.twa) > 130));
+    const sailing = onLeg.filter(q => q.v >= 0.6 * FOLKBOAT.speedKt(q.tws, Math.abs(q.twa)) * KT);
+    const pre = sailing.length * dtH >= 6 ? sailing : onLeg;
+    const secs = pre.length * dtH;
     const mean = (f: (q: Sample) => number) => pre.reduce((a, q) => a + f(q), 0) / Math.max(1, pre.length);
     const tws0 = pre.length ? mean(q => q.tws) : b.ww.kt;
     // (through the water, along the wind as it was each moment, as the twin sails: the tide and the wind's swing about

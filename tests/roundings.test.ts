@@ -109,3 +109,22 @@ describe('The rounding measure is through the water: the tide does not score her
     }
   });
 });
+
+describe('A boat sailed slowly the whole way in is measured as she sailed', () => {
+  it('her pace before the gate comes from her slow sailing (at the 0.6 floor), not a typical crew\'s', () => {
+    // (a learner with the sheets well off: every second under 60% of the polar's speed; her twin sails at her pace, so a
+    // clean rounding at that pace isn't charged a typical crew's speed)
+    const W = { x: 0, y: 600 }, pin = { x: 0, y: 0 }, tws = 12;
+    const course = { marks: [{ key: 'W', name: 'W', p: W, type: 'round', side: 'p', shape: 'cylinder', look: 'Y', beat: true, leg: 'beat', prev: pin, next: pin, dir: { x: 0, y: 1 }, sv: { x: 0, y: 0 }, r: { x: 0, y: 1 } }], pin, pinLabel: 'Pin' } as unknown as Course;
+    const tr = new RoundingTracker(course);
+    const a = FOLKBOAT.beatAngle(tws), S = 0.55 * FOLKBOAT.speedKt(tws, a) * KT, vb = V(360 - a);
+    const b = { isUser: false, pushing: false, motor: null, pilotSteers: false, x: 0, y: W.y - 150, h: 360 - a, v: S, vx: S * vb.x, vy: S * vb.y, cur: { x: 0, y: 0 },
+      ww: { from: 0, kt: tws }, sea: { hsW: 0, tpW: 3 }, tack: 'S', pole: 'down', markTouch: null, trim: { main: { flow: 'good' }, jib: { flow: 'good' } } } as unknown as Boat;
+    b.x = -S * vb.x * (150 / (S * vb.y)); // (so she'd pass the mark)
+    let t = 0;
+    for (let i = 0; i < 60 * 200 && (tr as unknown as { cur: unknown }).cur == null; i++) { b.x += b.vx * DT; b.y += b.vy * DT; t += DT; tr.step(b, t, DT); }
+    const eta = (tr as unknown as { eta: { up: number | null } }).eta.up;
+    expect(eta, 'measured, not left to the guess').not.toBeNull();
+    expect(eta!).toBeLessThan(0.7);
+  });
+});
