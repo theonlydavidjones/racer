@@ -10,6 +10,8 @@ import type { CourseFile } from '../src/courses/course';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
+import { slipTaken, slipsIn } from '../src/geo/marina';
+import { DEFAULT_BOAT } from '../src/boat/spec';
 import { SyncMirror, SyncSource } from '../src/sim/sync';
 import { firstDifference } from './helpers/worlds';
 import { applyCommand } from '../src/sim/commands';
@@ -71,6 +73,17 @@ describe('the mirror World is the real one over again', () => {
     expect(events).toBeGreaterThan(0); // (horns and messages at least: the events did go through)
   }, 900_000);
 
+  it('docking: lines ready, a line ashore, the rest, made fast (boat/dockLines.ts: new per-step state)', () => {
+    const home = slipsIn('west-harbor').find(x => x.kind === 'bow-in')!, boat = { ...DEFAULT_BOAT, marina: home.marina, slip: home.id };
+    const berth = slipsIn('west-harbor').find(x => x.kind === 'bow-in' && !slipTaken(x) && x.id !== home.id)!;
+    let sawLines = false;
+    sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 8, sailFrom: 'slip', boats: [boat], boat, boatId: boat.id, current: 'slack' }), 5, { freeSail: true }),
+      700, () => 4, 20, (w, i) => {
+        if (i === 5) { const u = w.user, r = berth.heading * Math.PI / 180; Object.assign(u, { docked: undefined, x: berth.p.x - Math.sin(r) * 9, y: berth.p.y - Math.cos(r) * 9, h: berth.heading, v: 0.4, astern: 0, sway: 0, turnRate: 0 }); u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; applyCommand(w, { k: 'lines' }); }
+        if (w.user.mooring?.lines.length) sawLines = true;
+      });
+    expect(sawLines).toBe(true);
+  }, 900_000);
   it('a cruise with a destination, the user at the helm through commands', () => {
     sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 14, sailFrom: 'cityfront', sailTo: '', current: 'real' }), 4, { freeSail: true }),
       900, () => 4, 60, (w, i) => {

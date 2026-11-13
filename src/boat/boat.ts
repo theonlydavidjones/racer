@@ -259,6 +259,8 @@ export interface Boat {
   ensign?: string; special?: string;
   /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
   ensignStruck?: boolean;
+  /** Coming in to a berth: the crew's lines going ashore (boat/dockLines.ts, sim/world.ts mooringStep). */
+  mooring?: import('./dockLines').Mooring;
   /** The ensign down for its hours: outside 0800–sunset, unless she's entering or leaving a harbour (boat/colours.ts). */
   ensignNight?: boolean;
   /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */

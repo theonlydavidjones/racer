@@ -62,6 +62,7 @@ node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headle
 node scripts/check/spelling.cjs              # US spelling in what the player reads (strings, index.html, README, docs); --fix changes them
 npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost races end to end (sail, save, sail it again with its ghost)
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
+npm run dev & node scripts/check/save-pattern.cjs <out-dir> # ~2 min: Save and "Save changes?" on a member, a boat's crew and the boat editor
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
                                               # discarding one function's code (docs/CAPACITY.md, "The compiler's thrown-away work")
