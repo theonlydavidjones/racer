@@ -83,6 +83,8 @@
   <!-- how each sail is drawing (its lines are in the sail controls band) -->
   <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
   <div class="tp-hint" id="tpHint"></div>
+  <!-- the tack and gybe drill: your last manoeuvre, scored, and what to change -->
+  <div class="tp-drill" id="tpDrill" hidden></div>
   <!-- what the sail control under the mouse (or last touched) does (the band has no hover titles) -->
   <div class="tp-help" id="tpHelp" hidden></div>
   <div class="tp-shape" id="tpShape"></div>
@@ -183,7 +185,7 @@
 </div>
 <div class="overlay" id="raceChoose" hidden>
   <div class="panel wide home">
-    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
+    <button type="button" class="linkbtn back" id="raceBack" data-home="back">‹ Start page</button>
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
@@ -195,7 +197,7 @@
 
 <div class="overlay" id="setup" hidden>
   <div class="panel wide setup">
-    <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="race">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
+    <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="back">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
     <div class="setgrid">
       <div class="steps">
         <div class="field step" id="hostField"><span>Host club</span>
@@ -241,7 +243,7 @@
         <small id="tideNote"></small>
         <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
         <button class="ghost" id="bCond" type="button">Change the conditions…</button>
-        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="ghost" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: every tack and gybe scored against a good crew's, with what to change">Practise tacks and gybes</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
       </div>
     </div>
   </div>
@@ -267,7 +269,7 @@
       <div class="adjrow"><span>Ship traffic</span><div class="seg" data-k="traffic"><button type="button" data-v="1">Ships, ferries &amp; tour boats</button><button type="button" data-v="0">None</button></div></div>
     </div>
     <small>Chop comes from the wind over the water and the open water upwind; the swell is the ocean's, from the San Francisco Bar buoy, dying away inside the Gate. Real fog is the summer fog bank at the Gate, by month and hour. Ships keep to their usual tracks; the collision regulations apply between you and them, not the racing rules.</small>
-    <div class="btnrow"><button class="ghost" id="bCondReal" type="button">Put everything back to real</button><button class="cta" id="bCondDone" type="button">Done</button></div>
+    <div class="btnrow"><button class="ghost" id="bCondReal" type="button">Put everything back to real</button></div>
   </div>
 </div>
 
@@ -377,7 +379,7 @@
     <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
-    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
+    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button></div>
   </div>
 </div>
 

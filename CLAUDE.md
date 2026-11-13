@@ -51,13 +51,19 @@ come later, once the physics and racing are dialed in.
 
 ```bash
 npm run test:fast        # ~40 s: everything but the whole-race runs; use while iterating
-npm test                 # ~4 min: the full suite (run before publishing)
+npm test                 # ~23 min: the full suite (run before publishing)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
 node scripts/check/smoke.cjs <out-dir>        # ~2 min: the built page in headless Chromium, fails on page errors
+npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost races end to end (sail, save, sail it again with its ghost)
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
 ```
 
+- perf.test (the owner, 13 Nov 2026): the budget holds. The shared test host is noisy, so a single perf.test failure on
+  code that hasn't changed the step is rerun once; it counts as a regression only if it fails again, or if the change
+  touches the step and measures slower than main back to back.
+- Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
+  (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - Publish by republishing artifact/folkboat-racing-sim.html to the existing artifact
   (https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m), never as a new one.
   Don't pass `capabilities` when publishing: the artifact already declares `db` and `user` (players' saves,

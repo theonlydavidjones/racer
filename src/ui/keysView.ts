@@ -6,7 +6,6 @@ export class KeysView {
   private listening: Action | null = null;
   constructor(private map: KeyMap, private onChange: () => void) {
     $('bKeysClose').onclick = () => this.close();
-    $('bKeysDone').onclick = () => this.close();
     $('bKeysReset').onclick = () => { this.map.reset(); this.note('Keys reset to the defaults.'); this.render(); this.onChange(); };
     $('keysList').addEventListener('click', e => {
       const b = (e.target as HTMLElement).closest('button[data-a]') as HTMLButtonElement | null;

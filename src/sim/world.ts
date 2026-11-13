@@ -1,3 +1,4 @@
+import { DrillTracker } from './drill';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -29,8 +30,9 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { berthClear, harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
+import { ensignDue } from '../boat/colours';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
@@ -224,6 +226,8 @@ export class World {
   boats: Boat[] = [];
   pairs: Record<string, PairRecord> = {};
   rec: Frame[] = [];
+  /** The tack and gybe drill (sim/drill.ts): your manoeuvres scored, in that mode only. */
+  readonly drill: DrillTracker | null;
   /** Racing: the whole race once a second (the race replay), from just before the gun. */
   track: Frame[] = [];
   horns: Record<number, boolean> = {};
@@ -250,7 +254,7 @@ export class World {
   readonly prepFlag: PrepFlag;
   flags: Flag[] = [];
   /** Racing called off for the wind (signals.ts CANCEL_KT): when, the wind then, and the signal flying. */
-  cancelled: { t: number; kt: number; up: Flag[]; say: string } | null = null;
+  cancelled: { t: number; kt: number; up: Flag[]; say: string; places?: Vec[] } | null = null; // (places: where each AI boat lies to off the harbour, ai.ts standOffPlaces)
   /** The wind the committee reads over the course, over about two minutes (kt). */
   private cbMean: number | null = null;
   private cbWin: number[] = [];
@@ -305,6 +309,7 @@ export class World {
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
+    this.drill = settings.mode === 'manoeuvres' ? new DrillTracker() : null;
     this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
     this.homeSlip = slipById(settings.boat?.slip);
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
@@ -412,12 +417,13 @@ export class World {
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
     } else if (isUser && this.freeSail) {
-      // where you chose to start, on a beam reach: whichever way has more open water ahead
+      // where you chose to start, on a beam reach (close-hauled for the drill): whichever way has more open water ahead
       const at = getPlace(this.settings.sailFrom)?.p;
       if (at) {
         p = { ...at };
         const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
-        const a = n360(this.windModel.base + 90), b = n360(this.windModel.base - 90);
+        // (the tack and gybe drill: close-hauled, ready to tack)
+        const off = this.settings.mode === 'manoeuvres' ? 45 : 90, a = n360(this.windModel.base + off), b = n360(this.windModel.base - off);
         h = room(a) >= room(b) ? a : b;
       } else {
         p = place(-220, 0); h = n360(lineH + 180);
@@ -457,7 +463,7 @@ export class World {
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
-      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
+      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
       // her outboard, if it's on its transom bracket: tilted up, stopped (boat/motor.ts)
       ...(isUser && spec?.perf.outboard === 'bracket' ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0 } } : {}),
       ai: isUser ? null : (() => {
@@ -654,7 +660,7 @@ export class World {
    * (her own wake doesn't count; her land lee is cached, refreshed every half second).
    */
   shadowAt(p: Vec, self?: Boat): Shadow {
-    const sum = new WindSum(), kt = this.wind.kt, from = this.wind.from;
+    const sum = new WindSum(this.wind.from), kt = this.wind.kt, from = this.wind.from;
     const lee = self?.leeK ?? landLee(p, from);
     for (const o of this.boats) {
       if (o === self) continue;
@@ -793,6 +799,9 @@ export class World {
     }
     this.vessels = this.traffic.vessels(this.trafficT);
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
+    // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour
+    // (under way as COLREGS Rule 3(i) has it: not made fast to the shore, not at anchor; going ahead, astern or stopped)
+    if (this.steps % 30 === 1) for (const b of this.boats) if (b.ensign) { const n = !ensignDue(this.clockUtc, inBasin(b), !b.docked && !b.atAnchor); if (b.ensignNight !== n) b.ensignNight = n; }
     if (this.steps % 30 === 1) for (const b of this.boats) {
       b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q));
       const wk = this.traffic.wakeAt(b, this.trafficT);
@@ -822,6 +831,7 @@ export class World {
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
     }
+    this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.log?.step(this, dt);
     this.trackCourses();

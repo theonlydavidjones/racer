@@ -5,8 +5,7 @@ import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { outlookFor } from '../src/sim/outlook';
-import { planLegs } from '../src/sim/strategist';
+import { sail } from './helpers/racePool';
 
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', ...o });
@@ -32,7 +31,7 @@ describe('AI fleet sails the course', () => {
 
 describe('the strategist\'s leg times against the fleet sailing them', () => {
   /**
-   * The brief plans each leg as a perfect sail (the best plan, 8 s a tack: sim/routing.ts). The AI fleet, sailing the
+   * The brief plans each leg as a perfect sail (the best plan, each tack at its cost for the wind: sim/routing.ts manoeuvreS). The AI fleet, sailing the
    * same course in the same wind and tide, should take about as long: measured on November 12, 2026 (Seaweed Soup
    * course 2, west 12 kt), the runs and reaches matched or beat the plan, the beats took 5–20% longer, and the first beat
    * longest (the start's traffic), as did the leg after the first rounding (the fleet bunched there, with penalties:
@@ -44,25 +43,21 @@ describe('the strategist\'s leg times against the fleet sailing them', () => {
    * put a leg anywhere (the fleet's first beat ran 1.2–1.9 times the plan from seed to seed, November 13, 2026), and one
    * seed passed or failed by that luck. The median of nine is the fleet against the plan, not one race's traffic.
    */
-  it('each leg within the fleet\'s range, and the whole race within 15%, over nine races', () => {
+  it('each leg within the fleet\'s range, and the whole race within 15%, over nine races', async () => {
     const median = (xs: number[]) => { const s = xs.slice().sort((a, b) => a - b); return s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
     const legR: number[][] = [], totals: number[] = [];
     let names: string[] = [];
-    for (let seed = 11; seed <= 19; seed++) {
-      const w = new World(SS2, settings({ fleet: 4, current: 'ebb' }), seed), legs = planLegs(w, outlookFor(w));
-      const times: Record<number, number[]> = {}, log = w.log!, orig = log.onAdvance.bind(log);
-      log.onAdvance = (ww, b, idx) => { (times[b.id] ??= []).push(w.t); orig(ww, b, idx); };
-      while (w.t < 110 * 60 && !w.boats.slice(1).every(b => b.finished)) w.step(DT);
-      let plan = 0, sailed = 0;
-      names = legs.map(L => `${L.name} (${L.kind})`);
-      legs.forEach((L, i) => {
-        const ai = w.boats.slice(1).map(b => { const T = [w.startTimes[b.id] ?? NaN, ...(times[b.id] ?? []), b.finishT ?? NaN]; return (T[i + 1] - T[i]) / 60; }).filter(x => isFinite(x));
-        expect(ai.length, `seed ${seed}: ${L.name}`).toBeGreaterThan(2);
-        (legR[i] ??= []).push(median(ai) / L.minutes);
-        plan += L.minutes; sailed += median(ai);
+    // (the nine races sailed side by side on the race pool's threads: tests/helpers/races.ts fleetLegs; then seed by seed as before)
+    const seeds = [11, 12, 13, 14, 15, 16, 17, 18, 19], R = await sail('fleetLegs', seeds.map(seed => [seed] as [number]));
+    seeds.forEach((seed, k) => {
+      const { perLeg, total } = R[k];
+      names = perLeg.map(L => L.name);
+      perLeg.forEach((L, i) => {
+        expect(L.sailedBy, `seed ${seed}: ${L.name}`).toBeGreaterThan(2);
+        (legR[i] ??= []).push(L.ratio);
       });
-      totals.push(sailed / plan);
-    }
+      totals.push(total);
+    });
     legR.forEach((rs, i) => {
       const r = median(rs), why = `${names[i]}: the fleet against the plan, seed by seed ${rs.map(x => x.toFixed(2)).join(' ')}`;
       expect(r, why).toBeGreaterThan(0.8);

@@ -6,6 +6,7 @@ import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
 import { TUNE_DEFAULT, TUNE_INFO, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
 import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
+import { morph } from './morph';
 
 /**
  * Editing one of your boats (from the Fleet): her particulars (name, number, club, skipper, home marina and slip),
@@ -185,7 +186,7 @@ export class BoatPanel {
     const upperList = wood ? [...HULL_COLORS, BRIGHT_FINISH] : HULL_COLORS;
     const deckList = [...TEAK_DECKS, ...HULL_COLORS]; // laid teak on glassfibre decks too (a common refit)
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
-    this.el.innerHTML = `
+    morph(this.el, `
       <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button><button type="button" class="cta" data-act="done">Done</button></div>
       <div class="garage">
         ${this.confirmDiscard
@@ -247,7 +248,7 @@ export class BoatPanel {
         <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label><small>${PERF_INFO.gear}</small></div>
         <div class="bpreport" id="bpReport"></div>
       </section>
-      </div>`;
+      </div>`);
     this.report();
   }
 }
@@ -274,7 +275,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
 function flagNote(b: BoatSpec): string {
   const club = BURGEES.find(x => x.id === b.club), ens = ENSIGNS.find(x => x.id === ensignFor(b.sails.country));
-  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern.`];
+  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern. Her ensign keeps its hours: up at 0800 and down at sunset, and flown after dark only for entering or leaving harbour.`];
   if (ens && ens.id !== 'us' && ens.id !== 'us-yacht') notes.push('As a visitor on the Bay she flies the US flag as a courtesy flag at the starboard spreader, and her burgee moves to port.');
   notes.push('Flags fly when she\'s cruising; racing boats strike them for a race. Officers\' flags will go with skippers, in the Yacht Club.');
   return notes.join(' ');

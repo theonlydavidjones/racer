@@ -12,7 +12,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { buildInstrument, syncInstrument, type Instrument } from './tacktick';
+import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
 import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -840,6 +840,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
   // starboard jumper strut (she has no spreaders; the masthead has the windex). Flying a foreign ensign on the Bay, she
   // flies the US flag as a courtesy flag at the starboard strut and moves her burgee to port.
+  // (The burgee at the starboard strut, struck for racing, is the Folkboat fleet's own practice: the owner, 13 Nov 2026.)
   const flags: FlyingFlag[] = [];
   let ensign: BoatMesh['ensign'] = null;
   const flagCleats = new Set<number>(); // (one flag-halyard cleat on each side of the mast that flies a flag)
@@ -883,7 +884,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const flag = ens ? flags[flags.length - 1].mesh : null;
     // (down the staff no further than leaves the flag's foot clear of the deck: a Danish or Norwegian ensign is deep in the hoist)
     const fh = ens ? 0.61 * ens.height / ens.width : 0, slideMax = Math.max(0, Math.min(0.62, staffH - 0.03 - fh - 0.05));
-    ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), slideMax, down: b.ensignStruck ? 1 : 0 };
+    ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), slideMax, down: b.ensignStruck || b.ensignNight ? 1 : 0 };
   }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
@@ -909,12 +910,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.068, 32), new THREE.MeshBasicMaterial({ map: card }));
   face.position.copy(cmp.position); face.position.z += 0.017; grp.add(face);
   const lubber = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.03), new THREE.MeshBasicMaterial({ color: 0xffb35c })); lubber.position.copy(face.position); lubber.position.y += 0.055; lubber.position.z += 0.001; grp.add(lubber);
-  // the racing instrument on your own boat's cabin top, as on Josephine: just forward of the sliding hatch's runners, on
-  // the centreline, its face tilted up toward the helm (render/tacktick.ts)
+  // the racing instrument on your own boat's cabin top, as on Josephine: on the flat roof well aft of the mast, its bracket
+  // against the forward end of the hatch garage (where the sliding hatch's runners end), on the centreline, its face
+  // tilted up toward the helm (render/tacktick.ts). The owner's photos: reference/photos/josephine-mast-cabin-vang-side-
+  // starboard.png (the mount circled, the unit stowed) and josephine-vang-to-mast-base.jpg (the unit, from the cockpit)
   let instrument: Instrument | undefined;
   if (b.isUser) {
     instrument = buildInstrument();
-    const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - 0.09; // (0.09 m forward of the runners' forward ends)
+    const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - UNIT.d / 2 - 0.01; // (its after face 1 cm forward of the runners' ends)
     instrument.grp.position.set(0, cabinTopAt(uAtZ(z), 0), z); grp.add(instrument.grp);
   }
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
@@ -975,7 +978,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   if (m.ensign) {
     // striking the ensign: hand over hand down the staff (about 3 s), then the staff out of its socket and below (1 s);
     // hoisting it again, the other way round
-    const e = m.ensign, { down, slide, out } = ensignStep(e.down, !!b.ensignStruck, dt); e.down = down;
+    const e = m.ensign, { down, slide, out } = ensignStep(e.down, !!b.ensignStruck || !!b.ensignNight, dt); e.down = down;
     if (e.flag) { e.flag.position.copy(e.at).addScaledVector(e.axis, -slide * e.slideMax); e.flag.visible = slide < 1; } // (down the raked staff, gathered in at the foot)
     e.staff.position.copy(e.axis).multiplyScalar(out * 0.3); e.staff.visible = out < 1; // (lifted up out of its socket, along its rake)
   }
