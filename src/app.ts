@@ -829,7 +829,7 @@ function sailButtons(): void {
 let ensignShown = false;
 function ensignButton(): void {
   const u = w.user, tws = u.twsSlow ?? 0, el = $('bEnsign');
-  ensignShown = !!u.ensign && w.running && w.freeSail && (!!u.ensignStruck || tws >= 20 || (ensignShown && tws >= 17));
+  ensignShown = !!u.ensign && w.running && w.freeSail && !u.ensignNight && (!!u.ensignStruck || tws >= 20 || (ensignShown && tws >= 17));
   if (el.hidden !== !ensignShown) el.hidden = !ensignShown;
   word('bEnsign', u.ensignStruck ? 'Hoist ensign' : 'Strike ensign');
   el.classList.toggle('on', !!u.ensignStruck);

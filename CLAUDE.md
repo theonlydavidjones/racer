@@ -55,6 +55,7 @@ npm test                 # ~4 min: the full suite (run before publishing)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
 node scripts/check/smoke.cjs <out-dir>        # ~2 min: the built page in headless Chromium, fails on page errors
+npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost races end to end (sail, save, sail it again with its ghost)
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
 ```
 
