@@ -163,10 +163,14 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   if (h.lying) {
     // (another boat lying to, or stopped, within a couple of lengths: they'd drift down together side by side, stopped,
     // for as long as they lay there. The one further from her own spot sails off clear before lying to again)
+    // (sailing off until 25 m clear, so she doesn't lie to again on the edge and drift back in)
+    const was = h.parting != null ? w.boats.find(o => o.id === h.parting) : undefined;
+    if (was && dist(was, b) < 25) return { desired: sailable(b, brg(b.x - was.x, b.y - was.y)), luff: false, beating: false };
+    h.parting = undefined;
     for (const o of w.boats) {
       if (o === b || dist(o, b) > 15) continue;
       const mine = dist(b, h.at), theirs = o.ai?.home ? dist(o, o.ai.home.at) : -1;
-      if (mine > theirs || (mine === theirs && b.id > o.id)) return { desired: sailable(b, brg(b.x - o.x, b.y - o.y)), luff: false, beating: false };
+      if (mine > theirs || (mine === theirs && b.id > o.id)) { h.parting = o.id; return { desired: sailable(b, brg(b.x - o.x, b.y - o.y)), luff: false, beating: false }; }
     }
     return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
   }
@@ -629,14 +633,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // First, her right of way. Rule 16.1: a right-of-way boat changing course must give the other boat room to keep
   // clear, so if the turn she wants would close on a boat close by she turns only as far as still leaves it that room.
   // (Room: 8 m between centres, a little more than a Folkboat's length (7.6 m); with less than that already, she
-  // mustn't close it further.) Rule 15 the same, anywhere on the course: a boat that has just got right of way by her
-  // own action (a gybe or tack onto the other tack, or an overlap made to leeward) must at first give the other boat
-  // room to keep clear, so she mustn't turn in on her either. (She needn't sail away: holding her course gives the room.
-  // Two boats running side by side zigzagged together and touched: the one keeping clear gybed away, became the
-  // leeward boat on the same tack, and at once steered back toward the boat that now had to keep clear of her.)
+  // mustn't close it further.) Anywhere on the course, not just at the start, and Rule 15 with it: a boat that has
+  // just got right of way by her own action must at first give the other boat room to keep clear. (She needn't sail
+  // away: holding her course gives the room. Two boats running side by side zigzagged together and touched: the one
+  // keeping clear gybed away, became the leeward boat on the same tack, and at once steered back toward the boat that
+  // now had to keep clear of her.) Not while she sails within the mark-room she's entitled to: rounding is her room
+  // (Rule 21: exonerated for 15 and 16 there).
   for (const { o, dx, dy, r, cp } of near) {
-    const rec = w.pairRecord(b, o), r15 = !!rec && rec.by === b.id && rec.grace > w.t;
-    if (!startArea && !r15) continue;
+    if (r.mr && !r.mr.ended && (r.mr.inside === b.id || r.mr.ahead === b.id)) continue;
     if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
     const ROOM = 8, need = Math.min(ROOM, clearanceOn(w, b, b.h, o));
     if (clearanceOn(w, b, desired, o) >= need) continue;

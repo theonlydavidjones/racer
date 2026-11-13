@@ -38,7 +38,7 @@ export interface AiState {
   urgent?: boolean;
   /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
    *  harbour, and whether she's lying to there (and on which tack) */
-  home?: { route: Vec[]; i: number; at: Vec; lying: boolean; tack?: 'S' | 'P' };
+  home?: { route: Vec[]; i: number; at: Vec; lying: boolean; tack?: 'S' | 'P'; parting?: number }; // (parting: lying to, sailing off clear of this boat)
   /** The world's step on which she last thought (world.ts AI_EVERY) */
   thought?: number;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the

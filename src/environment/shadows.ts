@@ -35,26 +35,38 @@ export const NO_SHADOW: Shadow = { k: 1, shift: 0 };
 /** Perturbations to the true wind, in units of the true wind speed, accumulated and then turned into k and shift. */
 export class WindSum {
   x = 0; y = 0; // the perturbation (flow direction, east and north)
-  // the wakes' deficits: summed as vectors, their sizes summed, and their squares (addDeficit)
-  private dx = 0; private dy = 0; private d1 = 0; private d2 = 0;
+  // the wakes' deficits (addDeficit), split along the true wind's flow and across it: along, the signed sum of their
+  // squares; across, their plain sum
+  private along2 = 0; private across = 0;
+  private readonly fx: number; private readonly fy: number;
+  /** For the true wind from `from` (deg). */
+  constructor(from: number) { const f = V(from + 180); this.fx = f.x; this.fy = f.y; }
   /** Add a flow perturbation `amt` (fraction of the true wind) along unit vector (ux, uy). */
   add(ux: number, uy: number, amt: number): void { this.x += ux * amt; this.y += uy * amt; }
   /**
    * Add a wake's deficit `d` (fraction of the true wind, slower air) along her wake's direction (ux, uy). Overlapping
    * wakes don't take their deficits out of the wind one after another: the air already slowed by one has less to lose
    * to the next. They combine as the root of the sum of their squares (Katić, Højstrup & Jensen 1986, "A simple model
-   * for cluster efficiency", EWEC, the wind-farm standard), not their sum, which took a bunched fleet running in line
-   * down to a fifth of the wind (three Folkboats 11–30 m ahead: 0.47 summed, about 0.64 so). (Katić's rule comes from
-   * wind turbines' wakes; there are no measurements for sails' and hulls' wakes, and we assume it carries over. Each
-   * boat's deficit is taken against the wind she herself sails in, already slowed by any wake she is in.)
-   * The vector sum is kept and scaled by √Σd²/Σd: for wakes in line that is Katić's root-sum-square, and wakes pointing
-   * opposite ways (a ferry running faster than the wind, whose wake carries the air forward, crossing a boat's lee) still
-   * cancel as they would added, rather than the larger taking the whole root-sum-square in her direction.
+   * for cluster efficiency", EWEC), not their sum, which took a bunched fleet running in line down to a fifth of the
+   * wind (three Folkboats 11–30 m ahead: 0.47 summed, about 0.64 so). (Katić's rule comes from wind turbines' wakes;
+   * there are no measurements for sails' and hulls' wakes, and we assume it carries over. Each boat's deficit is taken
+   * against the wind she herself sails in, already slowed by any wake she is in.)
+   * The root-sum-square is taken of their parts along the true wind, signed (a ferry running faster than the wind
+   * carries the air forward in her wake: the opposite sign, and cancelling as it would added); their parts across it,
+   * which turn the wind rather than slow it, add. So one wake is as before, wakes in line combine as Katić's, and a
+   * second wake at any angle only ever deepens the shadow along the wind.
    */
-  addDeficit(ux: number, uy: number, d: number): void { this.dx += ux * d; this.dy += uy * d; this.d1 += Math.abs(d); this.d2 += d * d; }
+  addDeficit(ux: number, uy: number, d: number): void {
+    const a = d * (ux * this.fx + uy * this.fy), c = d * (ux * this.fy - uy * this.fx);
+    this.along2 += a * Math.abs(a); this.across += c;
+  }
   /** The wind's speed factor and direction shift, for the true wind from `from`. */
   result(from: number): Shadow {
-    if (this.d1 > 0) { const r = Math.sqrt(this.d2) / this.d1; this.x -= this.dx * r; this.y -= this.dy * r; this.dx = this.dy = this.d1 = this.d2 = 0; }
+    if (this.along2 !== 0 || this.across !== 0) {
+      // (back from along and across the flow f to east and north: along f, and across it f⊥ = (fy, −fx))
+      const a = Math.sign(this.along2) * Math.sqrt(Math.abs(this.along2)), c = this.across;
+      this.x -= a * this.fx + c * this.fy; this.y -= a * this.fy - c * this.fx; this.along2 = this.across = 0;
+    }
     if (this.x === 0 && this.y === 0) return NO_SHADOW;
     const f = V(from + 180), fx = f.x + this.x, fy = f.y + this.y, k = Math.hypot(fx, fy);
     const flowNow = Math.atan2(fx, fy) / D2R, flowWas = from + 180;
