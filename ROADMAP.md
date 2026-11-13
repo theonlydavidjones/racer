@@ -169,6 +169,11 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
+   small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
+   chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
+   swell's direction) plainly where it matters, without cluttering the chart. Options to the owner if the look changes
+   much.
 8f. **Now — the map layer buttons need two clicks** (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
    OFF, the long visibility note above it), "these buttons are requiring two clicks for some reason". One click should
    switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
