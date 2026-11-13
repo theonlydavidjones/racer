@@ -704,11 +704,11 @@ const MS_GAP = 0.15;
 /** The vang's lower block: shackled at the base of the mast, abaft it, its sheave 5 cm above whatever the mast stands
  * out of there (the owner's photo: the block at the mast base, with the jammer on it). */
 const VANG_FOOT = new THREE.Vector3(0, Math.max(DECK_AT_MAST, cabinTopAt(uAtZ(MAST_AFT_Z + 0.04), 0) * (uAtZ(MAST_AFT_Z + 0.04) > CABIN.u0 ? 1 : 0)) + 0.05, MAST_AFT_Z + 0.04);
-/** Where the vang's span meets the boom (m aft of the gooseneck): about 1.0 m, scaled off the owner's side photo against
- * the boom's 1.0 m over the deck, the tackle rising at about 45° from the mast's foot. The span's two legs reach the
+/** Where the vang's span meets the boom (m aft of the gooseneck): about 0.9 m, scaled off the owner's side photo against
+ * the boom's 1.0 m over the deck, the tackle rising at about 42° from the mast's foot. The span's two legs reach the
  * boom either side of it (VANG_LEGS), and its block hangs 0.3 m down the line toward the foot (VANG_SPAN, in the boom's
  * frame). Estimates from the photos. */
-const VANG_BOOM = 1.0, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
+const VANG_BOOM = 0.9, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
 const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
