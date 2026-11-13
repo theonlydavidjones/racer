@@ -44,6 +44,14 @@ export interface RaceReplayData {
   clips: { clip: ReplayClip; title: string; what: string }[];
   /** Your race against the boat that won (or second, if you won), leg by leg; null when there's no one to measure against. */
   vs?: Versus | null;
+  /** A real past race: a line on where you'd have placed among the real fleet that day. */
+  real?: string;
+  /** The tactical debrief's chart (ui/tacticsView.ts), drawn into the list by the app; a leg picked there jumps to it. */
+  tactics?: (host: HTMLElement, onLeg: (i: number) => void) => void;
+  /** The planner's ideal track on each leg (0-based), dashed beside yours when you sail a leg. */
+  idealPaths?: { x: number; y: number }[][];
+  /** The boats chosen on the tactical chart, drawn beside you like the rival. */
+  chosen?: () => number[];
 }
 
 const SPEEDS = [10, 30, 60];
@@ -119,6 +127,7 @@ export class RaceReplay {
     this.tl = this.root.querySelector('.rrTime')!;
     this.root.hidden = false;
     this.root.onclick = e => this.click(e);
+    const th = this.root.querySelector<HTMLElement>('.tacHost'); if (th && D.tactics) D.tactics(th, i => this.pickLegNo(i));
     this.tl.onpointerdown = e => { this.dragging = true; this.tl.setPointerCapture(e.pointerId); this.scrub(e, true); };
     this.tl.onpointermove = e => { if (this.dragging) this.scrub(e, false); };
     this.tl.onpointerup = () => { this.dragging = false; };
@@ -136,18 +145,19 @@ export class RaceReplay {
   private listHtml(): string {
     const D = this.D!, total = D.findings.reduce((a, f) => a + f.lost, 0);
     const has = (key: string) => D.moments.some(m => m.key === key);
-    const items = D.findings.map((f, i) => `<li class="${has(f.key) ? 'rrPick' : ''}" data-key="${f.key}" ${has(f.key) ? 'tabindex="0"' : ''}>
+    const items = D.findings.map((f, i) => `<li class="${has(f.key) ? 'rrPick' : ''}" data-key="${f.key}" ${has(f.key) ? 'tabindex="0"' : ''} title="${esc(f.tip).replace(/"/g, '&quot;')}">
       <div class="dbHead"><b>${badge(f.key, i + 1)}${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div>
-      <p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
+      <p>${esc(f.detail)}</p></li>`).join(''); // (the tip on hover: one line on the screen)
     const rules = D.moments.filter(m => m.key === 'rule').map(m => `<li class="rrPick" data-at="${m.t1}" tabindex="0">
       <div class="dbHead"><b>${badge('rule', '!')}${esc(m.text)}</b><span class="dbLost">${mmss(m.t1)}</span></div></li>`).join('');
-    return `${this.vsHtml()}<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
+    return `${this.D!.tactics ? '<div class="eyebrow">Tactics, leg by leg</div><div class="tacHost"></div>' : ''}${this.vsHtml()}<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
       <ol>${items}</ol>${rules ? `<div class="eyebrow">Rule incidents</div><ol>${rules}</ol>` : ''}`;
   }
 
   /** Against the winner: the gap, then each leg with what you lost or gained and where it went. */
   private vsHtml(): string {
-    const V = this.D!.vs; if (!V || V.legs.length < 2) return '';
+    const real = this.D!.real ? `<div class="eyebrow">Against the real fleet</div><p class="lede">${esc(this.D!.real)}</p>` : '';
+    const V = this.D!.vs; if (!V || V.legs.length < 2) return real;
     const who = rivalWho(V, this.w!.boats[V.rival].finished);
     const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
     const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
@@ -157,7 +167,7 @@ export class RaceReplay {
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p>${mom(L)}</li>`).join('');
-    return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The metres are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
+    return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Pick a leg to sail it side by side.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
 
   /** Jump to one of the moments against her: follow you from a little before it. */
@@ -165,6 +175,15 @@ export class RaceReplay {
     this.clipView?.stop(); this.clipView = null;
     this.sel = null; this.selLeg = null; this.selVsm = m; this.follow = true;
     this.t = Math.max(this.D!.frames[0].t, m.t0 - 5);
+    this.caption(); this.paintButtons(); this.setPlaying(true);
+  }
+
+  /** Jump to leg i (0 the start) from the tactical chart: as a leg of the comparison if there is one, else from its start. */
+  pickLegNo(i: number): void {
+    const L = this.D?.vs?.legs.find(x => x.i === i);
+    if (L) { this.pickLeg(L); return; }
+    const t0 = i === 0 ? -15 : this.D?.marks[i - 1]?.t; if (t0 == null) return;
+    this.sel = null; this.selLeg = null; this.selVsm = null; this.follow = true; this.t = Math.max(this.D!.frames[0].t, t0 - 5);
     this.caption(); this.paintButtons(); this.setPlaying(true);
   }
 
@@ -275,7 +294,7 @@ export class RaceReplay {
       el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> ${esc(legWords(L, V.rivalName))}</span>`;
       return;
     }
-    if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is coloured where it cost you time.</span>'; return; }
+    if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is colored where it cost you time.</span>'; return; }
     const n = m.key === 'rule' ? '!' : this.rank.get(m.key) ?? '·', c = m.ref != null ? this.D!.clips[m.ref] : null;
     el.innerHTML = `${badge(m.key, n)}<span><b>${m.key === 'start' ? 'The start' : mmss(m.key === 'rule' ? m.t1 : m.t0)}</b> ${esc(c ? `${c.title}. ${c.what}` : m.text)}${m.lost >= 1 ? ` <span class="dbLost">about −${Math.round(m.lost)} s</span>` : ''}</span>${c ? '<button class="ghost rrBtn" type="button" data-rr="clip">Close-up</button>' : ''}`;
   }
@@ -335,12 +354,21 @@ export class RaceReplay {
       return on;
     };
     // the others' tracks, so far; the boat you're measured against brighter, all of hers faint ahead
-    const rv = D.vs?.rival ?? -1;
-    w.boats.forEach((bt, i) => { if (i === u || i === rv) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
-    if (rv >= 0) {
-      const c = w.boats[rv].color;
-      ctx.strokeStyle = hexA(c, .2); ctx.lineWidth = 1.5; if (line(rv, 0, F.length)) ctx.stroke();
-      ctx.setLineDash([2, 3]); ctx.strokeStyle = hexA(c, .9); ctx.lineWidth = 2.5; if (line(rv, 0, upto)) ctx.stroke(); ctx.setLineDash([]);
+    // (the tactical chart's chips choose them, the rival among them at first; without the chart, the rival)
+    const rv = D.vs?.rival ?? -1, picked = new Set((D.chosen ? D.chosen() : rv >= 0 ? [rv] : []).filter(i => i !== u));
+    w.boats.forEach((bt, i) => { if (i === u || picked.has(i)) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
+    for (const id of picked) {
+      const c = w.boats[id].color;
+      ctx.strokeStyle = hexA(c, .2); ctx.lineWidth = 1.5; if (line(id, 0, F.length)) ctx.stroke();
+      ctx.setLineDash([2, 3]); ctx.strokeStyle = hexA(c, .9); ctx.lineWidth = 2.5; if (line(id, 0, upto)) ctx.stroke(); ctx.setLineDash([]);
+    }
+    // the ideal (the planner's perfect sail) on the leg you're sailing, dashed
+    const ip = this.selLeg && this.selLeg.i > 0 ? D.idealPaths?.[this.selLeg.i - 1] : null;
+    if (ip && ip.length > 1) {
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(233,242,245,.75)'; ctx.lineWidth = 2; ctx.beginPath();
+      ip.forEach((p, k) => { const q = tf(p.x, p.y); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); ctx.setLineDash([]);
+      // named halfway along, as the still has it
+      const m = tf(ip[ip.length >> 1].x, ip[ip.length >> 1].y); ctx.fillStyle = 'rgba(233,242,245,.85)'; ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.fillText('the ideal', m[0] + 8, m[1] - 6);
     }
     // yours: all of it faint, so far bright
     ctx.strokeStyle = 'rgba(233,242,245,.18)'; ctx.lineWidth = 1.5; if (line(u, 0, F.length)) ctx.stroke();
@@ -370,10 +398,10 @@ export class RaceReplay {
     const hs = Math.max(scale, 1.6);
     w.boats.forEach((bt, i) => {
       const p = now[i]; if (!p) return;
-      const lab = i === u ? `You · ${p[3]}` : i === rv ? null : this.follow ? bt.name : null;
+      const lab = i === u ? `You · ${p[3]}` : i === rv ? null : this.follow ? bt.no || bt.name : null; // (a fleet goes by sail numbers)
       drawHull(ctx, P(p), p[2] - W, p[4], i === rv ? hs * 1.15 : hs, i === u || i === rv ? bt.color : hexA(bt.color, .7), lab);
       // her name below her hull (yours is above yours), so the two don't crowd when you're close
-      if (i === rv) { const q = P(p); ctx.fillStyle = bt.color; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillText(`${bt.name}${D.vs!.won ? ' (won)' : ''}`, q[0] + 12, q[1] + 20); }
+      if (i === rv) { const q = P(p); ctx.fillStyle = bt.color; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.fillText(`${bt.no || bt.name}${D.vs!.won ? ' (won)' : ''}`, q[0] + 12, q[1] + 20); }
     });
     // close in, with her out of sight: an arrow at the edge toward her, and how far
     if (rv >= 0 && this.follow && now[rv]) {

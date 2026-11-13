@@ -110,7 +110,7 @@ describe('the piers\' current wakes', () => {
 });
 
 describe('the piers\' wind shadows', () => {
-  const k = (from: number, q: Vec) => { const s = new WindSum(); addPierWakes(s, from, q); return s.result(from).k; };
+  const k = (from: number, q: Vec) => { const s = new WindSum(from); addPierWakes(s, from, q); return s.result(from).k; };
   it('lies downwind of each tower base, and turns with the wind', () => {
     const west = { x: T.c.x - 60, y: T.c.y }, east = { x: T.c.x + 60, y: T.c.y };
     expect(k(270, east)).toBeLessThan(0.9); expect(k(270, west)).toBe(1);

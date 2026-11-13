@@ -6,7 +6,12 @@ export class KeysView {
   private listening: Action | null = null;
   constructor(private map: KeyMap, private onChange: () => void) {
     $('bKeysClose').onclick = () => this.close();
-    $('bKeysDone').onclick = () => this.close();
+    // two tabs (docs/UI-AUDIT.md §4.10): the training aids, and the keys (with an index of their groups at the top)
+    $('setTabs').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-st]'); if (b) this.tab(b.dataset.st === 'keys' ? 'keys' : 'aids'); });
+    $('keysIndex').addEventListener('click', e => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-kg]'); if (!b) return;
+      document.querySelector(`#keysList .kgroup[data-g="${CSS.escape(b.dataset.kg!)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
     $('bKeysReset').onclick = () => { this.map.reset(); this.note('Keys reset to the defaults.'); this.render(); this.onChange(); };
     $('keysList').addEventListener('click', e => {
       const b = (e.target as HTMLElement).closest('button[data-a]') as HTMLButtonElement | null;
@@ -29,12 +34,17 @@ export class KeysView {
     }, true);
   }
   get isOpen(): boolean { return !$('keysView').hidden; }
-  open(): void { $('keysView').hidden = false; this.listening = null; this.note(''); this.render(); }
+  open(tab: 'aids' | 'keys' = 'aids'): void { $('keysView').hidden = false; this.listening = null; this.note(''); this.tab(tab); this.render(); }
+  private tab(t: 'aids' | 'keys'): void {
+    $('setAids').hidden = t !== 'aids'; $('setKeys').hidden = t !== 'keys';
+    for (const b of $('setTabs').querySelectorAll<HTMLElement>('[data-st]')) b.setAttribute('aria-pressed', String(b.dataset.st === t));
+  }
   close(): void { $('keysView').hidden = true; this.listening = null; }
   private note(t: string): void { $('keysNote').textContent = t; }
   private render(): void {
     const groups = [...new Set(ACTIONS.map(a => a.group))];
-    $('keysList').innerHTML = groups.map(g => `<div class="kgroup"><div class="eyebrow">${g}</div>` + ACTIONS.filter(a => a.group === g).map(a =>
+    $('keysIndex').innerHTML = groups.map(g => `<button type="button" class="chip" data-kg="${g}">${g}</button>`).join('');
+    $('keysList').innerHTML = groups.map(g => `<div class="kgroup" data-g="${g}"><div class="eyebrow">${g}</div>` + ACTIONS.filter(a => a.group === g).map(a =>
       `<div class="krow${this.listening === a.id ? ' listening' : ''}"><span class="klab">${a.label}</span>` +
       `<button class="kkeys" type="button" data-a="${a.id}" title="Click, then press the new key">${this.listening === a.id ? '<span class="knone">Press a key…</span>' : this.map.keys[a.id].map(k => `<kbd>${keyLabel(k)}</kbd>`).join('') || '<span class="knone">none</span>'}</button></div>`).join('') + '</div>').join('');
   }

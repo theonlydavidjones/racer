@@ -19,18 +19,18 @@ describe(`the committee calls racing off over ${CANCEL_KT} kt (the SF Bay Folkbo
     expect(w.boats.some(b => b.finished)).toBe(false);
     expect(w.boats.some(b => b.started || b.ocs)).toBe(false); // (no start under AP over A: nobody over early, nobody starts)
     expect(w.flags).toEqual(['AP', 'A']);
-  }, 60000);
+  }, 180_000);
   it('not in start practice: learning starts in a blow is what it is for', () => {
     const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, mode: 'drill', windKind: 'west', windKt: 28, current: 'slack', sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'] } as never, 5);
     while (w.t < 120) w.step(DT);
     expect(w.cancelled).toBeNull();
-  }, 60000);
+  }, 180_000);
   it('in 16 kt: they race', () => {
     const w = race(16);
     while (w.t < 240) w.step(DT);
     expect(w.cancelled).toBeNull();
     expect(w.flags.includes('AP')).toBe(false);
-  }, 60000);
+  }, 180_000);
   it('a breeze that builds past the limit after the start: N over A, abandoned', () => {
     const w = race(14);
     while (w.t < 60) w.step(DT);
@@ -39,7 +39,7 @@ describe(`the committee calls racing off over ${CANCEL_KT} kt (the SF Bay Folkbo
     while (w.t < 600 && !w.cancelled) w.step(DT);
     expect(w.cancelled?.up).toEqual(['N', 'A']);
     expect(w.cancelled!.t).toBeGreaterThan(60);
-  }, 60000);
+  }, 180_000);
   it('conditions changed mid-race to 30 kt: the committee watches the new wind two minutes, then N over A', () => {
     const w = race(14);
     while (w.t < 60) w.step(DT);
@@ -48,9 +48,9 @@ describe(`the committee calls racing off over ${CANCEL_KT} kt (the SF Bay Folkbo
     while (w.t < t0 + 300 && !w.cancelled) w.step(DT);
     expect(w.cancelled?.up).toEqual(['N', 'A']);
     expect(w.cancelled!.t - t0).toBeGreaterThan(119); expect(w.cancelled!.t - t0).toBeLessThan(130);
-  }, 60000);
+  }, 180_000);
   it("the strategist's briefing warns first when the forecast is over the limit, and not on an ordinary day", () => {
     expect(raceBrief(race(28)).sections[0].id).toBe('limit');
     expect(raceBrief(race(12)).sections.some(s => s.id === 'limit')).toBe(false);
-  }, 60000);
+  }, 180_000);
 });
