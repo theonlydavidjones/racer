@@ -300,8 +300,13 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
-  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (returning(kc) && ctx.t > 0)) && ((ctx.t > 0 && row.aboveProper) || turnedToward(row, kc) > 0))) {
-    // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper course
+  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0))) {
+    // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper
+    // course. "However, after the starting signal this rule does not apply when the boat is sailing her proper course": so
+    // after the start only leaving it counts (the sim's sign: sailing above it), not merely turning toward the other boat,
+    // which her proper course itself does at a mark she's rounding or when she keeps clear of a third boat (a turn into a
+    // boat she must give room to is still rule 16.1's, below). Before the start there's no proper course: a turn onto her
+    // is the sign.
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
   } else if ((r.rule === '10' || r.rule === '11' || r.rule === '12') && (turned = turnedToward(row, r.kc)) > 0) {
     // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond.
