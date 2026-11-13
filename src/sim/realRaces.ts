@@ -26,7 +26,7 @@ import { COURSES } from '../courses/registry';
  */
 
 export interface RealBoat {
-  /** the sail number's digits (one boat across events), the sail number as published, her name, her skipper */
+  /** the sail number's digits (one boat across events), the sail number as published, her name, her skipper's anonymous id (k001…: no real skippers' names in the game) */
   key: string; sail: string; boat: string; skipper: string;
   /** seconds from her fleet's start to her finish, or null (a scoring code: DNF, DNS…) */
   elapsedS: number | null; place: number | null; code: string | null;
