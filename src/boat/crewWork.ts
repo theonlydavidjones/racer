@@ -306,6 +306,9 @@ function carJob(b: Boat, dt: number): void {
   // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)
   const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && c.place?.across == null);
   if (!worth || a.job) return;
+  // (their own wish waits while they're forward of the cockpit, at the mast or on the foredeck on a run: a lazy car's pin
+  // isn't worth the trip back aft and forward again; they set it on their way back. Your call, they come for)
+  if (!yours && a.z < Z.cockpitFwd - 0.5) return;
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
 }
 

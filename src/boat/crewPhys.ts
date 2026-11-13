@@ -341,8 +341,13 @@ export const ROLL_HOLD = 2;
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
-interface Held { arm: number; z: number; since: number; off: number }
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30 };
+// (crossHeel, crossLast: off the wind (from a beam reach down), a move across to the other side of the boat, between gybes, is for a heel the
+// move itself would take off of more than crossHeel degrees, wanted for crossLast seconds (half a gust-lull cycle,
+// Bethwaite's minute: not one puff or lull, and many roll periods). Downwind a few degrees of heel cost her almost
+// nothing and the helm steers them out, and a crew sitting on a run settles on one side for minutes, steadying the roll
+// by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Both estimates.)
+interface Held { arm: number; z: number; since: number; off: number; cross?: number }
 
 /**
  * Where the crew go now, at a human pace. Each free person goes where the weight is wanted (or where you've put them);
@@ -531,6 +536,13 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // of them away at a job, a move by the rest is needed more, not less)
   const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * W.reduce((a, w) => a + w, 0));
   const ppl = c.ppl!;
+  // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
+  const stay = (i: number, h: Held, t: Target) => {
+    h.arm = Math.min(h.arm, maxOf(i));
+    t.arm = h.arm; t.z = h.z;
+    if (i === 0) t.pose = 'helm';
+    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
+  };
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
@@ -543,17 +555,19 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
     if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
+    // (off the wind, from a beam reach down, across to the other side only for a real heel, lasting: HOLD.crossHeel, crossLast)
+    if (k.twa > 75 && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1) {
+      const heelOff = dArm * W[i] * 9.81 / (k.rmPerDeg ?? 250);
+      h.cross = heelOff > HOLD.crossHeel ? (h.cross ?? 0) + step : 0;
+      if (h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
+    } else h.cross = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
     // change of place for the trim, waits until it has lasted, and the dwell
     const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
     if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; return; }
-    // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
-    h.arm = Math.min(h.arm, maxOf(i));
-    t.arm = h.arm; t.z = h.z;
-    if (i === 0) t.pose = 'helm';
-    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
+    stay(i, h, t);
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
   // while the other stays put would otherwise put them in each other's laps)
