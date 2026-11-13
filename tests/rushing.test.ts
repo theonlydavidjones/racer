@@ -7,9 +7,9 @@ import { foamDrift } from '../src/environment/sea';
 import { KT } from '../src/core/math';
 import { packWaves } from '../src/render/waves';
 import { LL } from '../src/geo/geo';
-import { HARBORS, harborAt } from '../src/geo/marina';
+import { HARBORS, harborAt, hitsWall } from '../src/geo/marina';
+import { onLand } from '../src/geo/shore';
 import { basinCalm, basinOpening } from '../src/environment/current';
-import { harborGaps } from '../src/environment/sea';
 
 /**
  * "Rushing water" (the owner, v146, v158 and again v176): the water's pattern running past a still boat faster than the
@@ -80,7 +80,7 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
     const w0 = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00' } as Settings, 1);
     expect(harborAt(corner)?.id).toBe('south-beach');
     const c = w0.currentAt(corner);
-    expect(Math.hypot(c.x, c.y) / KT).toBeLessThan(0.08); // (0.26 kt before: the open stream ran into the basin)
+    expect(Math.hypot(c.x, c.y) / KT).toBeLessThan(0.12); // (0.26 kt before: the open stream ran into the basin; near the mouth, a little of it comes in)
     const r = run('basin corner', { mode: 'sail', sailFrom: 'slip', sailTo: '', boat, boats: [boat], boatId: boat.id } as Partial<Settings>, { freeSail: true }, 60 * 600);
     expect(r.worst).toBeLessThan(0.05);
   }, 400_000);
@@ -93,9 +93,19 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
         const c = h.basin[0], q = { x: p.x + (c.x - p.x) * 0.02 + 0.5, y: p.y + (c.y - p.y) * 0.02 + 0.5 };
         if (harborAt(q) === h && basinCalm(q) < floor + 0.01) expect(kt(q), h.id).toBeLessThan(2.5 * floor + 0.1); // (2.5 kt outside at most)
       }
-      for (const g of harborGaps(h)) { // across each mouth: 3 m outside and 3 m inside, the same stream within 15%
-        const o = kt({ x: g.c.x - g.n.x * 3, y: g.c.y - g.n.y * 3 }), i = kt({ x: g.c.x + g.n.x * 3, y: g.c.y + g.n.y * 3 });
-        expect(Math.abs(o - i), h.id).toBeLessThan(0.15 * Math.max(o, i) + 0.02);
+      // along its whole outline, wherever the water outside is free (no wall, breakwater or land 1–30 m out): the
+      // stream 1.5 m inside and 1.5 m outside the same within 0.2 kt (2.5 kt outside at most)
+      const B = h.basin, free = (q: { x: number; y: number }) => !harborAt(q) && !hitsWall(q) && !onLand(q);
+      for (let i = 0; i < B.length; i++) {
+        const a = B[i], c = B[(i + 1) % B.length], L = Math.hypot(c.x - a.x, c.y - a.y); if (L < 1) continue;
+        const t = { x: (c.x - a.x) / L, y: (c.y - a.y) / L };
+        for (let d = 1; d < L; d += 2) {
+          const m = { x: a.x + t.x * d, y: a.y + t.y * d }; let n = { x: t.y, y: -t.x };
+          if (harborAt({ x: m.x + n.x * 0.5, y: m.y + n.y * 0.5 })) n = { x: -n.x, y: -n.y };
+          if (![1, 2, 3, 4, 6, 8, 15, 30].every(r => free({ x: m.x + n.x * r, y: m.y + n.y * r }))) continue;
+          const pin = { x: m.x - n.x * 1.5, y: m.y - n.y * 1.5 }; if (harborAt(pin) !== h) continue;
+          expect(Math.abs(kt({ x: m.x + n.x * 1.5, y: m.y + n.y * 1.5 }) - kt(pin)), `${h.id} at ${m.x.toFixed(0)},${m.y.toFixed(0)}`).toBeLessThan(0.2);
+        }
       }
     }
   });

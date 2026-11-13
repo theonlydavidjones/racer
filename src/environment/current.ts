@@ -51,33 +51,31 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
  * was found for these harbors, or in general. (The distance is a straight line, through a breakwater's head.)
  */
 export const BASIN_EDDY = 0.1, BASIN_OPEN = 0.3, BASIN_MOUTH = 30;
-/** Above this much mouth (m, all its entrances together), a basin is docks open to the stream rather than a breakwater's basin. */
-const OPEN_SIDE = 150;
 type Edge = { a: Vec; b: Vec };
-const EDGES = new Map<string, { segs: Edge[]; floor: number }>();
+const EDGES = new Map<string, { segs: Edge[]; open: number; floor: number }>();
+/** A breakwater basin opens on the stream along under this fraction of its outline; more, and it's docks open to the stream. */
+const OPEN_SHARE = 0.15;
 /**
- * A basin's open edges, worked out once: its entrances (sea.ts harborGaps: the span between the walls at each way out),
- * as segments across the mouth; for a basin with no entrance between walls (a marina whose docks lie along an estuary),
- * the stretches of its outline where the water outside (6, 15 and 30 m out) is open.
+ * A basin's open edges, worked out once: every stretch of its outline (2 m steps) where the water outside is free from
+ * 1 m out to 30 m (no wall, breakwater, land or other basin), and, for a harbor with breakwaters, the entrances between
+ * them (sea.ts harborGaps: the span between the walls at each way out) as segments across the mouth.
  */
-function openEdges(h: Harbor): { segs: Edge[]; floor: number } {
+function openEdges(h: Harbor): { segs: Edge[]; open: number; floor: number } {
   let e = EDGES.get(h.id); if (e) return e;
-  const gaps = harborGaps(h), segs: Edge[] = [];
-  for (const g of gaps) { const t = { x: g.n.y, y: -g.n.x }; segs.push({ a: { x: g.c.x - t.x * g.B / 2, y: g.c.y - t.y * g.B / 2 }, b: { x: g.c.x + t.x * g.B / 2, y: g.c.y + t.y * g.B / 2 } }); }
-  let open = gaps.reduce((s, g) => s + g.B, 0);
-  if (!gaps.length) {
-    const B = h.basin, free = (q: Vec) => !inBasin(q) && !hitsWall(q) && !onLand(q);
-    for (let i = 0; i < B.length; i++) {
-      const a = B[i], b = B[(i + 1) % B.length], L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 0.5) continue;
-      const t = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
-      for (let s = 0; s < L; s += 4) {
-        const p = { x: a.x + t.x * s, y: a.y + t.y * s }, q = { x: a.x + t.x * Math.min(L, s + 4), y: a.y + t.y * Math.min(L, s + 4) }, m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
-        let n = { x: t.y, y: -t.x }; if (inBasin({ x: m.x + n.x * 3, y: m.y + n.y * 3 })) n = { x: -n.x, y: -n.y }; // (outward)
-        if ([6, 15, 30].every(d => free({ x: m.x + n.x * d, y: m.y + n.y * d }))) { segs.push({ a: p, b: q }); open += Math.hypot(q.x - p.x, q.y - p.y); }
-      }
+  const segs: Edge[] = [], B = h.basin, free = (q: Vec) => !inBasin(q) && !hitsWall(q) && !onLand(q);
+  if (h.breakwaters.length) for (const g of harborGaps(h)) { const t = { x: g.n.y, y: -g.n.x }; segs.push({ a: { x: g.c.x - t.x * g.B / 2, y: g.c.y - t.y * g.B / 2 }, b: { x: g.c.x + t.x * g.B / 2, y: g.c.y + t.y * g.B / 2 } }); }
+  let open = 0, round = 0;
+  for (let i = 0; i < B.length; i++) {
+    const a = B[i], b = B[(i + 1) % B.length], L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 0.5) continue;
+    round += L; const t = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+    for (let s = 0; s < L; s += 2) {
+      const p = { x: a.x + t.x * s, y: a.y + t.y * s }, q = { x: a.x + t.x * Math.min(L, s + 2), y: a.y + t.y * Math.min(L, s + 2) }, m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+      let n = { x: t.y, y: -t.x }; if (inBasin({ x: m.x + n.x * 0.5, y: m.y + n.y * 0.5 })) n = { x: -n.x, y: -n.y }; // (outward)
+      if ([1, 2, 3, 4, 6, 8, 15, 30].every(d => free({ x: m.x + n.x * d, y: m.y + n.y * d }))) { segs.push({ a: p, b: q }); open += Math.hypot(q.x - p.x, q.y - p.y); }
     }
   }
-  e = { segs, floor: !gaps.length || open > OPEN_SIDE ? BASIN_OPEN : BASIN_EDDY }; EDGES.set(h.id, e); return e;
+  const mouths = h.breakwaters.length ? harborGaps(h).reduce((s, g) => s + g.B, 0) : 0;
+  e = { segs, open: Math.max(open, mouths), floor: !h.breakwaters.length || Math.max(open, mouths) > OPEN_SHARE * round ? BASIN_OPEN : BASIN_EDDY }; EDGES.set(h.id, e); return e;
 }
 export function basinCalm(p: Vec): number {
   const h = harborAt(p); if (!h) return 1;
@@ -89,7 +87,7 @@ export function basinCalm(p: Vec): number {
   return e.floor + (1 - e.floor) * Math.exp(-Math.sqrt(d2) / BASIN_MOUTH);
 }
 /** (for the tests) How much open edge a basin has, m, and the fraction of the stream left deep inside it. */
-export const basinOpening = (h: Harbor) => { const e = openEdges(h); return { m: e.segs.reduce((s, q) => s + Math.hypot(q.b.x - q.a.x, q.b.y - q.a.y), 0), floor: e.floor }; };
+export const basinOpening = (h: Harbor) => { const e = openEdges(h); return { m: e.open, floor: e.floor }; };
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
