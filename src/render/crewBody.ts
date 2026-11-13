@@ -172,6 +172,10 @@ export interface Kit {
   boots: Mat; sole: Mat; gloves: Mat; palm: Mat;
   head: 'cap' | 'beanie' | 'hood'; hat: Mat; hair: Mat;
   lens: Mat; frame: Mat;
+  /** wraparound sunglasses, or round everyday glasses (the owner's photo, reference/photos/josephine-vang-to-mast-base.jpg) */
+  eyes?: 'shades' | 'specs';
+  /** a small badge on the cap's front, and a maker's logo on the jacket's chest (their colours) */
+  badge?: Mat; logo?: Mat;
 }
 /** Skin under the sim's light: albedos a little warmer than the tones they're meant to read as, since the sky light
  * cools everything turned away from the sun (render/scene.ts hemisphere 0xe8f2ff over 0x29485a). */
@@ -205,6 +209,25 @@ export const KITS: Kit[] = [
     boots: { c: 0x464b52, r: 0.4 }, sole: { c: 0x1c1e21, r: 0.8 }, gloves: { c: 0x1d1f23, r: 0.7 }, palm: { c: 0x4a4e54, r: 0.85 },
     head: 'hood', hat: { c: 0x2a303c, r: 0.85 }, hair: { c: 0x8a6a3e, r: 0.9 },
     lens: { c: 0x283a4a, r: 0.08 }, frame: { c: 0x141518, r: 0.4 }
+  },
+  { // D, E: the owner's photo of Josephine's crew on the foredeck (reference/photos/josephine-vang-to-mast-base.jpg): a
+    // navy sailing jacket with its hood stowed in the collar, a navy inflatable, a black cap with a badge and sunglasses;
+    name: 'D', skin: SKIN.light,
+    jacket: { c: 0x1c2c4c, r: 0.42 }, yoke: { c: 0x16213a, r: 0.5 }, trim: { c: 0x15181c, r: 0.55 }, tape: { c: 0xb9bcbf, r: 0.35 },
+    pants: { c: 0x23272e, r: 0.5 }, patch: { c: 0x16181c, r: 0.7 },
+    pfd: 'inflatable', pfdBody: { c: 0x22325a, r: 0.6 }, pfdTrim: { c: 0x2e8fbf, r: 0.55 },
+    boots: { c: 0x1c1e21, r: 0.35 }, sole: { c: 0x8c9094, r: 0.8 }, gloves: { c: 0x1d1f23, r: 0.7 }, palm: { c: 0x4a4e54, r: 0.85 },
+    head: 'cap', hat: { c: 0x18191c, r: 0.85 }, hair: { c: 0x8a6a3e, r: 0.9 },
+    lens: { c: 0x2c3846, r: 0.08 }, frame: { c: 0x141518, r: 0.4 }, badge: { c: 0xd8611f, r: 0.7 }, logo: { c: 0xd8d8d2, r: 0.6 }
+  },
+  { // and a charcoal jacket, an orange inflatable harness, a navy cap and round everyday glasses
+    name: 'E', skin: SKIN.fair,
+    jacket: { c: 0x2e3238, r: 0.45 }, yoke: { c: 0x23262b, r: 0.5 }, trim: { c: 0x15181c, r: 0.55 }, tape: { c: 0xb9bcbf, r: 0.35 },
+    pants: { c: 0x1c1e22, r: 0.5 }, patch: { c: 0x141619, r: 0.7 },
+    pfd: 'inflatable', pfdBody: { c: 0xd8611f, r: 0.6 }, pfdTrim: { c: 0x1a1c20, r: 0.55 },
+    boots: { c: 0x1c1e21, r: 0.35 }, sole: { c: 0xd8d8d2, r: 0.8 }, gloves: { c: 0x1d1f23, r: 0.7 }, palm: { c: 0x4a4e54, r: 0.85 },
+    head: 'cap', hat: { c: 0x1f2c48, r: 0.85 }, hair: { c: 0xb89466, r: 0.9 },
+    eyes: 'specs', lens: { c: 0x6f7f8c, r: 0.06 }, frame: { c: 0x18191c, r: 0.4 }, badge: { c: 0xe8e4d8, r: 0.7 }, logo: { c: 0xd8d8d2, r: 0.6 }
   }
 ];
 
@@ -339,7 +362,7 @@ function loftParts(M: Mesh, rings: V3[][], parts: [number, Mat][], o: Omit<Piece
 
 /** The materials a kit uses, in a fixed order (the palette's texels). */
 const BUCKLE: Mat = { c: 0x6c7076, r: 0.3 }, LABEL: Mat = { c: 0x6a665f, r: 0.9 };
-const kitMats = (k: Kit): Mat[] => [skinMat(k.skin), k.jacket, k.yoke, k.trim, k.tape, k.pants, k.patch, k.pfdBody, k.pfdTrim, k.boots, k.sole, k.gloves, k.palm, k.hat, k.hair, k.lens, k.frame, BUCKLE, LABEL];
+const kitMats = (k: Kit): Mat[] => [skinMat(k.skin), k.jacket, k.yoke, k.trim, k.tape, k.pants, k.patch, k.pfdBody, k.pfdTrim, k.boots, k.sole, k.gloves, k.palm, k.hat, k.hair, k.lens, k.frame, BUCKLE, LABEL, ...(k.badge ? [k.badge] : []), ...(k.logo ? [k.logo] : [])];
 
 /** A person's geometry, garment by garment, in the bones' rest pose; `seg` how finely round things are divided. */
 function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
@@ -394,6 +417,18 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
     const collar = [0, 0.3, 0.62, 0.84, 0.86, 0.94, 0.96, 1].map(f => colRing(f, 0));
     collar.push(colRing(1, -0.008).map(q => q.setY(q.y + 0.004)), colRing(0.8, -0.012));
     loftParts(M, collar, [[0, kit.jacket], [4, kit.tape], [5, kit.jacket]], { w: () => [[SPINE, 1]], shade: (_q, r) => r >= 8 ? 0.35 : 1 });
+  }
+  if (kit.head !== 'hood') {
+    // the hood down, rolled and stowed in the back of the collar (as in the owner's photo): a soft roll round the back
+    // of the neck from one side of the collar to the other, sitting on the yoke
+    const path = range(0.55, Math.PI - 0.55, 9).map(th => { const q = onRow(COL_P(0.56), th, 0.016, 0, 0, g, g); q.y = 0.548 + 0.012 * Math.sin(th); return q; });
+    sweep(M, path, { mat: kit.jacket, w: () => [[SPINE, 1]], a: t => 0.008 + 0.018 * Math.sin(Math.PI * t), b: t => 0.006 + 0.014 * Math.sin(Math.PI * t), out: q => V(q.x, 0.4, q.z), n: 8, lift: 0.5 }); // (tapering into the collar at its ends)
+  }
+  if (kit.logo) {
+    // the maker's logo on the left of the chest: a small flat mark on the jacket (no real maker's)
+    // (out beside the life jacket's lobe, below the yoke)
+    const r = JACKET_P(0.33), th = FRONT - 0.85, q = onRow(r, th, 0.003, 0, 0, g, g);
+    box(M, q, V(0.018, 0.007, 0.0012), kit.logo, wJacket(q), Math.atan2(Math.cos(th), Math.sin(th))); // (turned to lie on the chest there)
   }
   {
     const path = range(-0.095, 0.5, 10).map(y => onRow(JACKET_P(y), FRONT, 0.002, 0, 0, g, g));
@@ -474,6 +509,21 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
   loft(M, hy.map(y => hth.map(th => { const q = headAt(y, th), n = nose(y, th); q.x += n * Math.cos(th); q.z += n * Math.sin(th); return up(q); })), { mat: skin, w: wHead, capEnd: true });
   // the ears
   if (kit.head !== 'hood') for (const xs of [-1, 1]) blob(M, V(xs * 0.076, HY + 0.124, 0.006), V(0.01, 0.027, 0.017), skin, [[HEAD, 1]], 8, 5, new THREE.Euler(0, xs * 0.3, 0));
+  if (kit.eyes === 'specs') {
+    // round everyday glasses: two round lenses on a thin frame, a bridge over the nose, arms back over the ears; the
+    // lenses lightly tinted and glossy (they show the sky, not the eyes behind: the face stays plain)
+    for (const xs of [-1, 1]) {
+      const th0 = FRONT + xs * 0.36, c = up(headAt(0.138, th0, 0.016)); c.y = HY + 0.138;
+      const n = V(Math.cos(th0), 0, Math.sin(th0)), t = V(-n.z, 0, n.x), R = 0.0215;
+      const rim = around(14).map(a => c.clone().addScaledVector(t, R * Math.cos(a)).add(V(0, R * Math.sin(a), 0)));
+      loft(M, [rim.map(q => q.clone().addScaledVector(n, -0.001)), rim.map(q => c.clone().lerp(q, 0.0001))], { mat: kit.lens, w: () => [[HEAD, 1]], shade: () => 1.15 });
+      sweep(M, rim, { mat: kit.frame, w: () => [[HEAD, 1]], a: () => 0.0018, b: () => 0.002, out: () => n.clone(), closed: true, n: 4, lift: 0 });
+      const temple = [c.clone().addScaledVector(t, xs > 0 ? R : -R).multiplyScalar(1), up(headAt(0.142, FRONT + xs * 1.3, 0.008)), up(headAt(0.142, FRONT + xs * 1.62, 0.006)), up(headAt(0.138, FRONT + xs * 1.95, 0.008))];
+      sweep(M, temple, { mat: kit.frame, w: () => [[HEAD, 1]], a: () => 0.0018, b: () => 0.003, out: () => V(0, 1, 0), n: 4, lift: 0 });
+    }
+    const bl = up(headAt(0.142, FRONT - 0.16, 0.019)), br = up(headAt(0.142, FRONT + 0.16, 0.019)); bl.y = br.y = HY + 0.142;
+    sweep(M, [bl, up(headAt(0.146, FRONT, 0.02)).setY(HY + 0.146), br], { mat: kit.frame, w: () => [[HEAD, 1]], a: () => 0.0018, b: () => 0.002, out: q => V(q.x, 0, q.z), n: 4, lift: 0 });
+  } else
   // the sunglasses: a wraparound lens standing off the face, a frame along its top, arms back over the ears
   {
     const half = 1.02, cols = around(17, FRONT - half, FRONT + half, true);
@@ -499,6 +549,8 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
     const crown = [0, 0.3, 0.58, 0.8, 0.93, 1].map(f => around(hair ? 24 : 16).map(th => { const y0 = band(th), y = y0 + (0.258 - y0) * f; const q = headAt(Math.min(0.249, y), th, 0.008 + 0.006 * Math.sin(Math.PI * f)); q.y = y + 0.004 * f; if (f === 1) { q.x *= 0.15; q.z *= 0.15; } return up(q); }));
     loft(M, crown, { mat: kit.hat, w: () => [[HEAD, 1]], capEnd: true });
     blob(M, up(V(0, 0.263, 0.0)), V(0.009, 0.004, 0.009), kit.hat, [[HEAD, 1]], 6, 4);
+    // a badge on the front panel (a club's or a team's: their colour, no real one)
+    if (kit.badge) { const y = band(FRONT) + 0.02, q = up(headAt(y, FRONT, 0.0152)); q.y = HY + y; box(M, q, V(0.012, 0.01, 0.0015), kit.badge, [[HEAD, 1]], 0, -0.2); } // (just above the peak)
     // the peak: 7 cm forward of the band, curved down at its sides, a few mm thick, darker beneath
     const us = range(-1, 1, 11), vs = [0, 0.4, 0.8, 1];
     const peak = (u: number, v: number, top: boolean) => {
@@ -619,12 +671,12 @@ const TOPS = [0xb2252b, 0x1f3456, 0xd4a017, 0x3a3f47, 0xaeb0ad, 0x2b6f86, 0xd256
 /** Salopettes: mostly dark, sometimes the jacket's own colour (sold as a set). */
 const BIBS = [0x2f343c, 0x1e2a40, 0x23272e, 0x3a3f47, 0x1b2230];
 /** Inflatables' covers, and foam vests' colours. */
-const COVERS = [0x1e2942, 0x1a1c20, 0xa8262a, 0x3a3f47, 0x23324f];
+const COVERS = [0x1e2942, 0x1a1c20, 0xa8262a, 0x3a3f47, 0x23324f, 0xd8611f, 0xd8611f]; // (orange as often as any two: the owner's photo)
 const VESTS = [0xd24a22, 0xc8372d, 0xd4a017, 0x1f3456, 0x23272e, 0x2b6f86];
 const TRIMS = [0xd8a514, 0xd24a22, 0x2e8fbf, 0x8fc93a, 0xb9bcbf];
 const BOOTS: [Mat, Mat][] = [[{ c: 0x1c1e21, r: 0.35 }, { c: 0x8c9094, r: 0.8 }], [{ c: 0x464b52, r: 0.4 }, { c: 0x1c1e21, r: 0.8 }], [{ c: 0x5b3a22, r: 0.55 }, { c: 0x2a2420, r: 0.8 }], [{ c: 0x1e2942, r: 0.4 }, { c: 0xb0b3b6, r: 0.8 }]];
 /** Caps (a white one kept a little grey: under the sky's light it would read as pure white), and knit beanies. */
-const CAPS = [0x1f2c48, 0xb7b5ad, 0xa8262a, 0x2a303c, 0xb9a88a, 0x2b4f8a];
+const CAPS = [0x1f2c48, 0xb7b5ad, 0xa8262a, 0x2a303c, 0xb9a88a, 0x2b4f8a, 0x18191c, 0x18191c]; // (black as often as any two: the owner's photo)
 const KNITS = [0x3a3e45, 0x1d2330, 0x7a2236, 0x2b4f8a, 0x4f5a3a, 0x8a8478];
 /** Skin from very fair to very dark, about evenly across the range (the Bay's sailors aren't all one people); hair by
  * skin (dark hair with dark skin, the full range with fair). */
@@ -654,7 +706,11 @@ export function kitFor(seed: number, team: number): Kit {
     boots, sole, gloves: { c: hash(seed, 15) < 0.7 ? 0x1d1f23 : 0x3a3f47, r: 0.7 }, palm: { c: 0x4a4e54, r: 0.85 },
     head, hat: head === 'beanie' ? { c: pick(KNITS, seed, 7), r: 0.95 } : { c: pick(CAPS, seed, 7), r: 0.85 },
     hair: { c: pick(tone >= 4 ? HAIR_DARK : HAIR_FAIR, seed, 2), r: 0.9 },
-    lens: { c: pick(LENSES, seed, 8), r: 0.08 }, frame: { c: 0x141518, r: 0.4 }
+    lens: { c: pick(LENSES, seed, 8), r: 0.08 }, frame: { c: 0x141518, r: 0.4 },
+    // (a few in everyday glasses instead of sunglasses: a pale tint, a dark or a tortoiseshell frame)
+    ...(hash(seed, 16) < 0.25 ? { eyes: 'specs' as const, lens: { c: 0x6f7f8c, r: 0.06 }, frame: { c: hash(seed, 17) < 0.5 ? 0x18191c : 0x4a3424, r: 0.4 } } : {}),
+    badge: head !== 'beanie' && hash(seed, 18) < 0.6 ? { c: pick([0xd8611f, 0xe8e4d8, 0xc8372d, 0xd4a017], seed, 19), r: 0.7 } : undefined,
+    logo: hash(seed, 20) < 0.6 ? { c: 0xd8d8d2, r: 0.6 } : undefined
   };
 }
 
