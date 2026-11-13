@@ -335,7 +335,8 @@ export const ROLL_HOLD = 2;
  *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
  *   Performance Sailing);
  * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
- * - `body`: out on the rail, how hard they hike follows the wind over about this long (s), not each wave;
+ * - `body`: out on the rail, easing in follows the wind over about this long (s), not each wave (out harder in a puff,
+ *   over their reaction time);
  * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time):
  *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
  *   body, not a move.
@@ -542,10 +543,14 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
     // again, is the body, not a move)
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
-    // (but over a few seconds, not with each wave: a hiker settles to how hard the wind's blowing, held by their feet under
-    // the strap, while the trimmer plays the main for the seas. Followed instantly, the target's swing with every wave's
-    // heel had them flop out and in a body's length every few seconds: the owner's "flopping around", v162)
-    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm += (t.arm - h.arm) * Math.min(1, step / HOLD.body); h.z = t.z; t.arm = h.arm; return; }
+    // (but not with each wave: a hiker settles to how hard the wind's blowing, held by their feet under the strap, while
+    // the trimmer plays the main for the seas. Out harder as a puff hits, at once (their reaction time: the righting
+    // moment's wanted then); easing in, lazily, over a few seconds. Followed instantly both ways, the target's swing with
+    // every wave's heel had them flop out and in a body's length every few seconds: the owner's "flopping around", v162)
+    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) {
+      const tau = t.arm > h.arm ? reactTime(ppl[i]) : HOLD.body;
+      h.arm += (t.arm - h.arm) * Math.min(1, step / tau); h.z = t.z; t.arm = h.arm; return;
+    }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;

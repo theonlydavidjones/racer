@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number }
 type Limb = Body['arm'][number];
@@ -799,11 +799,25 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   }
   // a tack under way: from the helm putting her about (the roll's lead) through the wind until they're across. The forward
   // crew works the jib on one knee, the others tack the main in a crouch (alone with the helm, the one crew does the jib)
+  // (one kneels in the middle of the sole, between the companionway's step and the thwart: there's room there for one,
+  // onSole's single spot. Two in the middle at once: the one whose place is nearer it kneels there, the other sits on
+  // the bench's edge on their side at their own place. Both drawn kneeling there, they were within a few centimetres of
+  // each other, and shuffled past each other each time the light air's puffs took the weight to the middle and back:
+  // the owner's "dancing around each other")
+  const SOLE_Z = THWART.z - THWART.half - 0.45;
+  const inMid = cr.crew.map((_, i) => { const a = ppl?.[i + 1]; return !!a && Math.abs(a.x) < 0.3 && (a.pose === 'sit' || a.pose === 'lee') && a.z > COCK0 && a.z < THWART.z - 0.05; });
+  const onBench = cr.crew.map(() => false);
+  if (inMid.filter(Boolean).length > 1) {
+    const mids = cr.crew.map((_, i) => i).filter(i => inMid[i]).sort((i, j) => Math.abs(ppl![i + 1].z - SOLE_Z) - Math.abs(ppl![j + 1].z - SOLE_Z));
+    for (const i of mids.slice(1)) onBench[i] = true;
+  }
   const tackOn = !!c && (tacking || !!c.roll);
   const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
   cr.crew.forEach((f, i) => {
     const a = ppl?.[i + 1];
     let x = a ? a.x : windward * 0.8;
+    // (on the side they're on, kept while they sit there: the weight a few centimetres either side of the middle isn't a crossing)
+    if (onBench[i]) x = (f.benchSide ??= Math.sign(f.cur?.hip.x ?? x) || windward) * 0.3; else f.benchSide = undefined;
     const lean = a?.lean ?? 0, pose = a?.pose ?? 'sit';
     // (two in the middle at once too: each where the physics has their weight, at their own place fore and aft, already a
     // shoulder's width apart. Brought together abreast at one place, either side of the centreline by their order aboard,

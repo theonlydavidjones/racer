@@ -80,8 +80,10 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         // (a job now and then: the cabin top's lines, the jib car. Not a trip every minute)
         expect(o.trips, `${t}: trips a minute`).toBeLessThan(1);
         expect(o.poses, `${t}: pose changes a minute`).toBeLessThan(3);
-        // (across the cockpit only when her side changes: not on a cruise holding her course)
-        expect(o.cross, `${t}: crossings a minute`).toBe(0);
+        // (off the wind, across the cockpit only when she gybes; close-hauled in light air, to leeward for a lull that
+        // lasts, heeling her, and back up as the breeze fills: a move each way in a few minutes, not each puff)
+        if (twa > 75) expect(o.cross, `${t}: crossings a minute`).toBe(0);
+        else expect(o.cross, `${t}: crossings a minute`).toBeLessThan(0.5);
         // (a trip to the cabin top and back is about 3 m; under one a minute, and nothing else along the deck)
         expect(o.crawl, `${t}: along the boat, m a minute`).toBeLessThan(1.5);
         // (sitting, a body sways a little with the boat; not flopping out and in with each wave)
