@@ -6,9 +6,9 @@ Rules session, 13 Nov 2026. Status: proposal. Nothing is built.
 
 ## What changes, in one line
 
-Today the sim **umpires**: a foul puts the turns on the fouler, and she can't finish until they're done (world.ts: the
-finish doesn't count while `penalty > 0`). Real fleet racing **polices itself**. The fouler takes a penalty *if she
-believes she fouled* (rule 44.1). If she doesn't, the other boat hails "Protest" and flies the red flag (rule 61.1). A
+Today the sim **umpires**: a foul puts the turns on the fouler. (Correction, 13 Nov: nothing enforces them; she can finish
+with turns still owed and lose nothing. Protests are what make skipping them cost.) Real fleet racing **polices itself**. The fouler takes a penalty *if she
+believes she fouled* (rule 44.1). If she doesn't, the other boat hails "Protest" and flies the red flag (rule 60.2(a)(1); 61 in the 2021 edition). A
 hearing after the race finds the facts and decides (rules 63–64).
 
 ## Decision for the owner (1)
@@ -18,7 +18,7 @@ Which is the default for a race?
 | | **Umpired** (today) | **Protests** (new) |
 |---|---|---|
 | A foul | the engine calls it; the turns are owed | the engine still knows, and still tells you (one line); the turns are your choice |
-| Not taking them | you can't finish | the other boat may protest; a hearing after the race; DSQ if upheld |
+| Not taking them | nothing happens (today) | the other boat may protest; a hearing after the race; DSQ if upheld |
 | Teaches | what the rules say | that plus the real game: when to take your turns, when to protest, how a hearing goes |
 
 Recommendation: **Protests for races, Umpired for practice and the rounding drill.** One setting in the race setup
@@ -29,7 +29,7 @@ menu: "On-the-water judging". No new button on the game surface.
 1. **Hailing.** The sail band's Hail chip (`.sb-hail`, key H), which today offers "Room to tack!" and "Starboard!", offers
    **"Protest!"**. It shows for 10 s after an incident with another boat that involves you. One press does two things:
    it hails, and the red flag goes up on the backstay.
-   - Rule 61.1(a): a boat over 6 m hull length must fly it "at the first reasonable opportunity". A Folkboat is 7.64 m.
+   - Rule 60.2(a)(1): a boat over 6 m hull length must fly it "at the first reasonable opportunity". A Folkboat is 7.64 m.
    - The flag is drawn on the boat. It needs a visual-checker pass from both sides on both tacks.
 2. **Being protested.** The AI's hail arrives as the existing toast, one short line: `USA 110: "Protest!" (Rule 10)`.
    You see her red flag.
@@ -56,7 +56,7 @@ menu: "On-the-water judging". No new button on the game surface.
 - **Validity**, as three ticks:
   - hailed at the first reasonable opportunity;
   - flag flown;
-  - protest delivered in time (61.1, 61.3).
+  - protest delivered in time (60.2, 60.3).
 
   An invalid protest is closed, and the tile says why.
 - **Decision.** One line, with the rule and a link to the rule's text (the existing explain popover):
@@ -87,7 +87,8 @@ temperament.
   - the other boat hasn't started turns within about 30 s, or by the next mark;
   - her temperament says so (some skippers rarely protest).
 
-  Third-party protests, where a boat that saw it protests, are rare and come later.
+  No third-party protests: under 60.4(a)(2), a protest alleging a Part 2 breach or rule 31 is invalid from a boat
+  that wasn't involved in the incident or didn't see it.
 - **At the hearing.** AI boats always attend. An AI that is protested and believes she fouled retires instead.
 
 ## Commercial traffic (item 10) rides on this
