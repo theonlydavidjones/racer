@@ -194,6 +194,37 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+   the owner first):
+   - "all sail stuff together, all hull stuff together, etc." Proposed groups:
+     - **Her:** name, sail number and country, club.
+     - **Hull:** material, topsides, boot stripe, bottom paint and its finish, bottom last cleaned, name lettering, weight
+       over the class minimum.
+     - **Deck and cabin:** deck, cabin top, forehatch, companionway, whisker pole stowage, navigation lights, outboard.
+     - **Rig:** mast, boom, rig tune.
+     - **Sails:** sailcloth, mainsail, jib, sail number color, class letter F color.
+     - **Lines:** each line's color.
+   - The skipper, and the home marina and slip: "not sure skipper assignment belongs here. also not sure about marina and
+     slip assignment. help me decide." **Owner's decision (13 November): as recommended.** The skipper moves to the Yacht Club, which is
+     already where crew are assigned to boats; the boat page shows the skipper read-only, with a link there. The home
+     marina and slip stay with the boat, as her "Home berth" at the end, since a berth is where the boat lives, not a
+     person's attribute.
+   - Color: "I don't like the little color chips, or the fact that some elements use a kind of toggle array for color.
+     I'd like a color picker for everything ideally, with ability to add hex codes, and some smarts to save a few custom
+     color chips (like in Google Docs) so I don't have to re-enter them for each different thing." One color picker for
+     every color on the boat (hull, boot stripe, bottom, deck, cabin top, lettering, sail numbers, the F, each line): a
+     full picker, a hex field, the class's usual colors as presets, and a row of your own saved custom colors shared by
+     every picker and kept with your account. Where a choice is a material rather than a color (teak or fiberglass,
+     sailcloth), it stays a choice.
+   - Lines are the exception (owner, 13 November): "color selection for lines should probably give options for real rope
+     patterns. there's not a ton of options IRL, so an infinite color picker seems to be the wrong choice." Lines get a
+     palette of real rope colorways, not the free picker. Sourced so far, from New England Ropes only (Sta-Set, Endura
+     Braid, VPC; neropes.com, fetched 13 November):
+     - solids: white, red, blue, black, green;
+     - flecks: red, blue and green fleck (on white, inferred from the naming).
+     Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
+     fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
+     Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
@@ -899,6 +930,20 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modelled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labelled where it's illustrative.
+
+- **3. The tack and gybe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+  the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
+  "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
+  also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
+  maybe even some on-water tracks or something. this doesn't feel different from regular cruise mode."
+  - **Cues where you're looking, in a word or two:** beside or above the boat, not in the Coach card: "Build speed",
+    "Tack now", "Hold", "Ease", "Trim". The full advice moves to after each rep.
+  - **On-water guides:** a lane or track drawn on the water showing the line to sail, where to start the turn, and the
+    new course after it; a target heading mark; and her wake shown against the ideal turn afterwards. All drawn from
+    the sim's own polar and turn model.
+  - **A drill's own shape,** so it doesn't feel like cruising: a set course in open water, numbered reps, a short
+    score after each (speed lost, distance lost, the turn's rate and the tiller's), and a best-of summary.
+  - On the screen rule: the cues live on the water and on the boat, not as new buttons.
 
 ## Next up
 
