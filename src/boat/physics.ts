@@ -39,6 +39,11 @@ export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c
  * 10 s to set it and 10 s to get forward, a club crew 13 and 13 (`forward`: out of the cockpit and up to the mast, on
  * top of their reaction time). Stowing it and gybing it end-for-end are scaled the same way from the sim's earlier
  * times (5 and 8 s against 8 to set): estimates.
+ * All of these are estimates, not measurements. The owner, 13 Nov 2026: theirs are "a wild estimate and might have been
+ * too long; I don't really know, but ten seconds seems like the bare minimum", so 10 s is the floor (the best crew,
+ * already at the mast) and the 20 s from the cockpit may be on the long side. A search for published or video-timed
+ * pole sets, stows and gybes on small keelboats (Folkboat, Star, Dragon, Etchells, J/24; coaching texts, US Sailing,
+ * class sites) found none, 13 Nov 2026. Real tracks or timed video would anchor them.
  */
 export const POLE = { set: 13, stow: 8, gybe: 13, forward: 13 };
 /** About how long (s) your crew will take to set the pole from where they are now, and to stow it. */
