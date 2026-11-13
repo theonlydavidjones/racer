@@ -1,9 +1,9 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
-import { DECK_ARM, Z } from '../boat/crewPhys';
+import { DECK_ARM } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -68,10 +68,17 @@ const ZC_FWD = COCK0 + 0.3, ZC_AFT = Math.min(BENCH_AFT - 0.09, THWART.z - THWAR
 /** Sitting on the side deck (or hiking from it), legs in over the coaming (crewPhys.ts Z: the owner's choice): from the
  * cockpit's forward corner aft beside the benches, and on past the thwart beside the footwell and the after shelf to
  * about 2.5, short of the helm; the shins clear of the thwart either side of it. */
-// (out on the side deck, no further forward than just aft of the jib winch on its pedestal there: winchAt, at 1.4, its
-// pedestal's radius and half a hip's width clear; crewPhys.ts Z.deckFwd)
-const DECK_FWD = Z.deckFwd, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.13, THW_B = THWART.z + THWART.half + 0.13;
-const deckZ = (z: number) => { const q = Math.min(DECK_AFT, Math.max(DECK_FWD, z)); return q > THW_A && q < THW_B ? (q - THW_A < THW_B - q ? THW_A : THW_B) : q; };
+// (out on the side deck, from the cockpit's forward end (the hips half a shoulder's width aft of the cabin's after end),
+// a seat either side of the jib winch on its pedestal between the cabin and the thwart (hull.ts JIB_WINCH_Z: the owner
+// wants one on the rail forward of it, and one, with a little less room, aft of it), the pedestal's radius and half a
+// hip's width clear; not on top of it)
+const DECK_FWD = COCK0 + 0.29, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.13, THW_B = THWART.z + THWART.half + 0.13;
+const WIN_A = JIB_WINCH_Z - 0.25, WIN_B = Math.min(JIB_WINCH_Z + 0.22, THW_A);
+const deckZ = (z: number) => {
+  let q = Math.min(DECK_AFT, Math.max(DECK_FWD, z));
+  if (q > WIN_A && q < WIN_B) q = q < JIB_WINCH_Z + 0.1 ? WIN_A : WIN_B; // (forward of it unless clearly aft: the seat aft is the tighter, the thwart at the shins)
+  return q > THW_A && q < THW_B ? (q - THW_A < THW_B - q ? THW_A : THW_B) : q;
+};
 const benchZ = (z: number) => Math.min(ZC_AFT, Math.max(ZC_FWD, z));
 const inCockpit = (ax: number, z: number) => z > COCK0 && z < COCK1 && ax < chz(z);
 /** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, shelf, thwart, coaming, deck, cabin top. */
@@ -128,9 +135,11 @@ const keepOnSole = (p: THREE.Vector3) => {
   return p;
 };
 /** The jib winch on side `ws` (boatMesh.ts buildLines, Boat Detail's, from Josephine's photos: on a moulded pedestal on
- * the side deck against the coaming's outer face, 1.4 m aft of amidships; the sheet leading to it 0.07 above its base);
+ * the side deck against the coaming's outer face, JIB_WINCH_Z aft of amidships; the sheet leading to it 0.07 above its base);
  * `up` higher, as for the handle on top. */
-const winchAt = (ws: number, up = 0) => { const wz = 1.4, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) + 0.03 + 0.07 + up, wz); };
+// (the jib winch's drum, its middle: on the side deck against the coaming between the cabin and the thwart, its top
+// about flush with the coaming's (Boat Detail, Josephine's photo: hull.ts JIB_WINCH_Z, boatMesh.ts WINCH_H 0.123))
+const winchAt = (ws: number, up = 0) => { const wz = JIB_WINCH_Z, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) - 0.123 + 0.01 + 0.07 + up, wz); };
 /** What the crew watch: the jib's luff (its telltales). */
 const JIB_LUFF = V(0, 1.5, -1.6);
 
@@ -357,8 +366,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.1, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
       // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
-      // within arm's reach of it, the sheet in the inboard hand)
-      const ws = -windward, w = winchAt(ws), wz = w.z + 0.2, bx = ws * (chz(wz) - 0.22); // (the forward knee clear of the bulkhead)
+      // within arm's reach of it, the sheet in the inboard hand. Just forward of it, abreast: the winch between the cabin
+      // and the thwart (JIB_WINCH_Z), the kneeling shin behind them clear of the thwart and the front foot of the bulkhead)
+      const ws = -windward, w = winchAt(ws), wz = w.z - 0.05, bx = ws * (chz(wz) - 0.22);
       const yaw = -ws * 0.15, hold = V(bx - ws * 0.12, SEAT_Y + 0.6 * k, wz - 0.25);
       // (the inboard knee up and the outboard one down on the lid by the coaming: the other way round, the forward thigh
       // would lie along the coaming and through it)
