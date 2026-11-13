@@ -682,6 +682,7 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .layerpop .lp-h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .layerpop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;white-space:nowrap}
 .layerpop input{accent-color:#ff6a1a}
+.layerpop .lp-k{font:600 10px/1 var(--f-inst);color:var(--muted);margin-left:4px;padding:1px 4px;border:1px solid var(--rule);border-radius:3px} /* (a training view's key) */
 .lp-wrap{position:relative}
 #chartLayersPop{position:absolute;top:calc(100% + 6px);left:0}
 

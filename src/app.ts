@@ -51,7 +51,7 @@ import { Hud, fmtClock, sideWord } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { onSaveTrouble } from './store/cloud';
-import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView } from './ui/layers';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
@@ -446,25 +446,25 @@ function chaseFrame(): void {
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
 /* The flow view (ui/flowPanel.ts): her sails cut across at three heights, beside the 3D view; off until you open it. The
  * picture moves left by half the panel, so she stays in the middle of what's left of the view. */
+/** Re-draw the layer menus if open (a training view switched by its key: the menu's tick follows). */
+let refreshMenus = () => {};
 const flowPanel = new FlowPanel(document.body, () => openFlow(false));
 function openFlow(open = !flowPanel.open): void {
   flowPanel.show(open);
-  $('bFlow').classList.toggle('on', open); $('bFlow').setAttribute('aria-pressed', String(open));
+  refreshMenus();
   document.body.classList.toggle('flow-open', open);
   look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
 }
-$('bFlow').onclick = () => openFlow();
 addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 /* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
- * beside her at three heights, off unless you turn it on (the Wind button, or its key), and remembered. */
+ * beside her at three heights, off unless you turn it on (the inset map's Layers menu, or its key), and remembered. */
 const ladder = new WindLadder(); ladder.grp.visible = false; view.scene.add(ladder.grp);
 function windShow(on: boolean): void {
   S.windLadder = on; saveSettings(S);
-  $('bWind').classList.toggle('on', on); $('bWind').setAttribute('aria-pressed', String(on));
+  refreshMenus();
 }
-$('bWind').onclick = () => windShow(!S.windLadder);
 windShow(!!S.windLadder);
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
 function windTick(): void {
@@ -768,8 +768,12 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
     else setLayer(f as LayerKey, true);
     redraw(); setTimeout(() => menus.forEach(m => m()), 30); // (after the chart's redrawn, so the key lists what's on it now)
   });
-  syncField(); openChartHook = syncField;
-  const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f)),
+  syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
+  // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
+  const views: MenuView[] = [
+    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' centre and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
+    { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
+  const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f), views),
     layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
 }
 $('map').addEventListener('click', () => {
@@ -815,7 +819,7 @@ function keysHint(): void {
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
-    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot'], ['bWind', 'Wind indicator: the true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' centre and the masthead', 'windLadder']];
+    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
   $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off';
 }
