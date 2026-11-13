@@ -221,6 +221,8 @@ What's planned, roughly in order. Done work is described in the README.
      first.
    - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
+   - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
+     there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
