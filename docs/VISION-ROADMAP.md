@@ -1,15 +1,15 @@
 # Vision roadmap: near, middle and long term
 
-_Adopted by the owner, 13 Nov 2026: the seven "dialled in" criteria are the bar. Protest records: the owner will try to get some; meanwhile we research independently. Crew timings: the owner can time routines next season (the current season is over); until then, published sources._
+_Adopted by the owner, 13 Nov 2026: the seven "dialed in" criteria are the bar. Protest records: the owner will try to get some; meanwhile we research independently. Crew timings: the owner can time routines next season (the current season is over); until then, published sources._
 
 A proposal for the owner (13 November 2026). It's drafted by the Roadmap session and measured against the mission and
 priority at the top of CLAUDE.md. That priority is **physics and racing first**: "If it's not real and accurate, then
 it's not a simulator." ROADMAP.md stays the working list. This page says where that list is heading, and what "done"
 means at each stage. Hours are rough focused build hours, ±50%.
 
-## 1. Now to near: physics and racing dialled in
+## 1. Now to near: physics and racing dialed in
 
-### What "dialled in" means (checkable)
+### What "dialed in" means (checkable)
 
 | # | Criterion | How it's checked | Where it stands (13 Nov) |
 |---|---|---|---|
@@ -26,7 +26,7 @@ means at each stage. Hours are rough focused build hours, ±50%.
 1. **The skipper model and its calibration** (15–25 h). This is the gap in criterion 1. Skill gives order, belief gives
    mistakes. The design is in docs/SKIPPER-MODEL-PROPOSAL.md.
 2. **True-to-life rigging** (8–14 h; the owner's top boat item, Rigging is on it). The blocks, the Cunninghams and the
-   lines along the traveller, each in its control's colour.
+   lines along the traveler, each in its control's color.
 3. **The rest of the physics pass** (10–18 h):
    - depowering against the sailmaker's guide;
    - every wave and puff felt in the boat's response;
@@ -40,7 +40,7 @@ means at each stage. Hours are rough focused build hours, ±50%.
 7. **Real past races** (8–12 h): race a day the fleet actually sailed, in its real wind and tide, and see where you'd
    have placed. This is also the strongest validation of criterion 1.
 
-That's about 55–90 h to "dialled in".
+That's about 55–90 h to "dialed in".
 
 ## 2. Middle: the Yacht Club, Seasons and the training tools
 
@@ -56,7 +56,7 @@ That's about 55–90 h to "dialled in".
 Why it serves the mission: these are how the sim *teaches*. A season gives the reason to come back. The training tools
 turn the physics into understanding.
 
-## 3. Long term (after physics and racing are dialled in)
+## 3. Long term (after physics and racing are dialed in)
 
 ### (a) The Bay's beauty
 
@@ -81,7 +81,7 @@ turn the physics into understanding.
     dockings and your passages in the log.
 - **Why it serves the mission:** it makes better sailors without a fleet, and it's the "family weekend cruiser" side
   of the Folkboat.
-- **Prerequisites:** the Bay East harbours and current fields; the navigator (done); docking physics under sail
+- **Prerequisites:** the Bay East harbors and current fields; the navigator (done); docking physics under sail
   (push-off is done); a reefing source.
 - **Size:** 30–50 h.
 - **Open questions:** which passages first? Should a seamanship challenge be scored, and how? Does cruising keep the
@@ -141,7 +141,7 @@ multiplayer mode." The priority still holds: physics and racing first. Community
   - **Accounts and identity,** beyond the artifact's user and db.
   - **Moderation** for chat and hails.
 - **Prerequisites:**
-  - physics and racing dialled in (section 1);
+  - physics and racing dialed in (section 1);
   - the Capacity work complete;
   - the Yacht Club;
   - the desktop release or a hosted page that can reach a server.
@@ -158,4 +158,4 @@ multiplayer mode." The priority still holds: physics and racing first. Community
    would settle criterion 2.
 2. Could the owner's crew time a few routines on Josephine (a tack, a gybe, setting the pole)? This would settle crew
    timings.
-3. Are the criteria in section 1 the right bar for "dialled in"? Should anything be added, or tightened?
+3. Are the criteria in section 1 the right bar for "dialed in"? Should anything be added, or tightened?

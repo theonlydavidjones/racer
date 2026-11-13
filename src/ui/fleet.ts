@@ -224,10 +224,10 @@ export class Fleet {
         ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
         ${row('Bottom', `${colour(BOTTOM_COLORS, b.hull.lower)}, ${p.cleanedWeeks ? `cleaned ${p.cleanedWeeks} wk ago` : 'just cleaned'}`)}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
-        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminium frame' : 'Teak')}
+        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
         ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}
         ${row('Sails', `${b.sails.color === 'black' ? 'Black' : 'White'}; main ${ages[p.mainAge]}, jib ${ages[p.jibAge]}`)}
-        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminium mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminium'} boom`)}
+        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminum mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminum'} boom`)}
       </table></section>
       <section><h3>Race record</h3>
         ${rec.races ? `<p class="frec"><b>${rec.races}</b> race${rec.races === 1 ? '' : 's'} · <b>${rec.wins}</b> win${rec.wins === 1 ? '' : 's'} · <b>${rec.podiums}</b> in the top three${rec.avg != null ? ` · average place <b>${rec.avg.toFixed(1)}</b>` : ''}</p>

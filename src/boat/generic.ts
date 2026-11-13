@@ -18,7 +18,7 @@ export const isGeneric = (id: string): boolean => /^gen:[1-9]\d?$/.test(id);
 const NAMES = ['Freya', 'Kittiwake', 'Solveig', 'Tern', 'Saga', 'Skua', 'Ingrid', 'Vega', 'Fulmar', 'Marit', 'Havørn', 'Sea Smoke',
   'Linnea', 'Petrel', 'Aurora', 'Sjøblomst', 'Gannet', 'Astrid', 'Nordlys', 'Wren'];
 /** Hull colours a club fleet shows: mostly white and cream glassfibre, some dark or bright, a few varnished wooden boats. */
-const HULLS = ['Snow white', 'Pearl', 'Cream', 'Navy', 'Flag blue', 'Hunter green', 'Burgundy', 'Light grey', 'Signal red', 'Black', 'Sky blue', 'Buff'];
+const HULLS = ['Snow white', 'Pearl', 'Cream', 'Navy', 'Flag blue', 'Hunter green', 'Burgundy', 'Light gray', 'Signal red', 'Black', 'Sky blue', 'Buff'];
 const BOTTOMS = ['#2a2d33', '#1f2a44', '#7a2420', '#2b4f8f', '#9a5a2e'];
 const DECKS = ['#cdbb94', '#e8e3d6', '#c9ccd0', 'teak-silver', '#8e9f7c'];
 /** Bay clubs with Folkboat sailors (render/burgees.ts ids). */

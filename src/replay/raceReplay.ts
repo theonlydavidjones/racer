@@ -167,7 +167,7 @@ export class RaceReplay {
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p>${mom(L)}</li>`).join('');
-    return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The metres are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
+    return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The meters are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
 
   /** Jump to one of the moments against her: follow you from a little before it. */
@@ -294,7 +294,7 @@ export class RaceReplay {
       el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> ${esc(legWords(L, V.rivalName))}</span>`;
       return;
     }
-    if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is coloured where it cost you time.</span>'; return; }
+    if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is colored where it cost you time.</span>'; return; }
     const n = m.key === 'rule' ? '!' : this.rank.get(m.key) ?? '·', c = m.ref != null ? this.D!.clips[m.ref] : null;
     el.innerHTML = `${badge(m.key, n)}<span><b>${m.key === 'start' ? 'The start' : mmss(m.key === 'rule' ? m.t1 : m.t0)}</b> ${esc(c ? `${c.title}. ${c.what}` : m.text)}${m.lost >= 1 ? ` <span class="dbLost">about −${Math.round(m.lost)} s</span>` : ''}</span>${c ? '<button class="ghost rrBtn" type="button" data-rr="clip">Close-up</button>' : ''}`;
   }

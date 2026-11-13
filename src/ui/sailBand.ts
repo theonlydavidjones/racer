@@ -188,7 +188,7 @@ export class SailBand {
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
-<div class="sb-bot">${jdial('P')}${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveller')}</div>${bstay('S')}${jdial('S')}</div>`;
+<div class="sb-bot">${jdial('P')}${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveler')}</div>${bstay('S')}${jdial('S')}</div>`;
     parent.appendChild(el);
     el.addEventListener('pointerdown', e => this.down(e));
     el.addEventListener('pointermove', e => this.move(e));
