@@ -559,7 +559,19 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   30+ kt under full sail? The heel past a few degrees still needs the righting curve from the hull's offsets (see crew
   weight, above); if Bay racers sail on unreefed, she must be able to too, not lie at 60° at 0 kt;
   (2) the auto crew's heavy-air handling as Bay sailors do it (dump the main, sail on the jib, feather);
-  (3) water in the cockpit: water shipped, its weight, the pump;
+  (3) water in the cockpit and the bilge, and the bilge pump (owner, 13 November, "for later": "pumping the bilge is
+  important to the physics. unpumped adds substantial weight. we may need a crew animation for this, but only if
+  performance allows. also. need logic for how and when the bilge fills: rain fills it, heavy heeling can fill it,
+  heavy seas and splash can fill it"; 4–6 h):
+  - How the bilge fills, each from the physics:
+    - rain, from the observed and forecast rainfall for the day (NWS);
+    - heeling far enough to put the lee rail or cockpit coaming under;
+    - green water and spray in heavy seas;
+    - a wooden boat's planks weeping a little, as lapstrake hulls do.
+  - Its weight (1 kg a liter) is carried low and sloshes to leeward, adding to her displacement, heel and drag.
+  - Pumping: a crew member at the pump, at a sourced rate per stroke. The class rules allow pumps only while racing
+    (no self-bailers; NFIA 12.40). The smart crew pump when it pays.
+  - A pumping animation only if the frame budget allows; otherwise the crew member shows as busy at the pump.
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
   Update (12 November): owner, "nobody who races Folkboats on the bay has a reef setup. races just get canceled at 23
