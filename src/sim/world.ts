@@ -1,3 +1,4 @@
+import { DrillTracker } from './drill';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -217,6 +218,8 @@ export class World {
   boats: Boat[] = [];
   pairs: Record<string, PairRecord> = {};
   rec: Frame[] = [];
+  /** The tack and gybe drill (sim/drill.ts): your manoeuvres scored, in that mode only. */
+  readonly drill: DrillTracker | null;
   /** Racing: the whole race once a second (the race replay), from just before the gun. */
   track: Frame[] = [];
   horns: Record<number, boolean> = {};
@@ -298,6 +301,7 @@ export class World {
     this.cur = { ...(CURRENTS[settings.current] ?? CURRENTS.slack) };
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
+    this.drill = settings.mode === 'manoeuvres' ? new DrillTracker() : null;
     this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
     this.homeSlip = slipById(settings.boat?.slip);
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
@@ -405,12 +409,13 @@ export class World {
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
     } else if (isUser && this.freeSail) {
-      // where you chose to start, on a beam reach: whichever way has more open water ahead
+      // where you chose to start, on a beam reach (close-hauled for the drill): whichever way has more open water ahead
       const at = getPlace(this.settings.sailFrom)?.p;
       if (at) {
         p = { ...at };
         const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
-        const a = n360(this.windModel.base + 90), b = n360(this.windModel.base - 90);
+        // (the tack and gybe drill: close-hauled, ready to tack)
+        const off = this.settings.mode === 'manoeuvres' ? 45 : 90, a = n360(this.windModel.base + off), b = n360(this.windModel.base - off);
         h = room(a) >= room(b) ? a : b;
       } else {
         p = place(-220, 0); h = n360(lineH + 180);
@@ -815,6 +820,7 @@ export class World {
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
     }
+    this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     this.log?.step(this, dt);
     this.trackCourses();
