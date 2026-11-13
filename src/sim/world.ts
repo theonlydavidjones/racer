@@ -92,6 +92,8 @@ export interface GunSnap {
 export interface WorldOptions {
   /** Begin this many seconds before the start signal instead of at the warning signal (start practice). */
   startAt?: number;
+  /** The start-line drill alone: no other boats, the line and course laid as for the fleet (its length is set for it). */
+  solo?: boolean;
   /** Just sail: no race, no other boats, no start sequence. */
   freeSail?: boolean;
   /** Fly your flags even though it's a race (to see them while setting up your boat). */
@@ -331,7 +333,7 @@ export class World {
     this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
-    for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
@@ -409,6 +411,13 @@ export class World {
     } else if (isUser && this.startAt < 120) {
       // start practice: somewhere below the line, reaching along it, with a minute or so to go
       p = place(55 + r() * 45, (r() - 0.5) * this.lineLen * 0.6); h = n360(lineH + (r() < 0.5 ? 0 : 180));
+    } else if (isUser && this.settings.mode === 'drill') {
+      // the start-line drill from 2 or 3 minutes: farther below the line, as far as a minute's run and some to spare
+      // (about 150–230 m), reaching along it; moved in toward the line where that would be ashore (the Cityfront)
+      let d = 60 + this.startAt * 0.7 + r() * 40; const a = (r() - 0.5) * this.lineLen * 0.6;
+      p = place(d, a);
+      while (onLand(p) && d > 60) { d -= 20; p = place(d, a); }
+      h = n360(lineH + (r() < 0.5 ? 0 : 180));
     } else if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
     else {
       let tries = 0;
@@ -809,7 +818,8 @@ export class World {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
-    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
+    // (the start-line drill keeps its whole short sequence, for the debrief's look at your run to the line)
+    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
   }
 
   private checkLines(prevT: number): void {

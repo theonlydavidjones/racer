@@ -25,6 +25,8 @@ export interface Settings {
   /** Who you race against: stock club boats ('stock:1' .. 'stock:5'), generic club Folkboats ('gen:1', 'gen:2'..., boat/generic.ts) and your own saved boats (their ids), all sailed by the AI. */
   opponents: string[];
   seq: number; // start sequence, minutes
+  /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
+  drillFrom?: number; drillSolo?: boolean;
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2;

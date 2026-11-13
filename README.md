@@ -111,12 +111,17 @@ Both work from `src/sim/outlook.ts`: the day's wind (without the puffs and oscil
 
 ### Start practice
 
-Create a race → **Practise the start** (beside *Start the sequence*). You begin one minute before the gun, somewhere below the line. Fifteen seconds after the gun the race pauses for a debrief:
+Create a race → **Practise the start** (beside *Start the sequence*): a start-line drill on the course's real line, in the conditions you've chosen. You begin 1, 2 or 3 minutes before the gun (2 by default), somewhere below the line, alone or with the fleet (alone by default); the two choices are in the debrief panel, for the next attempt. Fifteen seconds after the gun the race pauses for a debrief:
 
 - where you were at the gun (distance from the line, speed as a % of full close-hauled speed, position along the line), when you crossed and your place in the order across the line;
 - which end was favored and by how much (in metres upwind);
 - a grade (great, good, late, slow, over early) with specific tips (how many seconds to turn earlier, when to sheet in, what the current was doing);
 - an overhead replay of the last 45 s, with every boat's position at the gun marked.
+- **time on distance**: your final run to the line (when you turned for it, how far out, how long it took and at what speed, against full speed on the same line), and how many seconds earlier or later to turn next time;
+- **the favoured end as you'd judge it**: if you went head to wind near the line, where your bow pointed against square to the line, and whether that was the right read at the gun; if you didn't, how to check;
+- **your run of attempts** this session: each start's distance and seconds late at the gun, speed, end of the line (✓ at the favoured end) and grade, the best highlighted, and the trend.
+
+**New start** is the next attempt in the same conditions from a new spot; **Same start again** repeats it exactly.
 
 **Same start again** replays the identical setup (same seed: same boats, wind and positions). **New start** draws a new one; **Keep racing** carries on with the race. The debrief logic is `src/sim/startDebrief.ts`.
 

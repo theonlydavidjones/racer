@@ -1119,3 +1119,6 @@ body.showroom #flowPanel{display:none}
 #realRows:not(:empty){margin-bottom:10px}
 #realRows .warn,#resReal .warn{color:#ffb08a}
 #resReal tr.you td{color:var(--accent);font-weight:700}
+/* the start-line drill's choices for the next attempt (inside its panel) */
+.dopts{display:flex;gap:8px;flex-wrap:wrap}
+.dopts .seg{flex:1 1 200px}
