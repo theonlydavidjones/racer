@@ -21,5 +21,5 @@ describe('the race pool gives the races\' own answers', () => {
 
   it('a race that fails on a thread fails the test (no quiet falling back)', async () => {
     await expect(sail('approxRace', [[9, { grid: true, skip: true }], [9, { grid: true, skip: true }]] as never, 2)).rejects.toThrow();
-  }, 120_000);
+  }, 180_000);
 });

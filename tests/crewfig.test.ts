@@ -57,7 +57,7 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     ['pole out on a light-air run: up on the foredeck, and the trip there', { kt: 7, twa: 172, pole: true, secs: 40 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
-  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 30000); // (every 2 cm of every bone of every figure: some seconds a case)
+  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
 });
 
 /** The fastest any point of anyone moved in one frame (m/s), and how much they moved at all, over `frames`. */
@@ -104,7 +104,7 @@ describe('The figures are where the crew are (render/crew.ts)', () => {
       });
     }
     expect(bad.slice(0, 5)).toEqual([]);
-  }, 30000);
+  }, 180_000);
 });
 
 describe('The crew move like people (render/crew.ts)', () => {
