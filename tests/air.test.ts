@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { airTempC, warmDay } from '../src/environment/air';
+import { airTempC, dayWindOf, warmDay } from '../src/environment/air';
+import { dayWeather } from '../src/environment/weather';
 import { LL } from '../src/geo/geo';
 
 /** Local time on the Bay (Pacific) as minutes since epoch, UTC. */
@@ -47,5 +48,26 @@ describe("The air temperature on the race area (environment/air.ts, NOAA CO-OPS'
     let ga = 0, al = 0;
     for (let y = 2030; y < 2080; y++) for (let d = 1; d <= 28; d++) { const date = `${y}-09-${String(d).padStart(2, '0')}`; if (warmDay(date, gate)) ga++; if (warmDay(date, alameda)) al++; }
     expect(al).toBeGreaterThan(2 * ga); // (Fort Point about one day in eight in September, Alameda nearly one in two)
+  });
+  it("on climate-only days, warm with the day's wind as such days were (scripts/fit-warm-days.mjs), and as often overall", () => {
+    const fp = LL(37.806305, -122.46589), ala = LL(37.772, -122.30);
+    const share = (p: typeof fp, kind: 'auto' | 'light', windDay: 0 | 1 | 2, withWind = true) => {
+      let warm = 0, n = 0;
+      for (let y = 2030; y < 2130; y++) for (let d = 1; d <= 28; d++) {
+        const date = `${y}-09-${String(d).padStart(2, '0')}`;
+        if (warmDay(date, p, withWind ? dayWindOf(date, dayWeather(date, kind, windDay)) : undefined)) warm++; n++;
+      }
+      return warm / n;
+    };
+    const fpT = share(fp, 'auto', 1), fpPlain = share(fp, 'auto', 1, false), fpL = share(fp, 'light', 1);
+    const alT = share(ala, 'auto', 1), alPlain = share(ala, 'auto', 1, false), alLd = share(ala, 'auto', 0), alW = share(ala, 'auto', 2);
+    console.log(`September warm: Fort Point typical ${(100 * fpT).toFixed(0)}% (without the wind ${(100 * fpPlain).toFixed(0)}%), light and variable ${(100 * fpL).toFixed(0)}%; ` +
+      `Alameda typical ${(100 * alT).toFixed(0)}% (${(100 * alPlain).toFixed(0)}%), a light day ${(100 * alLd).toFixed(0)}%, a windy day ${(100 * alW).toFixed(0)}%`);
+    // (the month's rate kept on a typical day, near enough: the wind says which days)
+    expect(Math.abs(fpT - fpPlain)).toBeLessThan(0.06); expect(Math.abs(alT - alPlain)).toBeLessThan(0.1);
+    // (at Fort Point the light and variable days are the warm ones; on the east shore a light westerly day is cooler
+    // than a fresh one: the inland heat that drives the sea breeze)
+    expect(fpL).toBeGreaterThan(2 * fpT);
+    expect(alLd).toBeLessThan(alW - 0.1);
   });
 });

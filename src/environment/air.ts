@@ -1,6 +1,9 @@
 import climate from './data/sf-air-climate.json';
+import byWind from './data/sf-warm-by-wind.json';
 import real from './data/sf-real-days.json';
 import { LL } from '../geo/geo';
+import { sfLocalToUtcMin } from './tide';
+import { OPEN_WATER, type WindKind } from './wind';
 import type { Vec } from '../core/math';
 
 /**
@@ -102,6 +105,27 @@ export function airTempC(date: string, tMin: number, p: Vec = CITYFRONT): AirTem
 /** The temperature counted as a warm day for shorts (°C): 68 °F, the owner's (13 Nov 2026). */
 export const WARM_C = 20;
 
+interface WindCell { ratio: number }
+const W = byWind as unknown as { bands: number[]; stations: Record<string, { monthShare: number[]; cells: Record<string, WindCell[]> }> };
+/** The day's wind, as a climate-only day draws it (environment/weather.ts dayWeather): its kind, and its mean speed at
+ * Fort Point (the station, not out on the water) over 11:00–16:59. */
+export interface DayWind { kind: WindKind; kt: number }
+/** The day's wind from its weather (dayWeather): its kind, and the mean of its open-water wind 11:00–16:59 brought back
+ * to the station's (OPEN_WATER: wind.ts). */
+export function dayWindOf(date: string, wx: { kind: WindKind; at(tMin: number): { kt: number } }): DayWind {
+  const t0 = sfLocalToUtcMin(date, '11:00');
+  let s = 0; for (let k = 0; k < 12; k++) s += wx.at(t0 + 15 + k * 30).kt;
+  return { kind: wx.kind, kt: s / 12 / OPEN_WATER };
+}
+/** A station's chance of a warm afternoon in a month, given the day's wind (scripts/fit-warm-days.mjs: the month's
+ * share of warm days × the standardized ratio for that kind of day and band of wind). */
+function warmChance(id: string, month: number, wind: DayWind): number | null {
+  const st = W.stations[id]; if (!st) return null;
+  const b = wind.kind === 'light' ? 0 : Math.max(0, W.bands.findIndex((x, i) => wind.kt >= x && wind.kt < W.bands[i + 1]));
+  const r = st.cells[wind.kind]?.[b]?.ratio ?? 1;
+  return Math.min(0.95, st.monthShare[month] * r);
+}
+
 /** 0..1 from a date (YYYY-MM-DD): the same for everyone sailing that day. */
 function dayDraw(date: string): number {
   let h = 0x811c9dc5;
@@ -118,14 +142,17 @@ const RACE_HOURS = [12, 13, 14, 15, 16];
  *   the stations.
  * - A day it has only the climate for: warm as often as the stations' days were in that month (the share of days with a
  *   reading at 20 °C or more 12:00–16:59, 2021–2025, blended between the stations), against one number drawn from the
- *   date (the same day for everyone; and a warmer place on the same day is warm first).
- * Not yet: in real life the warm afternoons come with light wind and no fog (offshore or weak sea-breeze days: Fort
- * Point's August–October warm afternoons averaged 7 kt, the rest 9); on a climate-only day the draw here is independent
- * of the day's wind and fog, and heat that comes for several days in a row comes here a day at a time.
+ *   date (the same day for everyone; and a warmer place on the same day is warm first). Given the day's drawn wind
+ *   (`wind`), as often as days with that wind were (scripts/fit-warm-days.mjs, the same records): at Fort Point a light
+ *   and variable day is warm about three times as often as the month's usual, a light westerly less often; along the
+ *   east shore (Pier 1, Alameda, Richmond) a fresh westerly (12–16 kt at Fort Point) nearly twice as often, the inland
+ *   heat that drives the strong sea breeze reaching the sheltered shore, while the fog's own wind keeps Fort Point cool.
+ * Not yet: heat that comes for several days in a row comes here a day at a time.
  */
-export function warmDay(date: string, p: Vec = CITYFRONT): boolean {
+export function warmDay(date: string, p: Vec = CITYFRONT, wind?: DayWind): boolean {
   const month = +date.slice(5, 7) - 1;
   const hot = RACE_HOURS.map(h => { const d = dayTemps(date, month, h); return d ? blend(p, d.vals) : null; });
   if (hot.some(v => v != null)) return hot.some(v => v != null && v >= WARM_C);
-  return dayDraw(date) < (blend(p, Object.fromEntries(IDS.map(id => [id, C.stations[id].warmDay[month]]))) ?? 0);
+  const share = blend(p, Object.fromEntries(IDS.map(id => [id, wind ? warmChance(id, month, wind) : C.stations[id].warmDay[month]])));
+  return dayDraw(date) < (share ?? 0);
 }
