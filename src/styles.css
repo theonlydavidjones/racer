@@ -235,7 +235,6 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pl-lab{font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:2px}
 .pl-read{font:700 13px/1 var(--f-inst);letter-spacing:.04em;min-width:190px;padding:0 6px;color:var(--accent);white-space:nowrap}
 .pilot .tp-btn{padding:7px 8px}
-body.pilot-on #keysHint{display:none}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
 #controls .motorhead{flex-wrap:nowrap;width:max-content;margin-top:6px}
 #controls .motorhead .tp-btn{min-width:0;height:38px}
@@ -258,6 +257,7 @@ body.pilot-on #keysHint{display:none}
 .row2:not(:has(.pilot:not([hidden]))){display:none}
 /* start practice debrief */
 ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;line-height:1.45}
+ul.facts li.dmore{list-style:none;margin-left:-18px} /* (the start drill's "What happened", folded) */
 /* course view */
 .panel.wide{max-width:960px}
 .cvhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -293,7 +293,6 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .dot.gate{background:#6fd0ff} .dot.lane{background:#ff5d4c} .dot.wind{background:#e9f2f5}
 #navcanvas{width:100%;height:min(48vh,440px);background:#0c2534;border-radius:8px;border:1px solid var(--rule);display:block}
 .brief{display:flex;flex-direction:column;gap:18px}
-.brief .bf-key{font-size:12px;color:var(--muted);line-height:1.8}
 .bf-sec h3{font:700 17px/1.2 var(--f-inst);letter-spacing:.03em;margin:0 0 6px;color:var(--text)}
 .bf-sec .lede{font-size:14px;margin-bottom:8px}
 .bf-items{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
@@ -439,7 +438,7 @@ ul.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;l
 .bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
-body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #keysHint,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,body.showroom #keysHint,
 #showBar{display:none}
 body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-index:5;align-items:center;gap:10px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font:600 12px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 #showBar label{display:flex;align-items:center;gap:8px}
@@ -473,7 +472,6 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief .dbHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
 .debrief .dbLost{font:600 13px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap}
 .debrief li p{font-size:14px}
-.debrief .dbTip{color:var(--muted)}
 
 /* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */
 #raceReplay{z-index:30;background:rgba(6,14,21,.92)} /* (over the pause or results panel: none of it showing through) */
@@ -712,10 +710,6 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 #appBar .ib:hover,#appBar .ib:focus-visible{opacity:1}
 #mapBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 82px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}
 #viewBar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}
-/* the keys line: over the view buttons, while the pointer is on a button cluster (K lists every key) */
-#keysHint{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 66px);
-  pointer-events:none;opacity:0;transition:opacity .2s}
-body:has(.ibar:hover) #keysHint{opacity:1}
 /* the trim panel's own line: who has the lines, in plain words */
 .tp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 12px/1.2 var(--f-inst);color:var(--muted)}
 .tp-head.mine{color:var(--text)}
@@ -784,8 +778,6 @@ body.lashed .tg-lash{display:block}
 /* the messages panel stops above the keys line and the view buttons; older messages scroll */
 #msgLog{max-height:calc(100vh - 356px - 112px);overflow:hidden;box-sizing:border-box}
 #msgRecent{overflow-y:auto;min-height:0}
-/* the keys line on a dark strip, above the view buttons */
-#keysHint{background:var(--pod-solid);border:1px solid var(--rule);border-radius:6px;padding:5px 9px;color:var(--text);bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
 
 /* settings: quiet on/off rows, laid out like the key list (label left, a slim switch right; on = shown) */
 .togs{display:flex;flex-direction:column}
@@ -1183,7 +1175,7 @@ body.showroom #flowPanel{display:none}
 /* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
    which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
 body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
-body.still #appBar,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}
+body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar,body.still #keysHint{display:none!important}
 /* the tactical debrief (ui/tacticsView.ts): a chart a leg against the fleet's middle, the best and the ideal */
 .tac{display:flex;flex-direction:column;gap:8px}
 .tchips{display:flex;gap:6px;flex-wrap:wrap}
@@ -1254,3 +1246,6 @@ body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .
    "on the … side under the inset map", "I meant right side"). The map is 210 px across at the top right. */
 #dial{position:fixed!important;left:auto!important;top:calc(env(safe-area-inset-top,0px) + 76px + 210px + 12px)!important;
   right:calc(max(16px,env(safe-area-inset-right,0px)) + (210px - 96px) / 2)!important;width:96px!important;height:96px!important}
+
+/* (the briefing: a point's rest on hover) */
+.bf-items li[title]{cursor:help}.bf-more{color:var(--muted)}

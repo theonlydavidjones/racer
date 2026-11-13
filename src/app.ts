@@ -1109,7 +1109,8 @@ const keysView = new KeysView(keymap, () => keysHint());
 const held = new Set<Action>();
 function keysHint(): void {
   const k = (a: Action) => keymap.label(a);
-  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · right-click, double-click or ${k('lashTiller')}: lash it · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} all keys`;
+  // (the keys aren't spelled out on the sailing screen, the owner, 13 Nov 2026: they're in the Keys panel; a learn-to-sail
+  // mode will teach them)
   // each cluster button's name and key, on hover (the word under it is short)
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
@@ -1379,7 +1380,6 @@ function courseCard(): void {
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
 function tideBox(): void {
-  $('currentNote').hidden = S.current === 'real';
   $('windDaySeg').hidden = !w.seaBreeze || w.realWind;
   { // where the day's weather comes from, what the records say for the month, and what today is
     const mo = Number(w.raceDate.slice(5, 7)) - 1, f = windKindFreq(mo), month = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' });
@@ -1552,10 +1552,10 @@ function beginRaceNow(seed?: number): void {
     return;
   }
   toast(S.mode === 'sail'
-    ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}.${w.dest ? ' The navigator (M) has a passage plan.' : ' Try the tiller, the trim and the pole.'}`
+    ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}.`
     : S.mode === 'drill'
-    ? `Start practice${w.boats.length === 1 ? ', alone' : ''}: ${w.startAt / 60 === 1 ? 'one minute' : `${w.startAt / 60} minutes`} to the gun. Check the line head to wind, time your run in, and be on the line at full speed when it goes. Current: ${w.cur.label}.`
-    : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+    ? `Start practice${w.boats.length === 1 ? ', alone' : ''}: ${w.startAt / 60 === 1 ? 'one minute' : `${w.startAt / 60} minutes`} to the gun. Current: ${w.cur.label}.`
+    : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
   if (w.courseSignal && S.mode !== 'sail') logMessage(`Course ${w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signaled by the warning signal). ${w.courseSignal.why}`);
 }
 
@@ -1568,8 +1568,10 @@ function showDrill(): void {
   drillOptions(); drillTable();
   $('dTitle').textContent = d.title;
   const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  $('dFacts').innerHTML = d.facts.map(f => `<li>${esc(f)}</li>`).join('');
-  $('dTips').innerHTML = d.tips.map(f => `<li>${esc(f)}</li>`).join('');
+  // one line to act on, the top tip; what happened, and the other tips, folded away (the owner: no paragraphs on the screen)
+  const more = [...d.facts, ...d.tips.slice(1)];
+  $('dTips').innerHTML = d.tips.length ? `<li>${esc(d.tips[0])}</li>` : '';
+  $('dFacts').innerHTML = more.length ? `<li class="dmore"><details class="thow"><summary>What happened</summary>${more.map(f => `<p>${esc(f)}</p>`).join('')}</details></li>` : '';
   $('dVerdict').className = 'verdict' + (d.grade === 'great' || d.grade === 'good' ? ' ok' : '');
   $('drill').hidden = false;
   drillClip = { frames: w.rec.slice(), focus: [w.user.id], wind: w.gun?.windFrom ?? w.wind.from, kind: 'start' };
@@ -1669,10 +1671,11 @@ function debriefHtml(title: string): string {
   if (!log || w.t <= 0) return '';
   const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
   const fs = log.findings(w), pl = log.places().filter(p => p.place != null);
-  const items = fs.map(f => `<li><div class="dbHead"><b>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
+  // (the tip on hover: the owner, 13 Nov 2026, one line on the screen)
+  const items = fs.map(f => `<li title="${esc(f.tip).replace(/"/g, '&quot;')}"><div class="dbHead"><b>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${esc(f.detail)}</p></li>`).join('');
   const marks = pl.length > 1 ? `<p class="lede">Your place at each mark: ${pl.map(p => `${esc(p.name)} ${nth(p.place!)}`).join(' → ')}.</p>` : '';
   const total = fs.reduce((a, f) => a + f.lost, 0);
-  return `<div class="eyebrow">${title}</div><div class="tacHost" data-tac></div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
+  return `<div class="eyebrow">${title}</div><div class="tacHost" data-tac></div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
 }
 /**
  * Against the winner (or the boat second, if you won), in the debrief: the gap, a line for each leg, and the moments
@@ -1690,7 +1693,7 @@ function vsDebriefHtml(log: NonNullable<typeof w.log>): string {
   }).join('');
   const big = bigMoments(V);
   const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span><b>Leg ${m.leg}:</b> ${esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
-  return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${rivalWho(V, w.boats[V.rival].finished)}</div><p class="lede">${esc(gapWords(V))} Leg by leg, from both your tracks. Meters are ground made good up or down the course (across the mean wind; along the leg on a reach), in the same minutes of wind, less your plain speed difference: so they're the tacks and the shifts. Downwind, a lift is the wind going aft: gybe on the lifts.</p><ol>${legs}</ol>${moments}`;
+  return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${rivalWho(V, w.boats[V.rival].finished)}</div><p class="lede">${esc(gapWords(V))}</p><ol>${legs}</ol>${moments}`;
 }
 
 /* ---------------- the boats' logbooks ---------------- */
