@@ -418,7 +418,7 @@ export class World {
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor } } : { paint: F.paint }),
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor } } : { paint: F.paint }),
       ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
@@ -590,21 +590,33 @@ export class World {
     const g = this.field;
     if (!g) return this.fieldAt(p).extra;
     const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
-    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) return this.fieldAt(p).extra;
+    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1 || this.fieldEdge(fx, fy) < 1) return this.fieldAt(p).extra;
     const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n, a = g.extra;
     return (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
+  }
+  /** How far inside the grid's edge (cells) a grid position is. */
+  private fieldEdge(fx: number, fy: number): number { const m = this.field!.n - 1; return Math.min(fx, fy, m - fx, m - fy); }
+  /** The wind across the course from the day's weather itself (outside the grid, and blended into it at its edge). */
+  private fieldExact(p: Vec): { k: number; turn: number; extra: number } {
+    const f = this.weather.field(p, this.clockUtc, this.wind.from);
+    return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) };
   }
   /** The wind across the course at p: the factor on the course-wide speed, and the turn of its direction (deg). */
   fieldAt(p: Vec): { k: number; turn: number; extra: number } {
     const g = this.field;
-    if (!g) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
+    if (!g) return this.fieldExact(p);
     const fx = (p.x - g.x0) / g.step, fy = (p.y - g.y0) / g.step;
-    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) { const f = this.weather.field(p, this.clockUtc, this.wind.from); return { ...f, extra: f.k / Math.max(0.05, windTerrain(p, this.wind.from)) }; }
+    if (fx < 0 || fy < 0 || fx >= g.n - 1 || fy >= g.n - 1) return this.fieldExact(p);
     const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = g.n;
     const bl = (a: Float32Array) => (a[j * n + i] * (1 - u) + a[j * n + i + 1] * u) * (1 - v) + (a[(j + 1) * n + i] * (1 - u) + a[(j + 1) * n + i + 1] * u) * v;
     // the day's pattern (smooth over kilometres) from the grid; the shore and the slot exactly, here
-    const extra = bl(g.extra);
-    return { k: windTerrain(p, this.wind.from) * extra, turn: bl(g.turn), extra };
+    let extra = bl(g.extra), turn = bl(g.turn);
+    // across the grid's outermost cell, eased into the weather's own field, which holds outside it: the grid's samples
+    // between its nodes, and those made up to 30 s ago, needn't match it, and a boat (and the map) crossing the edge
+    // would meet a seam in the wind. At the edge itself, the exact field
+    const e = this.fieldEdge(fx, fy);
+    if (e < 1) { const x = this.fieldExact(p), s = e * e * (3 - 2 * e); extra = x.extra + (extra - x.extra) * s; turn = x.turn + wrap(turn - x.turn) * s; }
+    return { k: windTerrain(p, this.wind.from) * extra, turn, extra };
   }
 
   /**
@@ -1081,6 +1093,7 @@ export class World {
       if (!this.cancelled && this.settings.mode !== 'drill' && this.cbWin.length >= 240 && this.t >= this.sequence[0].t - 120 && !this.boats.some(b => b.finished) && this.cbMean! >= CANCEL_KT) {
         const sig = cancelSignal(this.t >= 0, this.cbMean!);
         this.cancelled = { t: this.t, kt: this.cbMean, up: sig.up, say: sig.say };
+        for (const b of this.boats) { b.penalty = 0; b.penaltyTurned = 0; } // (no race, no penalty left to take)
         for (let i = 0; i < sig.sounds; i++) this.emit({ type: 'horn', dur: 0.8, delayMs: i * 1100 });
         this.emit({ type: 'toast', ms: 9000, msg: sig.say });
       } }

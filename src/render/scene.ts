@@ -172,6 +172,8 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
+  get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
   private courseObjs: THREE.Object3D[] = [];
   private camLocal = new THREE.Vector3();
   private camSide = 1;
@@ -719,7 +721,7 @@ export class SceneView {
   /** Draw a frame. dt is wall-clock seconds since the last frame; now is ms. */
   /** The showroom camera's angle round the boat (it turns slowly unless paused). */
   private showroomA = 0;
-  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number; panelShift?: number; spin?: boolean }, over: Overhead): void {
+  render(w: World, dt: number, now: number, viewMode: number, look: { yaw: number; pitch: number; aft?: number; chase?: number; shift?: number; panelShift?: number; spin?: boolean; fov?: number }, over: Overhead): void {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     { const d = Math.atan2(Math.sin(-w.windModel.base * D2R - this.ripAngle), Math.cos(-w.windModel.base * D2R - this.ripAngle)); // the short way round
@@ -796,7 +798,7 @@ export class SceneView {
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     this.userHeading = u.h; this.userHeel = u.heel;
     camera.up.set(0, 1, 0);
-    const fov = viewMode === 0 ? 72 : this.baseFov;
+    const fov = viewMode === 0 ? look.fov ?? 72 : this.baseFov; // (narrower while you look at the cabin-top instrument: app.ts)
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     if (viewMode === 0) {
       // sit on the windward side, like a helm hiking

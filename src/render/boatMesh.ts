@@ -12,6 +12,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
+import { buildInstrument, syncInstrument, type Instrument } from './tacktick';
 import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -44,17 +45,24 @@ const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
  *   below the struts (CR 7.60).
  * The mast section is the timber mast's; an aluminium one may be 100–112 mm at the deck and tapers above 5.5–7.0 m
  * (CR 6.2.1, 6.2.3), so its after side, the origin for E, is up to about 1 cm further forward than drawn.
- * Heights "above the deck" are taken from the sheer at the mast. (CR 6.1.7's 2.00 m is a distance, CR 7.21's 0.80 m
+ * Heights "above the deck" are taken from the deck at the mast (DECK_AT_MAST). (CR 6.1.7's 2.00 m is a distance, CR 7.21's 0.80 m
  * horizontal: with the sheer 0.21 m higher at the stay, 2.00 m horizontally is 2.011 m in a straight line, as ORC's J
  * measures it horizontally.)
  */
 const MAST_FRONT_Z = -L / 2 + 0.80 + 2.00, MAST_FA = 0.133, MAST_ATH = 0.110;
 const MAST_Z = MAST_FRONT_Z + MAST_FA / 2, MAST_AFT_Z = MAST_FRONT_Z + MAST_FA;
-const DECK_AT_MAST = sheer(uAtZ(MAST_Z));
+/**
+ * The deck at the mast, on the centreline where the mast goes through it: CR 6.1.11 measures the Lower Mast Point "1000mm
+ * ± 10mm above deck ... taken along the aft side of the mast", so the rig's heights are from here, not from the sheer at
+ * the side (the deck's camber puts it about 4.5 cm higher), at the mast's after side as the rule measures. (The physics'
+ * heights, balance.ts RIG, are ORC's, from its datum, the sheer at the mast: HBI, BAS and IG, ORC VPP Documentation
+ * 2026. The drawing and the physics differ by the deck's camber at the mast.)
+ */
+const DECK_AT_MAST = deckY(uAtZ(MAST_AFT_Z), 0);
 const BAS = 1.0, P = 8.75, E = 3.38, IG = 6.5;
 /** The boom's top (the main's tack and foot), and the masthead. */
 const BOOM_TOP = DECK_AT_MAST + BAS, MAST_TOP = BOOM_TOP + P + 0.28, BOOM_R = 0.045;
-const FORESTAY_DECK = V3(0, sheer(uAtZ(-L / 2 + 0.80)), -L / 2 + 0.80);
+const FORESTAY_DECK = V3(0, deckY(uAtZ(-L / 2 + 0.80), 0), -L / 2 + 0.80); // (on the deck's crown, as the mast)
 /** Where the forestay meets the mast's front (the hounds), and the shrouds its sides. */
 const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
 /**
@@ -341,6 +349,8 @@ export interface BoatMesh {
   rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
+  /** The racing instrument on the cabin top (her heading and speed on its face), on your own boat. */
+  instrument?: Instrument;
   /** Her flags (stream in the apparent wind and flutter): ensign, burgee or officer's flag, courtesy flag. */
   flags: FlyingFlag[];
   /** The ensign, its staff and truck, and how far down it is (0 flying … 1 struck and the staff unshipped). */
@@ -573,15 +583,18 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // (Josephine's photos: a cluster of blocks at the partner, the lines coming down to them and running aft in a bundle),
   // and on to what it works:
   //  - the vang (dual-ended): to the vang's lower block, its tail;
-  //  - the outhaul (dual-ended): up the mast's after side to the gooseneck, and inside the boom to the clew (inside the
-  //    boom is an estimate: the photos don't show it; CR 6.3.4 allows an aluminium boom a groove for its controls);
+  //  - the outhaul (dual-ended): up the mast's after side to the gooseneck, and inside the boom to the clew, where it's
+  //    made fast (inside the boom and fixed to the clew: the owner, on Josephine; how it gets from the foot block to the
+  //    boom is still an estimate);
   //  - the jib Cunningham (dual-ended): forward along the foredeck, outboard of the forehatch, to a block at the stemhead
   //    and up the stay to the jib's cringle (an estimate: not in the photos, and her foredeck looks clear in the one from
   //    the bow; it may well run below);
   //  - the main Cunningham: up the mast's port side, outside the boom, to a block at the gooseneck and to its cringle
   //    above the main's tack (an estimate: not in the photos);
-  //  - the halyards: out of the mast above the deck (CR 6.2.5), the jib's at its front, the main's at its after side, down
-  //    its sides to the blocks and aft (where they exit is an estimate).
+  //  - the halyards: inside the mast, out of it low down (CR 6.2.5), the jib's at its front, the main's at its after side,
+  //    each to a small block-and-tackle on the mast's side by its foot, the tackle's fall to the foot block and aft to the
+  //    piano (the owner, on Josephine). The tackle's purchase and exact height aren't known: drawn as a 2:1, its moving
+  //    block on the halyard's end about 0.4 m up, its standing part and fall at the foot block (estimates).
   const mastLines: Lines['mastLines'] = [], deckAt = (x: number, z: number) => deckY(uAtZ(z), Math.abs(x));
   // (a line lying on the boat from a to b: straight in plan, following the cabin top, over its forward edge and down its
   // face to the deck; a point every 20 cm, and points at the edge, so it lies on the surface)
@@ -624,10 +637,15 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       const d = (z: number) => new THREE.Vector3(side * 0.36, 0, z);
       fixed(line([fb, ...lay(fb, new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12)), ...lay(new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12), d(-1.38)), ...lay(d(-1.38), d(-2.12)), ...lay(d(-2.12), new THREE.Vector3(side * 0.07, 0, stem.z + 0.06)), stem.clone().setX(side * 0.015)], 'jib', 'jibCunningham'));
       if (side > 0) cringles.push({ l: line([stem.clone(), FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP)], 'jib', 'jibCunningham'), sail: 'jib' }), grp.add(cringles[cringles.length - 1].l);
-    } else { // the halyards: from their exits down the mast's side to the block
-      const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.3, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.15, MAST_AFT_Z - 0.004);
+    } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
+      const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
-      upMast([exit, new THREE.Vector3(side * (MAST_ATH / 2 + 0.006), exit.y - 0.15, MAST_Z), new THREE.Vector3(side * (MAST_ATH / 2 + 0.006), fb.y + 0.12, MAST_Z + 0.02), fb], role, key);
+      const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + (key === 'jibHalyard' ? -0.025 : 0.025), my = fb.y + 0.36;
+      const mb = sheaveBlock(0.014, -0.03); mb.position.set(sx, my + 0.03, mz); mb.rotation.y = Math.PI / 2; grp.add(mb); // the moving block, hanging from the halyard's end
+      upMast([exit, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, down the mast's side to the block
+      // the tackle's two parts: the standing part from the foot block's becket up to the moving block, and back down to the
+      // foot block's sheave (the fall, which goes aft to the piano)
+      upMast([fb.clone().setX(fb.x + side * 0.03), new THREE.Vector3(sx + side * 0.014, my - 0.01, mz), new THREE.Vector3(sx - side * 0.014, my - 0.01, mz), fb.clone()], role, key); // (the two parts a sheave's width apart, either side of it)
     }
   });
   // the mast's own bands: a black boot where it goes through the deck, and the lower band (CR 6.1.11: its upper edge the
@@ -648,7 +666,7 @@ const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
 /** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
 const MS_GAP = 0.15;
 /** The vang's lower block: on its fitting at the foot of the mast, abaft it (fixed to the mast: the tackle swings to the boom's block). */
-const VANG_FOOT = new THREE.Vector3(0, sheer(uAtZ(MAST_Z)) + 0.045 + 0.07 + 0.05, MAST_AFT_Z + 0.05);
+const VANG_FOOT = new THREE.Vector3(0, DECK_AT_MAST + 0.07 + 0.05, MAST_AFT_Z + 0.05);
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
@@ -698,7 +716,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // Appendix G), each side its own picture so the numbers read the right way round from both sides
   // Each side of the cloth has its own picture, by which way it faces (the sail mesh is mirrored to the boom's side,
   // which swaps the faces: syncBoatMesh puts the right picture on each face)
-  const pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true), mainPort: sailTexture(b.sailColor, b.no, 'port', true), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
+  const inks = { no: b.paint?.numberColor, f: b.paint?.insigniaColor }, pics = { mainStbd: sailTexture(b.sailColor, b.no, 'stbd', true, inks), mainPort: sailTexture(b.sailColor, b.no, 'port', true, inks), jibStbd: sailTexture(b.sailColor, '', 'stbd', false), jibPort: sailTexture(b.sailColor, '', 'port', false) };
   const sm = (side: 'front' | 'back', map: THREE.Texture) => new THREE.MeshLambertMaterial({
     map, side: side === 'front' ? THREE.FrontSide : THREE.BackSide, transparent: b.isUser, opacity: b.isUser ? 0.86 : 1
   });
@@ -748,12 +766,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   }
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; rig.add(pole);
-  // ... and stowed when it isn't: on the foredeck, a little to starboard of the centreline, from abreast the mast
-  // forward, in two deck chocks (the usual place on a small keelboat without lifelines, clear of the jib's tack)
+  // ... and stowed when it isn't: flat on a side deck in two chocks, from near the bow aft
   const stowed = new THREE.Group();
-  // (on a side deck, port or starboard as her owner keeps it, flat, just inboard of the toe rail, alongside the cabin)
+  // (on a side deck, port or starboard as her owner keeps it, flat, just inboard of the toe rail)
   { const side = (b.paint?.poleSide ?? 'port') === 'starboard' ? 1 : -1;
-    const z0 = -1.35, z1 = 0.72, xAt = (z: number) => side * (halfBeam(uAtZ(z)) - 0.11), yAt = (z: number) => deckY(uAtZ(z), Math.abs(xAt(z))) + 0.024;
+    // (2.85 m long: Theis Palm, North Sails' Folkboat talk to the Finnish class, 2023, "Whisker 'Jib' pole is 2,85 m";
+    // stowed well forward, its fore end near the bow, as the owner has it on Josephine)
+    // (just aft of the forestay, 0.22 m in from the side: clear of the forehatch, inboard of the shrouds' chainplates, and
+    // about 8 cm off the cabin's side at its after end)
+    const z0 = -L / 2 + 0.9, z1 = z0 + 2.85, xAt = (z: number) => side * (halfBeam(uAtZ(z)) - 0.22), yAt = (z: number) => deckY(uAtZ(z), Math.abs(xAt(z))) + 0.024;
     const a = new THREE.Vector3(xAt(z0), yAt(z0), z0), c = new THREE.Vector3(xAt(z1), yAt(z1), z1), len = a.distanceTo(c);
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), POLE_MAT);
     sp.position.copy(a).lerp(c, 0.5); sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize()); stowed.add(sp);
@@ -848,6 +869,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.068, 32), new THREE.MeshBasicMaterial({ map: card }));
   face.position.copy(cmp.position); face.position.z += 0.017; grp.add(face);
   const lubber = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.03), new THREE.MeshBasicMaterial({ color: 0xffb35c })); lubber.position.copy(face.position); lubber.position.y += 0.055; lubber.position.z += 0.001; grp.add(lubber);
+  // the racing instrument on your own boat's cabin top, as on Josephine: just forward of the sliding hatch's runners, on
+  // the centreline, its face tilted up toward the helm (render/tacktick.ts)
+  let instrument: Instrument | undefined;
+  if (b.isUser) {
+    instrument = buildInstrument();
+    const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - 0.09; // (0.09 m forward of the runners' forward ends)
+    instrument.grp.position.set(0, cabinTopAt(uAtZ(z), 0), z); grp.add(instrument.grp);
+  }
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
@@ -862,7 +891,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, crew, flags, ensign, hideHelm: false, nav, ropes, lantern: grp.userData.lantern };
+  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, hideHelm: false, nav, ropes, lantern: grp.userData.lantern };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -911,6 +940,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     e.staff.position.copy(e.axis).multiplyScalar(out * 0.3); e.staff.visible = out < 1; // (lifted up out of its socket, along its rake)
   }
   m.card.rotation = b.h * D2R;
+  if (m.instrument) syncInstrument(m.instrument, t, b.h, b.v / KT);
   // the crew on the windward side, hiking as hard as she needs
   syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking);
   if (b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
@@ -1135,7 +1165,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
  */
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
-function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean): THREE.CanvasTexture {
+function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
   // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
   // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture
@@ -1222,14 +1252,15 @@ function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boo
         x += widths[k] + 0.06;
       }
     };
-    const ink = dark ? '#f2f2ee' : '#1c2128', letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
+    // (the numbers' ink: the colour chosen on the Boat page, or the one that contrasts with the cloth; the F like the numbers unless chosen)
+    const ink = inks.no ?? (dark ? '#f2f2ee' : '#1c2128'), fInk = inks.f ?? ink, letters = (no.match(/^[A-Z]+/)?.[0] ?? '').replace(/^US$/, 'USA'), digits = no.replace(/^[A-Z]+\s*/, '');
     // each side carries its own: the F up near the head and the numbers below, the starboard set higher (RRS G1.3);
     // this side's reads crisply, the other side's shows through the cloth mirrored, a little softer
     const set = (s: 'stbd' | 'port', alpha: number) => {
       const mir = s === 'stbd';
       const hi = s === 'stbd', fT = hi ? 0.835 : 0.765, nT = hi ? 0.665 : 0.565, step = 0.42 / LUFF;
       g.globalAlpha = alpha;
-      figures('F', fT, ink, mir); // the class insignia, in the same ink as the numbers (as on San Francisco boats' sails)
+      figures('F', fT, fInk, mir); // the class insignia (by default in the same ink as the numbers, as on San Francisco boats' sails)
       if (letters) figures(letters, nT, ink, mir);
       figures(digits, nT - (letters ? step : 0), ink, mir);
       g.globalAlpha = 1;
