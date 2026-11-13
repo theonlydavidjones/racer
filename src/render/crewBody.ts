@@ -1,6 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { Person } from '../boat/crewPhys';
+import { warmDay } from '../environment/air';
 
 /**
  * A sailor's body: one skinned mesh on fifteen bones (hips, spine, head, shoulders, elbows, wrists, hips, knees, ankles), so a person is
@@ -727,8 +728,25 @@ const LENSES = [0x303a44, 0x2c3846, 0x3a2e26, 0x26303a];
  * colour: a cap, a beanie or the hood up over a cap; their jacket in the team colour or their own; salopettes; an
  * inflatable or a foam vest; boots, skin, hair and lenses.
  */
-/** (Dev switch for now: a warm, dry day. To be driven by the day's real air temperature, rain and sea: environment/weather.ts) */
-export const dress: { warm: boolean | 'all' } = { warm: false }; // ('all': everyone in shorts, for checking the kit)
+/** A warm, dry day's kit or not, for the figures being built now (set by dressWarm for each boat as it's built:
+ * render/boatMesh.ts; 'all', everyone in shorts, for checking the kit: the crew lab's ?summer=all). */
+export const dress: { warm: boolean | 'all' } = { warm: false };
+/** Whitecaps at Beaufort force 5, a fresh breeze (17 kt, 8.75 m/s at 10 m), the first force whose sea state the scale
+ * gives "chance of some spray": the same whitecap formula as environment/sea.ts (Monahan & O'Muircheartaigh 1980,
+ * W = 3.84e-6·U^3.41). And chop steeper than about 1 in 14 (H/L 0.07: sea.ts's `steep`), short and steep, which throws
+ * it aboard in less wind (wind against the tide). */
+const SPRAY_WHITE = 3.84e-6 * Math.pow(8.75, 3.41), SPRAY_STEEP = 0.07;
+/**
+ * What a crew dresses for at the dock, for the day (the owner, 13 Nov 2026): shorts and sneakers for about half of
+ * them on a warm day (68 °F, 20 °C, or more in the racing hours: environment/air.ts warmDay, from Fort Point's record,
+ * forecast or climate) that's dry (no rain set) and where they won't be soaked (the sea where she is: no whitecaps
+ * of a fresh breeze, no steep chop). Decided once, as she's built for the race: nobody changes clothes mid-race.
+ */
+export function dressWarm(date: string, rain: number, sea?: { white: number; steep: number }): boolean {
+  if (!date || rain > 0) return false;
+  if (sea && (sea.white >= SPRAY_WHITE || sea.steep >= SPRAY_STEEP)) return false;
+  return warmDay(date);
+}
 /** Shorts in the colours they come in (the owner's photo: maroon), and sneakers: white, or grey and navy. */
 const SHORTS = [0x6a2a32, 0x6a2a32, 0x7a3a36, 0xb9a88a, 0xa8946e, 0x2a3346, 0x4a4f57, 0x3f5a3a]; // (maroons and khakis the commonest: they stand out from the dark jackets, as in the photo)
 const SNEAKERS: [Mat, Mat][] = [[{ c: 0xe9e8e2, r: 0.6 }, { c: 0xdedcd4, r: 0.85 }], [{ c: 0xe9e8e2, r: 0.6 }, { c: 0x8c6a4a, r: 0.85 }], [{ c: 0x3a3f47, r: 0.6 }, { c: 0xdedcd4, r: 0.85 }], [{ c: 0x1f2c48, r: 0.6 }, { c: 0xe9e8e2, r: 0.85 }]];

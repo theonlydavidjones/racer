@@ -8,6 +8,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
+import { dress, dressWarm } from './crewBody';
 import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
@@ -728,7 +729,8 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
-export function buildBoatMesh(b: Boat): BoatMesh {
+/** `day`: the race's date and set rain, for what the crew wear (crewBody.ts dressWarm); without it, their usual kit. */
+export function buildBoatMesh(b: Boat, day?: { date: string; rain: number }): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
   const alu = b.build.spars === 'aluminium', aluBoom = (b.build.boom ?? b.build.spars) === 'aluminium';
   const spar = alu ? MAT.sparAlu : MAT.spar, boomMat = aluBoom ? MAT.sparAlu : MAT.spar;
@@ -922,7 +924,10 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   }
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
+  const was = dress.warm;
+  if (day && was !== 'all') dress.warm = dressWarm(day.date, day.rain, b.sea);
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
+  dress.warm = was;
   // she stands in front of the lights' reflections on the water (the streaks are drawn over the waves, so they can't
   // use the depth buffer): everything of hers marks the stencil, and the streaks leave those pixels alone (navLights.ts)
   grp.traverse(o => { const m = (o as THREE.Mesh).material; for (const x of Array.isArray(m) ? m : m ? [m] : []) markBoat(x); });

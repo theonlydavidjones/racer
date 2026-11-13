@@ -436,7 +436,7 @@ export class SceneView {
     const oldBoats = this.boatMeshes.map(m => m.grp);
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => {
-      const m = buildBoatMesh(b); this.scene.add(m.grp);
+      const m = buildBoatMesh(b, { date: w.raceDate, rain: w.settings.rain ?? 0 }); this.scene.add(m.grp);
       m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       return m;
     });
