@@ -5,7 +5,7 @@ import type { Boat } from '../src/boat/boat';
 /** Dock lines as damped springs, with the capstan equation's hold round a cleat (boat/dockLines.ts). */
 const boat = (v = 0, h = 0): Boat => ({ x: 0, y: 0, h, v, astern: 0, sway: 0, turnRate: 0, vx: 0, vy: 0 } as unknown as Boat);
 const still = { x: 0, y: 0 }, calm = { from: 0, kt: 0 }, open = (_p: { x: number; y: number }) => false;
-const run = (b: Boat, lines: DockLine[], wind = calm, secs = 20, solid = open) => { let lost: DockLine | undefined, bump = 0; for (let i = 0; i < secs * 60; i++) { const o = dockStep(b, lines, wind, still, 1 / 60, solid); lost ??= o.lost; bump = Math.max(bump, o.bump ?? 0); } return { lost, bump }; };
+const run = (b: Boat, lines: DockLine[], wind = calm, secs = 20, solid = open) => { let lost: DockLine | undefined, bump = 0; for (let i = 0; i < secs * 60; i++) { const o = dockStep(b, lines, wind, still, 1 / 60, solid); lost ??= o.parted; bump = Math.max(bump, o.bump ?? 0); } return { lost, bump }; };
 
 describe('dock lines', () => {
   it('a made bow line stops her at a walk within a short way, with a tension the line takes (well under its breaking load)', () => {
@@ -31,6 +31,7 @@ describe('dock lines', () => {
   it('wind abeam: held off the dock by her bow and stern lines at about her windage, or, with none, blown off at a slow drift', () => {
     // wind from the west (270) on a boat heading north: it pushes her east (to starboard); the dock's to port, lines to it
     const b = boat(0, 0), lines: DockLine[] = [{ role: 'bow', at: 3.6, side: -1, to: { x: -1.6, y: 3.6 }, len: 0.6, state: 'made' }, { role: 'stern', at: -3.6, side: -1, to: { x: -1.6, y: -3.6 }, len: 0.6, state: 'made' }];
+    for (const l of lines) { const p = cleatOf(b, l); l.len = Math.hypot(l.to.x - p.x, l.to.y - p.y) + 0.05; } // (made with a little slack)
     run(b, lines, { from: 270, kt: 15 }, 30);
     const q = 0.5 * 1.225 * (15 * 0.5144) ** 2 * 5.5; // (her side-on windage, HOVE.windSide)
     const sumT = lines.reduce((a, l) => a + (l.T ?? 0), 0);

@@ -1,6 +1,11 @@
 import type { Boat } from './boat';
-import { HANDLING } from './dynamics';
+import { HANDLING, HULL } from './dynamics';
 import { ASTERN_DRAG, HOVE } from './physics';
+import { FULL_RUDDER, RUDDER } from './balance';
+import { displacement } from './crewPhys';
+import { condition } from './condition';
+import { motorForce } from './motor';
+import { clamp, D2R } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import type { Vec } from '../core/math';
 
@@ -18,9 +23,10 @@ import type { Vec } from '../core/math';
  *
  * The numbers, with their sources; ESTIMATE marks the ones no source was found for (the likeliest hosts, practicalsailor,
  * goodoldboat and seabreeze, weren't reachable):
- *  - Stretch: about 2.5% at its working load, 10% of its breaking strength, for nylon (Practical Sailor, "Used nylon
- *    three-strand rope faces the ultimate endurance test"); breaking strength 4,400 lb (19.6 kN) for 3/8" nylon three-strand
- *    (New England Ropes, as listed by West Marine). So EA = 0.1·19.6 kN / 0.025 = 78 kN.
+ *  - Stretch: 5.5% at its working load, 10% of its breaking strength, for nylon three-strand (Samson's Pro-Set-3 data, as
+ *    search summaries give it; its PTS-3 7.8%; Practical Sailor's 2.5% is for rope well worked in, stiffer than a dock
+ *    line's first loads); breaking strength 3,700 lb (16.5 kN) for 3/8" nylon three-strand, the minimum (Certex; New
+ *    England Ropes lists 4,400 lb as its average). So EA = 0.1·16.5 kN / 0.055 = 30 kN.
  *  - Damping: a fifth of critical for her mass on the line (ESTIMATE: nylon's hysteresis and the water's drag on the boat).
  *  - Friction of rope round a cleat μ = 0.3 (ESTIMATE: bulk nylon on steel is about 0.4, Engineering ToolBox; rope on a
  *    smooth cleat less), one full turn θ = 2π: a factor of e^(0.3·2π) ≈ 6.6.
@@ -40,19 +46,32 @@ export interface DockLine {
   state: 'held' | 'made';
   /** the line's tension now, N (for the drawing and the tests) */
   T?: number;
+  /** how long it'll be with her lying in her berth: the hands warp her in to that */
+  goal?: number;
 }
 
-export const LINE_EA = 0.1 * 19600 / 0.025;
+export const LINE_EA = 0.1 * 16500 / 0.055;
 export const LINE_ZETA = 0.2;
 export const CLEAT_MU = 0.3;
 export const HAND_N = 250;
-export const LINE_BREAK = 19600;
+export const LINE_BREAK = 16500;
 /** What a line held round a cleat with one turn holds before it renders out through the hand, N. */
 export const HELD_MAX = HAND_N * Math.exp(CLEAT_MU * 2 * Math.PI);
+/**
+ * A fender (or the rubbing strake on the dock's edge) as a spring and damper on how far her side presses into it: an
+ * inflated fender squashes about a tenth of a metre under a boat's push (ESTIMATE: 15 kN/m, damped at half of critical
+ * for a third of her mass, the end of her that's touching).
+ */
+export const FENDER_K = 15000;
+export const FENDER_ZETA = 0.5;
 
-const RHO = 1025, AIR = 1.225, D2R = Math.PI / 180;
-/** Her half-beam at a station `at` m forward of her middle: 1.1 m amidships, narrowing to her stem and transom. */
-export const railAt = (at: number): number => 1.1 * Math.max(0.15, 1 - (at / 3.9) ** 2);
+const RHO = 1025, AIR = 1.225;
+/**
+ * Her half-beam at her rail, `at` m forward of her middle: 1.1 m amidships, fining to the stem forward and to the transom
+ * aft, fuller aft than forward (ESTIMATE from the lines: render/hull.ts draws the shape; 0.15 m at the stem head, 0.55 m
+ * at the transom's corners).
+ */
+export const railAt = (at: number): number => at >= 0 ? 1.1 * Math.max(0.14, 1 - (at / 3.9) ** 2) : 1.1 * Math.max(0.5, 1 - 0.5 * (at / 3.9) ** 2);
 
 /** Where her cleat is, in the world. */
 export function cleatOf(b: Pick<Boat, 'x' | 'y' | 'h'>, L: Pick<DockLine, 'at' | 'side'>): Vec {
@@ -61,80 +80,102 @@ export function cleatOf(b: Pick<Boat, 'x' | 'y' | 'h'>, L: Pick<DockLine, 'at' |
 }
 
 export interface DockStepOut {
-  /** a line that rendered out past its end, or parted: let go */
-  lost?: DockLine;
-  /** she touched the dock: how fast her side or end met it (m/s) */
+  /** a made line that parted (gone: the others hold) */
+  parted?: DockLine;
+  /** she touched the dock or a moored boat: how fast her side or end met it (m/s) */
   bump?: number;
 }
 
 /**
- * One step at the dock: the wind (`wind`, from deg, kt over the water), the current (`cur`, m/s, the water's own drift), her
- * lines, and `solid(p)`: whether a point is dock (or land). Updates her speed through the water (v / astern, sway), her
- * turn and her position.
+ * One step at the dock: the wind (`wind`, from deg, kt over the water: windOnWater), the current (`cur`, m/s), her lines,
+ * and `solid(p)`: whether a point is dock, or a boat lying in a slip. Updates her speed through the water (v / astern,
+ * sway), her turn and her position. The body is the hove-to model's (physics.ts heaveTo): her displacement with her
+ * crew, its added masses and gyration, the keel's strips with their lift and broadside drag, the rudder (the helm still
+ * steers her against a line), the motor's push, and the wind on her rig and any sail still up and let fly.
  */
 export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: number }, cur: Vec, dt: number, solid: (p: Vec) => boolean): DockStepOut {
   const out: DockStepOut = {};
-  const m = HANDLING.mass, my = m * (1 + HOVE.swayAdded), I = m * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
+  const cs = b.crew, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  const disp = (cs ? displacement(cs.spec) : HULL.displacement) + (cond?.extraKg ?? 0);
+  const mx = HANDLING.mass * disp / HULL.displacement, my = disp * (1 + HOVE.swayAdded), I = disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
   const s = Math.sin(b.h * D2R), c = Math.cos(b.h * D2R), fwd = { x: s, y: c }, stb = { x: c, y: -s };
   let u = b.v - (b.astern ?? 0), sw = b.sway ?? 0, r = (b.turnRate ?? 0) * D2R; // (surge and sway through the water, m/s; yaw rate, rad/s, + to starboard)
-  // over the ground: through the water, plus the current
-  const vg = { x: fwd.x * u + stb.x * sw + cur.x, y: fwd.y * u + stb.y * sw + cur.y };
+  const vg = { x: fwd.x * u + stb.x * sw + cur.x, y: fwd.y * u + stb.y * sw + cur.y }; // (over the ground)
   let X = 0, Y = 0, M = 0;
-  // the water: at a walk, the coast's law ahead and astern (ASTERN_DRAG); sideways and turning, the hull and keel's
-  // broadside drag (HOVE.crossCd on its lateral area), strip by strip so it damps her turning too
-  X -= Math.sign(u) * (ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * Math.abs(u)) * m;
-  const Lw = orc.boat.imsL, N = 8, A = HOVE.latArea;
+  // the water: ahead and astern at a walk, the coast's law (ASTERN_DRAG, as an acceleration); sideways and turning, the
+  // hull and keel strip by strip as hove to: the keel's lift with way on and the broadside drag (its centre HOVE.dragAft
+  // abaft the keel's)
+  X -= Math.sign(u) * (ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * Math.abs(u)) * mx;
+  const Lw = orc.boat.imsL, N = 8, A = HOVE.latArea, aL = Math.PI * HOVE.aspect / 2, uEff = u >= 0 ? u : 0.5 * Math.abs(u);
+  const x2 = (Lw * Lw / 12) * (1 - 1 / (N * N)), kD = -HOVE.dragAft / x2;
   for (let i = 0; i < N; i++) {
-    const x = -Lw / 2 + (i + 0.5) * Lw / N, vy = sw + r * x, f = -0.5 * RHO * (A / N) * HOVE.crossCd * vy * Math.abs(vy);
+    const x = -Lw / 2 + (i + 0.5) * Lw / N, vy = sw + r * x;
+    const f = -0.5 * RHO * (A / N) * (aL * uEff * vy + HOVE.crossCd * (1 + kD * x) * vy * Math.abs(vy));
     Y += f; M += f * x;
   }
-  // the wind on her bare hull and rig, relative to her motion over the ground: drag along it, and the broadside push
-  const wTo = (wind.from + 180) * D2R, wv = wind.kt * 0.5144;
-  const ax = Math.sin(wTo) * wv - vg.x, ay = Math.cos(wTo) * wv - vg.y, aws = Math.hypot(ax, ay);
+  // the rudder, behind the keel (RUDDER): the blade's angle from the helm (+ turning her to starboard) and the sideways flow
+  // past it; going astern the water meets it from aft and it works backwards, and less well (0.7, as hove to)
+  {
+    const helm = clamp((b.steer ?? 0) - (b.tiller ?? 0), -1, 1), back = u < 0, vyR = HOVE.rudderFlow * (sw - r * RUDDER.arm);
+    const aoa = (back ? -1 : 1) * helm * FULL_RUDDER * D2R + Math.atan2(vyR, Math.max(0.01, Math.abs(u)));
+    const yR = -0.5 * RHO * (u * u + vyR * vyR) * RUDDER.area * clamp(RUDDER.slope * aoa, -1.05, 1.05) * (back ? 0.7 : 1);
+    Y += yR; M -= yR * RUDDER.arm;
+  }
+  // the motor, if it's driving (boat/motor.ts: its push along her heading, or its leg's drag)
+  X += motorForce(b);
+  // the wind on her, relative to her motion through the water (the wind's over the water: windOnWater): her bare hull and
+  // rig, and any sail still hoisted, let fly and flogging (HANDLING.flogCdA, as dynamics.ts airDrag); its broadside push a
+  // little ahead of the keel's centre, the mast being forward (HOVE.windLever)
+  const wTo = (wind.from + 180) * D2R, wv = wind.kt * 0.5144, vw = { x: vg.x - cur.x, y: vg.y - cur.y };
+  const ax = Math.sin(wTo) * wv - vw.x, ay = Math.cos(wTo) * wv - vw.y, aws = Math.hypot(ax, ay);
   if (aws > 0.01) {
     const q = 0.5 * AIR * aws * aws, along = (ax * fwd.x + ay * fwd.y) / aws, across = (ax * stb.x + ay * stb.y) / aws;
+    const cloth = Math.min(1, ((b.rig?.main ?? 0) + (b.rig?.jib ?? 0)) / 2);
     const wy = q * HOVE.windSide * across * Math.abs(across);
-    X += q * HANDLING.windageCdA * along * Math.abs(along); Y += wy; M += wy * HOVE.windLever; // (the windage acts a little ahead of the keel's centre: the mast's forward, so it blows her bow off)
+    X += q * (HANDLING.windageCdA + HANDLING.flogCdA * cloth) * along; Y += wy; M += wy * HOVE.windLever;
   }
   // the lines
-  for (const L of lines) {
+  for (const L of [...lines]) {
     const p = cleatOf(b, L), dx = L.to.x - p.x, dy = L.to.y - p.y, d = Math.hypot(dx, dy) || 1e-6;
-    const k = LINE_EA / Math.max(0.5, L.len), cDamp = 2 * LINE_ZETA * Math.sqrt(k * m);
+    const k = LINE_EA / Math.max(0.5, L.len), cDamp = 2 * LINE_ZETA * Math.sqrt(k * mx);
     // her cleat's speed over the ground (a turn to starboard, clockwise from above, moves a point ahead of her middle to
     // starboard), and how fast it's opening from the dock cleat
     const lx = { x: dx / d, y: dy / d }, arm = { x: p.x - b.x, y: p.y - b.y };
     const pvx = vg.x + r * arm.y, pvy = vg.y - r * arm.x;
     const stretch = d - L.len, rate = -(pvx * lx.x + pvy * lx.y);
     let T = stretch > 0 ? Math.max(0, k * stretch + cDamp * rate) : 0;
-    const cap = L.state === 'held' ? HELD_MAX : LINE_BREAK;
-    if (T > cap) { L.len += (T - cap) / k; T = cap; if (L.state === 'made') { out.lost = L; T = 0; } } // (renders out through the hand; a made line parts)
+    if (L.state === 'held' && T > HELD_MAX) { L.len += (T - HELD_MAX) / k; T = HELD_MAX; } // (renders out through the hand)
+    if (L.state === 'made' && T > LINE_BREAK) { out.parted = L; lines.splice(lines.indexOf(L), 1); continue; } // (it parts)
     L.T = T;
     const fx = lx.x * T, fy = lx.y * T;
-    X += fx * fwd.x + fy * fwd.y; const fy2 = fx * stb.x + fy * stb.y; Y += fy2;
+    X += fx * fwd.x + fy * fwd.y; Y += fx * stb.x + fy * stb.y;
     M += arm.y * fx - arm.x * fy; // (its moment about her middle, + turning her to starboard: clockwise from above)
   }
-  // integrate (semi-implicit: the line's stiffness against her mass, a period of a second or two, is well within a 60th of a second)
-  u += X / (m * 1.05) * dt; sw += Y / my * dt; r += M / I * dt;
+  // the dock (and the boats in the slips): wherever her rail presses into one, a fender's spring and damper along the way
+  // out of it (the shortest way: the dock's own face), acting there, so a bow that touches first swings her stern in
+  for (const at of [3.6, 2.4, 1.2, 0, -1.2, -2.4, -3.6]) for (const side of [1, -1] as const) {
+    const q = cleatOf(b, { at, side });
+    if (!solid(q)) continue;
+    let depth = Infinity, n = { x: 0, y: 0 };
+    for (let k = 0; k < 16; k++) {
+      const a = k * Math.PI / 8, dir = { x: Math.sin(a), y: Math.cos(a) };
+      for (let e = 0.02; e < Math.min(depth, 0.6); e += 0.02) if (!solid({ x: q.x + dir.x * e, y: q.y + dir.y * e })) { depth = e; n = dir; break; }
+    }
+    if (!Number.isFinite(depth)) continue; // (deeper than a fender: nothing sensible to push on)
+    const arm = { x: q.x - b.x, y: q.y - b.y }, vq = { x: vg.x + r * arm.y, y: vg.y - r * arm.x }, into = -(vq.x * n.x + vq.y * n.y);
+    if (into > 0.02) out.bump = Math.max(out.bump ?? 0, into);
+    const mEnd = disp / 3, F = Math.max(0, FENDER_K * depth + 2 * FENDER_ZETA * Math.sqrt(FENDER_K * mEnd) * into);
+    const fx = n.x * F, fy = n.y * F;
+    X += fx * fwd.x + fy * fwd.y; Y += fx * stb.x + fy * stb.y; M += arm.y * fx - arm.x * fy;
+  }
+  // integrate, semi-implicitly: the speeds first, then the position with them (a line's stiffness against the end of her
+  // it pulls, about 750 kg, rings at 13 rad/s on 0.6 m of line, a period of half a second: well inside a 60th)
+  u += X / mx * dt; sw += Y / my * dt; r += M / I * dt;
   b.v = Math.max(0, u); b.astern = Math.max(0, -u); b.sway = sw; b.turnRate = r / D2R;
   b.h = ((b.h + r / D2R * dt) % 360 + 360) % 360;
   const s2 = Math.sin(b.h * D2R), c2 = Math.cos(b.h * D2R);
   b.vx = s2 * u + c2 * sw + cur.x; b.vy = c2 * u - s2 * sw + cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
-  // the dock: her rail at the bow, the shrouds, amidships, the quarters and the transom, both sides; where one's inside the
-  // dock she's backed off it and her speed toward it taken away, as a fender takes it
-  for (const at of [3.6, 1.5, 0, -1.8, -3.6]) for (const side of [1, -1] as const) {
-    const q = cleatOf(b, { at, side });
-    if (!solid(q)) continue;
-    const n = { x: b.x - q.x, y: b.y - q.y }, nl = Math.hypot(n.x, n.y) || 1; n.x /= nl; n.y /= nl; // (back toward her middle)
-    const arm = { x: q.x - b.x, y: q.y - b.y }, vq = { x: b.vx + (b.turnRate * D2R) * arm.y, y: b.vy - (b.turnRate * D2R) * arm.x };
-    const into = -(vq.x * n.x + vq.y * n.y);
-    if (into > 0.02) out.bump = Math.max(out.bump ?? 0, into);
-    b.x += n.x * 0.04; b.y += n.y * 0.04;
-    // her speed into the dock, at her middle, taken out (sway and surge by their share along the normal)
-    const vn = b.vx * n.x + b.vy * n.y;
-    if (vn < 0) { const ux = n.x * -vn, uy = n.y * -vn; const du = ux * s2 + uy * c2, ds = ux * c2 - uy * s2; const u2 = (b.v - (b.astern ?? 0)) + du; b.v = Math.max(0, u2); b.astern = Math.max(0, -u2); b.sway = (b.sway ?? 0) + ds; b.vx += ux; b.vy += uy; }
-    b.turnRate *= 0.7;
-  }
   return out;
 }
 
