@@ -103,8 +103,12 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
  * flowTurnRate, the 9 m turning radius), so 8 s sees a turn of 90° through, with her yaw lag, and the boats' paths
  * after it (slower than about 1.7 m/s, not quite: a crawling boat's escape is a short one). */
 const ESC_HORIZON = 8;
-/** The turns she weighs, deg (+ to starboard). */
-const ESC_TURNS = [-90, -60, -40, -20, 20, 40, 60, 90];
+/** Her prediction's time step, s: a fifth of a second, against a yaw lag of about half a second (physics.ts yawLag),
+ * moves the gaps it finds by centimetres, and halves the cost of the tenth arcs.ts takes by default. */
+const ESC_DT = 0.2;
+/** The turns she weighs, deg (+ to starboard): arcs.ts's own, and her course among them (keepClear). Finer steps
+ * cost as much again for headings a few degrees apart, and her course is the one that matters. */
+const ESC_TURNS = [-90, -60, -30, 30, 60, 90];
 /** How long another boat's present turn is carried on in predicting her (s): a tack is done in about 2 s from here, and
  * a helm's small correction lasts about as long; carried the whole 8 s, a boat mid-tack was predicted circling 150° and
  * a 2°/s correction put her 2.8 m off by the end, the size of the gap kept. */
@@ -171,9 +175,10 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   const delay = threats.every(o => seen.has(String(o.id))) ? 0.2 : ai.kn.reactS;
   const toCourse = Math.round(wrap(aimH - b.h)), turns = [...(Math.abs(toCourse) > 3 ? [toCourse] : []), ...ESC_TURNS];
   const me = { x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 };
-  const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, { delay, horizon: ESC_HORIZON, turns }) : null;
-  const ownRow = others.filter(o => w.rights(b, o).kc === o), rest = others.filter(o => !ownRow.includes(o));
-  const gK = run(kc), gR = run(row), gO = run(ownRow), gX = run(rest);
+  const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT }) : null;
+  const gK = run(kc), gR = run(row);
+  // (the boats beside the threats, only when her own course won't do: most of the time it will, and they cost as much)
+  let gO: Candidate[] | null = null, gX: Candidate[] | null = null;
   const tackShort = TACK_SHORT_M_PER_KT * b.ww.kt, side = (h: number) => Math.sign(wrap(b.ww.from - h));
   // her slack on candidate i (m: her least gap less the gap she needs, the worst of the groups). The boats beside the
   // threats: with `all`, each given the gap it's owed; otherwise only kept from touching (whatever else gives way,
@@ -195,6 +200,8 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   // (her own course is no change of course, as far as the others are concerned: only the boats she's keeping clear of)
   const ownSlack = Math.min(gK ? gK[ownI].minGap - needKc : Infinity, gR ? gR[ownI].minGap - needRow : Infinity);
   if (!(ownSlack >= 0 && ok(cands[ownI]))) {
+    const ownRow = others.filter(o => w.rights(b, o).kc === o), rest = others.filter(o => !ownRow.includes(o));
+    gO = run(ownRow); gX = run(rest);
     const nearest = (is: number[]) => is.reduce((p, q) => Math.abs(wrap(cands[q].heading - aimH)) < Math.abs(wrap(cands[p].heading - aimH)) ? q : p);
     const idx = cands.map((_, i) => i).filter(i => i !== ownI && ok(cands[i]));
     const good = idx.filter(i => slack(i, true) >= 0);
@@ -889,7 +896,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const close = w.boats.filter(o => o !== b && !o.finished && dist(o, b) < 40);
     if (close.length) {
       const [c] = escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 },
-        close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))] }).filter(q => q.turn !== 0);
+        close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT }).filter(q => q.turn !== 0);
       if (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SHORT_M_PER_KT * ww.kt) {
         desired = b.tack === 'S' ? csS : csP; tackHeld = true;
         ai.tackHeldT = (ai.tackHeldT ?? 0) + dt;
