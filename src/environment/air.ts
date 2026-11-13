@@ -32,6 +32,8 @@ export interface AirTemp {
   warmShare: number;
   /** where it comes from, said plainly */
   source: string;
+  /** the day's own (observed or forecast), not the climate's usual */
+  observed?: boolean;
 }
 /** The air temperature at `tMin` (minutes since epoch, UTC) on `date` (the race day, YYYY-MM-DD). */
 export function airTempC(_date: string, tMin: number): AirTemp {
@@ -42,3 +44,23 @@ export function airTempC(_date: string, tMin: number): AirTemp {
 /** The temperature counted as a warm day for shorts (°C). A judgement, not a sourced figure: about where people
  * sailing in a breeze, with a jacket on, take their salopettes off. */
 export const WARM_C = 20;
+
+/** 0..1 from a date (YYYY-MM-DD): the same for everyone sailing that day. */
+function dayDraw(date: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < date.length; i++) { h ^= date.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
+  return (h >>> 0) / 4294967296;
+}
+/**
+ * Whether it's warm (WARM_C or more) at `tMin` on `date`. Where the sim has the day's own temperature (observed or
+ * forecast), that says. Where it has only the climate, the day is warm as often as Fort Point's hours are: the share of
+ * hours at 20 °C or more in that month at that hour (NOAA CO-OPS 9414290, 2021–2025), against one number drawn from the
+ * date (so a warm day is the same day for everyone, and warm all afternoon if it's warm at its warmest hour: one draw
+ * for the whole day, the warmer hours' larger shares passing it first).
+ */
+export function warmAt(date: string, tMin: number): boolean {
+  const a = airTempC(date, tMin);
+  if (a.observed) return a.c >= WARM_C;
+  return dayDraw(date) < a.warmShare;
+}
