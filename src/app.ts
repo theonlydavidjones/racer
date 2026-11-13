@@ -408,8 +408,14 @@ document.addEventListener('click', e => {
   else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
 });
 // the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout)
-function crewPopOpen(open = !!$('crewPop').hidden): void { $('crewPop').hidden = !open; $('bCrew').setAttribute('aria-expanded', String(open)); $('bCrew').classList.toggle('on', open); }
+function crewPopOpen(open = !!$('crewPop').hidden): void {
+  $('crewPop').hidden = !open; $('bCrew').setAttribute('aria-expanded', String(open)); $('bCrew').classList.toggle('on', open);
+  // (opened from the Coach card's crew line: it sits just above that card, on the left, clear of the band)
+  if (open) { const r = $('trimPanel').getBoundingClientRect(), pop = $('crewPop').style; pop.bottom = `${Math.round(innerHeight - r.top + 8)}px`; pop.left = `${Math.round(r.left)}px`; pop.right = 'auto'; }
+}
 $('bCrew').onclick = () => crewPopOpen();
+// the crew line in the Coach card is redrawn every frame: catch its clicks on the card
+$('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-crew')) crewPopOpen(); });
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
 /* The sail controls band (ui/sailBand.ts): every line, laid out as you face forward from the helm. */
 const band = new SailBand({
@@ -666,13 +672,17 @@ function goHome(): void {
 /** Home: the course to her slip (when she has one), the Navigator's button and keys for cruising. */
 function homeNow(): void { void host.ask({ k: 'sendHome' }).then(ok => { if (ok) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); } }); }
 $('bHome').onclick = goHome;
+// Home is part of the navigator (the owner, 13 Nov: "Home really belongs inside the nav experience"): its Sail home
+$('bNavHome').onclick = () => { navView.close(); goHome(); };
 $('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); homeNow(); };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
 /** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
 function homeButton(): void {
-  const el = $('bHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
-  const hide = !w.running || S.mode === 'drill' || !!u.docked || !!u.handled || home;
+  // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden)
+  const el = $('bNavHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
+  const hide = !w.running || !w.cruising || S.mode === 'drill' || !!u.docked || !!u.handled || home;
   if (el.hidden !== hide) el.hidden = hide;
+  if (!$('bHome').hidden) $('bHome').hidden = true;
   el.classList.toggle('dim', !w.homeSlip);
   const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Fleet first)';
   if (el.title !== t) el.title = t;
@@ -716,6 +726,8 @@ $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
 // Cruising, the same button (and key) opens the navigator's passage plan instead.
 $('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle(w));
+$('nextCard').addEventListener('click', () => (w.cruising ? navView.toggle(w) : courseView.toggle(w)));
+$('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navView.toggle(w) : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
@@ -724,7 +736,9 @@ let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
 let resultsShown = false;
 $('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
-$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
+$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); $('bSound2').textContent = `Sound: ${sound.on ? 'on' : 'off'}`; };
+// Sound and Exit live in the pause menu (the surface audit, owner 13 Nov: Pause and Speed stay on the surface)
+$('bSound2').onclick = () => $('bSound').click();
 $('bPause').onclick = () => {
   if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;
   $('bRestart').textContent = w.freeSail ? 'Restart this cruise' : 'Restart this race';
@@ -818,7 +832,7 @@ $('map').addEventListener('click', () => {
  * just be a view in the inset map", and no new buttons outside it); racing, the Course button stays with the helm's. */
 function insetViews(): void {
   const cruising = !!w?.cruising, b = $('bMapNav');
-  b.hidden = !cruising; $('bCourse').hidden = cruising;
+  b.hidden = !cruising; $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
   if (!cruising) hud.insetView = 'map';
   b.setAttribute('aria-pressed', String(hud.insetView === 'nav'));
 }
@@ -828,8 +842,18 @@ $('bMapNav').addEventListener('click', e => { e.stopPropagation(); hud.insetView
 /* ---------------- message log ---------------- */
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const stamp = (t: number | null) => t == null ? '' : `<span class="lt">${fmtClock(t)}</span>`;
+/**
+ * When each message arrived (wall clock, s), so the card can let it go once it's stale (the owner, 13 Nov: "it's hard to
+ * tell if it's stale; maybe hiding it is the solve"). A line stays MSG_FRESH s: long enough to read a two-line message
+ * twice at a glance, short enough that it doesn't linger into the next situation. The card's header and the log stay.
+ */
+const MSG_FRESH = 40, msgSeen = new WeakMap<object, number>();
+setInterval(() => { if (messageLog.length) renderLog(); }, 5000);
 function renderLog(): void {
-  const recent = messageLog.filter(m => !m.msg.startsWith('— ')).slice(-4).reverse();
+  const now = performance.now() / 1000;
+  for (const m of messageLog) if (!msgSeen.has(m)) msgSeen.set(m, now);
+  const recent = messageLog.filter(m => !m.msg.startsWith('— ') && now - msgSeen.get(m)! < MSG_FRESH).slice(-4).reverse();
+  $('msgLog').classList.toggle('rest', !recent.length);
   // one line each on screen, the headline (feedback.ts headline); the whole message on hover and in the log (All, or a tap)
   $('msgRecent').innerHTML = recent.map(m => { const { head, cut } = headline(m.msg);
     return `<li${cut ? ' class="cut"' : ''} title="${esc(m.msg).replace(/"/g, '&quot;')}">${stamp(m.t)}${esc(head)}</li>`; }).join('');
