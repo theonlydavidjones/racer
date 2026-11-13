@@ -349,7 +349,7 @@ describe('The crew\'s places fore and aft and the trim the polar is sailed withi
     const { DEFAULT_CREW, stationZ } = await import('../src/boat/crewPhys');
     const ref = [1.2, 1.8], at = (f: number, deck = false) => trimFromMoment(DEFAULT_CREW.crew.reduce((m, p, j) => m + p.w * (ref[j] - stationZ(j, 2, f, deck)), 0));
     expect(TRIM.reach[0]).toBeCloseTo(at(0), 3); expect(TRIM.reach[1]).toBeCloseTo(at(1), 3);
-    // (out on the side deck, aft of the jib winch, the forward end is short of the benches': hullTrim.ts's note)
-    expect(at(1, true)).toBeCloseTo(-0.0221, 3);
+    // (out on the side deck, the forward end is the seat forward of the jib winch, nearly the benches': hullTrim.ts's note)
+    expect(at(1, true)).toBeCloseTo(-0.0083, 3);
   });
 });

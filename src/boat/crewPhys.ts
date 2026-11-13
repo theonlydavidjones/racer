@@ -198,7 +198,7 @@ export function deckHalf(z: number): number {
  * Sails' Nordic Folkboat tuning guide: the cabin-top lead 2.65 m from the forestay pin, the track centred 58 cm off the
  * centreline: on the cabin top about 0.6 m aft of the mast).
  */
-export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.65, cockpitAft: 2.5, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
+export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, cockpitAft: 2.5, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
 /**
  * Deep downwind with the pole out in light air, the crew go right forward to put her bow down (the owner, who races
  * them: "normally people sit all the way up on the foredeck. usually one crew will sit in front of the forestay with both
@@ -210,16 +210,20 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.65, cockpitAft: 2.5,
  * Where the free crew sit fore and aft (the owner's choice, on the cockpit to the construction plan, render/hull.ts
  * COCKPIT_FIT): on the side benches (the bulkhead at 1.06 to St. 4¾ at 1.945) or the side deck beside them, and on aft
  * along the side deck past the thwart beside the after shelf, legs into the footwell or on the shelf: from the cockpit's
- * forward end (`Z.cockpitFwd`, the hips 1.35, half a shoulder's width clear of the bulkhead; out on the side deck, from
- * just aft of the jib winch, `Z.deckFwd`) to about 2.5 (`Z.cockpitAft`), short of the helm at 2.95; two of
+ * forward end (`Z.cockpitFwd`, the hips 1.35, half a shoulder's width clear of the bulkhead; out on the side deck, either
+ * side of the jib winch: forward of it at `Z.deckFwd`, aft of it from `Z.winchAft`) to about 2.5 (`Z.cockpitAft`), short
+ * of the helm at 2.95; two of
  * them a shoulder's width apart (`Z.gap`, 0.5 m). Their hiking arms are by the deck's half-breadth where each one is
  * (`crewEdge`): narrower aft.
  */
 /**
- * Out on the side deck (sitting up to windward, to leeward, hiking: the hips outboard of the coaming), not forward of
- * `Z.deckFwd`: the jib winch stands on its pedestal on the side deck against the coaming at 1.4 (render/crew.ts winchAt,
- * Boat Detail's from Josephine's photos), so the forward hand sits out just aft of it, the pedestal's radius and half a
- * hip's width clear (1.4 + 0.075 + 0.18). On the benches inside the coaming, in the middle, they can go on forward.
+ * Out on the side deck (sitting up to windward, to leeward, hiking: the hips outboard of the coaming), either side of the
+ * jib winch, never on it: the winch stands on its pedestal on the side deck against the coaming at 1.64 (render/hull.ts
+ * JIB_WINCH_Z, Boat Detail's, the owner's true position: 0.58 m aft of the cabin, 0.39 m forward of the thwart), the
+ * pedestal 0.119 m in radius fore and aft at the deck. So a seat forward of it at about 1.40 (`Z.deckFwd`, beside the
+ * cabin's after end), and aft of it from about 1.88 (`Z.winchAft`, the pedestal's radius and half a hip, about 0.12, clear),
+ * just short of the thwart; going from one to the other they step in off the deck round it. On the benches inside the
+ * coaming, in the middle, they're clear of it.
  */
 /** At the coaming: the hips outboard of about this (m), out on the side deck or on the bench leaning back against the
  * coaming (its inside face 0.71–0.74 between 1.35 and 1.65, render/hull.ts cockpitHalf), where the jib winch on its
@@ -229,12 +233,15 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.65, cockpitAft: 2.5,
  * minutes against 75.) */
 export const DECK_ARM = 0.5;
 /** Crew member `j`'s place fore and aft among `count` free crew, `f` of the way from the aft end to the forward end
- * (on a side deck, from just aft of the winch). Two crew at most (settings.ts): a third wouldn't fit along one side
- * deck aft of the winch (1.65 to 2.5 is 0.85 m, three a shoulder's width apart need 1.0). */
+ * (on a side deck, either side of the winch, never on it: a place within its pedestal's reach goes to the nearer side).
+ * Two crew at most (settings.ts). */
 export const stationZ = (j: number, count: number, f: number, deck: boolean) => {
   const za = Z.cockpitAft - (count - 1 - j) * Z.gap, zf = Math.min(za, (deck ? Z.deckFwd : Z.cockpitFwd) + j * Z.gap);
-  return za + (zf - za) * f;
+  const z = za + (zf - za) * f;
+  return deck && z > Z.deckFwd && z < Z.winchAft ? (z - Z.deckFwd < Z.winchAft - z ? Z.deckFwd : Z.winchAft) : z;
 };
+/** Within the jib winch's pedestal's reach on the side deck, fore and aft (between the seats either side of it). */
+export const atWinch = (z: number) => z > Z.deckFwd + 1e-6 && z < Z.winchAft - 1e-6;
 /** Whether crew member `i` (1…) is out on a side deck now. */
 const outOnDeck = (c: CrewState, i: number) => Math.abs(c.people[i]?.x ?? 1) > DECK_ARM;
 /** Half-beam at the sheer where the crew sit (between the cockpit's forward end and its middle), from the plan. */
@@ -487,12 +494,13 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const x0 = a.x, z0 = a.z;
     a.x += clamp(goal.x - a.x, -vx * dt, vx * dt);
     a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
-    // (in the cockpit, round the jib winch on the side deck, not through it: in off the deck before going forward of it,
-    // and aft of it before going out on the deck. Going on forward of the cockpit, to the mast, they climb past it)
+    // (in the cockpit, round the jib winch on the side deck, not through it: from one side of it to the other they step in
+    // off the deck first, past it on the bench, and out again beyond it; nor out on the deck beside it. Going on forward
+    // of the cockpit, to the mast, they climb past it)
     // (a job's station is its own: the jib winch's haul, the lines; this is for finding a seat)
     if (i > 0 && !a.job?.station && goal.z > Z.cockpitFwd - 0.05 && z0 > Z.cockpitFwd - 0.05) {
-      if (Math.abs(a.x) > DECK_ARM && a.z < Z.deckFwd && z0 >= Z.deckFwd - 1e-6) a.z = Z.deckFwd;
-      else if (a.z < Z.deckFwd && Math.abs(a.x) > DECK_ARM && Math.abs(x0) <= DECK_ARM) a.x = Math.sign(a.x) * DECK_ARM;
+      if (Math.abs(x0) > DECK_ARM && atWinch(a.z) && !atWinch(z0)) { a.z = z0; a.x = Math.sign(x0) * Math.max(DECK_ARM, Math.abs(x0) - vx * dt); }
+      else if (atWinch(a.z) && Math.abs(a.x) > DECK_ARM && Math.abs(x0) <= DECK_ARM) a.x = Math.sign(a.x) * DECK_ARM;
     }
     const arm = a.x * w;
     const he = i === 0 ? deckHalf(Z.helm) : crewEdge(c, i);
