@@ -929,7 +929,7 @@ export function buildBoatMesh(b: Boat, day?: { date: string; rain: number }): Bo
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
   const was = dress.warm;
-  if (day && was !== 'all') dress.warm = dressWarm(day.date, day.rain, b.sea);
+  if (day && was !== 'all') dress.warm = dressWarm(day.date, day.rain, b.sea, b); // (where she is as the race is set up)
   const crew = buildCrew(spec.helm, spec.crew, JACKETS[b.id % JACKETS.length], b.id * 3); grp.add(crew.group);
   dress.warm = was;
   // she stands in front of the lights' reflections on the water (the streaks are drawn over the waves, so they can't

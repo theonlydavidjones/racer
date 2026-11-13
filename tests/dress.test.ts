@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dressWarm, kitFor } from '../src/render/crewBody';
+import { LL } from '../src/geo/geo';
 
 /**
  * What the crew wear for the day (render/crewBody.ts): shorts and sneakers for about half of them on a warm, dry day
@@ -24,5 +25,13 @@ describe("The crew dress for the day's weather (render/crewBody.ts dressWarm, ki
     expect(shorts / n).toBeGreaterThan(0.35); expect(shorts / n).toBeLessThan(0.65);
     expect(kitFor(7, 0xc8372d, true).shorts).toBe(kitFor(7, 0xc8372d, true).shorts);
     expect(Array.from({ length: n }, (_, i) => kitFor(i, 0xc8372d, false).shorts).some(Boolean)).toBe(false);
+  });
+  it('where she is: on a day warm in the east Bay but cool at the Gate, shorts off Alameda, salopettes off Crissy Field', () => {
+    // (find such a day on record: the warmest racing hour over 20 °C at Alameda and under it at Fort Point)
+    const gate = LL(37.808, -122.465), alameda = LL(37.772, -122.30);
+    let found = '';
+    for (let d = 1; d <= 30 && !found; d++) { const date = `2024-09-${String(d).padStart(2, '0')}`; if (dressWarm(date, 0, calm, alameda) && !dressWarm(date, 0, calm, gate)) found = date; }
+    console.log(`a day warm off Alameda and not at the Gate: ${found || 'none in Sep 2024'}`);
+    expect(found).not.toBe('');
   });
 });

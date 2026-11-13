@@ -738,14 +738,14 @@ export const dress: { warm: boolean | 'all' } = { warm: false };
 const SPRAY_WHITE = 3.84e-6 * Math.pow(8.75, 3.41), SPRAY_STEEP = 0.07;
 /**
  * What a crew dresses for at the dock, for the day (the owner, 13 Nov 2026): shorts and sneakers for about half of
- * them on a warm day (68 °F, 20 °C, or more in the racing hours: environment/air.ts warmDay, from Fort Point's record,
- * forecast or climate) that's dry (no rain set) and where they won't be soaked (the sea where she is: no whitecaps
+ * them on a warm day where she is (68 °F, 20 °C, or more in the racing hours: environment/air.ts warmDay, from the shore
+ * stations round the Bay, blended by distance: their record, the forecast or their climate) that's dry (no rain set) and where they won't be soaked (the sea where she is: no whitecaps
  * of a fresh breeze, no steep chop). Decided once, as she's built for the race: nobody changes clothes mid-race.
  */
-export function dressWarm(date: string, rain: number, sea?: { white: number; steep: number }): boolean {
+export function dressWarm(date: string, rain: number, sea?: { white: number; steep: number }, at?: { x: number; y: number }): boolean {
   if (!date || rain > 0) return false;
   if (sea && (sea.white >= SPRAY_WHITE || sea.steep >= SPRAY_STEEP)) return false;
-  return warmDay(date);
+  return warmDay(date, at);
 }
 /** Shorts in the colours they come in (the owner's photo: maroon), and sneakers: white, or grey and navy. */
 const SHORTS = [0x6a2a32, 0x6a2a32, 0x7a3a36, 0xb9a88a, 0xa8946e, 0x2a3346, 0x4a4f57, 0x3f5a3a]; // (maroons and khakis the commonest: they stand out from the dark jackets, as in the photo)
