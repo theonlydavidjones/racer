@@ -39,6 +39,19 @@ describe('dock lines', () => {
     const free = boat(0, 0); run(free, [], { from: 270, kt: 15 }, 30);
     expect(free.sway).toBeGreaterThan(0.15); expect(free.sway).toBeLessThan(0.6); // (blown off sideways, slowly: the keel's broadside drag)
   });
+  it('a 20 kt gust abeam on her made lines: held, with no growing oscillation (the stiff lines integrate stably at a 60th of a second)', () => {
+    const b = boat(0, 0), lines: DockLine[] = [{ role: 'bow', at: 3.6, side: -1, to: { x: -1.6, y: 3.6 }, len: 0.6, state: 'made' }, { role: 'stern', at: -3.6, side: -1, to: { x: -1.6, y: -3.6 }, len: 0.6, state: 'made' }, { role: 'spring', at: 0, side: -1, to: { x: -1.6, y: -2.0 }, len: 2.3, state: 'made' }];
+    for (const l of lines) { const p = cleatOf(b, l); l.len = Math.hypot(l.to.x - p.x, l.to.y - p.y) + 0.05; } // (made with a little slack: as long as they reach)
+    run(b, lines, { from: 270, kt: 8 }, 10);
+    const swing = (secs: number) => { let lo = Infinity, hi = -Infinity; for (let i = 0; i < secs * 60; i++) { dockStep(b, lines, { from: 270, kt: 20 }, still, 1 / 60, open); lo = Math.min(lo, b.x); hi = Math.max(hi, b.x); } return hi - lo; };
+    const first = swing(5), later = swing(5), last = swing(5);
+    expect(Number.isFinite(b.x)).toBe(true); expect(last).toBeLessThanOrEqual(Math.max(first, 0.02) + 1e-6); expect(later).toBeLessThan(0.5);
+    expect(Math.max(...lines.map(l => l.T ?? 0))).toBeLessThan(LINE_BREAK / 4);
+  });
+  it('the same inputs, the same result, to the last bit', () => {
+    const go = () => { const b = boat(0.4, 10), L: DockLine[] = [{ role: 'bow', at: 3.6, side: 1, to: { x: 2, y: 4 }, len: 1.2, state: 'held' }]; run(b, L, { from: 200, kt: 12 }, 20); return [b.x, b.y, b.h, b.v, b.sway, L[0].len, L[0].T]; };
+    expect(go()).toEqual(go());
+  });
   it('touching the dock: her speed into it taken out, and the bump reported', () => {
     const b = boat(0, 0); b.sway = -0.6; // (sliding to port at 0.6 m/s onto a dock along x < -1.4)
     const { bump } = run(b, [], calm, 4, p => p.x < -1.4);
