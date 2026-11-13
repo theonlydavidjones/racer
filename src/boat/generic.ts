@@ -1,3 +1,4 @@
+import { realRace } from '../sim/realRaces';
 import { HULL_COLORS, BRIGHT_FINISH, fixSpec, type BoatSpec, type SailAge } from './spec';
 import { makeRng } from '../core/rng';
 
@@ -63,6 +64,20 @@ function makeGeneric(k: number, no: string): BoatSpec {
       outboard: r() < 0.7 ? 'none' : 'stowed', gearKg: Math.round(r() * r() * 40)
     }
   });
+}
+
+/**
+ * A boat of a real past race (sim/realRaces.ts), `real:<race id>:<sail key>`: her real name and sail number, as the
+ * results publish them; her looks, which the results don't give, a generic boat's, the same for her every time (seeded
+ * by her number).
+ */
+export const isReal = (id: string): boolean => id.startsWith('real:');
+export function realSpec(id: string): BoatSpec | undefined {
+  if (!isReal(id)) return undefined;
+  const [, raceId, key] = id.split(':'), b = realRace(raceId)?.boats.find(x => x.key === key);
+  if (!b) return undefined;
+  const look = makeGeneric(1 + (+key % 97 || 0), key);
+  return fixSpec({ ...look, id, name: b.boat.toUpperCase(), sails: { ...look.sails, number: key } });
 }
 
 /** The spec for a generic opponent id (`gen:k`), or undefined. */

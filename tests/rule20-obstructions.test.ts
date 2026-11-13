@@ -96,7 +96,7 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
     const { w, u, red } = race();
     const p = pinnedSpot(w, PLACES[0][1], 'S')!, wv = V(w.wind.from);
     sail(w, red, p, 'S'); sail(w, u, { x: p.x + wv.x * 9, y: p.y + wv.y * 9 }, 'S');
-    red.lastTackT = w.t - 3; w.pairs = {};
+    red.lastTackT = w.t - 3; red.headToWindT = w.t - 3; w.pairs = {};
     let hailed = false, foul: string | null = null;
     for (let i = 0; i < 60 * 12 && !foul; i++) {
       w.step(DT);
@@ -253,7 +253,7 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
     M.h = 335; expect(hailBreach(rec, L, M, 52, 0)).toBeNull();
     expect(rec.hail.respondedAt).toBe(52); expect(rec.hail.clearAt).toBeUndefined();
     expect(hailBreach(rec, L, M, 58, 0)).toBeNull(); // L waits for her: M still swinging through the wind
-    M.lastTackT = 59; M.tacking = true; M.tack = 'P' as never;
+    M.lastTackT = 59; (M as { headToWindT?: number }).headToWindT = 59; M.tacking = true; M.tack = 'P' as never;
     expect(hailBreach(rec, L, M, 59, 0)).toBeNull(); expect(rec.hail.clearAt).toBe(59);
     expect(hailBreach(rec, L, M, 64.5, 0)).toMatchObject({ boat: L, role: 'hailer' });
   });
@@ -285,7 +285,7 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
   it('a late hailing boat is still judged after the hail is half a minute old', () => {
     const L = mk(0, 315), M = mk(1, 315), rec = hail();
     rec.hail!.respondedAt = 52; rec.hail!.clearAt = 65; // a slow hailed boat, through the wind at 65
-    M.lastTackT = 65; M.tacking = true;
+    M.lastTackT = 65; (M as { headToWindT?: number }).headToWindT = 65; M.tacking = true;
     L.h = 337; // the hailing boat luffs at 69.5 and holds it
     expect(hailBreach(rec, L, M, 69.5, 0)).toBeNull();
     // (through assessPair, which also retires stale hails: 30 s after the hail itself would have dropped it at 80)

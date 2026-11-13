@@ -60,14 +60,14 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 | Case | p. | Rules | The Case's answer | Status |
 |---|---|---|---|---|
-| 2 | 77 | 12, 15, 18.2(a)(2) | B, clear astern, reached the zone first while A was outside it: A owes B mark-room and broke 12 and 18.2(a)(2) | covered without the gybes; with them, **finding 3** |
+| 2 | 77 | 12, 15, 18.2(a)(2) | B, clear astern, reached the zone first while A was outside it: A owes B mark-room and broke 12 and 18.2(a)(2) | covered, gybes included (finding 3, fixed) |
 | 12 | 93 | 11, 18.2(a)(1) | Overlapped when the first reached the zone, on courses 90° apart: OL broke 18.2(a)(1) | covered |
 | 15 | 99 | 12, 13, 18.2(a)(2), 18.2(b) | A clear ahead at the zone, upwind: B keeps clear and gives mark-room; once A tacks, 18.2(a) ends and B has right of way (13) | covered |
 | 21 | 105 | Mark-Room, Room | How much space mark-room is | not modelled (a judgement) |
 | 103 | | Room, 19.2(b) | Room at an obstruction and seamanlike handling | not modelled (a judgement) |
 | 25 | 112 | 11, 16.1, 18.1(b) | Once the inside boat has left the mark astern, rule 18 ends: IW broke 11 | partly (when the mark is "left astern") |
 | 26 | 115 | 10, 14, 18.1(a) | Boats leaving the mark on different sides: no rule 18; P broke 10 | partly (one course: both boats always leave a mark on the same side) |
-| 59 | 167 | 18.2(a)(2) | D outside the zone when E reached it: D owes E mark-room | covered (while nobody gybes: finding 3) |
+| 59 | 167 | 18.2(a)(2) | D outside the zone when E reached it: D owes E mark-room | covered |
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
@@ -119,9 +119,8 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tally
 
-- Covered, the test reaching the Case's answer: 16 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 101). Cases 2 and 59
-  only while nobody gybes (finding 3).
-- Findings, the engine answering differently: 2 (93, 105), plus finding 3 (the gybe), found while checking Case 2. Findings 4–6
+- Covered, the test reaching the Case's answer: 16 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 101).
+- Findings, the engine answering differently: 2 (93, 105). Findings 3 (the gybe, found while checking Case 2) and 4–6
   (Cases 27, 53, 101) are fixed.
 - Partly: 42.
 - Not modelled: 28.
@@ -154,7 +153,7 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
    contact broke 16.1, whatever the other boat could have done. 16.1 asks only that she "give the other boat room to keep clear":
    a fix would judge that room (the keep-clear boat's distance and time to respond against how fast she could turn or gybe away),
    not the turn alone. Test: Case 105 (`it.fails`).
-3. **A gybe counts as passing head to wind (18.2(b), 18.3, 13).** The boats' `lastTackT` (src/rules/types.ts: "race time she last
+3. **Fixed** (headToWindT, set by physics.ts only on a tack; read by 18.2(b), 18.2(d), 18.3 and rule 20's hails). **A gybe counted as passing head to wind (18.2(b), 18.3, 13).** The boats' `lastTackT` (src/rules/types.ts: "race time she last
    passed head to wind") is set by src/boat/physics.ts on any change of tack, gybes too. So a boat entitled to mark-room under
    18.2(a) that gybes in the zone loses it (src/rules/pairs.ts: 18.2(b) is taken as having happened), where 18.2(b) ends it only
    when she "passes head to wind or leaves the zone"; and a gybe from port to starboard in the zone of a mark left to port starts

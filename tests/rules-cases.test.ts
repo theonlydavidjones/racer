@@ -60,7 +60,7 @@ describe('Rule 18 · mark-room', () => {
     const A = boat('A', { at: off([0, 0], 45, -14, 3), heading: 45 }), B = boat('B', { at: off([0, 0], 45, -26, 3), heading: 45 });
     const p = pair(A, B, [M]);
     expect(p.at(100)).toMatchObject({ keepsClear: 'B', rule: '18.2(a)' });
-    A.tacking = true; A.lastTackT = 100.5; moveTo(A, [A.x, A.y], 350); A.tack = 'S'; // past head to wind
+    A.tacking = true; A.lastTackT = 100.5; A.headToWindT = 100.5; moveTo(A, [A.x, A.y], 350); A.tack = 'S'; // past head to wind
     expect(p.at(101)).toMatchObject({ keepsClear: 'A', rule: '13' });
   });
 
@@ -74,14 +74,14 @@ describe('Rule 18 · mark-room', () => {
     expect(p.at(104)).toMatchObject({ keepsClear: 'D', rule: '18.2(a)' });
   });
 
-  it.fails('Case 2, with the gybes: the boat entitled to mark-room under 18.2(a) gybes in the zone: 18.2(a) still applies (18.2(b) ends it only when she passes head to wind or leaves the zone)', () => {
+  it('Case 2, with the gybes: the boat entitled to mark-room under 18.2(a) gybes in the zone: 18.2(a) still applies (18.2(b) ends it only when she passes head to wind or leaves the zone)', () => {
     // A dead run to a mark left to port: E in the zone, D clear ahead and outside it, as in Case 59. E gybes onto starboard.
     const M = mark('p', false);
     const E = boat('E', { at: [-5, 20], heading: 180 }), D = boat('D', { at: [-30, 8], heading: 180 });
     const p = pair(D, E, [M]);
     p.at(100); // (D owes E mark-room, 18.2(a))
     E.lastTackT = 100.5; moveTo(E, [-5, 18], 190); // E gybes (a change of tack downwind, not head to wind)
-    expect(p.at(101)).toMatchObject({ keepsClear: 'D', rule: '18.2(a)' }); // (the engine: 18.2(a) ended by the gybe: finding 3)
+    expect(p.at(101)).toMatchObject({ keepsClear: 'D', rule: '18.2(a)' }); // (a gybe passes the wind astern, not head to wind: 18.2(a) holds)
   });
 
   it('Case 81: entitled to mark-room as the boat clear ahead, she tacks to round and the boat astern hits her: hers is the foul (13); her mark-room ended when she passed head to wind', () => {
@@ -90,7 +90,7 @@ describe('Rule 18 · mark-room', () => {
     const A = boat('A', { at: [12, -12], heading: 315 }), B = boat('B', { at: [21, -17], heading: 315 });
     const p = pair(A, B, [M]);
     expect(p.at(100)).toMatchObject({ keepsClear: 'B', rule: '18.2(a)' });
-    A.tacking = true; A.lastTackT = 101; moveTo(A, [12, -12], 20); A.tack = 'P'; // A tacks where she is
+    A.tacking = true; A.lastTackT = 101; A.headToWindT = 101; moveTo(A, [12, -12], 20); A.tack = 'P'; // A tacks where she is
     moveTo(B, off([21, -17], 315, 5.5)); // and B, sailing on at a Folkboat's speed (2.75 m/s), runs into her
     expect(p.at(102).foul).toMatchObject({ by: 'A', rule: '13' });
   });
@@ -102,7 +102,7 @@ describe('Rule 18 · mark-room', () => {
     const W = boat('W', { at: [6.9, -0.9], heading: 45 }), L = boat('L', { at: [14, -8], heading: 315 });
     const p = pair(W, L, [M]);
     const before = p.at(44);
-    W.lastTackT = 45.5; moveTo(W, [6.9, -0.9], 315); // W has tacked onto starboard in the zone
+    W.lastTackT = 45.5; W.headToWindT = 45.5; moveTo(W, [6.9, -0.9], 315); // W has tacked onto starboard in the zone
     const tacked = p.at(46);
     moveTo(L, off([6.9, -0.9], 315, -2, -3), 315); // overlapped to leeward from clear astern
     p.at(48);
@@ -125,7 +125,7 @@ describe('Rules 10–17 · Section A and B', () => {
     const S = boat('S', { at: [0, 0], heading: 315 }), P = boat('P', { at: [4, -10], heading: 70 }); // P bearing away to duck
     const p = pair(S, P);
     expect(clean(p, 50)).toMatchObject({ keepsClear: 'P', rule: '10' });
-    S.tacking = true; S.lastTackT = 51; moveTo(S, [-0.5, 0.5], 10); S.tack = 'P'; // past head to wind
+    S.tacking = true; S.lastTackT = 51; S.headToWindT = 51; moveTo(S, [-0.5, 0.5], 10); S.tack = 'P'; // past head to wind
     expect(p.at(51.5)).toMatchObject({ keepsClear: 'S', rule: '13', foul: null });
   });
 
@@ -193,7 +193,7 @@ describe('Rules 10–17 · Section A and B', () => {
     const AS = boat('AS', { at: [0, 0], heading: 45 }), BP = boat('BP', { at: off([0, 0], 45, -12, -7.6), heading: 45 });
     const p = pair(AS, BP);
     const before = clean(p, 50);
-    AS.tacking = true; AS.lastTackT = 50.5; moveTo(AS, [0.3, 0.3], 350); AS.tack = 'S';
+    AS.tacking = true; AS.lastTackT = 50.5; AS.headToWindT = 50.5; moveTo(AS, [0.3, 0.3], 350); AS.tack = 'S';
     moveTo(BP, [-2.6, -2.2]); // BP's bow into AS
     return { before, contact: p.at(51) };
   };
@@ -205,7 +205,7 @@ describe('Rules 10–17 · Section A and B', () => {
     const AS = boat('AS', { at: [0, 0], heading: 45 }), BP = boat('BP', { at: off([0, 0], 45, -12, -7.6), heading: 45 });
     const p = pair(AS, BP);
     clean(p, 50);
-    AS.tacking = true; AS.lastTackT = 50.5; moveTo(AS, [0.3, 0.3], 350); AS.tack = 'S';
+    AS.tacking = true; AS.lastTackT = 50.5; AS.headToWindT = 50.5; moveTo(AS, [0.3, 0.3], 350); AS.tack = 'S';
     moveTo(BP, off([0, 0], 45, -9, -7.6));
     expect(p.at(51)).toMatchObject({ keepsClear: 'AS', rule: '13', foul: null });
     AS.tacking = false; moveTo(AS, off([0.3, 0.3], 315, 3), 315); // close-hauled, 3 s past head to wind
@@ -262,7 +262,7 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     const p = pair(A, B);
     clean(p, 50);
     p.rec.hail = { by: A.id, at: 50, kind: 'room', replyAt: 50.5 };
-    A.lastTackT = 51; moveTo(A, [0.5, 0.5], 45); // she has tacked onto port (close-hauled)
+    A.lastTackT = 51; A.headToWindT = 51; moveTo(A, [0.5, 0.5], 45); // she has tacked onto port (close-hauled)
     return p.at(52);
   };
   it('Case 101: once she has tacked and had the time to bear away round the other\'s stern, contact is the hailing boat\'s (10)', () => {
@@ -271,7 +271,7 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     const p = pair(A, B);
     clean(p, 50);
     p.rec.hail = { by: A.id, at: 50, kind: 'room', replyAt: 50.5 };
-    A.lastTackT = 51; moveTo(A, [0.5, 0.5], 45);
+    A.lastTackT = 51; A.headToWindT = 51; moveTo(A, [0.5, 0.5], 45);
     p.at(52);
     const b1 = off(b0, 315, 10); moveTo(B, b1); // B holds her course
     moveTo(A, off(b1, 315, 4.5), 45); // and A, four seconds after her tack, sails across B's bow
@@ -283,7 +283,7 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     const p = pair(A, B);
     clean(p, 50);
     p.rec.hail = { by: A.id, at: 50, kind: 'room', replyAt: 50.5 };
-    A.tacking = true; A.lastTackT = 51; moveTo(A, [0.3, 0.3], 30);
+    A.tacking = true; A.lastTackT = 51; A.headToWindT = 51; moveTo(A, [0.3, 0.3], 30);
     expect(p.at(51.5, { swerve: true }).foul).toBeNull();
   });
   it('Case 101: a hailing boat that, given room, sails into the stern of the boat that replied and held her course broke 13, not B 20', () => {
@@ -294,7 +294,7 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     p.rec.hail = { by: A.id, at: 50, kind: 'room', replyAt: 50.5 };
     p.at(50.6);
     const b1 = off(b0, 315, 3); moveTo(B, b1); // B holds her course and speed
-    A.tacking = true; A.lastTackT = 51; moveTo(A, off(b1, 315, -4.6, -0.5), 20); // A tacks up into B's stern
+    A.tacking = true; A.lastTackT = 51; A.headToWindT = 51; moveTo(A, off(b1, 315, -4.6, -0.5), 20); // A tacks up into B's stern
     expect(p.at(52).foul).toMatchObject({ by: 'A', rule: '13' });
   });
   it('Case 101: right of way doesn\'t pass to the boat entitled to room: after "You tack" and her tack onto port, the hailing boat must keep clear of the boat on starboard (10)', () => {

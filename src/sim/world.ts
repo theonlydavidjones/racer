@@ -16,7 +16,7 @@ import { ShiftField, shiftStats } from '../environment/shifts';
 import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
-import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, type Frame } from '../replay/recorder';
+import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
 import { RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
@@ -34,7 +34,7 @@ import { ensignFor, sailNo } from '../boat/spec';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
-import { genericSpec, genericTag, isGeneric } from '../boat/generic';
+import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
@@ -385,7 +385,7 @@ export class World {
     // an opponent: a stock club boat, or one of your own saved boats (her looks and her condition), sailed by the AI
     const pick = isUser ? null : this.settings.opponents?.[i - 1] ?? `stock:${i}`;
     // (a generic club Folkboat, boat/generic.ts: her sail number clear of your boats')
-    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
+    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? realSpec(pick) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
@@ -809,7 +809,7 @@ export class World {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
-    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(snapshot(this.t, this.boats));
+    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
   }
 
   private checkLines(prevT: number): void {
@@ -1029,7 +1029,7 @@ export class World {
     const n = ctx.marks.length, nearZone = (X: Boat) => X.leg < n && markDist(X, ctx.marks[X.leg]) < ZONE * 2.5;
     if (nearZone(A) || nearZone(B) || cpa(A, B).d < 60) return false;
     rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null;
-    rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT; // (rule 18.3: tacks seen as they happen)
+    rec.seenTack[A.id] = A.headToWindT ?? -Infinity; rec.seenTack[B.id] = B.headToWindT ?? -Infinity; // (rule 18.3: tacks seen as they happen)
     return true;
   }
 
@@ -1709,7 +1709,7 @@ export class World {
   pendingRoomHail(b: Boat): Boat | null {
     for (const o of this.boats) {
       const h = o !== b ? this.pairs[pairKey(b, o)]?.hail : null;
-      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) return o;
+      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && (b.headToWindT ?? -Infinity) < h.at && !b.tacking) return o; // (rule 20: answered by a tack, not a gybe)
     }
     return null;
   }

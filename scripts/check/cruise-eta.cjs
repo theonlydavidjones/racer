@@ -17,7 +17,7 @@ const warm = (p, which) => p.evaluate(w => { const h = __hud; for (let i = 0; i 
   const shot = async (from, to, name) => {
     const p = await b.newPage({ viewport: { width: 1400, height: 860 } }); p.on('pageerror', e => errs.push(e.message));
     await p.addInitScript(([f, t]) => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: f, sailTo: t, windKind: 'west', windKt: 0, tideDate: '2026-07-11', tideTime: '15:00', mapLayers: { wind: true } }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); }, [from, to]);
-    await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+    await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
     await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(3000);
     await p.screenshot({ path: `${out}/${name}-setup.png` });
     await p.evaluate(() => document.getElementById('bPlanOpen').click()); await p.waitForTimeout(5000);
