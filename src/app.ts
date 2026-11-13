@@ -64,6 +64,7 @@ import { PlanChart } from './ui/planChart';
 import { passageNow, whyNot } from './sim/navigator';
 import { FlowPanel } from './ui/flowPanel';
 import type { PilotMode } from './boat/autopilot';
+import { Nav, type Place } from './ui/nav';
 
 const S: Settings = loadSettings();
 // the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
@@ -1037,8 +1038,15 @@ addEventListener('keydown', e => {
     if (navView.isOpen) { navView.close(); return; }
     if (chart.isOpen) { chart.close(); return; }
     if (!$('logView').hidden) { $('logView').hidden = true; return; }
+    // the screens around the sailing (docs/UI-AUDIT.md §3 rule 5): Esc is back. A layer over one closes first, then a
+    // sub-page (a member's page), then back to where you came from; on the start page, nothing
+    if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
+    if (boatPanel.open) { $('boatPanel').querySelector<HTMLElement>('[data-act="done"]')?.click(); return; }
+    if (fleet.escape()) return;
+    if (!$('raceChoose').hidden || !$('setup').hidden || fleet.open) { nav.back(); return; }
+    if (!$('club').hidden) { openHome(); return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
-    if (condLive && !$('condDlg').hidden) { $('bCondDone').click(); return; } // (back to the pause menu)
+    if (condLive && !$('condDlg').hidden) { $('bCondClose').click(); return; } // (back to the pause menu)
     if (!$('pause').hidden) { $('bResume').click(); return; }
     if (!anyOverlay() && w.running) $('bPause').click();
     return;
@@ -1243,7 +1251,7 @@ function courseCard(): void {
   $('bGo').textContent = cruise ? 'Cast off' : 'Start the sequence';
   $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
   $('setupTitle').textContent = cruise ? 'Cruise' : 'Create a race';
-  $('setupBack').textContent = cruise ? '‹ Start page' : '‹ Race'; $('setupBack').dataset.home = cruise ? 'home' : 'race';
+  $('setupBack').textContent = nav.backLabel() || (cruise ? '‹ Start page' : '‹ Race');
   $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
   { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
     $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Single-handed'}, ${Math.round(kg / 0.4536)} lb aboard`; }
@@ -1392,7 +1400,7 @@ function crewRows(): void {
     boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
   });
   rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
-  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openMembers(); });
+  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => nav.go({ k: 'club', tab: 'members' }));
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
@@ -1404,6 +1412,7 @@ function openSetupNow(): void {
   courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
+  nav.reset({ k: 'setup' }); // (the pause menu's and the results' Back to setup: the setup you sailed from)
   realRaceHolds();
   saveSettings(S);
   newGame(seed);
@@ -1490,7 +1499,7 @@ $('courseMode').addEventListener('click', e => {
 });
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
-$('bCondClose').onclick = $('bCondDone').onclick = () => {
+$('bCondClose').onclick = () => {
   $('condDlg').hidden = true;
   if (condLive) { condLive = false; $('pause').hidden = false; }
   if (showSaved) { // (from the showroom: what was set becomes the showroom's, and your own conditions go back as they were)
@@ -1763,13 +1772,12 @@ $('oppList').addEventListener('click', e => {
   fleetChanged();
 });
 boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(S); newGame(); boatSummary(); oppRows(); }, () => {
-  const id = boatPanel.editing.id; boatPanel.hide(); fleet.openBoat(id); // back to her page in the Fleet
+  const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
 });
 boatPanel.onSpin = () => (look.spin = !look.spin);
-$('bBoat').onclick = () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openList(); };
+$('bBoat').onclick = () => nav.go({ k: 'club' });
 
 /* ---------------- the start page: Race, Cruise, Marina, Yacht Club ---------------- */
-let fleetFrom: 'home' | 'setup' = 'home';
 /** The showroom: on while one of your boats is on show (her page in the Fleet, or editing her). */
 function showroom(on: boolean): void {
   if (on) queueMicrotask(showBar); // (once she's on show: the time she's shown at)
@@ -1789,14 +1797,32 @@ const fleet: Fleet = new Fleet(S, {
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
     if (mode === 'cruise') { S.mode = 'sail'; S.sailFrom = fromSlip && b.slip ? 'slip' : S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom; }
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
-    saveSettings(S); boatSummary(); oppRows(); prepare(); openSetup();
+    saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
   seasonHtml: () => { const s = seasons()[0]; return s ? seasonHtml(s, seasonResults(s.id)) : ''; },
   sailSeason: no => sailSeason(no),
-  back: () => { if (fleetFrom === 'setup') { prepare(); openSetup(); } else { newGame(); $('home').hidden = false; } }
+  back: () => nav.back(),
+  toBoat: id => nav.go({ k: 'boat', id }),
+  backLabel: () => nav.backLabel()
 });
+/*
+ * The back stack (ui/nav.ts; docs/UI-AUDIT.md §3): the screens around the sailing, each shown here, and named for the
+ * back link of the screen above it.
+ */
+const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'club' ? 'Yacht Club'
+  : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
+function showPlace(p: Place): void {
+  if (p.k === 'home') { openHome(); return; }
+  for (const id of ['home', 'raceChoose', 'setup', 'condDlg', 'club']) $(id).hidden = true;
+  if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
+  if (p.k === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceBack').textContent = nav.backLabel(); $('raceChoose').hidden = false; }
+  else if (p.k === 'setup') { prepare(); openSetup(); }
+  else if (p.k === 'club') { if (p.tab === 'members') fleet.openMembers(); else fleet.openList(); }
+  else fleet.openBoat(p.id);
+}
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
+  nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
   for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
@@ -1808,13 +1834,13 @@ function openHomeNow(): void {
 document.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-home]'); if (!b) return;
   const where = b.dataset.home;
-  if (where === 'home') { openHome(); return; }
-  $('home').hidden = true; $('raceChoose').hidden = true; $('setup').hidden = true; $('condDlg').hidden = true;
-  if (where === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceChoose').hidden = false; }
-  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); prepare(); openSetup(); }
-  else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); prepare(); openSetup(); }
-  else if (where === 'fleet') { fleetFrom = 'home'; fleet.openList(); }
-  else if (where === 'club') $('club').hidden = false;
+  if (where === 'home') openHome();
+  else if (where === 'back') nav.back(); // (a back link: where you came from, ui/nav.ts)
+  else if (where === 'race') nav.go({ k: 'race' });
+  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); nav.go({ k: 'setup' }); }
+  else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); nav.go({ k: 'setup' }); }
+  else if (where === 'fleet') nav.go({ k: 'club' });
+  else if (where === 'club') { $('home').hidden = true; $('club').hidden = false; }
 });
 $('bExit').onclick = () => openHome();
 $('bExit2').onclick = () => openHome();
@@ -2021,4 +2047,4 @@ requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
 if (import.meta.env.DEV) Object.assign(window, { __ghost: (pts: Ghost['pts'] | null) => { activeGhost = pts ? { at: 'dev', key: 'dev', pts } : null; view.setGhost(w, pts); } }); // (a ghost on any race, for checking how it's drawn)
-if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; }, __nav: () => nav.trail });
