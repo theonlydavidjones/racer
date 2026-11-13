@@ -325,12 +325,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
   // which is how a roll tack starts her turning with less rudder), so the same turn costs less or more by her balance
-  let bleed = 1;
-  if (Math.abs(rate) > 0.5) {
-    const toWind = rate * Math.sign(wrap(ww.from - b.h) || 1), turn = FULL_RUDDER * toWind / Math.max(1, maxTurnRate(b.v));
-    bleed = clamp(Math.abs(turn - clamp(b.helmNeed ?? 0, -12, 12)) / Math.max(2, Math.abs(turn)), 0.3, 2);
-  }
-  b.v = Math.max(0, b.v * (1 - HANDLING.turnDrag * bleed * Math.abs(rate) * D2R * dt));
+  b.v = Math.max(0, b.v * (1 - turnBleed(rate, b.v, b.h, ww.from, b.helmNeed) * dt));
   // leeway, as a motion: her sails' side force across the water and the wind on her topsides and rig (HOVE.windSide) set
   // her bodily to leeward; her keel's lift with way on (slender wing: ½ρ·A·(πAR/2)·u·v = ½ρ·πT²·u·v) and her hull and keel
   // broadside to the water (cross-flow drag, HOVE.crossCd: Hoerner) hold her. At speed the lift does it: a few degrees
@@ -396,6 +391,22 @@ export const HOVE = {
   /** Backed sail: normal-force coefficient at 90° (Hoerner: 1.17 for a flat plate, more for a cupped sail). */
   cnBacked: 1.2
 };
+
+/**
+ * The fraction of her speed a turn bleeds away per second (physics.ts's own step, and src/boat/arcs.ts's prediction):
+ * dv/dt = −turnBleed·v. Turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what
+ * the sails' own turning moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward
+ * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
+ * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
+ */
+export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
+  let bleed = 1;
+  if (Math.abs(rate) > 0.5) {
+    const toWind = rate * Math.sign(wrap(windFrom - h) || 1), turn = FULL_RUDDER * toWind / Math.max(1, maxTurnRate(v));
+    bleed = clamp(Math.abs(turn - clamp(helmNeed, -12, 12)) / Math.max(2, Math.abs(turn)), 0.3, 2);
+  }
+  return HANDLING.turnDrag * bleed * Math.abs(rate) * D2R;
+}
 
 /**
  * How long (s) her turn takes to answer the helm at speed u (m/s) through the water: the time constant of a first-order
