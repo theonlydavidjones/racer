@@ -320,7 +320,7 @@ export function cabinInteriorMaterial(): THREE.MeshBasicMaterial & { uniforms: {
       `vec3 toL = uLampAt - vP; float dL = length(toL); toL /= max(dL, 1e-4);
       float cU = -dot(toL, uLampUp), hide = 1.0 - smoothstep(0.62, 0.82, cU) - 0.35 * smoothstep(0.62, 0.82, -cU);
       float lampHere = vLamp + vLit * (max(0.0, dot(normalize(vN + 1e-6), toL)) * hide / (1.0 + (dL / 0.7) * (dL / 0.7)) + 0.12);
-      // a lamp's warm light (about 2700 K) on the cabin's colours, and the dim day
+      // a lamp's warm light (about 2700 K) on the cabin's colors, and the dim day
       vec3 outgoingLight = reflectedLight.indirectDiffuse * (uDay * vDay + uLamp * lampHere * vec3(1.5, 1.1, 0.7));`);
   };
   m.customProgramCacheKey = () => 'cabinInterior';

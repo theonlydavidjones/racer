@@ -7,6 +7,10 @@ export interface RulesBoat {
   x: number; y: number;
   h: number; // heading, deg
   vx: number; vy: number; // velocity over the ground, m/s
+  /** Speed through the water, m/s, and the current she's in (m/s, east and north). Omitted: still water, and her speed
+   *  over the ground. (Rule 16.1's room is judged in the water, where the boats steer: a current they share changes
+   *  nothing between them.) */
+  v?: number; cur?: { x: number; y: number };
   tack: Tack;
   tacking: boolean; // past head to wind, not yet close-hauled
   lastTackT: number; // race time she last changed tack, tacking or gybing (rule 15: a change of tack, either way)
@@ -92,6 +96,14 @@ export interface MarkRoomState {
 }
 
 /** Per-pair memory the engine carries between steps. */
+/** A boat's recent poses, as this pair has seen them: a ring of samples every 0.1 s (src/rules/pairs.ts recordPose, one per boat). */
+export interface PoseRing {
+  t: Float64Array; x: Float64Array; y: Float64Array; h: Float64Array; v: Float64Array;
+  /** The current's drift she'd had by each sample, m (a running sum of cur·Δt): positions less this are in the water. */
+  dx: Float64Array; dy: Float64Array;
+  n: number; i: number;
+}
+
 export interface PairRecord {
   kc: number | null; // id of the keep-clear boat at the last step
   rule: RuleId | null;

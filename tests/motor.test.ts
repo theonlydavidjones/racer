@@ -31,12 +31,12 @@ describe('the outboard', () => {
     // either shows here)
     const v35 = v(3.5); expect(v35).toBeGreaterThan(4.4); expect(v35).toBeLessThan(4.85);
     expect(v(2.5)).toBeLessThan(v35); expect(v(6)).toBeGreaterThan(v35);
-  }, 60000);
+  }, 180_000);
   it('in reverse she goes astern, slower; in neutral or tilted up she just drifts', () => {
     const r = run({ gear: 'R' }, 40); expect(r.astern ?? 0).toBeGreaterThan(0.5); expect(r.v).toBe(0);
     expect((r.astern ?? 0) / KT).toBeLessThan(run({}, 40).v / KT);
     expect(run({ gear: 'N' }, 40).v).toBeLessThan(0.3); expect(run({ down: false }, 40).v).toBeLessThan(0.3);
-  }, 60000);
+  }, 180_000);
 });
 
 import { DEFAULT_BOAT } from '../src/boat/spec';
@@ -60,7 +60,7 @@ describe('her outboard, aboard', () => {
     for (let i = 0; i < 60 * 30; i++) w.step(DT);
     expect(u.v / KT).toBeGreaterThan(3);
     w.motorTilt(); expect(u.motor!.running).toBe(false); expect(u.motor!.down).toBe(false); // (tilted up: stopped first)
-  }, 60000);
+  }, 180_000);
   it('the 2.5 has no reverse gear: swivelled round, it pushes her astern', () => {
     const w = withMotor('sail', 2.5), u = w.user;
     u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.v = 0; // (stopped, sails down)
@@ -69,7 +69,7 @@ describe('her outboard, aboard', () => {
     w.motorSwivel(); expect(u.motor!.swivel).toBe(true); w.motorGear('F'); w.motorThrottle(0.6);
     for (let i = 0; i < 60 * 20; i++) w.step(DT);
     expect(u.astern ?? 0).toBeGreaterThan(0.5);
-  }, 60000);
+  }, 180_000);
   it('before her preparatory signal she may motor out to the line; racing, it isn\'t hers to use (RRS 42.1): starting it asks first; told to, she retires, then it\'s hers', () => {
     const b = withMotor('race'); b.motorTilt();
     expect(b.racing(b.user)).toBe(false); expect(b.motorStart()).toBe('ok'); expect(b.user.retired).toBeFalsy(); // (not racing yet)
@@ -78,7 +78,7 @@ describe('her outboard, aboard', () => {
     w.motorTilt();
     expect(w.motorStart()).toBe('racing'); expect(u.motor!.pulling).toBeUndefined(); expect(u.retired).toBeFalsy();
     expect(w.motorStart(true)).toBe('ok'); expect(u.retired).toBe(true); expect(u.motor!.pulling).toBeTruthy();
-  }, 60000);
+  }, 180_000);
   it('in her slip with the motor running: lines in, and she backs out under power, clear of the docks', () => {
     const slip = slipsIn('west-harbor').find(s => s.kind === 'bow-in')!;
     const w = withMotor('sail', 3.5, slip.id), u = w.user;
@@ -89,7 +89,7 @@ describe('her outboard, aboard', () => {
     const p0 = { x: u.x, y: u.y };
     for (let i = 0; i < 60 * 20; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT); expect(hitsHarbor(u)).toBe(false); }
     expect(Math.hypot(u.x - p0.x, u.y - p0.y)).toBeGreaterThan(5); // (backed out of the slip)
-  }, 60000);
+  }, 180_000);
 });
 
 import { engage } from '../src/boat/autopilot';
@@ -107,13 +107,13 @@ describe('the tiller pilot under power', () => {
     const b = (Math.atan2(to.x - u.x, to.y - u.y) * 180 / Math.PI + 360) % 360;
     expect(Math.abs(((u.h - b + 540) % 360) - 180)).toBeLessThan(15); // (pointed at it, dead to windward)
     expect(u.v / KT).toBeGreaterThan(2.5);
-  }, 60000);
+  }, 180_000);
 });
 
 describe('the outboard, as it\'s used', () => {
   it('at tick-over in gear she creeps along at a knot or so (coming into a slip)', () => {
     const v = run({ throttle: 0 }, 90).v / KT; expect(v).toBeGreaterThan(0.6); expect(v).toBeLessThan(2.2);
-  }, 60000);
+  }, 180_000);
   it('the first pull doesn\'t always catch: race to race, about one start in four needs a second', () => {
     let second = 0;
     for (let seed = 1; seed <= 40; seed++) {

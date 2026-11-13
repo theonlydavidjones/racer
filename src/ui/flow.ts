@@ -60,7 +60,7 @@ export function readout(w: SimView, kind: FlowKind, p: Vec, wind?: { kt: number;
 }
 
 /** The affine map tf is (a turn, a scale and a shift): its matrix, and its inverse (screen to sim metres). */
-function affine(tf: Tf): { m: [number, number, number, number, number, number]; inv: (sx: number, sy: number) => Vec } {
+export function affine(tf: Tf): { m: [number, number, number, number, number, number]; inv: (sx: number, sy: number) => Vec } {
   const o = tf(0, 0), ex = tf(1, 0), ey = tf(0, 1);
   const a = ex[0] - o[0], b = ex[1] - o[1], c = ey[0] - o[0], d = ey[1] - o[1], det = a * d - b * c;
   return { m: [a, b, c, d, o[0], o[1]], inv: (sx, sy) => { const X = sx - o[0], Y = sy - o[1]; return { x: (d * X - c * Y) / det, y: (-b * X + a * Y) / det }; } };
@@ -129,9 +129,13 @@ export class FlowField {
   }
 }
 
-/** Screen speed of the streaks (px/s per kt): the slot's run, the lee's crawl; the current's are scaled up, being slower. */
-const PX_PER_KT: Record<FlowKind, number> = { wind: 6, current: 40 };
-const HIST = 20, EVERY = 0.08; // a trail of 20 points, one every 0.08 s: a second and a half behind each, long and smooth (the mock-up's)
+/**
+ * Screen speed of the streaks (px/s per kt): a calm drift you can read, as Windy's map shows at its default (the owner,
+ * 13 Nov 2026: "way, way too fast" at 6): 15 kt of wind drifts about 24 px a second, 2 kt of current about 24. The
+ * slot's run still shows against the lee's crawl; the current's are scaled up, being slower.
+ */
+const PX_PER_KT: Record<FlowKind, number> = { wind: 1.6, current: 12 };
+const HIST = 20, EVERY = 0.12; // a trail of 20 points, one every 0.12 s: 2.4 s behind each, so a slow streak is still long enough to read (about 60 px in 15 kt)
 
 /**
  * The streaks: a pool of particles carried along the flow in the sim's metres, each with a short fading trail, put
@@ -158,7 +162,7 @@ export class Streaks {
       if (this.age[i] > this.life[i]) { // a new one, somewhere on the water in view
         let p = inv(this.rnd() * w, this.rnd() * h);
         for (let t = 0; t < 4 && !field.at(p); t++) p = inv(this.rnd() * w, this.rnd() * h);
-        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 3 + this.rnd() * 3;
+        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 8 + this.rnd() * 6; // (long enough to grow its trail at the slow drift)
         this.hx[i * HIST] = p.x; this.hy[i * HIST] = p.y; this.hn[i] = 1;
       }
       const p = { x: this.xs[i], y: this.ys[i] }, f = field.at(p);

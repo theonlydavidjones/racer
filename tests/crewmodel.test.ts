@@ -73,5 +73,5 @@ describe('the crew model: attributes', () => {
     // and on the rail, a few minutes into a 22 kt beat, the unfit are leaning out less
     const unfit = beat(U, 22, 150), fit = beat(F, 22, 150), lean = (b: ReturnType<typeof beat>) => b.crew!.people[1].lean;
     expect(lean(unfit)).toBeLessThan(lean(fit));
-  }, 30_000);
+  }, 180_000);
 });

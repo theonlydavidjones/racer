@@ -10,7 +10,10 @@ import { World } from '../src/sim/world';
 describe('the real past races', () => {
   const rs = realRaces();
   it('are the Seaweed Soup races with every finisher timed, a course on the sheet and the day\'s wind on record', () => {
-    expect(rs.map(r => r.id).sort()).toEqual(['GGYC_T008047221-r1', 'GGYC_T008047221-r4', 'GGYC_T008047221-r5']);
+    expect(rs.map(r => r.id).sort()).toEqual(['GGYC_T00227699-r1', 'GGYC_T008047221-r1', 'GGYC_T008047221-r4', 'GGYC_T008047221-r5']);
+    // 7 Nov 2026: the course from the owner, who sailed it (the results give none)
+    const n7 = realRace('GGYC_T00227699-r1')!;
+    expect([n7.courseId, n7.start, n7.date]).toEqual(['ss2', '13:35', '2026-11-07']); expect(n7.courseFrom).toMatch(/last minute course change/);
     for (const r of rs) {
       expect(r.boats.filter(b => b.elapsedS != null && b.code == null).length).toBeGreaterThanOrEqual(3);
       expect(courseFile(r.courseId).id).toBe(r.courseId);
@@ -62,18 +65,41 @@ describe('realFleetFor (for the debrief)', () => {
 
 import { outlookFor } from '../src/sim/outlook';
 import { planLegs } from '../src/sim/strategist';
+/** A perfect boat's time on a real race (the planner: the polar, NOAA's current, the observed wind, every leg on its
+ * best line), and the real fleet's median finish, s. */
+function perfectVsFleet(r: ReturnType<typeof realRaces>[number]): { perfect: number; median: number } {
+  const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, current: 'real', sea: 'real', opponents: [], fleet: 0 };
+  const w = new World(courseFile(r.courseId), S, 7), o = outlookFor(w), legs = planLegs(w, o), last = legs[legs.length - 1];
+  const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).map(b => b.elapsedS!).sort((a, b) => a - b);
+  return { perfect: (last.t0 - o.t0 + last.minutes) * 60, median: fin[Math.floor(fin.length / 2)] };
+}
 describe('a real race whose course is uncertain', () => {
-  // A perfect boat (the planner: the polar, NOAA's current, the observed wind, every leg on its best line) slower than
-  // most of the real fleet means the course or the day's wind isn't what the fleet had: those races say so.
+  // A perfect boat slower than most of the real fleet means the course or the day's wind isn't what the fleet had:
+  // those races say so. A course given by someone who sailed it is known, so it's never "uncertain"; where a perfect
+  // boat still can't match the fleet there, the gap is the sim's, and it's an expected failure below, not excused.
   it('is flagged exactly when a perfect boat is slower than the median real finisher', () => {
     for (const r of realRaces()) {
-      const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, current: 'real', sea: 'real', opponents: [], fleet: 0 };
-      const w = new World(courseFile(r.courseId), S, 7), o = outlookFor(w), legs = planLegs(w, o), last = legs[legs.length - 1];
-      const perfect = (last.t0 - o.t0 + last.minutes) * 60;
-      const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).map(b => b.elapsedS!).sort((a, b) => a - b);
-      expect(!!r.uncertain, `${r.id}: perfect ${(perfect / 60).toFixed(1)} min, median real ${(fin[Math.floor(fin.length / 2)] / 60).toFixed(1)}`).toBe(perfect > fin[Math.floor(fin.length / 2)]);
+      if (r.courseFrom) { expect(r.uncertain, r.id).toBe(null); continue; }
+      const { perfect, median } = perfectVsFleet(r);
+      expect(!!r.uncertain, `${r.id}: perfect ${(perfect / 60).toFixed(1)} min, median real ${(median / 60).toFixed(1)}`).toBe(perfect > median);
     }
     expect(realFleetFor('GGYC_T008047221-r1')!.uncertain).toMatch(/Course uncertain/);
     expect(realFleetFor('GGYC_T008047221-r5')!.uncertain).toBe(null);
+    // the course sheet unread for the races whose distance disagrees; the player is warned only where the check fails
+    expect(realRaces().filter(r => r.sheetUnverified).map(r => r.id).sort()).toEqual(['GGYC_T008047221-r1', 'GGYC_T008047221-r4']);
+    expect(realRaces().filter(r => r.uncertain).map(r => r.id)).toEqual(['GGYC_T008047221-r1']);
+    expect(realFleetFor('GGYC_T008047221-r4')!.sheetUnverified).toBe(true);
+  });
+});
+
+describe('the sim against a real race on a known course', () => {
+  // EXPECTED TO FAIL until the planner works the shore's relief on a foul tide (Skipper Model's routing work): on
+  // 7 Nov 2026, course 2 (the owner sailed it), a perfect boat takes 76 min against the fleet's median 52, in NOAA's
+  // 2.2–2.4 kt ebb (SFB1204). The sim has the relief, 0.8 kt within 100 m of the Cityfront against 2.4 at the marks,
+  // but the planner's runs east to Fort Mason stay out in the stream; and the record's wind fades to 6.5 kt for the
+  // second lap. When this starts to pass, vitest says so: take the .fails off.
+  it.fails('7 Nov 2026, course 2: a perfect boat is at least as fast as the real fleet\'s median', () => {
+    const { perfect, median } = perfectVsFleet(realRace('GGYC_T00227699-r1')!);
+    expect(perfect, `perfect ${(perfect / 60).toFixed(1)} min, median real ${(median / 60).toFixed(1)}`).toBeLessThanOrEqual(median);
   });
 });

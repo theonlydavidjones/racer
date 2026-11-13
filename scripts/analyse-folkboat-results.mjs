@@ -15,6 +15,7 @@
  *  - gaps: the top boat against the middle and the back of the fleet.
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { isSkipperId, nameKey } from './skipper-keys.mjs';
 import { fileURLToPath } from 'node:url';
 
 const FILE = new URL('../src/boat/data/sf-folkboat-results.json', import.meta.url);
@@ -33,8 +34,9 @@ function pearson(xs, ys) {
   xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; syy += (ys[i] - my) ** 2; });
   return { r: sxy / Math.sqrt(sxx * syy), slope: sxy / sxx, intercept: my - (sxy / sxx) * mx };
 }
-/** One skipper however the scorer typed the name ("Tricia D Antin", "Tricia Dantin"). */
-const skipperKey = s => s.toLowerCase().replace(/[^a-z]/g, '');
+/** One skipper however the scorer typed the name ("Tricia D Antin", "Tricia Dantin"); the results now carry an anonymous
+ * id per skipper made by that same normalisation (scripts/skipper-keys.mjs), which keys as it is. */
+const skipperKey = s => isSkipperId(s) ? s : nameKey(s);
 
 /** Kendall's tau-a between two finishing orders, over the boats that finished both (null under 3 such boats). */
 function kendall(a, b) {

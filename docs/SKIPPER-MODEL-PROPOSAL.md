@@ -62,7 +62,7 @@ and rerun the analysis. The aim is 10 or more timed races, so the wind slope res
   only.
 - **Speed.** In 63 Laser World Cup and Olympic races (Heliyon 2022, PMC9719898, Table 2), the top 10 made good
   **about 3–8% more VMG upwind** than the rest (8% in light air, 3% at 8–12 kt and over 12 kt). The gap was **5–7%
-  on reaches** and **0–3% downwind**. That is among elites, so club fleets differ more. Manoeuvre counts didn't
+  on reaches** and **0–3% downwind**. That is among elites, so club fleets differ more. Maneuver counts didn't
   differ by rank. Speed and position decided it, not the number of tacks.
 - **Decisions.** Araújo, Davids & Serpa 2005 (Psych. Sport & Exercise 6(6)) compared skill levels in a simulated
   regatta. Sailors of different levels used the same information (the wind and the opponents), and the better
@@ -71,7 +71,7 @@ and rerun the analysis. The aim is 10 or more timed races, so the wind slope res
 - **Laylines.** Coaching sources say overstanding is the most common windward-mark mistake, and that a call made
   far away misses by more (Dellenbaugh, Windcheck; Ed Adams' "no more than 10 lengths out", Sailing World). No
   measured error in degrees was found.
-- **Not found** (any figure here will be a labelled estimate, tuned against the fleet results above):
+- **Not found** (any figure here will be a labeled estimate, tuned against the fleet results above):
   - the threshold and delay for seeing a shift;
   - how far off a puff can be read on the water;
   - OCS rates, or the distance behind the line at the gun;
@@ -87,13 +87,13 @@ fleet's is 0.43.
 ## 2. The skipper
 
 Each AI skipper has seven attributes on 0 (novice) … 1 (expert), as the crew's skill is (boat/crewPhys.ts). Each one
-changes things the AI already decides, so no new behaviour is invented.
+changes things the AI already decides, so no new behavior is invented.
 
 | Attribute | What it changes in the AI (src/ai/ai.ts) | Expert … novice (estimates unless cited) |
 |---|---|---|
-| **Starting** | `plan.tReach`, the error in judging her time to the line, which is a lasting bias plus noise. `aggr`, her margin. Which end she judges favoured. Her depth and where she sets up. | Time-on-distance error σ about 1.5 s … 6 s. A line-bias judging error of 2° … 8°. |
+| **Starting** | `plan.tReach`, the error in judging her time to the line, which is a lasting bias plus noise. `aggr`, her margin. Which end she judges favored. Her depth and where she sets up. | Time-on-distance error σ about 1.5 s … 6 s. A line-bias judging error of 2° … 8°. |
 | **Boat speed** (the helm) | How well she holds the groove: the error in her steered angle to the wind upwind (pinching and footing) and how much it wanders, and how far her steering lags in waves. Trim stays the crew's (Crew Model). | Upwind VMG lost about 0–1% … 5–8% at 6–12 kt, more in light air (Laser data: 3–8% among elites). |
-| **Strategy** (the wind and the water) | When she sees a shift: its size and how long she waits (now fixed at 4° and 15 s). How far ahead she reads puffs. How much current she allows for (now `aware`, 60% or 100%). The favoured side she believes in from the pre-start (the strategist's plan, with an error). | Shift seen at 3°/8 s … 8°/30 s (Pluijms: 3° vs 11° by feel). Far "wind over there" read at 400 m … 100 m. The imminent calls (≈45 m, ≈10 s; the owner) come mainly from the crew. Current allowed 95% … 40%. |
+| **Strategy** (the wind and the water) | When she sees a shift: its size and how long she waits (now fixed at 4° and 15 s). How far ahead she reads puffs. How much current she allows for (now `aware`, 60% or 100%). The favored side she believes in from the pre-start (the strategist's plan, with an error). | Shift seen at 3°/8 s … 8°/30 s (Pluijms: 3° vs 11° by feel). Far "wind over there" read at 400 m … 100 m. The imminent calls (≈45 m, ≈10 s; the owner) come mainly from the crew. Current allowed 95% … 40%. |
 | **Tactics** (boat on boat) | Laylines judged by eye (below). When she tacks out of dirty air. When she covers or splits. When she ducks or tacks at a crossing. When she hails. | Layline bias 1–2° … 6–8° (overstanding more often), growing with distance. |
 | **Rules knowledge** | Whether she reads an encounter right: who has right of way, mark-room, room to tack. A skipper who reads it wrong keeps clear late or not at all. The safety net (rule 14, contact) stays exact for everyone. Later: whether she knows she fouled. | Encounter read right 99% … 85%. |
 | **Consistency** | Her form on the day: a draw per race for each attribute. Her lapses: per leg, a chance of one real blunder (a shift missed, the wrong side, a bad rounding). | Day-to-day σ 0.05 … 0.2. A lapse in about 2% … 15% of legs. |
@@ -102,7 +102,7 @@ changes things the AI already decides, so no new behaviour is invented.
 **Errors are mostly lasting, not jitter.** A skipper who misjudges a layline misjudges it by the same few degrees
 until she gets closer and sees better. A skipper who believes the left pays goes left. Fresh noise every step would
 average away, and it would make her dither, which real skippers don't. So each error is a bias drawn when the
-judgement is made (each leg, each approach, each crossing), and it shrinks as she gets closer or as time passes,
+judgment is made (each leg, each approach, each crossing), and it shrinks as she gets closer or as time passes,
 with a small noise on top. All of it is drawn from the world's seeded `w.rng`, so races and replays repeat.
 
 ## 3. Acting on what she believes
@@ -298,7 +298,7 @@ the overall spread about where it is, or tightening it a little.
 | Phase | What | Hours |
 |---|---|---|
 | 0 | Calibration data: other clubs' timed Folkboat results; a baseline harness (spread, quarters, wind slope, tau) as a slow test | 2–3 |
-| 1 | `skipper.ts`: attributes, the legacy profile, `AiState.sk` and `mind`. No change in behaviour, all tests green | 2 |
+| 1 | `skipper.ts`: attributes, the legacy profile, `AiState.sk` and `mind`. No change in behavior, all tests green | 2 |
 | 2 | Beliefs about the water: shifts, puffs read ahead, laylines by eye, current share, start timing and line bias | 6–8 |
 | 3 | Traffic: nerve margins, crossing misjudgement, rules reading (safety net exact) | 3–4 |
 | 4 | The Yacht Club sliders (layout to the owner first) and the fleet's generation | 3–4 |

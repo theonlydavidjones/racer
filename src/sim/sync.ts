@@ -28,14 +28,15 @@ const NEVER = new Set(['rng', 'motorRng', 'emit', 'keepsClearOf', 'obstacle', 'e
 const APPEND = new Set(['rec', 'track']);
 /**
  * The mirror's check (every CHECK_EVERY frames, in the published page too): a few numbers from the worker's World and
- * the same worked out on the mirror must agree to the last bit: every boat's place, heading, speed and heel, the clock,
+ * the same worked out on the mirror must agree to the last bit: every boat's place, heading, speed, heel, heave and pitch, the waves, the clock,
  * the wind, and the answers to three of the page's questions (the current, the wind field, the wind) at the course's
  * middle. A difference is counted and reported (sim/host.ts): the mirror isn't the race.
  */
 export const CHECK_EVERY = 20;
 export function checkOf(w: World): number[] {
   const out: number[] = [w.t, w.steps, w.wind.from, w.wind.kt];
-  for (const b of w.boats) out.push(b.x, b.y, b.h, b.v, b.heel);
+  for (const b of w.boats) out.push(b.x, b.y, b.h, b.v, b.heel, b.heave ?? 0, b.pitch ?? 0);
+  out.push(w.waves.phase[0], w.waves.amp[5]);
   const p = w.C.center, c = w.currentAt(p), f = w.fieldAt(p), h = w.windHere(p);
   out.push(c.x, c.y, f.k, f.turn, f.extra, h.from, h.kt);
   return out;
@@ -78,6 +79,12 @@ export interface Packet {
  * first asked for, so their value depends on who asks first; they're sent, as the worker's.)
  */
 const LOCAL_WORLD = new Set(['kcMemo']);
+/**
+ * The World's memos that are sent (not local) but left out of the first numbering: the page's questions can fill them
+ * on a World before it's a mirror (the setup's cards ask the current, the line's transit, the sea's growth), and the two
+ * sides' numbers must not depend on who asked what. Their contents are sent as new objects the first time.
+ */
+const UNNUMBERED = new Set(['flows', 'flowsC', '_transit', 'seaNodes']);
 const LOCAL = new Map<object, ReadonlySet<string>>([
   [CurrentField.prototype, new Set(['vecs', 'stamp', 'bayFlow', 'cells', 'lastKey', 'lastList'])],
   // (the fetch on a 150 m grid by wind direction, worked out at the grid's node: the same whoever asks first)
@@ -115,7 +122,7 @@ function walkAll(w: World, see: (v: object) => void): void {
     for (const k of Object.keys(v)) { const x = (v as Record<string, unknown>)[k]; if (typeof x !== 'function' && !local(v, k)) visit(x); }
   };
   const o = w as unknown as Record<string, unknown>;
-  for (const k of Object.keys(o)) if (!NEVER.has(k) && !LOCAL_WORLD.has(k)) visit(o[k]);
+  for (const k of Object.keys(o)) if (!NEVER.has(k) && !LOCAL_WORLD.has(k) && !UNNUMBERED.has(k)) visit(o[k]);
 }
 
 /**
