@@ -107,3 +107,13 @@ describe('the laylines drawn with the passage', () => {
       expect(off).toBeLessThan(5);
     });
 });
+
+describe('passages along a shore', () => {
+  // the review's survey: tacking up the middle, the lanes either side of the course met the shore (the Gate to Pier 39
+  // and the Bay Bridge downwind in 8 kt, Berkeley to Belvedere upwind): she sails it the long board first instead
+  for (const [from, to] of [['gate', 'pier39'], ['berkeley', 'belvedere']] as const)
+    it(`${from} to ${to} in 8 kt gets there`, () => {
+      const pn = passageNow(at({ sailFrom: from, sailTo: to, windKt: 8, tideTime: '15:00' }))!;
+      expect(pn.ok, pn.why).toBe(true);
+    }, 30_000);
+});
