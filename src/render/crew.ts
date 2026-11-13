@@ -336,7 +336,15 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     if (Math.abs(z - MAST_Z) < 0.35 && Math.abs(x) < 0.32) x = (x >= 0 ? 1 : -1) * 0.32;
     const p = kneel(x, z, yaw, [V(0, 0, 0), V(0, 0, 0)], k);
     p.hip.y = g + 0.45 * k; p.pitch = -1.05;
-    p.hands = [0, 1].map(j => { const h = p.hip.clone().addScaledVector(f, (0.42 + 0.08 * Math.sin(ph + j * Math.PI)) * k).addScaledVector(r, (j ? 1 : -1) * 0.16 * k); return h.setY(ground(h.x, h.z) + 0.05); }) as [THREE.Vector3, THREE.Vector3];
+    // (beside the cabin, the knees and feet on the side deck outboard of its side too, not trailing in over it: its side
+    // stands up to 0.38 m above the deck aft, hull.ts cabinSideH, and the shins would go into it)
+    const ch = (q: number) => q > CAB0 - 0.1 && q < COCK0 + 0.05 ? cabinHalf(uAtZ(q)) : 0;
+    const outside = Math.abs(p.hip.x) > ch(p.hip.z);
+    if (outside) for (const ft of p.feet) { const e = ch(ft.z) + 0.12; if (e > 0.12 && Math.abs(ft.x) < e) { ft.x = Math.sign(p.hip.x) * e; ft.y = ground(ft.x, ft.z) + 0.07; } }
+    p.hands = [0, 1].map(j => { const h = p.hip.clone().addScaledVector(f, (0.42 + 0.08 * Math.sin(ph + j * Math.PI)) * k).addScaledVector(r, (j ? 1 : -1) * 0.16 * k);
+      // (and the hands on the deck clear of the cabin's side as well, the forearms not across its corner)
+      if (outside) { const e = ch(h.z) + 0.1; if (e > 0.1 && Math.abs(h.x) < e) h.x = Math.sign(p.hip.x) * e; }
+      return h.setY(ground(h.x, h.z) + 0.05); }) as [THREE.Vector3, THREE.Vector3];
     p.look = p.hip.clone().addScaledVector(f, 2).setY(p.hip.y + 0.4); p.step = true;
     return p;
   }
