@@ -4,7 +4,7 @@ import terrainPng from './data/terrain.png?inline';
 import meta from './data/terrain.json';
 import { LL } from '../geo/geo';
 import { limePointBox, limePointLand, onGround } from '../geo/shore';
-import { CHART_PIERS, chartCoast } from './shoreFit';
+import { CHART_PIERS, chartCoast, shoreKind } from './shoreFit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { inBasin } from '../geo/marina';
 
@@ -362,7 +362,14 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       }
       const shore = H[k - 1] <= 0 || H[k + 1] <= 0 || H[k - nx] <= 0 || H[k + nx] <= 0 || H[k - 2] <= 0 || H[k + 2] <= 0 || H[k - 2 * nx] <= 0 || H[k + 2 * nx] <= 0; // within 100 m of the water
       const patchCorner = isShore(i - 1, j - 1) || isShore(i, j - 1) || isShore(i - 1, j) || isShore(i, j); // (the patches put the sand where the shore is)
-      if (h < 5 && shore && !patchCorner && r !== 'city' && r !== 'port') tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      if (h < 5 && shore && !patchCorner && r !== 'city' && r !== 'port') { // beaches and rocky shore (on the Headlands, where OSM maps them)
+        // (this grid reaches 100 m inland: off a mapped beach, rock only where it's steep, a cliff; flat ground behind a
+        // rocky shore, Fort Baker's, keeps the land's colour)
+        const sk = shoreKind(lat, lon, pos[k * 3], -pos[k * 3 + 2]);
+        if (sk === 'sand') tmp.copy(PAL.sand);
+        else if (sk === 'rock') { if (slope > 0.4) tmp.copy(PAL.rock); }
+        else tmp.copy(slope > 0.4 || r === 'rock' ? PAL.rock : PAL.sand);
+      }
       else if (slope > 0.55) tmp.lerp(PAL.rock, 0.6); // cliffs
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
     }
@@ -376,7 +383,14 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
       }
       if (wt > 0) tmp.setRGB(r / wt, g / wt, bl / wt); else tmp.copy(PAL.sand);
       const h = fP[v * 3 + 1], lat = M.north - (M.north - M.south) * gj / F / (ny - 1), lon = M.west + (M.east - M.west) * gi / F / (nx - 1), rg = region(lat, lon, Math.max(h, 1));
-      if (!fPin[v] && h < 5 && rg !== 'city' && rg !== 'port') tmp.copy(1 - fNrm.getY(v) > 0.4 || rg === 'rock' ? PAL.rock : PAL.sand); // beaches and rocky shore
+      if (!fPin[v] && h < 5 && rg !== 'city' && rg !== 'port') { // beaches and rocky shore (on the Headlands, where OSM maps them)
+        // (off a mapped beach: rock on the cliffs and at the very edge, under 2 m, the patches' land starting at 1.5 m;
+        // flat ground just behind it, Fort Baker's, keeps the land's colour)
+        const sk = shoreKind(lat, lon, fP[v * 3], -fP[v * 3 + 2]), steep = 1 - fNrm.getY(v) > 0.4;
+        if (sk === 'sand') tmp.copy(PAL.sand);
+        else if (sk === 'rock') { if (steep || h < 2) tmp.copy(PAL.rock); }
+        else tmp.copy(steep || rg === 'rock' ? PAL.rock : PAL.sand);
+      }
       fCol[v * 3] = tmp.r; fCol[v * 3 + 1] = tmp.g; fCol[v * 3 + 2] = tmp.b;
     }
     (fGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
