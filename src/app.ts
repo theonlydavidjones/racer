@@ -49,7 +49,7 @@ import { WindLadder } from './render/windLadder';
 import { windBand, type ManoeuvreScore } from './sim/drill';
 import { roundingKey, type RoundingScore } from './sim/roundings';
 import { LINE_NAME } from './ui/lines';
-import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
+import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
 import { PerfMeter } from './ui/perfMeter';
 import { compassPoint, degAndPoint, turnWords } from './core/compass';
@@ -472,13 +472,19 @@ document.addEventListener('click', e => {
   if (you) { send({ k: 'line', key: k, mine: true }); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
   else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
 });
-// the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout)
-function crewPopOpen(open = !!$('crewPop').hidden): void {
+// the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout), or opened from the
+// Coach card's crew line. The owner (13 Nov 2026): the button back on the surface, so you can find where the crew sit
+// when you need them (in irons, their weight to leeward helps her bear away)
+function crewPopOpen(open = !!$('crewPop').hidden, from: 'button' | 'coach' = 'coach'): void {
   $('crewPop').hidden = !open; $('bCrew').setAttribute('aria-expanded', String(open)); $('bCrew').classList.toggle('on', open);
-  // (opened from the Coach card's crew line: it sits just above that card, on the left, clear of the band)
-  if (open) { const r = $('trimPanel').getBoundingClientRect(), pop = $('crewPop').style; pop.bottom = `${Math.round(innerHeight - r.top + 8)}px`; pop.left = `${Math.round(r.left)}px`; pop.right = 'auto'; }
+  if (!open) return;
+  const pop = $('crewPop').style;
+  // (from the button: just above it, bottom right, as before, with the places to sit open; from the Coach card's crew
+  // line: just above that card, on the left, clear of the band)
+  if (from === 'button') { pop.bottom = pop.left = pop.right = ''; openCrewChoices(); showCrewPlace(); }
+  else { const r = $('trimPanel').getBoundingClientRect(); pop.bottom = `${Math.round(innerHeight - r.top + 8)}px`; pop.left = `${Math.round(r.left)}px`; pop.right = 'auto'; }
 }
-$('bCrew').onclick = () => crewPopOpen();
+$('bCrew').onclick = () => crewPopOpen(undefined, 'button');
 // the crew line in the Coach card is redrawn every frame: catch its clicks on the card
 $('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-crew')) crewPopOpen(); });
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };

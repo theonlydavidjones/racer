@@ -1243,3 +1243,6 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .spark .halo{stroke:rgba(233,242,245,.22);stroke-width:3.4}
 .season .sfoot{display:flex;justify-content:space-between;gap:16px;margin-top:10px;color:var(--muted);font:500 12px var(--f-inst);letter-spacing:.03em}
 .ressea{margin-top:10px;padding-top:8px;border-top:1px solid var(--rule);font:600 14px/1.35 var(--f-inst)}.ressea span{color:var(--muted);font-weight:500}
+/* a member's crew ratings: the number always, "auto" by one that follows their Skill (set by hand, plain) */
+.mslider output{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap}
+.mslider .mauto{font:600 9.5px/1 var(--f-inst);font-style:normal;letter-spacing:.1em;text-transform:uppercase;color:#7ee0a5;opacity:.85}
