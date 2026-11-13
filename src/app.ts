@@ -15,6 +15,11 @@ import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
+import { tactics, type Tactics } from './replay/tactics';
+import { tacticsHtml, tacticsTop, type TacShown } from './ui/tacticsView';
+import { planLegs } from './sim/strategist';
+import { outlookFor } from './sim/outlook';
+import { beatAngle } from './boat/polar';
 import { bigMoments, gapWords, legWords, rivalWho, versus, type VsInput } from './replay/versus';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
@@ -858,6 +863,7 @@ $('bPause').onclick = () => {
   if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;
   $('bRestart').textContent = w.drill ? 'Restart the drill' : w.freeSail ? 'Restart this cruise' : 'Restart this race';
   const d = $('pauseDebrief'), html = w.drill ? drillHtml() : w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
+  mountDebriefTactics(d);
   $('pauseWatch').hidden = !html || w.track.length < 2;
 };
 /** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
@@ -871,13 +877,70 @@ function vsInput(log: NonNullable<typeof w.log>): VsInput {
     legs: [...C.marks.map(m => ({ name: m.name, to: m.p, kind: m.leg })), { name: 'the finish', to: C.center, kind: fin as 'beat' | 'reach' | 'run' }]
   };
 }
+/* ---------------- the tactical debrief (replay/tactics.ts, ui/tacticsView.ts) ---------------- */
+/** The planner's ideal for this race (strategist.planLegs: costly, so once a race), and what's shown on the chart. */
+let tacPlan: { w: unknown; legs: ReturnType<typeof planLegs> } | null = null;
+const tacShown: TacShown = { best: true, ideal: true, boats: new Set() };
+let tacShownFor: unknown = null;
+/** The plan, once a race (outlookFor reads the gun's day, not the clock: the same plan the briefing showed). */
+function tacPlanNow(): ReturnType<typeof planLegs> {
+  if (tacPlan?.w !== w) { try { tacPlan = { w, legs: planLegs(w, outlookFor(w)) }; } catch (e) { console.warn('the tactical debrief: no ideal', e); tacPlan = { w, legs: [] }; } }
+  return tacPlan.legs;
+}
+/** A planned leg's time, s: its sailing time and the rounding at its end (an island's, or 10 s at a mark: strategist.legEnds). */
+const idealS = (P: ReturnType<typeof planLegs>, k: number) => !P[k] ? null : ((P[k + 1] ? P[k + 1].t0 - P[k].t0 : P[k].minutes) * 60);
+function tacticsNow(): Tactics | null {
+  const log = w.log; if (!log || w.track.length < 2 || w.drill) return null;
+  tacPlanNow();
+  const C = w.C, u = w.user.id, V0 = vsInput(log);
+  const legs = V0.legs.map((L, k) => ({ name: L.name, from: k === 0 ? C.center : V0.legs[k - 1].to, to: L.to, kind: L.kind, ideal: idealS(tacPlan!.legs, k) }));
+  // what the race log measured for you, by leg: past the layline, and each tack or gybe's cost. A moment goes to the leg
+  // it happened in: a tack at its turn (the moment opens 3 s before it), a spell at its middle; the first leg from the gun
+  const ends = [0, ...C.marks.map((_, k) => log.boatMarks[u]?.[k] ?? null), w.user.finished ? w.user.finishT : null];
+  const at = (m: { key: string; t0: number; t1: number }) => m.key === 'tacks' ? m.t0 + 3 : (m.t0 + m.t1) / 2;
+  const ms = log.moments(w), logged = legs.map((_, k) => {
+    const a = ends[k], b = ends[k + 1] ?? Infinity, inLeg = (m: { key: string; t0: number; t1: number }) => a != null && at(m) >= a && at(m) < b;
+    return { laylines: ms.filter(m => m.key === 'laylines' && inLeg(m)).reduce((x, m) => x + m.lost, 0), tacks: ms.filter(m => m.key === 'tacks' && inLeg(m)).map(m => m.lost) };
+  });
+  return tactics({ frames: w.track, you: u, beat: beatAngle(w.wind.kt), tws: w.wind.kt, hs: w.user.sea?.hsW ?? 0, legs, logged,
+    boats: w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, color: b.color, start: w.startTimes[b.id] ?? null, marks: log.boatMarks[b.id] ?? [], finishT: b.finished ? b.finishT : null })) });
+}
+/** Draw the tactical debrief into `host` (the results' or the pause screen's debrief, or the replay's list), and answer its chips. */
+function mountTactics(host: HTMLElement, compact: boolean, onLeg: (i: number) => void): void {
+  const T = tacticsNow(); if (!T || T.rows.length < 2) { host.innerHTML = ''; return; }
+  if (tacShownFor !== w) {
+    // a new race: the winner shown beside you (or the boat second, if you won)
+    tacShownFor = w; tacShown.boats.clear();
+    const V = versus(vsInput(w.log!)); if (V) tacShown.boats.add(V.rival);
+  }
+  // (a fleet goes by sail numbers, the owner, 13 Nov 2026: the chips say "USA 110 Varnish", the chart's tight spots "USA 110")
+  const boats = w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : `${b.no} ${b.name}`.trim(), short: b.isUser ? 'You' : b.no || b.name, color: b.color }));
+  const paint = () => {
+    const sc = scores(), me = sc.get(w.user.id), place = me?.rank != null ? `${ordinal(me.rank)} of ${w.boats.length}` : 'Racing';
+    host.innerHTML = (compact ? '' : tacticsTop(T, place, w.user.finishT != null ? mmss(w.user.finishT) : `${mmss(w.t)} so far`)) + tacticsHtml(T, boats, w.user.id, tacShown, { compact });
+  };
+  paint();
+  host.onclick = e => {
+    const el = e.target as HTMLElement, chip = el.closest<HTMLElement>('[data-tchip]')?.dataset.tchip;
+    if (chip) {
+      if (chip === 'best') tacShown.best = !tacShown.best; else if (chip === 'ideal') tacShown.ideal = !tacShown.ideal;
+      else if (chip !== 'you') { const id = +chip; if (tacShown.boats.has(id)) tacShown.boats.delete(id); else tacShown.boats.add(id); }
+      paint(); return;
+    }
+    const leg = el.closest<HTMLElement>('[data-tleg]')?.dataset.tleg; if (leg != null) onLeg(+leg);
+  };
+}
+/** The planner's ideal track on each leg, for the replay (dashed beside yours). */
+const idealPaths = () => tacPlanNow().map(L => L.plans[L.best].path.map(q => q.p));
+
 /** The race replay: your race from just before the gun, with the debrief on its track and timeline. */
 function watchRace(): void {
   const log = w.log; if (!log || w.track.length < 2) return;
   raceReplay.open(w, {
     frames: w.track, moments: log.moments(w), findings: log.findings(w), wind: w.gun?.windFrom ?? w.wind.from,
     marks: log.places().filter(p => p.t != null).map(p => ({ name: p.name, t: p.t! })), clips: incidentClips,
-    vs: versus(vsInput(log)), real: realLine()
+    vs: versus(vsInput(log)), real: realLine(),
+    tactics: (host, onLeg) => mountTactics(host, true, onLeg), idealPaths: idealPaths(), chosen: () => [...tacShown.boats]
   });
 }
 /**
@@ -1533,6 +1596,11 @@ $('bCondReal').onclick = () => {
 };
 
 /** The tactics debrief: what cost you time, most first, and your place at each mark. */
+/** The tactical chart at the top of a debrief: clicking a leg opens "Watch your race" on it. */
+function mountDebriefTactics(box: HTMLElement): void {
+  const host = box.querySelector<HTMLElement>('.tacHost[data-tac]'); if (!host) return;
+  mountTactics(host, false, i => { watchRace(); raceReplay.pickLegNo(i); });
+}
 function debriefHtml(title: string): string {
   const log = w.log;
   if (!log || w.t <= 0) return '';
@@ -1541,7 +1609,7 @@ function debriefHtml(title: string): string {
   const items = fs.map(f => `<li><div class="dbHead"><b>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
   const marks = pl.length > 1 ? `<p class="lede">Your place at each mark: ${pl.map(p => `${esc(p.name)} ${nth(p.place!)}`).join(' → ')}.</p>` : '';
   const total = fs.reduce((a, f) => a + f.lost, 0);
-  return `<div class="eyebrow">${title}</div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
+  return `<div class="eyebrow">${title}</div><div class="tacHost" data-tac></div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
 }
 /**
  * Against the winner (or the boat second, if you won), in the debrief: the gap, a line for each leg, and the moments
@@ -1668,6 +1736,7 @@ function showResults(): void {
   { const rr = realResults(); $('resReal').innerHTML = rr; $('resReal').hidden = !rr; }
   const db = debriefHtml('Your race, debriefed');
   $('resDebrief').innerHTML = db; $('resDebrief').hidden = !db; $('resStart').hidden = !!db; // the debrief has the start in full
+  mountDebriefTactics($('resDebrief'));
   $('bWatch').hidden = !w.log || w.track.length < 2;
   $('results').hidden = false;
   send({ k: 'pause', on: true });
