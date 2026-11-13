@@ -33,8 +33,8 @@ export interface FleetHooks {
   members(): Member[];
   membersChanged(): void;
   /** The Season tab's contents (ui/season.ts), and sailing one of its races. */
-  seasonHtml(): string;
-  sailSeason(raceNo: number): void;
+  seasonHtml(id: string | null): string;
+  sailSeason(seasonId: string, raceNo: number): void;
 }
 
 const VIEW_KEY = 'fbsim-fleet-view';
@@ -47,6 +47,8 @@ export class Fleet {
   private confirmDelete = false;
   /** The Yacht Club's tab (docs/YACHT-CLUB.md): your boats, or the members; the member open, and the roster's filter. */
   private tab: 'boats' | 'members' | 'season' = 'boats';
+  /** The season shown (null: the one under way). */
+  private seasonId: string | null = null;
   private memberId: string | null = null;
   private filter: MemberFilter = 'all';
   private confirmMemberDel = false;
@@ -62,7 +64,9 @@ export class Fleet {
     });
     // (a member's page: their name, build, skill and ratings)
     this.list.addEventListener('change', e => {
-      const t = e.target as HTMLInputElement, m = this.member(); if (!m || !t.dataset.m) return;
+      const t = e.target as HTMLInputElement;
+      if (t.dataset.f === 'sseason') { this.seasonId = t.value; this.drawList(); return; } // (the Season tab's season)
+      const m = this.member(); if (!m || !t.dataset.m) return;
       if (applyMemberInput(m, t.dataset.m, t.value, t.dataset.a, t.checked)) { this.hooks.membersChanged(); this.drawList(); }
     });
     this.list.addEventListener('input', e => {
@@ -122,7 +126,7 @@ export class Fleet {
         this.hooks.changed(); this.hooks.back(); return;
       }
       case 'tab': this.tab = v === 'members' ? 'members' : v === 'season' ? 'season' : 'boats'; this.memberId = null; this.drawList(); return;
-      case 'season': this.close(); this.hooks.sailSeason(Number(v)); return;
+      case 'season': { const [id, no] = v.split('|'); this.close(); this.hooks.sailSeason(id, Number(no)); return; }
       case 'mfilter': this.filter = (['all', 'skipper', 'crew', 'yours'] as const).find(x => x === v) ?? 'all'; this.drawList(); return;
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
       case 'mback': this.memberId = null; this.drawList(); return;
@@ -156,7 +160,7 @@ export class Fleet {
       morph(this.list, `<div class="panel wide fleetpanel">
         <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${this.hooks.seasonHtml()}</div>`);
+        ${this.hooks.seasonHtml(this.seasonId)}</div>`);
       return;
     }
     if (this.tab === 'members') {
