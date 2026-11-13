@@ -96,12 +96,10 @@ export interface MarkRoomState {
 }
 
 /** Per-pair memory the engine carries between steps. */
-/** A boat's recent poses, as this pair has seen them: a ring of samples every 0.1 s (src/rules/pairs.ts recordPose). */
+/** A boat's recent poses, as this pair has seen them: a ring of samples every 0.1 s (src/rules/pairs.ts recordPose, one per boat). */
 export interface PoseRing { t: Float64Array; x: Float64Array; y: Float64Array; h: Float64Array; v: Float64Array; n: number; i: number }
 
 export interface PairRecord {
-  /** Each boat's recent poses (rule 16.1's room to keep clear: where they were when the right-of-way boat began to turn). */
-  hist?: Record<number, PoseRing>;
   kc: number | null; // id of the keep-clear boat at the last step
   rule: RuleId | null;
   grace: number; // Rule 15 grace lasts until this time

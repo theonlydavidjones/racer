@@ -130,8 +130,11 @@ export function wideOfGybe(b: RulesBoat, idx: number, ctx: RulesContext): boolea
   return d > 1.2 * LOA && away > 0.3;
 }
 
-/** Rule 20.2(c): how long after a "You tack" reply the hailing boat has to get round and clear, s. */
-export const REPLY_ROOM = 25;
+/** Rule 20.2(c): how long a "You tack" reply's room lasts if the hailing boat hasn't tacked, s: a stale-hail cap. Once
+ * the hailed boat has responded the hailing boat "shall tack as soon as possible" (20.2(d), called after HAIL_RESPONSE),
+ * which after "You tack" is "normally immediately" (Dave Perry, Understanding the Racing Rules of Sailing through 2028,
+ * rule 20); the room clears 4 s after her tack. A modelling choice, cut from 25 s (Bay East's audit, 13 Nov 2026). */
+export const REPLY_ROOM = 10;
 
 /**
  * Definitions, Fetching: she is sailing toward a position close to and to windward of the mark, and will
@@ -158,14 +161,15 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
 const RING = 80, RING_DT = 0.1;
 
 /**
- * Keep `b`'s pose in this pair's history (at most every RING_DT s): a fixed ring, no allocation once made. Kept in the
+ * Keep `b`'s pose in her history (at most every RING_DT s, however many pairs she's in): a fixed ring, no allocation once
+ * made. Kept in the
  * water's frame (her position less the current's drift, her speed through the water), where boats steer and turn: a
  * current both are in changes nothing between them.
  */
-export function recordPose(rec: PairRecord, b: RulesBoat, t: number): void {
-  const H = rec.hist ??= {};
-  let r = H[b.id];
-  if (!r) r = H[b.id] = { t: new Float64Array(RING), x: new Float64Array(RING), y: new Float64Array(RING), h: new Float64Array(RING), v: new Float64Array(RING), n: 0, i: 0 };
+const RINGS = new WeakMap<object, PoseRing>(); // (one per boat, made once: pairs come and go as boats meet and part)
+export function recordPose(b: RulesBoat, t: number): void {
+  let r = RINGS.get(b);
+  if (!r) RINGS.set(b, r = { t: new Float64Array(RING), x: new Float64Array(RING), y: new Float64Array(RING), h: new Float64Array(RING), v: new Float64Array(RING), n: 0, i: 0 });
   const last = r.n ? (r.i + RING - 1) % RING : -1;
   // (time went back, a new race or a test re-run; or a gap, the pair not looked at while apart: start afresh)
   if (last >= 0 && (t < r.t[last] || t - r.t[last] > 1)) r.n = r.i = 0;
@@ -212,13 +216,13 @@ const TURN_WINDOW = 1;
  * actual course? WS Case 105: the boat that could have kept clear (there, by gybing away) and didn't broke the basic
  * rule; the one that luffed broke nothing. Without a history, the turn is taken as leaving no room.
  */
-export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: PairRecord): boolean {
-  return roomGap(row, kc, ctx, rec) >= KEEP_CLEAR_GAP;
+export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): boolean {
+  return roomGap(row, kc, ctx) >= KEEP_CLEAR_GAP;
 }
 
 /** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
-export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: PairRecord): number {
-  const R = rec.hist?.[row.id], K = rec.hist?.[kc.id];
+export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): number {
+  const R = RINGS.get(row), K = RINGS.get(kc);
   if (!R || !K || R.n < 2) return 0;
   const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)];
   const dir = Math.sign(wrap(row.h - (row.headingAgo ?? row.h))) || Math.sign(wrap(R.h[at(R, 0)] - R.h[at(R, 1)]));
@@ -260,7 +264,7 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: P
  * must change course immediately to continue keeping clear." Is `P` sailing to pass astern of (to leeward of) `S`?
  * Her course crosses S's track behind S. "On a beat" runs from the starting signal (WS Case 132).
  */
-function duckingAstern(P: RulesBoat, S: RulesBoat, ctx: RulesContext): boolean {
+export function duckingAstern(P: RulesBoat, S: RulesBoat, ctx: RulesContext): boolean {
   if (ctx.t <= 0 || P.tack !== 'P') return false;
   const p = V(P.headingAgo ?? P.h), s = V(S.headingAgo ?? S.h), cross = p.x * s.y - p.y * s.x;
   if (Math.abs(cross) < 1e-3) return false;
@@ -288,7 +292,7 @@ export interface PairAssessment<B> { verdict: Verdict<B>; incident: Incident<B> 
 /** One step of the rules for a pair of boats. Updates `rec` (the pair's memory) in place and
  * reports any incident. Deterministic: depends only on its arguments. */
 export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation): PairAssessment<B> {
-  recordPose(rec, A, ctx.t); recordPose(rec, B, ctx.t);
+  recordPose(A, ctx.t); recordPose(B, ctx.t);
   const n = ctx.marks.length;
   // (rule 18 applies between boats required to leave a mark on the same side (18.1): a boat that's retired has no mark to
   // leave, so no mark-room either way between her and anyone)
@@ -469,7 +473,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // is the sign.
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
   } else if (['10', '11', '12', '13', '21.1', '21.2', '21.3'].includes(r.rule) && (turned = turnedToward(row, r.kc)) > 0
-    && ((r.rule === '10' && boreAwayOnBeat(row, ctx) && duckingAstern(r.kc, row, ctx)) || !leftRoom(row, r.kc, ctx, rec))) {
+    && ((r.rule === '10' && boreAwayOnBeat(row, ctx) && duckingAstern(r.kc, row, ctx)) || !leftRoom(row, r.kc, ctx))) {
     // (rule 16.1 whatever gave her right of way: the basic rules, or a tacking boat, or one returning, taking a penalty or
     // backing a sail keeping clear of her under 13 or 21)
     // Rule 16.1: the right-of-way boat changed course toward the other boat without leaving her room to keep clear (from

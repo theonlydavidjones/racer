@@ -8,6 +8,7 @@
 // close-hauled, 045 = port close-hauled, 180 = a dead run. A Folkboat is 7.64 m; the zone is 3 lengths (22.9 m).
 import { describe, expect, it } from 'vitest';
 import { V } from '../src/core/math';
+import { duckingAstern } from '../src/rules/pairs';
 import { hailBreach, newPairRecord, notRacing, rightOfWay, type RulesBoat, type RulesContext, type RulesMark } from '../src/rules';
 import { boat, ctx, moveTo, pair } from './diagram';
 
@@ -276,11 +277,13 @@ describe('Rules 10–17 · Section A and B', () => {
       expect(case105(30, 4, cur), JSON.stringify(cur)).toMatchObject({ by: 'S', rule: '16.1' });
     }
   });
-  it('16.2 is only for a port boat ducking: one trying to cross ahead, that starboard bears away a little from with room to spare, broke 10', () => {
-    // beating, P on port crossing ahead of S; S foots off 8° over 2 s (no luff, no hunting) and P, still trying to cross, hits her
-    const S = boat('S', { at: [0, 0], heading: 315 }), P = boat('P', { at: [-19.5, 0.5], heading: 45 }); // P a little ahead in the crossing
-    const p = pair(S, P);
-    expect(sailOn(p, [[S, t => 315 - Math.min(8, Math.max(0, (t - 50) * 4)), 2.5], [P, () => 45, 2.5]], 48, 60)).toMatchObject({ by: 'P', rule: '10' });
+  it('16.2 is only for a port boat ducking (2025–2028: "keeping clear by sailing to pass to leeward"), and only after the start', () => {
+    const S = boat('S', { at: [0, 0], heading: 315 });
+    const ducking = boat('P', { at: [-6, -14], heading: 45 }); // her course meets S's track behind S
+    const crossing = boat('P', { at: [-16, -4], heading: 45 }); // hers meets it ahead of S
+    expect(duckingAstern(ducking, S, ctx(50))).toBe(true);
+    expect(duckingAstern(crossing, S, ctx(50))).toBe(false);
+    expect(duckingAstern(ducking, S, ctx(-30))).toBe(false); // (before the start: no beat to windward yet, WS Case 132)
   });
 
   it('Case 105 in a seaway: the yaw of each wave doesn\'t hide when her luff began', () => {
