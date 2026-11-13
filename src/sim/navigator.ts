@@ -6,7 +6,8 @@ import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
 import type { World } from './world';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
-import { landDist, routeAround, sailLeg, type SailResult } from './routing';
+import { groundLaylines, landDist, routeAround, sailLeg, type SailResult } from './routing';
+import { landAlong } from '../geo/shore';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
 /**
@@ -30,15 +31,22 @@ const ROUTE_NAME: Record<string, string> = {
 };
 
 /** A passage from a to b leaving at t: round the land, each stretch sailed up the middle (tacking on a lane either side). */
-function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] } {
-  let tt = t, ok = true;
+function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] } {
+  let tt = t, ok = true, why: 'land' | 'time' | undefined;
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
+  // each stretch from where the last one really ended (she counts as round a turn within 120 m of it, and cuts the
+  // corner from there, as a boat does), so the track runs on unbroken and every metre of it is sailed and timed
+  let at = route[0];
   for (let i = 1; i < route.length; i++) {
-    const r = sailLeg(o, route[i - 1], route[i], tt, 'middle', undefined, i === route.length - 1 ? 30 : 120, 360);
-    legs.push(r); track.push(...r.path); tt += r.minutes;
-    if (!r.ok) { ok = false; break; }
+    const r = sailLeg(o, at, route[i], tt, 'middle', undefined, i === route.length - 1 ? 30 : 120, 360);
+    legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
+    if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
+    // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
+    const end = r.path[r.path.length - 1].p, next = route[i + 1];
+    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
+    if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
   }
-  return { ok, minutes: tt - t, track, legs };
+  return { ok, why, minutes: tt - t, track, legs };
 }
 
 /** The current along her track over the ground (kt, + helping) at each point. */
@@ -56,19 +64,68 @@ const placeName = (o: Outlook, p: Vec): string => {
   return nearFeature(p, 3000) ?? 'open water';
 };
 
+/**
+ * The passage leaving now, as she'd sail it: the navigator's way round the land, each stretch sailed at the Folkboat's
+ * polar speeds through the forecast wind and NOAA's current as they change on the way (sailLeg: the best VMG angles
+ * upwind and down, tacking or gybing on the layline the current makes, crabbing across it on a reach; the polar's
+ * angles are her course through the water, so her leeway is in them). The same passage the passage plan, the chart
+ * and the setup's tide graph show: worked out once for where she is, where she's going and the minute.
+ */
+export interface PassageNow {
+  route: Vec[]; track: { p: Vec; t: number }[]; ok: boolean; minutes: number; legs: SailResult[];
+  /** why she can't get there leaving now: the planner's course ran ashore, or it takes too long (becalmed, or a foul tide) */
+  why?: 'land' | 'time';
+  /** distance over the ground along her track (m), and where she tacks and gybes */
+  sailedM: number; tacks: Vec[]; gybes: Vec[];
+  /** the laylines into the destination over the ground (routing.ts groundLaylines: the wind, the chop and the current
+   * where she made her last tack or gybe), if she beats or runs the last of the way in: her last board is on one */
+  laylines: { kind: 'beat' | 'run'; tracks: [Vec, Vec] } | null;
+  /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
+  leave: number; eta: number | null;
+}
+const nowMemo = new WeakMap<World, { key: string; refs: unknown[]; v: PassageNow }>();
+export function passageNow(w: World): PassageNow | null {
+  const dest = w.dest; if (!dest) return null;
+  const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
+  const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
+  // (and the conditions it was worked in: changed from the pause menu, World.applyConditions, they're new objects)
+  const refs = [w.weather, w.tide, w.windModel, w.sea];
+  const m = nowMemo.get(w); if (m && m.key === key && m.refs.every((r, i) => r === refs[i])) return m.v;
+  const o = outlookFor(w), route = routeAround(from, dest.p), r = passage(o, route, t0);
+  const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
+  const turns = r.legs.flatMap(l => l.turns), last = r.legs[r.legs.length - 1];
+  const lk: 'beat' | 'run' | null = !last ? null : last.turns.length ? (last.turns[last.turns.length - 1].kind === 'gybe' ? 'run' : 'beat') : last.kind === 'reach' ? null : last.kind;
+  // (the laylines she tacked or gybed onto: the wind and the current where and when she made her last turn, which is
+  // where she saw she'd lay the mark; with no turn on the last stretch, those at the mark when she gets there)
+  const lt = last?.turns[last.turns.length - 1], ltT = lt ? r.track.find(q => dist(q.p, lt.p) < 1)?.t : undefined;
+  const laylines = lk ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
+  const v: PassageNow = { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
+    tacks: turns.filter(q => q.kind === 'tack').map(q => q.p), gybes: turns.filter(q => q.kind === 'gybe').map(q => q.p),
+    laylines, leave: t0, eta: r.ok ? t0 + r.minutes : null };
+  nowMemo.set(w, { key, refs, v });
+  return v;
+}
+
+/** Why a passage can't be sailed, in words: the planner's course ran ashore, or it took too long. */
+export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
+  ? 'the planner\'s course runs ashore on the way (its tacks or gybes don\'t fit between the shores there): pick a spot a little further out, or sail that part by eye'
+  : 'it takes too long, becalmed or against a foul tide somewhere on the way';
+
 export function passagePlan(w: World): PassagePlan | null {
   const dest = w.dest; if (!dest) return null;
   const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
-  const from = { x: u.x, y: u.y }, to = dest.p, route = routeAround(from, to);
+  const from = { x: u.x, y: u.y }, to = dest.p;
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
-  const now = passage(o, route, t0);
+  // (the same passage the chart and the setup show: passageNow)
+  const pn = passageNow(w)!, route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
+  const cant = whyNot(pn.why);
   const straight = dist(from, to), routeLen = route.slice(1).reduce((a, p, i) => a + dist(route[i], p), 0);
   const fromName = w.fromSlip && !w.running ? `her slip (${w.homeSlip?.id})` : place(w.settings.sailFrom)?.name.replace(/^Off /, 'off ') ?? 'here';
 
   /* ---------- the passage, and when to leave ---------- */
   const items: BriefItem[] = [];
   const nm = (m: number) => `${(m / 1852).toFixed(1)} nm`;
-  items.push({ head: 'The way', src: 'model', text: `${nm(routeLen)} to ${dest.name.replace(/^Off /, 'off ')}${route.length > 2 ? ` round the land (${nm(straight)} as the crow flies)` : ''}. ${now.ok ? `Leaving at ${clockOf(t0)}, about ${mins(now.minutes)} at the Folkboat's polar speeds, arriving ${clockOf(t0 + now.minutes)}.` : 'Leaving now she can\'t get there: becalmed against the tide somewhere on the way.'} ${now.legs.map(l => l.kind).includes('beat') ? `Part of it is a beat: ${now.legs.filter(l => l.kind === 'beat').reduce((a, l) => a + l.tacks, 0)} tacks or so.` : ''}` });
+  items.push({ head: 'The way', src: 'model', text: `${nm(routeLen)} to ${dest.name.replace(/^Off /, 'off ')}${route.length > 2 ? ` round the land (${nm(straight)} as the crow flies)` : ''}. ${now.ok ? `Leaving at ${clockOf(t0)}, about ${mins(now.minutes)} at the Folkboat's polar speeds, arriving ${clockOf(t0 + now.minutes)}.` : `Leaving now she can't get there: ${cant}.`} ${pn.tacks.length ? `Part of it is a beat: ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''} or so.` : ''}${pn.gybes.length ? ` ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''} downwind.` : ''}` });
   // the same passage leaving later: the tide and the wind change under it
   const horizon = (o.stations ? w.tide!.to : t0 + 600) - 10; // (the end of the span every station is predicted over)
   const rows: string[][] = [];
