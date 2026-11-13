@@ -578,7 +578,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
