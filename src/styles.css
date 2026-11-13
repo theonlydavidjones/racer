@@ -1122,3 +1122,4 @@ body.showroom #flowPanel{display:none}
 /* the start-line drill's choices for the next attempt (inside its panel) */
 .dopts{display:flex;gap:8px;flex-wrap:wrap}
 .dopts .seg{flex:1 1 200px}
+.dopts .dlabel{flex:1 0 100%;font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}

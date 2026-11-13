@@ -1289,7 +1289,7 @@ const closeDrill = () => { $('drill').hidden = true; drillView.stop(); };
 /** The drill's two choices (inside its panel): how long before the gun each attempt starts, and alone or with the fleet. */
 function drillOptions(): void {
   const from = S.drillFrom ?? DRILL_FROM, solo = S.drillSolo ?? true;
-  $('dOpts').innerHTML = `<div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
+  $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
     + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet</button></div>`;
 }
 $('dOpts').addEventListener('click', e => {

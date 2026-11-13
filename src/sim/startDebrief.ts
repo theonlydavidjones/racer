@@ -128,6 +128,8 @@ export function startDebrief(w: SimView): StartDebrief {
     const full = Math.max(0.5, me.target * clamp(ap.toward, 0.3, 1)), fullDur = ap.fromM / full;
     lateS = behind / full;
     facts.push(`Your run in: you turned for the line at ${clockOf(ap.t0)}, ${Math.round(ap.fromM)} m out. It took ${Math.round(ap.dur)} s at ${kt(ap.meanV)} kt on average; at full speed on that line it takes about ${Math.round(fullDur)} s.`);
+    // (the run in replaces the plain "about N s late" tip: it says when to turn instead)
+    const old = tips.findIndex(t => t.startsWith('At full speed you were about')); if (old >= 0 && !me.ocs && behind > LOA) tips.splice(old, 1);
     if (!me.ocs && behind > LOA) tips.push(`Time on distance: you were about ${Math.round(lateS)} s late. Turn for the line at ${clockOf(ap.t0 - lateS)}, or from ${Math.round(Math.max(0, ap.fromM - behind))} m out at the same time, and come in at full speed.`);
     else if (me.ocs) tips.push(`Time on distance: you were ${Math.round(me.d / full)} s early. Turn for the line at ${clockOf(ap.t0 + me.d / full)}, or start the run from ${Math.round(ap.fromM + me.d)} m out.`);
     if (ap.meanV < 0.8 * me.target && grade !== 'ocs') tips.push(`Your run averaged ${Math.round(100 * ap.meanV / me.target)}% of full speed. Build speed before you turn in (bear off a little and sheet in), so the run is at full speed and the time on distance holds.`);
