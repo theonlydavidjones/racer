@@ -1,5 +1,26 @@
 # Build plan
 
+**The mission** (the owner's words, 13 November 2026; in full at the top of CLAUDE.md): a true-to-life sailing simulator
+that helps people learn to sail, sail better and race better, as good as actually sailing to the maximum reasonable
+extent. Racing (tactics, seamanship, helmsmanship, teamwork, knowing the conditions and your boat) and cruising (you and
+your crew against yourselves, and the beauty and magic of sailing), on San Francisco Bay, for its complexity,
+variability and staggering beauty, in a Folkboat, the purest sailing boat a normal person can own. "If you can sail the
+Bay, you can sail anywhere; if you can sail a Folkboat, you can sail anything." Every item below is weighed against it.
+
+**The vision roadmap** (adopted by the owner, 13 November): docs/VISION-ROADMAP.md, near, middle and long term. Its
+seven "dialled in" criteria are the bar for physics and racing. On its questions: the owner will try to get protest
+records (Skipper Model researches meanwhile); crew timings come from published sources until next season.
+
+**Standing rule for the screen** (owner, 13 November): "We should be extremely conservative about allowing new buttons
+and distractions on the game surface." New controls go inside existing elements (the inset map, the sail band, the
+menus, the Keys), not as new buttons on the screen. Every item below that adds a control is held to this.
+
+**The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
+then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
+- **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
+- **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
+  reefing (reefing still waits on a Folkboat source); a cruising log.
+
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighbouring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **The vang's share of the leech** (for Deep Physics; from the mainsheet-point review): controls.ts mainShape lets a
   full vang hold 90% of the sheet's leech tension, an unsourced estimate, and that decides where the traveller stops
@@ -8,6 +29,16 @@
   boom (drawn about 0.75 m aft of the gooseneck) against the mainsheet's purchase at its blocks, 2.96 m aft. With it,
   the sheet's height in the same term (SHEET_H 1.25, where the sim's own rig gives about 0.73 m) and the curve set
   against it (vf 0.9–0.99): lowered alone, light air's ideal trim can't be set (tests/controls.test.ts).
+- **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
+  steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
+  so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
+  between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
+  neighbouring bins, as driveCalibration already does across the wind.
+- **AI boats into the harbour after an abandonment** (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
+  after N or AP over A the AI boats now sail home and stand off the nearest racing harbour, each at her own spot with
+  open water to leeward, lying to (ai.ts homeCourse). Real boats would go in: sail or motor through the entrance and
+  berth in the basin, out of the breeze (lying to for an hour in 23+ kt is hard on the sails). That needs the AI boats
+  given slips and the marina's way in (geo/marina.ts), as the user's boat has.
 - **Sternway and leeway with sails up** (from the push-off work; for Deep Physics and the AI): physics.ts now drives a
   stopped boat astern and sets her to leeward from the wind on her bare rig (sails struck, as at the dock). In irons with
   her sails up and flogging she'd drift astern too (a knot or two in 15 kt), and slow with sails up she'd make more leeway
@@ -129,6 +160,9 @@ What's planned, roughly in order. Done work is described in the README.
    view of the map to select start and end. I should be able to select both in the same map and not have to bounce from
    one to another." One large chart, opened from the cruise setup, where you place both the start and the destination
    (and move either), then return to the setup with both set.
+   Also (owner, 12 November; polish; queued, not to interrupt running work; 1–2 h): "the navigator button is at
+   bottom-right atm. it should just be a view in the inset map." The navigator becomes one of the inset map's views
+   (its route and advice there), and its button leaves the bottom-right cluster.
    Follow-ups built on branch rules-followups (stacked on rules-finish): AI boats hail at a boat obstruction (WS Case
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
@@ -581,6 +615,15 @@ the guide's line settings and the search decides only the depowering past them. 
 optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
 settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
 heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Open, the rig's height datum (November 2026, the Coordinator: keep the physics on the ORC certificates; settle if the
+IMS rule text becomes reachable): the drawing measures the rig from the deck at the mast, as CR 6.1.11 does (the Lower
+Mast Point 1000 mm above the deck, along the mast's after side); the physics (balance.ts RIG) uses ORC's BAS 1.00 and
+IG 6.50, which ORC measures from the sheer at the mast (VPP Documentation 2026: HBI, "height of sheer at the base of
+I"). The deck's camber there is about 4.5 cm, so a class-legal Folkboat's band would be about 1.045 m above the sheer
+while the certificates say 1.00: one of them is nominal. If the class rule governs, the sails' heights rise 4.5 cm
+(about 0.9% less induced drag, 0.9% more heeling arm). The IMS definition of the mast datum point would settle it
+(orc2.orc.org and osiris.ffvoile.fr were blocked from the sessions).
+
 Open items from the physics review (November 2026): the sails' "full" depth (balance.ts RIG.fullDepth) is unsourced, so
 ORC's full-power lift is never reached above about 10 kt (this partly hides the gap above); ORC's default crew for
 the sailing displacement is about 300–330 kg against the sim's 240 (GM 0.50 rather than 0.52); the sails' own weight
