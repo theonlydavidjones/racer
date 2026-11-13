@@ -604,7 +604,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
     // change of place for the trim, waits until it has lasted, and the dwell
     const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
-    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; return; }
+    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; return; } // (moved: the waits start afresh)
     stay(i, h, t);
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch

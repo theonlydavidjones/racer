@@ -54,6 +54,16 @@ describe('the crew off the wind', () => {
       expect(crossed, 'seconds before the helm went across').toBeGreaterThan(15);
       expect(crossed).toBeLessThan(30);
     });
+  for (const [twa, W] of [[90, 5], [110, 4]] as const)
+    it(`sailing a reach (${twa}° true), the wind falling from 9 to ${W} kt: the helm goes to leeward, after the wait`, () => {
+      const b = testBoat({ heading: 360 - twa, kt: 4, windKt: 9 });
+      sail(b, 40, () => { b.h = 360 - twa; });
+      const w = b.crew!.wind; expect(b.crew!.people[0].x * w, 'to windward in 9 kt').toBeGreaterThan(0.15);
+      b.ww.kt = W; let t = 0, crossed = -1;
+      sail(b, 60, () => { t += 1 / 60; b.h = 360 - twa; if (crossed < 0 && b.crew!.people[0].x * w < -0.15) crossed = t; });
+      expect(crossed, 'seconds before the helm was to leeward').toBeGreaterThan(18);
+      expect(crossed).toBeLessThan(40);
+    }, 30_000);
   it('a gybe still takes them across', () => {
     const b = testBoat({ heading: 360 - 165, kt: 4, windKt: 12 });
     sail(b, 30, () => { b.h = 360 - 165; });
