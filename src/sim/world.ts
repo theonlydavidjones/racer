@@ -1787,7 +1787,8 @@ export class World {
     // turns hadn't begun: rule 44.1(a), Appeal 65. Then the foul's penalty replaces the touch's; otherwise it's owed on top)
     const lt = this.lastTouch.get(b.id), vs = this.lastFoulVs.get(b.id)?.vs;
     const touched = !!lt && this.t - lt.t < TANGLE_MAX && !b.penaltyDir && vs != null && lt.near.includes(vs) && b.penalty > 0;
-    if (touched || b.penalty <= 0) startPenalty(b, this.penaltyDeg); else addPenalty(b, this.penaltyDeg);
+    // (same incident: the foul's turns replace only the touch's one turn, keeping any others she still owes)
+    if (b.penalty <= 0) startPenalty(b, this.penaltyDeg); else addPenalty(b, touched ? this.penaltyDeg - ONE_TURN : this.penaltyDeg);
     if (touched) { this.lastTouch.delete(b.id); if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Your mark touch was part of the same incident, so the foul\'s penalty covers it (Rule 44.1(a)).' }); }
   }
   /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */

@@ -396,9 +396,16 @@ describe('One penalty per incident, not per rule (Rule 44.1(a), US Appeal 65)', 
   });
   it('nor once her turns for the touch have begun', () => {
     const w = W(), u = w.user, o = w.boats[1], p = w as unknown as Priv;
-    u.penaltyTotal = 360; u.penalty = 300; u.penaltyDir = 1; // (60° of it turned) p.lastTouch.set(u.id, { t: w.t - 2, near: [o.id] }); p.lastFoulVs.set(u.id, { vs: o.id, t: w.t, clear: false });
+    u.penaltyTotal = 360; u.penalty = 300; u.penaltyDir = 1; // (60° of it turned)
+    p.lastTouch.set(u.id, { t: w.t - 2, near: [o.id] }); p.lastFoulVs.set(u.id, { vs: o.id, t: w.t, clear: false });
     w.assignPenalty(u);
     expect(u.penaltyTotal).toBe(1080);
+  });
+  it('a same-incident touch\'s turn is replaced, not any other turns she still owes for a separate foul', () => {
+    const w = W(), u = w.user, o = w.boats[1], p = w as unknown as Priv;
+    u.penalty = u.penaltyTotal = 360 + 720; p.lastTouch.set(u.id, { t: w.t - 2, near: [o.id] }); p.lastFoulVs.set(u.id, { vs: o.id, t: w.t, clear: false });
+    w.assignPenalty(u);
+    expect(u.penaltyTotal).toBe(720 + 720);
   });
 });
 
@@ -439,7 +446,7 @@ describe('Exoneration (Rule 43.1(a))', () => {
     fox.forced14 = zed.id; Object.assign(fox, at(9, 1.5)); // (Fox clear of Vic for now)
     (w as unknown as { checkPairs(): void }).checkPairs(); w.drainEvents(); // Zed fouls Fox (the swerve)
     expect((w as unknown as { fouledAt: Map<number, { by: number }> }).fouledAt.get(fox.id)?.by).toBe(zed.id);
-    // a second later Zed is long gone, and Fox, free to keep clear, touches Vic: the old 3 s window would have excused her
+    // a second later Zed is long gone, and Fox, free to keep clear, touches Vic: within the 3 s, but no longer compelled
     w.t += 1; fox.forced14 = null; Object.assign(zed, at(60, 40)); Object.assign(fox, at(1.2, 1.5));
     const incidents: { fouler: number; rule: string; ex?: number }[] = [];
     (w as unknown as { checkPairs(): void }).checkPairs();
