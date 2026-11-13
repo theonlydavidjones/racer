@@ -296,7 +296,7 @@ describe('Rule 44.1: one penalty per incident', () => {
       u.penalty = u.penaltyTotal = 720; u.penaltyTurned = c.turned; u.penaltyDir = c.turned ? 1 : 0; // her turns from the first foul, against A
       const hh = (w as unknown as { hHist: number[][] }).hHist; hh[0] = [u.h]; hh[1] = [A.h]; // (nobody turned onto the other)
       (w as unknown as { lastFoulVs: Map<number, { vs: number; t: number; clear: boolean }> }).lastFoulVs.set(u.id, { vs: A.id, t: w.t - 7, clear: c.clear });
-      (w as unknown as { tangles: Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean }> }).tangles.set(u.id < A.id ? u.id + '-' + A.id : A.id + '-' + u.id, { t0: w.t - 7, t: w.t - 7, clear: c.clear, fouler: c.firstBy ? A.id : u.id, parted: true }); // (they'd come apart since)
+      (w as unknown as { tangles: Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }> }).tangles.set(u.id < A.id ? u.id + '-' + A.id : A.id + '-' + u.id, { t0: w.t - 7, t: w.t - 7, clear: c.clear, fouler: c.firstBy ? A.id : u.id, parted: true, g0: 2 }); // (they'd come apart since)
       if (c.jam) { u.v = 0.2; A.v = 0.2; } // (drifting together at a few tenths of a knot, barely closing) else if (c.firstBy || c.turned) { u.v = 2.5; A.v = 2.5; } // (under way)
       u.x = OPEN.x; u.y = OPEN.y; A.x = OPEN.x + 0.2; A.y = OPEN.y; // in contact again
       const fouls = w.fouls;
