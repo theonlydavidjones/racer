@@ -1035,7 +1035,7 @@ export class World {
     const n = ctx.marks.length, nearZone = (X: Boat) => X.leg < n && markDist(X, ctx.marks[X.leg]) < ZONE * 2.5;
     if (nearZone(A) || nearZone(B) || cpa(A, B).d < 60) return false;
     rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null;
-    rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT; // (rule 18.3: tacks seen as they happen)
+    rec.seenTack[A.id] = A.headToWindT ?? -Infinity; rec.seenTack[B.id] = B.headToWindT ?? -Infinity; // (rule 18.3: tacks seen as they happen)
     return true;
   }
 
@@ -1715,7 +1715,7 @@ export class World {
   pendingRoomHail(b: Boat): Boat | null {
     for (const o of this.boats) {
       const h = o !== b ? this.pairs[pairKey(b, o)]?.hail : null;
-      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) return o;
+      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && (b.headToWindT ?? -Infinity) < h.at && !b.tacking) return o; // (rule 20: answered by a tack, not a gybe)
     }
     return null;
   }

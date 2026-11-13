@@ -407,11 +407,11 @@ settings and seed, and never stepped.
 |---|---|---|
 | The page's JS a frame, race of eight at 4× (software GL, 480×300) | 52 ms | 40 ms |
 | The sim on the page's thread at 4× | 4 steps, about 5.8 CPU ms | none: applying the mirror, about 0.5 CPU ms |
-| The worker's frame at 4× | — | 4 steps (5.8 ms) plus finding what changed and cloning it (3.1 CPU ms) |
+| The worker's frame at 4× | — | 4 steps (5.8 ms) plus finding what changed and cloning it (3.1 CPU ms; 2.3 after the cheaper walk, 13 Nov) |
 | The page (HTML) | 5.0 MB | **8.9 MB** (the worker's code, 3.9 MB, travels alongside the page's) |
 
 - **Headroom for the physics**: the worker's frame can take about 12 of the 16.7 ms at 60 fps. Less the sync's
-  fixed part, that's about 3.5× today's step at 4× on a laptop, and about 14× at 1×. It's less than §2's estimate of
+  fixed part, that's about 3.5× today's step at 4× on a laptop (about 3.7× after the cheaper walk), and about 14× at 1×. It's less than §2's estimate of
   4–5×, because finding what changed walks the World's state every frame. Making that walk cheaper is the next lever
   (most of it: about 180 new small objects a step, the 170 puffs and the boats).
 - **At 1×** the page's thread saves about half a step a frame: the mirror's apply and the message cost about half
