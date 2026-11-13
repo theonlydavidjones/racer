@@ -718,7 +718,9 @@ $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
 $('bFast').onclick = () => { send({ k: 'speed', v: w.speed === 1 ? 2 : w.speed === 2 ? 4 : 1 }); word('bFast', 'Speed ' + w.speed + '×'); };
-$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
+$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); $('bSound2').textContent = `Sound: ${sound.on ? 'on' : 'off'}`; };
+// Sound and Exit live in the pause menu (the surface audit, owner 13 Nov: Pause and Speed stay on the surface)
+$('bSound2').onclick = () => $('bSound').click();
 $('bPause').onclick = () => {
   if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;
   $('bRestart').textContent = w.freeSail ? 'Restart this cruise' : 'Restart this race';
