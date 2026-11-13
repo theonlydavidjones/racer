@@ -194,7 +194,7 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
       return { ...base, head: `Ease the main, about ${deg(n)}.`,
         why: s.awa > 110 ? 'Off the wind the main works by presenting area: eased out, square to the wind, it catches the most.'
           : s.over ? 'She\'s overpowered: with the main in this hard she heels and drags her rudder instead of driving.'
-          : b.trim.main.flow === 'stalled' ? 'The main is over-trimmed: the flow is breaking off its back, so it pushes sideways more than forward.' : 'The boom is closer to the centreline than this wind angle wants.',
+          : b.trim.main.flow === 'stalled' ? 'The main is over-trimmed: the flow is breaking off its back, so it pushes sideways more than forward.' : 'The boom is closer to the centerline than this wind angle wants.',
         look: s.awa > 110 ? 'the boom: out until it\'s nearly against the shroud' : s.over ? 'the heel and the weight on the tiller: both should ease' : b.trim.main.flow === 'stalled' ? 'the leech telltales: streaming off the back, not curling behind it' : 'the luff of the main: ease until it just lifts, then trim a touch',
         done: s.over ? 'she\'s back on her feet' : 'main drawing' };
     }
@@ -208,10 +208,10 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
         look: 'the leeward jib telltales drooping or spinning; and a jib leech close to the spreader', done: 'jib telltales streaming both sides' };
     }
     case 'traveller': return { ...base,
-      head: to < from ? `Traveller up to windward, ${amount(d)}.` : `Traveller down to leeward, ${amount(d)}.`,
-      why: to < from ? 'It brings the boom toward the centreline without hauling the leech shut: more power and height.'
-        : s.over ? `In ${tws} kt she's overpowered: dropping the boom to leeward without opening the leech takes heel and weather helm off her while the main keeps its shape.` : 'The boom is too close to the centreline for this breeze: the main is over-trimmed.',
-      look: to < from ? 'the boom: over the centreline, close-hauled in this breeze' : 'the heel and the tiller: both should come off',
+      head: to < from ? `Traveler up to windward, ${amount(d)}.` : `Traveler down to leeward, ${amount(d)}.`,
+      why: to < from ? 'It brings the boom toward the centerline without hauling the leech shut: more power and height.'
+        : s.over ? `In ${tws} kt she's overpowered: dropping the boom to leeward without opening the leech takes heel and weather helm off her while the main keeps its shape.` : 'The boom is too close to the centerline for this breeze: the main is over-trimmed.',
+      look: to < from ? 'the boom: over the centerline, close-hauled in this breeze' : 'the heel and the tiller: both should come off',
       done: to < from ? 'boom where it pays' : 'helm lighter' };
     case 'backstay': return { ...base,
       head: more ? `Backstay on, ${amount(d)}.` : `Ease the backstay, ${easeAmount(d)}.`,
@@ -318,7 +318,7 @@ function crewLine(b: Boat, s: Situation): string {
   if (s.up && s.over) {
     const on = (['backstay', 'outhaul', 'cunningham', 'vang'] as const).filter(k => crewHas(k) && c[k] > 0.7).map(k => NAME[k]);
     if (on.length) said.push(`${listWords(on)} on`);
-    if (crewHas('traveller') && c.traveller > 0.3) said.push('traveller down');
+    if (crewHas('traveller') && c.traveller > 0.3) said.push('traveler down');
     if (crewHas('mainsheet') && (b.depower ?? 0) > 0.6 && b.trim.main.flow === 'luffing') said.push('easing the main to keep her on her feet (the front lifting is deliberate)');
     return said.length ? `Crew: depowering: ${said.join(', ')}.${(b.depower ?? 0) > 0.95 ? ' They\'ve done all they can.' : ''}` : '';
   }
@@ -419,7 +419,7 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   // drop it, so it's said here rather than left unsaid)
   const travUp = byHand(b, 'traveller') && b.ctl.traveller < -0.2;
   if (s.over) return { ...base, head: `Trim's right for ${Math.round(s.tws)} kt: ${s.speedKt.toFixed(1)} kt.`,
-    why: travUp ? 'The traveller up costs little here: the vang holds the leech while the crew eases the sheet. Most boats drop it in a breeze instead, so the boom goes down to leeward without the leech opening.'
+    why: travUp ? 'The traveler up costs little here: the vang holds the leech while the crew eases the sheet. Most boats drop it in a breeze instead, so the boom goes down to leeward without the leech opening.'
       : `The polar's ${s.targetKt.toFixed(1)} kt assumes she can carry full power; in this breeze she can't, so she's depowered.`,
     look: 'the heel: under about 20°, and a light helm' };
   return { ...base, head: `Trim's right: ${s.speedKt.toFixed(1)} kt against the polar's ${s.targetKt.toFixed(1)}.`, why: '', look: steer };
