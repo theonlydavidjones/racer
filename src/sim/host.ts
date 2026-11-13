@@ -9,15 +9,20 @@
  * Today the host runs the World in the page's own thread, and the view is the World itself, typed read-only: nothing
  * changes in how the race is sailed, to the last bit. Step 3 runs the same World in a Web Worker. Then the view is
  * the World's state sent back after each frame's steps, and the commands are sent to the worker. The types here are
- * the contract between the two: the compiler finds anything on the page that writes to the race, or that changes it
- * through a method.
+ * the contract between the two. The compiler refuses a write to any field of the view, and any call of the World's
+ * own methods that change the race. It doesn't see everything: arrays in the view stay mutable (so a boat from the view
+ * can still be handed to the many read-only helpers in src/boat that take a Boat), a view passed to code typed `Boat`
+ * can be written there, and methods of the World's parts (the race log's note, say) stay callable. Those holes are
+ * closed by review and by the dev-only guard below (scripts/check/simguard.cjs), which refuses writes, in-place array
+ * changes and the race log's note at run time. Before step 3 makes a stray write silently go to a stale copy, the plan
+ * is to type the boat helpers' parameters read-only and close the holes at compile time too.
  */
 import type { Boat } from '../boat/boat';
 import type { SimEvent } from './events';
 import { applyCommand, type Command, type CommandResult } from './commands';
 import { DT, type World } from './world';
 
-/** Read-only, all the way down (arrays are left as they are, so a view can still be handed to code that takes a Boat). */
+/** Read-only all the way down, except arrays (left mutable so a view can still be handed to code that takes a Boat). */
 export type RO<T> = T extends (...a: never[]) => unknown ? T
   : T extends readonly unknown[] ? T
   : T extends object ? { readonly [K in keyof T]: RO<T[K]> }
@@ -73,9 +78,14 @@ export function guarded<T extends object>(o: T, path = 'w', seen = new WeakMap<o
   const p = new Proxy(o, {
     get(t, k) {
       const v = Reflect.get(t, k, t);
-      // the sim's own methods (the page's questions: the current here, the wind there) run on the real object: some keep
-      // memos of their sums, which are the sim's business; what they hand back is the page's (often a new object)
-      if (typeof v === 'function') return (...a: unknown[]) => v.apply(t, a);
+      if (typeof v === 'function') {
+        // an array changed in place, or a note in the race log, is the page writing to the race
+        if ((Array.isArray(t) && MUTATORS.has(k)) || k === 'note') return () => fail('called', k);
+        // the sim's own methods (the page's questions: the current here, the wind there) run on the real object, with
+        // real arguments (a boat from the view is the World's own boat to them: they compare boats by identity), and some
+        // keep memos of their sums, which are the sim's business; what they hand back is the page's (often a new object)
+        return (...a: unknown[]) => v.apply(t, a.map(x => (x !== null && typeof x === 'object' && REAL.get(x)) || x));
+      }
       if (v === null || typeof v !== 'object' || v instanceof Map || v instanceof Set || ArrayBuffer.isView(v)) return v;
       return guarded(v as object, `${path}.${String(k)}`, seen);
     },
@@ -83,8 +93,11 @@ export function guarded<T extends object>(o: T, path = 'w', seen = new WeakMap<o
     deleteProperty(_t, k) { return fail('deleted', k); },
     defineProperty(_t, k) { return fail('defined', k); }
   });
-  seen.set(o, p); return p;
+  seen.set(o, p); REAL.set(p, o); return p;
 }
+/** The real object behind each guard (for a sim method's arguments). */
+const REAL = new WeakMap<object, object>();
+const MUTATORS = new Set<PropertyKey>(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin']);
 
 /** The World in the page's own thread, as it has always run. */
 export class LocalHost implements SimHost {

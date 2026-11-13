@@ -168,6 +168,7 @@ let condLive = false;
 function newGame(seed = randomSeed()): void {
   incidentClips = []; // (a new race: its own rule incidents)
   if (condLive && w?.running) { send({ k: 'conditions', settings: S }); saveSettings(S); view.conditionsChanged(w); return; } // (the owner: at once, without a restart)
+  pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;

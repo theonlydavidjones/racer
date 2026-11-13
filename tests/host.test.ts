@@ -46,6 +46,10 @@ function oldWay(w: World, c: Command): void {
     case 'hail': w.userHail(); return;
     case 'dest': w.setDest(c.p, c.name); return;
     case 'pause': w.paused = c.on; return;
+    case 'running': w.running = c.on; return;
+    case 'shown': if (c.finishShown != null) w.finishShown = c.finishShown; if (c.logged != null) w.logged = c.logged; return;
+    case 'penalty': { const fouler = w.boats.find(x => x.id === c.boat)!; w.assignPenalty(fouler); return; } // (the page held the Boat itself)
+    case 'logNote': w.log!.note(c.note); return;
     case 'speed': w.speed = c.v; return;
     case 'settings': if (c.patch.chartPal) w.settings.chartPal = c.patch.chartPal; if (c.patch.mapLayers) w.settings.mapLayers = c.patch.mapLayers; return;
     default: throw new Error('not in the scenarios: ' + c.k);
@@ -54,7 +58,9 @@ function oldWay(w: World, c: Command): void {
 
 /** Every boat's whole state, to the last bit (the AI's and the crew's too), and the race's clock and wind. */
 function state(w: World): string {
-  return JSON.stringify({ t: w.t, steps: w.steps, wind: w.wind, pilot: w.pilot, boats: w.boats.map(b => ({ ...b, ai: b.ai ? { ...b.ai } : null })) },
+  return JSON.stringify({ t: w.t, steps: w.steps, wind: w.wind, pilot: w.pilot, dest: w.dest, running: w.running, paused: w.paused, speed: w.speed,
+    logged: w.logged, finishShown: w.finishShown, chartPal: w.settings.chartPal, layers: w.settings.mapLayers, pairs: w.pairs,
+    log: w.log ? w.log.moments(w).length : null, boats: w.boats.map(b => ({ ...b, ai: b.ai ? { ...b.ai } : null })) },
     (_k, v) => (typeof v === 'number' && !Number.isFinite(v) ? String(v) : v));
 }
 
@@ -100,7 +106,10 @@ describe('the page through the host sails as it did writing to the World', () =>
       [310, { k: 'hail' }], [320, { k: 'handsOff' }], [330, { k: 'pause', on: true }], [340, { k: 'pause', on: false }],
       [350, { k: 'speed', v: 2 }], [360, { k: 'helm', steer: -1, luff: true, ctl: { jibsheet: 1 } }], [400, { k: 'helm', steer: 0, luff: false, ctl: {} }],
       [410, { k: 'allToCrew' }], [420, { k: 'settings', patch: { chartPal: 'dusk' } }], [430, { k: 'speed', v: 1 }],
-      [440, { k: 'ctlTarget', key: 'jibsheet', v: 0.2 }], [460, { k: 'ctlTargetClear', keys: ['jibsheet', 'jibsheetW'] }]
+      [440, { k: 'ctlTarget', key: 'jibsheet', v: 0.2 }], [460, { k: 'ctlTargetClear', keys: ['jibsheet', 'jibsheetW'] }],
+      [470, { k: 'settings', patch: { mapLayers: { wind: true } } }], [480, { k: 'shown', logged: true }], [485, { k: 'shown', finishShown: true }],
+      [490, { k: 'logNote', note: { key: 'rule', t0: 10, t1: 20, x: 0, y: 0, lost: 0, text: 'a test incident', ref: 0 } }],
+      [600, { k: 'penalty', boat: 2 }], [610, { k: 'penalty', boat: 0 }], [800, { k: 'running', on: false }], [820, { k: 'running', on: true }]
     ]);
     const [a, b] = both(make, script, 900);
     const k = a.findIndex((x, i) => x !== b[i]);
