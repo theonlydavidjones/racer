@@ -8,9 +8,9 @@ import { KT } from '../src/core/math';
 import type { Boat } from '../src/boat/boat';
 
 /** A boat as the lesson sees her: where, which way, how fast, the wind's angle and how her sails are drawing. */
-const boat = (o: Partial<{ x: number; y: number; h: number; v: number; twa: number; main: string; jib: string }>): Boat => ({
-  x: o.x ?? 0, y: o.y ?? 0, h: o.h ?? 270, v: o.v ?? 2.5, twa: o.twa ?? 90,
-  trim: { main: { flow: o.main ?? 'good' }, jib: { flow: o.jib ?? 'good' } }
+const boat = (o: Partial<{ x: number; y: number; h: number; v: number; twa: number; main: string; jib: string; eff: number }>): Boat => ({
+  x: o.x ?? 0, y: o.y ?? 0, h: o.h ?? 270, v: o.v ?? 2.5, twa: o.twa ?? 90, ww: { kt: 12, from: 0 }, sea: { hsW: 0, tpW: 2 },
+  trim: { main: { flow: o.main ?? 'good', eff: o.eff ?? 1 }, jib: { flow: o.jib ?? 'good', eff: o.eff ?? 1 } }
 }) as unknown as Boat;
 const S = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'lesson', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0, ...o });
 
@@ -32,8 +32,20 @@ describe('Learn to sail: the lessons\' checks', () => {
     let t = 0;
     for (let k = 0; k < 30; k++) L.update(boat({ twa: 42, jib: 'luffing' }), t++, 1);
     expect(L.step).toBe(0); // (the jib luffing: not yet)
+    for (let k = 0; k < 30; k++) L.update(boat({ twa: 54 }), t++, 1);
+    expect(L.step).toBe(0); // (54° in 12 kt is a close reach, not close-hauled)
     for (const twa of [42, 90, 165]) for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa }), t++, 1);
     expect(L.passed).toBe(true);
+  });
+
+  it('a flicker of luffing in a puff takes back a moment, not the whole hold; a run with the sheets pinned in doesn\'t pass', () => {
+    const L = new LessonTracker('points', null);
+    let t = 0;
+    for (let k = 0; k < 20 * 4; k++) L.update(boat({ twa: 42, main: k % 20 === 19 ? 'luffing' : 'good' }), t++, 0.25); // (a quarter-second luff every 5 s)
+    expect(L.step).toBe(1);
+    for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa: 90 }), t++, 1);
+    for (let k = 0; k < 60; k++) L.update(boat({ twa: 170, eff: 0.85 }), t++, 1);
+    expect(L.passed).toBe(false); // (sheets in on a run: the sails stalled, eff 0.85)
   });
 
   it('in the World: a lesson sails alone off the Cityfront, the tiller\'s buoy on open water, checked as she sails', () => {

@@ -1,5 +1,6 @@
 import type { Boat } from '../boat/boat';
 import { KT, wrap, type Vec } from '../core/math';
+import { beatFor } from '../boat/seaway';
 
 /**
  * Learn to sail (the owner's go, 13 Nov 2026; design/learn-to-sail-mockup.png and design/LEARN-TO-SAIL-PLAN.md): lessons
@@ -22,15 +23,20 @@ export const LESSONS: { id: LessonId; no: number; title: string; icon: string; b
 export const LESSON_MARKS = {
   /** The tiller: reach the buoy within this (m); then hold the given course within HOLD_DEG for HOLD_S. */
   buoyM: 15, holdDeg: 10, holdS: 60,
-  /** Points of sail: each point held this long (s) with both sails drawing (telltales streaming, or a run's full sails). */
-  pointS: 15
+  /** Points of sail: each point held this long (s) with both sails drawing (telltales streaming, or a run's full sails);
+   * a moment off (a puff or a shift flicks the flow) takes back twice its length, not the whole hold. On a run the
+   * telltales just hang (boat/trim.ts calls any run's flow good), so there the sails must be eased to draw: each sail's
+   * efficiency at least RUN_EFF (a sheet pinned in gives 0.8–0.9). */
+  pointS: 15, runEff: 0.95
 };
 
-/** Each point of sail by its true wind angle (deg, either tack): the band a sailor would call by that name. */
-const POINTS: { key: 'close' | 'beam' | 'run'; lo: number; hi: number; cue: string }[] = [
-  { key: 'close', lo: 35, hi: 55, cue: 'Close-hauled: trim till both telltales stream' },
-  { key: 'beam', lo: 75, hi: 105, cue: 'Bear away to a beam reach, and ease to match' },
-  { key: 'run', lo: 150, hi: 180, cue: 'Bear away to a run: sheets out, wind from astern' }
+/** Each point of sail by its true wind angle (deg, either tack): the band a sailor would call by that name. Close-hauled
+ * is the boat's own beat angle in this wind and sea (boat/seaway.ts beatFor: about 41° in 12 kt), from a little above it
+ * (pinching) to a few degrees below; past that it's a close reach. A run is the wind from astern, 160° to 180°. */
+const POINTS: { key: 'close' | 'beam' | 'run'; band: (b: Boat) => [number, number]; cue: string }[] = [
+  { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 7]; }, cue: 'Close-hauled: trim till both telltales stream' },
+  { key: 'beam', band: () => [75, 105], cue: 'Bear away to a beam reach, and ease to match' },
+  { key: 'run', band: () => [160, 180], cue: 'Bear away to a run: sheets out, wind from astern' }
 ];
 
 export class LessonTracker {
@@ -74,11 +80,11 @@ export class LessonTracker {
   }
 
   private points(b: Boat, dt: number): void {
-    const P = POINTS[this.step], twa = Math.abs(b.twa);
-    // drawing: on the point, under way, and each sail's flow good (on a run the trim model calls a full sail good: the
-    // telltales just hang there, boat/trim.ts)
-    const drawing = twa >= P.lo && twa <= P.hi && b.v > 0.8 * KT && b.trim.main.flow === 'good' && (!b.trim.jib || b.trim.jib.flow === 'good');
-    this.held = drawing ? this.held + dt : 0;
+    const P = POINTS[this.step], twa = b.twa, [lo, hi] = P.band(b);
+    // drawing: on the point, under way, and each sail's flow good; on a run, each sail eased to draw (see LESSON_MARKS)
+    const good = (t: { flow: string; eff: number } | null) => !t || (P.key === 'run' ? t.eff >= LESSON_MARKS.runEff : t.flow === 'good');
+    const drawing = twa >= lo && twa <= hi && b.v > 0.8 * KT && good(b.trim.main) && good(b.trim.jib);
+    this.held = drawing ? this.held + dt : Math.max(0, this.held - 2 * dt);
     this.progress = Math.min(1, this.held / LESSON_MARKS.pointS);
     if (this.held < LESSON_MARKS.pointS) return;
     this.held = 0;

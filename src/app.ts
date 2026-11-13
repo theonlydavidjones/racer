@@ -615,9 +615,10 @@ function coachTick(dt: number): void {
 }
 /** A lesson (sim/lessons.ts): its one cue in the coach's own places (the trim panel's headline, and on the water for a few
  * seconds when it's new), with how far through the check you are; passed, it's kept with your settings. */
-let lessonCue = '';
+let lessonCue = '', lessonOf: unknown = null;
 function lessonTick(): void {
   const L = w.lesson!, tip = $('coachTip');
+  if (L !== lessonOf) { lessonOf = L; lessonCue = ''; } // (a new lesson, or the same one again: its first cue shows)
   $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
   $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
   if (L.cue !== lessonCue) {

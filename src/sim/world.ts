@@ -404,7 +404,8 @@ export class World {
     this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
       const u = this.boats[0], lee = wrap(this.windModel.base - u.h) > 0 ? -20 : 20;
       for (const a of [lee, 0, -lee]) { const q = { x: u.x + V(u.h + a).x * 250, y: u.y + V(u.h + a).y * 250 }; if (!onLand(q)) return q; }
-      return { x: u.x + V(u.h).x * 120, y: u.y + V(u.h).y * 120 };
+      for (const d of [120, 60]) { const q = { x: u.x + V(u.h).x * d, y: u.y + V(u.h).y * d }; if (!onLand(q)) return q; }
+      return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
