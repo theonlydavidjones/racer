@@ -175,11 +175,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const lid = new THREE.Mesh(mergeGeometries([cockpitLid().toNonIndexed(), companionwayLid(), windowLids()], false)!, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide })); lid.renderOrder = 1; grp.add(lid);
   // deck: non-skid on glassfibre boats, painted canvas or laid teak on the wooden ones
   const teak = paint.deck.startsWith('teak'), silver = paint.deck === 'teak-silver';
-  const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map: nonSkidTexture('deck', paint.deck, glass ? '#ebe5d6' : paint.deck), side: THREE.DoubleSide }); // (painted: non-skid, with a smooth margin)
+  const deckMat = teak ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(silver), side: THREE.DoubleSide }) : nonSkidMaterial('deck', paint.deck, glass ? GELCOAT : paint.deck); // (painted: non-skid, with a smooth margin)
   // the cabin top: as chosen (paint or laid teak), or else like the deck (a teak-decked boat's: painted canvas)
   const ct = paint.cabinTop;
-  const cabinTopMat = ct ? (ct.startsWith('teak') ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(ct === 'teak-silver'), side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map: nonSkidTexture('top', ct, glass ? '#ebe5d6' : ct), side: THREE.DoubleSide }))
-    : teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map: nonSkidTexture('top', paint.deck, glass ? '#ebe5d6' : paint.deck), side: THREE.DoubleSide });
+  const cabinTopMat = ct ? (ct.startsWith('teak') ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(ct === 'teak-silver'), side: THREE.DoubleSide }) : nonSkidMaterial('top', ct, glass ? GELCOAT : ct))
+    : teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : nonSkidMaterial('top', paint.deck, glass ? GELCOAT : paint.deck);
   grp.add(new THREE.Mesh(planUV(deckGeometry(), 'deck'), deckMat));
   // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top
   const cab = cabinGeometry();
@@ -513,46 +513,82 @@ function syncCompanionway(c: Companionway, b: Boat): void {
   });
 }
 /**
- * Non-skid on a painted deck and cabin top, as Josephine's (the owner): a paint with crushed walnut shells in it, a fine,
- * irregular grit, laid in a field that stops about 2 in (5 cm) short of every edge, leaving a smooth gelcoat margin along
- * the toerail, round the cabin's foot and the cockpit's coamings, round the forehatch; and on the cabin top in from its
- * edges and round the sliding hatch. Drawn as a texture in plan (x across, z fore and aft: planUV), the margin and the
- * field each a colour, the grit a fine speckle of lighter and darker grains over the field.
+ * Non-skid on a painted deck and cabin top, as Josephine's (the owner): a paint with crushed walnut shells in it, laid in
+ * a field that stops about 2 in (5 cm) short of every edge, leaving the smooth fiberglass, a warm white gelcoat that isn't
+ * painted, along the toerail, round the cabin's foot and the cockpit's coamings, round the forehatch and the mast; on the
+ * cabin top in from its edges and round the sliding hatch. Two textures, shared by every boat (colors go in as uniforms):
+ * the field's shape in plan (nsMask: x across, z fore and aft, planUV), with its edge antialiased so it reads crisp; and
+ * the grit, a fine tile repeated every NS_GRIT_REP m (nsGrit), its grain set by the GRIT style.
  */
-const NS_MARGIN = 0.05, NS_PLAN = { x0: -1.15, x1: 1.15, z0: -L / 2, z1: L / 2 };
-const nsCache = new Map<string, THREE.CanvasTexture>();
-function nonSkidTexture(which: 'deck' | 'top', field: string, margin: string): THREE.CanvasTexture {
-  const key = `${which}${field}${margin}`, hit = nsCache.get(key); if (hit) return hit;
-  const W = 640, H = 2048, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
-  const rgb = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 }; }, fc = rgb(field), mc = rgb(margin), img = c.createImageData(W, H), d = img.data, m = NS_MARGIN;
+const NS_MARGIN = 0.05, NS_PLAN = { x0: -1.15, x1: 1.15, z0: -L / 2, z1: L / 2 }, NS_GRIT_REP = 0.12;
+/** The unpainted fiberglass margin: a warm white gelcoat (the owner). */
+export const GELCOAT = '#f0eadc';
+/** The grit's look: 'walnut' (fine, soft, low contrast), 'sand' (finer, flatter still), 'coarse' (the first try). */
+export type GritStyle = 'walnut' | 'sand' | 'coarse';
+export let GRIT: GritStyle = 'walnut';
+export const setGrit = (g: GritStyle) => { GRIT = g; };
+const nsMasks = new Map<string, THREE.CanvasTexture>(), nsGrits = new Map<string, THREE.CanvasTexture>();
+function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
+  const hit = nsMasks.get(which); if (hit) return hit;
+  const W = 1024, H = 3072, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
+  const img = c.createImageData(W, H), d = img.data, m = NS_MARGIN, px = (NS_PLAN.x1 - NS_PLAN.x0) / W;
   const hz = -1.75, hh = 0.25 + 0.045; // (the forehatch's frame: its middle, half its size)
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let j = 0; j < H; j++) {
     const z = NS_PLAN.z0 + (NS_PLAN.z1 - NS_PLAN.z0) * (j + 0.5) / H, u = uAtZ(z);
     // the field's extent across this row: [lo, hi] in |x|, or none
     let lo = 0, hi = -1;
     if (which === 'deck') {
       hi = halfBeam(u) - 0.045 - m; // (in from the toerail's inboard face)
-      const dm = Math.abs(z - MAST_Z); if (dm < 0.16) lo = Math.max(lo, Math.sqrt(0.16 * 0.16 - dm * dm)); // (a smooth pad round the mast's foot)
       const near = (ua: number, ub: number) => u > ua - m / L && u < ub + m / L;
       if (near(CABIN.u0, CABIN.u1)) lo = Math.max(lo, cabinHalf(Math.min(CABIN.u1, Math.max(CABIN.u0 + 0.001, u))) + m);
       if (near(COCKPIT.u0, COCKPIT.u1)) lo = Math.max(lo, cockpitHalf(Math.min(COCKPIT.u1, Math.max(COCKPIT.u0, u))) + COAMING_T + m);
       if (Math.abs(z - hz) < hh + m) lo = Math.max(lo, hh + m);
+      const dm = Math.abs(z - MAST_Z); if (dm < 0.16) lo = Math.max(lo, Math.sqrt(0.16 * 0.16 - dm * dm)); // (a smooth pad round the mast's foot)
     } else if (u > CABIN.u0 && u < CABIN.u1) {
       hi = cabinHalf(u) - CABIN_LEAN - m;
       if ((u - CABIN.u0) * L < m || (CABIN.u1 - u) * L < m) hi = -1;
       if (u > CABIN.u1 - (2 * COMPANIONWAY.len + 0.1) / L) lo = COMPANIONWAY.hw + 0.045 + m; // (round the sliding hatch and its runners)
     }
     for (let i = 0; i < W; i++) {
-      const x = Math.abs(NS_PLAN.x0 + (NS_PLAN.x1 - NS_PLAN.x0) * (i + 0.5) / W), inField = x >= lo && x <= hi, k = (j * W + i) * 4;
-      const col = inField ? fc : mc, g = inField ? 1 + (rnd() - 0.5) * 0.22 + (rnd() < 0.08 ? (rnd() - 0.5) * 0.35 : 0) : 1 + (rnd() - 0.5) * 0.02;
-      d[k] = Math.min(255, col.r * 255 * g); d[k + 1] = Math.min(255, col.g * 255 * g); d[k + 2] = Math.min(255, col.b * 255 * g); d[k + 3] = 255;
+      const x = Math.abs(NS_PLAN.x0 + (NS_PLAN.x1 - NS_PLAN.x0) * (i + 0.5) / W), k = (j * W + i) * 4;
+      // (coverage across the edge, over a pixel: a clean line, not a staircase)
+      const f = hi < lo ? 0 : Math.max(0, Math.min(1, (x - lo) / px + 0.5, (hi - x) / px + 0.5));
+      d[k] = d[k + 1] = d[k + 2] = Math.round(f * 255); d[k + 3] = 255;
     }
   }
-  c.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(cv); t.anisotropy = 8; nsCache.set(key, t); return t;
+  // (the field's fore-and-aft ends, too: soften each column's changes over a row)
+  c.putImageData(img, 0, 0); c.filter = 'blur(0.6px)'; c.drawImage(cv, 0, 0); c.filter = 'none';
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 8; t.generateMipmaps = true; nsMasks.set(which, t); return t;
 }
-/** Plan texture coordinates (x across, z fore and aft) for the deck or the cabin top, matching nonSkidTexture. */
+export function nsGrit(style: GritStyle): THREE.CanvasTexture {
+  const hit = nsGrits.get(style); if (hit) return hit;
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const c = cv.getContext('2d')!;
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  c.fillStyle = 'rgb(128,128,128)'; c.fillRect(0, 0, N, N);
+  // grains: small irregular flecks, lighter and darker, at the style's size and contrast (they wrap at the tile's edges)
+  const S = { walnut: { n: 5200, r: [0.6, 1.3], a: 0.16 }, sand: { n: 9000, r: [0.4, 0.8], a: 0.1 }, coarse: { n: 2600, r: [0.8, 2.0], a: 0.32 } }[style];
+  for (let k = 0; k < S.n; k++) {
+    const x = rnd() * N, y = rnd() * N, r = S.r[0] + rnd() * (S.r[1] - S.r[0]), v = rnd() < 0.5 ? 255 : 0;
+    c.fillStyle = `rgba(${v},${v},${v},${S.a * (0.4 + 0.6 * rnd())})`;
+    for (const [dx, dy] of [[0, 0], [N, 0], [0, N], [-N, 0], [0, -N]]) { c.beginPath(); c.ellipse(x + dx, y + dy, r, r * (0.6 + 0.4 * rnd()), rnd() * Math.PI, 0, 2 * Math.PI); c.fill(); }
+  }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; nsGrits.set(style, t); return t;
+}
+/** The non-skid material: the field in `field`, the margin in `margin`, the grit over the field. */
+function nonSkidMaterial(which: 'deck' | 'top', field: string, margin: string): THREE.MeshLambertMaterial {
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: nsMask(which), side: THREE.DoubleSide });
+  const uniforms = { uField: { value: new THREE.Color(field) }, uMargin: { value: new THREE.Color(margin) }, uGrit: { value: nsGrit(GRIT) },
+    uRep: { value: new THREE.Vector2((NS_PLAN.x1 - NS_PLAN.x0) / NS_GRIT_REP, (NS_PLAN.z1 - NS_PLAN.z0) / NS_GRIT_REP) } };
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.fragmentShader = 'uniform vec3 uField;\nuniform vec3 uMargin;\nuniform sampler2D uGrit;\nuniform vec2 uRep;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+      `float nsF = texture2D(map, vMapUv).g; float nsG = texture2D(uGrit, vMapUv * uRep).r - 0.5;
+      diffuseColor.rgb *= mix(uMargin, uField * (1.0 + nsG * 1.6), nsF);`);
+  };
+  mat.customProgramCacheKey = () => 'nonSkid'; mat.userData.ns = uniforms; // (its uniforms, for trying the grit styles)
+  return mat;
+}
+/** Plan texture coordinates (x across, z fore and aft) for the deck or the cabin top, matching nsMask. */
 function planUV(g: THREE.BufferGeometry, _which: 'deck' | 'top'): THREE.BufferGeometry {
   const p = g.attributes.position, uv: number[] = [];
   for (let i = 0; i < p.count; i++) uv.push((p.getX(i) - NS_PLAN.x0) / (NS_PLAN.x1 - NS_PLAN.x0), 1 - (p.getZ(i) - NS_PLAN.z0) / (NS_PLAN.z1 - NS_PLAN.z0));

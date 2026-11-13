@@ -13,7 +13,8 @@ showing it, and add to it whenever the owner confirms something. One line each; 
 ## Deck and rails
 - The deck and cabin top are non-skid: a paint with crushed walnut shells (a fine irregular grit), laid in a field
   that stops about 2 in short of every edge, leaving a smooth gelcoat margin (along the toerail, round the cabin's foot,
-  the cockpit, the forehatch and the mast; on the cabin top in from its edges and round the sliding hatch).
+  the cockpit, the forehatch and the mast; on the cabin top in from its edges and round the sliding hatch). The margin
+  is the bare fiberglass, a warm white gelcoat, not painted. Its edges are crisp.
 - One toerail, continuous and unbroken along the whole deck edge. No second rail or rubbing strake on the topsides.
 - The hiking rail (where the crew sit to hike out) lies inboard of the toerail, alongside the cockpit, the cockpit's
   length (cabin's after end to the coaming's after end). Not alongside the cabin.
