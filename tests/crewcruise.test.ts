@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type * as THREE from 'three';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
@@ -23,7 +24,7 @@ import { n360 } from '../src/core/math';
  * - the body's lean, pitch and roll (the "flopping");
  * - the knees' movement (the "knee kicking");
  * - the most they turn round in 4 s;
- * - time two of them spend within a body's width of each other while one is moving (the "dancing around each other").
+ * - time two of them spend within a body's width of each other both moving at once (the "dancing around each other").
  */
 type Watch = { secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
 
@@ -55,8 +56,10 @@ function cruise(twa: number, kt: number, mins: number) {
         const d = Math.atan2(Math.sin(now.yaw - q.yaw), Math.cos(now.yaw - q.yaw));
         s.turned += d; s.hist.push(s.turned); if (s.hist.length > 4 / DT) s.hist.shift();
         s.spin = Math.max(s.spin, Math.max(...s.hist) - Math.min(...s.hist));
-        const moving = Math.hypot(now.hip.x - q.hip.x, now.hip.z - q.hip.z) > 0.003;
-        if (i > 0) figs.forEach((g, j) => { if (j > i && moving && c.hip.distanceTo(g.cur!.hip) < 0.55) s.dance += DT; });
+        // (both on the move at once, within a body's width: one sliding along the bench past the other, sat still, is
+        // ordinary; two shuffling round each other isn't)
+        const moved = (h: { x: number; z: number }, g: THREE.Vector3) => Math.hypot(g.x - h.x, g.z - h.z) > 0.003;
+        if (i > 0) figs.forEach((g, j) => { const o = ws[j].prev; if (j > i && o && moved(q.hip, c.hip) && moved(o.hip, g.cur!.hip) && c.hip.distanceTo(g.cur!.hip) < 0.5) s.dance += DT; });
       } else s.hist = [];
       s.prev = now;
     });
@@ -71,7 +74,7 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
       console.log(`${name} ${kt} kt\n` + out.map(o => `  ${o.who}: ${o.mins.toFixed(1)} min, trips ${o.trips.toFixed(1)}/min, poses ${o.poses.toFixed(1)}/min, crossings ${o.cross.toFixed(2)}/min, crawl ${o.crawl.toFixed(2)} m/min, lean ${o.lean.toFixed(1)} rad/min, knees ${o.knee.toFixed(1)} rad/min, turned ${o.spin.toFixed(0)}° in 4 s, close and moving ${o.dance.toFixed(1)} s`).join('\n'));
       for (const o of out) {
         const t = `${o.who}, ${name} in ${kt} kt`;
-        expect(o.mins, t).toBeGreaterThan(4);
+        expect(o.mins, t).toBeGreaterThan(3); // (of six: the first half-minute, and 10 s after any gybe she makes, aren't counted)
         // (a job now and then: the cabin top's lines, the jib car. Not a trip every minute)
         expect(o.trips, `${t}: trips a minute`).toBeLessThan(1);
         expect(o.poses, `${t}: pose changes a minute`).toBeLessThan(3);
