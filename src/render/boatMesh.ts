@@ -12,7 +12,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { buildInstrument, syncInstrument, type Instrument } from './tacktick';
+import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
 import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, companionwayDoors, companionwayDoorPanels, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -900,12 +900,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.068, 32), new THREE.MeshBasicMaterial({ map: card }));
   face.position.copy(cmp.position); face.position.z += 0.017; grp.add(face);
   const lubber = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.03), new THREE.MeshBasicMaterial({ color: 0xffb35c })); lubber.position.copy(face.position); lubber.position.y += 0.055; lubber.position.z += 0.001; grp.add(lubber);
-  // the racing instrument on your own boat's cabin top, as on Josephine: just forward of the sliding hatch's runners, on
-  // the centreline, its face tilted up toward the helm (render/tacktick.ts)
+  // the racing instrument on your own boat's cabin top, as on Josephine: on the flat roof well aft of the mast, its bracket
+  // against the forward end of the hatch garage (where the sliding hatch's runners end), on the centreline, its face
+  // tilted up toward the helm (render/tacktick.ts). The owner's photos: reference/photos/josephine-mast-cabin-vang-side-
+  // starboard.png (the mount circled, the unit stowed) and josephine-vang-to-mast-base.jpg (the unit, from the cockpit)
   let instrument: Instrument | undefined;
   if (b.isUser) {
     instrument = buildInstrument();
-    const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - 0.09; // (0.09 m forward of the runners' forward ends)
+    const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - UNIT.d / 2 - 0.01; // (its after face 1 cm forward of the runners' ends)
     instrument.grp.position.set(0, cabinTopAt(uAtZ(z), 0), z); grp.add(instrument.grp);
   }
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
