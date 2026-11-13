@@ -319,7 +319,7 @@ const zU = (z: number) => (z + L / 2) / L;
 export const SIDE_DECK = 0.30;
 /** The line of the cabin sides and the coamings' outer face: the sheer less the side deck. */
 export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
-export const CABIN = { u0: zU(-0.847) /* (the front's foot about 4 cm aft of the mast: Josephine, the owner's side photo) */, u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
+export const CABIN = { u0: zU(-0.79) /* (the front's foot a strip of deck aft of the mast foot's horseshoe, the owner; and CR 3.11's least deck-line length, 1850 mm, to u1, so no further aft) */, u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
 export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
 /**
  * The cockpit's furniture, from the construction plan's profile and cockpit section (1:10; the arrangement is free,
@@ -464,11 +464,12 @@ function aftRound(u: number, b: number): number {
 /**
  * The cabin's front is a raked face, not an upright one (Josephine: the owner's side photo, as Rigging measured it,
  * about 700 px/m; CR 3.11 agrees, the roof at least 1785 mm long against at least 1850 mm at the deck line): from the
- * deck about 4 cm aft of the mast it rises to the cabin side's height over about CABIN_NOSE m, about 37° to the deck,
- * steepest at its foot and easing round onto the roof. The roof's crown comes down with it in the same proportion: the
+ * deck a strip aft of the mast foot's horseshoe (MAST_RING, the owner) it rises to the cabin side's height over about
+ * CABIN_NOSE m, about 45° to the deck, steepest at its foot and easing round onto the roof, which it reaches where the
+ * side photo shows. The roof's crown comes down with it in the same proportion: the
  * side photo can't show the centreline's height at the front, so that much is an estimate.
  */
-export const CABIN_NOSE = 0.265;
+export const CABIN_NOSE = 0.208;
 function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sin(Math.PI / 2 * d / CABIN_NOSE); }
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
 /**
@@ -480,7 +481,7 @@ function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L
  * 51 cm at 0.1, 0.38, 0.65, 1.0, 1.3 and 1.8 m aft of its front; within a few cm, the photo being a little oblique).
  */
 const CONE_K = 1.9;
-const CROWN = fairCurve([[-0.847, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
+const CROWN = fairCurve([[-0.79, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
 export const cabinTopAt = (u: number, x: number) => {
   const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w), full = r - Math.sqrt(r * r - w * w);
   const arch = (Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w)) / full; // (0 at the sides' top edges … 1 on the centreline)

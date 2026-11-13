@@ -453,7 +453,7 @@ const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 const FOOTREST_RAIL = new THREE.MeshPhongMaterial({ color: 0x2e3033, specular: 0x444444, shininess: 40, side: THREE.DoubleSide }); // (the footrest's rails: dark metal, Josephine's photo)
 /** The mast's foot on deck (m): the stainless plate's radius, the rubber boot's height, and the horseshoe's radius round the mast, its height at the top (aft of the mast, about 6 in), and how far round it reaches from aft (rad: its ends on the deck either side just forward of the mast). The lines thread under it or are made fast to it. */
-export const MAST_RING = { plate: 0.17, boot: 0.4, r: 0.14, h: 0.152, ends: 150 * Math.PI / 180 };
+export const MAST_RING = { plate: 0.16, boot: 0.4, r: 0.14, h: 0.152, ends: 150 * Math.PI / 180 };
 /** The jib winch's handle below the side deck (m): its spindle's drop under the deck, the crank arm's length (about 10 in, the owner), the grip's length. */
 export const WINCH_HANDLE = { drop: 0.05, len: 0.254, grip: 0.1 };
 /**
