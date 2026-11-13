@@ -159,8 +159,8 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
   if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
-  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = b.tack; }
-  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = lieTack(w, b, from); }
+  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on)
   // her way: each turn of it passed within 60 m, or the next in sight with clear water to it
   while (h.i < h.route.length - 1 && (dist(b, h.route[h.i]) < 60 || landAlong(b, h.route[h.i + 1]) === Infinity)) h.i++;
   const q = h.i < h.route.length - 1 ? h.route[h.i] : h.at, bq = brg(q.x - b.x, q.y - b.y), rel = Math.abs(wrap(from - bq));
@@ -183,6 +183,20 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
  * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 40 m apart along the wind's line
  * across, so the fleet isn't all on one point.
  */
+/**
+ * The tack she lies to on: beam-on, she still forereaches slowly along her spot's line across the wind, so on the tack
+ * that heads her away from the nearest other boat's spot, as a skipper heaving to near others would. (On the tack she
+ * came in on, two neighbours 40 m apart on opposite tacks lay heading at each other and closed it: tests/abandon-home.)
+ */
+function lieTack(w: World, b: Boat, from: number): 'S' | 'P' {
+  const at = b.ai!.home!.at;
+  let near: Vec | null = null, best = Infinity;
+  for (const o of w.boats) { const q = o !== b && o.ai?.home?.at; if (q && dist(q, at) < best) { best = dist(q, at); near = q; } }
+  if (!near) return b.tack;
+  const s = V(from - 90); // (her heading lying to on starboard)
+  return s.x * (at.x - near.x) + s.y * (at.y - near.y) >= 0 ? 'S' : 'P';
+}
+
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
   const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
   const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
