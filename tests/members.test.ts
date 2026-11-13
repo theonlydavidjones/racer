@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { YOU, ensureMembers, pullCrew, pushCrew, type Member } from '../src/club/members';
 import { DEFAULT_BOAT, fixSpec } from '../src/boat/spec';
+import { COURSES } from '../src/courses/registry';
+import { World } from '../src/sim/world';
 
 // The Yacht Club's members, phase 1 (club/members.ts): you and your crew as members, your boat's seats, the race's crew
 // drawn from them, and the old crew settings carried over without loss.
@@ -32,6 +34,16 @@ describe('the Yacht Club\'s members (phase 1)', () => {
     // (and You alone: the seats empty, the members kept)
     s.crew.n = 0; pushCrew(s, ms); expect(s.boat.crewIds).toEqual([]); expect(ms).toHaveLength(3);
     pullCrew(s, ms); expect(s.crew.n).toBe(0);
+  });
+  it('both seats empty is single-handed, in a race too (the owner: no "Just you" button, just no crew picked)', () => {
+    const s = settings({ n: 2, helm: { h: 1.8, w: 82 }, people: [{ h: 1.7, w: 70 }, { h: 1.9, w: 90 }] }); s.boat = s.boats[0];
+    const ms: Member[] = []; ensureMembers(s, ms);
+    s.boat.crewIds = []; // (both seats at None)
+    expect(ensureMembers(s, ms)).toBe(false); expect(s.boat.crewIds).toEqual([]); // (an empty boat isn't refilled)
+    pullCrew(s, ms); expect(s.crew.n).toBe(0);
+    const w = new World(COURSES[0], { ...s, mode: 'race', fleet: 1, windKt: 12, current: 'slack', tideDate: '2026-11-14' }, 1);
+    expect(w.user.crew!.people).toHaveLength(1); // (her skipper alone)
+    expect(w.boats[1].crew!.people.length).toBeGreaterThan(1); // (and the others still race crewed)
   });
   it('another boat of yours gets the crew you have, not new people', () => {
     const s = settings({ n: 2, helm: { h: 1.8, w: 82 }, people: [{ h: 1.7, w: 70 }, { h: 1.9, w: 90 }] }); s.boat = s.boats[0];
