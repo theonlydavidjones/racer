@@ -224,23 +224,36 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
     const W = 12, b = testBoat({ heading: 360 - beatAngle(W), kt: 4.5, windKt: W });
     b.crew = newCrew(crewOf(0.6), 'S'); sail(b, 20);
     b.crew.place = { across: 'hike', fore: null };
-    const c = b.crew, bad: string[] = []; let trips = 0;
+    const c = b.crew, bad: string[] = [];
+    // the bow hand's trips in for a big job (the Cunningham, the downhaul, the jib halyard), each second, by the change of
+    // wind (or tack) they answer: a crew resets the luff for a new wind, as they should, and is done in a minute or so;
+    // fussing is trips in the steady wind that follows
+    const trips: { leg: string; t: number }[] = []; let legNow = '';
     // every second, outside the tack itself: still yours, everyone free out on the rail, nobody off at the cabin top
     const check = (when: string) => {
       if (c.place?.across !== 'hike') bad.push(`${when}: place lost`);
       c.people.forEach((p, i) => {
         if (p.job?.station && PIANO.includes(p.job.line) && !p.job.big) bad.push(`${when}: #${i} left the rail for the ${p.job.line}`);
-        if (p.job?.big) trips++;
+        if (p.job?.big) trips.push({ leg: legNow, t: +when.split(' ').pop()!.replace('s', '') });
         if (i > 0 && !p.job && c.tgt![i].pose !== 'hike' && !['piano', 'winch', 'car', 'mast'].includes(c.tgt![i].pose)) bad.push(`${when}: #${i} ${c.tgt![i].pose}`); // (a job just done: the plan catches up within 0.05 s)
       });
     };
-    const leg = (secs: number, kt: number, label: string) => { b.ww.kt = kt; sail(b, secs, t => { if (t > 5 && Math.abs(t % 1) < 1 / 120) check(`${label} ${t.toFixed(0)}s`); }); };
+    // (`flicker`: the wind a knot up and down every 5 s from 35 s on, as a steady breeze does: nothing to reset for)
+    const leg = (secs: number, kt: number, label: string, flicker = false) => { b.ww.kt = kt; legNow = label; sail(b, secs, t => { if (flicker && t > 35) b.ww.kt = kt + (Math.floor(t / 5) % 2 ? 1 : -1); if (t > 5 && Math.abs(t % 1) < 1 / 120) check(`${label} ${t.toFixed(0)}s`); }); };
     leg(30, W, 'steady'); leg(30, 18, 'puff'); leg(30, 6, 'lull');
     b.ww.kt = W; startTack(b); sail(b, 15); expect(b.tack).toBe('P');
-    leg(120, W, 'after the tack');
+    leg(120, W, 'after the tack', true);
     expect(bad).toEqual([]);
-    // (a big change of wind may take the bow hand in for the Cunningham or downhaul, briefly: seconds, not the minutes)
-    expect(trips).toBeLessThan(30);
+    // a big change of wind (12 → 18 → 6 → 12 kt, and the tack) takes the bow hand in for the luff's lines, to set them for
+    // the new wind: done within 35 s of the change (two trips, LINE_GAP apart, for a big reset), 20 s of them at most;
+    // and none in the steady wind after (the after-the-tack leg's last 85 s, the tack itself 15 s before it began, the
+    // breeze flickering a knot either way):
+    // the crew don't fuss. (Counted in total, as it was, this failed a crew that put the 12 kt setup back after the
+    // lull, which is right, not one that worked the lines through the steady stretches: Deep Physics and the
+    // Coordinator, 13 Nov 2026. A trip made in the steady stretch fails it; the crew's own guards against fussing,
+    // crewWork.ts LINE_GAP and PLACED_TRIP, held even with minGain 0 and the plan's Cunningham swung every 5 or 30 s.)
+    for (const L of ['puff', 'lull', 'after the tack']) expect(trips.filter(x => x.leg === L).length, `${L}: ${trips.filter(x => x.leg === L).map(x => x.t).join(' ')} s`).toBeLessThanOrEqual(20);
+    expect(trips.filter(x => x.leg === 'steady' || x.leg === 'after the tack' && x.t > 35).map(x => `${x.leg} ${x.t}s`), 'trips in the steady wind').toEqual([]);
     // the weight is on the new windward side (port), as far out as they reach
     expect(c.side).toBe('P'); expect(c.mode).toBe('hike');
     // Auto: in a drifter a good crew goes back to their own call (to leeward or the middle, not hiking)
