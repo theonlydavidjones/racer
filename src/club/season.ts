@@ -15,9 +15,10 @@ import { RC_COURSE } from '../courses/committee';
  * How it's scored, best-supported answers (the series' sailing instructions couldn't be read: ggyc.com and jibeset refuse
  * this project's fetches):
  *  - Low point (RRS A4): a race's points are its places, the sim's race scores (rules/scoring.ts).
- *  - Ratings: level. The real series scored the Folkboats on PHRF time on time ("650/(550+PHRF)"), but in every saved race
- *    of it the published points follow elapsed time exactly, as equal ratings give: time on time on equal ratings is
- *    boat for boat (sf-folkboat-results.json, 2025–26 races 1, 2, 4, 5 and 2026–27 race 1).
+ *  - Ratings: level. The series scores the Folkboats on PHRF time on time, every Folkboat on the same rating: 252 on the
+ *    2026–27 race 1 results sheet (reference/results/seaweed-soup-2026-27-race1-2026-11-07.png), and in every saved race
+ *    the published points follow elapsed time exactly (sf-folkboat-results.json, 2025–26 races 1, 2, 4, 5). Time on time
+ *    on equal ratings is boat for boat.
  *  - A boat that didn't finish (or retired, or was disqualified): the number of starters + 1, as the real series scored
  *    them (race 2 and race 4: 6 starters, DNF scored 7), an arrangement RRS A5.3 allows; a boat that didn't sail a race at
  *    all (DNC): the number of entries + 1 (A5.2; 9 for the real fleet's 8, as published).
@@ -50,25 +51,44 @@ export interface Series {
 }
 
 type Raw = { id: string; name: string; url: string; races: { raceNo: number; date: string; start: string | null; course: string | null; boats: { code: string | null }[] }[] };
-const EVENT = 'GGYC_T008047221';
+/**
+ * The seasons: GGYC's Seaweed Soup, each from its published results (Jibeset). 2026–27 is the season now under way: its
+ * races appear as they're sailed and published (race 1, 7 Nov 2026, sailed on course 2: a last-minute change the results
+ * don't show, from the owner, who sailed it; reference/results/seaweed-soup-2026-27-race1-2026-11-07.png). No date is
+ * listed before it's published.
+ *
+ * Five races make the full series, for the throwout: the series is run as five races (Latitude 38, 25 Apr 2025: "all
+ * five races completed", above; the 2025–26 results have five).
+ */
+const EVENTS = [
+  { event: 'GGYC_T008047221', id: 'ggyc-seaweed-2025-26', title: 'Seaweed Soup 2025–26' },
+  { event: 'GGYC_T00227699', id: 'ggyc-seaweed-2026-27', title: 'Seaweed Soup 2026–27' }
+];
+const SCHEDULED = 5;
 
-/** The series on offer. */
+/** The series on offer, oldest first; the last is the current season. */
 export function seasons(): Series[] {
-  const e = (results as unknown as { events: Raw[] }).events.find(x => x.id === EVENT); if (!e) return [];
-  const races: SeasonRace[] = e.races.map(r => {
-    const real = realRace(`${EVENT}-r${r.raceNo}`), abandoned = r.boats.length > 0 && r.boats.every(b => b.code === 'ABN');
-    return { no: r.raceNo, date: r.date, start: (r.start ?? '12:00').slice(0, 5), courseId: real?.courseId ?? RC_COURSE, courseNo: real?.courseNo ?? r.course, realId: real?.id ?? null, abandoned };
-  });
-  return [{
-    id: 'ggyc-seaweed-2025-26', title: 'Seaweed Soup 2025–26', host: 'Golden Gate YC', club: 'ggyc', races, scheduled: races.length,
-    // the five club boats and the first two of the club's other Folkboats: 8 entries with you, as the real fleet had
-    fleet: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], url: e.url
-  }];
+  const all = (results as unknown as { events: Raw[] }).events, out: Series[] = [];
+  for (const E of EVENTS) {
+    const e = all.find(x => x.id === E.event); if (!e) continue;
+    const races: SeasonRace[] = e.races.map(r => {
+      const real = realRace(`${E.event}-r${r.raceNo}`), abandoned = r.boats.length > 0 && r.boats.every(b => b.code === 'ABN');
+      return { no: r.raceNo, date: r.date, start: (r.start ?? '12:00').slice(0, 5), courseId: real?.courseId ?? RC_COURSE, courseNo: real?.courseNo ?? r.course, realId: real?.id ?? null, abandoned };
+    });
+    out.push({
+      id: E.id, title: E.title, host: 'Golden Gate YC', club: 'ggyc', races, scheduled: Math.max(SCHEDULED, races.length),
+      // the five club boats and the first two of the club's other Folkboats: 8 entries with you, as the real fleet had
+      fleet: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], url: e.url
+    });
+  }
+  return out;
 }
+/** The season under way: the latest. */
+export const currentSeason = (): Series | undefined => seasons().at(-1);
 export const seasonById = (id: string): Series | undefined => seasons().find(s => s.id === id);
 
 /** One boat's result in one race of the series, as kept. */
-export interface SeasonScore { sail: string; name: string; hull: string; you: boolean; points: number; code: string | null }
+export interface SeasonScore { sail: string; name: string; hull: string; you: boolean; points: number; code: string | null; club?: string }
 /** A race of the series as sailed: when, and every boat's score. */
 export interface SeasonResult { at: string; scores: SeasonScore[] }
 
@@ -84,7 +104,7 @@ export function keepSeasonRace(id: string, no: number, r: SeasonResult): void {
 }
 
 export interface StandingRow {
-  sail: string; name: string; hull: string; you: boolean;
+  sail: string; name: string; hull: string; you: boolean; club?: string;
   /** by race number: points and code, or null (not in that race: DNC); `out` the excluded (thrown out) score */
   races: Record<number, { points: number; code: string | null; out: boolean }>;
   total: number; nett: number; rank: number;
@@ -96,10 +116,15 @@ export const throwouts = (sailed: number, scheduled: number): number => sailed >
  * The series standings from the races sailed. `entries`: the boats entered (a DNC scores entries + 1). Abandoned races
  * and races not yet sailed don't count.
  */
-export function standings(series: Series, res: Record<number, SeasonResult>): { rows: StandingRow[]; sailed: number[]; discards: number } {
+/**
+ * A boat as she is now, by her sail number (her spec: name, hull color, club), where she's one the game knows: the owner's
+ * rule, results follow a boat's listed club, so an edit to her shows in every race she's sailed, not only the next.
+ */
+export type LiveBoat = (sail: string) => { name?: string; hull?: string; club?: string } | undefined;
+export function standings(series: Series, res: Record<number, SeasonResult>, live?: LiveBoat): { rows: StandingRow[]; sailed: number[]; discards: number } {
   const sailed = series.races.filter(r => !r.abandoned && res[r.no]).map(r => r.no);
   const boats = new Map<string, Omit<StandingRow, 'races' | 'total' | 'nett' | 'rank'>>();
-  for (const no of sailed) for (const s of res[no].scores) boats.set(s.sail, { sail: s.sail, name: s.name, hull: s.hull, you: s.you || !!boats.get(s.sail)?.you });
+  for (const no of sailed) for (const s of res[no].scores) boats.set(s.sail, { sail: s.sail, name: s.name, hull: s.hull, you: s.you || !!boats.get(s.sail)?.you, club: s.club });
   const entries = boats.size, discards = throwouts(sailed.length, series.scheduled); // (an abandoned race is a race not completed)
   const rows: StandingRow[] = [...boats.values()].map(b => {
     const races: StandingRow['races'] = {};
@@ -108,7 +133,8 @@ export function standings(series: Series, res: Record<number, SeasonResult>): { 
     const order = sailed.slice().sort((x, y) => races[y].points - races[x].points || x - y);
     for (const no of order.slice(0, Math.min(discards, sailed.length - 1))) races[no].out = true;
     const total = sailed.reduce((a, no) => a + races[no].points, 0), nett = sailed.reduce((a, no) => a + (races[no].out ? 0 : races[no].points), 0);
-    return { ...b, races, total, nett, rank: 0 };
+    const now = live?.(b.sail);
+    return { ...b, ...(now?.name ? { name: now.name } : {}), ...(now?.hull ? { hull: now.hull } : {}), ...(now && 'club' in now ? { club: now.club } : {}), races, total, nett, rank: 0 };
   });
   rows.sort((a, b) => a.nett - b.nett || tieBreak(a, b, sailed));
   rows.forEach((r, i) => { r.rank = i > 0 && rows[i - 1].nett === r.nett && tieBreak(rows[i - 1], r, sailed) === 0 ? rows[i - 1].rank : i + 1; });

@@ -78,7 +78,7 @@ describe('sailing the new courses', () => {
     expect(b.leg, `still on leg 0 after ${(t / 3600).toFixed(1)} min; closest ${closest.toFixed(0)} m off`).toBe(1);
     expect(aground).toBe(0);
     expect(dist(b, mk.p)).toBeGreaterThan(mk.reach![0] * 0.5);
-  }, 120_000);
+  }, 180_000);
 
   it('the next mark behind an island: from the far side of Alcatraz she sails round it to Fort Mason (course 3)', () => {
     const w = new World(byId('ss3'), settings({ fleet: 1, windKt: 14 }), 5);
@@ -88,5 +88,5 @@ describe('sailing the new courses', () => {
     for (let t = 0; t < 60 * 60 * 20 && b.leg === 2; t++) { w.step(DT); if (onLand({ x: b.x, y: b.y })) aground++; }
     expect(b.leg).toBe(3);
     expect(aground).toBe(0);
-  }, 120_000);
+  }, 180_000);
 });

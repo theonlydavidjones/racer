@@ -15,7 +15,10 @@ export const LANDMARKS: Landmark[] = ([
   ['Fort Point', 37.81055, -122.47710], ['Lime Point', 37.82545, -122.47832], ['Point Bonita light', 37.81561, -122.52958],
   ['Mt Tamalpais', 37.9291, -122.5778], ['Sutro Tower', 37.75523, -122.45284], ['Salesforce Tower', 37.7899, -122.3969],
   ['the Palace of Fine Arts dome', 37.80292, -122.44840], ['Belvedere Point', 37.8690, -122.4590], ['Sausalito', 37.8590, -122.4850],
-  ['Yerba Buena Island', 37.8100, -122.3640]
+  ['Yerba Buena Island', 37.8100, -122.3640],
+  // the East Bay's two marks for a bearing across the Bay (the owner): the Campanile (OSM way 24024507) and the
+  // Claremont Hotel's tower (OSM way 41745855; the tower's place in it read off photographs)
+  ['the Campanile (Sather Tower)', 37.87208, -122.25784], ['the Claremont Hotel', 37.85945, -122.24185]
 ] as [string, number, number][]).map(([name, la, lo]) => ({ name, p: LL(la, lo) }));
 
 /** The landmark most nearly in line with `from` → `through` (beyond `through`), within `tol` degrees; null if none. */

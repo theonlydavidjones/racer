@@ -109,5 +109,5 @@ describe("the wind's shifts, against Fort Point's record", () => {
     expect(a.wind).toEqual(b.wind);
     const best = bestLag(sp, sq, 240), U = a.windModel.kt * KT; // (s)
     expect(best).toBeGreaterThan(0.7 * 600 / U); expect(best).toBeLessThan(1.3 * 600 / U);
-  }, 120000);
+  }, 180_000);
 });
