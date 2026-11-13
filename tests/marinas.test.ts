@@ -149,18 +149,28 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
   }, 180_000);
   it('the wind: held by the bow, her stern swings downwind, so she comes round toward the wind; head to wind she\'s held there for the main; an end tie\'s bow is pushed off the wind', () => {
     const rel = (from: number, h: number) => ((from - h + 540) % 360) - 180;
-    let n = 0, held = 0;
+    let n = 0, held = 0, against = 0, round = 0;
     for (const s of SLIPS.filter((_, i) => i % 3 === 0)) for (const from of [270, 225, 0]) {
       const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing') continue;
       if (15 * Math.abs(Math.sin(rel(from, s.heading) * Math.PI / 180)) < WIND_SWINGS) continue;
       n++;
-      // (the bow comes round toward the wind, the stern going downwind; or, with no room for that in a breeze a hand can hold
-      // (marina.ts CREW_TURNS), the crew turns her the other way by hand, to point her downwind out of it)
-      if (Math.sign(p.turn) !== Math.sign(rel(from, s.heading))) expect(Math.abs(rel(from + 180, p.h))).toBeLessThanOrEqual(61);
-      else expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading)));
-      if (p.hold) { held++; expect(Math.abs(rel(from, s.heading + p.turn))).toBeLessThan(6); expect(Math.abs(p.hold.off)).toBeGreaterThanOrEqual(30); expect(Math.abs(p.hold.off) <= 60 || Math.abs(p.hold.off) >= 135).toBe(true); } // (held head to wind, then her bow pushed off for the main; or, with no room for that, walked right round to point downwind: marina.ts CREW_TURNS)
+      // the bow comes round toward the wind, the stern going downwind. The one exception (marina.ts, the search's fallback):
+      // the wind's own swing has no room, the wind's on or near her beam (45–135 degrees off her bow) and a breeze a hand can
+      // hold (CREW_TURNS, 16 kt), so the crew turns her the other way by hand: never held (she's let go), no more than a
+      // quarter turn, and let go pointing within 60 degrees of downwind, to be carried out by it
+      if (Math.sign(p.turn) !== Math.sign(rel(from, s.heading))) {
+        against++; const fromBow = Math.abs(rel(from, s.heading));
+        expect(p.hold).toBeUndefined(); expect(Math.abs(p.turn)).toBeLessThanOrEqual(90); expect(Math.abs(rel(from + 180, p.h))).toBeLessThanOrEqual(60 + 1e-9);
+        expect(fromBow).toBeGreaterThan(45); expect(fromBow).toBeLessThan(135);
+      }
+      // held head to wind, then her bow pushed off 30–60 degrees for the main; or, only in a breeze a hand can hold and with
+      // no room for that, walked right round (135 or 180 degrees) to point downwind
+      if (p.hold) { held++; expect(Math.abs(rel(from, s.heading + p.turn))).toBeLessThan(6); const o = Math.abs(p.hold.off); if (o > 90) { round++; expect([135, 180]).toContain(o); } else { expect(o).toBeGreaterThanOrEqual(30); expect(o).toBeLessThanOrEqual(60); } }
     }
     expect(n).toBeGreaterThan(40); expect(held).toBeGreaterThan(10); // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead)
+    // (the two hand-turns are the exceptions, not the rule: no more of them than today, 13 Nov 2026, 1036 cases: 204 turned
+    // against the wind, 333 walked right round. More would mean the wind's own swing, held for the main, has lost room)
+    expect(against).toBeLessThanOrEqual(204); expect(round).toBeLessThanOrEqual(333);
     // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
     // (West Harbor's 135: the first of its berths still held head to wind now the let-go needs 20 m of clear water along her
     // path as she rounds up and sags (pushoff-letgo.test.ts); 677, old A7, is shoved off astern instead)

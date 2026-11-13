@@ -46,7 +46,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     // (less Fort Mason's piers: they stand on piles over the water, drawn below; the apron runs straight along the bulkhead
     // across each pier's foot)
     const foot = (p: { x: number; y: number }) => FORT_MASON_PILES.some(f => p.x >= f.box.x0 && p.x <= f.box.x1 && p.y >= f.box.y0 && p.y <= f.box.y1
-      && Math.min(...[f.pts[0], f.pts[f.pts.length - 1]].map(q => Math.hypot(p.x - q.x, p.y - q.y))) > 2);
+      && Math.min(...[f.pts[0], f.pts[f.pts.length - 1]].map(q => Math.hypot(p.x - q.x, p.y - q.y))) > 20); // (the apron runs under the deck's shore end: no seam)
     LAND.filter(p => !foot(p)).forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
     // West Harbor's basin is water (geo/marina.ts): cut out of the apron
     const hole = new THREE.Path(); HARBOR.basin.forEach((p, i) => i ? hole.lineTo(p.x, p.y) : hole.moveTo(p.x, p.y)); s.holes.push(hole);
@@ -419,12 +419,17 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // north seawall, facing the Bay (the start line's inner end: see the Seaweed Soup course files)
   place(block(22, 25, 8, lam(0xf4f1ea)), 37.80773, -122.44259, 79, 2.3);
   place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80799, -122.44260, 0, 2.3);
-  // Fort Mason's piers, with the long pier sheds
-  // (on the real piers, OpenStreetMap's coast: Piers 1, 2 and 3, ending at 37.8085, 37.8091 and 37.8092; each shed's
-  // north end a few metres short of its pier's, turned to the pier: they run 7–14° west of north)
-  for (const [end, lon, brg] of [[37.8085, -122.4324, 346], [37.8091, -122.4316, 350], [37.8092, -122.4304, 353]]) {
-    const r = brg * Math.PI / 180, back = 80; // the shed's middle, 80 m back along the pier from the end
-    place(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK), end - back * Math.cos(r) / 111320, lon - back * Math.sin(r) / 88000, brg, 0);
+  // Fort Mason's piers, with the long pier sheds: each on its own pier's centerline (geo/fortMason.ts), its north end a
+  // few meters short of the pier's
+  for (const f of FORT_MASON_PILES) {
+    const n = f.pts.length, base = { x: (f.pts[0].x + f.pts[n - 1].x) / 2, y: (f.pts[0].y + f.pts[n - 1].y) / 2 };
+    const far = [...f.pts].sort((p, q) => Math.hypot(q.x - base.x, q.y - base.y) - Math.hypot(p.x - base.x, p.y - base.y)).slice(0, 2);
+    const end = { x: (far[0].x + far[1].x) / 2, y: (far[0].y + far[1].y) / 2 };
+    // (along the pier's longest side, so the shed runs parallel to its edges; the bulkhead end is cut on the skew)
+    const side = f.pts.map((p, i) => [p, f.pts[(i + 1) % n]]).sort(([a, b], [c2, d]) => Math.hypot(d.x - c2.x, d.y - c2.y) - Math.hypot(b.x - a.x, b.y - a.y))[0];
+    const sl = Math.hypot(side[1].x - side[0].x, side[1].y - side[0].y), sg = Math.sign((side[1].x - side[0].x) * (end.x - base.x) + (side[1].y - side[0].y) * (end.y - base.y)) || 1;
+    const u = { x: sg * (side[1].x - side[0].x) / sl, y: sg * (side[1].y - side[0].y) / sl }, c = { x: end.x - u.x * 80, y: end.y - u.y * 80 }; // (its middle 80 m back from the end)
+    const shed = group(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK)); shed.position.copy(P3(c.x, c.y, 0)); shed.rotation.y = -Math.atan2(u.x, u.y); grp.add(shed);
   }
   // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
   // through: a boat set onto them is caught (boat/physics.ts onPiles). The deck's height and the piles' size and spacing are
