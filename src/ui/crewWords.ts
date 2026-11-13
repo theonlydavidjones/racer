@@ -58,6 +58,8 @@ export function autoAcross(u: Boat): 'lee' | 'mid' | 'up' | 'hike' {
 let lastRow = '', crewOpen = false;
 /** Open or fold the crew section while they're on auto (placed by you, it stays open). */
 export function toggleCrewOpen(): void { crewOpen = !crewOpen; lastRow = ''; }
+/** Open the crew section, its places showing (from the Crew button: where to sit is what you came for). */
+export function openCrewChoices(): void { crewOpen = true; lastRow = ''; }
 /** The full sailing reason for each place, on hover. */
 const PLACE_TIP: Record<string, string> = {
   lee: 'Sit to leeward: on the low side. In light air your weight heels her about 6°, so the sails fall into their shape instead of slatting.',
