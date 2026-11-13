@@ -216,6 +216,15 @@ What's planned, roughly in order. Done work is described in the README.
      full picker, a hex field, the class's usual colors as presets, and a row of your own saved custom colors shared by
      every picker and kept with your account. Where a choice is a material rather than a color (teak or fiberglass,
      sailcloth), it stays a choice.
+   - Lines are the exception (owner, 13 November): "color selection for lines should probably give options for real rope
+     patterns. there's not a ton of options IRL, so an infinite color picker seems to be the wrong choice." Lines get a
+     palette of real rope colorways, not the free picker. Sourced so far, from New England Ropes only (Sta-Set, Endura
+     Braid, VPC; neropes.com, fetched 13 November):
+     - solids: white, red, blue, black, green;
+     - flecks: red, blue and green fleck (on white, inferred from the naming).
+     Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
+     fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
+     Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
