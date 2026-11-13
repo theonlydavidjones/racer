@@ -423,6 +423,8 @@ const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.
 const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
+/** The mast's foot on deck (m): the stainless plate's radius, the rubber boot's height, and the ring's radius and height above the deck (centred on the mast; the lines thread under it or are made fast to it). */
+export const MAST_RING = { plate: 0.17, boot: 0.4, r: 0.14, h: 0.1 };
 /** The jib winch's handle below the side deck (m): its spindle's drop under the deck, the crank arm's length (about 10 in, the owner), the grip's length. */
 export const WINCH_HANDLE = { drop: 0.05, len: 0.254, grip: 0.1 };
 /**
@@ -975,6 +977,16 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.5, 0.5, mastH, 14, MAST_SEGS) : new THREE.CylinderGeometry(0.34, 0.5, mastH, 10, MAST_SEGS), spar);
   mast.scale.set(MAST_ATH, 1, MAST_FA); mast.position.set(0, DECK_AT_MAST + mastH / 2, MAST_Z); rig.add(mast);
   const mastBase = (mast.geometry.attributes.position.array as Float32Array).slice();
+  // the mast's foot on deck (Josephine, the owner's photos): a round stainless plate on the deck; a black rubber boot
+  // round the mast from the deck about 0.4 m up, where it goes down through the deck to its step on the keel; and a
+  // stainless ring on short legs standing just above the plate, which the lines from the mast thread under or are made
+  // fast to before running aft (MAST_RING, for Rigging). Sizes read off the photos, estimates.
+  { const y0 = deckY(uAtZ(MAST_Z), 0), foot = new THREE.Group(); foot.position.set(0, y0, MAST_Z); rig.add(foot); // (on the deck's crown, the centreline)
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(MAST_RING.plate, MAST_RING.plate, 0.006, 32), STEEL); plate.position.y = 0.003; foot.add(plate);
+    const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.56, 1, 18, 1, true), new THREE.MeshLambertMaterial({ color: 0x15171a, side: THREE.DoubleSide }));
+    boot.scale.set(MAST_ATH + 0.012, MAST_RING.boot, MAST_FA + 0.012); boot.position.y = MAST_RING.boot / 2; foot.add(boot);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(MAST_RING.r, 0.006, 8, 40).rotateX(Math.PI / 2), STEEL); ring.position.y = MAST_RING.h; foot.add(ring);
+    for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, leg = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, MAST_RING.h, 6), STEEL); leg.position.set(Math.cos(a) * MAST_RING.r, MAST_RING.h / 2, Math.sin(a) * MAST_RING.r); foot.add(leg); } }
   // Your own sails are slightly see-through, as Dacron is in daylight, so the leeward telltales show through.
   // Dacron sails: crosscut panel seams, the class letter, and the sail number on the main (starboard side higher, RRS
   // Appendix G), each side its own picture so the numbers read the right way round from both sides
