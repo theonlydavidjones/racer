@@ -354,7 +354,8 @@ export class RaceReplay {
       return on;
     };
     // the others' tracks, so far; the boat you're measured against brighter, all of hers faint ahead
-    const rv = D.vs?.rival ?? -1, picked = new Set([...(rv >= 0 ? [rv] : []), ...(D.chosen?.() ?? [])].filter(i => i !== u));
+    // (the tactical chart's chips choose them, the rival among them at first; without the chart, the rival)
+    const rv = D.vs?.rival ?? -1, picked = new Set((D.chosen ? D.chosen() : rv >= 0 ? [rv] : []).filter(i => i !== u));
     w.boats.forEach((bt, i) => { if (i === u || picked.has(i)) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
     for (const id of picked) {
       const c = w.boats[id].color;
@@ -364,8 +365,10 @@ export class RaceReplay {
     // the ideal (the planner's perfect sail) on the leg you're sailing, dashed
     const ip = this.selLeg && this.selLeg.i > 0 ? D.idealPaths?.[this.selLeg.i - 1] : null;
     if (ip && ip.length > 1) {
-      ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(233,242,245,.55)'; ctx.lineWidth = 1.6; ctx.beginPath();
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(233,242,245,.75)'; ctx.lineWidth = 2; ctx.beginPath();
       ip.forEach((p, k) => { const q = tf(p.x, p.y); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); ctx.setLineDash([]);
+      // named halfway along, as the still has it
+      const m = tf(ip[ip.length >> 1].x, ip[ip.length >> 1].y); ctx.fillStyle = 'rgba(233,242,245,.85)'; ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.fillText('the ideal', m[0] + 8, m[1] - 6);
     }
     // yours: all of it faint, so far bright
     ctx.strokeStyle = 'rgba(233,242,245,.18)'; ctx.lineWidth = 1.5; if (line(u, 0, F.length)) ctx.stroke();

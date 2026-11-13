@@ -1217,3 +1217,4 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .tacHost{display:flex;flex-direction:column;gap:10px}
 /* (the results and pause panels widen for the tactical chart: desktop only) */
 #results .panel,#pause .panel{max-width:980px}
+#results,#pause{z-index:9} /* (over the HUD's own buttons, the map's layers among them, now the panel is wide enough to reach under them) */

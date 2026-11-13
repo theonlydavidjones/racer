@@ -881,19 +881,25 @@ function vsInput(log: NonNullable<typeof w.log>): VsInput {
 let tacPlan: { w: unknown; legs: ReturnType<typeof planLegs> } | null = null;
 const tacShown: TacShown = { best: true, ideal: true, boats: new Set() };
 let tacShownFor: unknown = null;
+/** The plan, once a race (outlookFor reads the gun's day, not the clock: the same plan the briefing showed). */
+function tacPlanNow(): ReturnType<typeof planLegs> {
+  if (tacPlan?.w !== w) { try { tacPlan = { w, legs: planLegs(w, outlookFor(w)) }; } catch (e) { console.warn('the tactical debrief: no ideal', e); tacPlan = { w, legs: [] }; } }
+  return tacPlan.legs;
+}
 function tacticsNow(): Tactics | null {
   const log = w.log; if (!log || w.track.length < 2 || w.drill) return null;
-  if (tacPlan?.w !== w) { try { tacPlan = { w, legs: planLegs(w, outlookFor(w)) }; } catch { tacPlan = { w, legs: [] }; } }
+  tacPlanNow();
   const C = w.C, u = w.user.id, V0 = vsInput(log);
   const legs = V0.legs.map((L, k) => ({ name: L.name, from: k === 0 ? C.center : V0.legs[k - 1].to, to: L.to, kind: L.kind, ideal: tacPlan!.legs[k] ? tacPlan!.legs[k].minutes * 60 : null }));
-  // what the race log measured for you, by leg: past the layline, dirty air and the lee of the land, slow tacks and gybes
-  const ends = [w.startTimes[u], ...C.marks.map((_, k) => log.boatMarks[u]?.[k] ?? null), w.user.finished ? w.user.finishT : null];
+  // what the race log measured for you, by leg: past the layline, and each tack or gybe's cost. A moment goes to the leg
+  // it happened in: a tack at its turn (the moment opens 3 s before it), a spell at its middle; the first leg from the gun
+  const ends = [0, ...C.marks.map((_, k) => log.boatMarks[u]?.[k] ?? null), w.user.finished ? w.user.finishT : null];
+  const at = (m: { key: string; t0: number; t1: number }) => m.key === 'tacks' ? m.t0 + 3 : (m.t0 + m.t1) / 2;
   const ms = log.moments(w), logged = legs.map((_, k) => {
-    const a = ends[k], b = ends[k + 1] ?? Infinity, inLeg = (m: { t0: number }) => a != null && m.t0 >= a && m.t0 < b;
-    const sum = (keys: string[]) => ms.filter(m => keys.includes(m.key) && inLeg(m)).reduce((x, m) => x + m.lost, 0);
-    return { laylines: sum(['laylines']), clearAir: sum(['dirty', 'lee']), manoeuvres: sum(['tacks']) };
+    const a = ends[k], b = ends[k + 1] ?? Infinity, inLeg = (m: { key: string; t0: number; t1: number }) => a != null && at(m) >= a && at(m) < b;
+    return { laylines: ms.filter(m => m.key === 'laylines' && inLeg(m)).reduce((x, m) => x + m.lost, 0), tacks: ms.filter(m => m.key === 'tacks' && inLeg(m)).map(m => m.lost) };
   });
-  return tactics({ frames: w.track, you: u, beat: beatAngle(w.wind.kt), legs, logged,
+  return tactics({ frames: w.track, you: u, beat: beatAngle(w.wind.kt), tws: w.wind.kt, hs: w.user.sea?.hsW ?? 0, legs, logged,
     boats: w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, color: b.color, start: w.startTimes[b.id] ?? null, marks: log.boatMarks[b.id] ?? [], finishT: b.finished ? b.finishT : null })) });
 }
 /** Draw the tactical debrief into `host` (the results' or the pause screen's debrief, or the replay's list), and answer its chips. */
@@ -907,7 +913,7 @@ function mountTactics(host: HTMLElement, compact: boolean, onLeg: (i: number) =>
   const boats = w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, color: b.color }));
   const paint = () => {
     const sc = scores(), me = sc.get(w.user.id), place = me?.rank != null ? `${ordinal(me.rank)} of ${w.boats.length}` : 'Racing';
-    host.innerHTML = (compact ? '' : tacticsTop(T, place, w.userFinishT != null ? mmss(w.userFinishT) : `${mmss(w.t)} so far`)) + tacticsHtml(T, boats, w.user.id, tacShown, { compact });
+    host.innerHTML = (compact ? '' : tacticsTop(T, place, w.user.finishT != null ? mmss(w.user.finishT) : `${mmss(w.t)} so far`)) + tacticsHtml(T, boats, w.user.id, tacShown, { compact });
   };
   paint();
   host.onclick = e => {
@@ -921,7 +927,7 @@ function mountTactics(host: HTMLElement, compact: boolean, onLeg: (i: number) =>
   };
 }
 /** The planner's ideal track on each leg, for the replay (dashed beside yours). */
-const idealPaths = () => (tacPlan?.w === w ? tacPlan.legs.map(L => L.plans[L.best].path.map(q => q.p)) : []);
+const idealPaths = () => tacPlanNow().map(L => L.plans[L.best].path.map(q => q.p));
 
 /** The race replay: your race from just before the gun, with the debrief on its track and timeline. */
 function watchRace(): void {
