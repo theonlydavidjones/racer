@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { placeAmong, realRace, realRaces } from '../src/sim/realRaces';
+import { placeAmong, realStarters, realRace, realRaces } from '../src/sim/realRaces';
 import { realSpec } from '../src/boat/generic';
 import { courseFile } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
@@ -21,6 +21,12 @@ describe('the real past races', () => {
     expect(realRace('GGYC_T008047221-r5')!.doubt).toBe(null);
     expect(realRace('GGYC_T008047221-r1')!.doubt).toMatch(/6\.1 nm.*3\.7 nm/);
     expect(realRace('GGYC_T008047221-r4')!.doubt).toMatch(/8\.9 nm.*5 nm/);
+    // 6.1 nm in the winner's 46:49 is 7.8 kt: the distance is the typo, and the race says so
+    expect(realRace('GGYC_T008047221-r1')!.doubt).toMatch(/7\.8 kt, faster than a Folkboat sails/);
+    // the fleet the sim sails her against: every boat that started (a DNF too), none that didn't
+    const r4 = realRace('GGYC_T008047221-r4')!;
+    expect(realStarters(r4).length).toBeGreaterThan(r4.boats.filter(b => b.elapsedS != null && b.code == null).length);
+    expect(realStarters(r4).some(b => b.code && /DN[SC]/.test(b.code))).toBe(false);
   });
   it('place your time among the real finishers', () => {
     const r = realRace('GGYC_T008047221-r5')!, t = r.boats.filter(b => b.elapsedS != null).map(b => b.elapsedS!).sort((a, b) => a - b);

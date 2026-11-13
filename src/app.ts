@@ -24,7 +24,7 @@ import { EXONERATION, RULES, explain, ptsText, raceScores, scoreOrder, type Inci
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
-import { placeAmong, realRace, realRaces } from './sim/realRaces';
+import { placeAmong, realRace, realRaces, realStarters } from './sim/realRaces';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, World, describeTide } from './sim/world';
@@ -1212,6 +1212,7 @@ function openSetupNow(): void {
   courseView.close(); navView.close(); send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
+  realRaceHolds();
   saveSettings(S);
   newGame(seed);
   logMessage(`— ${S.mode === 'sail' ? `Cruise · ${place(S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
@@ -1558,7 +1559,7 @@ $('bPast').onclick = () => { const n = $('pastNote'); n.hidden = !n.hidden; $('b
    sailed in that day's observed wind and NOAA's tide, on the course they sailed, against the real boats (by name and sail
    number), and at the finish your time among theirs. Listed in the past-race panel, no new buttons (the owner's rule). */
 const titleCase = (t: string) => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const mmss = (t: number) => { const s = Math.round(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 function realRaceRows(): void {
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
   const rs = realRaces();
@@ -1578,13 +1579,23 @@ $('realRows').addEventListener('click', e => {
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
     chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.id });
   replayPin = null;
-  S.opponents = r.boats.filter(x => x.elapsedS != null || (x.code && !/DN[SC]/.test(x.code))).slice(0, MAX_OPPONENTS).map(x => `real:${r.id}:${x.key}`);
+  S.opponents = realStarters(r).slice(0, MAX_OPPONENTS).map(x => `real:${r.id}:${x.key}`);
   S.fleet = S.opponents.length;
   if (!S.boat.slip) S.raceFrom = 'water';
   saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
   $('raceChoose').hidden = true;
   beginRace();
 });
+/**
+ * A real race is only that race on its day: the course, the day and the gun it was sailed on, in the wind as it was. Once
+ * any of those is changed in the setup it's a different race, so the real fleet and the comparison with it go.
+ */
+function realRaceHolds(): void {
+  const r = S.realRace ? realRace(S.realRace) : undefined; if (!S.realRace) return;
+  if (r && S.mode === 'race' && S.course === r.courseId && S.tideDate === r.date && S.tideTime === r.start
+    && S.windKind === 'auto' && !S.windKt && !S.windTurn && S.windDir == null && replayPin == null) return;
+  S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length;
+}
 /** At the finish of a real past race: your time among the real fleet's, and the sim's boats beside them. */
 function realResults(): string {
   const r = S.realRace ? realRace(S.realRace) : undefined; if (!r || w.userFinishT == null) return '';
@@ -1629,7 +1640,7 @@ $('pastRows').addEventListener('click', e => {
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
   if (!S.boat.slip) S.raceFrom = 'water';
-  { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
+  { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
   saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
   $('raceChoose').hidden = true;
   beginRace(en.setup?.seed);

@@ -53,8 +53,10 @@ export function realRaces(): RealRace[] {
       const course = COURSES.find(c => c.id === `ss${r.course}`);
       if (!course) continue;
       const nm = course.distanceNm ?? 0;
+      // (which one is the typo: the published distance in the winner's time, beside a Folkboat's hull speed, about 6 kt)
+      const win = Math.min(...timed.map(b => b.elapsedS!)), kt = r.distanceNm != null ? r.distanceNm / (win / 3600) : 0;
       const doubt = r.distanceNm != null && nm && Math.abs(r.distanceNm - nm) > 0.15
-        ? `The results give course ${r.course} as ${r.distanceNm} nm; GGYC's course sheet has it as ${nm} nm. One of the two was typed wrong: this is course ${r.course}, the number the committee flies.`
+        ? `The results give course ${r.course} as ${r.distanceNm} nm; GGYC's course sheet has it as ${nm} nm. ${r.distanceNm} nm in the winner's time would be ${kt.toFixed(1)} kt${kt > 6 ? ', faster than a Folkboat sails' : ''}, so the distance looks like the typo: this is course ${r.course}, the number the committee flies.`
         : null;
       out.push({
         id: `${ev.id}-r${r.raceNo}`, event: ev.name, raceNo: r.raceNo, date: r.date, start: r.start.slice(0, 5),
@@ -67,6 +69,9 @@ export function realRaces(): RealRace[] {
 }
 
 export const realRace = (id: string): RealRace | undefined => realRaces().find(r => r.id === id);
+
+/** The boats that started (a time, or a code other than didn't start / didn't come): the fleet the sim sails her against. */
+export const realStarters = (r: RealRace): RealBoat[] => r.boats.filter(b => b.elapsedS != null || (b.code != null && !/DN[SC]/.test(b.code)));
 
 /** Where an elapsed time (s) would have placed among the real fleet's finishers (1 = first), and of how many. */
 export function placeAmong(race: RealRace, elapsedS: number): { place: number; of: number } {

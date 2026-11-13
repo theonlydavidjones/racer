@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { realRaces } from '../src/sim/realRaces';
+import { realRaces, realStarters } from '../src/sim/realRaces';
 import { courseFile } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
@@ -13,8 +13,9 @@ import { DT, World } from '../src/sim/world';
  */
 describe.skipIf(!(globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.VALIDATE)('the sim against the real fleet, race by race', () => {
   for (const r of realRaces()) it(`${r.date} course ${r.courseNo}: the AI fleet's times beside the real ones`, () => {
+    // (the fleet the page races: every boat that started, a DNF too; the times compared are the finishers')
     const real = r.boats.filter(b => b.elapsedS != null && b.code == null);
-    const ids = real.map(b => `real:${r.id}:${b.key}`);
+    const ids = realStarters(r).map(b => `real:${r.id}:${b.key}`);
     const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, current: 'real', sea: 'real', realRace: r.id, opponents: ids, fleet: ids.length };
     const w = new World(courseFile(r.courseId), S, 7), ai = w.boats.slice(1);
     // (to the gun, then until the AI boats are all in, or the SI's time limit: 17:30)
