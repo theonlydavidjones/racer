@@ -45,6 +45,9 @@ come later, once the physics and racing are dialed in.
 - Ask before big design changes. Desktop only (no phone layout).
 - Keep building through everything they've asked for. Don't install npm packages without asking.
 - Don't relabel things they've named (e.g. the S/P labels).
+- No blocks of explanatory copy on the player's screens (owner, 13 Nov 2026: "these blocks of tiny copy are useless.
+  nobody will ever read this."). At most one short line where the player needs it to act; methods and caveats go
+  behind one hover or link, or are cut. Prefer visuals (tiles, charts, icons) to words.
 - Be extremely conservative about new buttons and distractions on the game surface (owner, 13 Nov 2026): put new controls inside existing elements (the inset map, the sail band, menus, Keys), not as new on-screen buttons.
 
 ## Workflow
@@ -69,6 +72,12 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
   practice, color, favor, meters, harbor, maneuver, center, gray, -ize. New code comments use it too.
+- Before opening a PR (the owner, 13 Nov 2026, for faster releases): merge origin/main into your branch and run the
+  full `npm test` on it, not only test:fast; say in the PR that it passed (or which load timeouts you reran alone).
+- How the Coordinator tests a batch (the owner, 13 Nov 2026): test:fast first on the merged batch (fail fast), then the
+  tier the batch needs. A batch touching src/boat, src/environment, src/sim, src/ai, src/rules, src/core, tests or the
+  data under src/ gets the full `npm test`. A batch touching only src/ui, src/render, styles, index.html, scripts or docs
+  gets test:fast + smoke + simguard. Either way the built page is smoke-tested before publishing.
 - Publish by republishing artifact/folkboat-racing-sim.html to the existing artifact
   (https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m), never as a new one.
   Don't pass `capabilities` when publishing: the artifact already declares `db` and `user` (players' saves,
