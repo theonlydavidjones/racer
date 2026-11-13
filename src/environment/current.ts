@@ -23,6 +23,12 @@ export function currentVector(c: CurrentPreset): Vec {
  * Current relief near the shore: 25% of the open-water current at the beach, full strength 350 m out. In water the
  * Wharf's piers and breakwaters enclose (Aquatic Park, inside Municipal Pier and the Wharf's breakwater; the Pier 39
  * marina) they count as shore too; off a pier head, where the stream runs past, they don't.
+ * The 25% and the 350 m are unsourced; no published profile of speed against distance from the shore along the
+ * Cityfront was found (constants audit, docs/CONSTANTS.md). The nearest check is NOAA's Fort Point 0.5 nmi E (PCT0286,
+ * off Crissy Field, 16.8 m deep): its factors against Golden Gate Bridge 0.88 nmi NE (SFB1202) are 0.2 on the flood
+ * and 0.8 on the ebb (the 2027 mean peaks against PCT0281 in the Gate channel: 0.22 and 0.57). So the flood's relief
+ * here fits, and the ebb's is stronger than the water does. Near a station the station's own prediction wins
+ * (tide.ts atShore fades this out within 600 m of one), so PCT0286 already carries that asymmetry off Crissy Field.
  */
 export const shoreRelief = (p: Vec, lattice = false): number => {
   const k = clamp(0.25 + 0.75 * (lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 350, 0.25, 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)

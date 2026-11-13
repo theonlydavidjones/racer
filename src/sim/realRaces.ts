@@ -30,6 +30,8 @@ export interface RealRace {
   courseId: string; courseNo: string; distanceNm: number;
   /** what the scorer published, where it disagrees with the sheet, in words; or null */
   doubt: string | null;
+  /** why the course itself is in doubt (the sim's best possible time is slower than the real fleet's), in words; or null */
+  uncertain: string | null;
   /** the results page */
   url: string;
   boats: RealBoat[];
@@ -38,6 +40,16 @@ export interface RealRace {
 type RawBoat = { sail: string; key: string; boat: string; skipper: string; elapsedS: number | null; place: number | null; code: string | null };
 type RawRace = { raceNo: number; date: string; start: string | null; course: string | null; distanceNm: number | null; url: string; boats: RawBoat[] };
 type RawEvent = { source: string; id: string; name: string; races: RawRace[] };
+
+/**
+ * Races whose course is uncertain: a perfect boat (the sim's own polar, NOAA's predicted current and the wind observed
+ * at Fort Point, every leg on the planner's best line, sim/strategist.ts planLegs) is slower than most of the
+ * real fleet (than its median finisher). Measured 13 Nov 2026; tests/realRaces.test.ts checks the list against the planner. On the other
+ * races the real fleet takes 0.9–1.5 × the perfect boat's time, as a fleet of real boats does.
+ */
+const UNCERTAIN: Record<string, string> = {
+  'GGYC_T008047221-r1': 'Course uncertain: on course 3 as the sheet draws it, a perfect boat in the wind observed at Fort Point (9 kt from 249°) and NOAA\'s ebb takes about 53 min, slower than every real finisher (47–52 min). It would need about 11 kt to make 47. The fleet may have sailed a shorter course, or had more wind than Fort Point recorded, so compare your time with care.'
+};
 
 /** At least this many timed finishers, so a placing among them means something. */
 const MIN_TIMED = 3;
@@ -60,7 +72,7 @@ export function realRaces(): RealRace[] {
         : null;
       out.push({
         id: `${ev.id}-r${r.raceNo}`, event: ev.name, raceNo: r.raceNo, date: r.date, start: r.start.slice(0, 5),
-        courseId: course.id, courseNo: r.course, distanceNm: nm, doubt, url: r.url,
+        courseId: course.id, courseNo: r.course, distanceNm: nm, doubt, uncertain: UNCERTAIN[`${ev.id}-r${r.raceNo}`] ?? null, url: r.url,
         boats: r.boats.map(b => ({ key: b.key, sail: b.sail, boat: b.boat, skipper: b.skipper, elapsedS: b.elapsedS, place: b.place, code: b.code }))
       });
     }
@@ -102,6 +114,8 @@ export interface RealFleet {
   boats: { name: string; sail: string; elapsed: number | null; place: number | null; code?: string }[];
   /** the course sheet's distance (nm); what the scorer published, if it disagrees, in words */
   courseNm: number; doubt: string | null;
+  /** why the course itself is in doubt, in words; or null */
+  uncertain: string | null;
   /** where the times come from, in words, and the results page */
   source: string; url: string;
 }
@@ -111,6 +125,6 @@ export function realFleetFor(x: string | { settings: { realRace?: string } }): R
   const title = (t: string) => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
   return {
     boats: r.boats.map(b => ({ name: title(b.boat), sail: b.key, elapsed: b.elapsedS, place: b.place, ...(b.code ? { code: b.code } : {}) })),
-    courseNm: r.distanceNm, doubt: r.doubt, source: `${r.event}, race ${r.raceNo} (${r.date}), published results`, url: r.url
+    courseNm: r.distanceNm, doubt: r.doubt, uncertain: r.uncertain, source: `${r.event}, race ${r.raceNo} (${r.date}), published results`, url: r.url
   };
 }

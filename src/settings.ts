@@ -2,7 +2,10 @@ import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 export interface Settings {
-  mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
+  mode: 'race' | 'drill' | 'sail' | 'manoeuvres'; // full race, start practice (from one minute to go), just sail (open water, no race), or the tack and gybe drill (open water, alone)
+  /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
+   * drill's are the fewest metres lost, by manoeuvre and wind band ('tack-medium'), with a good crew's then. */
+  practiceBest?: Record<string, { lostM: number; goodM: number }>;
   course: string; // course id, or 'rc': the race committee chooses (courses/committee.ts)
   raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
@@ -25,6 +28,8 @@ export interface Settings {
   /** Who you race against: stock club boats ('stock:1' .. 'stock:5'), generic club Folkboats ('gen:1', 'gen:2'..., boat/generic.ts) and your own saved boats (their ids), all sailed by the AI. */
   opponents: string[];
   seq: number; // start sequence, minutes
+  /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
+  drillFrom?: number; drillSolo?: boolean;
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2;

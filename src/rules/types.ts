@@ -7,9 +7,16 @@ export interface RulesBoat {
   x: number; y: number;
   h: number; // heading, deg
   vx: number; vy: number; // velocity over the ground, m/s
+  /** Speed through the water, m/s, and the current she's in (m/s, east and north). Omitted: still water, and her speed
+   *  over the ground. (Rule 16.1's room is judged in the water, where the boats steer: a current they share changes
+   *  nothing between them.) */
+  v?: number; cur?: { x: number; y: number };
   tack: Tack;
   tacking: boolean; // past head to wind, not yet close-hauled
-  lastTackT: number; // race time she last passed head to wind
+  lastTackT: number; // race time she last changed tack, tacking or gybing (rule 15: a change of tack, either way)
+  /** Race time she last passed head to wind: a tack, not a gybe, which passes the wind astern (Definitions, Tack;
+   *  rules 18.2(b) and 18.3 turn on it). Undefined: never. */
+  headToWindT?: number;
   penalty: number; // degrees of penalty turn still to do
   ocs: boolean; // over early and not yet returned
   /**
@@ -84,11 +91,19 @@ export interface MarkRoomState {
   ahead?: number; // boat id clear ahead when not overlapped
   /** Rule 18.2(b): the entitled boat has since passed head to wind or left the zone, so 18.2(a) no longer applies. */
   ended?: boolean;
-  /** The entitled boat's lastTackT when mark-room began (to see her pass head to wind). */
+  /** The entitled boat's headToWindT when mark-room began (to see her pass head to wind). */
   tackT?: number;
 }
 
 /** Per-pair memory the engine carries between steps. */
+/** A boat's recent poses, as this pair has seen them: a ring of samples every 0.1 s (src/rules/pairs.ts recordPose, one per boat). */
+export interface PoseRing {
+  t: Float64Array; x: Float64Array; y: Float64Array; h: Float64Array; v: Float64Array;
+  /** The current's drift she'd had by each sample, m (a running sum of cur·Δt): positions less this are in the water. */
+  dx: Float64Array; dy: Float64Array;
+  n: number; i: number;
+}
+
 export interface PairRecord {
   kc: number | null; // id of the keep-clear boat at the last step
   rule: RuleId | null;
@@ -104,7 +119,7 @@ export interface PairRecord {
   /** Rule 18.3: a boat that passed head to wind from port to starboard in the zone of a mark left to port, and the
    * mark. `binds`: the other boat had been on starboard since entering the zone, so 18.3(a) and (b) apply. */
   r183: { tacker: number; idx: number; binds: boolean } | null;
-  /** Each boat's lastTackT at the previous step (to see a tack happen). */
+  /** Each boat's headToWindT at the previous step (to see her pass head to wind, rule 18.3). */
   seenTack: Record<number, number>;
   /** For each boat in the zone of the next mark: has she been on starboard tack since entering it? (Rule 18.3) */
   stbdInZone: Record<number, boolean>;
@@ -129,6 +144,8 @@ export interface Hail {
   by: number; at: number; kind: 'room' | 'starboard';
   /** Rule 20.2(c): the hailed boat replied "You tack" at this time, and now owes the hailing boat room to tack and avoid her. */
   replyAt?: number;
+  /** Her speed when she replied (taken at the first look after it): slowing down into the hailing boat's way is not giving room. */
+  replyV?: number;
   /** When the hailed boat responded (tacked, or replied "You tack"). Rule 20.2(d): the hailing boat must then tack as soon as possible. */
   respondedAt?: number;
   /** When the hailed boat was through head to wind (or replied "You tack"): clear of her, the hailing boat can tack, and

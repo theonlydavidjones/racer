@@ -615,7 +615,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const bhC = bh ? w.boats.find(x => x.id === bh.c) : undefined;
   // (released when time runs short to the meeting, or when a hail passed on beyond the boat she hailed failed: then the
   // hold ends and her ordinary keep-clear below ducks the other boat)
-  const boatHailOn = !!bh && !!bhC && w.t - bh.at < BOAT_HAIL_HOLD && b.lastTackT < bh.at && bhHail?.kind === 'room' && bhHail.by === b.id
+  const boatHailOn = !!bh && !!bhC && w.t - bh.at < BOAT_HAIL_HOLD && (b.headToWindT ?? -Infinity) < bh.at && bhHail?.kind === 'room' && bhHail.by === b.id
     && !bhHail.passedOn?.failed && cpa(b, bhC).t > BOAT_HAIL_MARGIN;
   if (bh && !boatHailOn) boatHails.delete(b);
   if (boatHailOn) holdForHail = true;
@@ -715,7 +715,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // Hailed for room to tack: respond by tacking as soon as possible (Rule 20.2(c)), unless she replied "You tack".
     // With a boat on the same tack to windward stopping her, she first passes the hail on to it (Rule 20.3; WS Case 113)
     // and holds her course until it responds; then she tacks.
-    if (h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) {
+    if (h.by === o.id && h.replyAt == null && (b.headToWindT ?? -Infinity) < h.at && !b.tacking) { // (rule 20.2(c): she answers by tacking; a gybe isn't an answer)
       if (!h.passedOn) w.passOnHail(b, o);
       const po = h.passedOn, waiting = !!po && po.respondedAt == null && !po.failed;
       if (po?.failed) continue; // the boat she hailed never responded: she still can't tack into her
@@ -723,7 +723,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       else holdForHail = true;
     }
     // She hailed and the other boat responded (is through the wind, or replied "You tack"): tack now (Rule 20.2(d)).
-    if (h.by === b.id && h.clearAt != null && b.lastTackT < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t, with: o.id }; }
+    if (h.by === b.id && h.clearAt != null && (b.headToWindT ?? -Infinity) < h.at && !b.tacking) { desired = b.tack === 'S' ? csP : csS; luff = false; holdForHail = false; tackNow = true; ai.hailTack ??= { to: b.tack === 'S' ? 'P' : 'S', at: w.t, with: o.id }; }
   }
   // a tack begun for a hail is finished: past head to wind (where the hail no longer asks it of her) she carries on
   // until she's close-hauled on the new tack (unless she has a boat to keep clear of: rule 13 makes her the keep-clear

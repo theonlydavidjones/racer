@@ -44,6 +44,8 @@ export interface RaceReplayData {
   clips: { clip: ReplayClip; title: string; what: string }[];
   /** Your race against the boat that won (or second, if you won), leg by leg; null when there's no one to measure against. */
   vs?: Versus | null;
+  /** A real past race: a line on where you'd have placed among the real fleet that day. */
+  real?: string;
 }
 
 const SPEEDS = [10, 30, 60];
@@ -147,7 +149,8 @@ export class RaceReplay {
 
   /** Against the winner: the gap, then each leg with what you lost or gained and where it went. */
   private vsHtml(): string {
-    const V = this.D!.vs; if (!V || V.legs.length < 2) return '';
+    const real = this.D!.real ? `<div class="eyebrow">Against the real fleet</div><p class="lede">${esc(this.D!.real)}</p>` : '';
+    const V = this.D!.vs; if (!V || V.legs.length < 2) return real;
     const who = rivalWho(V, this.w!.boats[V.rival].finished);
     const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
     const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
@@ -157,7 +160,7 @@ export class RaceReplay {
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p>${mom(L)}</li>`).join('');
-    return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The metres are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
+    return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The metres are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
 
   /** Jump to one of the moments against her: follow you from a little before it. */

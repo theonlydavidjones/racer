@@ -31,10 +31,10 @@ describe('Rule 20.2(e): 18.2 stays off until the hailing boat has tacked and avo
     const red = boat('Red', { at: [-12, -10], heading: 315 }), blue = boat('Blue', { at: [-6, -16], heading: 315 });
     const p = pair(red, blue, [M]);
     p.at(48); p.rec.hail = { by: blue.id, at: 48.5, kind: 'room' }; p.at(49);
-    red.lastTackT = 50; moveTo(red, [-16, -6], 45); // Red responds by tacking
+    red.lastTackT = 50; red.headToWindT = 50; moveTo(red, [-16, -6], 45); // Red responds by tacking
     p.at(51);
     expect(p.rec.r202e).not.toBeNull(); // Blue hasn't tacked yet
-    blue.lastTackT = 52; moveTo(blue, [-2, -14], 45); // Blue tacks, away from Red
+    blue.lastTackT = 52; blue.headToWindT = 52; moveTo(blue, [-2, -14], 45); // Blue tacks, away from Red
     p.at(53);
     expect(p.rec.r202e).not.toBeNull(); // just out of the tack
     p.at(55);
