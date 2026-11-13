@@ -720,12 +720,12 @@ export class Hud {
     // one field layer at a time (ui/layers.ts fieldLayer): the wind or the current as colour for its speed, with moving
     // streaks over it (drawn every frame on the map's overlay: insetStreaks, chartFx); the sea state; or the fog
     const field = fieldLayer(S), kind: FlowKind | null = field === 'wind' || field === 'current' ? field : null;
-    if (field === 'sea') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
+    if (field === 'sea' && detail === 'chart') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
     this.drawn[detail] = { tf, w, h, scale, kind };
     // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
     // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
     const plan = detail === 'inset' && this.insetPlan ? this.insetPlan : wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
-    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    const fog = field === 'fog' && detail === 'chart' ? visibilityFor(wd.raceDate, wd.clockUtc) : null; // (the inset gives fog in words only)
     const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key
     const sim: SimKey[] = ['you'];
@@ -734,12 +734,13 @@ export class Hud {
     else if (wd.dest) sim.push('dest', 'destline', ...(wd.running ? [] : ['track' as const]));
     if (on('laylines') && L) sim.push('laylines');
     if (on('ships') && wd.vessels.length) sim.push('ships');
-    // (the wind's and the current's colours and streaks are on the full chart only: the owner, 13 Nov 2026, "they
-    // shouldn't be present on the inset map, just the expanded map". The inset keeps its readout of them where you are.)
+    // (the field layers, the wind's and the current's colours and streaks, the sea state, the fog, are on the full chart
+    // only: the owner, 13 Nov 2026, "they shouldn't be present on the inset map, just the expanded map". The inset stays
+    // calm and plain, and keeps its readout of the wind, the current and the fog where you are.)
     const flowHere = kind && detail === 'chart';
     if (flowHere && kind === 'current') sim.push('current');
     if (flowHere && kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
-    if (field === 'sea' && !wd.sea.flat) sim.push('sea');
+    if (field === 'sea' && detail === 'chart' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
     if (on('shadows') && !wd.freeSail) sim.push('shadows');
     this.keyState[detail] = { sim, pal, scale };
