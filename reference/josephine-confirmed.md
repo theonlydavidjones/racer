@@ -45,6 +45,10 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   the top board. They are a pain to get on and off.
 - Opening: the hatch first, then the washboards. Closing: the reverse.
 
+- Midships mooring cleat: on the side deck just inboard of the toerail, halfway along the cabin light (about halfway
+  between the hiking rail's forward end and the shroud). Josephine has one, to starboard; the sim fits one each side by
+  default (the owner).
+
 ## Foredeck
 - The forehatch: about half a metre forward of the mast on the centreline, square, big enough for a person or the
   anchor (drawn at the class's largest opening, 500 mm, CR 3.31); low, nearly flush with the deck, an aluminium frame

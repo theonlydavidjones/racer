@@ -306,6 +306,14 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     for (const dz of [-0.035, 0.035]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, 0.022), STEEL); leg.position.set(0, 0.017, dz); cleat.add(leg); }
     cleat.position.set(cx, cy, cz); grp.add(cleat);
   }
+  // the midships mooring cleats: on the side deck just inboard of the toerail, halfway along the cabin light (Josephine,
+  // the owner's photo: hers has one, to starboard; a cleat each side by default, the usual fit), lying fore and aft
+  for (const s of [1, -1]) {
+    const cz = (WINDOW.z0 + WINDOW.z1) / 2, u = uAtZ(cz), cx = s * (halfBeam(u) - 0.075), cleat = new THREE.Group();
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.15, 10), STEEL); horn.rotation.x = Math.PI / 2; horn.position.y = 0.03; cleat.add(horn);
+    for (const dz of [-0.03, 0.03]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.02), STEEL); leg.position.set(0, 0.015, dz); cleat.add(leg); }
+    cleat.position.set(cx, deckY(u, Math.abs(cx)), cz); cleat.rotation.z = -s * 0.08; grp.add(cleat); // (sitting on the deck's camber)
+  }
   // rudder and tiller, hinged on the raked sternpost/transom line
   const rud = new THREE.Group(); rud.position.set(0, HEEL.y, HEEL.z); rud.rotation.x = RUDDER_RAKE;
   const turn = new THREE.Group(); rud.add(turn);
