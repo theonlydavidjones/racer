@@ -880,8 +880,10 @@ Trophies (owner, 13 November): use the fleet's real perpetuals where they're fou
 Cup, the San Francisco International Cup, and, unconfirmed, the Rick Wolf trophy for the Wednesday series). Elsewhere use
 placeholder names, marked as placeholders in the code (and the doc) so they're never shown as a real trophy's history.
 After each race, the club's evening at the race's level: drinks; drinks and dinner; drinks, dinner and results; drinks,
-dinner, results and awards (owner). The Plastic Classic's committee-boat mark with its lively, cheering crew
-(TRADITIONS item 14).
+dinner, results and awards (owner). The Plastic Classic's committee-boat mark, when it's built (TRADITIONS item 14), as in real life (owner, 13 November:
+"this is a true to life sim"): its crew of adult women flash the fleet as boats round, topless only, nothing sexual,
+in the crew figures' stylized style. Pending the owner: whether it sits behind a mature-content setting, and the
+default. Before any public release, the host club's permission covers it.
 
 Also asked for:
 
