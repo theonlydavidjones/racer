@@ -2,7 +2,7 @@
 /**
  * One click switches a map layer (the owner: "these buttons are requiring two clicks"). With the race in its worker
  * (the default, not ?inproc: the bug was the maps drawing from the mirror before the race had the change), each chip
- * of the full chart's field picker, each row of its Layers menu (the inset's choices are there too) and the Dusk colours
+ * of the full chart's field picker, each row of its Layers menu (the inset's choices are there too) and the Dusk colors
  * button is clicked once, and what's drawn is checked: the chart's field, the menu's ticks, the palette.
  * Needs the dev server (npm run dev) on :5173.
  *
@@ -40,11 +40,11 @@ const out = process.argv[2] || '.';
     console.log(`chart menu ${r}: ${before} → ${after}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`chart menu ${r}`);
   }
   await p.screenshot({ path: `${out}/layer-clicks-chart.png` });
-  // Dusk colours, once each way
+  // Dusk colors, once each way
   for (const want of ['dusk', 'day']) {
     await p.click('#bChartPal'); await settle();
     const pal = await p.evaluate(() => sim().settings.chartPal ?? 'day'), label = await p.evaluate(() => document.getElementById('bChartPal').textContent);
-    const ok = pal === want && label === (want === 'day' ? 'Dusk colours' : 'Day colours');
+    const ok = pal === want && label === (want === 'day' ? 'Dusk colors' : 'Day colors');
     console.log(`palette → ${want}: race has ${pal}, button says "${label}"`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`palette ${want}`);
   }
   await p.click('#bChartClose'); await p.waitForTimeout(800);

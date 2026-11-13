@@ -4,7 +4,7 @@ import type { Boat } from '../boat/boat';
 const JOB: Record<string, string> = {
   car: 'forward moving the jib car', pole: 'at the mast with the pole', hoist: 'at the mast on a halyard',
   vang: 'adjusting the vang', outhaul: 'adjusting the outhaul', cunningham: 'adjusting the Cunningham', downhaul: 'tensioning the main halyard', jibHalyard: 'tensioning the jib halyard', jibCunningham: 'adjusting the jib Cunningham',
-  backstay: 'adjusting the backstay', traveller: 'playing the traveller', jibsheet: 'trimming the jib', mainsheet: 'trimming the main'
+  backstay: 'adjusting the backstay', traveller: 'playing the traveler', jibsheet: 'trimming the jib', mainsheet: 'trimming the main'
 };
 /** The windward and leeward sides on this tack (the wind comes over the windward side), in words. */
 export function sides(u: Boat): { ww: string; lw: string; wwS: string; lwS: string } {
@@ -63,7 +63,7 @@ export function openCrewChoices(): void { crewOpen = true; lastRow = ''; }
 /** The full sailing reason for each place, on hover. */
 const PLACE_TIP: Record<string, string> = {
   lee: 'Sit to leeward: on the low side. In light air your weight heels her about 6°, so the sails fall into their shape instead of slatting.',
-  mid: 'Middle: weight on the centreline: downwind, where she sails flat.',
+  mid: 'Middle: weight on the centerline: downwind, where she sails flat.',
   up: 'Sit up: on the windward side deck, without leaning out. Weight to windward in a moderate breeze.',
   hike: 'Hike out: lean out over the windward rail to hold her up in a breeze. Hiking is always to windward: to put weight to leeward, sit to leeward.',
   fwd: 'Forward: weight forward in the cockpit. The bow goes down and the transom lifts clear: less drag in light air and flat water.',

@@ -53,7 +53,7 @@ export class Chart {
       if (!this.w) return;
       // (the race learns the palette by command; the chart redraws once its mirror has it, or it'd take two clicks)
       const pal = (this.w.settings.chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
-      this.setPal(pal); $('bChartPal').textContent = pal === 'day' ? 'Dusk colours' : 'Day colours';
+      this.setPal(pal); $('bChartPal').textContent = pal === 'day' ? 'Dusk colors' : 'Day colors';
       void this.race.ask({ k: 'settings', patch: {} }).then(() => { this.palLabel(); this.draw(); });
     };
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
@@ -93,7 +93,7 @@ export class Chart {
     if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
-  private palLabel(): void { $('bChartPal').textContent = (this.w?.settings.chartPal ?? 'day') === 'day' ? 'Dusk colours' : 'Day colours'; }
+  private palLabel(): void { $('bChartPal').textContent = (this.w?.settings.chartPal ?? 'day') === 'day' ? 'Dusk colors' : 'Day colors'; }
 
   close(): void {
     if (!this.isOpen) return;

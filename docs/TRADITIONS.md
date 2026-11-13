@@ -27,7 +27,7 @@ until the owner confirms it from the fleet.
 
 1. **The season championship and the Hall of Fame.** The SF Bay Folkboat fleet has named a season champion every year
    since 1958–59, skipper and boat, with no racing in 2020. Some skippers and boats have won it many times. The fleet
-   prospered on the Bay from 1950 to 1970, and the first fibreglass Folkboat was moulded from a wooden Bay boat in 1975.
+   prospered on the Bay from 1950 to 1970, and the first fibreglass Folkboat was molded from a wooden Bay boat in 1975.
    The Hall of Fame page jokes that you "may be quizzed at the bar after the race".
    - Sources: https://sfbayfolkboats.org/hall-of-fame/ and https://sfbayfolkboats.org/history/.
    - In the sim: a club Hall of Fame with every season's champion and boat, your own name added when you win. Real
@@ -52,14 +52,14 @@ until the owner confirms it from the fleet.
 4. **The Wednesday Night Series.** A separate award from the season championship, first to third. Source:
    https://sfbayfolkboats.org/racing/.
    - In the sim: short evening races in the summer westerly, at sunset.
-5. **Calling it off in a blow.** By the fleet's practice, a vote on cancelling at 23 kt (owner). The fleet's written,
+5. **Calling it off in a blow.** By the fleet's practice, a vote on canceling at 23 kt (owner). The fleet's written,
    proposed protocol says cancel above 25 kt, decided by the race chair and texted to the fleet. Source:
    https://sfbayfolkboats.org/racing/. Built: the committee calls racing off at 23 kt.
 6. **Burgees and flags.**
    - Sourced:
      - The burgee flies at the masthead, or from the starboard spreader, star up.
      - The ensign flies at the stern, or high on the aftermost sail's leech when under way.
-     - Colours are made at 0800 and struck at sunset.
+     - Colors are made at 0800 and struck at sunset.
      - By custom the ensign isn't flown while racing.
    - Sources: CCA, https://cruisingclub.org/article/cca-flag-and-burgee-etiquette; USPS,
      https://usps.org/national/fecom/faq/flag/gaffpole.html; Good Old Boat; Manhattan YC, https://myc.org/flag-etiquette/.
@@ -67,10 +67,27 @@ until the owner confirms it from the fleet.
    - The RRS themselves don't limit flags while racing, beyond advertising.
    - On the SF Folkboats (the owner, 13 Nov 2026): the burgee flies on the starboard side, at the jumper strut, and is
      struck for racing. Built that way.
-   - Built: the ensign keeps its hours (0800 to sunset, and entering or leaving harbour after dark: USPS, Seattle YC;
+   - Built: the ensign keeps its hours (0800 to sunset, and entering or leaving harbor after dark: USPS, Seattle YC;
      src/boat/colours.ts).
-   - Not yet sourced: dipping the ensign, officers' flags, dressing ship.
-   - In the sim: the burgee at the masthead, the ensign struck at the preparatory signal (both partly in), and colours
+   - **Officers' flags** (CCA, https://cruisingclub.org/article/cca-flag-and-burgee-etiquette, 29 March 2024):
+     - A commodore's, vice commodore's or rear commodore's flag flies day and night at the masthead of a sloop, in
+       place of the burgee, on the officer's own boat.
+     - A guest officer flies it at the starboard spreader, with the owner's permission.
+     - A past officer flies it at the starboard spreader at club rendezvous.
+     - A private signal goes on the main's leech, about two-thirds of the way up from the clew, or at the masthead in
+       place of the burgee.
+     - The flags' designs aren't described.
+   - **Dressing ship** (CCA, same page):
+     - Allowed "when not underway (or when underway in a marine parade)", weather permitting, from morning to evening
+       colors.
+     - A marine parade is what Opening Day's parade is.
+     - Any order of signal flags will do. The suggested order from the bow is: AB2, UJ1, KE3, GH6, IV5, FL4, DM7, P O
+       3rd repeater, R N 1st repeater, S T 0, C X 9, W Q 8, Z Y 2nd repeater, answering pennant. The first two run
+       down to the water at the bow, the last two to the transom or boom.
+     - The Union Jack may fly at the bow on Sundays, holidays, or when dressed, only when not under way.
+   - Not yet sourced: dipping the ensign, or saluting. The CCA page doesn't cover it, and the USPS pages couldn't be
+     reached.
+   - In the sim: the burgee at the masthead, the ensign struck at the preparatory signal (both partly in), and colors
      at the club.
 7. **The committee and protests.**
    - Sourced:
@@ -114,5 +131,6 @@ until the owner confirms it from the fleet.
 
 - Which of these does the Folkboat fleet really live by? In particular, the after-race customs and any crew rites.
 - Do the fleet's perpetual trophies have names and deeds of gift? Could someone share them, or a photo of the trophies?
-- Are the CCA and USPS sites worth allowing, for the rest of the flag etiquette (dipping, officers' flags, dressing
+- (Answered: the CCA and USPS sites were allowed. Officers' flags and dressing ship are now sourced from the CCA; dipping
+  the ensign is still unfound.) Were the CCA and USPS sites worth allowing, for the rest of the flag etiquette (dipping, officers' flags, dressing
   ship)?
