@@ -179,7 +179,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         a.job = null;
       }
     }
-    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
+    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist' && j.line !== 'paddle') a.job = null; // (the paddle's job ends when she stops paddling: world.ts paddleWork)
   });
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)

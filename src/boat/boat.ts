@@ -90,6 +90,10 @@ export interface Boat {
   astern?: number;
   /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
   motor?: import('./motor').MotorState;
+  /** The crew paddling her with the boom crutch (boat/paddle.ts): the side, since when, and whether they called it. */
+  paddle?: import('./paddle').PaddleState | null;
+  /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
+  lastHitT?: number;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);

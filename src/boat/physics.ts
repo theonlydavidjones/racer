@@ -6,6 +6,7 @@ import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce } from './motor';
+import { paddleForce, paddleYawRate } from './paddle';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
@@ -202,6 +203,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
   b.helm = clamp(bladeFlip ? -rudder : rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
+  // (paddling on one side swings her too, against the same inertia and the water's resistance to her turning: paddle.ts)
+  rate += paddleYawRate(b, t);
   // (penalty spins too: the crew's backed sails turn her against the same inertia and damping as the rudder does)
   b.turnRate = r0 + (rate - r0) * (1 - Math.exp(-dt / tau)); rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
@@ -316,7 +319,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // zone, where she stops (the flogging cloth only as much as is hoisted; struck, the bare rig's windage at any angle
   // forward of the beam)
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
-  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
+  const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b) - paddleForce(b, t), disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
@@ -422,15 +425,18 @@ export function turnBleed(rate: number, v: number, h: number, windFrom: number, 
  * turning hard. At a standstill it's all there is: sculled at 4°/s it gives 7–8 s, near the 5.8 s the speed's floor,
  * 0.25 m/s, gives.)
  */
-let yawK = 0;
+let yawK = 0, yawPerU = 0;
 export function yawLag(u: number): number {
   if (!yawK) {
     const L = orc.boat.imsL, aL = Math.PI * HOVE.aspect / 2, N = 8, I = HULL.displacement * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
-    const perU = 0.5 * 1025 * (HOVE.latArea * aL * (L * L / 12) * (1 - 1 / (N * N)) + RUDDER.area * RUDDER.slope * HOVE.rudderFlow * RUDDER.arm ** 2);
-    yawK = I / perU;
+    yawPerU = 0.5 * 1025 * (HOVE.latArea * aL * (L * L / 12) * (1 - 1 / (N * N)) + RUDDER.area * RUDDER.slope * HOVE.rudderFlow * RUDDER.arm ** 2);
+    yawK = I / yawPerU;
   }
   return yawK / Math.max(0.25, u);
 }
+/** The keel's and rudder's lift damping her turn, N·m per rad/s at `u` m/s through the water (the same strips as yawLag's;
+ * a steady yaw moment M turns her at M / this, with way on). */
+export function yawDamping(u: number): number { if (!yawK) yawLag(1); return yawPerU * Math.max(0, u); }
 
 /**
  * The sails' drive in the force model, against the polar. balance.ts's sail coefficients were set for heel and helm,
@@ -765,7 +771,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   const sw = b.sway ?? 0, stb = V(b.h + 90);
   b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
-  const bump = (msg: string) => { if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } };
+  const bump = (msg: string) => { b.lastHitT = t; if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } }; // (lastHitT: rule 42.3(h), getting clear after it)
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
   else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
     const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)

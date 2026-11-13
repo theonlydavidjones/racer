@@ -1,4 +1,5 @@
 import { DrillTracker } from './drill';
+import { paddlePower, paddler } from '../boat/paddle';
 import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
@@ -138,6 +139,12 @@ const SWING_DRAG = 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3
 function windSwing(kt: number, rel: number): number {
   const vSide = kt * KT * Math.sin(rel * D2R), torque = 0.5 * 1.225 * HOVE.windSide * vSide * vSide * 3.8;
   return Math.sqrt(torque / SWING_DRAG) / D2R;
+}
+
+/** The nearest land within `r` m (bearings every 15°, 2 m steps), or null. */
+function nearestLand(p: Vec, r: number): Vec | null {
+  for (let d = 2; d <= r; d += 2) for (let a = 0; a < 360; a += 15) { const u = V(a), q = { x: p.x + u.x * d, y: p.y + u.y * d }; if (onLand(q)) return q; }
+  return null;
 }
 
 /** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
@@ -687,6 +694,89 @@ export class World {
   }
 
   /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
+  /**
+   * Paddle her with the boom crutch on `side` (back: back-paddling), or stop (null): you calling it (auto false), or the
+   * crew of themselves in a jam (crewPaddleCall). Changing sides keeps the crutch out. Racing, rule 42.1 forbids it
+   * except to get clear after grounding or colliding (42.3(h)), or to help someone in danger (42.3(g)).
+   */
+  paddle(side: 'P' | 'S' | null, back: boolean, auto: boolean): void {
+    const u = this.user, was = u.paddle;
+    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } return; }
+    if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
+    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back };
+    this.paddleJob(u, side);
+    const who = (u.crew?.spec.crew.length ?? 0) === 0 ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
+    const how = `${back ? 'back-paddles' : 'paddles'} on the ${side === 'P' ? 'port' : 'starboard'} side`;
+    if (!was) this.emit({ type: 'toast', ms: 5000, msg: `${who} the boom crutch from the cabin and ${how}${auto ? ': she\'s being set onto something with no wind to sail clear.' : '.'}${this.racing(u) && !this.paddleAllowed(u) ? ' Racing, that breaks rule 42.1 unless you\'re getting clear after hitting something (42.3(h)).' : ''}` });
+    else if (was.side !== side || !!was.back !== back) this.emit({ type: 'toast', msg: `Now ${how}.` });
+  }
+  /** Rule 42.3(h): paddling to get clear after grounding or colliding (the spell begun within 30 s of the contact, or a
+   * contact during it). */
+  paddleAllowed(b: Boat): boolean {
+    const p = b.paddle, hit = b.lastHitT; if (!p || hit == null) return false;
+    return hit >= p.t0 || p.t0 - hit <= 30;
+  }
+  /** The paddler at the side deck on the paddling side, as long as she's paddling (crewPhys places them; render/crew.ts
+   * draws them kneeling there, as at the jib car). */
+  private paddleJob(b: Boat, side: 'P' | 'S' | null): void {
+    const c = b.crew; if (!c) return;
+    const a = c.people[paddler(b)]; if (!a) return;
+    if (!side) { if (a.job?.line === 'paddle') a.job = null; return; }
+    const windward = (b.tack === 'S') === (side === 'S') ? 1 : -1; // (the station's arm is out to windward when +)
+    a.job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' } };
+  }
+  /** Each step: the paddling ends with the motor driving her or once she's made fast; racing, a breach of rule 42 is
+   * flagged (rules: world.rule42, one penalty a spell). */
+  private paddleWork(b: Boat): void {
+    const p = b.paddle; if (!p) return;
+    if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
+    if (paddlePower(b, this.t) > 0 && this.racing(b) && !this.paddleAllowed(b)) this.rule42(b, 'paddle');
+  }
+  /**
+   * Rule 42 (propulsion): a boat racing that paddles breaks 42.1 unless an exception holds. Rules builds the incident and
+   * the penalty (DSQ, or Appendix P's two turns where the race applies it), once a spell; until then it's told.
+   */
+  rule42(b: Boat, why: 'paddle'): void {
+    const p = b.paddle; if (!p || !b.isUser || this.r42told === p.t0) return;
+    this.r42told = p.t0;
+    this.emit({ type: 'toast', ms: 6000, msg: `Paddling while racing breaks rule 42.1 (propulsion). Only getting clear after hitting something (42.3(h)) or helping someone in danger (42.3(g)) allows it.` });
+    void why;
+  }
+  private r42told = NaN;
+  /**
+   * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
+   * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons with the shore
+   * within 40 m. They paddle her away from it (back-paddling if it's ahead), on the side that turns her bow off it, and stop
+   * once she's clear with way on or wind to sail by. Racing, only where rule 42 lets them (42.3(h)). Not while you're
+   * paddling her yourself, the motor's driving, or she's alongside.
+   */
+  private crewPaddleCall(b: Boat): void {
+    const p = b.paddle, n = b.crew?.spec.crew.length ?? 0;
+    if ((p && !p.auto) || n === 0 || b.docked || b.handled || b.pushing || (b.motor?.running && b.motor.gear !== 'N')) return;
+    if (this.racing(b) && !(b.lastHitT != null && this.t - b.lastHitT <= 30)) { if (p) this.paddle(null, false, true); return; }
+    const calm = b.ww.kt < 3, slow = b.v < 0.25;
+    // what she'll hit in the next minute, drifting as she is over the ground
+    let hazard: Vec | null = null;
+    for (let k = 1; k <= 6 && !hazard; k++) {
+      const q = { x: b.x + b.vx * 10 * k, y: b.y + b.vy * 10 * k };
+      if (onLand(q)) hazard = q;
+      else for (const m of [...this.C.marks, ...(this.rounding?.marks ?? [])]) if (m.shape !== 'island' && dist(q, m.p) < 10) { hazard = m.p; break; }
+    }
+    const irons = slow && Math.abs(wrap(b.ww.from - b.h)) < 30 && shoreDist(b) < 40;
+    if (!(slow && (calm && hazard || irons))) {
+      // clear: with way on or wind to sail by, and nothing ahead of her drift, they stop (after a fair spell)
+      if (p && !hazard && (b.v > 0.5 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
+      if (p && this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
+      return;
+    }
+    if (p) return; // (already at it)
+    // away from it: back-paddle if it's ahead, else forward; the side that swings her bow off it (in irons, off the wind
+    // toward open water: the side the shore isn't)
+    const at = hazard ?? nearestLand(b, 40) ?? { x: b.x + V(b.h).x, y: b.y + V(b.h).y }, rel = wrap(brg(at.x - b.x, at.y - b.y) - b.h);
+    const back = !irons && Math.abs(rel) < 90, turn = -Math.sign(rel) || 1; // (+: bow to starboard)
+    const side: 'P' | 'S' = back ? (turn > 0 ? 'S' : 'P') : (turn > 0 ? 'P' : 'S');
+    this.paddle(side, back, true);
+  }
   private belowSinceGun = new Set<number>();
   /**
    * Definitions, Racing: "from her preparatory signal until she finishes and clears the finishing line and marks or
@@ -826,6 +916,8 @@ export class World {
     }
     // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
     if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
+    if (this.steps % 30 === 0 && !this.user.handled) this.crewPaddleCall(this.user); // (a jam, looked for twice a second)
+    this.paddleWork(this.user);
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -953,7 +1045,7 @@ export class World {
           const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
           const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = Math.hypot(dx, dy) || 1;
           b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          b.v *= m.q ? 0.9 : 0.97;
+          b.v *= m.q ? 0.9 : 0.97; b.lastHitT = this.t;
         }
       }
       // the same touch until she's got clearly away from that mark
@@ -1128,7 +1220,7 @@ export class World {
       // sim doesn't model, and rule 23.1, handled as its own case)
       if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
       if (incident.kind === 'contact') {
-        A.v *= 0.35; B.v *= 0.35;
+        A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
@@ -1235,7 +1327,7 @@ export class World {
         if (gap < 0) {
           const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
           const cx = hv.a.x + (hv.b.x - hv.a.x) * k, cy = hv.a.y + (hv.b.y - hv.a.y) * k, l = Math.hypot(b.x - cx, b.y - cy) || 1;
-          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0;
+          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0; b.lastHitT = this.t;
           if (b.isUser && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
         }
       }

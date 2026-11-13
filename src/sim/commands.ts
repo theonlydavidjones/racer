@@ -52,6 +52,8 @@ export type Command =
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
   /** Set or stow the whisker pole (it's yours until Auto-trim). */
   | { k: 'pole'; want: boolean }
+  /** Paddle her with the boom crutch on that side (or back-paddle), or stop (null). Yours until you stop or the crew stops of itself. */
+  | { k: 'paddle'; side: 'P' | 'S' | null; back?: boolean }
   /** Strike or hoist the ensign. */
   | { k: 'ensign'; struck: boolean }
   /** Navigation lights off or on. */
@@ -118,6 +120,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
     case 'pole': u.poleWant = c.want; u.poleMine = true; return;
+    case 'paddle': w.paddle(c.side, !!c.back, false); return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
     case 'sail': w.setSail(c.sail, c.up); return;

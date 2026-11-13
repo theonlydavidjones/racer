@@ -880,6 +880,11 @@ body.pilot-on #bHome{display:none}
 .sb-tab[hidden]{display:none}
 button.sb-tab:hover{color:var(--text)!important}
 .sb-pole{color:var(--text)!important}
+/* the paddle (only when she's all but stopped): P and S, the side being paddled lit */
+.sb-paddle{gap:4px;color:var(--muted)!important}
+.sb-paddle button{font:700 10px/1 var(--f-inst)!important;padding:2px 5px!important;border-radius:4px;color:var(--muted)!important;background:none!important;border:1px solid var(--rule)!important}
+.sb-paddle button:hover{color:var(--text)!important}
+.sb-paddle button.on{color:#1a1205!important;background:var(--accent)!important;border-color:var(--accent)!important}
 .sb-pole.mine{color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
 .sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
