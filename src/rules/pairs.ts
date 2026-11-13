@@ -310,14 +310,15 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   const obst = rule19(A, B, r.rule, rec, ctx);
   // Rule 18.3(a): the boat that tacked in the zone shall not cause a boat fetching the mark (on starboard since entering
   // the zone) to sail above close-hauled to avoid contact. It doesn't switch off the basic rules: a fetching boat that
-  // bears away into her broke them (11 to windward, 12 from astern). But one at or above close-hauled, not turning
-  // toward her, was made to luff to avoid her: the tacker's breach, overlapped (rightOfWay's '18.3') or from clear
-  // ahead (rule 12 alone would have the boat astern luff).
+  // bears away into her broke them (11). Overlapped with the fetching boat to windward (rightOfWay's '18.3'), bearing
+  // away only takes her into the tacker, so contact or a swerve while she's at or above close-hauled and not turning
+  // toward her is the tacker's breach. (Not modelled: the fetching boat clear astern made to luff above close-hauled,
+  // where she could usually bear away instead and rule 12 holds; whether bearing away would also have cleared her is
+  // docs/ROOM-TO-RESPOND.md's escapes(), not yet built.)
   const r3 = rec.r183;
-  const r183T = r3?.binds && (r.rule === '18.3' || r.rule === '12') ? (r3.tacker === A.id ? A : B) : null;
+  const r183T = r3?.binds && r.rule === '18.3' ? (r3.tacker === A.id ? A : B) : null;
   const r183O = r183T ? (r183T === A ? B : A) : null;
-  const r183a = !!r183T && !!r183O && (r.rule === '18.3' || r.kc === r183O) && turnedToward(r183O, r183T) === 0
-    && twaOf(r183O, ctx) <= (ctx.beat ?? 42) + 3;
+  const r183a = !!r183T && !!r183O && turnedToward(r183O, r183T) === 0 && twaOf(r183O, ctx) <= (ctx.beat ?? 42) + 3;
   if (notRacing(kc) && !notRacing(row)) {
     // Rule 23.1: a boat not racing (she has retired, or finished and cleared the line) shall not interfere with a boat that is racing
     rule = '23'; part = '23.1';

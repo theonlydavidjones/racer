@@ -299,11 +299,12 @@ describe('Rule 18.3 · tacking in the zone', () => {
     expect(p.at(104).foul).toMatchObject({ by: 'Blue', rule: '11', kind: 'contact' });
   });
 
-  it('18.3(a) from clear ahead: Red tacks close ahead of Blue and Blue, close-hauled and holding her course, runs into her: Red\'s foul', () => {
+  it('18.3 is no right of way from clear ahead either: once Red\'s rule 15 time is over, Blue sailing into her stern broke 12 (she could bear away)', () => {
     const { blue, p } = scene({ redAt: ahead(12, 0) }); // Red tacks dead ahead of Blue, a length and a half clear
     expect(p.at(103)).toMatchObject({ keepsClear: 'Blue', rule: '12', foul: null });
-    moveTo(blue, ahead(4.2, 0)); // Red, slow out of her tack, and Blue's bow sails into her stern, still clear astern
-    expect(p.at(104).foul).toMatchObject({ by: 'Red', rule: '18.3', part: '18.3(a)' });
+    p.at(107);
+    moveTo(blue, ahead(4.2, 0)); // Blue's bow into Red's stern, still clear astern
+    expect(p.at(107.5).foul).toMatchObject({ by: 'Blue', rule: '12' });
   });
 
   it('tacking outside the zone is plain Rule 11 (after Rule 15 gives Blue time to respond)', () => {

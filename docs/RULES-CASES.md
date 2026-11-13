@@ -142,7 +142,8 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
    15 for it. Now (src/rules/rightOfWay.ts, pairs.ts): 18.2 is off between them, as before; the tacker keeps clear under '18.3' only
    with the fetching boat to windward of her, where rule 11 alone would have that boat luff above close-hauled; otherwise the basic
    rules, 15 and 16 govern. At an incident, 18.3(a) is the tacker's breach when the fetching boat, at or above close-hauled and not
-   turning toward her, was overlapped to windward or clear astern of her; a fetching boat that bears away into her broke 11 or 12.
+   turning toward her, was overlapped to windward of her; a fetching boat that bears away into her broke 11, and one clear astern
+   is under 12 as usual (made to luff above close-hauled from there isn't modelled: it needs ROOM-TO-RESPOND's escapes()).
    Not modelled: 18.3(b)'s mark-room as exoneration under 43.1(b) (as for 18.2). Tests: Case 93 in tests/rules-cases.test.ts,
    "Rule 18.3" in tests/rules.test.ts.
 2. **Case 105 (rule 16.1): the engine calls any turn toward the other boat a 16.1 breach, without asking whether she had room to
