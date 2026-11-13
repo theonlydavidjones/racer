@@ -222,7 +222,7 @@ What's planned, roughly in order. Done work is described in the README.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
-   - **The place** (owner's chart screenshot): Josephine's real slip, at the west end of a Gashouse Cove fairway close to
+   - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
      the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
      literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
      crew would. It's hard but possible, as in real life.
@@ -236,7 +236,7 @@ What's planned, roughly in order. Done work is described in the README.
    isn't the same distance as the actual hoisting distance." As on Josephine:
    - **The hoist is done at the mast:** a crew member (or you) goes to the mast and hauls the sail up, taking the real
      time and moving the crew's weight forward. It's started from inside an existing element (the band's crew tab,
-     or the key), not a new button. Assumed for both sails; the owner to confirm for the jib.
+     or the key), not a new button. Both sails are hoisted at the mast (owner confirmed).
    - **The piano's halyard controls finish it:** the main halyard's tackle and the jib halyard take up only the last
      several inches, then set the luff tension. Their range is that short distance, not the whole hoist. With the sail
      down they show as slack and idle.
@@ -251,6 +251,11 @@ What's planned, roughly in order. Done work is described in the README.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (bug; 2–3 h): owner, "at aquatic park, auto
+   nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
+   curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
+   geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
+   of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
 8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
    intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
    Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
@@ -275,7 +280,8 @@ What's planned, roughly in order. Done work is described in the README.
       barnacles." So:
       - the pier's pile field is solid to the boat;
       - the current runs through and under the piles, while the shed above blocks the wind;
-      - getting set under it is a real wreck, with damage and the sail over, not a bounce;
+      - getting set under it is a real wreck, not a bounce. Until the wreck design below is agreed, contact with the piles
+        just stops her;
       - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
         of the pier, and pick the tide.
    4. Eddies in the entrance (owner: "There are also frequent eddies in the entry. Have the physics session model the
@@ -370,6 +376,7 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
      no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
@@ -1275,6 +1282,11 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **Wrecks: an open design** (owner, 13 November: "we need to work through the broader logic and plan for wrecks. I
+  don't know yet."; Marinas drafts a proposal): what counts as a wreck (piles, rocks, a ship, a seawall, grounding),
+  the damage and what it does to her, whether she retires or is towed, and how the logbook and the season score it.
+  For now, contact with the Fort Mason piles just stops her.
 
 - **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
   whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's
