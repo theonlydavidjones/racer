@@ -783,6 +783,8 @@ export class Hud {
     if (flowHere) this.flowField.chart.draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
+    // a lesson's buoy (the tiller: steer for it), a filled yellow dot while it's the one to reach
+    if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
     else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in

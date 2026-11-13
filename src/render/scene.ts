@@ -515,6 +515,8 @@ export class SceneView {
           ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(m.p.x, m.p.y, 0.3)); add(ring);
         }
       }
+      // a lesson's buoy (the tiller: steer for it): a yellow practice ball, as sailing schools lay
+      if (w.lesson?.buoy) this.addMark(add, w.lesson.buoy, 'sphere', 'Y');
       for (const pl of PLACES) if (pl.buoy) this.addMark(add, pl.p, pl.buoy.shape, pl.buoy.look ?? 'Y');
       if (w.dest && !PLACES.some(pl => pl.buoy && pl.p === w.dest!.p) && aids) {
         // a spot rather than a buoy: a faint ring on the water where you're heading

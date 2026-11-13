@@ -1,5 +1,6 @@
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
+import { LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -258,6 +259,8 @@ export class World {
   readonly drill: DrillTracker | null;
   /** The mark-rounding drill (sim/roundings.ts): laps of the practice course, W and the pin, each rounding scored; that mode only. */
   readonly rounding: RoundingTracker | null;
+  /** Learn to sail (sim/lessons.ts): the lesson you're sailing, its cue and its check; that mode only. */
+  readonly lesson: LessonTracker | null;
   /** Racing: the whole race once a second (the race replay), from just before the gun. */
   track: Frame[] = [];
   horns: Record<number, boolean> = {};
@@ -397,6 +400,12 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    // a lesson: the tiller's buoy 250 m off, 20° to leeward of her heading (a broad reach to it), where there's water
+    this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
+      const u = this.boats[0], lee = wrap(this.windModel.base - u.h) > 0 ? -20 : 20;
+      for (const a of [lee, 0, -lee]) { const q = { x: u.x + V(u.h + a).x * 250, y: u.y + V(u.h + a).y * 250 }; if (!onLand(q)) return q; }
+      return { x: u.x + V(u.h).x * 120, y: u.y + V(u.h).y * 120 };
+    })()) : null;
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
     this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
@@ -887,6 +896,7 @@ export class World {
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
+    this.lesson?.update(this.user, this.t, dt); // (a lesson: its check, on the boat as she sails)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);

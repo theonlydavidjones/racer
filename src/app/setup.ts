@@ -3,6 +3,7 @@
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
 import { PREP_MEANING } from '../sim/signals';
+import { LESSONS, type LessonId } from '../sim/lessons';
 import { describeSea } from '../environment/sea';
 import { CURRENTS } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
@@ -50,7 +51,7 @@ function prepare(seed = randomSeed()): void {
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   // (the practice drills, alone, in the setup's day and conditions: the tack and gybe drill off the Cityfront; the
   // mark-rounding drill round the practice course's marks, so its file is forced to the practice course)
-  const soloDrill = (app.S.mode === 'manoeuvres' || app.S.mode === 'roundings') && !shown;
+  const soloDrill = (app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') && !shown;
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSd, seed,
@@ -319,7 +320,7 @@ function crewRows(): void {
 function openSetup(): void { app.results.settleLog(openSetupNow); }
 function openSetupNow(): void {
   app.replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
-  if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings') { app.S.mode = 'race'; prepare(); }
+  if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') { app.S.mode = 'race'; prepare(); }
   // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
   // and is sent nothing until it starts)
   setStill(true);
@@ -332,6 +333,10 @@ function beginRaceNow(seed?: number): void {
   newGame(seed);
   if (app.S.mode === 'manoeuvres') { logMessage('— Tacks and gybes'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     toast(`Tacks and gybes: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
+  if (app.S.mode === 'lesson') { // (Learn to sail: its cue is in the coach's places, sim/lessons.ts)
+    const L = LESSONS.find(l => l.id === app.w.lesson?.id);
+    logMessage(`— Learn to sail · ${L ? `${L.no} ${L.title}` : ''}`); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
+    return; }
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
@@ -381,5 +386,7 @@ $('bCondClose').onclick = () => {
   }
 };
 
-return { beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, tideBox, wake };
+/** Start a Learn to sail lesson (its tile, in the Drill section). */
+function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup']) $(el).hidden = true; beginRace(); }
+return { beginLesson, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, tideBox, wake };
 }

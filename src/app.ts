@@ -78,6 +78,7 @@ const ctx = {
   get DRILL_FROM() { return DRILL_FROM; },
   get S() { return S; },
   get beginRace() { return setup.beginRace; },
+  get beginLesson() { return setup.beginLesson; },
   get drillRuns() { return drillRuns; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
@@ -592,6 +593,7 @@ $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLEleme
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(dt: number): void {
   if (!w.running) { $('coachTip').classList.remove('on'); return; }
+  if (w.lesson) { lessonTick(); return; }
   const u = w.user;
   if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
   coachT += dt; if (coachT < 0.5 && coachShown) { tipFade(); return; }
@@ -610,6 +612,20 @@ function coachTick(dt: number): void {
   if (open) coachTipUntil = 0;
   tipFade();
   if (!$('coachPanel').hidden) renderCoach();
+}
+/** A lesson (sim/lessons.ts): its one cue in the coach's own places (the trim panel's headline, and on the water for a few
+ * seconds when it's new), with how far through the check you are; passed, it's kept with your settings. */
+let lessonCue = '';
+function lessonTick(): void {
+  const L = w.lesson!, tip = $('coachTip');
+  $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
+  $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
+  if (L.cue !== lessonCue) {
+    lessonCue = L.cue;
+    if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
+    if (L.passed && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
+  }
+  tipFade();
 }
 function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 function stepCar(k: 'carFore' | 'carIn', d: number): void {
