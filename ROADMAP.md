@@ -931,6 +931,20 @@ traveling over the hull and sails to help players learn about sail shape and lam
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labelled where it's illustrative.
 
+- **3. The tack and gybe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+  the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
+  "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
+  also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
+  maybe even some on-water tracks or something. this doesn't feel different from regular cruise mode."
+  - **Cues where you're looking, in a word or two:** beside or above the boat, not in the Coach card: "Build speed",
+    "Tack now", "Hold", "Ease", "Trim". The full advice moves to after each rep.
+  - **On-water guides:** a lane or track drawn on the water showing the line to sail, where to start the turn, and the
+    new course after it; a target heading mark; and her wake shown against the ideal turn afterwards. All drawn from
+    the sim's own polar and turn model.
+  - **A drill's own shape,** so it doesn't feel like cruising: a set course in open water, numbered reps, a short
+    score after each (speed lost, distance lost, the turn's rate and the tiller's), and a best-of summary.
+  - On the screen rule: the cues live on the water and on the boat, not as new buttons.
+
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
