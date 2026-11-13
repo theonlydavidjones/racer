@@ -3,13 +3,15 @@
 //
 // The same motion as physics.ts, stepped forward: her turn rate the rudder's (flowTurnRate, from the turning radius and
 // her speed), reached through her yaw lag (yawLag: her yaw inertia against the water's damping), and the speed the turn
-// bleeds away (turnBleed). HANDLING and those functions are read live, never copied, so a change to the rudder or the
-// hull changes this with them. Left out over the few seconds this looks ahead: the sails' drive (she's assumed to hold
-// what speed the turn leaves her, a little pessimistic) and the speed a tack through the wind costs beyond the turn.
+// bleeds away (turnBleed), and through the no-go zone the drive gone (surgeAccel with none). HANDLING and those
+// functions are read live, never copied, so a change to the rudder or the hull changes this with them. Left out over the
+// few seconds this looks ahead: the sails' drive off the wind (she's assumed to hold what speed the turn leaves her, a
+// little pessimistic).
 
-import { V, wrap } from '../core/math';
+import { KT, V, wrap } from '../core/math';
 import { hullGap } from '../rules/geometry';
-import { flowTurnRate } from './dynamics';
+import { airDrag, flowTurnRate, surgeAccel } from './dynamics';
+import { beatAngle } from './polar';
 import { turnBleed, yawLag } from './physics';
 
 /** Where a boat is: position (m, x east, y north), heading (deg), speed through the water (m/s). */
@@ -28,11 +30,14 @@ export interface EscapeOpts {
   dt?: number;
   /** Heading changes to try, deg (+ to starboard). Default: 30°, 60° and 90° each way; holding on is always tried. */
   turns?: number[];
+  /** The true wind's speed, kt, for her close-hauled angle (the polar's beatAngle): through the no-go zone, tacking, her
+   * sails give no drive and she slows. Default 12 kt. */
+  windKt?: number;
 }
 
 /** One avoiding manoeuvre: the heading change asked for, the heading she reaches (the AI's `desired`), and her least
  * hull-to-hull gap to any of the other boats over the horizon, m. `turn` 0 is holding on: carrying on her present turn. */
-export interface Candidate { turn: number; heading: number; minGap: number }
+export interface Candidate { turn: number; heading: number; minGap: number; /** her least gap to each track, in order */ gaps: number[]; /** her speed at the end, m/s */ v: number }
 
 const TURNS = [-90, -60, -30, 30, 60, 90];
 
@@ -42,10 +47,11 @@ const TURNS = [-90, -60, -30, 30, 60, 90];
  * keeps every gap above hers, nearest her course.
  */
 export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFrom: number, o: EscapeOpts): Candidate[] {
-  const dt = o.dt ?? 0.1, n = Math.max(1, Math.round(o.horizon / dt));
+  const dt = o.dt ?? 0.1, n = Math.max(1, Math.round(o.horizon / dt)), wKt = o.windKt ?? 12, beat = beatAngle(wKt);
   const out: Candidate[] = [];
   const me = { x: 0, y: 0, h: 0 }; // (reused: hullGap memoises a hull's ends by its numbers)
   for (const turn of [0, ...(o.turns ?? TURNS)]) {
+    const gaps = tracks.map(() => Infinity);
     let x = kc.x, y = kc.y, h = kc.h, v = kc.v, r = kc.turnRate ?? 0, minGap = Infinity;
     const target = h + turn;
     for (let i = 1; i <= n; i++) {
@@ -61,11 +67,15 @@ export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFro
       r += (want - r) * (1 - Math.exp(-dt / yawLag(v)));
       h += r * dt;
       v = Math.max(0, v * (1 - turnBleed(r, v, h, windFrom, kc.helmNeed ?? 0) * dt));
+      // (head to wind, inside the no-go zone, the sails give no drive: the hull's resistance and the flogging sails' and
+      // rig's windage slow her (airDrag, apparent wind about the true wind plus her speed), as physics.ts's surge step
+      // does with the drive gone; Deep Physics and the physics-reviewer found her tack 2-3 m too far without it)
+      if (Math.abs(wrap(windFrom - h)) < beat) v = Math.max(0, v + surgeAccel(v, 0, airDrag(wKt * KT + v, Math.abs(wrap(windFrom - h)), 1)) * dt);
       const u = V(h); x += u.x * v * dt; y += u.y * v * dt;
       me.x = x; me.y = y; me.h = h;
-      for (const tr of tracks) { const g = hullGap(me, tr(t)); if (g < minGap) minGap = g; }
+      for (let k = 0; k < tracks.length; k++) { const g = hullGap(me, tracks[k](t)); if (g < gaps[k]) gaps[k] = g; if (g < minGap) minGap = g; }
     }
-    out.push({ turn, heading: ((h % 360) + 360) % 360, minGap });
+    out.push({ turn, heading: ((h % 360) + 360) % 360, minGap, gaps, v });
   }
   return out;
 }
