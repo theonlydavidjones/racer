@@ -240,9 +240,17 @@ What's planned, roughly in order. Done work is described in the README.
    - **The piano's halyard controls finish it:** the main halyard's tackle and the jib halyard take up only the last
      several inches, then set the luff tension. Their range is that short distance, not the whole hoist. With the sail
      down they show as slack and idle.
+   - **The routine** (owner): "one of the first steps after raising sails and getting underway is tensioning the
+     halyards from the piano. they usually stay untouched for the rest of the sail, unless there's need to fine tune
+     (which better sailors than I may do often; I'm not sure)." So the crew tension the halyards at the piano soon
+     after getting under way, then leave them; a skilled crew may fine-tune them as the wind changes (to source).
    - **Lowering:** let the halyard go at the mast, and the sail comes down fast.
    - The sails, flags, telltales and physics answer the hoist as it happens: half-hoisted sails draw badly, luff and
      flog.
+8q. **The boom on the centerline in the slip** (owner, 13 November; <1 h): "when in a slip, boom should be at
+   centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
+   with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
+   tied up.
 8p. **Bug: with the sails down, the jib cars show as loaded** (owner, 13 November; <1 h): "with sails down, neither jib
    car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
 8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
