@@ -10,6 +10,7 @@ import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
 import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { JUMPER_HALF_TURN_S } from '../boat/condition';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
+import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
 
 /**
  * The sail controls band (the owner's design, 12 Nov 2026; the UI session's mock-up, design/sail-controls-band.html):
@@ -83,21 +84,21 @@ const vert = (key: CtlKey | 'jib', side: Side) => {
   <button type="button" class="sb-nm" data-act="name">${SHORT[k]}</button>
   <button type="button" class="sb-a" data-act="ease" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: ease">${chev('u')}</button>
   <span class="sb-cleat ${CLEAT[k] ?? 'cam'}"></span>
-  <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-mark"></span></span>
+  <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span>
   <button type="button" class="sb-a" data-act="pull" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: pull on">${chev('d')}</button></div>`;
 };
 /** The backstay's end on one side, pulled outboard. */
 const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="--rope:${ROPE.backstay}">
   <button type="button" class="sb-nm" data-act="name">Backstay</button>
   <span class="sb-hrow">${side === 'P'
-    ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
-    : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
+    ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
+    : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
 /** A track across the boat (port end left): the mainsheet's boom marker or the traveller's car. */
 const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="--rope:${ROPE.mainsheet}">
   <button type="button" class="sb-nm" data-act="name">${label}</button><span class="sb-end p">P</span>
   <button type="button" class="sb-a" data-act="left" aria-label="${k === 'mainsheet' ? 'Boom toward port' : 'Car to port'}">${chev('l')}</button>
   <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
-  <button type="button" class="sb-a" data-act="right" aria-label="${k === 'mainsheet' ? 'Boom toward starboard' : 'Car to starboard'}">${chev('r')}</button><span class="sb-end s">S</span></div>`;
+  <button type="button" class="sb-a" data-act="right" aria-label="${k === 'mainsheet' ? 'Boom toward starboard' : 'Car to starboard'}">${chev('r')}</button><span class="sb-end s">S</span>${k === 'mainsheet' ? '<span class="sb-rin"></span><span class="sb-rtk"></span>' : ''}</div>`;
 /**
  * The windex, as you'd see it looking up at the masthead (in the band's middle, where the helm looks up past the
  * companionway): the boat from above, bow up; the vane points into the apparent wind; the white tabs at 28° either side
@@ -207,6 +208,11 @@ export class SailBand {
       d.dataset.help = k === 'jib' ? 'Jib sheet: ' + lineHelp('jibsheet') : k === 'car' ? 'Jib car: click a hole to move it. Forward is up, inboard toward the middle. ' + lineHelp('carFore') + ' ' + lineHelp('carIn').replace(/^The lazy car[^:]*: /, '')
         : k === 'mainsheet' ? 'Mainsheet: the blue marker is where the boom is. Toward the middle trims, out to leeward eases. ' + lineHelp('mainsheet')
         : `${LINE_LABEL[k as CtlKey]}: ${lineHelp(k as CtlKey)}`;
+      // (the rope's ticks: what each one is)
+      const r = ROPE_IN[k as keyof typeof ROPE_IN];
+      if (r) d.dataset.help += ` The faint ticks: about ${r.inches < 3 ? (Math.round(r.inches * 2) / 2).toFixed(1) : Math.round(r.inches)} in of rope from off to full on${r.even ? '' : ', marked evenly here though a bridle really pays out unevenly'} (${r.note}).`;
+      else if (k === 'jib') d.dataset.help += ' The faint ticks on the working sheet: every foot of sheet eased, by its lead (closer together toward hard in).';
+      else if (k === 'mainsheet') d.dataset.help += ' Under the track: where so many inches of sheet eased put the boom (four parts: the first few inches swing it furthest), and how much is out now.';
     });
     const jt = `Jumpers: turns on their turnbuckle, 0 to ${JMAX}. On (more turns) stiffens the top of the mast, so the main's head twists off less; off lets it bend and twist (about ±1.5° up top). North Sails' medium is ${TUNE_PRESETS.medium.jumperTurns} turns (the tall tick); Heikkilä Sailmaker's guide: loose in light air, tighter in medium, tighter again in a breeze if the mast bends past the main's luff round. The crew turns them a half turn at a time, about ${JUMPER_HALF_TURN_S} s each. Auto-trim leaves them alone. Click the left half for a half turn off, the right half for a half turn on, or scroll.`;
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
@@ -418,6 +424,43 @@ export class SailBand {
   }
 
   /** Every frame while it's open: the ropes, the boom and the car, who has what, and where the crew would set it. */
+  /**
+   * The rope's inches on a line (a design branch, the owner's "middle way": the marks unchanged, the rope through the hand
+   * marked as faint hairlines in the well, Rigging's purchases and travels, ropeScale.ts). Even for the tension lines (each
+   * works the sail evenly over its travel), every foot for the working jib sheet (by its geometry: they bunch toward hard
+   * in), none on the lazy sheet. Redrawn only when they'd move.
+   */
+  private ropeTicks(d: HTMLElement, k: CtlKey, u: Boat, horiz: boolean): void {
+    const tk = d.querySelector<HTMLElement>('.sb-tk'); if (!tk) return;
+    let key = k as string, pos: number[] = [];
+    if (k === 'jibsheet') {
+      const c = u.ctl, total = jibsheetTotal(c, u.tack); key = `${k}${u.tack}${c.car[u.tack === 'S' ? 'P' : 'S'].ins}`;
+      if (tk.dataset.k === key) return;
+      for (let i = 12; i < total - 3; i += 12) pos.push(1 - jibsheetAtIn(i, c, u.tack)); // (the well shows how much is on: hard in is full)
+    } else {
+      const r = ROPE_IN[k as keyof typeof ROPE_IN]; if (!r) { if (tk.dataset.k !== 'none') { tk.innerHTML = ''; tk.dataset.k = 'none'; } return; }
+      if (tk.dataset.k === key) return;
+      const step = r.inches <= 3 ? 0.5 : r.inches <= 6 ? 1 : r.inches <= 15 ? 2 : 10;
+      for (let i = step; i < r.inches - step / 3; i += step) pos.push(i / r.inches);
+    }
+    const prop = horiz ? (d.dataset.side === 'P' ? 'left' : 'right') : 'top';
+    tk.innerHTML = pos.map(f => `<i style="${prop}:${(f * 100).toFixed(1)}%"></i>`).join(''); tk.dataset.k = key;
+  }
+  /** Under the mainsheet's track: where so many inches of sheet eased put the boom (by its four parts' geometry, with the
+   * traveller where it is), a few of them labelled, and how much is out now. */
+  private sheetTicks(d: HTMLElement, u: Boat): void {
+    const c = u.ctl, lee = leeSign(u), out = mainsheetIn(boomAngle(c), c.traveller);
+    const rin = d.querySelector<HTMLElement>('.sb-rin')!, txt = `${Math.round(out)} in out`;
+    if (rin.textContent !== txt) rin.textContent = txt;
+    const strip = d.querySelector<HTMLElement>('.sb-rtk')!, key = `${lee}${Math.round(c.traveller * 50)}`;
+    if (strip.dataset.k === key) return;
+    const LAB = new Set([12, 48, 192]);
+    strip.innerHTML = [6, 12, 24, 48, 96, 192, 300].map(i => {
+      const x = 50 + lee * Math.sin(boomAtIn(i, c.traveller) * D2R) * 50;
+      return `<i style="left:${x.toFixed(1)}%"${LAB.has(i) ? ` data-l="${i}″"` : ''}></i>`;
+    }).join('');
+    strip.dataset.k = key;
+  }
   update(): void {
     const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
     this.tabs(w, u);
@@ -439,6 +482,7 @@ export class SailBand {
       d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === k);
       // the dual-ended lines: the windward end's cleat is ringed
       d.classList.toggle('ww', (k === 'vang' || k === 'outhaul' || k === 'jibCunningham' || k === 'backstay') && d.dataset.side === ws);
+      this.ropeTicks(d, k, u, horiz);
       const iv = ideal?.[k as keyof typeof ideal] as number | undefined;
       mark.hidden = !mine || iv == null;
       if (iv != null) { const io = Math.round(onOf(k, iv) * 100) + '%'; if (horiz) { mark.style.left = d.dataset.side === 'P' ? `calc(100% - ${io})` : io; } else mark.style.top = io; }
@@ -446,6 +490,7 @@ export class SailBand {
     // the mainsheet: the boom's end across the boat (sin of its angle, toward leeward); the crew's boom, dashed
     {
       const d = this.el.querySelector<HTMLElement>('.sb-trk[data-line="mainsheet"]')!, mine = byHand(u, 'mainsheet');
+      this.sheetTicks(d, u);
       const x = clamp(Math.sin(u.boom * D2R), -1, 1), boom = d.querySelector<HTMLElement>('.sb-boom')!, mark = d.querySelector<HTMLElement>('.sb-mark')!;
       boom.style.left = `${50 + x * 50}%`; d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'mainsheet');
       mark.hidden = !mine || !ideal;
