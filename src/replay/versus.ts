@@ -32,10 +32,18 @@ export interface LegVs {
   t0: number; t1: number;
   /** On average, how far their line lay from yours across the leg, m, and in which compass direction. */
   apartM: number; apartDir: string;
+  /** The leg's big moments against her: each tack or gybe, the shifts, the mark at its end. */
+  moments: VsMoment[];
 }
 
+/**
+ * A moment on a leg where you lost or gained on her, in a line: `lostM` metres you lost (− gained) in distance made good
+ * along the leg, over the same stretch of clock time (so you both sailed in the same wind); `t0`–`t1` that stretch.
+ */
+export interface VsMoment { leg: number; kind: 'tack' | 'mark'; t0: number; t1: number; lostM: number; text: string }
+
 /** `won`: she won; `youWon`: you did; `youDone`: you've finished and both of you sailed every leg (the gap is the finish gap). */
-export interface Versus { rival: number; rivalName: string; tie?: boolean; won: boolean; youWon: boolean; youDone: boolean; legs: LegVs[]; total: number }
+export interface Versus { rival: number; rivalName: string; tie?: boolean; won: boolean; youWon: boolean; youDone: boolean; legs: LegVs[]; total: number; moments: VsMoment[] }
 
 /**
  * Metres a boat sailed between two race times, from the track: each second's step over the ground counted only as far
@@ -105,7 +113,7 @@ export function versus(I: VsInput): Versus | null {
   };
   const A = times(me), B = times(r), legs: LegVs[] = [];
   if (A[0] == null || B[0] == null) return null;
-  legs.push({ i: 0, name: 'The start', kind: 'start', you: A[0], them: B[0], lost: A[0] - B[0], fromDist: 0, fromSpeed: A[0] - B[0], youM: 0, themM: 0, t0: Math.min(A[0], B[0]) - 30, t1: Math.max(A[0], B[0]), apartM: 0, apartDir: '' });
+  legs.push({ i: 0, name: 'The start', kind: 'start', you: A[0], them: B[0], lost: A[0] - B[0], fromDist: 0, fromSpeed: A[0] - B[0], youM: 0, themM: 0, t0: Math.min(A[0], B[0]) - 30, t1: Math.max(A[0], B[0]), apartM: 0, apartDir: '', moments: [] });
   let from = I.from;
   for (let k = 0; k < I.legs.length; k++) {
     const L = I.legs[k], a0 = A[k], a1 = A[k + 1], b0 = B[k], b1 = B[k + 1];
@@ -115,8 +123,9 @@ export function versus(I: VsInput): Versus | null {
     const u = unit(sub(L.to, from)), off = meanOff(F, r, b0, b1, from, u) - meanOff(F, me, a0, a1, from, u);
     // + off: their line lay to the left of yours (going from the last mark to this one): which compass way that is
     const left = { x: -u.y, y: u.x }, dir = off >= 0 ? left : { x: u.y, y: -u.x };
+    const rbName = I.boats.find(b => b.id === r)!.name;
     legs.push({ i: k + 1, name: L.name, kind: L.kind, you, them, lost: you - them, fromDist, fromSpeed: you - them - fromDist, youM, themM, t0: a0, t1: a1,
-      apartM: Math.abs(off), apartDir: compassPoint(brg(dir.x, dir.y)) });
+      apartM: Math.abs(off), apartDir: compassPoint(brg(dir.x, dir.y)), moments: legMoments(F, me, r, rbName, k + 1, L, from, a0, a1, b0, b1, k === I.legs.length - 1) });
     from = L.to;
   }
   const total = legs.reduce((s, l) => s + l.lost, 0);
@@ -124,7 +133,100 @@ export function versus(I: VsInput): Versus | null {
   const mine = I.boats.find(b => b.id === me)!, first = I.boats.filter(b => !b.dsq && b.finishT != null).sort(byScore)[0];
   // (equal points share the place: 44.3(c), A7; then neither of you won outright)
   const tie = mine.finishT != null && rb.finishT != null && mine.points != null && mine.points === rb.points;
-  return { rival: r, rivalName: rb.name, tie, won: !tie && first?.id === r, youWon: !tie && first?.id === me, youDone: mine.finishT != null && legs.length === I.legs.length + 1, legs, total };
+  return { moments: legs.flatMap(l => l.moments), rival: r, rivalName: rb.name, tie, won: !tie && first?.id === r, youWon: !tie && first?.id === me, youDone: mine.finishT != null && legs.length === I.legs.length + 1, legs, total };
+}
+
+/* ---------- the big moments: tacks, gybes, shifts and marks ---------- */
+
+/** Where a boat was at race time t, from the 1 Hz track (between frames, in a straight line). */
+function posAt(F: Frame[], id: number, t: number): Vec | null {
+  let lo = 0, hi = F.length - 1;
+  if (!F.length || t < F[0].t || t > F[hi].t) return null;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (F[m].t <= t) lo = m; else hi = m; }
+  const a = F[lo].b[id], b = F[hi].b[id]; if (!a || !b) return null;
+  const f = F[hi].t > F[lo].t ? (t - F[lo].t) / (F[hi].t - F[lo].t) : 0;
+  return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f };
+}
+/**
+ * Metres a boat made good along the leg (the line from the last mark to this one) between two race times: how sailors
+ * count gains on a beat or a run, by the "ladder rungs" across the course, not the straight-line distance to the mark
+ * (which, far from it, counts being off to one side as lost ground). The course is laid to the wind, so on a beat or
+ * a run the leg's line is the wind's.
+ */
+function madeGood(F: Frame[], id: number, t0: number, t1: number, u: Vec): number {
+  const p = posAt(F, id, t0), q = posAt(F, id, t1);
+  return p && q ? (q.x - p.x) * u.x + (q.y - p.y) * u.y : 0;
+}
+/** Her mean wind shift (+ headed, − lifted, deg) over a stretch, from the track, up to (not including) its end: a tack's own second is on the new tack. */
+function shiftOver(F: Frame[], id: number, t0: number, t1: number): number {
+  let s = 0, n = 0;
+  for (const f of F) if (f.t >= t0 && f.t < t1) { const v = f.b[id]?.[5]; if (v != null) { s += v; n++; } }
+  return n ? s / n : 0;
+}
+/**
+ * A boat's tacks (or gybes) between two times: each change of tack in the track. A penalty's turns (RRS 44.2: a tack
+ * and a gybe within seconds) aren't tacks: a change undone within 15 s is dropped with its pair.
+ */
+function tacksOf(F: Frame[], id: number, t0: number, t1: number): { t: number; to: string }[] {
+  const ch: { t: number; to: string }[] = [];
+  for (let i = 1; i < F.length; i++) {
+    const f = F[i]; if (f.t <= t0 || f.t > t1) continue;
+    const a = F[i - 1].b[id], b = f.b[id]; if (a && b && a[3] !== b[3]) ch.push({ t: f.t, to: b[3] });
+  }
+  const out: { t: number; to: string }[] = [];
+  for (let i = 0; i < ch.length; i++) { if (i + 1 < ch.length && ch[i + 1].t - ch[i].t < 15) { i++; continue; } out.push(ch[i]); }
+  return out;
+}
+const clock = (t: number) => { const r = Math.round(t); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
+const metres = (m: number) => `${m > 0 ? 'lost' : 'gained'} ${Math.round(Math.abs(m))} m`;
+/** "on an 8° header" / "on a 5° lift" / "" (under 3°, about the wind's own wobble). */
+const aN = (n: number) => /^(8|11|18|8\d)$/.test(String(n)) ? 'an' : 'a';
+const onShift = (d: number) => { const n = Math.round(Math.abs(d)); return d >= 3 ? ` on ${aN(n)} ${n}° header` : d <= -3 ? ` on ${aN(n)} ${n}° lift` : ''; };
+
+/**
+ * A leg's moments against her. Only while you were both on this leg at the same time can a tack be matched (then you
+ * sailed in the same wind): each of her tacks is matched to your next onto the same tack. What it cost or gained is the
+ * difference in distance made good along the leg over that stretch of clock time, to 20 s after the later tack (a
+ * Folkboat takes about that to get back up to speed). Moments under 5 m (under a boat length) aren't kept.
+ */
+function legMoments(F: Frame[], me: number, r: number, name: string, leg: number, L: { name: string; to: Vec; kind: string }, from: Vec, a0: number, a1: number, b0: number, b1: number, finish: boolean): VsMoment[] {
+  const out: VsMoment[] = [], lo = Math.max(a0, b0), hi = Math.min(a1, b1), M = L.to, U = unit(sub(M, from));
+  const verb = L.kind === 'run' ? 'gybed' : L.kind === 'beat' ? 'tacked' : 'went about';
+  const lost = (t0: number, t1: number) => madeGood(F, r, t0, t1, U) - madeGood(F, me, t0, t1, U);
+  if (hi > lo + 10) {
+    const hers = tacksOf(F, r, lo, hi), mine = tacksOf(F, me, lo, a1), used = new Set<number>();
+    for (const h of hers) {
+      const k = mine.findIndex((y, i) => !used.has(i) && y.to === h.to && y.t >= h.t - 30);
+      const sh = onShift(shiftOver(F, r, h.t - 10, h.t));
+      if (k >= 0 && mine[k].t - h.t < 300) {
+        used.add(k);
+        const y = mine[k], d = y.t - h.t, t0 = Math.min(h.t, y.t) - 5, t1 = Math.min(Math.max(h.t, y.t) + 20, hi), m = lost(t0, t1);
+        if (Math.abs(m) < 5) continue;
+        const text = d > 5 ? `${name} ${verb}${sh} at ${clock(h.t)}; you held on ${Math.round(d)} s longer${onShift(shiftOver(F, me, h.t, y.t)) ? `,${onShift(shiftOver(F, me, h.t, y.t))}` : ''}, and ${metres(m)}.`
+          : d < -5 ? `You ${verb} ${Math.round(-d)} s before ${name} (at ${clock(y.t)}${onShift(shiftOver(F, me, y.t - 10, y.t))}), and ${metres(m)}.`
+          : `You both ${verb} at ${clock(h.t)}${sh ? `,${sh.replace(/ on an? /, ' on the ')}` : ''}: through it you ${metres(m)}.`;
+        out.push({ leg, kind: 'tack', t0, t1, lostM: m, text });
+      } else {
+        const t1 = Math.min(h.t + 120, hi), m = lost(h.t - 5, t1);
+        if (Math.abs(m) >= 5) out.push({ leg, kind: 'tack', t0: h.t - 5, t1, lostM: m, text: `${name} ${verb}${sh} at ${clock(h.t)}; you didn't, and over the next ${Math.round(t1 - h.t)} s you ${metres(m)}.` });
+      }
+    }
+    mine.forEach((y, i) => {
+      if (used.has(i) || y.t > hi) return;
+      const t1 = Math.min(y.t + 30, hi), m = lost(y.t - 5, t1);
+      if (Math.abs(m) >= 5) out.push({ leg, kind: 'tack', t0: y.t - 5, t1, lostM: m, text: `You ${verb} at ${clock(y.t)}${onShift(shiftOver(F, me, y.t - 10, y.t))}; ${name} held on, and over the next ${Math.round(t1 - y.t)} s you ${metres(m)}.` });
+    });
+  }
+  // the mark at the end of the leg: who got there first, and how far back the other was
+  const where = finish ? 'the finish' : L.name;
+  if (a1 > b1) {
+    const p = posAt(F, me, b1), d = p ? Math.hypot(p.x - M.x, p.y - M.y) : 0;
+    out.push({ leg, kind: 'mark', t0: b1 - 10, t1: a1, lostM: d, text: `${name} ${finish ? 'finished' : `rounded ${where}`} at ${clock(b1)} with you ${Math.round(d)} m back; you ${finish ? 'finished' : 'rounded'} ${Math.round(a1 - b1)} s later.` });
+  } else {
+    const p = posAt(F, r, a1), d = p ? Math.hypot(p.x - M.x, p.y - M.y) : 0;
+    out.push({ leg, kind: 'mark', t0: a1 - 10, t1: b1, lostM: -d, text: `You ${finish ? 'finished' : `rounded ${where}`} at ${clock(a1)}, ${Math.round(b1 - a1)} s ahead of ${name} (${Math.round(d)} m back).` });
+  }
+  return out.sort((a, b) => a.t0 - b.t0);
 }
 
 /** A leg's comparison in a line or two, for the list and the caption. */
@@ -142,4 +244,19 @@ export function legWords(L: LegVs, rival: string): string {
   let txt = parts[0] + (parts.length > 1 ? ' ' + parts.slice(1).join(' ') + '.' : '');
   if (L.apartM >= 40) txt += ` ${rival}'s line lay on average ${Math.round(L.apartM)} m to the ${L.apartDir} of yours.`;
   return txt;
+}
+
+/** How to name her: "who won", "who came second", … ("Against Blue, who won"). `rivalFinished`: she's crossed the line. */
+export function rivalWho(V: Versus, rivalFinished: boolean): string {
+  return V.tie ? 'who tied with you on points' : V.won ? 'who won' : V.youWon ? (rivalFinished ? 'who came second' : 'the next boat')
+    : V.total > 0 ? 'who is ahead of you' : 'the boat behind you';
+}
+/** The gap in a sentence: "You finished 1 min 12 s behind Blue." */
+export function gapWords(V: Versus): string {
+  const g = Math.round(Math.abs(V.total)), t = g < 60 ? `${g} s` : `${Math.floor(g / 60)} min ${g % 60} s`, side = V.total < 0 ? 'ahead of' : 'behind';
+  return V.youDone ? `You finished ${t} ${side} ${V.rivalName}.` : `Over the legs you've both sailed, you're ${t} ${side} ${V.rivalName}.`;
+}
+/** The moments that cost or gained most (tacks, gybes and shifts; the marks go with their legs), biggest first. */
+export function bigMoments(V: Versus, n = 5): VsMoment[] {
+  return V.moments.filter(m => m.kind === 'tack').sort((a, b) => Math.abs(b.lostM) - Math.abs(a.lostM)).slice(0, n);
 }

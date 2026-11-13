@@ -490,6 +490,9 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .rrList li.rrPick{cursor:pointer}
 .rrList li.rrPick:hover,.rrList li.rrPick:focus-visible{border-color:var(--rule);background:rgba(150,196,218,.05);outline:0}
 .rrList li.on{border-color:var(--accent)}
+.rrMoments{list-style:none;margin:6px 0 0;padding:0 0 0 10px;border-left:2px solid var(--rule);display:flex;flex-direction:column;gap:4px}
+.rrMoments li{font-size:13px;line-height:1.4;padding:3px 6px;color:var(--text)}
+.rrMoments .dbLost{margin-right:4px}
 
 /* the race committee's choice of course */
 .coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}

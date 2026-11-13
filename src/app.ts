@@ -14,7 +14,7 @@ import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
-import { versus, type VsInput } from './replay/versus';
+import { bigMoments, gapWords, legWords, rivalWho, versus, type VsInput } from './replay/versus';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
 import { HELD, KeyMap, type Action } from './ui/keys';
@@ -1324,7 +1324,25 @@ function debriefHtml(title: string): string {
   const items = fs.map(f => `<li><div class="dbHead"><b>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
   const marks = pl.length > 1 ? `<p class="lede">Your place at each mark: ${pl.map(p => `${esc(p.name)} ${nth(p.place!)}`).join(' → ')}.</p>` : '';
   const total = fs.reduce((a, f) => a + f.lost, 0);
-  return `<div class="eyebrow">${title}</div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}`;
+  return `<div class="eyebrow">${title}</div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
+}
+/**
+ * Against the winner (or the boat second, if you won), in the debrief: the gap, a line for each leg, and the moments
+ * that cost or gained most (her tacks and gybes against yours, on the shifts), from the race's own recorded tracks.
+ * The replay ("Watch your race") has every moment, to jump to.
+ */
+function vsDebriefHtml(log: NonNullable<typeof w.log>): string {
+  const V = w.track.length > 1 ? versus(vsInput(log)) : null;
+  if (!V || V.legs.length < 2) return '';
+  const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
+  const kindW: Record<string, string> = { beat: 'a beat', reach: 'a reach', run: 'a run' };
+  const legs = V.legs.map(L => {
+    const mark = L.moments.find(m => m.kind === 'mark');
+    return `<li><div class="dbHead"><b>${L.i ? `Leg ${L.i}, to ${esc(L.name)} (${kindW[L.kind]})` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div><p>${esc(legWords(L, V.rivalName))}${mark ? ` ${esc(mark.text)}` : ''}</p></li>`;
+  }).join('');
+  const big = bigMoments(V);
+  const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span>${esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
+  return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${rivalWho(V, w.boats[V.rival].finished)}</div><p class="lede">${esc(gapWords(V))} Leg by leg, from both your tracks (metres are distance made good along the leg, in the same minutes of wind):</p><ol>${legs}</ol>${moments}`;
 }
 
 /* ---------------- the boats' logbooks ---------------- */

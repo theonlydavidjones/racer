@@ -56,7 +56,7 @@ describe('your race against the winner', () => {
   });
 
   it('times read as minutes and whole seconds (never 1:60)', () => {
-    const L = { i: 1, name: 'A', kind: 'beat' as const, you: 119.6, them: 59.7, lost: 59.9, fromDist: 0, fromSpeed: 59.9, youM: 500, themM: 500, t0: 0, t1: 120, apartM: 0, apartDir: '' };
+    const L = { i: 1, name: 'A', kind: 'beat' as const, you: 119.6, them: 59.7, lost: 59.9, fromDist: 0, fromSpeed: 59.9, youM: 500, themM: 500, t0: 0, t1: 120, apartM: 0, apartDir: '', moments: [] };
     expect(legWords(L, 'Blue')).toMatch(/You 2:00, Blue 1:00\./);
   });
 
@@ -75,5 +75,35 @@ describe('your race against the winner', () => {
     expect(rivalOf(three({ boats: [{ id: 0, name: 'You', finishT: 100, dsq: false }, { id: 1, name: 'Blue', finishT: null, dsq: false }, { id: 2, name: 'Red', finishT: null, dsq: false }], marks: [[20, 50], [40], [45, 80]] }))).toBe(2);
     expect(rivalOf(three({ boats: [{ id: 0, name: 'You', finishT: 300, dsq: false }, { id: 1, name: 'Blue', finishT: 200, dsq: false }, { id: 2, name: 'Red', finishT: 150, dsq: true }] }))).toBe(1);
     expect(rivalOf(three({ boats: [{ id: 0, name: 'You', finishT: null, dsq: false }, { id: 1, name: 'Blue', finishT: null, dsq: false }, { id: 2, name: 'Red', finishT: null, dsq: false }], marks: [[50], [40, 90], [45, 80]] }))).toBe(2);
+  });
+
+  it('the big moments: she tacked on the header and you held on: when, how much longer, and the metres it cost', () => {
+    // a beat due north to a mark 1000 m up; both close-hauled at 3 m/s, 45° off the wind, from the same spot on starboard.
+    // At 100 s the wind backs 10° (350°): starboard is headed, port lifted. She tacks at 110 s, you at 150 s.
+    const wind = (t: number) => t < 100 ? 0 : 350;
+    const sail = (tackAt: number) => { const P: [number, number, number, string, number][] = []; let x = 0, y = 0, tack = 'S';
+      for (let t = 0; t <= 400; t++) { if (t === tackAt) tack = 'P'; const W = wind(t), h = tack === 'S' ? W - 45 : W + 45;
+        const dev = ((W - 0 + 540) % 360) - 180, shift = tack === 'S' ? -dev : dev;
+        P.push([x, y, (h + 360) % 360, tack, 0, shift] as never); x += 3 * Math.sin(h * Math.PI / 180); y += 3 * Math.cos(h * Math.PI / 180); }
+      return P; };
+    const you = sail(150), her = sail(110);
+    const F = you.map((p, t) => ({ t, b: [p, her[t]] })) as unknown as Frame[];
+    const V = versus(input(F, 400, 395))!;
+    const tack = V.moments.find(m => m.kind === 'tack')!;
+    expect(tack.text).toMatch(/Blue tacked on a 10° header at 1:50; you held on 40 s longer, on a 10° header, and lost \d+ m\./);
+    // the cost: 40 s at 3 m/s with 20° worse to the mark than her: about 40·3·(cos 35° − cos 55°) ≈ 30 m
+    expect(tack.lostM).toBeGreaterThan(20); expect(tack.lostM).toBeLessThan(45);
+    expect(V.moments.some(m => m.kind === 'mark' && /Blue finished at 6:35 with you \d+ m back; you finished 5 s later/.test(m.text))).toBe(true);
+  });
+
+  it('a penalty\'s turns aren\'t tacks', () => {
+    // she does a 360 (two changes of tack within 15 s) and sails on: no tack moments
+    const F: Frame[] = [];
+    for (let t = 0; t <= 200; t++) {
+      const herTack = t >= 50 && t < 58 ? 'P' : 'S';
+      F.push({ t, b: [[0, t * 3, 0, 'S', 0, 0], [0, t * 3, 0, herTack, 0, 0]] as Frame['b'] });
+    }
+    const V = versus(input(F, 200, 199))!;
+    expect(V.moments.filter(m => m.kind === 'tack')).toEqual([]);
   });
 });
