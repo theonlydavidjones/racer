@@ -48,6 +48,9 @@ const HALF_BEAM = 1.1;
  * must keep clear is doing so: she holds on rather than ease and head up further. Measured between the centrelines
  * (rules hullGap), so the two half-beams are added. */
 const OPEN_GAP = 3 + 2 * HALF_BEAM;
+/** Closer than this between the centrelines (m: rules hullGap; contact is called at a beam, 2.2 m, rules CONTACT_GAP),
+ * she's all but touching, with little more than a metre of water: she gets off the other boat, sailing full. */
+const UNTANGLE_GAP = 3.5;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   let near: string | null = null;
@@ -634,6 +637,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // hailed "Starboard!" by this boat: duck early and generously
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
     if (ducking && cp.t < 16 && cp.d < 22 + lagM) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); if (o.id !== ai.hailTack?.with) avoiding = true; continue; }
+    // Touching, or all but: whoever has right of way, she gets her boat off the other one, steering away from her with
+    // way on. (Easing her sails at it, as she does to keep clear, both boats lay stopped and locked together, and the
+    // rules judged them again every few seconds: a third of all the AI's incidents were the same two boats again within
+    // half a minute)
+    if (hullGap(b, o) < UNTANGLE_GAP) {
+      desired = sailable(b, brg(-dx, -dy)); luff = false; avoiding = true;
+      if (cp.t < lagT + 1) ai.urgent = true;
+      continue;
+    }
     // (the boat she has hailed about, while that hail is answered and there's still time: she holds on, to tack)
     if (boatHailOn && o.id === bh!.c && cp.t > BOAT_HAIL_MARGIN) continue;
     // (and, overlapped to windward, closing on her with less than that room already, however slowly: converging side
