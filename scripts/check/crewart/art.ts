@@ -30,6 +30,11 @@ function pose(b: ReturnType<typeof buildArtBody>, i: number) {
   b.head.rotation.set(0.04, 0.12 * (i % 2 ? -1 : 1), 0);
   b.leg[0].root.rotation.set(0, 0, -0.03); b.leg[1].root.rotation.set(0, 0, 0.03);
 }
+type Fig = ReturnType<typeof buildArtBody>;
+/** Both legs: the thighs swung forward `hip` rad, the knees bent `knee` (negative: the shin back), spread `out`. */
+const leg = (b: Fig, hip: number, knee: number, out: number) => b.leg.forEach((l, i) => { l.root.rotation.set(hip, 0, (i ? 1 : -1) * out); l.mid.rotation.set(knee, 0, 0); });
+/** Both arms forward `sh` rad from hanging, the elbows bent `el`. */
+const arms = (b: Fig, sh: number, el: number) => b.arm.forEach((a, i) => { a.root.rotation.set(sh, 0, (i ? 1 : -1) * 0.12); a.mid.rotation.set(-el, 0, 0); });
 function place(kits: number[]) {
   for (const f of figures) scene.remove(f);
   figures = kits.map((k, i) => {
@@ -67,6 +72,36 @@ const art = {
   lineup() {
     place([0, 1, 2]);
     draw([{ x: 0, y: 0, w: W, h: H, eye: orbit(-20, 6, 5.2, [0, 0.0, 0]), at: [0, -0.05, 0], fov: 32, label: 'A · B · C' }]);
+  },
+  /** The joints in the poses the boat asks of them (for the skinning): seated on a bench, hiking, kneeling, reaching
+   * forward and overhead, the head turned hard round in a hood; each figure on its own, a bench where it sits. */
+  poses(k: number, hoodKit = 2) {
+    for (const f of figures) scene.remove(f);
+    const P = [
+      { n: 'seated', kit: k, set: (b: Fig) => { leg(b, 1.5, -1.5, 0.1); arms(b, 0.6, -0.9); }, bench: true },
+      { n: 'hiking', kit: k, set: (b: Fig) => { leg(b, 1.35, -1.1, 0.08); b.torso.rotation.set(0.75, 0, 0); arms(b, 1.0, -0.4); }, bench: true },
+      { n: 'kneeling', kit: k, set: (b: Fig) => { leg(b, 0.1, -1.6, 0.06); b.torso.rotation.set(-0.25, 0, 0); arms(b, 0.9, -0.6); }, bench: false },
+      { n: 'reaching', kit: k, set: (b: Fig) => { b.arm[0].root.rotation.set(1.5, 0, -0.15); b.arm[1].root.rotation.set(2.7, 0, 0.2); b.arm[0].mid.rotation.set(0.3, 0, 0); b.arm[1].mid.rotation.set(0.2, 0, 0); }, bench: false },
+      { n: 'head turned, hood', kit: hoodKit, set: (b: Fig) => { b.head.rotation.set(0.1, 1.3, 0); }, bench: false }
+    ];
+    figures = P.map((q, i) => {
+      const b = buildArtBody({ h: 1.78, w: 80 }, KITS[q.kit]); pose(b, 0); q.set(b);
+      b.root.position.set(i * 4, 0, 0); scene.add(b.root);
+      if (q.bench) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.06, 0.5), new THREE.MeshLambertMaterial({ color: 0xb08a5a })); m.position.set(i * 4, -0.12, 0.05); m.receiveShadow = true; scene.add(m); (b.root as any).bench = m; }
+      return b.root;
+    });
+    const v = (i: number, yaw: number, pitch: number, dist: number, y: number) => { const at = [i * 4, y, 0]; return { eye: orbit(yaw, pitch, dist, at), at }; };
+    draw([
+      { x: 0, y: 0, w: 450, h: 600, ...v(0, -90, 8, 2.3, -0.1), fov: 30, label: 'seated, side' },
+      { x: 450, y: 0, w: 450, h: 600, ...v(0, 140, 12, 2.3, -0.1), fov: 30, label: 'seated, behind' },
+      { x: 900, y: 0, w: 450, h: 600, ...v(0, -30, 5, 2.3, -0.15), fov: 30, label: 'seated, front' },
+      { x: 1350, y: 0, w: 450, h: 600, ...v(1, -90, 8, 2.6, 0.0), fov: 30, label: 'hiking, side' },
+      { x: 0, y: 600, w: 450, h: 600, ...v(2, -90, 8, 2.8, -0.3), fov: 30, label: 'kneeling, side' },
+      { x: 450, y: 600, w: 450, h: 600, ...v(3, -40, 8, 2.2, 0.45), fov: 30, label: 'reaching, front' },
+      { x: 900, y: 600, w: 450, h: 600, ...v(3, 140, 15, 2.2, 0.45), fov: 30, label: 'reaching, behind' },
+      { x: 1350, y: 600, w: 450, h: 600, ...v(4, 150, 10, 1.0, 0.62), fov: 30, label: 'head turned, hood' }
+    ]);
+    for (const f of figures) { const bm = (f as any).bench; if (bm) scene.remove(bm); }
   },
   any(k: number, yaw: number, pitch: number, dist: number, y: number) { place([k]); draw([{ x: 0, y: 0, w: W, h: H, eye: orbit(yaw, pitch, dist, [0, y, 0]), at: [0, y, 0], fov: 30, label: '' }]); }
 };

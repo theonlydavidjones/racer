@@ -566,6 +566,45 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   // the head turns to what they're watching (within a neck's reach)
   local(p.look, _h).applyQuaternion(_tq).sub(f.head.position);
   f.head.rotation.set(Math.max(-0.6, Math.min(0.5, Math.atan2(_h.y - 0.1, Math.hypot(_h.x, _h.z)))), Math.max(-1.3, Math.min(1.3, Math.atan2(-_h.x, -_h.z))), 0);
+  // the feet set down on what's under them, and the hands' angle at the wrist
+  f.foot[0].quaternion.identity(); f.foot[1].quaternion.identity(); f.hand[0].quaternion.identity(); f.hand[1].quaternion.identity();
+  f.root.updateMatrixWorld(true);
+  for (const i of [0, 1]) { footDown(f, i); wrist(f, i); }
+}
+
+const _pw = new THREE.Quaternion(), _gq = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _up = V(0, 0, 0), _fw = V(0, 0, 0), _an = V(0, 0, 0), _bx = V(0, 0, 0), _by = V(0, 0, 0), _bz = V(0, 0, 0), _mb = new THREE.Matrix4();
+const IDQ = new THREE.Quaternion();
+/** A turn at a joint no more than `max` rad from its rest (a slerp back toward it). */
+const clampTurn = (q: THREE.Quaternion, max: number) => { const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w))); if (ang > max) q.slerpQuaternions(IDQ, q, max / ang); return q; };
+/**
+ * A foot set flat on what it stands on: the sole level with the deck (the boat's own up: the crew are in her frame), the
+ * toes the way the shin faces, within an ankle's reach (about 50° either way); flat only on the ground, eased off as the
+ * foot lifts (stepping, or a leg over the coaming in the air), where it hangs on in line with the shin.
+ */
+function footDown(f: Figure, i: number): void {
+  const a = f.foot[i], knee = f.leg[i].mid, grp = f.root.parent;
+  if (!grp) return;
+  knee.getWorldQuaternion(_pw); grp.getWorldQuaternion(_gq);
+  _up.set(0, 1, 0).applyQuaternion(_gq);
+  _fw.set(0, 0, -1).applyQuaternion(_pw).addScaledVector(_up, -_fw.dot(_up));
+  if (_fw.lengthSq() < 1e-6) return; _fw.normalize();
+  _by.copy(_up); _bz.copy(_fw).negate(); _bx.crossVectors(_by, _bz).normalize();
+  _qt.setFromRotationMatrix(_mb.makeBasis(_bx, _by, _bz));
+  _q1.copy(_pw).invert().multiply(_qt); clampTurn(_q1, 0.9);
+  // (how high the ankle is over the ground under it: on it, 6 cm up, the foot flat; a hand's breadth higher, not)
+  a.getWorldPosition(_an); grp.worldToLocal(_an);
+  const lift = _an.y - ground(_an.x, _an.z) - 0.065 * f.scale;
+  a.quaternion.slerpQuaternions(IDQ, _q1, 1 - smooth01((lift - 0.04) / 0.14));
+}
+/** A hand's angle at the wrist: in line with the forearm, eased a quarter of the way toward hanging down (a relaxed wrist
+ * holding a line or the tiller extension drops a little; a straight one looks like a stick). */
+function wrist(f: Figure, i: number): void {
+  const grp = f.root.parent; if (!grp) return;
+  f.arm[i].mid.getWorldQuaternion(_pw); grp.getWorldQuaternion(_gq);
+  _bx.set(0, -1, 0).applyQuaternion(_pw); _by.set(0, -1, 0).applyQuaternion(_gq);
+  _bz.copy(_bx).lerp(_by, 0.25).normalize();
+  _qt.setFromUnitVectors(_bx, _bz);
+  f.hand[i].quaternion.copy(_pw).invert().multiply(_qt).multiply(_pw); clampTurn(f.hand[i].quaternion, 0.6);
 }
 /** Ease the pose shown toward the pose wanted (a quarter of a second or so). */
 function ease(f: Figure, want: PoseT, dt: number): PoseT {

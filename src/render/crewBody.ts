@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { Person } from '../boat/crewPhys';
 
 /**
- * A sailor's body: one skinned mesh on eleven bones (hips, spine, head, shoulders, elbows, hips, knees), so a person is
+ * A sailor's body: one skinned mesh on fifteen bones (hips, spine, head, shoulders, elbows, wrists, hips, knees, ankles), so a person is
  * one draw call however they're posed (tests/perf.test.ts and scripts/check/perf.cjs: draw calls in every view).
  * Proportions from body-segment lengths as fractions of height (Winter, Biomechanics and Motor Control of Human
  * Movement, fig. 4.1, after Drillis & Contini): thigh 0.245 H, shank 0.246 H, upper arm 0.186 H, forearm 0.146 H,
@@ -33,12 +33,14 @@ import type { Person } from '../boat/crewPhys';
 export const BONE = { thigh: 0.43, shin: 0.43, upper: 0.30, fore: 0.255, shoulderY: 0.47, hipX: 0.095, shoulderX: 0.2, headY: 0.57 };
 
 export interface Limb { root: THREE.Object3D; mid: THREE.Object3D }
-export interface Body { root: THREE.Group; torso: THREE.Bone; head: THREE.Bone; arm: [Limb, Limb]; leg: [Limb, Limb]; scale: number; mesh: THREE.SkinnedMesh }
+/** (`foot` and `hand`: the ankles' and wrists' bones, at the ends of the shins and forearms, for setting a foot flat on
+ * the deck and a hand's angle at the wrist: render/crew.ts) */
+export interface Body { root: THREE.Group; torso: THREE.Bone; head: THREE.Bone; arm: [Limb, Limb]; leg: [Limb, Limb]; foot: [THREE.Bone, THREE.Bone]; hand: [THREE.Bone, THREE.Bone]; scale: number; mesh: THREE.SkinnedMesh }
 
 type V3 = THREE.Vector3;
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** Bone indices, in the skeleton's order (below). */
-const HIPS = 0, SPINE = 1, HEAD = 2, SH = [3, 5], EL = [4, 6], HP = [7, 9], KN = [8, 10];
+const HIPS = 0, SPINE = 1, HEAD = 2, SH = [3, 5], EL = [4, 6], HP = [7, 9], KN = [8, 10], ANK = [11, 12], WR = [13, 14];
 type W = [number, number][];
 const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const blend = (a: number, b: number, t: number): W => t <= 0 ? [[a, 1]] : t >= 1 ? [[b, 1]] : [[a, 1 - t], [b, t]];
@@ -258,7 +260,7 @@ const SEAT_P = profile([
 ]);
 /** A trouser leg (salopettes), centred on the hip joint: thigh to an ankle cuff wide enough to go over a sea boot. */
 const LEG_P = profile([
-  [0.0, 0.076, 0.086, 0.096, 0.006, 2, -0.008], // (under the jacket's hem, merging into the seat)
+  [0.0, 0.07, 0.084, 0.094, 0.006, 2, -0.014], // (under the jacket's hem, merging into the seat: inside the jacket's sides)
   [-0.08, 0.079, 0.092, 0.097, 0.002, 2, -0.008],
   [-0.18, 0.081, 0.092, 0.089, -0.004, 2, -0.006], // the thigh, fuller in front (the quadriceps), angling in to the knee;
   // (its outside, below the jacket's hem, kept a little inside the hem's line: the hips don't stand out past the jacket)
@@ -295,10 +297,36 @@ const drape = (r: V3[], a: number, k: number, ph: number) => {
 
 /** Skin weights. The torso: the hips' bone below the waist, the spine's above, blended over the waist. */
 const wTorso = (p: V3): W => blend(HIPS, SPINE, ss(0.02, 0.22, p.y));
-const wArm = (i: number) => (p: V3): W => p.y > 0.42 ? blend(SH[i], SPINE, 0.55 * ss(0.42, 0.51, p.y)) : blend(EL[i], SH[i], ss(0.13, 0.21, p.y));
+/** Two sets of weights mixed, `t` of the second. */
+const mixW = (a: W, b: W, t: number): W => t <= 0 ? a : t >= 1 ? b : [...a.map(([i, x]) => [i, x * (1 - t)] as [number, number]), ...b.map(([i, x]) => [i, x * t] as [number, number])];
+/** The jacket: as the torso, but its front below the waist rides partly with the thighs, so sitting down it comes up onto
+ * the lap (the hem's front lies on the thighs) instead of hanging straight down through them. */
+const wJacket = (p: V3): W => {
+  // (the point of the shoulder rides partly with the arm: raised, the jacket's shoulder lifts with it instead of the
+  // sleeve's head pulling away from it)
+  const sh = 0.35 * ss(0.38, 0.46, p.y) * ss(0.13, 0.185, Math.abs(p.x));
+  if (sh > 0) return mixW(wTorso(p), [[SH[p.x > 0 ? 1 : 0], 1]], sh);
+  const f = 0.6 * ss(0.03, -0.1, p.y) * Math.min(1, Math.max(0, (-p.z - 0.02) / 0.1));
+  if (f <= 0) return wTorso(p);
+  const t = ss(-0.04, 0.04, p.x); // (the left thigh's, the right's, half each down the middle)
+  return mixW(wTorso(p), [[HP[0], 1 - t], [HP[1], t]], f);
+};
+const wArm = (i: number) => (p: V3): W => {
+  if (p.y <= 0.42) return blend(EL[i], SH[i], ss(0.13, 0.21, p.y));
+  // (the sleeve's head: its inner, upper side, toward the neck, shares the spine's weight; its underside, the armpit,
+  // stays with the arm)
+  const xs = i ? 1 : -1, inward = Math.min(1, Math.max(0, (xs * 0.2 - p.x) * xs / 0.06));
+  return blend(SH[i], SPINE, 0.6 * ss(0.42, 0.51, p.y) * (0.35 + 0.65 * inward));
+};
 // (the sleeve's head shares the spine's weight toward the top, so a raised arm stretches the shoulder rather than lifting
 // the sleeve's head clear of the jacket)
-const wLeg = (i: number) => (p: V3): W => p.y > -0.02 ? blend(HP[i], HIPS, ss(-0.02, 0.06, p.y)) : blend(KN[i], HP[i], ss(-0.47, -0.39, p.y));
+const wLeg = (i: number) => (p: V3): W => {
+  const w = p.y > -0.02 ? blend(HP[i], HIPS, ss(-0.02, 0.06, p.y)) : blend(KN[i], HP[i], ss(-0.47, -0.39, p.y));
+  // (the back of the thigh's top, the buttock, stays with the hips: sitting, the thigh swings up in front of it rather
+  // than folding the seat into a lump at the hip)
+  const k = 0.5 * Math.min(1, Math.max(0, p.z / 0.08)) * ss(-0.18, -0.05, p.y);
+  return mixW(w, [[HIPS, 1]], k);
+};
 
 /** One surface through rings, in material regions: each region its own piece (its own vertices along the seam), so a
  * colour stops at the seam the way a panel of cloth does, with no overlay and no smear. `parts`: [first ring, material]. */
@@ -337,15 +365,17 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
     loft(M, leg, { mat: kit.pants, w: wLeg(i), shade: (_q, r) => r >= ys.length ? 0.4 : 1 });
     loft(M, rings(LEG_P, [-0.35, -0.39, -0.43, -0.47, -0.51], 7, 0.004, cx, 0, FRONT - 0.95, FRONT + 0.95, true), { mat: kit.patch, w: wLeg(i), wrap: false }); // the knee's patch
     // ——— the sea boots: a shaft up under the trousers, the foot, a sole with a little lip
-    loft(M, [-0.66, -0.76, -0.84, -0.875].map(y => ring([y, 0.046, 0.051, 0.054, 0.006, 2.2], 12, 0, cx)), { mat: kit.boots, w: () => [[KN[i], 1]] });
+    // (the ankle's joint at the shin's end, 0.86 below the hips: the boot's shaft bends there, the foot and sole move with it)
+    const wAnk = (q: V3): W => blend(KN[i], ANK[i], ss(-0.8, -0.88, q.y));
+    loft(M, [-0.66, -0.76, -0.82, -0.85, -0.875].map(y => ring([y, 0.046, 0.051, 0.054, 0.006, 2.2], 12, 0, cx)), { mat: kit.boots, w: wAnk });
     const foot: [z: number, rx: number, yt: number, yb: number, yc: number][] = [
       [0.078, 0.03, 0.028, 0.028, -0.886], [0.064, 0.044, 0.052, 0.036, -0.884], [0.02, 0.049, 0.06, 0.04, -0.882], [-0.05, 0.052, 0.042, 0.034, -0.89],
       [-0.12, 0.052, 0.03, 0.031, -0.894], [-0.175, 0.046, 0.023, 0.028, -0.897], [-0.205, 0.033, 0.017, 0.024, -0.899], [-0.215, 0.014, 0.01, 0.016, -0.9]
     ];
     const fx = cx + xs * 0.006;
-    loft(M, foot.map(f => around(10).map(th => { const c = Math.cos(th), sn = Math.sin(th); return V(fx + f[1] * spow(c, 0.8), f[4] + (sn > 0 ? f[2] : f[3]) * spow(sn, 0.8), f[0]); })), { mat: kit.boots, w: () => [[KN[i], 1]], capStart: true, capEnd: true });
+    loft(M, foot.map(f => around(10).map(th => { const c = Math.cos(th), sn = Math.sin(th); return V(fx + f[1] * spow(c, 0.8), f[4] + (sn > 0 ? f[2] : f[3]) * spow(sn, 0.8), f[0]); })), { mat: kit.boots, w: () => [[ANK[i], 1]], capStart: true, capEnd: true });
     const sole = [[0.082, 0.032], [0.06, 0.05], [0.0, 0.054], [-0.1, 0.058], [-0.17, 0.052], [-0.205, 0.038], [-0.219, 0.018]];
-    loft(M, sole.map(([z, rx]) => around(10).map(th => V(fx + rx * spow(Math.cos(th), 0.6), -0.917 + 0.011 * spow(Math.sin(th), 0.6), z))), { mat: kit.sole, w: () => [[KN[i], 1]], capStart: true, capEnd: true });
+    loft(M, sole.map(([z, rx]) => around(10).map(th => V(fx + rx * spow(Math.cos(th), 0.6), -0.917 + 0.011 * spow(Math.sin(th), 0.6), z))), { mat: kit.sole, w: () => [[ANK[i], 1]], capStart: true, capEnd: true });
   }
 
   // ——— the jacket: a drawcord band at the hem, the body, the shoulders in a darker reinforcement, a collar zipped to
@@ -354,7 +384,7 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
     const ys = [-0.105, -0.095, -0.075, -0.03, 0.02, 0.08, 0.16, 0.25, 0.32, 0.38, 0.4, 0.425, 0.455, 0.48, 0.503, 0.523, 0.54];
     const body = rings(JACKET_P, ys, 24).map((r, k) => drape(r, 0.004 * ss(0.03, -0.1, ys[k]), 5, 0.7));
     body.unshift(drape(ring(JACKET_P(-0.1), 24, -0.01), 0.004, 5, 0.7).map(q => q.setY(-0.08))); // (the hem turned up inside)
-    loftParts(M, body, [[0, kit.trim], [3, kit.jacket], [11, kit.yoke]], { w: wTorso, shade: (_q, r) => r === 0 ? 0.45 : 1 });
+    loftParts(M, body, [[0, kit.trim], [3, kit.jacket], [11, kit.yoke]], { w: wJacket, shade: (_q, r) => r === 0 ? 0.45 : 1 });
   }
   const collarTop = (th: number) => 0.62 + 0.026 * Math.max(0, Math.sin(th)) + 0.012 * (1 - Math.abs(Math.sin(th))); // (front .612, sides .624, back .646)
   // (in the spine's frame: the neck's top, about the chin, at HY = 0.57, so the rim comes up over the chin in front)
@@ -368,7 +398,7 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
   {
     const path = range(-0.095, 0.5, 10).map(y => onRow(JACKET_P(y), FRONT, 0.002, 0, 0, g, g));
     for (const f of [0.3, 0.7, 0.97]) { const r = colRing(f, 0.002); path.push(r[Math.round(r.length * 0.75) % r.length]); } // (its front)
-    sweep(M, path, { mat: kit.trim, w: wTorso, a: () => 0.011, b: () => 0.0035, out: () => V(0, 0, -1), n: 4, lift: 0.6, sq: 4 });
+    sweep(M, path, { mat: kit.trim, w: wJacket, a: () => 0.011, b: () => 0.0035, out: () => V(0, 0, -1), n: 4, lift: 0.6, sq: 4 });
   }
   for (const i of [0, 1]) {
     const xs = i ? 1 : -1, cx = xs * sx;
@@ -389,11 +419,13 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
       [-0.19, 0.01, 0.03, 0.045, 0.004], [-0.206, 0.014, 0.026, 0.039, 0.003], [-0.215, 0.016, 0.016, 0.027, 0.002]
     ];
     const hring = (h: number[], d = 0, a0 = 0, a1 = TAU, open = false, n = 12) => around(n, a0, a1, open).map(th => V(cx + inward * h[1] + (h[2] + d) * spow(Math.cos(th), 0.8), h[0], h[4] + (h[3] + d) * spow(Math.sin(th), 0.8)));
-    loft(M, hand.map(h => hring(h)), { mat: kit.gloves, w: () => [[EL[i], 1]], capEnd: true });
+    // (the wrist's joint at the forearm's end: the glove's cuff bends there with the sleeve's, the hand moves with it)
+    const wWr = (q: V3): W => blend(WR[i], EL[i], ss(-0.105, -0.07, q.y));
+    loft(M, hand.map(h => hring(h)), { mat: kit.gloves, w: wWr, capEnd: true });
     const palm = inward > 0 ? 0 : Math.PI;
-    loft(M, hand.slice(1, 6).map(h => hring(h, 0.002, palm - 0.9, palm + 0.9, true, 6)), { mat: kit.palm, w: () => [[EL[i], 1]], wrap: false });
+    loft(M, hand.slice(1, 6).map(h => hring(h, 0.002, palm - 0.9, palm + 0.9, true, 6)), { mat: kit.palm, w: wWr, wrap: false });
     sweep(M, [V(cx + inward * 0.012, -0.1, -0.03), V(cx + inward * 0.016, -0.13, -0.046), V(cx + inward * 0.02, -0.158, -0.05), V(cx + inward * 0.024, -0.176, -0.043)], {
-      mat: kit.gloves, w: () => [[EL[i], 1]], a: t => 0.014 - 0.003 * t, b: t => 0.012 - 0.002 * t, out: () => V(0, 0, -1), lift: 0, n: 8
+      mat: kit.gloves, w: wWr, a: t => 0.014 - 0.003 * t, b: t => 0.012 - 0.002 * t, out: () => V(0, 0, -1), lift: 0, n: 8
     });
   }
 
@@ -417,7 +449,7 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
     const vr = vy.map(y => ring(vrow(y), 24));
     vr.unshift(ring([0.1, VEST_X(0.1) - 0.016, JACKET_P(0.1)[2] + 0.004, JACKET_P(0.1)[3] + 0.004, 0, 2.6], 24));
     vr.push(ring([0.512, 0.088, 0.086, 0.082, 0.004, 2.2], 24));
-    loft(M, vr, { mat: kit.pfdBody, w: wTorso });
+    loft(M, vr, { mat: kit.pfdBody, w: wJacket });
     // its black side panels and zip, a buckled strap at the waist, reflective patches high on the chest
     for (const xs of [-1, 1]) loft(M, [0.11, 0.18, 0.26, 0.33].map(y => around(6, xs > 0 ? -0.55 : Math.PI - 0.55, xs > 0 ? 0.55 : Math.PI + 0.55, true).map(th => onRow(vrow(y), th, 0.003, 0, 0, g, g))), { mat: kit.pfdTrim, w: wTorso, wrap: false });
     sweep(M, range(0.1, 0.5, 8).map(y => onRow(vrow(y), FRONT, 0, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.008, b: () => 0.003, out: () => V(0, 0, -1), n: 4, sq: 4 });
@@ -516,7 +548,7 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
  * figure is a few dozen pixels tall and the coarser one can't be told apart, about half the triangles. */
 export const CREW_LOD_M = 32, CREW_LOD_SEG = 0.5;
 
-/** A person: their geometry near and far off (a THREE.LOD), both skinned to one skeleton on the eleven bones. */
+/** A person: their geometry near and far off (a THREE.LOD), both skinned to one skeleton on the fifteen bones. */
 export function buildArtBody(p: Person, kit: Kit): Body & { tris: number; trisFar: number } {
   const s = p.h / 1.75, g = Math.max(0.85, Math.min(1.35, Math.sqrt(p.w / (p.h * p.h) / 24)));
   const hx = BONE.hipX * g, sx = BONE.shoulderX * g, HY = BONE.headY;
@@ -526,7 +558,8 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number; trisFa
   const sh = [-1, 1].map(q => B(spine, q * sx, BONE.shoulderY, 0)), el = sh.map(b => B(b, 0, -BONE.upper, 0));
   const hp = [-1, 1].map(q => B(hips, q * hx, 0, 0)), kn = hp.map(b => B(b, 0, -BONE.thigh, 0));
   head.rotation.order = 'YXZ';
-  const skeleton = new THREE.Skeleton([hips, spine, head, sh[0], el[0], sh[1], el[1], hp[0], kn[0], hp[1], kn[1]]);
+  const an = kn.map(b => B(b, 0, -BONE.shin, 0)), wr = el.map(b => B(b, 0, -BONE.fore, 0));
+  const skeleton = new THREE.Skeleton([hips, spine, head, sh[0], el[0], sh[1], el[1], hp[0], kn[0], hp[1], kn[1], an[0], an[1], wr[0], wr[1]]);
   root.add(hips);
   const near = bodyMesh(kit, g, 1), far = bodyMesh(kit, g, CREW_LOD_SEG), row = paletteRow(near.mats);
   const skinned = (M: Mesh) => {
@@ -544,7 +577,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number; trisFa
   const lod = new THREE.LOD(), mesh = skinned(near), meshFar = skinned(far);
   lod.addLevel(mesh, 0); lod.addLevel(meshFar, CREW_LOD_M); root.add(lod);
   root.updateMatrixWorld(true); mesh.bind(skeleton); meshFar.bind(skeleton);
-  return { root, torso: spine, head, arm: [{ root: sh[0], mid: el[0] }, { root: sh[1], mid: el[1] }], leg: [{ root: hp[0], mid: kn[0] }, { root: hp[1], mid: kn[1] }], scale: s, mesh, tris: near.tris, trisFar: far.tris };
+  return { root, torso: spine, head, arm: [{ root: sh[0], mid: el[0] }, { root: sh[1], mid: el[1] }], leg: [{ root: hp[0], mid: kn[0] }, { root: hp[1], mid: kn[1] }], foot: [an[0], an[1]], hand: [wr[0], wr[1]], scale: s, mesh, tris: near.tris, trisFar: far.tris };
 }
 
 /**
@@ -625,7 +658,7 @@ export function kitFor(seed: number, team: number): Kit {
   };
 }
 
-/** A sailor's body for a person, in their kit (kitFor), on the eleven bones. */
+/** A sailor's body for a person, in their kit (kitFor), on the fifteen bones. */
 export function buildBody(p: Person, jacket: number, seed: number): Body {
   return buildArtBody(p, kitFor(seed, jacket));
 }
