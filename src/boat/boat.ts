@@ -48,6 +48,8 @@ export interface AiState {
   commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
+  /** Owing a penalty, since when she's been looking for clear water to take it in (s, race time). */
+  clearSince?: number;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for

@@ -33,8 +33,13 @@ const BOAT_HAIL_LEAD = 9;
 
 const FLAG_CAUTION: Record<PrepFlag, number> = { P: 0, I: 1, Z: 2, U: 3, black: 3.5 };
 
-/** A boat owing a penalty first gets this far (m) from other boats before turning. */
-const PENALTY_CLEAR = 25;
+/** A boat owing a penalty first gets this far (m) from other boats before turning (Rule 44.2: "after getting well
+ * clear of other boats"), and with none coming within PENALTY_PASS of her in the next 12 s: turning takes her 20 s
+ * and more, near enough stopped, and at 25 m with boats sailing by she was hit in her turns, a foul on them under
+ * Rule 23.2 and another penalty, a third of all the AI's fouls. */
+const PENALTY_CLEAR = 40, PENALTY_PASS = 15, PENALTY_WAIT = 30;
+/** Room she leaves a boat turning her penalty circles (m, centre to centre): her circle, about a length across, and a length more. */
+const TURNING_ROOM = 12;
 /** ...and this far from marks. */
 const MARK_CLEAR = 20;
 /** Pass marks with at least this much room between the mark and her centreline, m (Rule 31). */
@@ -327,7 +332,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
     let near: Vec | null = null, nd = PENALTY_CLEAR;
-    for (const o of w.boats) if (o !== b) { const d = dist(o, b); if (d < nd) { nd = d; near = o; } }
+    // (well clear, but not for ever: in a fleet there's always another boat coming by, and after PENALTY_WAIT s of
+    // looking for clear water she settles for 25 m, as before, or she'd sail off from the fleet and never turn)
+    const notTurned = b.penalty >= b.penaltyTotal - 1;
+    if (!notTurned || ai.clearSince == null) ai.clearSince = notTurned ? w.t : undefined;
+    const patient = notTurned && w.t - (ai.clearSince ?? w.t) < PENALTY_WAIT;
+    if (patient) nd = PENALTY_CLEAR; else nd = 25;
+    for (const o of w.boats) if (o !== b && !o.finished) { const d = dist(o, b); if (d < nd || (patient && d < 80 && cpa(b, o).d < PENALTY_PASS && d < nd + 40)) { nd = Math.min(nd, d); near = o; } }
     for (const m of w.touchableMarks(b)) { const d = dist(m.p, b); if (d < MARK_CLEAR && d < nd + 10) { nd = d; near = m.p; } } // and away from the marks
     ai.clearing = !!near && b.penalty >= b.penaltyTotal - 1; // not started turning yet
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
@@ -634,6 +645,29 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // hailed "Starboard!" by this boat: duck early and generously
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
     if (ducking && cp.t < 16 && cp.d < 22 + lagM) { desired = sailable(b, b.h + (b.tack === 'P' ? 45 : -45)); if (o.id !== ai.hailTack?.with) avoiding = true; continue; }
+    // A boat doing her penalty turns, near enough stopped and turning: she must keep clear of everyone (Rule 21.2), but
+    // no boat may interfere with her either (Rule 23.2): steer round her in good time, on the clearest heading near the
+    // course (treated as a boat with right of way over her, she was swerved round only at the last moment, and hit)
+    // (she's turning circles where she is, so it's her place she's steered round, not where her heading points now: a
+    // closest approach on her velocity of the moment, swinging round as she turns, is no guide)
+    // (and one still sailing off to take it, from the moment she owes it, as the rules see it: steered round on her
+    // course, as any boat)
+    if (o.penalty > 0 && o.ai?.clearing && cp.t < 10 && cp.d < TURNING_ROOM) {
+      desired = clearestHeading(w, b, desired); luff = false; avoiding = true; continue;
+    }
+    if (o.penalty > 0 && (o.ai ? !o.ai.clearing : o.penaltyDir !== 0) && dist(o, b) < 40) {
+      const still = { x: o.x, y: o.y, vx: 0, vy: 0 }, u = V(b.h), v = Math.max(b.v, 1.2);
+      const pass = (h: number) => { const q = V(h); return cpa({ x: b.x, y: b.y, vx: q.x * v, vy: q.y * v }, still).d; };
+      if (pass(desired) < TURNING_ROOM) {
+        let best = desired, bestS = -Infinity;
+        for (const k of [0, 15, -15, 30, -30, 45, -45, 60, -60, 90, -90]) {
+          const h = sailable(b, desired + k), sc = Math.min(TURNING_ROOM + 3, pass(h)) - Math.abs(k) * 0.03;
+          if (sc > bestS) { bestS = sc; best = h; }
+        }
+        desired = best; luff = false; avoiding = true; void u;
+      }
+      continue;
+    }
     // (the boat she has hailed about, while that hail is answered and there's still time: she holds on, to tack)
     if (boatHailOn && o.id === bh!.c && cp.t > BOAT_HAIL_MARGIN) continue;
     // (and, overlapped to windward, closing on her with less than that room already, however slowly: converging side
