@@ -7,6 +7,7 @@ import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina
 import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
 import { applyMemberInput, memberPage, membersGrid, type MemberFilter } from './members';
+import { morph } from './morph';
 
 /**
  * The Fleet: your boats, as a grid of cards (her profile, name and number) or a table of her particulars (name,
@@ -140,19 +141,19 @@ export class Fleet {
     const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button><span class="later">Club · Seasons: later</span></div>`;
     if (this.tab === 'members') {
       const ms = this.hooks.members(), m = this.member();
-      this.list.innerHTML = `<div class="panel wide fleetpanel">
+      morph(this.list, `<div class="panel wide fleetpanel">
         <button type="button" class="linkbtn back" data-f="back">‹ Back</button>
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats, this.filter)}</div>`;
+        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats, this.filter)}</div>`);
       return;
     }
-    this.list.innerHTML = `<div class="panel wide fleetpanel">
+    morph(this.list, `<div class="panel wide fleetpanel">
       <button type="button" class="linkbtn back" data-f="back">‹ Back</button>
       <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div>
         <div class="seg"><button type="button" data-f="view" data-v="grid" aria-pressed="${this.view === 'grid'}">Grid</button><button type="button" data-f="view" data-v="list" aria-pressed="${this.view === 'list'}">List</button></div>
         <button type="button" class="cta" data-f="new">New boat</button></div>${tabs}
       ${body}
-      <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or race or cruise her.</small></div>`;
+      <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or race or cruise her.</small></div>`);
     // her pictures: drawn one at a time once the list is up (each is a 3D render of her as she's set up)
     const imgs = [...this.list.querySelectorAll<HTMLImageElement>('img[data-thumb]')], job = ++this.thumbJob;
     const next = () => {
@@ -184,7 +185,7 @@ export class Fleet {
     const row = (k: string, v: string) => `<tr><td>${k}</td><td>${v}</td></tr>`;
     const colour = (list: [string, string][], c: string) => list.find(x => x[1] === c)?.[0] ?? '';
     const p = b.perf, ages = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
-    this.page.innerHTML = `
+    morph(this.page, `
       <div class="bphead"><button type="button" class="linkbtn" data-f="toList">‹ Yacht Club</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
       <div class="garage">
         <div class="gbtns"><button type="button" class="cta" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
@@ -218,7 +219,7 @@ export class Fleet {
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
           : '<small>Nobody has sailed her yet.</small>'}
         <small>Skippers and crews come with the Yacht Club; until then, when she isn't sailed by you she has a generic AI skipper and crew.</small></section>
-      </div>`;
+      </div>`);
   }
 
 }
