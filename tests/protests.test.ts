@@ -35,6 +35,15 @@ describe('Protests: the hail and the red flag (RRS 60.2(a)(1))', () => {
     expect(w.protests[0]).toMatchObject({ vs: o.id, rule: null, fouler: w.user.id });
   });
 
+  it('a port-tacker that has just fouled you, still close: the hail is "Protest!", not "Starboard!"', () => {
+    const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
+    const u = w.user, o = w.boats[1], wf = w.wind.from;
+    Object.assign(u, { tack: 'S', h: (wf + 315) % 360, v: 2 });
+    Object.assign(o, { x: u.x + 8, y: u.y + 8, tack: 'P', h: (wf + 45) % 360, v: 2, finished: false });
+    incident(w, 'them');
+    expect(w.hailOption()).toMatchObject({ kind: 'protest', to: o });
+  });
+
   it('only at the first reasonable opportunity: the offer lapses PROTEST_HAIL seconds after the incident', () => {
     const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
     incident(w, 'them');

@@ -18,8 +18,10 @@ export interface ConductCtx {
 /**
  * Does she take her penalty? Disqualifications run at 0.15–0.32% of starts in real fleets (Skipper Model's census,
  * docs/SKIPPER-MODEL-PROPOSAL.md). Here every AI boat fouled protests, and the hearing finds the facts exactly, so a
- * declined penalty is a DSQ: the decline rate is that census divided by the sim's fouls per start, about one per boat a
- * race (the physics-reviewer's probe, SS2, 8 boats, 13 Nov 2026): 0.25%, so she takes it 997 times in 1000. (Most real
+ * declined penalty is a DSQ: the decline rate is that census divided by the sim's fouls per start. The physics-reviewer's
+ * probe (SS2, 8 boats, 13 Nov 2026) found about one a boat in the first 11 minutes of racing; a whole race has more,
+ * unmeasured. One a start gives 0.25%, so she takes it 997 times in 1000: an upper bound on declines, the true one lower.
+ * (So a protest against an AI boat will seldom change a result until the skipper's perception, Skipper Model, lands.) (Most real
  * refusals are honest disagreement, not cheating, rule 2: the skipper's perception will model that.) The fallback
  * stands by her choice after the race. `rnd` is her draw, 0–1.
  */
