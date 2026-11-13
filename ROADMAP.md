@@ -169,6 +169,11 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
+   tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
+   should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
+   what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
+   released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
