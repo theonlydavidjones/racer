@@ -175,6 +175,11 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
   switch (k) {
     case 'mainsheet': {
       const was = b.sheets.main, will = clamp(boomAngle(withCrew(b, 'mainsheet', to)), SAILS.main.min, SAILS.main.max), n = Math.abs(will - was);
+      // the boom on the shroud and the main stalled (a broad reach): no sheet will ease it further. The vang lets the top
+      // twist off, or her course changes the angle
+      if (more && n < 1.5 && was >= SAILS.main.max - 0.5 && b.trim.main.flow === 'stalled') return { ...base, kind: 'info' as const, head: 'The boom\'s on the shroud: it can\'t go out any further.',
+        why: 'On this broad reach the main is still sheeted tighter than the wind angle wants, and the shroud stops the boom: the flow breaks off its back.',
+        look: 'ease the vang to let the top twist off, or bear away (or come up) until the leech telltales stream', done: 'main drawing' };
       // the boom barely moves (it's at its stop, or the crew's traveller keeps it where they want it): the sheet is the leech
       if (n < 1.5 && s.awa < 110) return more
         ? { ...base, head: `Ease the mainsheet ${easeAmount(d)}: open the leech.`, why: `The leech is closed tighter than ${tws} kt wants: the top of the main needs a little twist.`,
