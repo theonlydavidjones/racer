@@ -27,6 +27,11 @@ cruiser, or it can cross the Pacific single-handed.
 Sailors say two things: if you can sail the Bay, you can sail anywhere; and if you can sail a Folkboat, you can sail
 anything. That's what this game amounts to. Our mission is to bring those two truths to anyone who wants them.
 
+Community (the owner, 13 Nov 2026): the mission is also about community. You can't race in real life without belonging
+to a club, and no single person can know or do everything required to sail and maintain a boat. The marinas, the trading
+and training of crew, the flying of burgees, the traditions, the legacies and the trophies all belong to that community
+element. Eventually: a live multiplayer mode.
+
 Priority (the owner, 13 Nov 2026): physics and racing first. "Physics is the key to the true-to-life element of the
 simulator. If it's not real and accurate, then it's not a simulator." The Bay's beauty and a robust open-Bay cruising mode
 come later, once the physics and racing are dialed in.

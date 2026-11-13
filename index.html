@@ -141,8 +141,6 @@
   <button class="ib on" id="bBand" type="button" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
   <button class="ib" id="bEnsign" type="button" hidden title="Strike the ensign in a blow: the flag lowered and its staff stowed below, before it flogs itself to rags. Again hoists it."><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V3"/><path d="M5 4h9l-2 3 2 3H5"/><path class="dn" d="M15 12v6M12.5 15.5 15 18l2.5-2.5"/></svg><span class="w">Strike ensign</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
-  <button class="ib" id="bWind" type="button" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h9a2.5 2.5 0 1 0-2.5-2.5"/><path d="M3 10h12a2.5 2.5 0 1 1-2.5 2.5"/><path d="M3 14h6"/></svg><span class="w">Wind</span></button>
-  <button class="ib" id="bFlow" type="button" aria-pressed="false" title="The flow view: the air over the sails at three heights, and what the telltales are saying"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 6c4-2 8 2 16 0"/><path d="M2 10c4-2 8 2 16 0"/><path d="M2 14c4-2 8 2 16 0"/></svg><span class="w">Flow</span></button>
   <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
 </div>
 <div id="crewPop" hidden role="dialog" aria-label="The crew's weight">
@@ -189,9 +187,9 @@
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
-      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>Sail one of your races again: the same course, fleet, day and start</span></button>
+      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
     </div>
-    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="pastRows"></div></div>
+    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
   </div>
 </div>
 
@@ -413,6 +411,7 @@
     <p id="resStart"></p>
     <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
     <p id="resFouls" class="lede"></p>
+    <div id="resReal" class="debrief" hidden></div>
     <div id="resDebrief" class="debrief"></div>
     <div class="btnrow"><button class="ghost" id="bWatch" type="button">Watch your race</button></div>
     <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Back to setup</button></div>

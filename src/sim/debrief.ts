@@ -36,6 +36,8 @@ export interface Moment { key: string; t0: number; t1: number; x: number; y: num
 interface Spell { key: string; t0: number; t1: number; x: number; y: number; lost: number; peak: number; aux: number; who: Map<string, number>; leg?: number }
 /** A spell off for this long is over (a brief let-up doesn't split it); one that cost less than EP_MIN isn't kept. */
 const EP_GAP = 4, EP_MIN = 1;
+/** A wind shift worth calling a header or a lift, deg: past the wind's own wobble (the debrief's and the replay's line). */
+export const SHIFT_DEG = 4;
 /** Dirty air with no boat to windward to blame. */
 const SHIP = 'a ship or the committee boat';
 interface MarkLog { name: string; leg: 'beat' | 'reach' | 'run'; overM: number; overT: number; wide: number | null; place: number | null; t: number | null }
@@ -218,7 +220,7 @@ export class RaceLog {
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), headed = u.tack === 'S' ? -dev : dev; // + headed
     this.liftedAtTack = -headed;
     if (leg === 'beat' && u.twa < 65 && !u.tacking) {
-      if (headed > 4) {
+      if (headed > SHIFT_DEG) {
         this.header.streak += dt;
         // (the spell runs from the header's start; it costs only once held for 15 s, and one let go sooner isn't kept)
         if (this.header.streak > 15) {
