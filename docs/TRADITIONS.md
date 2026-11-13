@@ -65,6 +65,10 @@ until the owner confirms it from the fleet.
      https://usps.org/national/fecom/faq/flag/gaffpole.html; Good Old Boat; Manhattan YC, https://myc.org/flag-etiquette/.
      These were read through search summaries; the CCA and USPS hosts are blocked here.
    - The RRS themselves don't limit flags while racing, beyond advertising.
+   - On the SF Folkboats (the owner, 13 Nov 2026): the burgee flies on the starboard side, at the jumper strut, and is
+     struck for racing. Built that way.
+   - Built: the ensign keeps its hours (0800 to sunset, and entering or leaving harbour after dark: USPS, Seattle YC;
+     src/boat/colours.ts).
    - Not yet sourced: dipping the ensign, officers' flags, dressing ship.
    - In the sim: the burgee at the masthead, the ensign struck at the preparatory signal (both partly in), and colours
      at the club.
