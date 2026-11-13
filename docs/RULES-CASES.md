@@ -14,8 +14,8 @@ Every Case whose rules-referred list touches Part 2 (rules 10–24, 43, 44), mar
   The test checks what the engine does model.
 - **not modelled**: the Case turns on hails' wording, intent, propulsion (rule 42), equipment out of position, protest or race
   committee procedure, or scoring: things the sim doesn't simulate.
-- **?** marks a Case where reading the engine suggests it may give a different answer: the test will tell, and a failure is reported
-  as a finding, not fixed in the same change.
+- A Case the engine answers differently is a **finding** (below): its test is written as `it.fails` with the Case's answer, so it
+  turns red, asking to be made a plain test, once the engine is fixed. Findings aren't fixed in the same change.
 
 What the engine models (src/rules): rules 10–13, 15 (a few seconds' grace), 16.1 and 16.2 (a turn toward the other boat), 17
 (above proper course), 18.2(a)–(d), 18.3, 18.4, 19.2(b)/(c) (the shore, the committee boat after the start, a boat both must keep
@@ -34,7 +34,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 13 | 95 | 11, 15, 16.1, 17 | Before the start L luffs from a leeward overlap from astern: no proper course, so no 17; W broke 11 | covered |
 | 14 | 97 | 11, 16.1, 17 | L luffs slowly to her own proper course: W broke 11 | partly (proper course is a judgement) |
 | 17 | 102 | 13 | Rule 13 ends when she's on a close-hauled course, whatever her speed | covered |
-| 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered **?** (the engine may treat S as an obstruction to the pair) |
+| 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered |
 | 24 | 111 | 11, 12, 15 | B overlaps to leeward from astern close to A's stern: A must luff promptly; contact then is B's (15) | covered |
 | 27 | 117 | 13, 15 | AS tacks right in front of BP: AS broke 13 and 15 | covered |
 | 30 | 123 | 12, 19 | B astern blankets A, A gybes unintentionally: B broke 12 | partly (the unintended gybe) |
@@ -95,7 +95,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 124 | 276 | 19.2(a), 19.2(b) | Who chooses the side to pass an obstruction | partly |
 | 125 | 278 | 19.2(b) | Three port boats meeting S: PL must give room to PM and PW | partly (three boats) |
 | 126 | 280 | 23.2 | Which leg a boat is on when she has made a mistake | partly |
-| 146 | 315 | 11, 16.1, Section C preamble | A starting committee vessel in open water: rule 19 doesn't apply; W exonerated (room under 16.1) | partly **?** (the engine treats the committee boat as an obstruction from the gun on) |
+| 146 | 315 | 11, 16.1, Section C preamble | A starting committee vessel in open water: rule 19 doesn't apply; W exonerated (room under 16.1) | partly (before the gun the engine doesn't make the committee boat an obstruction, as the Section C preamble asks; the 43.1(b) exoneration isn't modelled) |
 | 149 | 322 | 21.2, 23.2, 44.2 | B breaks off her turns to keep clear of A: no breach by B; A broke 23.2 only if off her proper course | covered |
 | 150 | 325 | 19.1, 19.2 | When boats are "at" an obstruction; who is inside at a breakwater | partly |
 
@@ -125,9 +125,8 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tests
 
-The tests live in tests/rules-cases.test.ts, one `it` per Case, named by its number. They are added in slices, highest value first:
-rule 18, then 10–11, 15–17, then 19. Findings (the engine reaching a different answer from a Case) are listed here as they're
-found.
+tests/rules-cases.test.ts has one `it` per covered Case, named by its number: all 27 covered Cases. 25 reach the Case's answer;
+2 are findings (`it.fails`). Partly covered Cases get tests of the part the engine models as the engine grows.
 
 ### Findings
 
