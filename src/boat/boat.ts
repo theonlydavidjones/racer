@@ -85,6 +85,8 @@ export interface Boat {
   x: number; y: number; h: number; // position (m) and heading (deg)
   /** In her slip, made fast, bow in (sim/world.ts pushOff casts her off). */
   docked?: { slip: string };
+  /** Wrecked: set in among a pier's piles (geo/fortMason.ts), the pier's name. Her rig's down and she's held there; the outing's over. */
+  wrecked?: string;
   /** At anchor or on a mooring (she shows the all-round anchor light after dark; render/navLights.ts). */
   atAnchor?: boolean;
   /** Her navigation lights switched off by her skipper (the owner's switch: the lights key). */

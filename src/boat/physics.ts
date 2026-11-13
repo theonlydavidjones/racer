@@ -1,6 +1,7 @@
 import { hitsHarbor } from '../geo/marina';
 import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
+import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
@@ -755,6 +756,16 @@ function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number)
   b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
 
+/** Fort Mason's piers stand on close-set concrete piles under a deck lower than her masthead: a boat set onto one by the
+ * stream or the wind, with no way on to steer off, or set sideways onto it, goes in among the piles, her rig comes down on
+ * the deck's edge and her hull's ground on the concrete. A wreck (the owner, 13 Nov 2026), not a bump. Struck bow first
+ * under way she bounces off its face, as off any pier. */
+function wreck(b: Boat, pier: string, emit: Emit): void {
+  b.wrecked = pier; b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0;
+  if (b.isUser) emit({ type: 'toast', ms: 9000, msg: `Wrecked: she's been set in under ${pier}, among the piles. Rig down, hull holed: in real life, the end of your boat. Esc to go ashore.` });
+}
+/** Below this speed through the water (m/s) her rudder barely bites: she goes where the stream and wind set her. */
+const STEERAGE = 0.5;
 /** Move her over the ground (through the water plus the current), and stop her on a dock or the shore. */
 function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   const u = V(b.h), ww = b.ww;
@@ -773,8 +784,10 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
   else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
     const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
+    const piles = underPier(hit);
+    if (piles && b.v < STEERAGE && !b.motor?.running) { wreck(b, piles.name, emit); return; }
     b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
-    bump(pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+    bump(piles ? `Collision: you hit the piles of ${piles.name}. Bear away and give it room: set in under it, she's a wreck.` : pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {
     const hit = stern(b), pier = pierNear(hit, 6);
     b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
@@ -787,6 +800,8 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y;
   if (!b.pushing && Math.abs(side) > 0.005 && Math.abs(side) > 0.5 * Math.abs(ahead)) {
     const sgn = Math.sign(side), hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
+    const piles = hit && underPier(hit);
+    if (piles) { wreck(b, piles.name, emit); return; }
     if (hit) {
       const pier = pierNear(hit, 6);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;

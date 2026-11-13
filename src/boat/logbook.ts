@@ -20,6 +20,8 @@ export interface LogEntry {
   elapsed?: number;
   /** Cruises: how far she sailed, nm, and whether she got where she was going. */
   nm?: number; arrived?: boolean;
+  /** Wrecked, and where (the pier she was set in under): the outing ended there. */
+  wreck?: string;
   /** Who skippered her, and who crewed. */
   skipper: 'you' | 'ai';
   crew: string;

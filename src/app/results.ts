@@ -205,10 +205,10 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
 /** Leaving an outing (back to the start page, to setup, or starting another): log it if there's anything to log. */
 function logOuting(): void {
   if (!app.w || app.w.logged || app.S.mode === 'drill') return;
-  if (app.S.mode === 'sail' && app.w.freeSail && app.w.t >= 60) {
+  if (app.S.mode === 'sail' && app.w.freeSail && (app.w.t >= 60 || app.w.user.wrecked)) {
     app.send({ k: 'shown', logged: true });
     const from = app.S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(app.S.boat.slip))})` : place(app.S.sailFrom)?.name ?? 'the Bay';
-    stage([{ ...outing(app.S.boat, true), kind: 'cruise', title: `From ${from}${app.w.dest ? ` to ${app.w.dest.name}` : ''}`, elapsed: Math.round(app.w.t), nm: app.w.sailedM / 1852, arrived: app.w.arrivedT != null }]);
+    stage([{ ...outing(app.S.boat, true), kind: 'cruise', title: `From ${from}${app.w.dest ? ` to ${app.w.dest.name}` : ''}`, elapsed: Math.round(app.w.t), nm: app.w.sailedM / 1852, arrived: app.w.arrivedT != null, ...(app.w.user.wrecked ? { wreck: app.w.user.wrecked } : {}) }]);
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.cancelled) {
     // racing called off for the wind: no result, but the outing goes in her logbook
     app.send({ k: 'shown', logged: true });
@@ -216,7 +216,7 @@ function logOuting(): void {
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.t > 0 && app.w.userFinishT == null) {
     // you left the race before finishing: retired
     app.send({ k: 'shown', logged: true });
-    stage([{ ...outing(app.S.boat, true), kind: 'race', title: app.w.C.title, code: 'RET', of: app.w.boats.length, setup: raceSetup() }]);
+    stage([{ ...outing(app.S.boat, true), kind: 'race', title: app.w.C.title, code: 'RET', of: app.w.boats.length, setup: raceSetup(), ...(app.w.user.wrecked ? { wreck: app.w.user.wrecked } : {}) }]);
     // (a season race left unfinished: RET in the series too, if it's saved)
     { const sr = app.seasonRaceOf(); app.pendingSeason = sr && pending ? { ...sr, at: pending[0].at } : null; }
   }
@@ -236,8 +236,8 @@ function settleLog(next: () => void): void {
   const mins = (s?: number) => s == null ? '' : `${Math.floor(s / 60)} min`;
   $('keepTitle').textContent = e.kind === 'race' ? 'Keep this race?' : 'Keep this cruise?';
   $('keepWhat').textContent = e.kind === 'race'
-    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing canceled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
-    : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}. Saved, it goes in her logbook.`;
+    ? `${e.title}: ${e.wreck ? `wrecked under ${e.wreck}` : e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing canceled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
+    : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}${e.wreck ? `, wrecked under ${e.wreck}` : ''}. Saved, it goes in her logbook.`;
   $('keepAsk').hidden = false;
   const done = (keep: boolean) => {
     $('keepAsk').hidden = true; pending = null;

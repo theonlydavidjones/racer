@@ -734,7 +734,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const spar = alu ? MAT.sparAlu : MAT.spar, boomMat = aluBoom ? MAT.sparAlu : MAT.spar;
   const rudder = buildHull(b, grp);
   // the rig sits on the real deck height
-  const rig = new THREE.Group(); grp.add(rig);
+  const rig = new THREE.Group(); grp.add(rig); grp.userData.rig = rig;
   // aluminium extrusion: constant section; wooden mast: tapered
   // (its section an oval, wider fore and aft; from the deck, through the cabin top, to the masthead)
   const mastH = MAST_TOP - DECK_AT_MAST;
@@ -941,8 +941,11 @@ export function buildBoatMesh(b: Boat): BoatMesh {
 export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: number; pitch: number; roll: number }): void {
   // riding the waves: heave, pitch and roll from the sea surface under her (or a gentle bob in flat water)
   const heave = wave ? wave.heave : Math.sin(t * 1.3 + b.id) * 0.03, pitch = wave ? wave.pitch : Math.sin(t * 0.9 + b.id) * 0.006;
-  m.grp.position.copy(P3(b.x, b.y, heave));
-  m.grp.rotation.y = -b.h * D2R; m.grp.rotation.z = b.heel * D2R + (wave ? wave.roll : 0); m.grp.rotation.x = pitch;
+  // wrecked among Fort Mason's piles (physics.ts wreck): her rig down, her hull holed, settled and listing on the concrete
+  const wk = b.wrecked ? 1 : 0;
+  m.grp.position.copy(P3(b.x, b.y, heave - 0.35 * wk));
+  m.grp.rotation.y = -b.h * D2R; m.grp.rotation.z = b.heel * D2R + (wave ? wave.roll : 0) + 0.26 * wk; m.grp.rotation.x = pitch;
+  (m.grp.userData.rig as THREE.Group).visible = !wk; m.mainsheet.visible = !wk; m.lines.jibSheet.visible = !wk;
   // rudder and tiller: the helm. Turning to port (heading falling) means the tiller is pushed to starboard.
   // rudder and tiller follow the helm the sim is using (steady, not estimated from frame-to-frame heading changes,
   // which jitter with the frame rate); eased so it swings like a real tiller
