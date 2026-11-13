@@ -343,7 +343,13 @@ export const ROLL_HOLD = 2;
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30, helmHeel: 3, helmLast: 20 };
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30, helmHeel: 3, helmLast: 20, leeLast: 15 };
+// (leeLast: in light air, short of the breeze they sit up for, a move across to leeward waits for a lull that has lasted
+// this long (s), against HOLD.last's 3 for a move on their own side; going back out is as quick as ever. Lulls of a few
+// seconds about the 6 kt threshold had a crew member across to leeward and straight back out two seconds later, the wind
+// rising through 6 again (Crew Figures' flicker test, 7 kt +- 2, its lulls under 6 kt some 10 s long). A crew doesn't
+// cross the cockpit for a dip of a few seconds; they go to leeward for a lull that has come to stay. 15 s, a quarter of
+// the breeze's own minute-long gust-lull cycle (Bethwaite): an estimate.)
 // (helmHeel, helmLast: in light air, short of the breeze the crew sit up for (under 8 kt, placeCrew's `breeze`), on a
 // reach (15 degrees free of the beat up to a run), the helm, one heavy weight that swings her heel some 4 degrees at a
 // stroke, goes across the cockpit
@@ -603,7 +609,11 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     h.off = worth ? h.off + step : 0;
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
     // change of place for the trim, waits until it has lasted, and the dwell
-    const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
+    // (in light air, across the boat to leeward waits for a lull that has lasted, HOLD.leeLast: one of a few seconds had
+    // them across and, the wind back through 6 kt, straight back out again)
+    // (not for the helm where helmLight's own wait has been served)
+    const leeCross = !out && k.tws < 8 && !helmLight(i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+    const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= (leeCross ? HOLD.leeLast : HOLD.last) && (out || h.since >= HOLD.dwell));
     if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; return; } // (moved: the waits start afresh)
     stay(i, h, t);
   });
