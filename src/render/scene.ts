@@ -126,10 +126,13 @@ const WATER_FRAGMENT = `
   // the waves or the puffs. The threshold is the noise field's own quantile for that fraction (fitted from its
   // distribution: T = 0.5665 − 0.1835·x − 0.0227·x², x = log10 W), so the area that shows white is the area the law says
   float Wc = clamp(vWhite, 0.0, 0.2), lx = log(max(Wc, 1e-4)) / log(10.0), thr = 0.5665 - 0.1835 * lx - 0.0227 * lx * lx;
-  vec2 fadv = vWaveP - uFoamOff, wdc = normalize(uPuffV + vec2(1e-5, 0.0)), fq = vec2(dot(fadv, wdc) / 3.0, dot(fadv, vec2(-wdc.y, wdc.x)) / 1.6);
+  vec2 fadv0 = vWaveP - uFoamOff, wdc = normalize(uPuffV + vec2(1e-5, 0.0));
   float caps = 0.0;
   if (Wc > 1e-4) for (int k = 0; k < 2; k++) {
     float a = uTime / 8.0 + 0.5 * float(k), ph = fract(a), seed = floor(a) + 3.7 * float(k);
+    // (uFoamOff carries it on the course's stream; over its life each patch also moves with the water here's difference
+    // from that, dflow / 6 (m/s): in a harbor's still basin, or off South Beach with the Cityfront's ebb, it lies still)
+    vec2 fadv = fadv0 - dflow / 6.0 * (ph * 8.0), fq = vec2(dot(fadv, wdc) / 3.0, dot(fadv, vec2(-wdc.y, wdc.x)) / 1.6);
     float life = ph < 0.1 ? ph / 0.1 : 1.0 - (ph - 0.1) / 0.9; // (white at once as it breaks, then fading)
     vec2 q = fq + seed * vec2(37.1, 17.3);
     float cf = 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + vec2(7.1, 3.3)) + 0.06 * (vnoise(q * 7.0 + 2.0) - 0.5);
@@ -140,7 +143,7 @@ const WATER_FRAGMENT = `
   caps *= 0.75 + 0.25 * smoothstep(0.0, 1.0, crest); // (brightest on the crests)
   // ... and from Beaufort 7 (28–33 kt), white foam blown in streaks along the wind (WMO's Beaufort scale): thin lines,
   // broken along their length, drifting with the rest of the foam
-  vec2 wq = vec2(dot(fadv, wdc) / 1.5, dot(fadv, vec2(-wdc.y, wdc.x)) / 0.12);
+  vec2 wq = vec2(dot(fadv0, wdc) / 1.5, dot(fadv0, vec2(-wdc.y, wdc.x)) / 0.12);
   float streak = smoothstep(13.0, 17.0, uMeanKt * 0.5144) * smoothstep(0.82, 0.95, vnoise(vec2(wq.x / 6.0, wq.y))) * smoothstep(0.45, 0.7, vnoise(wq * vec2(1.0, 0.05) + 4.0)) * 0.3;
   float foam = max(caps, streak) * (1.0 - smoothstep(1200.0, 4000.0, camDF));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.97), clamp(foam, 0.0, 0.8));
@@ -573,8 +576,9 @@ export class SceneView {
     }
     this.seaGrid = { x0, y0, cell, v };
     // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s
-    const cc = span / (CUR_N - 1), cx0 = at.x - span / 2, cy0 = at.y - span / 2, U = new Float32Array(CUR_N * CUR_N * 2);
-    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentAt({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
+    const cc = span / (CUR_N - 1), cx0 = Math.round((at.x - span / 2) / cc) * cc, cy0 = Math.round((at.y - span / 2) / cc) * cc, // (on its own grid, so a sharp edge in the current doesn't slide between updates)
+      U = new Float32Array(CUR_N * CUR_N * 2);
+    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentDrawn({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
     const d = this.curData, at2 = (i: number, j: number, k: number) => U[(Math.min(CUR_N - 1, Math.max(0, j)) * CUR_N + Math.min(CUR_N - 1, Math.max(0, i))) * 2 + k];
     for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) {
       const o = (j * CUR_N + i) * 4, conv = -((at2(i + 1, j, 0) - at2(i - 1, j, 0)) + (at2(i, j + 1, 1) - at2(i, j - 1, 1))) / (2 * cc);
@@ -806,7 +810,7 @@ export class SceneView {
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);
     for (const mo of this.markObjs) {
-      const c = w.currentAt(mo.p), kt = Math.hypot(c.x, c.y) / 0.5144, set = Math.atan2(c.x, c.y);
+      const c = w.currentDrawn(mo.p), kt = Math.hypot(c.x, c.y) / 0.5144, set = Math.atan2(c.x, c.y);
       const lean = Math.min(16, 6.5 * kt) * D2R; // a moored buoy heels over downstream on its chain
       if (!mo.fixed) { // (a beacon stands on its pile: it doesn't heel or ride the waves)
         mo.float.rotation.set(0, 0, 0); mo.float.rotateOnWorldAxis(new THREE.Vector3(Math.cos(set), 0, Math.sin(set)), -lean);
@@ -837,7 +841,7 @@ export class SceneView {
         gm.crew.group.visible = false; // (no crew aboard the ghost: its track doesn't know where they sat, and a see-through crew is clutter)
       }
     }
-    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => waves.height(p, tw, 0.7, 0.4));
+    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentDrawn(p), p => w.windHere(p), p => waves.height(p, tw, 0.7, 0.4));
     this.wildlife.setMonth(+w.raceDate.slice(5, 7) || new Date().getMonth() + 1);
     this.wildlife.update(w.running && !w.paused ? dt * w.speed : 0, tw, w.user, w.boats, (x, y) => waves.height({ x, y }, tw, 1, 1));
     this.vesselView.sync(w.vessels, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => waves.height({ x, y }, tw, 1, 1));

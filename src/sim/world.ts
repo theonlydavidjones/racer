@@ -9,7 +9,7 @@ import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReac
 import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
-import { CURRENTS, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
+import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
@@ -53,6 +53,8 @@ import { RaceLog } from './debrief';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
+/** How near (m) the basins' current is worked out before the start (farther ones in the worker's or the page's spare time: sim/worker.ts, app.ts). */
+const BASINS_NEAR = 4000;
 /** Two-turns penalty, in degrees of turning. */
 export const TWO_TURNS = 720;
 
@@ -400,8 +402,11 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
+    // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
+    prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
     // the sea she's in from the first frame (step() works it out twice a second after that)
-    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
     this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
@@ -596,8 +601,18 @@ export class World {
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
-    return withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t);
+    const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
+    return k === 1 ? c : { x: c.x * k, y: c.y * k };
   }
+  /** The stream at a point as if no breakwater stood there: the sea's look upwind for the water its waves came
+   * through (environment/sea.ts), which is never a harbor's still basin (no waves come to open water through one). */
+  /** The current for drawing (the chart's streaks and arrows, its readout, the water's flow): as currentAt, but never
+   * waiting on a harbor's still-water grid not built yet (the open stream there until it is, a moment later). */
+  currentDrawn(p: Vec): Vec {
+    const c = withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t), k = basinCalmIfBuilt(p) ?? 1;
+    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+  }
+  openStreamAt(p: Vec): Vec { return withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t); }
   /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
    * every step, where the same places come up again and again; the sea map, the chart and the arrows, which sample the
    * whole area once, keep the exact distance, or they'd fill a tile for every look) */
@@ -776,7 +791,7 @@ export class World {
   /** The sea at any point, for the wind and current there. */
   seaHere(p: Vec): SeaHere {
     const c = this.currentAt(p);
-    return this.sea.at(p, windOnWater(this.seaWind(p), c), c, q => this.currentAt(q));
+    return this.sea.at(p, windOnWater(this.seaWind(p), c), c, q => this.openStreamAt(q));
   }
   /**
    * The wind the sea is made by at p: the wind over the water around it (the day's field, the land's lee), not the
@@ -856,7 +871,7 @@ export class World {
     // (under way as COLREGS Rule 3(i) has it: not made fast to the shore, not at anchor; going ahead, astern or stopped)
     if (this.steps % 30 === 1) for (const b of this.boats) if (b.ensign) { const n = !ensignDue(this.clockUtc, inBasin(b), !b.docked && !b.atAnchor); if (b.ensignNight !== n) b.ensignNight = n; }
     if (this.steps % 30 === 1) for (const b of this.boats) {
-      b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q));
+      b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q));
       const wk = this.traffic.wakeAt(b, this.trafficT);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
@@ -1537,7 +1552,7 @@ export class World {
     const h = twa != null ? n360(this.wind.from + twa) : u.h;
     u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.luff = false;
     u.cur = this.currentAt(u); u.ww = windOnWater(this.windHere(u, u), u.cur);
-    if (this.steps % 30 === 0) u.sea = this.sea.at(u, windOnWater(this.seaWind(u, u.leeK), u.cur), u.cur, q => this.currentAt(q));
+    if (this.steps % 30 === 0) u.sea = this.sea.at(u, windOnWater(this.seaWind(u, u.leeK), u.cur), u.cur, q => this.openStreamAt(q));
     this.steps++;
     moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
     u.h = h; // held there
@@ -1681,6 +1696,7 @@ export class World {
    * that would be a restart. False on land.
    */
   moveHere(p: Vec, name: string): boolean {
+    prepareBasins([p], BASINS_NEAR); // (a jump: the harbors round where she lands, at once)
     if (!this.freeSail || onLand(p) || hitsHarbor(p)) return false;
     const u = this.user;
     u.x = p.x; u.y = p.y; u.v = 0; u.astern = 0; u.sway = 0; u.vx = 0; u.vy = 0; u.turnTarget = null;
@@ -1713,7 +1729,7 @@ export class World {
     if (this.tide) this.updateTide();
     // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
     // as it would on the water, until the new mean settles in)
-    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
+    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
     if (!this.freeSail) {
       // racing: the laid marks stay where they are, but which legs are beats, reaches and runs goes with the wind they're
       // sailed in (rule 18.1(a), the laylines, the AI); the committee boat swings to the new wind at her anchor
