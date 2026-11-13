@@ -721,6 +721,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // (overlapped and closer than open water already, however slowly they converge: side by side at a few cm a second the
     // closest approach lies beyond the time she looks ahead)
     if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || hullGap(b, o) < OPEN_GAP)) kcThreats.push(o);
+    // Rule 23.2: a boat taking a penalty or sailing on another leg she mustn't interfere with, right of way or not
+    // (unless she's sailing her proper course; keeping clear of it is the simple way to be sure): she gives it the
+    // room she'd give a boat she must keep clear of
+    else if (r.kc === o && b.started && (o.penalty > 0 || (o.leg !== b.leg && o.started && !o.finished)) && cp.t < ai.kn.keepClearS / 2 && cp.d < ai.kn.keepClearM / 2 + lagM) kcThreats.push(o);
     else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       rowThreats.push(o);
@@ -764,6 +768,20 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   if (ht && ((b.tack === ht.to && !b.tacking) || w.t - ht.at > 30)) ai.hailTack = null;
   else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
+  // A tack of her own choosing (a shift, a layline, clear air: not one a hail asks of her, nor one away from the shore)
+  // only when it keeps clear of every boat near: from head to wind until close-hauled she must keep clear of them all
+  // (Rule 13), and through the wind she's slow and can't turn away. Her tack is stepped forward as any other turn
+  // (boat/arcs.ts escapes, with no reaction time: it's her own helm); with too little room she holds on until there is.
+  if (beating && !avoiding && !holdForHail && !b.tacking && !tackNow && !ai.hailTack && !ai.urgent && Math.sign(wrap(ww.from - desired)) !== Math.sign(wrap(ww.from - b.h))
+    && Math.abs(wrap(desired - b.h)) > 20 && !blocked(w, b, b.h, 45)) {
+    const close = w.boats.filter(o => o !== b && !o.finished && dist(o, b) < 40);
+    if (close.length) {
+      const tracks = close.map(o => straightOn({ x: o.x, y: o.y, h: o.h, v: o.v + (o.astern ?? 0) }, o.turnRate ?? 0));
+      const [c] = escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 },
+        tracks, ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))] }).filter(q => q.turn !== 0);
+      if (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM) desired = b.tack === 'S' ? csS : csP;
+    }
+  }
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
