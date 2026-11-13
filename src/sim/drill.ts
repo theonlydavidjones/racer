@@ -143,7 +143,8 @@ export class DrillTracker {
  * before), seconds back to speed (BACK; 75: not within the drill's 75 s), metres lost against the twin by then]. The
  * last is the drill's 'a good crew': you and the crew are measured the same way, at the same moment. (The passage
  * planner's MANOEUVRE_LOSS is the same loss carried on to full speed: a little more.) tests/drill.test.ts keeps it in step with the physics. The coaching figures are
- * set against these, because no published turn rate or recovery time for a Folkboat (or a like keelboat) was found:
+ * set against these, because no published turn rate or recovery time exists for a Folkboat (or a like keelboat): a
+ * search of coaching texts found none,
  * only words ("too fast a turn and you throw off speed; too slow and you lose momentum": US Sailing, "Tacking Tips
  * Part I – The Turn").
  */
