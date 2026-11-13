@@ -231,8 +231,8 @@ const FRONT = -Math.PI / 2;
 /** The jacket's body, waist to collar: a long offshore cut to below the seat, squared off across the chest and
  * shoulders, the shoulders' width taking in the deltoids (the sleeves set in below them). */
 const JACKET_P = profile([
-  [-0.1, 0.18, 0.13, 0.146, 0.012, 2.3], // (the hem, hanging loose over the seat and the tops of the thighs)
-  [-0.05, 0.17, 0.124, 0.138, 0.01, 2.4],
+  [-0.1, 0.173, 0.127, 0.143, 0.012, 2.3], // (the hem, hanging loose over the seat and the tops of the thighs)
+  [-0.05, 0.166, 0.122, 0.137, 0.01, 2.4],
   [0.0, 0.159, 0.118, 0.13, 0.008, 2.5], // the hips
   [0.08, 0.152, 0.112, 0.12, 0.006, 2.5], // the waist
   [0.16, 0.153, 0.117, 0.116, 0.004, 2.5],
@@ -352,8 +352,8 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
   // the chin with a reflective band, sleeves, cuffs, the zip's storm flap
   {
     const ys = [-0.105, -0.095, -0.075, -0.03, 0.02, 0.08, 0.16, 0.25, 0.32, 0.38, 0.4, 0.425, 0.455, 0.48, 0.503, 0.523, 0.54];
-    const body = rings(JACKET_P, ys, 24).map((r, k) => drape(r, 0.006 * ss(0.03, -0.1, ys[k]), 5, 0.7));
-    body.unshift(drape(ring(JACKET_P(-0.1), 24, -0.01), 0.006, 5, 0.7).map(q => q.setY(-0.08))); // (the hem turned up inside)
+    const body = rings(JACKET_P, ys, 24).map((r, k) => drape(r, 0.004 * ss(0.03, -0.1, ys[k]), 5, 0.7));
+    body.unshift(drape(ring(JACKET_P(-0.1), 24, -0.01), 0.004, 5, 0.7).map(q => q.setY(-0.08))); // (the hem turned up inside)
     loftParts(M, body, [[0, kit.trim], [3, kit.jacket], [11, kit.yoke]], { w: wTorso, shade: (_q, r) => r === 0 ? 0.45 : 1 });
   }
   const collarTop = (th: number) => 0.62 + 0.026 * Math.max(0, Math.sin(th)) + 0.012 * (1 - Math.abs(Math.sin(th))); // (front .612, sides .624, back .646)
