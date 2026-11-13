@@ -15,12 +15,14 @@
  *    Resin Regatta. One-design races there carry finish places and the fleet's start time; finish times are almost
  *    never entered, so these races give places only.
  *
- * What's kept: public results only (sail number, boat, skipper as published, club, places, times, scoring codes).
+ * What's kept: public results only (sail number, boat, club, places, times, scoring codes; the skipper as an anonymous id,
+ * the names kept apart in reference/skipper-keys.json, which the app never imports: scripts/skipper-keys.mjs).
  * No contact details.
  *
  * Output: src/boat/data/sf-folkboat-results.json
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { anonymise } from './skipper-keys.mjs';
 import { analyse } from './analyse-folkboat-results.mjs';
 
 const OUT = new URL('../src/boat/data/sf-folkboat-results.json', import.meta.url);
@@ -254,11 +256,12 @@ const out = {
       'Those three races carry sheet: "unverified". sim/realRaces.ts says so beside the race.',
     'Distances are the scorer\'s nominal course lengths, not sailed distances.',
     'Regatta Network gives every 2023 SYC Classic race the date 2023-06-11 although the event ran June–October; treat those dates as unsure.',
-    'Skippers are as published, tidied to one spelling; a boat can have several skippers over the years.',
+    'skipper is an anonymous id (k001…), one per skipper however the name was typed; the names are in reference/skipper-keys.json, which the app never imports (no real skippers\' names in the game). A boat can have several skippers over the years.',
   ],
   gated,
   events,
 };
 const real = JSON.parse(await readFile(new URL('../src/environment/data/sf-real-days.json', import.meta.url), 'utf8'));
+anonymise(out); // (before anything is written: the names go to reference/skipper-keys.json only)
 await writeFile(OUT, JSON.stringify(analyse(out, real), null, 1) + '\n');
 console.log('Wrote', OUT.pathname, events.reduce((n, e) => n + e.races.length, 0), 'races');
