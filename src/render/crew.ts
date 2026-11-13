@@ -28,7 +28,7 @@ export interface Figure extends Body {
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
-export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh }
+export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number }
 type Limb = Body['arm'][number];
 
 /** A sailor (crewBody.ts): their body, and the state the posing keeps. */
@@ -720,8 +720,16 @@ export function tillerTip(turn: THREE.Object3D): THREE.Vector3 {
   return TILLER_TIP.clone().applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
 }
 
-/** (Moving, and which way: from where the physics has them now against last frame.) */
+/**
+ * (Moving, and which way: from where the physics has them now against last frame, over the time the race moved
+ * between them, `dt` here: the sim clock's change, not the page's frame. A frame gets no steps, one, or two (and three
+ * to five at 4×), and the race in its worker answers a frame late or two at once; by the page's frame time the speed went
+ * from nothing to double and back, the feet stepping and stopping. A frame the race didn't move in, they go on as they
+ * were.)
+ */
 function track(f: Figure, x: number, z: number, dt: number): number {
+  const vel = f.vel ??= V(0, 0, 0);
+  if (dt <= 0 && f.last) return Math.atan2(-vel.x, -vel.z);
   const was = f.last ?? V(x, 0, z), dx = x - was.x, dz = z - was.z, dist = Math.hypot(dx, dz);
   f.last = V(x, 0, z);
   const v = dt > 0 && dt < 0.5 ? dist / dt : 0;
@@ -729,7 +737,6 @@ function track(f: Figure, x: number, z: number, dt: number): number {
   f.gait += dist / 0.32 * Math.PI; // (a step about every 0.3 m)
   // which way they're going: their velocity, smoothed over a few tenths of a second (so the body doesn't swing about
   // as they slow and stop)
-  const vel = f.vel ??= V(0, 0, 0);
   if (dt > 0 && dt < 0.5) vel.lerp(_s.set(dx / dt, 0, dz / dt), Math.min(1, dt * 5));
   return Math.atan2(-vel.x, -vel.z);
 }
@@ -773,6 +780,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   // (sitting, people hold their bodies near upright as she heels; hiking or kneeling at a job, braced, less)
   const heel = heelDeg * Math.PI / 180, against = (pose: string) => -heel * (pose === 'sit' || pose === 'lee' || pose === 'helm' ? 0.55 : pose === 'cross' ? 0.3 : 0.2);
   const ppl = c?.people;
+  // (the time the race moved since the last frame, for their walking: track)
+  const clk = c?.clock, sdt = clk == null || cr.clock == null || clk < cr.clock ? dt : clk - cr.clock; cr.clock = clk;
   // (two of them on the same side don't sit in each other's laps: at least a shoulder's width apart fore and aft)
   // (out on a side deck, not forward of the winch there; in the middle, on the benches, on forward)
   const ZMAX = DECK_AFT, inC = (z: number) => z > COCK0 - 0.1 && z < COCK1;
@@ -806,7 +815,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       if (f.aftSide == null || Math.abs(x) > AFT_MID) f.aftSide = Math.sign(x) || windward;
       x = aftSide(f, x, a.z);
     } else f.aftSide = undefined;
-    const dir = track(f, x, a?.z ?? z, dt);
+    const dir = track(f, x, a?.z ?? z, sdt);
     // (on the move from 0.22 m/s, settled again under 0.1: no flicker between walking and sitting)
     const go = f.going = travelling(f, a, x);
     // (in the tack while it's under way, and until they're across; a job elsewhere, the mast or the car, comes first)
@@ -824,7 +833,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const hp = ppl?.[0], h = cr.helm, x = hp ? hp.x : windward * 0.55, z = hp?.z ?? 2.95;
   cr.helmSide = Math.abs(x) > 0.05 ? Math.sign(x) : windward;
   const away = hp?.pose === 'piano'; // single-handed, gone forward to the cabin-top lines
-  const dir = track(h, x, z, dt);
+  const dir = track(h, x, z, sdt);
   const t = tip ?? V(0, 0.8, 2.6);
   const want = away ? crewPose(h, x, z, hp?.lean ?? 0, 'piano', windward, h.speed > 0.18, dir, 9)
     : (h.going = travelling(h, hp, x)) ? helmCrossing(h, x, z, dir, t) : helmPose(h, x, z, hp?.lean ?? 0, windward, t);
