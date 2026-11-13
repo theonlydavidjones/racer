@@ -17,7 +17,7 @@ const warm = (p, which) => p.evaluate(w => { const h = __hud; for (let i = 0; i 
   const p = await b.newPage({ viewport: { width: 1400, height: 860 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => { try { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: 'cityfront', sailTo: '', windKind: 'west', windKt: 16, tideDate: '2026-11-14', tideTime: '18:30', mapLayers: {} , chartPal: 'day' }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); } catch {} });
-  await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(1500);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(6000);
   // (headless, the 3-D scene is drawn in software and a frame takes seconds: the layers' own JS is what's measured,

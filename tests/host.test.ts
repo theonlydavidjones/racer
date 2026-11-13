@@ -73,7 +73,7 @@ function both(make: () => World, script: Map<number, Command[]>, frames: number)
   const a: string[] = [], h = new LocalHost(make());
   for (let i = 0; i < frames; i++) {
     for (const c of script.get(i) ?? []) h.send(c);
-    if (h.world.running && !h.world.paused) h.frame(frameDt(i));
+    h.advance(frameDt(i));
     if (i % 30 === 0) a.push(state(h.world));
   }
   // the page's old way: its own accumulator and its writes
@@ -83,7 +83,7 @@ function both(make: () => World, script: Map<number, Command[]>, frames: number)
     if (w.running && !w.paused) {
       acc += frameDt(i) * w.speed;
       while (acc >= DT) { w.step(DT); acc -= DT; if (w.paused) { acc = 0; break; } }
-    }
+    } else if (!w.running) { acc += frameDt(i); while (acc >= DT) { w.idle(DT); acc -= DT; } }
     if (i % 30 === 0) b.push(state(w));
   }
   return [a, b];

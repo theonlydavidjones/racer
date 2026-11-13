@@ -37,13 +37,18 @@ export function withLayer(s: Settings, k: LayerKey, on: boolean): NonNullable<Se
  * A layer menu: a button that opens a small list of switches. `get` reads the settings now; `set` saves a change (the
  * app keeps the saved settings and the running race's in step); `changed` redraws.
  */
+/** A view that isn't a map layer but is switched from the same menu (the owner, 13 Nov 2026: new controls go inside
+ * existing elements, not on new buttons): the wind indicator, the flow view. */
+export interface MenuView { name: string; what: string; keyLabel: () => string; on: () => boolean; set: (on: boolean) => void }
 export function layerMenu(button: HTMLElement, pop: HTMLElement, get: () => Settings | null, set: (k: LayerKey, on: boolean) => void, changed: () => void,
-  key?: (el: HTMLElement, force: boolean) => void): () => void {
+  key?: (el: HTMLElement, force: boolean) => void, views: MenuView[] = []): () => void {
   let keyEl: HTMLElement | null = null;
   const render = () => {
     const s = get(); if (!s) return;
     pop.innerHTML = '<div class="lp-h">Map layers</div>' + LAYERS.map(l =>
       `<label title="${l.what}"><input type="checkbox" data-layer="${l.key}"${shown(s, l.key) ? ' checked' : ''}><span>${l.name}</span></label>`).join('')
+      + (views.length ? '<div class="lp-h lp-kh">Training views</div>' + views.map((v, i) =>
+        `<label title="${v.what}"><input type="checkbox" data-view="${i}"${v.on() ? ' checked' : ''}><span>${v.name} <span class="lp-k">${v.keyLabel()}</span></span></label>`).join('') : '')
       + (key ? '<div class="lp-h lp-kh">Key: what\'s on the map</div><div class="lp-key"></div>' : '');
     keyEl = pop.querySelector('.lp-key');
     if (key && keyEl) key(keyEl, true);
@@ -55,6 +60,7 @@ export function layerMenu(button: HTMLElement, pop: HTMLElement, get: () => Sett
   pop.addEventListener('pointerdown', e => e.stopPropagation());
   pop.addEventListener('change', e => {
     const t = e.target as HTMLInputElement, k = t.dataset.layer as LayerKey | undefined;
+    if (t.dataset.view != null) { views[+t.dataset.view]?.set(t.checked); render(); return; }
     if (k) { set(k, t.checked); render(); changed(); if (key && keyEl) setTimeout(() => key(keyEl!, false), 60); }
   });
   document.addEventListener('pointerdown', e => { if (!pop.hidden && !pop.contains(e.target as Node) && e.target !== button) { pop.hidden = true; button.setAttribute('aria-expanded', 'false'); } });

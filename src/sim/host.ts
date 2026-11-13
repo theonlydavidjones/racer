@@ -20,7 +20,11 @@
 import type { Boat } from '../boat/boat';
 import type { SimEvent } from './events';
 import { applyCommand, type Command, type CommandResult } from './commands';
-import { DT, type World } from './world';
+import { DT, World, type WorldOptions } from './world';
+import { SyncMirror, checkOf } from './sync';
+import type { FromWorker, ToWorker } from './worker';
+import type { CourseFile } from '../courses/course';
+import type { Settings } from '../settings';
 
 /** Read-only all the way down, except arrays (left mutable so a view can still be handed to code that takes a Boat). */
 export type RO<T> = T extends (...a: never[]) => unknown ? T
@@ -53,16 +57,26 @@ export type BoatView = RO<Boat>;
 export type SimView = RO<Omit<World, Changes | 'boats' | 'user'>> & { readonly boats: readonly BoatView[]; readonly user: BoatView };
 
 export interface SimHost {
+  /** Where the World sails: in the page's own thread, or in a Web Worker (the page then reads its mirror). */
+  readonly mode: 'local' | 'worker';
   /** The race as it stands after the last frame's steps. */
   readonly view: SimView;
-  /** A frame: the steps due for `dt` seconds of the page's time (at the race's speed), while it runs and isn't paused. */
-  frame(dt: number): void;
-  /** Nothing running (the start page, setup, the showroom): she still sails, in the real wind and physics. */
-  idle(dt: number, twa?: number): void;
-  /** Do something to the race (sim/commands.ts). In this thread the answer comes at once. */
-  send(c: Command): CommandResult;
+  /** The World on the page's side (the real one, or the mirror): for the dev handles only. */
+  readonly world: World;
+  /**
+   * A frame of the page's time: while the race runs (and isn't paused) the steps due for `dt` seconds at its speed;
+   * with nothing running (the start page, setup, the showroom) she still sails, in the real wind and physics, on the
+   * showroom's point of sail (`twa`) if she's on show. The time the steps took, ms (from the worker: its last frame's).
+   */
+  advance(dt: number, twa?: number): number;
+  /** Do something to the race (sim/commands.ts), at the next step boundary, in the order sent. */
+  send(c: Command): void;
+  /** Do something whose answer the page needs (the motor's start, home, move her here). */
+  ask(c: Command): Promise<CommandResult>;
   /** What happened in the race since the last call (toasts, horns, incidents). */
   drainEvents(): SimEvent[];
+  /** Done with this race (a new one's being built): the worker stops. */
+  dispose(): void;
 }
 
 /**
@@ -101,22 +115,127 @@ const MUTATORS = new Set<PropertyKey>(['push', 'pop', 'shift', 'unshift', 'splic
 
 /** The World in the page's own thread, as it has always run. */
 export class LocalHost implements SimHost {
+  readonly mode = 'local';
   /** Time not yet stepped, s (the race's time: the page's time × its speed). */
   private acc = 0;
   /** The view the page reads: the World itself, or (?simguard, dev only) a proxy that refuses writes. */
   readonly view: SimView;
   constructor(readonly world: World, guard = false) { this.view = guard ? guarded(world) : world; }
-  frame(dt: number): void {
-    const w = this.world;
-    this.acc += dt * w.speed;
-    while (this.acc >= DT) {
-      w.step(DT); this.acc -= DT;
-      if (w.paused) { this.acc = 0; break; }
+  advance(dt: number, twa?: number): number {
+    const w = this.world, t0 = performance.now();
+    if (w.running && !w.paused) {
+      this.acc += dt * w.speed;
+      while (this.acc >= DT) {
+        w.step(DT); this.acc -= DT;
+        if (w.paused) { this.acc = 0; break; }
+      }
+    } else if (!w.running) {
+      this.acc += dt; while (this.acc >= DT) { w.idle(DT, twa); this.acc -= DT; }
     }
+    return performance.now() - t0;
   }
-  idle(dt: number, twa?: number): void {
-    this.acc += dt; while (this.acc >= DT) { this.world.idle(DT, twa); this.acc -= DT; }
-  }
-  send(c: Command): CommandResult { return applyCommand(this.world, c); }
+  send(c: Command): void { applyCommand(this.world, c); }
+  ask(c: Command): Promise<CommandResult> { return Promise.resolve(applyCommand(this.world, c)); }
   drainEvents(): SimEvent[] { return this.world.drainEvents(); }
+  dispose(): void { /* (nothing running apart from the page) */ }
+}
+
+/** What a World is built from: the same on both sides of the worker (the mirror is built from it too). */
+export interface WorldArgs { file: CourseFile; settings: Settings; seed: number; opts: WorldOptions }
+
+/**
+ * The World in a Web Worker (sim/worker.ts), the page drawing its mirror (sim/sync.ts). Each frame the page sends the
+ * time that's passed and the commands since the last, and draws what the worker last sent: the picture is a frame
+ * behind the race, the worker sailing the next frame's steps while the page draws. At most two frames are in flight;
+ * past that (the worker behind) the page's time waits, as a slow frame's does now (up to a tenth of a second of it).
+ * If the worker fails, the mirror, a whole World in step with the race to the last frame, sails on in the page's thread.
+ */
+export class WorkerHost implements SimHost {
+  mode: 'local' | 'worker' = 'worker';
+  readonly world: World;
+  readonly view: SimView;
+  private mirror: SyncMirror;
+  private queue: { c: Command; id?: number }[] = [];
+  /** The frames sent and not yet answered: their commands, and when each was sent (ms, the page's clock). */
+  private sent: { cmds: { c: Command; id?: number }[]; at: number; frame: number }[] = [];
+  private frames = 0;
+  private asks = new Map<number, (r: CommandResult) => void>();
+  private nextAsk = 1; private inflight = 0; private due = 0; private lastMs = 0;
+  private events: SimEvent[] = [];
+  /** Checks the mirror failed (sim/sync.ts checkOf): 0, or the mirror isn't the race. */
+  faults = 0;
+  /** Checks made. */
+  checks = 0;
+  /** After a failure: the mirror, sailing in the page's thread. */
+  private local: LocalHost | null = null;
+  constructor(private worker: Worker, args: WorldArgs, private guard = false, private onFail?: (why: string) => void) {
+    this.world = new World(args.file, args.settings, args.seed, args.opts);
+    this.mirror = new SyncMirror(this.world);
+    this.view = guard ? guarded(this.world) : this.world;
+    worker.onmessage = (e: MessageEvent<FromWorker>) => this.receive(e.data);
+    worker.onerror = e => { e.preventDefault(); this.fail(e.message || 'the worker stopped'); };
+    worker.postMessage({ k: 'init', ...args } satisfies ToWorker);
+  }
+  private receive(m: FromWorker): void {
+    if (this.local) return;
+    if (m.k === 'failed') { this.fail(m.msg); return; }
+    this.inflight--;
+    const frame = this.sent.shift();
+    if (m.resync != null && frame) {
+      // new conditions: the same commands to the mirror, up to them (the mirror is the race as the worker had it before
+      // the frame), then both Worlds numbered afresh, and the packet with everything in it
+      for (const { c } of frame.cmds.slice(0, m.resync + 1)) applyCommand(this.world, c);
+      this.world.drainEvents(); // (the mirror's own toasts: the worker's come in the packet)
+      this.mirror = new SyncMirror(this.world);
+    }
+    this.events.push(...(this.mirror.apply(m.packet) as SimEvent[]));
+    if (m.check) {
+      this.checks++;
+      const mine = checkOf(this.world), k = mine.findIndex((x, i) => !Object.is(x, m.check![i]));
+      if (k >= 0 || mine.length !== m.check.length) { this.faults++; console.error(`sim/sync: the mirror differs from the race (check number ${k}: ${mine[k]} against ${m.check[k]})`); }
+    }
+    for (const { id, r } of m.results) { this.asks.get(id)?.(r); this.asks.delete(id); }
+    this.lastMs = m.ms;
+  }
+  private fail(why: string): void {
+    if (this.local) return;
+    console.error('The race\'s worker failed; it sails on in the page:', why);
+    this.worker.terminate();
+    this.local = new LocalHost(this.world, this.guard); this.mode = 'local';
+    // (the mirror is the race as of the worker's last answer: the commands of the frames sent since, and those not yet
+    // sent, are done here, in order; one that throws (perhaps what broke the worker) is left out. The race sails on from
+    // where it was, but not exactly as the worker would have sailed it: the random streams (the puffs', the AI's) are
+    // each side's own, and the mirror's never ran)
+    for (const { c, id } of [...this.sent.flatMap(f => f.cmds), ...this.queue]) {
+      let r: CommandResult;
+      try { r = applyCommand(this.world, c); } catch (e) { console.error('A command failed after the worker did:', c, e); }
+      if (id != null) { this.asks.get(id)?.(r); this.asks.delete(id); }
+    }
+    for (const [, res] of this.asks) res(undefined);
+    this.queue = []; this.sent = []; this.asks.clear();
+    this.onFail?.(why);
+  }
+  advance(dt: number, twa?: number): number {
+    if (this.local) return this.local.advance(dt, twa);
+    this.due = Math.min(0.1, this.due + dt);
+    const now = performance.now();
+    // (a worker that's stopped answering, stuck or gone: the race carries on in the page. Its answers come between the
+    // page's frames, so a frame waiting through 30 of the page's frames and 5 seconds wasn't answered; a slow page alone
+    // (a frame of seconds) isn't taken for a stuck worker)
+    this.frames++;
+    if (this.sent.length && now - this.sent[0].at > 5000 && this.frames - this.sent[0].frame > 30) { this.fail('the worker stopped answering'); return this.local!.advance(dt, twa); }
+    if (this.inflight >= 2) return this.lastMs;
+    const cmds = this.queue, due = this.due; this.queue = []; this.due = 0; this.inflight++;
+    this.sent.push({ cmds, at: now, frame: this.frames });
+    this.worker.postMessage({ k: 'frame', dt: due, twa, cmds } satisfies ToWorker);
+    return this.lastMs;
+  }
+  send(c: Command): void { if (this.local) this.local.send(c); else this.queue.push({ c }); }
+  ask(c: Command): Promise<CommandResult> {
+    if (this.local) return this.local.ask(c);
+    const id = this.nextAsk++;
+    return new Promise(res => { this.asks.set(id, res); this.queue.push({ c, id }); });
+  }
+  drainEvents(): SimEvent[] { if (this.local) return this.local.drainEvents(); const e = this.events; this.events = []; return e; }
+  dispose(): void { if (!this.local) this.worker.terminate(); }
 }

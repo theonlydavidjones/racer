@@ -40,6 +40,7 @@ export interface Settings {
   mapLayers?: Partial<Record<'wind' | 'current' | 'sea' | 'fog' | 'ships' | 'laylines' | 'shadows', boolean>>; // the map's layers, on or off (ui/layers.ts; unset: the default)
   sailFrom: string; // Just sail: where you start (a place id, sim/places.ts)
   sailTo: string; // Just sail: where you're heading ('' = nowhere in particular)
+  realRace?: string; // a real past race being sailed (sim/realRaces.ts): its fleet raced as the real boats, your time set against theirs
   raceFrom?: 'water' | 'slip'; // Race: start on the water by the line, or in her slip in time to sail out to it
   burgee?: string; // (older saves: your burgee, now in boat.flags)
   /** Your boats (boat/spec.ts), and the one you're sailing. `boat` is that one (the same object as its entry in `boats`). */

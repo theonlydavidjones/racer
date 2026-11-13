@@ -16,7 +16,7 @@ const LL = (lat, lon) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT];
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1280, height: 760 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="race"]').click()); await p.waitForTimeout(600);
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1200);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(5000);
