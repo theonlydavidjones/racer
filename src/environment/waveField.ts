@@ -74,8 +74,8 @@ export class WaveField {
   readonly cd = new Float64Array(N_WAVES);
   /** The sea the heights are set for: the reference each place's sea scales them from. */
   refW = 0; refS = 0;
-  /** The wind sea's mean direction of travel (deg), easing after the course's mean wind. */
-  windDir = NaN;
+  /** The wind sea's mean direction of travel (deg), easing after the course's mean wind; the swell's, after the reference sea's. */
+  windDir = NaN; swellDir = NaN;
   /** Set once the heights have been set (the first update sets them; later ones ease toward the sea). */
   primed = false;
 
@@ -115,6 +115,11 @@ export class WaveField {
     const travel = windFrom + 180;
     if (Number.isNaN(this.windDir)) this.windDir = travel;
     this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
+    // (the swell eases round as the chop does: a direction that jumped, even turned about `about`, swept the pattern past
+    // everywhere else at many times its own speed: the owner's "rushing water", v176)
+    const swellTravel = s.fromS + 180;
+    if (Number.isNaN(this.swellDir)) this.swellDir = swellTravel;
+    this.swellDir += (((swellTravel - this.swellDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
     const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
     // (never quite flat: a reference sea in a lee would leave nothing for the rougher water elsewhere to scale up)
     const hsW = Math.max(0.05, s.hsW), hsS = Math.max(0.05, s.hsS);
@@ -129,7 +134,7 @@ export class WaveField {
     }
     for (let j = 0; j < SWELL_F.length; j++) {
       const i = N_WIND + j, target = (j === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
-      this.amp[i] += (target - this.amp[i]) * ease; turn(i, s.fromS + 180 + SWELL_SPREAD[j]); this.q[i] = 0.3;
+      this.amp[i] += (target - this.amp[i]) * ease; turn(i, this.swellDir + SWELL_SPREAD[j]); this.q[i] = 0.3;
     }
     this.refW += (hsW - this.refW) * ease; this.refS += (hsS - this.refS) * ease;
   }
