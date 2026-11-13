@@ -1,6 +1,7 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { anyShoreDist, anyShoreDistNear, wharfDist, wharfShelter } from '../geo/shore';
-import { harborAt } from '../geo/marina';
+import { anyShoreDist, anyShoreDistNear, onLand, wharfDist, wharfShelter } from '../geo/shore';
+import { harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
+import { harborGaps } from './sea';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -41,17 +42,54 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
  * breakwater doesn't carry the tidal stream: water enters and leaves only through its mouth, at the rate the tide fills
  * and empties it (its tidal prism). A 300 × 300 m basin 3 m deep, with the tide's 0.9 m amplitude over 12.42 h, takes in
  * at most about 11 m³/s: about 1 cm/s across the basin, a few tenths of a knot in a 30 m mouth. The stream running past
- * the mouth also stirs a slow eddy (gyre) inside (USACE Coastal Engineering Manual, EM 1110-2-1100, Part II ch. 7;
- * Nece, Falconer & Tsutsumi 1976 on the exchange). BASIN_EDDY (that eddy as a fraction of the stream outside) and
- * BASIN_MOUTH (how far the stream reaches in past the mouth, m) are estimates: no measured figure for either was found,
- * for these harbors or in general.
+ * the mouth also stirs a slow eddy (gyre) inside, driven by the shear across the mouth (USACE Coastal Engineering Manual,
+ * EM 1110-2-1100, Part II ch. 7; Nece, Falconer & Tsutsumi 1976 on the exchange; Booij 1986 and Langendoen, Booij &
+ * Kranenburg 1994 on harbors beside a stream).
+ * The stream fades in from the basin's open edges (its mouths, and the whole side of a marina whose docks lie open to an
+ * estuary), BASIN_MOUTH meters in, to BASIN_EDDY of itself behind breakwaters, or BASIN_OPEN among docks open to the
+ * stream along a long side (more of it gets in among their piles and hulls). All three are estimates: no measured figure
+ * was found for these harbors, or in general. (The distance is a straight line, through a breakwater's head.)
  */
-export const BASIN_EDDY = 0.1, BASIN_MOUTH = 30;
+export const BASIN_EDDY = 0.1, BASIN_OPEN = 0.3, BASIN_MOUTH = 30;
+/** Above this much mouth (m, all its entrances together), a basin is docks open to the stream rather than a breakwater's basin. */
+const OPEN_SIDE = 150;
+type Edge = { a: Vec; b: Vec };
+const EDGES = new Map<string, { segs: Edge[]; floor: number }>();
+/**
+ * A basin's open edges, worked out once: its entrances (sea.ts harborGaps: the span between the walls at each way out),
+ * as segments across the mouth; for a basin with no entrance between walls (a marina whose docks lie along an estuary),
+ * the stretches of its outline where the water outside (6, 15 and 30 m out) is open.
+ */
+function openEdges(h: Harbor): { segs: Edge[]; floor: number } {
+  let e = EDGES.get(h.id); if (e) return e;
+  const gaps = harborGaps(h), segs: Edge[] = [];
+  for (const g of gaps) { const t = { x: g.n.y, y: -g.n.x }; segs.push({ a: { x: g.c.x - t.x * g.B / 2, y: g.c.y - t.y * g.B / 2 }, b: { x: g.c.x + t.x * g.B / 2, y: g.c.y + t.y * g.B / 2 } }); }
+  let open = gaps.reduce((s, g) => s + g.B, 0);
+  if (!gaps.length) {
+    const B = h.basin, free = (q: Vec) => !inBasin(q) && !hitsWall(q) && !onLand(q);
+    for (let i = 0; i < B.length; i++) {
+      const a = B[i], b = B[(i + 1) % B.length], L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 0.5) continue;
+      const t = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+      for (let s = 0; s < L; s += 4) {
+        const p = { x: a.x + t.x * s, y: a.y + t.y * s }, q = { x: a.x + t.x * Math.min(L, s + 4), y: a.y + t.y * Math.min(L, s + 4) }, m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+        let n = { x: t.y, y: -t.x }; if (inBasin({ x: m.x + n.x * 3, y: m.y + n.y * 3 })) n = { x: -n.x, y: -n.y }; // (outward)
+        if ([6, 15, 30].every(d => free({ x: m.x + n.x * d, y: m.y + n.y * d }))) { segs.push({ a: p, b: q }); open += Math.hypot(q.x - p.x, q.y - p.y); }
+      }
+    }
+  }
+  e = { segs, floor: !gaps.length || open > OPEN_SIDE ? BASIN_OPEN : BASIN_EDDY }; EDGES.set(h.id, e); return e;
+}
 export function basinCalm(p: Vec): number {
   const h = harborAt(p); if (!h) return 1;
-  let d = Infinity; for (const e of h.exits) d = Math.min(d, Math.hypot(p.x - e.x, p.y - e.y));
-  return BASIN_EDDY + (1 - BASIN_EDDY) * Math.exp(-d / BASIN_MOUTH);
+  const e = openEdges(h); let d2 = Infinity;
+  for (const { a, b } of e.segs) {
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy, u = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    const ex = p.x - a.x - u * dx, ey = p.y - a.y - u * dy; d2 = Math.min(d2, ex * ex + ey * ey);
+  }
+  return e.floor + (1 - e.floor) * Math.exp(-Math.sqrt(d2) / BASIN_MOUTH);
 }
+/** (for the tests) How much open edge a basin has, m, and the fraction of the stream left deep inside it. */
+export const basinOpening = (h: Harbor) => { const e = openEdges(h); return { m: e.segs.reduce((s, q) => s + Math.hypot(q.b.x - q.a.x, q.b.y - q.a.y), 0), floor: e.floor }; };
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
