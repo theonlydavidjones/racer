@@ -18,6 +18,20 @@ const clean = (p: ReturnType<typeof pair>, t: number) => { const r = p.at(t); ex
 /** The fleet and who keeps clear of whom, for a boat as an obstruction (as the World supplies them). */
 const fleetCtx = (boats: RulesBoat[], t = 50): Partial<RulesContext> => ({ fleet: boats, keepsClearOf: (a, c) => rightOfWay(a, c, ctx(t)).kc.id === a.id });
 
+// (sailed through in 0.1 s steps, as the World looks at a pair: each boat's heading as a function of time)
+const sailOn = (p: ReturnType<typeof pair>, boats: [ReturnType<typeof boat>, (t: number) => number, number][], t0: number, t1: number, extra?: (b: ReturnType<typeof boat>, t: number) => void) => {
+  for (let t = t0; t <= t1 + 1e-9; t += 0.1) {
+    for (const [b, hOf, v] of boats) {
+      const h = hOf(t), u = V(h);
+      b.h = h; b.headingAgo = hOf(t - 3); b.v = v; b.vx = u.x * v; b.vy = u.y * v; b.x += u.x * v * 0.1; b.y += u.y * v * 0.1;
+      extra?.(b, t);
+    }
+    const r = p.at(t);
+    if (r.foul) return r.foul;
+  }
+  return null;
+};
+
 const mark = (side: 's' | 'p', beat: boolean, at: [number, number] = [0, 0]): RulesMark => ({ name: 'M', p: { x: at[0], y: at[1] }, type: 'round', side, beat });
 /** A point `along` metres ahead of p on heading h and `across` metres to her starboard. */
 const off = (p: [number, number], h: number, along: number, across = 0): [number, number] => {
@@ -120,7 +134,34 @@ describe('Rule 18 · mark-room', () => {
   });
 });
 
+describe('Rule 18 · leaving the mark', () => {
+  it('Case 25: once the inside boat has had her mark-room and left the mark astern, rule 18 no longer applies; the leeward boat\'s 30° luff over two hull lengths leaves her room (16.1), so the contact is IW\'s (11)', () => {
+    // a leeward mark left to port, the next leg a beat; both have rounded onto port, IW to windward (she was inside),
+    // still sailing below close-hauled with her boom out; OL luffs to her course for the next mark
+    const marks = [mark('p', false), mark('p', true, [0, 400])];
+    const OL = boat('OL', { at: [6, 4], heading: 60, leg: 1 }), IW = boat('IW', { at: off([6, 4], 60, 0, -4.5), heading: 60, leg: 1 });
+    const p = pair(IW, OL, marks);
+    expect(clean(p, 49.9)).toMatchObject({ keepsClear: 'IW', rule: '11' });
+    const hOL = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5)); // 30° over 6 s: two hull lengths at 2.5 m/s
+    expect(sailOn(p, [[OL, hOL, 2.5], [IW, () => 60, 2.5]], 50, 70)).toMatchObject({ by: 'IW', rule: '11' });
+  });
+});
+
 describe('Rule 18.3 · the boat that tacked, with the fetching boat inside her', () => {
+  it('Case 95: Jagga tacks in the zone to windward of Freebird, fetching on starboard, then luffs so her swinging stern makes Freebird swerve: Jagga broke 11 (and 18.3(b))', () => {
+    const M = mark('p', true), fb: [number, number] = [14, -12];
+    const F = boat('Freebird', { at: fb, heading: 315 }), J = boat('Jagga', { at: off(fb, 315, 2, 8), heading: 45 });
+    const p = pair(J, F, [M]);
+    clean(p, 100); // Jagga on port, coming in, crossing ahead of her
+    J.tacking = true; J.lastTackT = J.headToWindT = 100.8; J.tack = 'S'; moveTo(J, off(fb, 315, 1.5, 6), 0);
+    p.at(101);
+    J.tacking = false; moveTo(J, off(fb, 315, 1.5, 4), 315); // tacked: overlapped to windward of Freebird
+    expect(p.at(102)).toMatchObject({ keepsClear: 'Jagga', rule: '11', foul: null }); // (Freebird inside: no '18.3' right of way, rule 11)
+    expect(p.rec.r183).toMatchObject({ tacker: J.id, binds: true });
+    moveTo(J, off(fb, 315, 2, 3.6), 335, 315); // Jagga luffs; her stern swings down at Freebird
+    expect(p.at(103, { swerve: true }).foul).toMatchObject({ by: 'Jagga', rule: '11', kind: 'swerve' });
+  });
+
   it('Case 93 (the other half): L, overlapped inside, holds her course; W sags down onto her: W broke 11 (she still owes room, 18.3(b))', () => {
     const M = mark('p', true);
     const W = boat('W', { at: [6.9, -0.9], heading: 45 }), L = boat('L', { at: [14, -8], heading: 315 });
@@ -181,6 +222,15 @@ describe('Rules 10–17 · Section A and B', () => {
     expect(clean(p, 50)).toMatchObject({ keepsClear: 'P', rule: '10' });
     moveTo(S, [-1, -1], 265, 315); moveTo(P, [-2.5, -2.3], 80); // S bears away onto P as P bears away to pass astern
     expect(p.at(52).foul).toMatchObject({ by: 'S', rule: '16.2' });
+  });
+
+  it('Case 14: running after the windward mark, L luffs slowly toward the shore (her proper course, as she judges it): W, who had room to keep clear and didn\'t, broke 11; L didn\'t break 16.1 (or 17)', () => {
+    // starboard, broad reaching at 200°; L 6 m to leeward luffs 2°/s; W holds her course
+    const W = boat('W', { at: [0, 0], heading: 200 }), L = boat('L', { at: off([0, 0], 200, 0, -6), heading: 200 });
+    const p = pair(W, L);
+    expect(clean(p, 49.9)).toMatchObject({ keepsClear: 'W', rule: '11' });
+    const hL = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 2));
+    expect(sailOn(p, [[L, hL, 2.5], [W, () => 200, 2.5]], 50, 80)).toMatchObject({ by: 'W', rule: '11' });
   });
 
   // (partly covered: the part the engine models)
@@ -245,19 +295,6 @@ describe('Rules 10–17 · Section A and B', () => {
     expect(case53(true).after.foul).toBeNull();
   });
 
-  // (sailed through in 0.1 s steps, as the World looks at a pair: each boat's heading as a function of time)
-  const sailOn = (p: ReturnType<typeof pair>, boats: [ReturnType<typeof boat>, (t: number) => number, number][], t0: number, t1: number, extra?: (b: ReturnType<typeof boat>, t: number) => void) => {
-    for (let t = t0; t <= t1 + 1e-9; t += 0.1) {
-      for (const [b, hOf, v] of boats) {
-        const h = hOf(t), u = V(h);
-        b.h = h; b.headingAgo = hOf(t - 3); b.v = v; b.vx = u.x * v; b.vy = u.y * v; b.x += u.x * v * 0.1; b.y += u.y * v * 0.1;
-        extra?.(b, t);
-      }
-      const r = p.at(t);
-      if (r.foul) return r.foul;
-    }
-    return null;
-  };
   const case105 = (luffRate: number, apart: number, cur?: { x: number; y: number }) => {
     // running south on opposite tacks, side by side; S luffs toward P (30° at luffRate°/s), then holds; P holds on
     const S = boat('S', { at: [0, 0], heading: 181 }), P = boat('P', { at: [-apart, 0], heading: 179 });
@@ -314,6 +351,15 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     const p = pair(PL, PW, [], fleetCtx([S, PW, PL]));
     expect(clean(p, 50)).toMatchObject({ keepsClear: 'PW', rule: '11' });
     moveTo(PW, [10.2, 8.3], 70); moveTo(PL, [12.2, 6.2]); // PW bears away to pass astern of S; PL holds her course
+    expect(p.at(51).foul).toMatchObject({ by: 'PL', rule: '19', part: '19.2(b)' });
+  });
+
+  it('Case 125: three port boats overlapped meet a starboard boat; PW and PM bear away to pass astern, PL holds her course into PM: PL broke 19.2(b) (her room must let both inside boats keep clear)', () => {
+    const S = boat('S', { at: [3, 15], heading: 270 });
+    const PW = boat('PW', { at: [6, 11], heading: 45 }), PM = boat('PM', { at: [9, 8.5], heading: 45 }), PL = boat('PL', { at: [12, 6], heading: 45 });
+    const p = pair(PL, PM, [], fleetCtx([S, PW, PM, PL]));
+    expect(clean(p, 50)).toMatchObject({ keepsClear: 'PM', rule: '11' });
+    moveTo(PW, [7.6, 10.3], 70); moveTo(PM, [10.8, 7.5], 70); moveTo(PL, [12.2, 6.2]); // PW and PM bear away; PL holds on
     expect(p.at(51).foul).toMatchObject({ by: 'PL', rule: '19', part: '19.2(b)' });
   });
 

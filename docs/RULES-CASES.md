@@ -32,7 +32,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 7 | 85 | 11, 15, 16.1, 17 | L overlapped from astern within 2 lengths, not above her proper course: W broke 11 | covered |
 | 9 | 88 | 10, 18.1(a) | Opposite tacks at a windward mark: no rule 18; P keeps clear (10) | covered |
 | 13 | 95 | 11, 15, 16.1, 17 | Before the start L luffs from a leeward overlap from astern: no proper course, so no 17; W broke 11 | covered |
-| 14 | 97 | 11, 16.1, 17 | L luffs slowly to her own proper course: W broke 11 | partly (proper course is a judgement) |
+| 14 | 97 | 11, 16.1, 17 | L luffs slowly to her own proper course: W broke 11 | covered (16.1's room; the proper course is the sim's own `aboveProper`) |
 | 17 | 102 | 13 | Rule 13 ends when she's on a close-hauled course, whatever her speed | partly (the physics decides when she's close-hauled) |
 | 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered |
 | 24 | 111 | 11, 12, 15 | B overlaps to leeward from astern close to A's stern: A must luff promptly; contact then is B's (15) | partly (whether A responded promptly) |
@@ -65,14 +65,14 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 15 | 99 | 12, 13, 18.2(a)(2), 18.2(b) | A clear ahead at the zone, upwind: B keeps clear and gives mark-room; once A tacks, 18.2(a) ends and B has right of way (13) | covered |
 | 21 | 105 | Mark-Room, Room | How much space mark-room is | not modelled (a judgement) |
 | 103 | | Room, 19.2(b) | Room at an obstruction and seamanlike handling | not modelled (a judgement) |
-| 25 | 112 | 11, 16.1, 18.1(b) | Once the inside boat has left the mark astern, rule 18 ends: IW broke 11 | partly (when the mark is "left astern") |
+| 25 | 112 | 11, 16.1, 18.1(b) | Once the inside boat has left the mark astern, rule 18 ends: IW broke 11; OL's 30° luff over two lengths left room (16.1) | covered ("left astern" is the sim's mark passing, her leg moving on) |
 | 26 | 115 | 10, 14, 18.1(a) | Boats leaving the mark on different sides: no rule 18; P broke 10 | partly (one course: both boats always leave a mark on the same side) |
 | 59 | 167 | 18.2(a)(2) | D outside the zone when E reached it: D owes E mark-room | covered |
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
 | 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered (finding 1, fixed) |
-| 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | partly (the mark touch's exoneration) |
+| 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | covered for Jagga (11); Freebird's 43.1(b) exoneration for the touch isn't modelled |
 | 114 | 253 | 16.1, 18.2(a)(1), 31 | Room owed through a middle boat; at a starting mark L luffs W onto it: L broke 16.1 | partly (three-boat chains; Q3 buildable) |
 | 118 | 260 | 18.2(a)(1) | "Room to sail to the mark" at a leeward mark: no breach | partly |
 | 132 | 289 | 16.2, 18.1(a)(1) | When boats on opposite tacks are "on a beat" | partly (the sim uses the leg's beat flag) |
@@ -94,7 +94,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 113 | 251 | 20 | L, M and W: M must pass the hail on to W (20.3) | partly (the pass-on's timing only) |
 | 117 | 259 | 15, 19.2(b) | A row of boats isn't a continuing obstruction; L overlapping D to leeward ends D being an obstruction | partly |
 | 124 | 276 | 19.2(a), 19.2(b) | Who chooses the side to pass an obstruction | partly |
-| 125 | 278 | 19.2(b) | Three port boats meeting S: PL must give room to PM and PW | partly (three boats) |
+| 125 | 278 | 19.2(b) | Three port boats meeting S: PL must give room to PM and PW | covered (PL, 19.2(b), pair by pair with S an obstruction) |
 | 126 | 280 | 23.2 | Which leg a boat is on when she has made a mistake | partly |
 | 146 | 315 | 11, 16.1, Section C preamble | A starting committee vessel in open water: rule 19 doesn't apply; W exonerated (room under 16.1) | partly (the engine always names one boat at an incident, where the Case penalises nobody: W exonerated, L met 16.1. Not tested: after the gun the committee boat is an obstruction once both have started, where the Section C preamble excludes it until they've left it astern) |
 | 149 | 322 | 21.2, 23.2, 44.2 | B breaks off her turns to keep clear of A: no breach by B; A broke 23.2 only if off her proper course | partly (23.2 for A) |
@@ -119,10 +119,12 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tally
 
-- Covered, the test reaching the Case's answer: 18 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 93, 101, 105).
+Order of work: no published counts of protests by rule exist (US Sailing, RYA, World Sailing, club logs searched, 13 Nov 2026); judges' guidance puts port-tackers tacking into the zone at the windward mark (18.3, 13), mark-room at leeward marks (18.2) and the start (11, 15, 16) first, then obstructions (19). The Cases added in that order: 25, 95, 14, 125.
+
+- Covered, the test reaching the Case's answer: 22 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 43, 53, 59, 81, 92, 93, 95, 101, 105, 125).
 - Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the gybe, found while checking
   Case 2) and 4–6 (Cases 27, 53, 101) are fixed.
-- Partly: 42.
+- Partly: 38.
 - Not modelled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
 
