@@ -61,7 +61,8 @@ const CELL = 4, PAD = 120;
 interface Calm { x0: number; y0: number; nx: number; ny: number; d: Float32Array; floor: Float32Array; box: { x0: number; x1: number; y0: number; y1: number } }
 /** The harbors in groups whose margins overlap (the Alameda marinas lie within 120 m of one another), each group on one
  * grid, so a grid's edge is always out in the open stream, 120 m from every harbor's works, never through a neighbor. */
-const GROUPS: { box: { x0: number; x1: number; y0: number; y1: number }; harbors: Harbor[]; calm?: Calm }[] = (() => {
+type Group = { box: { x0: number; x1: number; y0: number; y1: number }; harbors: Harbor[]; calm?: Calm; job?: Generator<void, Calm> };
+const GROUPS: Group[] = (() => {
   let gs = HARBORS.map(h => ({ box: { x0: h.reach.x0 - PAD, x1: h.reach.x1 + PAD, y0: h.reach.y0 - PAD, y1: h.reach.y1 + PAD }, harbors: [h] }));
   for (let merged = true; merged;) {
     merged = false;
@@ -74,8 +75,7 @@ const GROUPS: { box: { x0: number; x1: number; y0: number; y1: number }; harbors
   return gs;
 })();
 /** The distance through the water from open water (m; Infinity where the water's cut off, −1 where it's solid), on a group of harbors' grid. */
-function calmOf(g: typeof GROUPS[number]): Calm {
-  if (g.calm) return g.calm;
+function* buildCalm(g: Group): Generator<void, Calm> {
   const x0 = g.box.x0, y0 = g.box.y0, nx = Math.ceil((g.box.x1 - g.box.x0) / CELL) + 1, ny = Math.ceil((g.box.y1 - g.box.y0) / CELL) + 1, N = nx * ny;
   const solid = new Uint8Array(N), at = (i: number, j: number) => ({ x: x0 + i * CELL, y: y0 + j * CELL });
   // the walls, every harbor's within reach: a breakwater's or shore line's cells out to its half-width plus a cell's
@@ -95,43 +95,68 @@ function calmOf(g: typeof GROUPS[number]): Calm {
   // ... and the land and walls at the cell's middle and its four corners (a strip of land a couple of meters wide on a
   // slant would otherwise fall between the middles)
   const basin = new Uint8Array(N), h2 = CELL / 2, corner = new Uint8Array((nx + 1) * (ny + 1)); // (the corners, shared between cells: each looked up once)
-  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) corner[j * (nx + 1) + i] = onLand({ x: x0 + i * CELL - h2, y: y0 + j * CELL - h2 }) ? 1 : 0;
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (solid[k]) continue; const p = at(i, j), K = j * (nx + 1) + i;
+  for (let j = 0; j <= ny; j++, yield) for (let i = 0; i <= nx; i++) corner[j * (nx + 1) + i] = onLand({ x: x0 + i * CELL - h2, y: y0 + j * CELL - h2 }) ? 1 : 0;
+  for (let j = 0; j < ny; j++, yield) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (solid[k]) continue; const p = at(i, j), K = j * (nx + 1) + i;
     if (corner[K] || corner[K + 1] || corner[K + nx + 1] || corner[K + nx + 2] || hitsWall(p) || onLand(p)) solid[k] = 1; else if (inBasin(p)) basin[k] = 1; }
   // distances on the grid (8 neighbours, never cutting a solid corner), from `src` cells, through water
   const SQ = Math.SQRT2 * CELL, NB: [number, number, number][] = [[1, 0, CELL], [-1, 0, CELL], [0, 1, CELL], [0, -1, CELL], [1, 1, SQ], [1, -1, SQ], [-1, 1, SQ], [-1, -1, SQ]];
-  const spread = (d: Float32Array, through: (k: number) => boolean) => { // (a Dijkstra on a small binary heap)
+  const spread = function* (d: Float32Array, through: (k: number) => boolean) { // (a Dijkstra on a small binary heap)
     const heap: number[] = []; const push = (k: number) => { heap.push(k); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (d[heap[p]] <= d[heap[i]]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
     const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && d[heap[l]] < d[heap[m]]) m = l; if (r < heap.length && d[heap[r]] < d[heap[m]]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-    const done = new Uint8Array(N); for (let k = 0; k < N; k++) if (d[k] === 0) push(k);
-    while (heap.length) { const k = pop(); if (done[k]) continue; done[k] = 1; const i = k % nx, j = (k - i) / nx;
+    const done = new Uint8Array(N); for (let k = 0; k < N; k++) { if (d[k] === 0) push(k); if ((k & 4095) === 4095) yield; }
+    let n = 0; while (heap.length) { if ((++n & 1023) === 0) yield; const k = pop(); if (done[k]) continue; done[k] = 1; const i = k % nx, j = (k - i) / nx;
       for (const [di, dj, w] of NB) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= nx || b >= ny) continue; const q = b * nx + a;
         if (!through(q) || (di && dj && (!through(j * nx + a) || !through(b * nx + i)))) continue;
         if (d[k] + w < d[q]) { d[q] = d[k] + w; push(q); } } } };
   // open water: 30 m clear of every wall (its clearance spread over everything, walls the sources), outside every basin
   // (a two-pass chamfer distance from the walls: the same 4 m and 5.66 m steps as the Dijkstra below, in two sweeps)
   const clear = new Float32Array(N).fill(Infinity); for (let k = 0; k < N; k++) if (solid[k]) clear[k] = 0;
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; let v = clear[k];
+  for (let j = 0; j < ny; j++, yield) for (let i = 0; i < nx; i++) { const k = j * nx + i; let v = clear[k];
     if (i > 0) v = Math.min(v, clear[k - 1] + CELL); if (j > 0) { v = Math.min(v, clear[k - nx] + CELL); if (i > 0) v = Math.min(v, clear[k - nx - 1] + SQ); if (i < nx - 1) v = Math.min(v, clear[k - nx + 1] + SQ); } clear[k] = v; }
-  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) { const k = j * nx + i; let v = clear[k];
+  for (let j = ny - 1; j >= 0; j--, yield) for (let i = nx - 1; i >= 0; i--) { const k = j * nx + i; let v = clear[k];
     if (i < nx - 1) v = Math.min(v, clear[k + 1] + CELL); if (j < ny - 1) { v = Math.min(v, clear[k + nx] + CELL); if (i < nx - 1) v = Math.min(v, clear[k + nx + 1] + SQ); if (i > 0) v = Math.min(v, clear[k + nx - 1] + SQ); } clear[k] = v; }
   // the open stream: the water round the grid's edge (120 m out from the harbor's works), and water 30 m clear of every
   // wall and outside every basin that joins it through such water (not a pond walled in but for a narrow way out)
   const d = new Float32Array(N).fill(Infinity), edge = (k: number) => { const i = k % nx, j = (k - i) / nx; return i === 0 || j === 0 || i === nx - 1 || j === ny - 1; };
   const wide = new Float32Array(N).fill(Infinity), isWide = (k: number) => !solid[k] && !basin[k] && clear[k] >= BASIN_CLEAR;
   for (let k = 0; k < N; k++) if (edge(k) && isWide(k)) wide[k] = 0;
-  spread(wide, isWide);
+  yield* spread(wide, isWide);
   for (let k = 0; k < N; k++) if (!solid[k] && !basin[k] && (edge(k) || Number.isFinite(wide[k]))) d[k] = 0;
-  spread(d, q => !solid[q]);
+  yield* spread(d, q => !solid[q]);
   for (let k = 0; k < N; k++) if (solid[k]) d[k] = -1; // (solid: no water to ask about; water cut off from the stream keeps Infinity, its calm the floor)
   // the floor: the harbor's whose basin it is; outside the basins, the harbor whose works it lies among
   const floor = new Float32Array(N), fl = (h: Harbor) => h.breakwaters.length ? BASIN_EDDY : BASIN_OPEN;
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const p = at(i, j), H = basin[j * nx + i] ? harborAt(p) : null;
+  for (let j = 0; j < ny; j++, yield) for (let i = 0; i < nx; i++) { const p = at(i, j), H = basin[j * nx + i] ? harborAt(p) : null;
     let f = H && g.harbors.includes(H) ? fl(H) : -1;
     if (f < 0) { let best = Infinity; for (const h of g.harbors) { const r = h.reach, dx = Math.max(r.x0 - p.x, 0, p.x - r.x1), dy = Math.max(r.y0 - p.y, 0, p.y - r.y1), dd = dx * dx + dy * dy; if (dd < best) { best = dd; f = fl(h); } } }
     floor[j * nx + i] = f; }
-  return g.calm = { x0, y0, nx, ny, d, floor, box: g.box };
+  return { x0, y0, nx, ny, d, floor, box: g.box };
 }
+/** A group's grid, built now if it isn't yet (finishing what warmBasins began). */
+function calmOf(g: Group): Calm {
+  if (g.calm) return g.calm;
+  const job = g.job ??= buildCalm(g); let r = job.next(); while (!r.done) r = job.next();
+  g.job = undefined; return g.calm = r.value;
+}
+const nearBox = (g: Group, p: Vec, r: number) => p.x > g.box.x0 - r && p.x < g.box.x1 + r && p.y > g.box.y0 - r && p.y < g.box.y1 + r;
+/**
+ * Build, before the start, the grids of the harbors within `r` of these places (the course, her start, her slip, where
+ * she's bound), so nothing is built mid-race there.
+ */
+export function prepareBasins(near: Vec[], r: number): void { for (const g of GROUPS) if (!g.calm && near.some(p => nearBox(g, p, r))) calmOf(g); }
+/**
+ * Work on the nearest unbuilt grid within `r` of any of these places (the boats) for up to `ms` milliseconds, a slice at a
+ * time, so a harbor a boat is sailing toward is ready long before she's there. The grid comes out the same however its
+ * building is sliced. True while there's more to do.
+ */
+export function warmBasins(near: Vec[], r: number, ms: number): boolean {
+  let best: Group | null = null, bd = Infinity;
+  for (const g of GROUPS) { if (g.calm) continue; for (const p of near) { if (!nearBox(g, p, r)) continue; const dx = Math.max(g.box.x0 - p.x, 0, p.x - g.box.x1), dy = Math.max(g.box.y0 - p.y, 0, p.y - g.box.y1), d = dx * dx + dy * dy; if (d < bd) { bd = d; best = g; } } }
+  if (!best) return false;
+  const job = best.job ??= buildCalm(best), t0 = performance.now();
+  for (;;) { const r = job.next(); if (r.done) { best.calm = r.value; best.job = undefined; return true; } if (performance.now() - t0 >= ms) return true; }
+}
+
 /** The calm one harbor's grid gives at p (1 off its grid, and in open water). */
 function calmIn(c: Calm, p: Vec): number {
   const fx = (p.x - c.x0) / CELL, fy = (p.y - c.y0) / CELL, i = Math.floor(fx), j = Math.floor(fy);

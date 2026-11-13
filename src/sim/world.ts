@@ -9,7 +9,7 @@ import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReac
 import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
-import { CURRENTS, basinCalm, currentAt, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
+import { CURRENTS, basinCalm, currentAt, prepareBasins, warmBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
@@ -53,6 +53,8 @@ import { RaceLog } from './debrief';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
+/** How near (m) the basins' current is worked out before the start; and how far ahead of a boat, as she sails. */
+const BASINS_NEAR = 4000, BASINS_AHEAD = 3000;
 /** Two-turns penalty, in degrees of turning. */
 export const TWO_TURNS = 720;
 
@@ -397,6 +399,9 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
+    // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
+    prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
     this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
@@ -835,6 +840,7 @@ export class World {
 
   /* ---------- the fixed step ---------- */
   step(dt = DT): void {
+    if (this.steps % 6 === 0) warmBasins(this.boats, BASINS_AHEAD, 1); // (a harbor a boat is sailing toward, a millisecond at a time)
     const prevT = this.t;
     this.t += dt;
     this.steps++;
@@ -1503,6 +1509,7 @@ export class World {
    * starboard of the wind) if given; the race clock doesn't move and nothing else happens.
    */
   idle(dt: number, twa?: number): void {
+    warmBasins(this.boats, BASINS_AHEAD, 2);
     const u = this.user;
     if (u.docked) { this.dockStep(u, dt); return; }
     const h = twa != null ? n360(this.wind.from + twa) : u.h;
@@ -1652,6 +1659,7 @@ export class World {
    * that would be a restart. False on land.
    */
   moveHere(p: Vec, name: string): boolean {
+    prepareBasins([p], BASINS_NEAR); // (a jump: the harbors round where she lands, at once)
     if (!this.freeSail || onLand(p) || hitsHarbor(p)) return false;
     const u = this.user;
     u.x = p.x; u.y = p.y; u.v = 0; u.astern = 0; u.sway = 0; u.vx = 0; u.vy = 0; u.turnTarget = null;

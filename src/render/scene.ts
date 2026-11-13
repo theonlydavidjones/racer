@@ -30,6 +30,7 @@ import { Harbor } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
+import { warmBasins } from '../environment/current';
 import { N_WAVES, WAVE_GLSL, boatOnWaves, packWaves, waterGrid } from './waves';
 import { waveTime } from '../environment/waveField';
 import type { SeaHere } from '../environment/sea';
@@ -801,6 +802,7 @@ export class SceneView {
       this.seaAcc = 0; this.seaRef = w.seaHere(focus);
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
     }
+    warmBasins([focus], 3000, 1); // (the page's own copy of the harbors' still water, ready before the camera's there: environment/current.ts)
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
