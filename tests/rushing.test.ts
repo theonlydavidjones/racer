@@ -9,7 +9,7 @@ import { packWaves } from '../src/render/waves';
 import { LL } from '../src/geo/geo';
 import { HARBORS, harborAt, hitsWall } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
-import { basinCalm, basinOpening } from '../src/environment/current';
+import { basinCalm, basinFloor } from '../src/environment/current';
 
 /**
  * "Rushing water" (the owner, v146, v158 and again v176): the water's pattern running past a still boat faster than the
@@ -84,31 +84,36 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
     const r = run('basin corner', { mode: 'sail', sailFrom: 'slip', sailTo: '', boat, boats: [boat], boatId: boat.id } as Partial<Settings>, { freeSail: true }, 60 * 600);
     expect(r.worst).toBeLessThan(0.05);
   }, 400_000);
-  it('in every harbor\'s basin the water is near slack away from its mouth, and the stream fades in through the mouth without a step', () => {
+  it('by every harbor the stream fades in through the water, round its walls: whole in open water, near slack deep inside, no step anywhere', () => {
     const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00', current: 'bigebb' } as Settings, 1);
     const kt = (p: { x: number; y: number }) => Math.hypot(w.currentAt(p).x, w.currentAt(p).y) / KT;
+    const solid = (q: { x: number; y: number }) => hitsWall(q) || onLand(q);
     for (const h of HARBORS) {
-      const { floor } = basinOpening(h);
-      for (const p of h.basin) { // (a hair in from each corner of its outline, 150 m or more from a mouth)
-        const c = h.basin[0], q = { x: p.x + (c.x - p.x) * 0.02 + 0.5, y: p.y + (c.y - p.y) * 0.02 + 0.5 };
-        if (harborAt(q) === h && basinCalm(q) < floor + 0.01) expect(kt(q), h.id).toBeLessThan(2.5 * floor + 0.1); // (2.5 kt outside at most)
-      }
-      // along its whole outline, wherever the water outside is free (no wall, breakwater or land 1–30 m out): the
-      // stream 1.5 m inside and 1.5 m outside the same within 0.2 kt (2.5 kt outside at most)
-      const B = h.basin, free = (q: { x: number; y: number }) => !harborAt(q) && !hitsWall(q) && !onLand(q);
+      const floor = basinFloor(h), B = h.basin;
+      // across the outline wherever it's water on both sides with nothing solid between (whatever lies farther out)
       for (let i = 0; i < B.length; i++) {
         const a = B[i], c = B[(i + 1) % B.length], L = Math.hypot(c.x - a.x, c.y - a.y); if (L < 1) continue;
-        const t = { x: (c.x - a.x) / L, y: (c.y - a.y) / L };
+        const t = { x: (c.x - a.x) / L, y: (c.y - a.y) / L }, n = { x: t.y, y: -t.x };
         for (let d = 1; d < L; d += 2) {
-          const m = { x: a.x + t.x * d, y: a.y + t.y * d }; let n = { x: t.y, y: -t.x };
-          if (harborAt({ x: m.x + n.x * 0.5, y: m.y + n.y * 0.5 })) n = { x: -n.x, y: -n.y };
-          if (![1, 2, 3, 4, 6, 8, 15, 30].every(r => free({ x: m.x + n.x * r, y: m.y + n.y * r }))) continue;
-          const pin = { x: m.x - n.x * 1.5, y: m.y - n.y * 1.5 }; if (harborAt(pin) !== h) continue;
-          expect(Math.abs(kt({ x: m.x + n.x * 1.5, y: m.y + n.y * 1.5 }) - kt(pin)), `${h.id} at ${m.x.toFixed(0)},${m.y.toFixed(0)}`).toBeLessThan(0.2);
+          const m = { x: a.x + t.x * d, y: a.y + t.y * d }, p = { x: m.x + n.x * 1.5, y: m.y + n.y * 1.5 }, q = { x: m.x - n.x * 1.5, y: m.y - n.y * 1.5 };
+          if ([-1.5, -1, -0.5, 0, 0.5, 1, 1.5].some(r => solid({ x: m.x + n.x * r, y: m.y + n.y * r }))) continue;
+          expect(Math.abs(kt(p) - kt(q)), `${h.id} at ${m.x.toFixed(0)},${m.y.toFixed(0)}`).toBeLessThan(0.2);
         }
       }
+      // deep inside (its calm at the floor): the eddy's share of the 2.5 kt outside
+      for (let x = h.box.x0; x < h.box.x1; x += 20) for (let y = h.box.y0; y < h.box.y1; y += 20) {
+        const p = { x, y }; if (harborAt(p) === h && basinCalm(p) < floor + 0.005) expect(kt(p), h.id).toBeLessThan(2.5 * floor + 0.1);
+      }
+      // open water round it (40 m clear of every wall and outside every basin): the whole stream
+      for (let x = h.reach.x0 - 100; x < h.reach.x1 + 100; x += 25) for (let y = h.reach.y0 - 100; y < h.reach.y1 + 100; y += 25) {
+        const p = { x, y }; if (harborAt(p) || solid(p)) continue;
+        if (Array.from({ length: 16 }, (_, k) => ({ x: x + 40 * Math.cos(k * Math.PI / 8), y: y + 40 * Math.sin(k * Math.PI / 8) })).some(q => solid(q) || harborAt(q))) continue;
+        expect(basinCalm(p), `${h.id} open water at ${x},${y}`).toBeGreaterThan(0.99);
+      }
     }
-  });
+    // the strip between South Beach's docks and its breakwater (outside the basin's outline, walled off from the stream)
+    for (const p of [{ x: 5175, y: -3300 }, { x: 5177, y: -3422 }]) expect(kt(p)).toBeLessThan(0.6);
+  }, 120_000);
   it('the foam drifts with the surface water: the current and 3% of the wind, no more', () => {
     for (const kt of [5, 15, 25]) for (const cur of [{ x: 0, y: 0 }, { x: 1.5, y: -0.5 }]) {
       const d = foamDrift(270, kt, cur), extra = Math.hypot(d.x - cur.x, d.y - cur.y);

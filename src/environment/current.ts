@@ -1,7 +1,6 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
 import { anyShoreDist, anyShoreDistNear, onLand, wharfDist, wharfShelter } from '../geo/shore';
-import { harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
-import { harborGaps } from './sea';
+import { BREAKWATER_W, HARBORS, SHORE_W, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -38,56 +37,94 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
 };
 
 /**
- * How much of the stream outside reaches a point inside a harbor's basin (1 outside any basin). A basin behind a
- * breakwater doesn't carry the tidal stream: water enters and leaves only through its mouth, at the rate the tide fills
- * and empties it (its tidal prism). A 300 × 300 m basin 3 m deep, with the tide's 0.9 m amplitude over 12.42 h, takes in
- * at most about 11 m³/s: about 1 cm/s across the basin, a few tenths of a knot in a 30 m mouth. The stream running past
- * the mouth also stirs a slow eddy (gyre) inside, driven by the shear across the mouth (USACE Coastal Engineering Manual,
+ * How much of the open stream reaches a point in or by a harbor (1 in open water). A basin behind a breakwater doesn't
+ * carry the tidal stream: water enters and leaves only through its mouth, at the rate the tide fills and empties it
+ * (its tidal prism). A 300 × 300 m basin 3 m deep, with the tide's 0.9 m amplitude over 12.42 h, takes in at most about
+ * 11 m³/s: about 1 cm/s across the basin, a few tenths of a knot in a 30 m mouth. The stream running past the mouth also
+ * stirs a slow eddy (gyre) inside, driven by the shear across the mouth (USACE Coastal Engineering Manual,
  * EM 1110-2-1100, Part II ch. 7; Nece, Falconer & Tsutsumi 1976 on the exchange; Booij 1986 and Langendoen, Booij &
  * Kranenburg 1994 on harbors beside a stream).
- * The stream fades in from the basin's open edges (its mouths, and the whole side of a marina whose docks lie open to an
- * estuary), BASIN_MOUTH meters in, to BASIN_EDDY of itself behind breakwaters, or BASIN_OPEN among docks open to the
- * stream along a long side (more of it gets in among their piles and hulls). All three are estimates: no measured figure
- * was found for these harbors, or in general. (The distance is a straight line, through a breakwater's head.)
+ * So the stream here fades with how far the water is from the open stream, measured through the water, round the
+ * breakwaters, piers and shore (not through them; the floating docks don't count, the water runs under them): open
+ * water is any 30 m clear of every wall and outside every basin (BASIN_CLEAR), and the stream is whole within that
+ * distance of it, so it runs on along a breakwater's outside and in through a mouth. Past that it fades over
+ * BASIN_MOUTH meters to BASIN_EDDY of itself in a harbor with breakwaters, or BASIN_OPEN among docks that lie open to
+ * an estuary with no breakwater (more of the stream gets in among their piles and hulls). All four are estimates: no
+ * measured figure was found for these harbors, or in general.
  */
-export const BASIN_EDDY = 0.1, BASIN_OPEN = 0.3, BASIN_MOUTH = 30;
-type Edge = { a: Vec; b: Vec };
-const EDGES = new Map<string, { segs: Edge[]; open: number; floor: number }>();
-/** A breakwater basin opens on the stream along under this fraction of its outline; more, and it's docks open to the stream. */
-const OPEN_SHARE = 0.15;
-/**
- * A basin's open edges, worked out once: every stretch of its outline (2 m steps) where the water outside is free from
- * 1 m out to 30 m (no wall, breakwater, land or other basin), and, for a harbor with breakwaters, the entrances between
- * them (sea.ts harborGaps: the span between the walls at each way out) as segments across the mouth.
- */
-function openEdges(h: Harbor): { segs: Edge[]; open: number; floor: number } {
-  let e = EDGES.get(h.id); if (e) return e;
-  const segs: Edge[] = [], B = h.basin, free = (q: Vec) => !inBasin(q) && !hitsWall(q) && !onLand(q);
-  if (h.breakwaters.length) for (const g of harborGaps(h)) { const t = { x: g.n.y, y: -g.n.x }; segs.push({ a: { x: g.c.x - t.x * g.B / 2, y: g.c.y - t.y * g.B / 2 }, b: { x: g.c.x + t.x * g.B / 2, y: g.c.y + t.y * g.B / 2 } }); }
-  let open = 0, round = 0;
-  for (let i = 0; i < B.length; i++) {
-    const a = B[i], b = B[(i + 1) % B.length], L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 0.5) continue;
-    round += L; const t = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
-    for (let s = 0; s < L; s += 2) {
-      const p = { x: a.x + t.x * s, y: a.y + t.y * s }, q = { x: a.x + t.x * Math.min(L, s + 2), y: a.y + t.y * Math.min(L, s + 2) }, m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
-      let n = { x: t.y, y: -t.x }; if (inBasin({ x: m.x + n.x * 0.5, y: m.y + n.y * 0.5 })) n = { x: -n.x, y: -n.y }; // (outward)
-      if ([1, 2, 3, 4, 6, 8, 15, 30].every(d => free({ x: m.x + n.x * d, y: m.y + n.y * d }))) { segs.push({ a: p, b: q }); open += Math.hypot(q.x - p.x, q.y - p.y); }
-    }
+export const BASIN_EDDY = 0.1, BASIN_OPEN = 0.3, BASIN_MOUTH = 30, BASIN_CLEAR = 30;
+/** The raster each harbor's calm is worked out on: cell size and margin round its works (m). */
+const CELL = 4, PAD = 120;
+interface Calm { x0: number; y0: number; nx: number; ny: number; d: Float32Array; floor: number }
+const CALMS = new Map<string, Calm>();
+/** The distance through the water from open water (m; Infinity where it's solid or cut off), on a grid round harbor `h`. */
+function calmOf(h: Harbor): Calm {
+  let c = CALMS.get(h.id); if (c) return c;
+  const x0 = h.reach.x0 - PAD, y0 = h.reach.y0 - PAD, nx = Math.ceil((h.reach.x1 - h.reach.x0 + 2 * PAD) / CELL) + 1, ny = Math.ceil((h.reach.y1 - h.reach.y0 + 2 * PAD) / CELL) + 1, N = nx * ny;
+  const solid = new Uint8Array(N), at = (i: number, j: number) => ({ x: x0 + i * CELL, y: y0 + j * CELL });
+  // the walls, every harbor's within reach: a breakwater's or shore line's cells out to its half-width plus a cell's
+  // half-diagonal (so a wall a cell thick can't be slipped through), its solid areas, and the land
+  const line = (pts: Vec[], half: number) => { const r = half + CELL * 0.71;
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+      const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x) - r - x0) / CELL)), i1 = Math.min(nx - 1, Math.ceil((Math.max(a.x, b.x) + r - x0) / CELL));
+      const j0 = Math.max(0, Math.floor((Math.min(a.y, b.y) - r - y0) / CELL)), j1 = Math.min(ny - 1, Math.ceil((Math.max(a.y, b.y) + r - y0) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const p = at(i, j), u = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+        if (Math.hypot(p.x - a.x - u * dx, p.y - a.y - u * dy) < r) solid[j * nx + i] = 1; } } };
+  for (const H of HARBORS) {
+    if (H.reach.x1 < x0 || H.reach.x0 > x0 + nx * CELL || H.reach.y1 < y0 || H.reach.y0 > y0 + ny * CELL) continue;
+    for (const b of H.breakwaters) if (!b.area) line(b.pts, BREAKWATER_W / 2);
+    for (const l of H.shore) line(l, SHORE_W / 2);
   }
-  const mouths = h.breakwaters.length ? harborGaps(h).reduce((s, g) => s + g.B, 0) : 0;
-  e = { segs, open: Math.max(open, mouths), floor: !h.breakwaters.length || Math.max(open, mouths) > OPEN_SHARE * round ? BASIN_OPEN : BASIN_EDDY }; EDGES.set(h.id, e); return e;
+  const basin = new Uint8Array(N);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (solid[k]) continue; const p = at(i, j);
+    if (onLand(p) || hitsWall(p)) solid[k] = 1; else if (inBasin(p)) basin[k] = 1; }
+  // distances on the grid (8 neighbours, never cutting a solid corner), from `src` cells, through water
+  const SQ = Math.SQRT2 * CELL, NB: [number, number, number][] = [[1, 0, CELL], [-1, 0, CELL], [0, 1, CELL], [0, -1, CELL], [1, 1, SQ], [1, -1, SQ], [-1, 1, SQ], [-1, -1, SQ]];
+  const spread = (d: Float32Array, through: (k: number) => boolean) => { // (a Dijkstra on a small binary heap)
+    const heap: number[] = []; const push = (k: number) => { heap.push(k); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (d[heap[p]] <= d[heap[i]]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && d[heap[l]] < d[heap[m]]) m = l; if (r < heap.length && d[heap[r]] < d[heap[m]]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+    const done = new Uint8Array(N); for (let k = 0; k < N; k++) if (d[k] === 0) push(k);
+    while (heap.length) { const k = pop(); if (done[k]) continue; done[k] = 1; const i = k % nx, j = (k - i) / nx;
+      for (const [di, dj, w] of NB) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= nx || b >= ny) continue; const q = b * nx + a;
+        if (!through(q) || (di && dj && (!through(j * nx + a) || !through(b * nx + i)))) continue;
+        if (d[k] + w < d[q]) { d[q] = d[k] + w; push(q); } } } };
+  // open water: 30 m clear of every wall (its clearance spread over everything, walls the sources), outside every basin
+  const clear = new Float32Array(N).fill(Infinity); for (let k = 0; k < N; k++) if (solid[k]) clear[k] = 0;
+  spread(clear, () => true);
+  const d = new Float32Array(N).fill(Infinity); for (let k = 0; k < N; k++) if (!solid[k] && !basin[k] && clear[k] >= BASIN_CLEAR) d[k] = 0;
+  spread(d, q => !solid[q]);
+  c = { x0, y0, nx, ny, d, floor: h.breakwaters.length ? BASIN_EDDY : BASIN_OPEN }; CALMS.set(h.id, c); return c;
 }
+/** The calm one harbor's grid gives at p (1 off its grid, and in open water). */
+function calmIn(c: Calm, p: Vec): number {
+  const fx = (p.x - c.x0) / CELL, fy = (p.y - c.y0) / CELL, i = Math.floor(fx), j = Math.floor(fy);
+  if (i < 0 || j < 0 || i >= c.nx - 1 || j >= c.ny - 1) return 1;
+  // (bilinear between the four nodes, over those in water: a wall's own nodes don't pull it either way)
+  const u = fx - i, v = fy - j; let s = 0, w = 0;
+  for (const [a, b, ww] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]] as const) {
+    const d = c.d[(j + b) * c.nx + i + a]; if (!Number.isFinite(d) || ww <= 0) continue;
+    s += ww * (c.floor + (1 - c.floor) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
+  }
+  if (w > 0) return s / w;
+  // (right against a wall, all four nodes solid: the nearest water nodes, two cells round, weighed by nearness)
+  for (let b = -2; b <= 3; b++) for (let a = -2; a <= 3; a++) {
+    const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= c.nx || J >= c.ny) continue;
+    const d = c.d[J * c.nx + I]; if (!Number.isFinite(d)) continue;
+    const ww = 1 / (0.01 + (I - fx) ** 2 + (J - fy) ** 2); s += ww * (c.floor + (1 - c.floor) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
+  }
+  return w > 0 ? s / w : 1;
+}
+/** How much of the stream reaches p (1 in open water): the most open of the harbor grids it's on. */
 export function basinCalm(p: Vec): number {
-  const h = harborAt(p); if (!h) return 1;
-  const e = openEdges(h); let d2 = Infinity;
-  for (const { a, b } of e.segs) {
-    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy, u = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
-    const ex = p.x - a.x - u * dx, ey = p.y - a.y - u * dy; d2 = Math.min(d2, ex * ex + ey * ey);
+  let k = 1, on = false;
+  for (const h of HARBORS) {
+    if (p.x < h.reach.x0 - PAD || p.x > h.reach.x1 + PAD || p.y < h.reach.y0 - PAD || p.y > h.reach.y1 + PAD) continue;
+    const c = calmIn(calmOf(h), p); k = on ? Math.max(k, c) : c; on = true;
   }
-  return e.floor + (1 - e.floor) * Math.exp(-Math.sqrt(d2) / BASIN_MOUTH);
+  return k;
 }
-/** (for the tests) How much open edge a basin has, m, and the fraction of the stream left deep inside it. */
-export const basinOpening = (h: Harbor) => { const e = openEdges(h); return { m: e.open, floor: e.floor }; };
+/** (for the tests) The fraction of the stream left deep inside harbor h. */
+export const basinFloor = (h: Harbor) => calmOf(h).floor;
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
