@@ -12,7 +12,7 @@ export const LAYERS: { key: LayerKey; name: string; what: string }[] = [
   { key: 'fog', name: 'Fog', what: 'Visibility from the National Weather Service forecast, or as observed, for this day and hour' },
   { key: 'ships', name: 'Ships', what: 'Ships, ferries and tour boats, with where they\'ll be in a minute' },
   { key: 'laylines', name: 'Laylines', what: 'The laylines to your next mark or destination' },
-  { key: 'shadows', name: 'Wind shadows', what: 'Each boat\'s dirty air downwind of her sails' }
+  { key: 'shadows', name: 'Wind shadows', what: 'Where the wind is lighter for what stands upwind: the lee of the land, boats\' dirty air, ships, the committee boat and the bridge piers, as the sails feel it' }
 ];
 
 const DEFAULT: Record<LayerKey, (s: Settings) => boolean> = {
