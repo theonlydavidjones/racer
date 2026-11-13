@@ -1574,7 +1574,7 @@ function drawHeads(): void {
     r.hidden = ![...r.querySelector('.srow-body')!.children].some(c => !(c as HTMLElement).hidden);
     // (the cruise's chart, drawn while its row was still hidden, had no size: drawn again now it shows)
     if (was && !r.hidden && r.dataset.row === 'where') setupChart?.sync(true);
-    const open = r.classList.contains('always') || r.dataset.row === rowOpen;
+    const open = !r.hidden && (r.classList.contains('always') || r.dataset.row === rowOpen); // (a hidden row isn't open)
     r.classList.toggle('open', open);
     r.querySelector('.srow-head')!.setAttribute('aria-expanded', String(open));
     r.querySelector('.srow-go')!.textContent = open ? 'Done ▴' : 'Change ▾';
