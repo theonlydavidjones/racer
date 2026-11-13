@@ -251,6 +251,11 @@ What's planned, roughly in order. Done work is described in the README.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (bug; 2–3 h): owner, "at aquatic park, auto
+   nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
+   curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
+   geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
+   of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
 8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
    intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
    Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
