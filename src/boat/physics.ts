@@ -829,6 +829,12 @@ export function byHand(b: Boat, k: LineKey): boolean {
   if (k === 'jibsheetW') return false; // the lazy sheet is the crew's until you haul on it
   return k === 'mainsheet' || k === 'jibsheet' ? b.manualTrim : b.trimAll;
 }
+/**
+ * Hove to with the tiller lashed: a crew told "we're hove to" keep her so, the jib's windward sheet made fast with the jib
+ * backed and the main left eased where it is, whoever had the lines before (the owner: Auto, crew or trim, while she's
+ * hove to should keep her hove to). Only the helm sails her off, by letting the lashing go.
+ */
+export const keepsHove = (b: Boat) => b.isUser && !!b.hove && b.lashed != null;
 /** The lines you have. */
 export const linesByHand = (b: Boat): LineKey[] => LINES.filter(k => byHand(b, k));
 /** Take a line (you're working it), or give it back to the crew (`mine` false): they carry on from where it is. */
@@ -846,6 +852,10 @@ export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.h
  * (the classic way to heave to: tack and leave the jib sheet made fast).
  */
 function jibSheetsAtTack(b: Boat, emit: Emit): void {
+  // (the crew holding her hove to, and she's gone through the wind all the same, a shift or the lashed tiller moved: the
+  // sheet made fast is the leeward one now, so the jib fills on it and the old leeward sheet, let fly, is the lazy one;
+  // the lines stay the crew's, who trim her once she's sailing)
+  if (!byHand(b, 'jibsheetW') && keepsHove(b)) { const c = b.ctl; [c.jibsheet, c.jibsheetW] = [c.jibsheetW, c.jibsheet]; return; }
   if (!byHand(b, 'jibsheetW')) return;
   const c = b.ctl, h = b.hand ??= {}, leeMine = byHand(b, 'jibsheet');
   [c.jibsheet, c.jibsheetW] = [c.jibsheetW, c.jibsheet];
@@ -870,11 +880,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const c = b.ctl, tws = b.ww.kt;
   // working a line takes that line, and only that line, off the crew
   if (b.isUser) for (const k of [...Object.keys(b.ctlCmd), ...Object.keys(b.ctlTarget ?? {})] as Ctl[]) if (b.ctlCmd[k] || b.ctlTarget?.[k] != null) takeLine(b, k);
-  // hove to, the tiller lashed: a crew told "we're hove to" keep her so, the jib's windward sheet made fast with the jib
-  // backed and the main left eased where it is, whoever had the lines before (the owner: Auto, crew or trim, while she's
-  // hove to should keep her hove to). Only the helm sails her off, by letting the lashing go; then the crew let the
-  // windward sheet fly and trim for sailing. (Lines you take yourself are yours as ever.)
-  const keepHove = b.isUser && !!b.hove && b.lashed != null;
+  // hove to, the tiller lashed, the crew keep her so (keepsHove); the lashing let go, they let the windward sheet fly and
+  // trim for sailing. (Lines you take yourself are yours as ever.)
+  const keepHove = keepsHove(b);
   const held = (k: 'jibsheetW' | 'mainsheet') => byHand(b, k) || keepHove;
   // the crew work the lines they have one job at a time, each person at their own pace (crewWork.ts): `on` is filled in
   // below, once the crew's targets are known
