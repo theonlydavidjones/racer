@@ -35,10 +35,21 @@ export const NO_SHADOW: Shadow = { k: 1, shift: 0 };
 /** Perturbations to the true wind, in units of the true wind speed, accumulated and then turned into k and shift. */
 export class WindSum {
   x = 0; y = 0; // the perturbation (flow direction, east and north)
+  // the wakes' deficits: their directions summed, weighted, and their squares (addDeficit)
+  private dx = 0; private dy = 0; private d2 = 0;
   /** Add a flow perturbation `amt` (fraction of the true wind) along unit vector (ux, uy). */
   add(ux: number, uy: number, amt: number): void { this.x += ux * amt; this.y += uy * amt; }
+  /**
+   * Add a wake's deficit `d` (fraction of the true wind, slower air) along her wake's direction (ux, uy). Overlapping
+   * wakes don't take their deficits out of the wind one after another: the air already slowed by one has less to lose
+   * to the next. They combine as the root of the sum of their squares (Katić, Højstrup & Jensen 1986, "A simple model
+   * for cluster efficiency", EWEC, the wind-farm standard), not their sum, which took a bunched fleet running in line
+   * down to a fifth of the wind (three Folkboats 11–30 m ahead: 0.47 summed, about 0.64 so).
+   */
+  addDeficit(ux: number, uy: number, d: number): void { this.dx += ux * d; this.dy += uy * d; this.d2 += d * d; }
   /** The wind's speed factor and direction shift, for the true wind from `from`. */
   result(from: number): Shadow {
+    if (this.d2 > 0) { const n = Math.hypot(this.dx, this.dy) || 1, D = Math.sqrt(this.d2); this.x -= this.dx / n * D; this.y -= this.dy / n * D; this.dx = this.dy = this.d2 = 0; }
     if (this.x === 0 && this.y === 0) return NO_SHADOW;
     const f = V(from + 180), fx = f.x + this.x, fy = f.y + this.y, k = Math.hypot(fx, fy);
     const flowNow = Math.atan2(fx, fy) / D2R, flowWas = from + 180;
@@ -71,7 +82,7 @@ export function addBoatWake(sum: WindSum, c: Caster, p: Vec, trueKt: number): vo
     // the momentum wake: slower air
     const ks = 0.04 + 0.02 * breeze, sigma = ks * x + 0.22 * d0, cd = c.luff ? 0.12 : cdFor(c.awa), q = cd / (8 * (sigma / d0) ** 2);
     const deficit = q >= 1 ? 0.65 : Math.min(0.65, 1 - Math.sqrt(1 - q));
-    sum.add(e.x, e.y, -deficit * Math.exp(-(y * y) / (2 * sigma * sigma)) * scale * clamp(x / (0.3 * H), 0, 1));
+    sum.addDeficit(e.x, e.y, deficit * Math.exp(-(y * y) / (2 * sigma * sigma)) * scale * clamp(x / (0.3 * H), 0, 1));
     // the downwash: turned toward her windward side (a header for a boat on her tack)
     const Lv = H * (4 - 1.5 * breeze), ang = -7.5 * cl * Math.exp(-x / Lv) / (1 + (y / (0.5 * H)) ** 2);
     sum.add(lx, ly, ang * D2R * scale);
@@ -110,14 +121,14 @@ export function addShipWake(sum: WindSum, from: number, trueKt: number, v: { x: 
   const sinA = Math.abs(vs.x * ey - vs.y * ex), cosA = Math.abs(vs.x * ex + vs.y * ey);
   const W = sinA * len + cosA * beam, L = cosA * len + sinA * beam;
   const d = bluffDeficit(x, y, air, W, L);
-  if (d > 0.001) sum.add(ex, ey, -d * rel / trueKt);
+  if (d > 0.001) sum.addDeficit(ex, ey, d * rel / trueKt);
 }
 
 /** The committee boat (anchored, about 12 m long and 4 m tall, lying head to wind): only the lower part of a rig is in it. */
 export function addCommitteeWake(sum: WindSum, from: number, c: Vec, p: Vec): void {
   const e = V(from + 180), dx = p.x - c.x, dy = p.y - c.y, x = dx * e.x + dy * e.y, y = dx * e.y - dy * e.x;
   const d = bluffDeficit(x, y, 4, 4, 12) * 0.7;
-  if (d > 0.001) sum.add(e.x, e.y, -d);
+  if (d > 0.001) sum.addDeficit(e.x, e.y, d);
 }
 
 /* ---------- the lee of the land ---------- */
