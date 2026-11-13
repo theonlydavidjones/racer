@@ -13,7 +13,7 @@ const LAT0 = 37.81053, LON0 = -122.44332, M = 111320, MLON = M * Math.cos(LAT0 *
   const p = await b.newPage({ viewport: { width: 1400, height: 860 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: 'cityfront', sailTo: 'alcatraz', mapLayers: { current: true, wind: false } }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); });
-  await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(2000);
   await p.evaluate(() => document.getElementById('bPlanOpen').click()); await p.waitForTimeout(5000);
   await p.screenshot({ path: `${out}/plan-open.png` });

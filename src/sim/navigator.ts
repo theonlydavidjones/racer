@@ -4,7 +4,7 @@ import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
 import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
-import type { World } from './world';
+import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
 import { groundLaylines, landDist, routeAround, sailLeg, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
@@ -38,7 +38,14 @@ function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'lan
   // corner from there, as a boat does), so the track runs on unbroken and every metre of it is sailed and timed
   let at = route[0];
   for (let i = 1; i < route.length; i++) {
-    const r = sailLeg(o, at, route[i], tt, 'middle', undefined, i === route.length - 1 ? 30 : 120, 360);
+    const arrive = i === route.length - 1 ? 30 : 120;
+    let r = sailLeg(o, at, route[i], tt, 'middle', undefined, arrive, 360);
+    // run ashore up the middle (its lanes either side of the course meet the shore): a navigator would sail it the other
+    // ways, the long board first to one side or the other, and take whichever gets there soonest
+    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) {
+      const q = sailLeg(o, at, route[i], tt, pl, undefined, arrive, 360);
+      if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q;
+    }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
     // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
@@ -83,8 +90,8 @@ export interface PassageNow {
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
-const nowMemo = new WeakMap<World, { key: string; refs: unknown[]; v: PassageNow }>();
-export function passageNow(w: World): PassageNow | null {
+const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
+export function passageNow(w: SimView): PassageNow | null {
   const dest = w.dest; if (!dest) return null;
   const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
   const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
@@ -98,7 +105,7 @@ export function passageNow(w: World): PassageNow | null {
   // (the laylines she tacked or gybed onto: the wind and the current where and when she made her last turn, which is
   // where she saw she'd lay the mark; with no turn on the last stretch, those at the mark when she gets there)
   const lt = last?.turns[last.turns.length - 1], ltT = lt ? r.track.find(q => dist(q.p, lt.p) < 1)?.t : undefined;
-  const laylines = lk ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
+  const laylines = lk && r.ok ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
   const v: PassageNow = { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
     tacks: turns.filter(q => q.kind === 'tack').map(q => q.p), gybes: turns.filter(q => q.kind === 'gybe').map(q => q.p),
     laylines, leave: t0, eta: r.ok ? t0 + r.minutes : null };
@@ -111,7 +118,7 @@ export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
   ? 'the planner\'s course runs ashore on the way (its tacks or gybes don\'t fit between the shores there): pick a spot a little further out, or sail that part by eye'
   : 'it takes too long, becalmed or against a foul tide somewhere on the way';
 
-export function passagePlan(w: World): PassagePlan | null {
+export function passagePlan(w: SimView): PassagePlan | null {
   const dest = w.dest; if (!dest) return null;
   const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
   const from = { x: u.x, y: u.y }, to = dest.p;

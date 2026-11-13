@@ -3,7 +3,7 @@ import { polar, runAngle } from '../boat/polar';
 import type { Boat } from '../boat/boat';
 import { V, brg, unit, wrap, type Vec } from '../core/math';
 import type { CourseMark } from '../courses/course';
-import type { World } from './world';
+import type { SimView } from './host';
 
 export interface Laylines {
   mark: CourseMark;
@@ -14,7 +14,7 @@ export interface Laylines {
 }
 
 /** The mark a boat should be thinking about: before her start, the first mark. */
-export function targetMark(w: World, b: Boat): CourseMark | null {
+export function targetMark(w: SimView, b: Boat): CourseMark | null {
   if (b.finished || b.retired) return null;
   if (!b.started && !w.freeSail) return w.C.marks[0] ?? null;
   return w.nextMark(b);
@@ -25,7 +25,7 @@ export function targetMark(w: World, b: Boat): CourseMark | null {
  * best-VMG downwind tracks on a run. Uses the wind on the water at the boat and the current at the
  * mark, so the lines bend with the tide like a sailor's.
  */
-export function laylinesFor(w: World, b: Boat): Laylines | null {
+export function laylinesFor(w: SimView, b: Boat): Laylines | null {
   const m = targetMark(w, b);
   if (!m || m.type !== 'round') return null;
   const ww = b.ww, c = w.currentAt(m.p);

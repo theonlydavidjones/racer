@@ -27,7 +27,9 @@ then it's not a simulator." Later, once the physics and racing are dialled in (t
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighbouring bins, as driveCalibration already does across the wind.
-- **AI boats into the harbour after an abandonment** (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
+- **AI boats into the harbour after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
+  call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
+  come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
   after N or AP over A the AI boats now sail home and stand off the nearest racing harbour, each at her own spot with
   open water to leeward, lying to (ai.ts homeCourse). Real boats would go in: sail or motor through the entrance and
   berth in the basin, out of the breeze (lying to for an hour in 23+ kt is hard on the sails). That needs the AI boats
@@ -160,6 +162,15 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8b. **A UI audit with real rigour** (owner, 13 November; next): "a UI audit on the roadmap to focus on real rigor on these
+   screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
+   docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
+   navigation in place of "< Start page"; and the Yacht Club's Everyone / Skippers / Crew / Yours toggle, which confuses
+   the owner. Proposals go to the owner before building; the screen rule above applies.
+   Also filed with it:
+   - The setup builds the World only on Start (owner: the configurator lags because it rebuilds the play surface
+     behind it).
+   - Bug: the flag index doesn't scroll.
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear

@@ -7,6 +7,7 @@ import { trimDrive } from '../boat/trim';
 import { driveSpeed, tuneLoss } from '../boat/coach';
 import { presetFor, tuneName, tuneWords, TUNE_PRESETS } from '../boat/rigTune';
 import type { World } from './world';
+import type { SimView } from './host';
 
 /**
  * The tactics debrief: a log of your race as you sail it, and afterwards what cost you time, ranked, with what to do.
@@ -35,6 +36,8 @@ export interface Moment { key: string; t0: number; t1: number; x: number; y: num
 interface Spell { key: string; t0: number; t1: number; x: number; y: number; lost: number; peak: number; aux: number; who: Map<string, number>; leg?: number }
 /** A spell off for this long is over (a brief let-up doesn't split it); one that cost less than EP_MIN isn't kept. */
 const EP_GAP = 4, EP_MIN = 1;
+/** A wind shift worth calling a header or a lift, deg: past the wind's own wobble (the debrief's and the replay's line). */
+export const SHIFT_DEG = 4;
 /** Dirty air with no boat to windward to blame. */
 const SHIP = 'a ship or the committee boat';
 interface MarkLog { name: string; leg: 'beat' | 'reach' | 'run'; overM: number; overT: number; wide: number | null; place: number | null; t: number | null }
@@ -135,7 +138,7 @@ export class RaceLog {
   }
 
   /** Every moment so far, in time order (spells and a turn still going included, as far as they've got). */
-  moments(w: World): Moment[] {
+  moments(w: SimView): Moment[] {
     const out = this.done.slice(), over = new Map(this.over);
     for (const S of this.open.values()) if (S.key === 'laylines') this.keepOver(S, over); else this.close(S, out);
     if (this.turn) this.endTurn(w.t, out);
@@ -217,7 +220,7 @@ export class RaceLog {
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), headed = u.tack === 'S' ? -dev : dev; // + headed
     this.liftedAtTack = -headed;
     if (leg === 'beat' && u.twa < 65 && !u.tacking) {
-      if (headed > 4) {
+      if (headed > SHIFT_DEG) {
         this.header.streak += dt;
         // (the spell runs from the header's start; it costs only once held for 15 s, and one let go sooner isn't kept)
         if (this.header.streak > 15) {
@@ -251,7 +254,7 @@ export class RaceLog {
   }
 
   /** Seconds lost on the laylines, mark by mark. */
-  private overstands(w: World): { lost: number; worst: MarkLog | null } {
+  private overstands(w: SimView): { lost: number; worst: MarkLog | null } {
     let lost = 0, worst: MarkLog | null = null;
     const vBeat = Math.max(1, polar(w.wind.kt, beatAngle(w.wind.kt)));
     for (const L of this.marks) if (L.overM > 0) { lost += 0.6 * L.overM / vBeat; if (!worst || L.overM > worst.overM) worst = L; }
@@ -259,7 +262,7 @@ export class RaceLog {
   }
 
   /** What cost you time, most first: only what cost a couple of seconds or more. */
-  findings(w: World): Finding[] {
+  findings(w: SimView): Finding[] {
     const out: Finding[] = [], mmss = (x: number) => x < 60 ? `${Math.round(x)} s` : `${Math.floor(x / 60)} min ${Math.round(x % 60)} s`;
     const bl = (m: number) => `${Math.round(m / 7.6)} boat length${Math.round(m / 7.6) === 1 ? '' : 's'}`;
     // the start

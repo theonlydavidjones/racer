@@ -1,6 +1,6 @@
 import { KT, V, dist, dot, type Vec } from '../core/math';
 import { onLand } from '../geo/shore';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import type { Tf } from './draw2d';
 
 /*
@@ -32,7 +32,7 @@ export function rampColor(r: Ramp, v: number): [number, number, number] {
 }
 
 /** The flow at p for the map: its speed (kt) and the way it goes (a unit vector, x east, y north). */
-export function flowAt(w: World, kind: FlowKind, p: Vec): { kt: number; ux: number; uy: number } {
+export function flowAt(w: SimView, kind: FlowKind, p: Vec): { kt: number; ux: number; uy: number } {
   if (kind === 'wind') {
     // the wind here: the day's wind with the shore's lee and the slot (World.fieldAt), and the puffs and lulls drifting
     // over it (the owner: puffs in the field's own colours, not grey), without the gusts of the seconds
@@ -46,13 +46,13 @@ export function flowAt(w: World, kind: FlowKind, p: Vec): { kt: number; ux: numb
 const deg = (a: number) => String(Math.round(((a % 360) + 360) % 360)).padStart(3, '0') + '°';
 /** Flood or ebb at p, by the nearest NOAA station's flood direction (as the tide box says it), or the Gate's with a
  * practice current (the flood sets in about 095°: environment/current.ts). */
-export function tideWord(w: World, p: Vec, c: Vec): string {
+export function tideWord(w: SimView, p: Vec, c: Vec): string {
   const kt = Math.hypot(c.x, c.y) / KT; if (kt < 0.15) return 'slack';
   const st = w.tide?.stations.length ? w.tide.stations.reduce((a, s) => (dist(s.p, p) < dist(a.p, p) ? s : a)) : null;
   return dot(c, V(st ? st.flood : 95)) >= 0 ? 'flood' : 'ebb';
 }
 /** The two lines of the readout at p: the layer's own first. `wind` and `cur` default to what's on the water there. */
-export function readout(w: World, kind: FlowKind, p: Vec, wind?: { kt: number; from: number }, cur?: Vec): [string, string] {
+export function readout(w: SimView, kind: FlowKind, p: Vec, wind?: { kt: number; from: number }, cur?: Vec): [string, string] {
   const wv = wind ?? w.windHere(p, undefined, false), c = cur ?? w.currentAt(p), ck = Math.hypot(c.x, c.y) / KT, tw = tideWord(w, p, c);
   const wl = `${Math.round(wv.kt)} kt from ${deg(wv.from)}`;
   const cl = tw === 'slack' ? 'slack water' : `${tw} ${ck.toFixed(1)} kt toward ${deg(Math.atan2(c.x, c.y) * 180 / Math.PI)}`;
@@ -78,7 +78,7 @@ export class FlowField {
   private kt = new Float32Array(0); private ux = new Float32Array(0); private uy = new Float32Array(0);
   /** samples worked out last time, and how long that took (ms): for the frame-cost check */
   lastSamples = 0; lastMs = 0;
-  draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, wd: World, kind: FlowKind, alpha: number, cellPx = 12, everyS = 60): void {
+  draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, wd: SimView, kind: FlowKind, alpha: number, cellPx = 12, everyS = 60): void {
     if (!(w > 0 && h > 0 && scale > 0 && cellPx > 0)) return; // (a map not laid out yet, or hidden)
     const { m, inv } = affine(tf);
     const cs = [inv(0, 0), inv(w, 0), inv(0, h), inv(w, h)], xs = cs.map(p => p.x), ys = cs.map(p => p.y);
@@ -97,7 +97,7 @@ export class FlowField {
     ctx.drawImage(this.img!, -0.5, -0.5);
     ctx.restore();
   }
-  private build(wd: World, kind: FlowKind, vx0: number, vx1: number, vy0: number, vy1: number, d: number, key: string): void {
+  private build(wd: SimView, kind: FlowKind, vx0: number, vx1: number, vy0: number, vy1: number, d: number, key: string): void {
     const T0 = performance.now();
     const mx = (vx1 - vx0) * 0.25, my = (vy1 - vy0) * 0.25;
     this.x0 = Math.floor((vx0 - mx) / d) * d; this.y1 = Math.ceil((vy1 + my) / d) * d; this.d = d; this.key = key;
@@ -129,9 +129,13 @@ export class FlowField {
   }
 }
 
-/** Screen speed of the streaks (px/s per kt): the slot's run, the lee's crawl; the current's are scaled up, being slower. */
-const PX_PER_KT: Record<FlowKind, number> = { wind: 6, current: 40 };
-const HIST = 20, EVERY = 0.08; // a trail of 20 points, one every 0.08 s: a second and a half behind each, long and smooth (the mock-up's)
+/**
+ * Screen speed of the streaks (px/s per kt): a calm drift you can read, as Windy's map shows at its default (the owner,
+ * 13 Nov 2026: "way, way too fast" at 6): 15 kt of wind drifts about 24 px a second, 2 kt of current about 24. The
+ * slot's run still shows against the lee's crawl; the current's are scaled up, being slower.
+ */
+const PX_PER_KT: Record<FlowKind, number> = { wind: 1.6, current: 12 };
+const HIST = 20, EVERY = 0.12; // a trail of 20 points, one every 0.12 s: 2.4 s behind each, so a slow streak is still long enough to read (about 60 px in 15 kt)
 
 /**
  * The streaks: a pool of particles carried along the flow in the sim's metres, each with a short fading trail, put
@@ -158,7 +162,7 @@ export class Streaks {
       if (this.age[i] > this.life[i]) { // a new one, somewhere on the water in view
         let p = inv(this.rnd() * w, this.rnd() * h);
         for (let t = 0; t < 4 && !field.at(p); t++) p = inv(this.rnd() * w, this.rnd() * h);
-        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 3 + this.rnd() * 3;
+        this.xs[i] = p.x; this.ys[i] = p.y; this.age[i] = 0; this.life[i] = 8 + this.rnd() * 6; // (long enough to grow its trail at the slow drift)
         this.hx[i * HIST] = p.x; this.hy[i * HIST] = p.y; this.hn[i] = 1;
       }
       const p = { x: this.xs[i], y: this.ys[i] }, f = field.at(p);

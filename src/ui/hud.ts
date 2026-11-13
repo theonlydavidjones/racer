@@ -11,10 +11,12 @@ import { byHand, sailPlan } from '../boat/physics';
 import type { SailTrim } from '../boat/trim';
 import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '../core/math';
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
-import { youTackPays, type World } from '../sim/world';
+import { youTackPays } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { $ } from './dom';
 import { routeAround } from '../sim/routing';
 import { passageNow, type PassageNow } from '../sim/navigator';
+import { clockOf } from '../sim/outlook';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
@@ -83,14 +85,29 @@ export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) =>
 export class Hud {
   private acc = 0;
   mapZoom = false;
+  /** What the inset shows, cruising: the water round her (the map), or the navigator's passage (her course to the
+   * destination, whole, north up; a tap opens the passage plan). The owner: "It should just be a view in the inset map." */
+  insetView: 'map' | 'nav' = 'map';
+  /** The passage the navigator view shows: worked out again each minute of the clock, or 300 m on (it takes a moment). */
+  private insetPlan: PassageNow | null = null;
+  private navMemo: { pn: PassageNow; t: number; x: number; y: number; dest: unknown } | null = null;
+  navPassage(wd: SimView): PassageNow | null {
+    if (!wd.dest) return null;
+    const u = wd.user, m = this.navMemo;
+    if (!m || m.dest !== wd.dest || wd.clockUtc - m.t >= 1 || Math.hypot(u.x - m.x, u.y - m.y) > 300) {
+      const pn = passageNow(wd); if (!pn) return null;
+      this.navMemo = { pn, t: wd.clockUtc, x: u.x, y: u.y, dest: wd.dest };
+    }
+    return this.navMemo!.pn;
+  }
   /** Label of the key bound to Hail (set by main, which owns the key map). */
   hailKey: () => string = () => 'H';
   private dialC = $<HTMLCanvasElement>('dial');
   private mapC = $<HTMLCanvasElement>('map');
   /** The wind or current as Windy draws it (ui/flow.ts): the colour field for each map, and its moving streaks (drawn
    * every frame on a canvas over each map: the maps themselves are drawn ten times a second, or when the chart moves). */
-  private flowField = { inset: new FlowField(), chart: new FlowField() };
-  private streaks = { inset: new Streaks(120), chart: new Streaks(900) };
+  private flowField = { chart: new FlowField() }; // (the full chart's only: the inset shows no field)
+  private streaks = { chart: new Streaks(900) };
   private mapFx = $<HTMLCanvasElement>('mapFx');
   /** how each map was drawn last (its transform), for the streaks */
   private drawn: Partial<Record<'inset' | 'chart', { tf: Tf; w: number; h: number; scale: number; kind: FlowKind | null }>> = {};
@@ -103,7 +120,7 @@ export class Hud {
    * for the heading she'd sail on the other tack (or after a gybe), a white one for her average close-hauled heading
    * on this tack. Steer above the average and she's lifted, below it headed: the pod's label says by how much.
    */
-  private compass(w: World, u: Boat, dt: number): void {
+  private compass(w: SimView, u: Boat, dt: number): void {
     const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), cx = W / 2, span = 50, px = (W - 12) / (2 * span);
     ctx.clearRect(0, 0, W, H);
     const h = u.h, x = (b: number) => cx + wrap(b - h) * px;
@@ -145,12 +162,12 @@ export class Hud {
     ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
   }
 
-  private trCache: { key: string; t: ReturnType<World['laylineTransit']> } = { key: '', t: null };
+  private trCache: { key: string; t: ReturnType<SimView['laylineTransit']> } = { key: '', t: null };
   /**
    * Transits: before the start, what the far end of the line lines up with (in line = on the line); on a beat, what
    * the mark lines up with along your layline (in line = on the layline).
    */
-  private transit(w: World, u: Boat): void {
+  private transit(w: SimView, u: Boat): void {
     const el = $('transit');
     if (w.freeSail || u.finished || u.retired || !w.settings.aids) { el.hidden = true; return; }
     const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
@@ -158,7 +175,7 @@ export class Hud {
       const T = w.lineTransit; if (!T) { el.hidden = true; return; }
       el.hidden = false;
       el.innerHTML = `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`;
-      $('nextCard').title = el.textContent ?? '';
+      $('nextCard').title = (el.textContent ?? '') + ' · Click for the course and the strategist';
       return;
     }
     const m = w.nextMark(u), L = laylinesFor(w, u);
@@ -168,19 +185,19 @@ export class Hud {
     const T = this.trCache.t; if (!T) { el.hidden = true; return; }
     el.hidden = false;
     el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
-    $('nextCard').title = el.textContent ?? '';
+    $('nextCard').title = (el.textContent ?? '') + ' · Click for the course and the strategist';
   }
 
   private sigKey = '';
   /** The flag index (the Flags tile opens it): every flag the committee can fly, what it means, and what's up now. */
-  flagIndex(w: World, open?: boolean): void {
+  flagIndex(w: SimView, open?: boolean): void {
     const el = $('flagIndex');
     if (open != null) el.hidden = !open;
     if (!el.hidden) fillFlagIndex($('fiBody'), { flying: w.flags, prep: w.prepFlag, course: w.courseSignal?.no ?? null });
   }
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
-  private signals(w: World): void {
+  private signals(w: SimView): void {
     const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd || !!w.cancelled);
     const el = $('sigPanel'); el.hidden = !show; if (!show) return;
     const key = w.flags.join(',') + '|' + (w.courseSignal?.no ?? '');
@@ -210,7 +227,7 @@ export class Hud {
     $('sigText').textContent = txt;
   }
 
-  update(w: World, dt: number): void {
+  update(w: SimView, dt: number): void {
     this.signals(w);
     this.transit(w, w.user);
     this.compass(w, w.user, dt);
@@ -290,8 +307,20 @@ export class Hud {
       // the Coach card's second line (the chase-view layout): the sails' state, heel and helm, where the crew are; a state
       // that isn't good in amber or red
       const st = (name: string, w: string, c: string) => `${name} <b class="tp-st ${c}">${w.toLowerCase()}</b>`;
-      const c = u.crew, crew = !c ? '' : ` · crew ${c.mode === 'hike' ? 'hiking' : c.mode === 'leeward' ? 'to leeward' : c.mode === 'foredeck' ? 'on the foredeck' : c.fore > 0.55 ? 'forward' : c.fore < 0.25 ? 'aft' : 'amidships'}`;
-      $('tpBalance').innerHTML = `${st('Main', mw, mc)} · ${st('Jib', jw, jc)} · Heel <b>${heel}°</b> · helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b>${crew}<span class="warn">${advice}</span>`; }
+      // where the crew are, the line's last word: a button that opens their places, in place of a Crew button (the
+      // surface audit, owner 13 Nov), amber once you've placed them as a line is in the band. It's built once and only its
+      // words change, so a click never straddles a rewrite of the line.
+      const c = u.crew, crewWhere = !c ? '' : `crew ${c.mode === 'hike' ? 'hiking' : c.mode === 'leeward' ? 'to leeward' : c.mode === 'foredeck' ? 'on the foredeck' : c.fore > 0.55 ? 'forward' : c.fore < 0.25 ? 'aft' : 'amidships'}`;
+      const box = $('tpBalance');
+      if (!box.querySelector('.tp-crew')) box.innerHTML = '<span class="tp-bal"></span><span class="tp-sep"> · </span><button type="button" class="tp-crew"></button><span class="tp-adv warn"></span>';
+      const bal = `${st('Main', mw, mc)} · ${st('Jib', jw, jc)} · Heel <b>${heel}°</b> · helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b>`;
+      if (bal !== this.balShown) { box.querySelector('.tp-bal')!.innerHTML = bal; this.balShown = bal; }
+      const cb = box.querySelector<HTMLButtonElement>('.tp-crew')!, placed = !!c?.place;
+      if (cb.textContent !== crewWhere) cb.textContent = crewWhere;
+      cb.hidden = !c; (box.querySelector('.tp-sep') as HTMLElement).hidden = !c;
+      cb.classList.toggle('mine', placed);
+      const tt = `Where the crew sit: click to place them (keys 7–0). ${placed ? 'Placed by you' : 'On auto'}`; if (cb.title !== tt) cb.title = tt;
+      const adv = box.querySelector('.tp-adv')!; if (adv.textContent !== advice) adv.textContent = advice; }
     // (the line under the sails' state is the trim coach's headline: app.ts coachTick)
   }
 
@@ -299,7 +328,7 @@ export class Hud {
   private abackT = 0;
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
-  private poleHints(w: World, u: Boat): void {
+  private poleHints(w: SimView, u: Boat): void {
     if (w.t < 0 || u.finished || u.retired || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
@@ -318,8 +347,8 @@ export class Hud {
   }
 
   /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
-  private situation(w: World, u: Boat): void {
-    let best: { o: Boat; r: ReturnType<World['rights']>; c: { t: number; d: number }; d: number; risk: boolean } | null = null, bestScore = -1e9;
+  private situation(w: SimView, u: Boat): void {
+    let best: { o: Boat; r: ReturnType<SimView['rights']>; c: { t: number; d: number }; d: number; risk: boolean } | null = null, bestScore = -1e9;
     for (const o of w.boats) {
       if (o.isUser) continue;
       const d = dist(u, o); if (d > 90) continue;
@@ -340,8 +369,9 @@ export class Hud {
       // a hail for room to tack trumps everything else
       const key = this.hailKey();
       if (hail.replyAt != null) {
-        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now: they must give you room.`;
-        el.className = hail.by === o.id ? 'kc' : 'row';
+        // (the room passes, not right of way: WS Case 101. So the colour follows who keeps clear, as everywhere else)
+        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now${kc ? ' and keep clear of them' : ''}: they must give you room to do it.`;
+        el.className = kc ? 'kc' : 'row';
       } else if (hail.by === o.id && hail.passedOn) {
         // Rule 20.3: you passed the hail on to the boat to windward of you
         const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';
@@ -362,8 +392,9 @@ export class Hud {
         el.className = 'row';
       } else if (hail.clearAt != null) {
         const left = Math.max(0, hail.clearAt + HAIL_RESPONSE - w.t);
-        $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
-        el.className = u.lastTackT >= hail.at ? 'row' : 'kc alarm';
+        const tacked = (u.headToWindT ?? -Infinity) >= hail.at; // (a gybe isn't the tack rule 20.2(d) asks for)
+        $('situMsg').textContent = tacked ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
+        el.className = tacked ? 'row' : 'kc alarm';
       } else if (hail.respondedAt != null) {
         $('situMsg').textContent = `${o.name} is tacking to give you room. Tack as soon as she's through the wind.`;
         el.className = 'kc';
@@ -380,6 +411,8 @@ export class Hud {
   }
 
   private cardKey = '';
+  /** The Coach card's second line as last drawn. */
+  private balShown = '';
   /** The signal flags drawn into the card's sketch (as data URLs, made once). */
   private flagUrl: Partial<Record<'N' | 'AP' | 'A', string>> = {};
   /** The "where next" card's header, number and sketch (only rewritten when they change). */
@@ -392,7 +425,7 @@ export class Hud {
    * A line in the card's sketch, seen from below it looking up the course: its two ends (the favoured one starred),
    * and you as a dot (red when you're over it), your arrow toward the line or away from it.
    */
-  private lineSketch(w: World, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean): string {
+  private lineSketch(w: SimView, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean): string {
     const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     // which end is on the left, looking up the course (N): the pin if it's to the left of N
     const left = { x: -w.N.y, y: w.N.x }, pinLeft = dot(sub(w.pin, w.center), left) > 0;
@@ -415,7 +448,7 @@ export class Hud {
    * name, range, which side to leave it, the bearing); Finish; and, cruising, the Navigator (the destination, range,
    * speed made good toward it, the time at that rate). The transits go on its last line (transit()).
    */
-  private lineBox(w: World, u: Boat): void {
+  private lineBox(w: SimView, u: Boat): void {
     const el = $('linebox'), C = w.C;
     if (u.finished) { $('nextCard').hidden = true; return; }
     const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
@@ -436,8 +469,9 @@ export class Hud {
           + `<br><small>${speed}</small>`;
         return;
       }
-      this.card('', 'Sailing', (u.v / KT).toFixed(1), 'kt', `${T(75, 26, `${pct}% OF TARGET`, '#3fd197')}`);
-      el.textContent = speed + (u.twa < 70 ? ` · VMG upwind ${vmg.toFixed(1)} kt` : u.twa > 110 ? ` · VMG downwind ${(-vmg).toFixed(1)} kt` : '');
+      // no destination, no card (the owner, 13 Nov: it only repeated the boat speed)
+      if (!$('nextCard').hidden) { $('nextCard').hidden = true; this.cardKey = ''; }
+      void speed; void vmg;
       return;
     }
     // the committee has called racing off (AP or N over A, signals.ts cancelSignal): that's what's next, whatever the leg
@@ -512,12 +546,18 @@ export class Hud {
     ctx.fillText('AWA ' + Math.round(u.awa) + '°', cx, cy + R * 0.8);
   }
 
-  private map(wd: World, u: Boat): void {
+  private map(wd: SimView, u: Boat): void {
     const [ctx, w, h] = fitCanvas(this.mapC);
     ctx.clearRect(0, 0, w, h);
-    const W = insetRotation(wd);
+    const nav = this.insetView === 'nav' && wd.cruising ? this.navPassage(wd) : null;
+    const W = nav ? 0 : insetRotation(wd);
     let tf: Tf, scale: number, ctr = { x: u.x, y: u.y };
-    if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
+    if (nav) { // the navigator's view: her course to the destination, whole, north up, round the circle's middle
+      const pts = [{ x: u.x, y: u.y }, ...nav.track.map(q => q.p), wd.dest!.p], xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+      ctr = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
+      const span = Math.max(400, Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1.15);
+      scale = Math.min(w, h) / span; tf = makeTf(ctr.x, ctr.y, 0, scale, w, h);
+    } else if (this.mapZoom) { scale = Math.min(w, h) / 220; tf = makeTf(u.x, u.y, W, scale, w, h); }
     else if (wd.freeSail) { scale = Math.min(w, h) / 2800; tf = makeTf(u.x, u.y, W, scale, w, h); } // just sailing: the water around you, about 1.5 nm across
     else {
       const pts = [wd.pin, wd.committee].concat(wd.C.marks.map(m => m.p));
@@ -529,12 +569,14 @@ export class Hud {
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
+    this.insetPlan = nav; // (chartBody draws her course with it: drawSailing)
     this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
+    this.insetPlan = null;
     const day = (wd.settings.chartPal ?? 'day') === 'day', I = INK[day ? 'day' : 'dusk'];
     // the map's own words, each on a halo so it reads over the chart
     const say = (t: string, x: number, y: number, align: CanvasTextAlign) => { ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, x, y); ctx.fillStyle = I.text; ctx.fillText(t, x, y); };
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
-    const lab = W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
+    const lab = nav ? 'NAVIGATOR' : W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
     // (the inset is a circle: the label and the north arrow go at its top middle, inside the rim, where it's widest
     // enough for them, clear of the layers button on its upper left)
     const tw = ctx.measureText(lab).width, lx0 = w / 2 - (tw + 22) / 2, ly0 = 26;
@@ -550,7 +592,12 @@ export class Hud {
     if (fog) say(fog, w / 2, h - 10, 'center');
     // with the wind or the current on: what's on the water where you are, the layer's own first (as the chart's readout)
     const kind = this.drawn.inset?.kind;
-    if (kind) {
+    if (nav) { // the navigator's view: how far she has to sail, and when she'd get there
+      const y = h - 34 - (fog ? 12 : 0), turns = nav.tacks.length + nav.gybes.length;
+      ctx.font = '700 11px "Saira Semi Condensed", sans-serif';
+      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} GYBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
+      ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say('TAP FOR THE PASSAGE PLAN', w / 2, y + 12, 'center');
+    } else if (kind) {
       const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif'; say(a.toUpperCase(), w / 2, y, 'center');
       ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say(b.toUpperCase(), w / 2, y + 12, 'center');
@@ -561,7 +608,7 @@ export class Hud {
    * The full-screen chart (ui/chart.ts): north up, centred on (cx, cy) at `scale` px/m, with the places' names, and the
    * spot you've picked. Same picture as the inset map: land, wind, puffs, current, the course or your destination, boats, ships.
    */
-  drawChart(c: HTMLCanvasElement, wd: World, cx: number, cy: number, scale: number, pick: Vec | null): void {
+  drawChart(c: HTMLCanvasElement, wd: SimView, cx: number, cy: number, scale: number, pick: Vec | null): void {
     const pal = wd.settings.chartPal ?? 'day', [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[pal];
     // the places' names go over the chart: its own print keeps clear of them
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
@@ -619,22 +666,21 @@ export class Hud {
     const t0 = performance.now(); this.insetStreaks0(dt); this.fxMs.inset += (performance.now() - t0 - this.fxMs.inset) * 0.05;
   }
   private insetStreaks0(dt: number): void {
-    const fx = this.mapFx, d = this.drawn.inset;
+    const fx = this.mapFx;
     this.fxT -= dt;
     if (this.fxT <= 0) { // (the overlay kept over the map: it moves with the layout, not every frame)
       this.fxT = 0.5; const r = this.mapC.getBoundingClientRect();
       Object.assign(fx.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', display: r.width ? '' : 'none' });
     }
+    // (cleared, and left clear: the streaks are the full chart's only, the owner, 13 Nov 2026)
     const [ctx, w, h] = fitCanvas(fx); ctx.clearRect(0, 0, w, h);
-    if (!d?.kind || !w || this.mapC.hidden) return;
-    this.streaks.inset.draw(ctx, d.tf, w, h, d.scale, this.flowField.inset, d.kind, dt, 1.1);
   }
 
   /** The chart's streaks and the readout under the cursor, every frame while it's open, on its overlay. */
-  chartFx(fx: HTMLCanvasElement, wd: World, dt: number, cursor: [number, number] | null): void {
+  chartFx(fx: HTMLCanvasElement, wd: SimView, dt: number, cursor: [number, number] | null): void {
     const t0 = performance.now(); this.chartFx0(fx, wd, dt, cursor); this.fxMs.chart += (performance.now() - t0 - this.fxMs.chart) * 0.05;
   }
-  private chartFx0(fx: HTMLCanvasElement, wd: World, dt: number, cursor: [number, number] | null): void {
+  private chartFx0(fx: HTMLCanvasElement, wd: SimView, dt: number, cursor: [number, number] | null): void {
     const [ctx, w, h] = fitCanvas(fx); ctx.clearRect(0, 0, w, h);
     const d = this.drawn.chart; if (!d?.kind) return;
     this.streaks.chart.draw(ctx, d.tf, w, h, d.scale, this.flowField.chart, d.kind, dt, 1.4);
@@ -647,7 +693,7 @@ export class Hud {
 
   /** The sea state, remembered for ten seconds of the race at each spot (it's worked out from the wind, current and fetch). */
   private seaCache = new Map<string, SeaHere>(); private seaT = -1;
-  private seaAt(wd: World, p: Vec): SeaHere | null {
+  private seaAt(wd: SimView, p: Vec): SeaHere | null {
     if (wd.sea.flat) return null;
     const tb = Math.floor(wd.t / 10); if (tb !== this.seaT) { this.seaCache.clear(); this.seaT = tb; }
     if (onLand(p)) return null;
@@ -657,7 +703,7 @@ export class Hud {
   }
 
   /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
-  fogNote(wd: World, short: boolean): string | null {
+  fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
     // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
     const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
@@ -684,19 +730,19 @@ export class Hud {
     renderKey(el, k.sim, SEEN[detail], k.pal, detail, k.scale); el.dataset.sig = sig;
   }
 
-  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: World, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
+  private chartBody(ctx: CanvasRenderingContext2D, w: number, h: number, wd: SimView, u: Boat, tf: Tf, scale: number, ctr: Vec, W: number, labels: boolean, detail: 'inset' | 'chart', avoid: [number, number, number, number][] = []): void {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
     const S = wd.settings, pal = S.chartPal ?? 'day', I = INK[pal], on = (k: LayerKey) => layerOn(S, k), half = Math.max(w, h) / scale * 0.75;
     drawEncChart(ctx, tf, scale, w, h, pal, detail, avoid); // NOAA's chart underneath everything the sim draws
     // one field layer at a time (ui/layers.ts fieldLayer): the wind or the current as colour for its speed, with moving
     // streaks over it (drawn every frame on the map's overlay: insetStreaks, chartFx); the sea state; or the fog
     const field = fieldLayer(S), kind: FlowKind | null = field === 'wind' || field === 'current' ? field : null;
-    if (field === 'sea') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
+    if (field === 'sea' && detail === 'chart') drawSea(ctx, tf, p => this.seaAt(wd, p), ctr, half, I, detail === 'chart');
     this.drawn[detail] = { tf, w, h, scale, kind };
     // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
     // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
-    const plan = wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
-    const fog = field === 'fog' ? visibilityFor(wd.raceDate, wd.clockUtc) : null;
+    const plan = detail === 'inset' && this.insetPlan ? this.insetPlan : wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
+    const fog = field === 'fog' && detail === 'chart' ? visibilityFor(wd.raceDate, wd.clockUtc) : null; // (the inset gives fog in words only)
     const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key
     const sim: SimKey[] = ['you'];
@@ -705,17 +751,21 @@ export class Hud {
     else if (wd.dest) sim.push('dest', 'destline', ...(wd.running ? [] : ['track' as const]));
     if (on('laylines') && L) sim.push('laylines');
     if (on('ships') && wd.vessels.length) sim.push('ships');
-    if (kind === 'current') sim.push('current');
-    if (kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
-    if (field === 'sea' && !wd.sea.flat) sim.push('sea');
+    // (the field layers, the wind's and the current's colours and streaks, the sea state, the fog, are on the full chart
+    // only: the owner, 13 Nov 2026, "they shouldn't be present on the inset map, just the expanded map". The inset stays
+    // calm and plain, and keeps its readout of the wind, the current and the fog where you are.)
+    const flowHere = kind && detail === 'chart';
+    if (flowHere && kind === 'current') sim.push('current');
+    if (flowHere && kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
+    if (field === 'sea' && detail === 'chart' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
     if (on('shadows') && !wd.freeSail) sim.push('shadows');
     this.keyState[detail] = { sim, pal, scale };
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
-    // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore);
-    // the inset's every 5 s of the clock (the puffs drift by), the chart's every 10 (it's paused)
-    if (kind) this.flowField[detail].draw(ctx, tf, w, h, scale, wd, kind, detail === 'chart' ? 0.6 : 0.35, detail === 'chart' ? 14 : 8, detail === 'chart' ? 10 : 5);
+    // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore),
+    // every 10 s of the clock (the chart's paused); the full chart's only
+    if (flowHere) this.flowField.chart.draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
     else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
