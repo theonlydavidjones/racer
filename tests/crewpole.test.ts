@@ -1,3 +1,4 @@
+import { TRAVELLER_SWING } from '../src/boat/controls';
 import { describe, expect, it } from 'vitest';
 import { crewPoleCall } from '../src/ai/ai';
 import { settleTrim } from '../src/boat/physics';
@@ -57,7 +58,7 @@ describe('Boats start trimmed for their heading (UI session, 12 Nov 2026)', () =
   it('a race fleet: the main and jib barely move on the first step, and no phantom tack', () => {
     for (const r of firstStep(new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, current: 'real' }, 1))) {
       expect(r.tack).toBe(true);
-      expect(r.dm).toBeLessThan(2 + 9.5 * Math.abs(r.trav)); // (less the traveller the crew's plan sets on the first step)
+      expect(r.dm).toBeLessThan(2 + TRAVELLER_SWING * Math.abs(r.trav)); // (less the traveller the crew's plan sets on the first step)
       expect(r.dj).toBeLessThan(2);
     }
   });
@@ -66,6 +67,6 @@ describe('Boats start trimmed for their heading (UI session, 12 Nov 2026)', () =
     const u = w.user; u.h = n360(u.ww.from + 90); settleTrim(u, u.ww.from, u.ww.kt);
     const lee = u.tack === 'S' ? 'P' : 'S', ins0 = u.ctl.car[lee].ins; const [r] = firstStep(w);
     // (less what the crew's plan does on the first step: the traveller, and the leeward car's lead, 1.25° a pin: controls.ts carLead)
-    expect(r.dm).toBeLessThan(2 + 9.5 * Math.abs(r.trav)); expect(r.dj).toBeLessThan(2 + 1.25 * Math.abs(u.ctl.car[lee].ins - ins0));
+    expect(r.dm).toBeLessThan(2 + TRAVELLER_SWING * Math.abs(r.trav)); expect(r.dj).toBeLessThan(2 + 1.25 * Math.abs(u.ctl.car[lee].ins - ins0));
   });
 });

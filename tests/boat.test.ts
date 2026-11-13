@@ -141,6 +141,25 @@ describe('handling: turning and tacking', () => {
     expect(sawTacking).toBe(true);
     expect(b.tacking).toBe(false);
   });
+
+  // The rules tell a tack (passing head to wind: RRS 13, 18.2(d), 18.3, 20) from a gybe; rule 15 counts either.
+  it('a tack marks the moment she passes head to wind; a gybe changes tack without it', () => {
+    const t = testBoat({ heading: 360 - FOLKBOAT.beatAngle(12), kt: 4.7 });
+    sail(t, 0.5); startTack(t);
+    sail(t, 15);
+    expect(t.tack).toBe('P');
+    expect(t.headToWindT).toBeDefined();
+    expect(t.headToWindT).toBe(t.lastTackT);
+
+    const g = testBoat({ heading: 175, kt: 4 });
+    sail(g, 2); const tack0 = g.tack; g.lastTackT = -50;
+    g.h = 185; g.turnTarget = null; // gybe
+    sail(g, 3);
+    expect(g.tack).not.toBe(tack0);
+    expect(g.lastTackT).toBeGreaterThanOrEqual(0); // the change of tack is still recorded (rule 15)
+    expect(g.headToWindT).toBeUndefined();
+    expect(g.tacking).toBe(false);
+  });
 });
 
 describe('predictions used by the AI and the line aid match the simulation', () => {

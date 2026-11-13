@@ -69,12 +69,20 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
   if (!m.q) return segPt(m.p, bw, st);
   return Math.min(segPt(m.p, bw, st), segPt(m.q, bw, st), segPt(bw, m.p, m.q), segPt(st, m.p, m.q));
 }
-/** How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. */
+/**
+ * How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. A time proxy: the published test
+ * is causal, "whether the second occurrence was the inevitable result of the first" (US Sailing Appeal 65; Appeal 82, a
+ * boom touching the mark in the tack, the same incident). No source gives seconds.
+ */
 const SAME_INCIDENT = 8;
 /** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
 const TANGLE_MAX = 30;
 
-/** A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. */
+/**
+ * A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. A time proxy: the
+ * published test is whether she was "compelled", unable to avoid it once the other's breach was clear (WS Case 3; US
+ * Sailing Appeals 2, 19, 78). No source gives seconds.
+ */
 const COMPELLED_WINDOW = 3;
 
 export interface StartReport { delay: number; frac: number; kt: number }
@@ -92,6 +100,8 @@ export interface GunSnap {
 export interface WorldOptions {
   /** Begin this many seconds before the start signal instead of at the warning signal (start practice). */
   startAt?: number;
+  /** The start-line drill alone: no other boats, the line and course laid as for the fleet (its length is set for it). */
+  solo?: boolean;
   /** Just sail: no race, no other boats, no start sequence. */
   freeSail?: boolean;
   /** Fly your flags even though it's a race (to see them while setting up your boat). */
@@ -331,7 +341,7 @@ export class World {
     this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
-    for (let i = 0; i <= (this.freeSail ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q)); }
@@ -409,6 +419,14 @@ export class World {
     } else if (isUser && this.startAt < 120) {
       // start practice: somewhere below the line, reaching along it, with a minute or so to go
       p = place(55 + r() * 45, (r() - 0.5) * this.lineLen * 0.6); h = n360(lineH + (r() < 0.5 ? 0 : 180));
+    } else if (isUser && this.settings.mode === 'drill') {
+      // the start-line drill from 2 or 3 minutes: farther below the line, as far as a minute's run and some to spare
+      // (about 150–230 m), reaching along it; moved in toward the line where that would be ashore (the Cityfront)
+      let d = 60 + this.startAt * 0.7 + r() * 40; const a = (r() - 0.5) * this.lineLen * 0.6;
+      p = place(d, a);
+      while (onLand(p) && d > 60) { d -= 20; p = place(d, a); }
+      if (onLand(p)) p = place(100, -this.lineLen * 0.1); // (as a race's start, if even that's ashore)
+      h = n360(lineH + (r() < 0.5 ? 0 : 180));
     } else if (isUser) { p = place(100, -this.lineLen * 0.1); h = n360(lineH + 180); }
     else {
       let tries = 0;
@@ -809,7 +827,8 @@ export class World {
       this.rec.push(snapshot(this.t, this.boats));
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
-    if (this.log && this.t >= TRACK_FROM && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
+    // (the start-line drill keeps its whole short sequence, for the debrief's look at your run to the line)
+    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
   }
 
   private checkLines(prevT: number): void {
@@ -1029,7 +1048,7 @@ export class World {
     const n = ctx.marks.length, nearZone = (X: Boat) => X.leg < n && markDist(X, ctx.marks[X.leg]) < ZONE * 2.5;
     if (nearZone(A) || nearZone(B) || cpa(A, B).d < 60) return false;
     rec.kc = null; rec.rule = null; rec.wasOverlapped = false; rec.ovStart = null;
-    rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT; // (rule 18.3: tacks seen as they happen)
+    rec.seenTack[A.id] = A.headToWindT ?? -Infinity; rec.seenTack[B.id] = B.headToWindT ?? -Infinity; // (rule 18.3: tacks seen as they happen)
     return true;
   }
 
@@ -1709,7 +1728,7 @@ export class World {
   pendingRoomHail(b: Boat): Boat | null {
     for (const o of this.boats) {
       const h = o !== b ? this.pairs[pairKey(b, o)]?.hail : null;
-      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) return o;
+      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && (b.headToWindT ?? -Infinity) < h.at && !b.tacking) return o; // (rule 20: answered by a tack, not a gybe)
     }
     return null;
   }

@@ -295,7 +295,8 @@ describe('"You tack" (Rule 20.2(c))', () => {
     w.pairs = {};
     expect(w.hail(u, red, 'room')).toBe(true);
     expect(w.pairRecord(u, red)?.hail?.replyAt).toBe(w.t);
-    expect(w.rights(u, red)).toMatchObject({ kc: red, rule: '20' });
+    // she now owes you room to tack and pass astern of her, but right of way doesn't pass with it (WS Case 101): you're clear astern
+    expect(w.rights(u, red)).toMatchObject({ kc: u, rule: '12' });
   });
 
   it('an AI boat beside you tacks instead', () => {
@@ -319,7 +320,8 @@ describe('"You tack" (Rule 20.2(c))', () => {
     w.hail(red, u, 'room');
     w.userHail();
     expect(w.pairRecord(u, red)?.hail?.replyAt).toBe(w.t);
-    expect(w.rights(u, red)).toMatchObject({ kc: u, rule: '20' });
+    // (you owe Red room to tack and avoid you: an obligation judged at an incident, not right of way, WS Case 101)
+    expect(w.rights(u, red).rule).not.toBe('20');
   });
 });
 
