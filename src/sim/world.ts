@@ -34,7 +34,7 @@ import { ensignFor, sailNo } from '../boat/spec';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
-import { genericSpec, genericTag, isGeneric } from '../boat/generic';
+import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
@@ -385,7 +385,7 @@ export class World {
     // an opponent: a stock club boat, or one of your own saved boats (her looks and her condition), sailed by the AI
     const pick = isUser ? null : this.settings.opponents?.[i - 1] ?? `stock:${i}`;
     // (a generic club Folkboat, boat/generic.ts: her sail number clear of your boats')
-    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
+    const oppSpec = pick && !pick.startsWith('stock:') ? genericSpec(pick, (this.settings.boats ?? []).map(b => b.sails.number)) ?? realSpec(pick) ?? this.settings.boats?.find(b => b.id === pick) : undefined;
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
