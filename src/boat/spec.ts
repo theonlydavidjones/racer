@@ -90,7 +90,7 @@ export const DEFAULT_BOAT: BoatSpec = {
   hull: { material: 'fiberglass', upper: '#f4f1e8', lower: '#2a2d33', stripe: '#24324f' },
   deck: '#8e9f7c',
   sails: { country: 'USA', number: '122', color: 'white' }, // (Josephine's own: USA 122, the owner and the 2026–27 Seaweed Soup results, reference/results)
-  club: 'stfyc', skipper: 'you',
+  club: 'bvbc', skipper: 'you', // (Josephine's club: Bay View Boat Club, the owner, 13 Nov 2026)
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 

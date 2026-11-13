@@ -1921,7 +1921,7 @@ const fleet: Fleet = new Fleet(S, {
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
-  seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons()) : ''; },
+  seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons(), liveBoat) : ''; },
   sailSeason: (id, no) => sailSeason(id, no),
   back: () => nav.back(),
   toBoat: id => nav.go({ k: 'boat', id }),
@@ -2037,6 +2037,13 @@ const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id
   : COURSES.slice().sort((a, b) => b.title.length - a.title.length).find(c => e.title.startsWith(c.title))?.id ?? null;
 /* ---------------- the season (club/season.ts): a real club series, race by race, against the club's fleet ---------------- */
 let pendingSeason: { series: Series; no: number; at: string } | null = null;
+/** A boat as she is now, by sail number: your boats and the club's other Folkboats, from their specs (club/season.ts LiveBoat). */
+const liveBoat = (sail: string) => {
+  const mine = S.boats.find(b => sailNo(b).replace(/^US\s+/, 'USA ') === sail);
+  if (mine) return { name: mine.name || undefined, hull: mine.hull.upper, club: mine.club };
+  for (const id of seasons()[0]?.fleet ?? []) if (isGeneric(id)) { const g = genericSpec(id, S.boats.map(x => x.sails.number)); if (g && sailNo(g) === sail) return { name: g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), hull: g.hull.upper, club: g.club }; }
+  return undefined;
+};
 /** Sail race `no` of the season: its real day and start, the day's observed wind and tide, its course (or the committee's), the club's fleet. */
 function sailSeason(id: string, no: number): void {
   const series = seasonById(id), r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
@@ -2070,7 +2077,7 @@ function hullOf(b: Boat): string {
 function seasonResult(at: string): SeasonResult | null {
   if (!w) return null;
   const sc = scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
-  return { at, scores: rows.map((b, i) => { const s = sc.get(b.id)!; return { sail: b.no.replace(/^US\s+/, 'USA '), name: b.isUser ? (S.boat.name || 'You') : b.name, hull: hullOf(b), you: b.isUser, points: s.points ?? (b.isUser ? w.boats.length + 1 : i + 1), code: s.points == null && b.isUser ? 'RET' : s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.code }; }) };
+  return { at, scores: rows.map((b, i) => { const s = sc.get(b.id)!; return { sail: b.no.replace(/^US\s+/, 'USA '), name: b.isUser ? (S.boat.name || 'You') : b.name, hull: hullOf(b), you: b.isUser, club: b.isUser ? S.boat.club : b.spec?.club, points: s.points ?? (b.isUser ? w.boats.length + 1 : i + 1), code: s.points == null && b.isUser ? 'RET' : s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.code }; }) };
 }
 /** At the finish of a season race: where this race puts you in the series (counted once you save it). */
 function seasonLine(): string {
