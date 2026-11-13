@@ -55,6 +55,7 @@ import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey } from '.
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
+import { passageNow, whyNot } from './sim/navigator';
 import { FlowPanel } from './ui/flowPanel';
 import type { PilotMode } from './boat/autopilot';
 
@@ -744,7 +745,7 @@ let chartDest: unknown = null;
 const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); }
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); tideBox(); } // (the tide graph's Arrive moves with them)
 };
 setupChart = new SetupChart(hud, cruisePicks);
 /** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
@@ -1137,8 +1138,20 @@ function drawTideGraph(): void {
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  ctx.fillStyle = '#ffb627'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc), 10);
+  const pn = cruise && w.dest ? passageNow(w) : null, near = pn?.eta != null && tx(pn.eta) - tx(w.gunUtc) < 44;
+  ctx.fillStyle = '#ffb627'; if (near) ctx.textAlign = 'right'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc) - (near ? 4 : 0), 10); ctx.textAlign = 'center';
+  // cruising somewhere: when she'd get there leaving then (sim/navigator.ts passageNow: the course she'd sail, tacks and
+  // all, in the forecast wind and NOAA's current), as a second bar; past the graph's end, an arrow at its edge
+  if (pn?.eta != null) {
+    const xa = tx(pn.eta), inside = xa <= W - 8, xd = Math.min(xa, W - 10);
+    ctx.strokeStyle = '#3fd197'; ctx.lineWidth = 2; ctx.setLineDash(inside ? [] : [3, 3]); ctx.beginPath(); ctx.moveTo(xd, top - 6); ctx.lineTo(xd, bot + 6); ctx.stroke(); ctx.setLineDash([]);
+    // (close to the leave bar, the label goes to the right of its bar, clear of 'leave')
+    const close = inside && near;
+    ctx.fillStyle = '#3fd197'; ctx.textAlign = !inside ? 'right' : close ? 'left' : 'center';
+    ctx.fillText(inside ? 'arrive' : `arrive ${sfClock(pn.eta)} →`, !inside ? W - 12 : close ? xd + 4 : xd, 10);
+  }
   const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
