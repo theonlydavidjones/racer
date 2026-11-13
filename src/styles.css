@@ -890,6 +890,7 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}
 .sb-wx svg{width:100%;height:100%;display:block}
 .sb-awa{fill:#cfdbe1;font:700 12px var(--f-inst);letter-spacing:1px}
+.sb-pos{fill:#ffffff;font:700 10.5px var(--f-inst);letter-spacing:.04em;paint-order:stroke;stroke:#08141e;stroke-width:3px}
 .sb-top{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
 .sb-div{width:1px;align-self:stretch;background:var(--rule);margin:4px 2px}
 .sb-slot{width:30px}

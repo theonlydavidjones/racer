@@ -27,6 +27,9 @@ const root = path.resolve(__dirname, '../..'), out = process.argv[2] || root;
   await page.screenshot({ path: path.join(out, 'smoke.png') });
   console.log(await page.evaluate(() => ['clock', 'spd', 'linebox'].map(i => document.getElementById(i).textContent).join(' | ')));
   // (the race sails in its worker: sim/host.ts WorkerHost; 'local' would mean the worker didn't start)
+  // (the windex names her point of sail: ROADMAP 8j)
+  const pos = await page.evaluate(() => document.querySelector('#sailBand .sb-pos')?.textContent ?? ''); console.log('point of sail:', pos || '(none)');
+  if (!pos) errs.push('no point of sail in the band\'s windex');
   const mode = await page.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode);
   if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
   // (sailing on at 4× until the mirror has been checked against the race a few times: sim/sync.ts checkOf, every 20 frames)
