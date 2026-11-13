@@ -96,6 +96,9 @@ const COMPELLED_WINDOW = 3;
  * sign of it: the boat that broke a rule against her is still within ENGAGED of her when she breaks hers (she's still
  * dealing with that boat: swerving from her, or pushed by her), within COMPELLED_WINDOW. */
 
+/** After a rule 42 penalty, she has this long to stop paddling before going on counts as a fresh breach, s (a judgement). */
+const R42_STOP = 5;
+
 export interface StartReport { delay: number; frac: number; kt: number }
 
 /** Where a boat was at the start signal. */
@@ -710,11 +713,12 @@ export class World {
     if (!was) this.emit({ type: 'toast', ms: 5000, msg: `${who} the boom crutch from the cabin and ${how}${auto ? ': she\'s being set onto something with no wind to sail clear.' : '.'}${this.racing(u) && !this.paddleAllowed(u) ? ' Racing, that breaks rule 42.1 unless you\'re getting clear after hitting something (42.3(h)).' : ''}` });
     else if (was.side !== side || !!was.back !== back) this.emit({ type: 'toast', msg: `Now ${how}.` });
   }
-  /** Rule 42.3(h): paddling to get clear after grounding or colliding (the spell begun within 30 s of the contact, or a
-   * contact during it). */
+  /** Rule 42.3(h): paddling "to get clear after grounding or colliding": judged each moment, within 30 s of the contact
+   * (the rule gives no time; its purpose, getting clear, does: a judgement, as the crew's own call uses), so a spell
+   * begun to get clear doesn't stay legal for a whole calm leg. */
   paddleAllowed(b: Boat): boolean {
     const p = b.paddle, hit = b.lastHitT; if (!p || hit == null) return false;
-    return hit >= p.t0 || p.t0 - hit <= 30;
+    return this.t - hit <= 30;
   }
   /** The paddler at the side deck on the paddling side, as long as she's paddling (crewPhys places them; render/crew.ts
    * draws them kneeling there, as at the jib car). */
@@ -738,8 +742,12 @@ export class World {
    */
   rule42(b: Boat, why: 'paddle'): void {
     // (one penalty a spell of paddling, b.paddle.t0: switching sides is the same spell; stopping and starting again, a new one)
-    const p = b.paddle; if (!p || this.r42spell.get(b.id) === p.t0 || b.retired || b.finished) return;
-    this.r42spell.set(b.id, p.t0);
+    // (and paddling on past R42_STOP after the penalty is a fresh breach, as a judge would see it: one penalty doesn't buy
+    // a whole calm leg; under Appendix P that's her second, P2.2)
+    const p = b.paddle; if (!p || b.retired || b.scoring === 'DSQ' || !this.racing(b)) return; // (disqualified already: nothing more to add)
+    const last = this.r42spell.get(b.id);
+    if (last && last.t0 === p.t0 && this.t - last.at < R42_STOP) return;
+    this.r42spell.set(b.id, { t0: p.t0, at: this.t });
     const n = (this.r42count.get(b.id) ?? 0) + 1; this.r42count.set(b.id, n);
     const how = why === 'paddle' ? 'Paddling' : 'Propelling her';
     if (this.settings.appendixP) {
@@ -757,7 +765,7 @@ export class World {
     }
   }
   /** Rule 42 penalties: the spell (b.paddle.t0) each boat was last penalized for, and how many this race (Appendix P2.2). */
-  private r42spell = new Map<number, number>();
+  private r42spell = new Map<number, { t0: number; at: number }>();
   private r42count = new Map<number, number>();
   /**
    * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and

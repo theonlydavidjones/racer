@@ -55,7 +55,7 @@ export const tenth = (x: number): number => Math.floor(x * 10 + 0.5 + 1e-9) / 10
 export function raceScores(boats: ScoreIn[], entries = boats.length): ScoreOut[] {
   const dnf = entries + 1, pen = tenth(0.2 * dnf);
   // A4 places across the line, for the boats scored by finishing (the disqualified are scored DNF+… instead: A5.2)
-  const fin = boats.filter(b => b.finishT != null && b.code !== 'UFD' && b.code !== 'BFD').sort((a, b) => a.finishT! - b.finishT!);
+  const fin = boats.filter(b => b.finishT != null && b.code !== 'UFD' && b.code !== 'BFD' && b.code !== 'DSQ').sort((a, b) => a.finishT! - b.finishT!);
   const across = new Map<number, number>();
   for (let i = 0; i < fin.length;) {
     // A7: boats tied at the line share the points for those places

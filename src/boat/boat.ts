@@ -248,7 +248,7 @@ export interface Boat {
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
-  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: disqualified, e.g. for rule 42, scored as entries + 1, A4.2)
+  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: disqualified, for rule 42, scored as entries + 1, A5.2)
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;

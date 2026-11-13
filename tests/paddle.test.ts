@@ -111,6 +111,24 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     expect(w.user.penaltyTotal ?? 0).toBe(0);
     expect(toasts(w).filter(m => /DSQ/.test(m)).length).toBe(1);
   });
+  it('with Appendix P, paddling on past the penalty (5 s to stop) is a fresh breach: one penalty doesn\'t buy a calm leg (P2.2)', () => {
+    const w = racingWorld(true);
+    applyCommand(w, { k: 'paddle', side: 'P' }); for (let i = 0; i < 60 * 20; i++) w.step(DT);
+    expect(w.user.retired).toBe(true);
+  });
+  it('no rule 42 penalty before her preparatory signal (not racing), nor within 30 s of a contact (42.3(h)), judged from now', () => {
+    const w = world('race', 1);
+    for (let i = 0; i < 60 * 2; i++) w.step(DT);
+    expect(w.racing(w.user)).toBe(false);
+    paddleSpell(w);
+    expect(w.user.scoring ?? null).toBeNull();
+    const r = racingWorld();
+    r.user.lastHitT = r.t;
+    applyCommand(r, { k: 'paddle', side: 'P' }); for (let i = 0; i < 60 * 20; i++) r.step(DT);
+    expect(r.user.scoring ?? null).toBeNull(); // (getting clear)
+    for (let i = 0; i < 60 * 15; i++) r.step(DT);
+    expect(r.user.scoring).toBe('DSQ'); // (35 s on, still paddling: not getting clear any more)
+  });
   it('with Appendix P: a first rule 42 penalty is a Two-Turns Penalty (P2.1), a second spell means retiring (P2.2)', () => {
     const w = racingWorld(true);
     paddleSpell(w);
