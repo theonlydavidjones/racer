@@ -495,7 +495,7 @@ const band = new SailBand({
   hold: (k, d) => { if (d == null) delete btnCmd[k]; else btnCmd[k] = d; applyHeld(); },
   changed: () => showTrimOwner(),
   toast: (m, ms) => toast(m, ms),
-  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line, both jib cars and the pole back to the crew.', 2500); },
+  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
@@ -725,7 +725,7 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant; send({ k: 'pole', want }); // (yours now, until Auto-trim)
+  const want = !w.user.poleWant; send({ k: 'pole', want }); // (the pole is always yours: your call only)
   toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)

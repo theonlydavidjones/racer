@@ -208,7 +208,7 @@ export interface Boat {
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
-  /** Your boat: the pole is yours to call (you've worked it), not the crew's (ai.ts crewPoleCall). */
+  /** Your boat: the pole is yours to call, always (the owner); the crew only stows it when it must come in (ai.ts poleMustCome). */
   poleMine?: boolean;
   pole: PoleState;
   poleT: number; // seconds left in the current crew job

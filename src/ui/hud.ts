@@ -329,7 +329,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: SimView, u: Boat): void {
-    if (w.t < 0 || u.finished || u.retired || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
+    if (w.t < 0 || u.finished || u.retired) return; // (the pole is yours to call: a cue, never done for you)
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
@@ -337,12 +337,14 @@ export class Hud {
       this.hinted.deep = true;
       toast('Running deep: the main is blanketing the jib. Pole it out to windward and go wing-on-wing (the band\'s Pole tab, or O).', 4500);
     }
-    const aback = u.pole === 'set' && u.twa < 140;
+    // (poled out up where it doesn't pay: from 154.5 true down to 145 the jib does less than it would to leeward; below
+    // that the crew bring it in themselves, ai.ts poleMustCome)
+    const aback = u.pole === 'set' && u.twa < 154.5;
     this.abackT = aback ? this.abackT + 0.1 : 0;
     if (!aback) this.hinted.aback = false;
     if (this.abackT > 3 && !this.hinted.aback) {
       this.hinted.aback = true;
-      toast('The poled-out jib is aback on this course. Stow the pole (the band\'s Pole tab, or O).', 4000);
+      toast('Up here the poled-out jib does less than it would to leeward. Stow the pole (the band\'s Pole tab, or O), or bear away.', 4000);
     }
   }
 
