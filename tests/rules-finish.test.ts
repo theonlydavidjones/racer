@@ -274,3 +274,29 @@ describe('hull contact geometry', () => {
     expect(hullGap(a, b)).toBe(0);
   });
 });
+
+describe('Rule 44.1: one penalty per incident', () => {
+  it('you foul a boat and touch her again while still tangled: the same incident. Once you have begun your turns, or been clear of her, a new contact is a new foul (21.2, 44.2)', async () => {
+    const cases: [string, { turned: number; clear: boolean }, number][] = [
+      ['still tangled, turns not begun', { turned: 0, clear: false }, 0],
+      ['already turning next to her', { turned: 90, clear: false }, 1],
+      ['had been clear of her since', { turned: 0, clear: true }, 1]
+    ];
+    for (const [name, c, want] of cases) {
+      const w = race(), [u, A] = w.boats;
+      w.boats[2].x = OPEN.x + 3000; w.boats[3].x = OPEN.x + 4000;
+      sail(w, u, OPEN, 'P'); sail(w, A, OPEN, 'S');
+      // (A on her proper course for her mark, so she isn't above it: rule 23.2 doesn't come into it)
+      const { properTwa } = await import('../src/sim/world'), pt = properTwa(w, A) ?? 90;
+      A.h = A.desired = n360(w.wind.from - pt); A.twa = pt;
+      u.penalty = u.penaltyTotal = 720; u.penaltyTurned = c.turned; u.penaltyDir = c.turned ? 1 : 0; // her turns from the first foul, against A
+      const hh = (w as unknown as { hHist: number[][] }).hHist; hh[0] = [u.h]; hh[1] = [A.h]; // (nobody turned onto the other)
+      (w as unknown as { lastFoulVs: Map<number, { vs: number; t: number; clear: boolean }> }).lastFoulVs.set(u.id, { vs: A.id, t: w.t - 7, clear: c.clear });
+      u.x = OPEN.x; u.y = OPEN.y; A.x = OPEN.x + 0.2; A.y = OPEN.y; // in contact again
+      const fouls = w.fouls;
+      w.step(DT);
+      expect(w.drainEvents().filter(e => e.type === 'incident').length, name).toBe(want);
+      expect(w.fouls - fouls, name).toBe(want);
+    }
+  });
+});
