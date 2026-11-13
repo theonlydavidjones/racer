@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tactical debrief mock-up</title>
+<style>
+  :root { --ink:#0a1520; --pod:#0f2130; --rule:rgba(150,196,218,.2); --text:#e9f2f5; --muted:#94abb7; --accent:#ffb627; --lost:#ff6a2a; --won:#56b4e9; }
+  body { margin:0; background:#06101a; color:var(--text); font:15px/1.5 "Atkinson Hyperlegible", system-ui, sans-serif; padding:24px 16px; }
+  .wrap { max-width:1100px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:24px; }
+  h1 { font:700 22px/1.2 system-ui; margin:0 0 4px; } .note { color:var(--muted); font-size:13px; max-width:70ch; }
+  .panel { background:var(--pod); border:1px solid var(--rule); border-radius:12px; padding:18px; }
+  .eyebrow { font:600 11px/1 system-ui; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:14px 0 8px; }
+  .leg { border-top:1px solid var(--rule); padding:10px 0; }
+  .legHead { display:flex; justify-content:space-between; gap:12px; font-weight:700; }
+  .legHead .sub { color:var(--muted); font-weight:400; font-size:13px; }
+  ol { margin:6px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
+  li { display:grid; grid-template-columns:64px 1fr; gap:10px; font-size:14px; }
+  .n { font:700 13px/1.4 system-ui; font-variant-numeric:tabular-nums; text-align:right; }
+  .n.lost { color:var(--lost); } .n.won { color:var(--won); } .n.even { color:var(--muted); }
+  .k { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+  .src { color:var(--muted); font-size:12px; }
+  .chart { height:240px; border-radius:8px; border:1px solid var(--rule); background:#0c2534; position:relative; overflow:hidden; }
+  .chart svg { width:100%; height:100%; }
+  .cap { font-size:13px; margin-top:8px; }
+  .ann { font-size:12px; color:var(--muted); margin-top:10px; }
+  @media (max-width: 800px) { .wrap { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Tactics, leg by leg: mock-up</h1>
+    <p class="note">A still mock-up for the owner, before building. It shows where the tactical debrief would sit in the results' "Your race, debriefed". The numbers come from one sim race: Seaweed Soup course 2, 14 kt westerly, an ebb, six boats, measured from the race's own tracks and current. The seconds marked ≈ are rounded estimates for the layout. Each beat and run gets its lines ranked by what cost the most. Each line is one plain sentence with a number (− lost, + gained, against the fleet's middle on that leg). No new buttons: the same section appears in "Watch your race", where each line jumps to its moment.</p>
+
+    <div class="panel">
+      <div class="eyebrow">Tactics, leg by leg</div>
+      <p class="note">Each beat and run against the fleet that sailed it. The middle is the median boat on the leg. Shifts over 4° count as headers or lifts, by your own compass.</p>
+
+      <div class="leg">
+        <div class="legHead"><span>Leg 8 · beat to the finish</span><span class="sub">8:54 · 6 s quicker than the middle, 18 s behind Varnish (fastest)</span></div>
+        <ol>
+          <li><span class="n lost">≈ −20 s</span><span><span class="k">Tide</span><br>You sailed the left side, 143 m off the line to the finish, with 0.77 kt of ebb under you. Varnish, 82 m off, had 0.93 kt. Nearer the middle the ebb ran harder, and on this beat the ebb was pushing you up the course.</span></li>
+          <li><span class="n lost">≈ −6 s</span><span><span class="k">Shifts</span><br>Of the time the wind was shifted (over 4°), you spent 59% on the lifted tack. Tack on the headers that last: the fleet's best on this beat was at 65%.</span></li>
+          <li><span class="n even">0 s</span><span><span class="k">Laylines</span><br>Laid the finish without overstanding.</span></li>
+          <li><span class="n even">0 s</span><span><span class="k">Clear air</span><br>Clear air all the way up.</span></li>
+        </ol>
+      </div>
+
+      <div class="leg">
+        <div class="legHead"><span>Leg 4 · beat to X</span><span class="sub">8:30 · 6 s slower than the middle</span></div>
+        <ol>
+          <li><span class="n lost">≈ −6 s</span><span><span class="k">Shifts</span><br>On the lifted tack 57% of the shifted time; the boats ahead of you on this leg averaged 50%, so the shifts aren't where the seconds went. Look at your speed through the tacks (the "Tacks and gybes" finding).</span></li>
+          <li><span class="n even">0 s</span><span><span class="k">Side</span><br>You sailed up the middle with the fleet, 54 m left of the line (the fleet 45–57 m): no side to pay or lose on.</span></li>
+          <li><span class="n even">0 s</span><span><span class="k">Tide</span><br>The same 1.25 kt of ebb as everyone.</span></li>
+        </ol>
+      </div>
+
+      <div class="leg">
+        <div class="legHead"><span>Leg 3 · run to 6 · Fort Mason</span><span class="sub">9:42 · 6 s slower than the middle</span></div>
+        <ol>
+          <li><span class="n won">≈ +4 s</span><span><span class="k">Shifts</span><br>Downwind, on the favoured gybe 73% of the shifted time (the gybe the wind lets you sail lower on). The fleet's middle was at 45%. Well done.</span></li>
+          <li><span class="n lost">≈ −10 s</span><span><span class="k">Tide</span><br>Running into a 1.43 kt ebb, like the fleet. There was no relief to be had on this line; nearer the Cityfront shore it eases, which costs distance. <i>(Example line: on a run against the tide, the debrief looks for the slacker water each boat could have used.)</i></span></li>
+        </ol>
+      </div>
+
+      <div class="eyebrow">The tactics that cost most, all race</div>
+      <ol>
+        <li><span class="n lost">≈ −20 s</span><span>Leg 8, the tide: the left side had less ebb under it than the middle.</span></li>
+        <li><span class="n lost">≈ −12 s</span><span>Shifts on the beats, all told: 58% on the lifted tack of the shifted time (the fleet's best boat: 63%).</span></li>
+        <li><span class="n won">≈ +4 s</span><span>Shifts on the runs: good gybing.</span></li>
+      </ol>
+      <p class="src">How each is measured, and the standard behind it:</p>
+      <ul class="src">
+        <li><b>Shifts:</b> time on the headed tack, from each boat's own wind against her 1-minute mean. Seconds lost at the sim's own rate: cos(β+θ)/cos(β−θ), as the existing debrief uses. Coaching: on oscillating shifts tack on the headers, on persistent ones get to the side the wind is moving toward (Sailing World, "Windshift Rules of Thumb"; Dave Perry on shifts). <i>No published share of "time on the lifted tack" was found, so the sim compares you with its own fleet.</i></li>
+        <li><b>Laylines:</b> metres past the layline, and the extra distance they cost. Coaching: approach late, tack on the layline even when you fear overstanding, overstand only as insurance (Dellenbaugh, "Five familiar layline dilemmas", Windcheck).</li>
+        <li><b>Side:</b> your mean distance off the leg's line against the fleet's, and whether the boats on your side did better. <i>Leverage and consolidating (Dellenbaugh, Speed & Smarts) still to be quoted from the sources.</i></li>
+        <li><b>Tide:</b> the current along the leg under each boat, from the sim's NOAA-based current field. On a beat the current helping you up the course counts as a gain; on a run, against you as a loss. General rule: the beat in the most favourable or least adverse current. <i>Local relief sources (Latitude 38, StFYC) not yet reachable, so no Bay lore is quoted. The numbers are the current model's.</i></li>
+        <li><b>Clear air:</b> seconds lost in another boat's shadow (the existing finding, now per leg). Coaching: the shadow runs about 5–10 lengths along the other boat's apparent wind, longer in light air (Dellenbaugh, "Light and Heavy Air Differences"; Windcheck, "Don't lurk in wind shadows").</li>
+      </ul>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="eyebrow">In "Watch your race"</div>
+      <div class="chart">
+        <svg viewBox="0 0 380 240" aria-label="The replay with the leg's tide line">
+          <rect width="380" height="240" fill="#0c2534"/>
+          <path d="M40 220 L20 0" stroke="rgba(233,242,245,.25)" stroke-dasharray="4 4"/>
+          <path d="M190 220 C 150 170, 120 120, 110 60 L 150 20" stroke="#e9f2f5" stroke-width="2.5" fill="none"/>
+          <path d="M190 220 C 190 160, 200 110, 180 60 L 160 20" stroke="#56b4e9" stroke-width="2" stroke-dasharray="2 3" fill="none"/>
+          <text x="118" y="108" fill="#ff6a2a" font-size="11">0.77 kt ebb</text>
+          <text x="196" y="108" fill="#56b4e9" font-size="11">0.93 kt</text>
+          <text x="12" y="16" fill="#e9f2f5" font-size="11">WIND ↓</text>
+          <text x="196" y="232" fill="#94abb7" font-size="10">Varnish (fastest on the leg), dotted</text>
+        </svg>
+      </div>
+      <p class="cap">In the replay, under each leg's row in "Against …", a <b>Tactics</b> list holds the same lines. Picking one plays that stretch. A tide line marks the current under you and under the fastest boat on the leg, a shift line the stretch you spent headed, a layline line the overstand.</p>
+      <p class="ann">Built from what's already recorded (the 1 Hz track with each boat's wind shift), plus one new field per frame: the current under each boat. The results-page section sits after "What cost you time" and "Against the winner".</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
