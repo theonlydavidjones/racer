@@ -24,9 +24,18 @@ export interface SailSpec {
   share: number; // share of the drive (by area)
 }
 
+/**
+ * The best angles of attack are estimates: no primary source was reachable for either (Marchaj's 22° for a main is
+ * quoted second-hand). The jib's is measured, as everything here is, from the apparent wind to its sheeting angle,
+ * which reads low: the main's upwash bends the wind round ahead of it, so the jib meets it at a wider angle than the
+ * boat's apparent wind (Gentry, "The Aerodynamics of Sail Interaction", 1971; in degrees, not found). 16.5° is fitted to
+ * the lead: North's car track (controls.ts carLead, 11.6–13.7°) puts the jib at its best close-hauled from the beat in
+ * light air (apparent wind 28.5°, the inner holes) to a breeze (32°, eased off the outer ones), as a Folkboat sails;
+ * at 18° the inner hole was too wide for the beat itself in 8 kt, the jib luffing a little at its own best course.
+ */
 export const SAILS: Record<SailName, SailSpec> = {
   main: { aoa: 22, min: 2, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
-  jib: { aoa: 18, min: carLead(0), max: 68, crewRate: 14, handRate: 16, share: 0.3 }, // (min: the car's innermost lead, controls.ts)
+  jib: { aoa: 16.5, min: carLead(0), max: 68, crewRate: 14, handRate: 16, share: 0.3 }, // (min: the car's innermost lead, controls.ts)
 };
 
 /** Luffing starts this far (deg) below the best angle of attack and is complete 10° further on. */
