@@ -1173,7 +1173,7 @@ addEventListener('keydown', e => {
     // the screens around the sailing (docs/UI-AUDIT.md §3 rule 5): Esc is back. A layer over one closes first, then a
     // sub-page (a member's page), then back to where you came from; on the start page, nothing
     if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
-    if (boatPanel.open) { $('boatPanel').querySelector<HTMLElement>('[data-act="done"]')?.click(); return; }
+    if (boatPanel.open) { boatPanel.requestDone(); return; }
     if (fleet.escape()) return;
     if (!$('raceChoose').hidden || !$('pastView').hidden || !$('setup').hidden || fleet.open) { nav.back(); return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
@@ -1912,8 +1912,9 @@ $('oppList').addEventListener('click', e => {
   S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);
   fleetChanged();
 });
-boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(S); newGame(); boatSummary(); oppRows(); }, () => {
+boatPanel = new BoatPanel(S, save => { S.fleet = S.opponents.length; if (save) saveSettings(S); newGame(); boatSummary(); oppRows(); }, saved => {
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
+  if (saved) fleet.flashSaved();
 });
 boatPanel.onSpin = () => (look.spin = !look.spin);
 $('bBoat').onclick = () => nav.go({ k: 'club' });
@@ -1964,6 +1965,7 @@ function showPlace(p: Place): void {
 }
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
+  if (boatPanel.open && boatPanel.edited) { boatPanel.leave(openHomeNow); if (boatPanel.edited) return; } // (her changes unsaved: Save or Discard first)
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
