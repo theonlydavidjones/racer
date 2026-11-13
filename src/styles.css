@@ -1205,3 +1205,69 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 #pastView .pastrows{max-height:none}
 /* Settings is a layer: the screen it opened over (the start page, the pause menu) is put away while it's up, not half-seen */
 body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .panel{visibility:hidden}
+/* ---------- the setup, tightened (the owner OK'd design/setup-tight, 13 Nov 2026) ---------- */
+/* one picture for a boat or a person: a tile in her hull colour (a person's: the club's), the number big, the country
+   small over it, the name under; round for a person (ui/tiles.ts) */
+.t-av{display:inline-flex;flex-direction:column;align-items:center;gap:5px;width:60px;background:none;border:0;padding:2px 0;color:inherit;font:inherit}
+button.t-av{cursor:pointer}
+button.t-av:disabled{cursor:default;opacity:.3}
+.t-tile{position:relative;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font:700 15px/1 var(--f-inst);letter-spacing:.01em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);box-sizing:border-box;transition:transform .08s,outline-color .12s,opacity .12s}
+.t-tile:has(.t-ctry){padding-top:9px}
+.t-ctry{position:absolute;top:6px;left:0;right:0;text-align:center;font:700 8.5px/1 var(--f-inst);font-style:normal;letter-spacing:.1em;opacity:.8}
+.t-av.round .t-tile{border-radius:50%}
+.t-av small{font:600 11px/1.15 var(--f-inst);color:var(--muted);text-align:center;max-width:66px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-av.on .t-tile{outline:2px solid var(--accent);outline-offset:2px}
+.t-av.on small{color:var(--text)}
+.t-av.dim{opacity:.4}
+button.t-av:hover:not(:disabled) .t-tile{outline:2px solid rgba(255,182,39,.55);outline-offset:2px}
+button.t-av.on:hover .t-tile{outline-color:var(--accent)}
+button.t-av:active:not(:disabled) .t-tile{transform:scale(.94)}
+button.t-av.dim:hover{opacity:.8}
+.t-add{background:transparent!important;border:1.5px dashed #5f7a8c;color:#9fb3c2;box-shadow:none;font-size:18px}
+.t-group{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap}
+.t-links{display:flex;gap:12px;align-items:center}
+.t-pickrow{display:grid;grid-template-columns:96px 1fr;column-gap:18px;align-items:center;margin-top:12px}
+.t-pickrow:first-child{margin-top:0}
+.t-lab{font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:right}
+.t-h{font:700 15px/1.2 var(--f-inst);letter-spacing:.02em;color:var(--text)}
+.t-s{font:500 13px/1.35 var(--f-inst);color:var(--muted)}
+.t-text{display:flex;flex-direction:column;gap:3px}
+.t-burgee{height:34px;width:auto;box-shadow:0 1px 2px rgba(0,0,0,.5)}
+.t-course{display:block;border-radius:8px;flex:none}
+.t-date{width:46px;height:46px;border-radius:10px;background:#f3f1ea;color:#13202b;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.t-date b{font:800 18px/1 var(--f-inst)}
+.t-date small{font:700 9px/1 var(--f-inst);letter-spacing:.1em;margin-top:2px}
+/* the rows: one grid (a lead tile, the line, Change), the controls opening under it */
+#setup .steps{gap:12px}
+#setup .srow{border:1px solid var(--rule);border-radius:12px;background:var(--ink);transition:border-color .12s}
+#setup .srow[hidden]{display:none}
+#setup .srow:not(.open):hover{border-color:rgba(255,182,39,.5)}
+#setup .srow.open:not(.always){border-color:var(--accent)}
+#setup .srow-head{display:grid;grid-template-columns:96px 1fr auto;align-items:center;column-gap:18px;padding:14px 16px;cursor:pointer;border-radius:12px}
+#setup .srow-head:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#setup .srow-lead{display:flex;align-items:center;justify-content:center}
+#setup .srow-main{display:flex;align-items:center;gap:14px;min-width:0;flex-wrap:wrap}
+#setup .srow-go{color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;white-space:nowrap}
+#setup .srow-body{display:none;padding:0 16px 16px;flex-direction:column;gap:14px}
+#setup .srow.open .srow-body{display:flex;border-top:1px solid var(--rule);padding-top:14px}
+#setup .srow.always .srow-head{display:none}
+#setup .srow.always .srow-body{border-top:0}
+#setup .srow .step{border-top:0;padding:0}
+#setup .srow .step>span:first-child::before{content:none}
+#setup #row-fleet .step>span:first-child,#setup #row-boat .step>span:first-child,#setup #row-when .step>span:first-child{display:none}
+#setup #oppList{display:flex;flex-direction:column;gap:0}
+#setup #crewRows{display:flex;flex-direction:column}
+#setup #crewRows .t-pickrow:first-child{margin-top:12px}
+#setup #crewField .t-pickrow .seg{max-width:420px}
+/* the right column: the day as one strip over the graph; the other buttons smaller, Start big */
+#setSide{gap:12px}
+#setSide #tideNote{display:none}
+.t-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
+.t-strip>div{display:flex;align-items:center;gap:8px;background:var(--ink);border:1px solid var(--rule);border-radius:10px;padding:8px 10px;min-width:0}
+.t-strip b{font:700 17px/1 var(--f-inst);white-space:nowrap}
+.t-strip small{display:block;font:600 11px/1.2 var(--f-inst);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#setSide #bCond{padding:8px 10px;font-size:12px}
+#setSide .gobtns .ghost{padding:8px 10px;font-size:12px}
+#setSide #bGo{padding:18px;font-size:18px}
+#setup #crewRows{display:block;margin:0;font-size:inherit}
+#setup #crewRows .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:600 13px/1 var(--f-inst);padding:0}

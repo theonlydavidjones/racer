@@ -198,6 +198,10 @@
     <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="back">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
     <div class="setgrid">
       <div class="steps">
+        <!-- four rows on one grid (the owner OKd design/setup-tight): each a line of tiles and words, its controls open in place -->
+        <section class="srow" id="row-course" data-row="course">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="hostField"><span>Host club</span>
           <div class="seg" id="hostSeg"><button type="button" data-host="ggyc">Golden Gate YC · Seaweed Soup</button><button type="button" data-host="practice">Practice area (no club)</button></div>
           <details class="si" id="siBox"><summary><small><span id="siSum"></span> <u>Change</u></small></summary>
@@ -218,25 +222,48 @@
           <div class="seg" data-k="raceLength" id="lengthField"><button type="button" data-v="short">Short · ~30 min</button><button type="button" data-v="medium">Club race · ~60 min</button><button type="button" data-v="long">Long · ~90 min</button></div>
           <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select>
           <div class="coursecard" id="courseCard"></div></div>
+          </div>
+        </section>
+        <section class="srow" id="row-fleet" data-row="fleet">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="fleetField"><span>Competitors <b id="oppCount"></b></span>
           <div class="opps" id="oppList"></div></div>
+          </div>
+        </section>
+        <section class="srow always" id="row-where" data-row="where">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="whereField"><span>Where <button type="button" class="ghost sm" id="bPlanOpen" title="Both pins on one big chart: drag either, then Done">Plan on the big chart</button></span>
           <div class="seg" id="setupPinSeg"><button type="button" data-pin="from">Start</button><button type="button" data-pin="to">Destination</button></div>
           <canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas>
           <p class="pins" id="setupPins"></p>
           <div class="pinbtns"><small id="setupChartHint"></small><button type="button" class="ghost sm" id="bPinSlip">Her slip</button><button type="button" class="ghost sm" id="bPinNone">Nowhere in particular</button></div></div>
-        <div class="field step" id="crewField"><span>Your boat and crew</span>
-          <div class="boatsum"><select id="boatPick" class="pick" aria-label="The boat you'll sail"></select><button type="button" class="ghost sm" id="bBoat">Your boats…</button></div>
-          <small id="boatSum"></small>
-          <details class="crewbox" id="crewBox"><summary><small><span id="crewSum"></span> <u>Who's aboard</u></small></summary><div class="crewrows" id="crewRows"></div></details>
-          <div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div>
+          </div>
+        </section>
+        <section class="srow" id="row-boat" data-row="boat">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
+        <div class="field step" id="crewField">
+          <div class="t-pickrow"><span class="t-lab">Boat</span><span class="t-group"><span class="t-group" id="boatTiles"></span><button type="button" class="t-av" id="bBoat" title="Your boats, in the Yacht Club"><span class="t-tile t-add">+</span><small>Yacht Club</small></button></span></div>
+          <select id="boatPick" class="pick" aria-label="The boat you'll sail" hidden></select><small id="boatSum" hidden></small><small id="crewSum" hidden></small>
+          <div class="crewrows" id="crewRows"></div>
+          <div class="t-pickrow"><span class="t-lab">Start</span><div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div></div>
           <small id="raceFromNote"></small></div>
+          </div>
+        </section>
+        <section class="srow" id="row-when" data-row="when">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="tideBox"><span id="whenLab">Start time</span>
           <div class="tiderow"><label>Date <input type="date" id="tideDate"></label><label><span id="timeLab">Start signal</span> <input type="time" id="tideTime" step="300"></label></div></div>
+          </div>
+        </section>
       </div>
       <div class="side" id="setSide">
         <div class="condhead"><span>Conditions</span><b id="condState">real</b></div>
-        <dl class="cond" id="condSum"></dl>
+        <div class="t-strip" id="condStrip"></div>
+        <dl class="cond" id="condSum" hidden></dl>
         <canvas id="tideGraph" aria-label="Current and wind through the day"></canvas>
         <small id="tideNote"></small>
         <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>

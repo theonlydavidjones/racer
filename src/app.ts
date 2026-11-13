@@ -63,6 +63,9 @@ import { passageNow, whyNot } from './sim/navigator';
 import { FlowPanel } from './ui/flowPanel';
 import type { PilotMode } from './boat/autopilot';
 import { Nav, type Place } from './ui/nav';
+import { burgeeCanvas } from './render/burgees';
+import { morph } from './ui/morph';
+import { CLUB_TILE, emptyTile, initials, splitNo, tile } from './ui/tiles';
 
 const S: Settings = loadSettings();
 // the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
@@ -195,6 +198,8 @@ function newGame(seed = randomSeed()): void {
  * own displays are put away (body.still).
  */
 let still = false, unshown = false;
+/** The course file the prepared race was built from (the setup's course row reads its length). */
+let courseFileNow: WorldArgs['file'] | null = null;
 /** How many Worlds the page has built (for the checks: a setup change builds one, after the debounce). */
 let prepared = 0;
 function prepare(seed = randomSeed()): void {
@@ -214,6 +219,7 @@ function prepare(seed = randomSeed()): void {
   const args: WorldArgs = { file: rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), settings: WSd, seed,
     opts: S.mode === 'drill' ? { startAt: S.drillFrom ?? DRILL_FROM, solo: S.drillSolo ?? true, showFlags, courseSignal } : (S.mode === 'sail' || S.mode === 'manoeuvres') && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
   // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
+  courseFileNow = args.file;
   const facts = new World(args.file, args.settings, args.seed, args.opts);
   if (host) host.rebuild(args, facts);
   else {
@@ -1253,6 +1259,7 @@ function courseCard(): void {
   { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
     $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Single-handed'}, ${Math.round(kg / 0.4536)} lb aboard`; }
   adjustUi();
+  setupHeads();
 }
 /* Real tide: race day, start time, and a graph of the current at the start line through the day. */
 function tideBox(): void {
@@ -1292,6 +1299,7 @@ function drawTideGraph(): void {
   // race window: the gun to about 75 minutes later
   if (!cruise) { ctx.fillStyle = 'rgba(255,182,39,.10)'; ctx.fillRect(tx(w.gunUtc), top - 6, tx(w.gunUtc + 75) - tx(w.gunUtc), bot - top + 12); }
   const rows: [string, string][] = [];
+  const strip: { windKt?: number; windFrom?: number; windAll?: boolean; curKt?: number; curSet?: number; curKind?: string; sea?: string; seaSub?: string; sunset?: string; arrive?: string } = {};
   if (w.tide) {
     // signed current at the line: + flood (east, into the Bay), − ebb
     const f = new CurrentField(w.tide.stations), fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
@@ -1307,6 +1315,7 @@ function drawTideGraph(): void {
     ctx.fillStyle = '#9cc3ff'; ctx.fillText('FLOOD ↑', 10, top + 2);
     ctx.fillStyle = '#ffb08a'; ctx.fillText('EBB ↓', 10, bot);
     f.setTime(w.gunUtc);
+    { const c = f.atShore(p), along = c.x * fl.x + c.y * fl.y; strip.curKt = Math.hypot(c.x, c.y) / 0.5144; strip.curSet = (Math.atan2(c.x, c.y) * 180 / Math.PI + 360) % 360; strip.curKind = strip.curKt < 0.1 ? 'slack' : along > 0 ? 'flood' : 'ebb'; }
     rows.push(['Current', `${describeTide(f, p, w.gunUtc).label}${cruise ? '' : ' at the line'}`]);
   }
   if (w.seaBreeze) {
@@ -1318,16 +1327,19 @@ function drawTideGraph(): void {
     ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = '#7fe0a8'; ctx.textAlign = 'right';
     ctx.fillText(`WIND · top ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
     const b = w.weather.at(w.gunUtc), b2 = w.weather.at(w.gunUtc + 90), k = windTerrain(p, b.from);
+    strip.windKt = Math.round(b.kt * k); strip.windFrom = S.windDir ?? b.from; strip.windAll = w.windKind === 'light' && S.windDir == null;
     const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * k)} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * k)} kt` : 'steady';
     rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (an older setting)` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (S.windTurn ? ` (${turnWords(S.windTurn)} from the usual ${compassPoint(b.from - S.windTurn)})` : '')}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
-  } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]);
+  } else { strip.windKt = Math.round(w.wind.kt); strip.windFrom = w.wind.from; rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]); }
   if (!w.tide) rows.push(['Current', CURRENTS[S.current]?.label ?? S.current]);
+  if (w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (w.sea.swell) { strip.sea = `${Math.round(w.sea.swell.hs / 0.3048)} ft`; strip.seaSub = `${Math.round(w.sea.swell.tp)} s swell`; }
   rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate${w.sea.swell.total ? ` (the buoy reads ${Math.round(w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(w.gunUtc * 60000), sp = sunPosition(w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';
     if (Number.isFinite(st.set)) { const xs = tx(st.set / 60000); if (xs < W - 8) ctx.fillRect(Math.max(8, xs), top - 6, W - 8 - Math.max(8, xs), bot - top + 12); }
     if (Number.isFinite(st.rise)) { const xr = tx(st.rise / 60000); if (xr > 8) ctx.fillRect(8, top - 6, Math.min(W - 16, xr - 8), bot - top + 12); }
+    strip.sunset = sfClock(st.set / 60000);
     rows.push(['Sun', sp.el > 0 ? `${Math.round(sp.el)}° up in the ${compass(sp.az)}, sets ${sfClock(st.set / 60000)}` : `After sunset (${sfClock(st.set / 60000)}): sailing in the dusk`]);
   }
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
@@ -1347,6 +1359,8 @@ function drawTideGraph(): void {
   }
   const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
+  if (pn?.eta != null) strip.arrive = sfClock(pn.eta);
+  condStrip(strip, rows); sunsetNow = strip.sunset ?? '';
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
@@ -1381,23 +1395,110 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
  */
 function crewRows(): void {
   const rows = $('crewRows'), boat = S.boats.find(b => b.id === S.boatId) ?? S.boat, seats = boat.crewIds ?? [];
-  const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
-  // (anyone who crews, and isn't on another seat of hers; someone on another of your boats can still be brought aboard)
+  // (anyone who crews; someone in the other seat can be brought across: the two swap)
   const crewers = MEMBERS.filter(m => m.id !== YOU && m.roles.includes('crew'));
-  const seatName = (i: number) => (i === 0 ? 'Middle: main' : 'Forward: jib, pole');
-  const pick = (i: number) => `<label>${seatName(i)} <select data-seat="${i}"><option value="">None</option>${crewers.map(m => `<option value="${esc(m.id)}"${seats[i] === m.id ? ' selected' : ''}${seats.includes(m.id) && seats[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select></label>`;
   const you = MEMBERS.find(m => m.id === YOU);
-  rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${pick(0)}${pick(1)}`
-    + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
-    + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
+  const seatTiles = (i: number) => crewers.map(m => tile(initials(m.name), m.name, CLUB_TILE, { round: true, on: seats[i] === m.id, dim: seats[i] !== m.id && seats.includes(m.id), data: { seat: String(i), id: m.id }, title: seats[i] === m.id ? `${m.name}, ${i ? 'forward: jib and pole' : 'middle: the main'}` : seats.includes(m.id) ? `${m.name} (in the other seat: tap to swap)` : m.name })).join('')
+    + emptyTile('Nobody', false, { round: true, on: !seats[i], data: { seat: String(i), id: '' }, title: 'Nobody in this seat' });
+  morph(rows, `<div class="t-pickrow"><span class="t-lab">Helm</span><span class="t-group">${tile(initials(you?.name ?? 'You'), you?.name ?? 'You', '#ffb627', { round: true, on: true })}</span></div>
+    <div class="t-pickrow"><span class="t-lab">Main</span><span class="t-group">${seatTiles(0)}</span></div>
+    <div class="t-pickrow"><span class="t-lab">Jib · pole</span><span class="t-group">${seatTiles(1)}</span></div>
+    <div class="t-pickrow"><span></span><span class="t-links">${seats.length === 2 ? '<button type="button" class="ghost sm" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>' : ''}<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></span></div>`);
+  setupHeads();
+}
+// (one listener on the crew rows, which are redrawn in place: a seat's tile, the swap, the Yacht Club)
+$('crewRows').addEventListener('click', e => {
+  const t = e.target as HTMLElement, boat = S.boats.find(b => b.id === S.boatId) ?? S.boat;
   const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); crewRows(); setupChanged(courseCard); };
-  rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => {
-    const ids = [...(boat.crewIds ?? [])], i = Number(sel.dataset.seat);
-    if (sel.value) ids[i] = sel.value; else ids.splice(i, 1);
-    boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
-  });
-  rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
-  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => nav.go({ k: 'club', tab: 'members' }));
+  if (t.closest('[data-crew="club"]')) { nav.go({ k: 'club', tab: 'members' }); return; }
+  if (t.closest('[data-crew="swap"]')) { const ids = boat.crewIds ?? []; if (ids.length === 2) { boat.crewIds = [ids[1], ids[0]]; changed(); } return; }
+  const b = t.closest<HTMLElement>('[data-seat]'); if (!b) return;
+  const i = Number(b.dataset.seat), id = b.dataset.id ?? '', ids = [...(boat.crewIds ?? [])];
+  if (id) { const j = ids.indexOf(id); if (j >= 0 && j !== i) ids[j] = ids[i]; ids[i] = id; } else ids.splice(i, 1);
+  boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
+});
+/*
+ * The setup as four rows (the owner OK'd design/setup-tight, 13 Nov 2026): each a line of tiles and words, its controls
+ * opening in place under Change. The controls are the same as before; only their summaries are new.
+ */
+let rowOpen: string | null = null, headsQueued = false, sunsetNow = '';
+const burgeeUrls = new Map<string, string>();
+function setupHeads(): void { if (headsQueued) return; headsQueued = true; requestAnimationFrame(() => { headsQueued = false; drawHeads(); }); }
+function drawHeads(): void {
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  const cruise = S.mode === 'sail', set = (row: string, lead: string, main: string) => {
+    const r = document.getElementById('row-' + row); if (!r) return;
+    morph(r.querySelector('.srow-lead')!, lead); morph(r.querySelector('.srow-main')!, main);
+  };
+  // the course: the host's burgee, the course from above, its number and length; the start's rules in a line
+  const host = hostOf(S.course), practice = host === 'practice';
+  let burgee = burgeeUrls.get(host);
+  if (burgee == null && !practice) { try { burgee = burgeeCanvas(host)?.toDataURL() ?? ''; } catch { burgee = ''; } burgeeUrls.set(host, burgee); }
+  const C = w.C, nm = courseFileNow?.distanceNm;
+  const title = C.title.replace(/^Seaweed Soup · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
+  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Golden Gate Yacht Club">` : '',
+    `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailing instructions|Practice): /, ''))}</span></span>`);
+  // the fleet: a tile each, and + to add one
+  const fl = fleetChosen;
+  set('fleet', '<span class="t-lab">Racing</span>', fl.length ? `<span class="t-group">${fl.slice(0, 8).map(b => { const [c, n] = splitNo(b.no); return tile(n, b.name, b.hull, { country: c, ring: b.tag }); }).join('')}${fl.length > 8 ? `<span class="t-s">+${fl.length - 8}</span>` : ''}${emptyTile('Add', true)}</span>`
+    : `<span class="t-text"><span class="t-h">Nobody: a solo race</span><span class="t-s">Add the club's boats under Change</span></span>`);
+  // her and her crew: her tile, then the helm and the two seats; what they weigh, and where she starts
+  const boat = S.boats.find(b => b.id === S.boatId) ?? S.boat, [bc, bn] = splitNo(sailNo(boat)), seats = boat.crewIds ?? [];
+  const name = (id?: string) => MEMBERS.find(m => m.id === id)?.name ?? '';
+  const you = MEMBERS.find(m => m.id === YOU)?.name ?? 'You';
+  const seat = (i: number, label: string) => seats[i] ? tile(initials(name(seats[i])), name(seats[i]), CLUB_TILE, { round: true }) : emptyTile(label, false, { round: true });
+  const kg = ($('crewSum').textContent!.match(/([\d,]+)\s*lb/) || [])[1];
+  set('boat', tile(bn, boat.name || 'Unnamed', boat.hull.upper, { country: bc, on: true }),
+    `<span class="t-group">${tile(initials(you), 'Helm', '#ffb627', { round: true })}${seat(0, 'Main')}${seat(1, 'Jib')}</span><span class="t-text">${kg ? `<span class="t-s">${kg} lb aboard</span>` : ''}${cruise ? '' : `<span class="t-s">${S.raceFrom === 'slip' ? 'From her slip' : 'Starts at the line'}</span>`}</span>`);
+  // when: the day, and the gun (or when she leaves)
+  const day = new Date(w.raceDate + 'T12:00');
+  set('when', `<span class="t-date"><b>${day.getDate()}</b><small>${day.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</small></span>`,
+    `<span class="t-text"><span class="t-h">${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${cruise ? 'leaving at' : 'gun at'} ${esc(S.tideTime || '12:00')}</span>${sunsetNow ? `<span class="t-s">Sunset ${esc(sunsetNow)}</span>` : ''}</span>`);
+  // which rows show (a row whose fields are all hidden: not this mode's), and which is open
+  for (const r of document.querySelectorAll<HTMLElement>('#setup .srow')) {
+    const was = r.hidden;
+    r.hidden = ![...r.querySelector('.srow-body')!.children].some(c => !(c as HTMLElement).hidden);
+    // (the cruise's chart, drawn while its row was still hidden, had no size: drawn again now it shows)
+    if (was && !r.hidden && r.dataset.row === 'where') setupChart?.sync(true);
+    const open = r.classList.contains('always') || r.dataset.row === rowOpen;
+    r.classList.toggle('open', open);
+    r.querySelector('.srow-head')!.setAttribute('aria-expanded', String(open));
+    r.querySelector('.srow-go')!.textContent = open ? 'Done ▴' : 'Change ▾';
+  }
+}
+// a row's line opens it (and closes the one open); Done folds it
+document.querySelector('#setup .steps')!.addEventListener('click', e => {
+  const head = (e.target as HTMLElement).closest<HTMLElement>('.srow-head'); if (!head) return;
+  const row = head.closest<HTMLElement>('.srow')!.dataset.row!;
+  rowOpen = rowOpen === row ? null : row; drawHeads();
+});
+document.querySelector('#setup .steps')!.addEventListener('keydown', e => {
+  const k = e as KeyboardEvent, head = (k.target as HTMLElement).closest<HTMLElement>('.srow-head');
+  if (head && (k.key === 'Enter' || k.key === ' ')) { k.preventDefault(); head.click(); }
+});
+/** The course from above, north up: the legs mark to mark, the line in amber, the marks. */
+function courseThumb(W: number, H: number): string {
+  const C = w.C, line = C.committee && C.pin ? [C.committee, C.pin] : [], pts = [...line, ...C.marks.map(m => m.p)], pad = 8;
+  if (!pts.length) return '';
+  const xs = pts.map(q => q.x), ys = pts.map(q => q.y), minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const k = Math.min((W - 2 * pad) / Math.max(1, maxX - minX), (H - 2 * pad) / Math.max(1, maxY - minY)), ox = (W - (maxX - minX) * k) / 2, oy = (H - (maxY - minY) * k) / 2;
+  const X = (q: { x: number }) => (ox + (q.x - minX) * k).toFixed(1), Y = (q: { y: number }) => (H - oy - (q.y - minY) * k).toFixed(1);
+  const mid = line.length ? { x: (line[0].x + line[1].x) / 2, y: (line[0].y + line[1].y) / 2 } : C.marks[0].p;
+  const path = [mid, ...C.marks.map(m => m.p), mid].map((q, i) => `${i ? 'L' : 'M'}${X(q)} ${Y(q)}`).join(' ');
+  return `<svg class="t-course" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><rect width="${W}" height="${H}" rx="8" fill="#123b52"/><path d="${path}" fill="none" stroke="#9fd3ea" stroke-width="1.4" stroke-dasharray="3 3"/>${line.length ? `<line x1="${X(line[0])}" y1="${Y(line[0])}" x2="${X(line[1])}" y2="${Y(line[1])}" stroke="#ffb627" stroke-width="2.2"/>` : ''}${C.marks.map(m => `<circle cx="${X(m.p)}" cy="${Y(m.p)}" r="3" fill="#ffb627"/>`).join('')}</svg>`;
+}
+/** The day as one strip of pictures: the wind and the current as arrows on a ring, the sea, the sun (and when she'd arrive). */
+function condStrip(st: { windKt?: number; windFrom?: number; windAll?: boolean; curKt?: number; curSet?: number; curKind?: string; sea?: string; seaSub?: string; sunset?: string; arrive?: string }, rows: [string, string][]): void {
+  const say = (k: string) => (rows.find(r => r[0] === k)?.[1] ?? '').replace(/<[^>]*>/g, '').replace(/"/g, '&quot;');
+  const arrow = (to: number | undefined, col: string) => to == null ? '' : `<svg viewBox="-12 -12 24 24" width="22" height="22" aria-hidden="true"><circle r="11" fill="none" stroke="#2e4a5e"/><g transform="rotate(${Math.round(to)})"><line y1="7" y2="-5" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/><path d="M0 -9 L4 -3 L-4 -3 Z" fill="${col}"/></g></svg>`;
+  const cell = (title: string, pic: string, big: string, small: string) => `<div title="${title}">${pic}<span><b>${big}</b><small>${small}</small></span></div>`;
+  morph($('condStrip'), [
+    st.windKt != null ? cell(say('Wind'), arrow(st.windAll ? undefined : ((st.windFrom ?? 0) + 180) % 360, '#7ee0a5'), `${st.windKt} kt`, st.windAll ? 'all over' : `from ${compassPoint(st.windFrom ?? 0)}`) : '',
+    st.curKt != null ? cell(say('Current'), arrow(st.curKind === 'slack' ? undefined : st.curSet, '#6fb7ff'), `${st.curKt.toFixed(1)} kt`, st.curKind ?? '') : cell(say('Current'), '', 'Current', say('Current')),
+    st.sea ? cell(say('Sea'), '<svg viewBox="0 0 24 16" width="22" height="16" aria-hidden="true"><path d="M1 10 q3 -5 6 0 t6 0 t6 0" fill="none" stroke="#9fd3ea" stroke-width="2"/></svg>', st.sea, st.seaSub ?? '') : '',
+    st.arrive ? cell(say('Arrive'), '', st.arrive, 'arrive') : st.sunset ? cell(say('Sun'), `<svg viewBox="-12 -12 24 24" width="20" height="20" aria-hidden="true"><circle r="5" fill="#ffcf5a"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<line y1="-8" y2="-11" stroke="#ffcf5a" stroke-width="1.6" transform="rotate(${a})"/>`).join('')}</svg>`, st.sunset, 'sunset') : ''
+  ].join(''));
+  setupHeads();
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
@@ -1405,7 +1506,7 @@ function openSetupNow(): void {
   if (S.mode === 'drill' || S.mode === 'manoeuvres') { S.mode = 'race'; prepare(); }
   // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
   // and is sent nothing until it starts)
-  setStill(true);
+  setStill(true); rowOpen = null; setupHeads();
   courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
@@ -1720,7 +1821,13 @@ function boatSummary(): void {
   pick.innerHTML = S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${(x.name || 'Unnamed').replace(/</g, '&lt;')} · ${sailNo(x)}</option>`).join('');
   const cond = [p.cleanedWeeks ? `bottom ${p.cleanedWeeks} wk` : 'clean bottom', p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : 'used sails', p.mast === 'wood' ? 'wooden mast' : ''].filter(Boolean).join(', ');
   $('boatSum').textContent = `${colour} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull; ${cond}.`;
+  morph($('boatTiles'), S.boats.map(x => { const [ctry, n] = splitNo(sailNo(x)); return tile(n, x.name || 'Unnamed', x.hull.upper, { country: ctry, on: x.id === b.id, data: { boat: x.id }, title: `${sailNo(x)} ${x.name || 'Unnamed'}${x.id === b.id ? `: ${$('boatSum').textContent}` : ''}` }); }).join(''));
+  setupHeads();
 }
+$('boatTiles').addEventListener('click', e => {
+  const t = (e.target as HTMLElement).closest<HTMLElement>('[data-boat]'), pick = $('boatPick') as HTMLSelectElement; if (!t || t.dataset.boat === pick.value) return;
+  pick.value = t.dataset.boat!; pick.dispatchEvent(new Event('change'));
+});
 ($('boatPick') as HTMLSelectElement).onchange = e => {
   const b = S.boats.find(x => x.id === (e.target as HTMLSelectElement).value); if (!b) return;
   S.boat = b; S.boatId = b.id; crewFromClub(); fleetChanged(); boatSummary();
@@ -1732,29 +1839,27 @@ function fleetChanged(): void {
   S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId));
   S.fleet = S.opponents.length; saveSettings(S); oppRows(); setupChanged();
 }
+/** The fleet chosen, for the setup's fleet row: each boat's number, name and colours. */
+let fleetChosen: { no: string; name: string; hull: string; tag: string }[] = [];
 function oppRows(): void {
+  const chosen: typeof fleetChosen = [];
   const chip = (id: string, name: string, no: string, colour: string, hull: string) => {
-    const on = S.opponents.includes(id), full = !on && S.opponents.length >= MAX_OPPONENTS;
-    return `<button type="button" class="opp" data-opp="${id}" aria-pressed="${on}"${full ? ' disabled' : ''}><i style="background:${hull};box-shadow:0 0 0 2px ${colour}"></i><span>${name}</span><small>${no}</small></button>`;
+    const on = S.opponents.includes(id), full = !on && S.opponents.length >= MAX_OPPONENTS, [ctry, n] = splitNo(no);
+    if (on) chosen.push({ no, name, hull, tag: colour });
+    return tile(n, name, hull, { country: ctry, ring: colour, on, dim: !on, data: { opp: id }, disabled: full, title: `${no} ${name}${on ? ': racing (tap to leave her out)' : full ? ': the fleet is full' : ': tap to race her'}` });
   };
   const mine = S.boats.filter(b => b.id !== S.boatId);
-  const html = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
+  const title = (t: string) => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  const html = `<div class="t-pickrow"><span class="t-lab">Club boats</span><span class="t-group">${FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')}</span></div>`
     // generic club Folkboats (boat/generic.ts), to fill out the fleet: tap one to drop her, + to add another
-    + `<div class="opp-h">More club Folkboats</div>` + S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), sailNo(g), genericTag(id), g.hull.upper); }).join('')
-    + (S.opponents.length < MAX_OPPONENTS ? `<button type="button" class="opp" data-fill="1"><span>+ Add one</span></button>` : '')
-    + `<div class="opp-h">Your boats</div>` + (mine.length ? mine.map(b => chip(b.id, (b.name || 'Unnamed').replace(/</g, '&lt;'), sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more boats under Your boats…</small>');
-  // The same chips as shown: change only who's picked, in place, so the chip under the pointer keeps its hover and
-  // eases into its new look like every other choice; rebuild only when boats come or go.
-  const list = $('oppList'), next = document.createElement('div'); next.innerHTML = html;
-  const keys = (el: Element) => [...el.querySelectorAll<HTMLElement>('.opp')].map(b => b.dataset.opp ?? 'fill').join(',');
-  if (keys(list) === keys(next) && list.childElementCount === next.childElementCount) {
-    const now = list.querySelectorAll<HTMLButtonElement>('.opp');
-    next.querySelectorAll<HTMLButtonElement>('.opp').forEach((b, i) => {
-      const pr = b.getAttribute('aria-pressed'); if (pr !== null) now[i].setAttribute('aria-pressed', pr);
-      now[i].disabled = b.disabled;
-    });
-  } else list.innerHTML = html;
+    + `<div class="t-pickrow"><span class="t-lab">More boats</span><span class="t-group">${S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, title(g.name), sailNo(g), genericTag(id), g.hull.upper); }).join('')}`
+    + (S.opponents.length < MAX_OPPONENTS ? emptyTile('Add one', true, { data: { fill: '1' }, title: 'Another club Folkboat' }) : '') + `</span></div>`
+    + `<div class="t-pickrow"><span class="t-lab">Your boats</span><span class="t-group">${mine.length ? mine.map(b => chip(b.id, b.name || 'Unnamed', sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more in the Yacht Club</small>'}</span></div>`;
+  // (changed in place: the tile under the pointer keeps its hover and eases into its new look)
+  morph($('oppList'), html);
+  fleetChosen = chosen;
   $('oppCount').textContent = S.opponents.length ? `· ${S.opponents.length} boat${S.opponents.length > 1 ? 's' : ''}` : '· nobody (a solo race)';
+  setupHeads();
 }
 $('oppList').addEventListener('click', e => {
   if ((e.target as HTMLElement).closest('[data-fill]')) { S.opponents = fillFleet(S.opponents, S.opponents.length + 1, MAX_OPPONENTS); fleetChanged(); return; }
