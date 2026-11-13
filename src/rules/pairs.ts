@@ -216,7 +216,8 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   const overlapped = !clearAstern(A, B) && !clearAstern(B, A);
   if (overlapped && !rec.wasOverlapped) {
     const astern = rec.rule === '12' && rec.kc != null ? rec.kc : null;
-    const tacker = ctx.t - A.lastTackT < JUST_TACKED + 1 ? A.id : ctx.t - B.lastTackT < JUST_TACKED + 1 ? B.id : null;
+    // (18.2(d): an overlap obtained "by tacking to windward": through head to wind, not a gybe)
+    const tacker = ctx.t - (A.headToWindT ?? -Infinity) < JUST_TACKED + 1 ? A.id : ctx.t - (B.headToWindT ?? -Infinity) < JUST_TACKED + 1 ? B.id : null;
     let insideMark: number | null = null, markUnable = false, insideObst: number | null = null, obstUnable = false;
     if (!out && A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
       const mk = ctx.marks[A.leg], ins = markDist(A, mk) < markDist(B, mk) ? A : B, out = ins === A ? B : A;

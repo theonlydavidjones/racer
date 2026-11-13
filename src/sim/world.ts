@@ -1709,7 +1709,7 @@ export class World {
   pendingRoomHail(b: Boat): Boat | null {
     for (const o of this.boats) {
       const h = o !== b ? this.pairs[pairKey(b, o)]?.hail : null;
-      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && b.lastTackT < h.at && !b.tacking) return o;
+      if (h && h.kind === 'room' && h.by === o.id && h.replyAt == null && (b.headToWindT ?? -Infinity) < h.at && !b.tacking) return o; // (rule 20: answered by a tack, not a gybe)
     }
     return null;
   }
