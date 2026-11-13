@@ -109,6 +109,8 @@ export interface Boat {
   tack: Tack;
   tacking: boolean; // past head to wind, not yet close-hauled (Rule 13)
   lastTackT: number;
+  /** When she last passed head to wind (a tack; a gybe passes the wind astern): rules 18.2(b), 18.3. */
+  headToWindT?: number;
   // helm
   steer: number; // −1..1: turn to port .. starboard (keys, and the AI's helm)
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)

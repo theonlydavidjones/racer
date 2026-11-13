@@ -25,6 +25,8 @@ describe.skipIf(!(globalThis as { process?: { env: Record<string, string | undef
     const realT = real.map(b => b.elapsedS!).sort((a, b) => a - b);
     console.log(`${r.date} course ${r.courseNo} (${r.distanceNm} nm): real ${realT.map(t => (t / 60).toFixed(1)).join(' ')} min · sim ${sim.map(t => (t / 60).toFixed(1)).join(' ')} min · median sim/real ${(med(sim) / med(realT)).toFixed(2)}`);
     expect(sim.length).toBeGreaterThan(0);
+    // (a race whose course is uncertain is logged, not judged: the gap there may be the course, not the AI)
+    if (r.uncertain) return;
     expect(med(sim) / med(realT)).toBeGreaterThan(0.5); expect(med(sim) / med(realT)).toBeLessThan(2);
   }, 3_600_000);
 });
