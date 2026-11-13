@@ -288,6 +288,16 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The season's flow** (owner, 13 November; clarity; next; 3–5 h; a mock-up to the owner first): "I'm confused about the
+     UX for seasons. I go to the yacht club to pick a season (counterintuitive, since I would think to go to Race), then
+     when I select a season, BAM, I'm in my slip. no clue what's going on." Proposed:
+     1. **Enter from Race:** Race → Season (the Yacht Club's Season tab shows the standings and history too).
+     2. **Choosing a season opens its overview first,** not the water: the calendar (the real regattas, which are done),
+        the next race (date, club, course, the day's real conditions), the standings, and her crew.
+     3. **"Sail the next race"** opens that race's setup, filled in, and the brief.
+     4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
+        signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
+        saying.
    - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
      save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
