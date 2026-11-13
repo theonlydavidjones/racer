@@ -73,6 +73,19 @@ export const realRace = (id: string): RealRace | undefined => realRaces().find(r
 /** The boats that started (a time, or a code other than didn't start / didn't come): the fleet the sim sails her against. */
 export const realStarters = (r: RealRace): RealBoat[] => r.boats.filter(b => b.elapsedS != null || (b.code != null && !/DN[SC]/.test(b.code)));
 
+/** A sail number's digits, the way the results key a boat ('USA 113' → '113'). */
+export const sailKey = (sail: string): string => sail.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+
+/**
+ * The real boats the sim sails, as opponent ids, at most `max`: the starters, less any that wears your own sail number.
+ * Your boat has the number on the water (two boats with one number can't be told apart, or scored); if it's hers, you
+ * sail in her place, and the results say so.
+ */
+export function realFleetIds(r: RealRace, yourSail: string, max: number): string[] {
+  const mine = sailKey(yourSail);
+  return realStarters(r).filter(b => !mine || b.key !== mine).slice(0, max).map(b => `real:${r.id}:${b.key}`);
+}
+
 /** Where an elapsed time (s) would have placed among the real fleet's finishers (1 = first), and of how many. */
 export function placeAmong(race: RealRace, elapsedS: number): { place: number; of: number } {
   const times = race.boats.filter(b => b.elapsedS != null && b.code == null).map(b => b.elapsedS!);

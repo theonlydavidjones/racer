@@ -24,7 +24,7 @@ import { EXONERATION, RULES, explain, ptsText, raceScores, scoreOrder, type Inci
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
-import { placeAmong, realRace, realRaces, realStarters } from './sim/realRaces';
+import { placeAmong, realFleetIds, realRace, realRaces, sailKey } from './sim/realRaces';
 import type { Boat, LineKey } from './boat/boat';
 import { randomSeed } from './core/rng';
 import { CONDITION_KEYS, World, describeTide } from './sim/world';
@@ -1579,7 +1579,7 @@ $('realRows').addEventListener('click', e => {
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
     chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.id });
   replayPin = null;
-  S.opponents = realStarters(r).slice(0, MAX_OPPONENTS).map(x => `real:${r.id}:${x.key}`);
+  S.opponents = realFleetIds(r, S.boat.sails.number, MAX_OPPONENTS);
   S.fleet = S.opponents.length;
   if (!S.boat.slip) S.raceFrom = 'water';
   saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
@@ -1603,12 +1603,14 @@ function realResults(): string {
   const you = w.userFinishT, { place, of } = placeAmong(r, you), nth = ordinal(place);
   const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!), win = fin[0].elapsedS!;
   const simT = (key: string) => w.boats.find(b => !b.isUser && b.spec?.id === `real:${r.id}:${key}`);
-  const rows = [...fin.map(b => ({ name: titleCase(b.boat), no: b.key, t: b.elapsedS!, sim: simT(b.key), you: false })), { name: 'You', no: '', t: you, sim: undefined, you: true }].sort((a, b) => a.t - b.t);
+  // (a real boat with your sail number stays ashore: you sailed in her place)
+  const mine = sailKey(S.boat.sails.number);
+  const rows = [...fin.map(b => ({ name: titleCase(b.boat), no: b.key, t: b.elapsedS!, sim: simT(b.key), you: false, yours: !!mine && b.key === mine })), { name: 'You', no: '', t: you, sim: undefined, you: true, yours: false }].sort((a, b) => a.t - b.t);
   const gap = you - win, perMile = gap / Math.max(0.1, r.distanceNm);
   return `<div class="eyebrow">Against the real fleet · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
     + `<p class="lede">On the day you'd have been <b>${nth} of ${of}</b>: ${gap <= 0 ? `${mmss(-gap)} ahead of the winner` : `${mmss(gap)} behind the winner, ${Math.round(perMile)} s a mile`}. Their times are the published ones (${esc(r.event)}, race ${r.raceNo}: all on the same rating, so elapsed time decides); the sim's column is the AI sailing each boat today, a check on the sim against the real fleet.</p>`
     + (r.doubt ? `<p class="lede">${esc(r.doubt)}</p>` : '')
-    + `<table class="res"><thead><tr><th></th><th>Boat</th><th>Real</th><th>In the sim</th></tr></thead><tbody>${rows.map((x, i) => `<tr${x.you ? ' class="you"' : ''}><td>${i + 1}</td><td>${esc(x.name)} <span style="color:var(--muted)">${esc(x.no)}</span></td><td>${mmss(x.t)}</td><td>${x.you ? '' : x.sim?.finished ? mmss(x.sim.finishT!) : x.sim ? '–' : ''}</td></tr>`).join('')}</tbody></table>`
+    + `<table class="res"><thead><tr><th></th><th>Boat</th><th>Real</th><th>In the sim</th></tr></thead><tbody>${rows.map((x, i) => `<tr${x.you ? ' class="you"' : ''}><td>${i + 1}</td><td>${esc(x.name)} <span style="color:var(--muted)">${esc(x.no)}</span></td><td>${mmss(x.t)}</td><td>${x.you ? '' : x.yours ? 'your number: you sailed for her' : x.sim?.finished ? mmss(x.sim.finishT!) : x.sim ? '–' : ''}</td></tr>`).join('')}</tbody></table>`
     + `<p class="lede"><a href="${esc(r.url)}" target="_blank" rel="noopener">The published results</a></p>`;
 }
 

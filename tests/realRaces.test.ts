@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { placeAmong, realStarters, realRace, realRaces } from '../src/sim/realRaces';
+import { placeAmong, realFleetIds, realStarters, realRace, realRaces } from '../src/sim/realRaces';
 import { realSpec } from '../src/boat/generic';
 import { courseFile } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
@@ -26,6 +26,11 @@ describe('the real past races', () => {
     // the fleet the sim sails her against: every boat that started (a DNF too), none that didn't
     const r4 = realRace('GGYC_T008047221-r4')!;
     expect(realStarters(r4).length).toBeGreaterThan(r4.boats.filter(b => b.elapsedS != null && b.code == null).length);
+    // your boat keeps her number on the water: a real boat wearing it stays ashore
+    const all = realFleetIds(r4, '', 7), theirs = realStarters(r4)[0];
+    expect(all.length).toBe(Math.min(7, realStarters(r4).length));
+    expect(realFleetIds(r4, `USA ${theirs.key}`, 7)).not.toContain(`real:${r4.id}:${theirs.key}`);
+    expect(realFleetIds(r4, `USA ${theirs.key}`, 7).length).toBe(all.length - 1);
     expect(realStarters(r4).some(b => b.code && /DN[SC]/.test(b.code))).toBe(false);
   });
   it('place your time among the real finishers', () => {
