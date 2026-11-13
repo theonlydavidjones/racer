@@ -48,6 +48,8 @@ const HALF_BEAM = 1.1;
  * must keep clear is doing so: she holds on rather than ease and head up further. Measured between the centrelines
  * (rules hullGap), so the two half-beams are added. */
 const OPEN_GAP = 3 + 2 * HALF_BEAM;
+/** Out of another boat's wind shadow on a run, she heads up this far (deg) onto a broad reach. */
+const DIRTY_RUN_UP = 25;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   let near: string | null = null;
@@ -300,8 +302,20 @@ function inIslandLee(q: Vec, from: number): boolean {
  * in the rounding direction (clockwise leaving it to starboard), steering for the furthest point off its shore she
  * can see with clear water between.
  */
-function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number): Vec {
+function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number, rounded = false): Vec {
   if (clearRun(b, P, windFrom)) return P;
+  // in the island's lee already, she gets out of it first, whatever the way round,
+  // across the wind (out of a wind shadow the quick way is sideways to the wind, not on away from the island, which is
+  // downwind and deeper into it, where an ebb would hold her), on the side nearer where she's going. (Standing off from
+  // the island's centre there, the fleet lost over half an hour in Alcatraz's lee on the real 1 November 2025 race:
+  // Charts' real past races, #192)
+  // (once she has rounded it: before that, the rounding's own way round)
+  // (in its lee by the wind she has, the shadows' own model, sim/world.ts leeK: a single ray upwind misses the lee off
+  // an island's corner)
+  if (rounded && ((b as Boat).leeK != null ? (b as Boat).leeK! < LEE_OUT : inIslandLee(b, windFrom))) {
+    const a = V(windFrom + 90), side = dot(a, sub(P, b)) >= 0 ? 1 : -1;
+    return { x: b.x + a.x * side * ISLAND_EXIT, y: b.y + a.y * side * ISLAND_EXIT };
+  }
   const M = m.p, dir = m.side === 's' ? 1 : -1, b0 = brg(b.x - M.x, b.y - M.y), bP = brg(P.x - M.x, P.y - M.y);
   const span = ((dir * (bP - b0)) % 360 + 360) % 360; // how far round to the aim point
   let best: Vec | null = null;
@@ -314,6 +328,10 @@ function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number): Vec {
   const u = V(b0), r = markReach(m, b) + islandBerth(u, windFrom) * 1.5;
   return { x: M.x + u.x * r, y: M.y + u.y * r };
 }
+/** How far across the wind she steers to get out of an island's lee (m): beyond the shadow's width off Alcatraz. */
+const ISLAND_EXIT = 300;
+/** In an island's lee: less than this share of the wind there, by the land's wind shadow alone. */
+const LEE_OUT = 0.7;
 
 /**
  * The fastest way to the start line from here: of close-hauled, a reach or a run on either tack (a start to
@@ -457,7 +475,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       P = aimPoint(w, b);
       // just rounded an island: carry on round it the same way, with the same berth, until she's clear of it and its lee
       const prev = b.leg > 0 && b.leg <= w.C.marks.length ? w.C.marks[b.leg - 1] : null;
-      if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from);
+      if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from, true);
     }
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
@@ -544,6 +562,16 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // downwind (sim/laylines.ts), as she tacks on them upwind. A gybe she's decided on is held as a tack is.
       const rS = n360(ww.from - ra), rP = n360(ww.from + ra);
       desired = (ai.goTack ? ai.goTack.to : b.tack) === 'S' ? rS : rP;
+      // Clear air downwind: with the wind astern a boat's sails throw a long, deep shadow downwind, and boats running
+      // together sat in each other's for many minutes at a third of the wind (the AI looked for clear air only on a
+      // beat). A sailor heads up out of it, onto a broad reach, and if that doesn't clear her, gybes away.
+      const dirtyRun = (b.shadowK ?? 1) / (b.leeK ?? 1) < 0.75;
+      ai.dirtyRunT = dirtyRun ? (ai.dirtyRunT ?? 0) + dt : Math.max(0, (ai.dirtyRunT ?? 0) - dt * 2);
+      if (!ai.goTack && (ai.dirtyRunT ?? 0) > ai.kn.dirtyAirS) {
+        desired = b.tack === 'S' ? n360(rS + DIRTY_RUN_UP) : n360(rP - DIRTY_RUN_UP); // (heading up: on starboard, to starboard)
+        const other = b.tack === 'S' ? 'P' : 'S';
+        if ((ai.dirtyRunT ?? 0) > ai.kn.dirtyAirS * 3 && w.t - b.lastTackT > 20) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = other === 'S' ? rS : rP; ai.dirtyRunT = 0; }
+      }
       if (!ai.goTack && w.t - b.lastTackT > 12) {
         const d = sub(P, b), vr = targetFor(b, ra);
         // (the other gybe lays the mark when its track over the ground passes no more than 3° to leeward of it: on
