@@ -22,12 +22,12 @@ would settle it"). First pass, 13 Nov 2026 (Bay East). No values were changed by
 
 | | sourced | measured | calibrated | owner | estimate | unsourced | standard | numerical | design | total |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| src/boat | 77 | 1 | 4 | 3 | 54 | 72 | 14 | 15 | 11 | 251 |
+| src/boat | 79 | 1 | 4 | 4 | 55 | 71 | 14 | 15 | 11 | 254 |
 | src/environment | 16 | 0 | 0 | 0 | 7 | 9 | 6 | 26 | 11 | 75 |
-| src/sim | 2 | 0 | 0 | 1 | 0 | 32 | 2 | 6 | 7 | 50 |
-| src/ai | 0 | 0 | 0 | 0 | 0 | 13 | 0 | 0 | 0 | 13 |
+| src/sim | 3 | 1 | 0 | 1 | 0 | 31 | 2 | 9 | 9 | 56 |
+| src/ai | 1 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 5 | 13 |
 | src/rules | 0 | 0 | 0 | 0 | 2 | 10 | 0 | 0 | 0 | 12 |
-| **all** | **95** | **1** | **4** | **4** | **63** | **136** | **22** | **47** | **29** | **401** |
+| **all** | **99** | **2** | **4** | **5** | **64** | **128** | **22** | **50** | **36** | **410** |
 
 ## The ten unsourced that matter most
 
@@ -37,9 +37,9 @@ that would act on a finding.
 | # | Constants | What they do | What would settle it | Owner |
 |---|---|---|---|---|
 | 1 | trim.ts SAILS.aoa (main 22°, jib 18°), LUFF_START 2, LUFF_SPAN 10, STALL_START 4 | The best angle of attack and how fast trim error costs drive: every boat's speed, every trim lesson | Sail aerodynamics (wind-tunnel or VPP data for a main and jib: angle of best drive, the width of the "groove") | Deep Physics |
-| 2 | dynamics.ts HANDLING.turnRadius 9 m, maxTurnRate 22°/s, turnDrag 0.15 | How fast she turns and what a tack or a gybe costs in speed: the cost of every manoeuvre | Tack-loss measurements for long-keel boats (GPS tracks of Folkboats tacking; published tack-loss studies) | Deep Physics |
+| 2 | dynamics.ts HANDLING.turnRadius 9 m, maxTurnRate 22°/s, turnDrag 0.15 | How fast she turns and what a tack or a gybe costs in speed. routing.ts MANOEUVRE_LOSS is measured from the sim's own boat, so it inherits these | Tack-loss measurements for long-keel boats (GPS tracks of Folkboats tacking; published tack-loss studies) | Deep Physics |
 | 3 | dynamics.ts HANDLING.formFactor 1.15, windageCdA 2.0 m², flogCdA 3 m² | Hull resistance beyond friction, and the rig's windage: speed at every angle, and upwind most | Form factors for full-bodied keelboats (ITTC/Delft series); windage of a rig and hull (Marchaj, ORC VPP windage terms) | Deep Physics |
-| 4 | routing.ts MANOEUVRE_S 8 s | The seconds a tack or gybe costs in routing and the committee's course table | Same as 2; should come out of the sim's own tack loss (a test) once 2 is sourced | Deep Physics |
+| 4 | balance.ts CREW.kg 240, CREW.reach 1.05 m (estimate) | The crew's righting moment hiking: heel, and so speed, in every breeze | Sailor weights for the SF fleet (the owner); hiking reach from the deck plan and anthropometry | Crew Model |
 | 5 | polar.ts NO_GO 25° | Below this true wind angle, no drive at all: pinching and luffing behaviour | Folkboat polars (ORC certificates' beat angles) and sail-model stall | Deep Physics |
 | 6 | balance.ts RUDDER (area 0.42 m², arm 2.6 m), CHORD (2.4, 2.0 m), IDEAL_HELM 2.5°, FULL_RUDDER 30° | Weather helm, and how much rudder she needs: the feel of the boat, and the rudder's drag | Class plans (rudder dimensions), the ORC rig for chords; sailing texts for ideal helm (2–4° is the usual advice) | Deep Physics |
 | 7 | controls.ts CONTROL_RATE (11 lines), trim.ts crewRate/handRate | How fast lines are worked: how quickly a crew answers a puff or rounds a mark | Timed routines (the owner can time them next season); until then published timings for small keelboats | Crew Model |
@@ -191,39 +191,42 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 | DEFAULT_CREW.w | 78 | 66 | design | default crew (anthropometry not cited) |
 | DEFAULT_CREW.h | 1.72 | 66 | design | default crew (anthropometry not cited) |
 | DEFAULT_CREW.w | 72 | 66 | design | default crew (anthropometry not cited) |
-| Z.helm | 2.95 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.cockpitFwd | 1.35 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.deckFwd | 1.65 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.cockpitAft | 2.5 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.piano | 0.85 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.car | -3… | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.mast | -0.95 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.gap | 0.5 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.bow | -3… | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| Z.foredeck | -2.0 | 199 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
-| DECK_ARM | 0.5 | 228 | sourced |  |
-| CAR_ARM | 0.8 | 245 | owner |  |
-| lean | 1 | 254 | numerical |  |
-| RECOVER | 60 | 271 | sourced |  |
-| ROLL_HOLD | 2 | 323 | owner |  |
-| HOLD.heel | 2 | 342 | estimate | coaching practice; the seconds are judgement |
-| HOLD.last | 3 | 342 | estimate | coaching practice; the seconds are judgement |
-| HOLD.dwell | 10 | 342 | estimate | coaching practice; the seconds are judgement |
-| HOLD.urgent | 2 | 342 | estimate | coaching practice; the seconds are judgement |
-| HOLD.fore | 0.3 | 342 | estimate | coaching practice; the seconds are judgement |
-| HOLD.settle | 4 | 342 | estimate | coaching practice; the seconds are judgement |
-| LAYOUT_STAY | 60 | 589 | estimate | coaching practice; the seconds are judgement |
+| Z.helm | 2.95 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.cockpitFwd | 1.35 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.deckFwd | 1.65 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.cockpitAft | 2.5 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.piano | 0.85 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.car | -3… | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.mast | -0.95 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.gap | 0.5 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.bow | -3… | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| Z.foredeck | -2.0 | 201 | sourced | NFIA CR 3.22, 6.1.7; North Sails guide; owner photos |
+| DECK_ARM | 0.5 | 230 | sourced |  |
+| CAR_ARM | 0.8 | 247 | owner |  |
+| lean | 1 | 256 | numerical |  |
+| RECOVER | 60 | 273 | sourced |  |
+| ROLL_HOLD | 2 | 325 | owner |  |
+| HOLD.heel | 2 | 344 | estimate | coaching practice; the seconds are judgement |
+| HOLD.last | 3 | 344 | estimate | coaching practice; the seconds are judgement |
+| HOLD.dwell | 10 | 344 | estimate | coaching practice; the seconds are judgement |
+| HOLD.urgent | 2 | 344 | estimate | coaching practice; the seconds are judgement |
+| HOLD.fore | 0.3 | 344 | estimate | coaching practice; the seconds are judgement |
+| HOLD.settle | 4 | 344 | estimate | coaching practice; the seconds are judgement |
+| LAYOUT_STAY | 60 | 601 | estimate | coaching practice; the seconds are judgement |
 
 ### src/boat/crewWork.ts
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | LINE_TAU | 20 | 45 | estimate | coaching practice; the seconds are judgement |
-| PLACED_TRIP | 0.3 | 54 | unsourced |  |
-| JIB_HAUL | 0.25 | 62 | estimate |  |
-| NOVICE | 0.3 | 70 | owner |  |
-| DONE | 1e-4 | 129 | numerical |  |
-| CAR.work | 6 | 229 | unsourced |  |
+| LINE_GAP | 60 | 53 | sourced |  |
+| LINE_TRIP | 90 | 53 | sourced |  |
+| LINE_URGENT | 0.25 | 55 | estimate |  |
+| PLACED_TRIP | 0.3 | 64 | estimate |  |
+| JIB_HAUL | 0.25 | 72 | owner |  |
+| NOVICE | 0.3 | 80 | owner |  |
+| DONE | 1e-4 | 139 | numerical |  |
+| CAR.work | 6 | 281 | unsourced |  |
 
 ### src/boat/dynamics.ts
 
@@ -533,16 +536,17 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 | OPEN_WATER | 1.25 | 52 | estimate | flagged; set to match the station |
 | SLOT_WIDTH | 1300 | 102 | estimate |  |
 | SLOT_BOOST | 0.2 | 102 | estimate |  |
-| PUFF_LONG | 1.5 | 141 | unsourced |  |
-| PUFF_WIDE | 0.75 | 141 | unsourced |  |
-| FAR_CELL | 200 | 214 | numerical |  |
+| PUFF_LONG | 1.5 | 143 | unsourced |  |
+| PUFF_WIDE | 0.75 | 143 | unsourced |  |
+| FAR_CELL | 200 | 216 | numerical |  |
 
 ### src/sim/debrief.ts
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| EP_GAP | 4 | 37 | design | coaching/debrief threshold |
-| EP_MIN | 1 | 37 | design | coaching/debrief threshold |
+| EP_GAP | 4 | 38 | design | coaching/debrief threshold |
+| EP_MIN | 1 | 38 | design | coaching/debrief threshold |
+| SHIFT_DEG | 4 | 40 | design | debrief threshold |
 
 ### src/sim/obstruction.ts
 
@@ -551,6 +555,12 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 | SUBSTANTIAL_TURN | 10 | 11 | sourced | Perry, Understanding the Racing Rules |
 | HULL_SIDE | 1.8 | 13 | unsourced |  |
 
+### src/sim/realRaces.ts
+
+| Constant | Value | Line | Class | Note |
+|---|---:|---:|---|---|
+| MIN_TIMED | 3 | 43 | design | debrief threshold |
+
 ### src/sim/routing.ts
 
 | Constant | Value | Line | Class | Note |
@@ -558,8 +568,7 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 | AS_FORECAST.dFrom | 0 | 25 | numerical |  |
 | AS_FORECAST.kMul | 1 | 25 | numerical |  |
 | AS_FORECAST.early | 0 | 25 | numerical |  |
-| MANOEUVRE_S | 8 | 77 | unsourced | tack/gybe loss |
-| DT | 10 | 78 | numerical |  |
+| DT | 10 | 106 | numerical |  |
 
 ### src/sim/signals.ts
 
@@ -567,6 +576,14 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 |---|---:|---:|---|---|
 | CANCEL_KT | 23 | 33 | owner |  |
 | X_FLAG_MAX | 240 | 76 | sourced | RRS 29.1: four minutes |
+
+### src/sim/sync.ts
+
+| Constant | Value | Line | Class | Note |
+|---|---:|---:|---|---|
+| CHECK_EVERY | 20 | 35 | numerical |  |
+| SWEEP_EVERY | 300 | 44 | numerical |  |
+| LONG | 1000 | 96 | numerical |  |
 
 ### src/sim/traffic.ts
 
@@ -606,16 +623,17 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 | ONE_TURN | 360 | 60 | standard |  |
 | HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |
 | SAME_INCIDENT | 8 | 73 | unsourced | RRS names the rule, not the number |
-| COMPELLED_WINDOW | 3 | 76 | unsourced | RRS names the rule, not the number |
-| SHOVE | 0.5 | 107 | unsourced |  |
-| WALK | 0.45 | 109 | unsourced |  |
-| CREW_TURN | 2 | 109 | unsourced |  |
-| AI_CREW_SKILL.Red | 0.75 | 132 | design | fleet variety |
-| AI_CREW_SKILL.Blue | 0.6 | 132 | design | fleet variety |
-| AI_CREW_SKILL.Green | 0.5 | 132 | design | fleet variety |
-| AI_CREW_SKILL.Black | 0.85 | 132 | design | fleet variety |
-| AI_CREW_SKILL.Varnish | 0.45 | 132 | design | fleet variety |
-| AI_EVERY | 3 | 160 | numerical |  |
+| TANGLE_MAX | 30 | 75 | sourced |  |
+| COMPELLED_WINDOW | 3 | 78 | unsourced | RRS names the rule, not the number |
+| SHOVE | 0.5 | 109 | unsourced |  |
+| WALK | 0.45 | 111 | unsourced |  |
+| CREW_TURN | 2 | 111 | unsourced |  |
+| AI_CREW_SKILL.Red | 0.75 | 134 | design | fleet variety |
+| AI_CREW_SKILL.Blue | 0.6 | 134 | design | fleet variety |
+| AI_CREW_SKILL.Green | 0.5 | 134 | design | fleet variety |
+| AI_CREW_SKILL.Black | 0.85 | 134 | design | fleet variety |
+| AI_CREW_SKILL.Varnish | 0.45 | 134 | design | fleet variety |
+| AI_EVERY | 3 | 162 | numerical |  |
 
 ### src/ai/ai.ts
 
@@ -623,17 +641,17 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 |---|---:|---:|---|---|
 | BOAT_HAIL_MARGIN | 5 | 28 | unsourced |  |
 | BOAT_HAIL_LEAD | 9 | 30 | unsourced |  |
-| FLAG_CAUTION.P | 0 | 34 | unsourced |  |
-| FLAG_CAUTION.I | 1 | 34 | unsourced |  |
-| FLAG_CAUTION.Z | 2 | 34 | unsourced |  |
-| FLAG_CAUTION.U | 3 | 34 | unsourced |  |
-| FLAG_CAUTION.black | 3.5 | 34 | unsourced |  |
+| FLAG_CAUTION.P | 0 | 34 | design | signal-flag caution order |
+| FLAG_CAUTION.I | 1 | 34 | design | signal-flag caution order |
+| FLAG_CAUTION.Z | 2 | 34 | design | signal-flag caution order |
+| FLAG_CAUTION.U | 3 | 34 | design | signal-flag caution order |
+| FLAG_CAUTION.black | 3.5 | 34 | design | signal-flag caution order |
 | PENALTY_CLEAR | 25 | 37 | unsourced |  |
 | MARK_CLEAR | 20 | 39 | unsourced |  |
 | MARK_ROOM | 5 | 41 | unsourced | Rule 31 gives no distance |
 | SHORE_TURN | 15 | 44 | unsourced |  |
-| HALF_BEAM | 1.1 | 46 | unsourced |  |
-| ISLAND_BERTH | 70 | 237 | unsourced |  |
+| HALF_BEAM | 1.1 | 46 | sourced | NFIA class rules |
+| ISLAND_BERTH | 70 | 247 | unsourced |  |
 
 ### src/rules/pairs.ts
 
@@ -651,3 +669,9 @@ ai.ts clearances, world.ts docking speeds, condition.ts WOOD_RIG.
 | THROUGH_WIND | 15 | 42 | estimate | modelling threshold, flagged |
 | ROOM_GAP | 3.5 | 95 | unsourced | RRS names the rule, not the number |
 | REPLY_ROOM | 25 | 130 | unsourced | RRS names the rule, not the number |
+
+### src/sim/routing.ts
+
+| Constant | Value | Line | Class | Note |
+|---|---:|---:|---|---|
+| MANOEUVRE_LOSS | table | 89 | measured | the sim's own tack/gybe loss, tests/manoeuvre.test.ts (rests on HANDLING, top 10 #2) |
