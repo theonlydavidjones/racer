@@ -51,6 +51,12 @@ export interface AiState {
   commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
+  /** How long she's been in another boat's wind shadow running, s (it eases off twice as fast once she's clear). */
+  dirtyRunT?: number;
+  /** Headed up out of a wind shadow on a run: she holds the higher course until this time. */
+  dirtyRunUntil?: number;
+  /** Getting out of an island's lee after rounding it: the side she chose (+1: to the right of the wind's direction). */
+  leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
