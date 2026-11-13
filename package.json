@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "census": "CALIB_MODE=census vitest run -c vitest.calib.config.ts && CALIB_MODE=census-summary vitest run -c vitest.calib.config.ts",
     "calibrate": "vitest run -c vitest.calib.config.ts && CALIB_SUMMARY=1 vitest run -c vitest.calib.config.ts",
     "data:polar": "node scripts/fetch-orc-polar.mjs",
     "data:currents": "node scripts/fetch-currents.mjs",
