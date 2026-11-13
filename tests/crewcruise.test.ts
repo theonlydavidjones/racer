@@ -96,8 +96,10 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         expect(o.lean, `${t}: lean, rad a minute`).toBeLessThan(6);
         // (still legs, sitting: the knees moved in a minute while sat, or at a job, not walking)
         expect(o.knee, `${t}: knees, rad a minute`).toBeLessThan(15);
-        // (turning round to walk aft is half a circle; a spin is a whole one)
-        expect(o.spin, `${t}: turned within 4 s`).toBeLessThan(200);
+        // (turning round to walk aft is half a circle; back from a job on one side deck to a seat on the other, inboard to
+        // go aft and on round to sit facing inboard, three-quarters, all one way, as anyone does it (the other way round
+        // is out over the water). A spin is a whole circle, or round and back again)
+        expect(o.spin, `${t}: turned within 4 s`).toBeLessThan(320);
         expect(o.dance, `${t}: seconds close to another while moving`).toBeLessThan(5);
       }
     }, 300000);
