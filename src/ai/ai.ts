@@ -143,7 +143,7 @@ export function sailable(b: Boat, desired: number): number {
  * the way round the land a skipper would draw (sim/routing.ts), allowing for the current as she does racing (crabFor).
  * Off the harbour she stands off and lies to (going in to her berth is the harbour's work, not drawn yet): at a spot of
  * her own (the fleet spread along the wind, not all on one point), with open water a long way to leeward for the drift
- * while she lies there, on the tack she came in on; drifted well off it, or with the land coming up to leeward, she
+ * while she lies there, on the tack that heads her away from her neighbour; drifted well off it, or with the land coming up to leeward, she
  * sails back. The rest is her ordinary sailing (aiThink): the shore, the marks, and the right-of-way rules, which still
  * apply between boats that have been racing (Part 2 preamble), though a boat not racing takes no penalty for breaking one.
  */
@@ -178,15 +178,11 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   return { desired, luff: false, beating };
 }
 /**
- * Where she stands off the harbour (h: its entrance): open water within 800 m of it, reached from it straight, with no
- * land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
- * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 40 m apart along the wind's line
- * across, so the fleet isn't all on one point.
- */
-/**
- * The tack she lies to on: beam-on, she still forereaches slowly along her spot's line across the wind, so on the tack
- * that heads her away from the nearest other boat's spot, as a skipper heaving to near others would. (On the tack she
- * came in on, two neighbours 40 m apart on opposite tacks lay heading at each other and closed it: tests/abandon-home.)
+ * The tack she lies to on: the one that heads her away from the nearest other boat's spot. She comes in to her spot
+ * with way on (1 to 3 m/s) and carries it along her beam-on heading as she stops; on the tack she came in on, two
+ * neighbours on opposite tacks coasted in toward each other (tests/abandon-home). A stopgap: the physics review found the
+ * spots nearer than 40 m (standOff: each boat's own best point, then her step along it), and boats sailing back passing
+ * close by those lying to: both still to do.
  */
 function lieTack(w: World, b: Boat, from: number): 'S' | 'P' {
   const at = b.ai!.home!.at;
@@ -197,6 +193,12 @@ function lieTack(w: World, b: Boat, from: number): 'S' | 'P' {
   return s.x * (at.x - near.x) + s.y * (at.y - near.y) >= 0 ? 'S' : 'P';
 }
 
+/**
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, reached from it straight, with no
+ * land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * such, a little upwind of it the better (on a lee shore, well out); each boat her own, stepped 40 m along the wind's line
+ * across from her own best point, so the fleet isn't all on one point (not always 40 m from each other: lieTack).
+ */
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
   const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
   const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
