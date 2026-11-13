@@ -188,7 +188,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // Rule 18.2 then doesn't apply between her and a starboard-tack boat fetching the mark.
     for (const [T, O] of [[A, B], [B, A]] as const) {
       const seen = rec.seenTack[T.id];
-      if (seen != null && T.lastTackT > seen && T.tack === 'S' && mk.side === 'p' && markDist(T, mk) < ZONE
+      if (seen != null && (T.headToWindT ?? -Infinity) > seen && T.tack === 'S' && mk.side === 'p' && markDist(T, mk) < ZONE
         && O.tack === 'S' && !O.tacking && fetching(O, mk, ctx)) {
         rec.r183 = { tacker: T.id, idx: A.leg, binds: rec.stbdInZone[O.id] === true }; rec.mark = null;
       }
@@ -197,14 +197,14 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
       const ov = !clearAstern(A, B) && !clearAstern(B, A);
       const entitled = ov ? (dA < dB ? A : B) : (dA < ZONE && dB >= ZONE ? A : dB < ZONE && dA >= ZONE ? B : clearAstern(A, B) ? B : A);
       rec.mark = ov
-        ? { idx: A.leg, overlapped: true, inside: entitled.id, tackT: entitled.lastTackT }
-        : { idx: A.leg, overlapped: false, ahead: entitled.id, tackT: entitled.lastTackT };
+        ? { idx: A.leg, overlapped: true, inside: entitled.id, tackT: entitled.headToWindT ?? -Infinity }
+        : { idx: A.leg, overlapped: false, ahead: entitled.id, tackT: entitled.headToWindT ?? -Infinity };
     }
     // Rule 18.2(b): 18.2(a) no longer applies once the entitled boat passes head to wind or leaves the zone.
     const m = rec.mark;
     if (m && !m.ended) {
       const E = (m.overlapped ? m.inside : m.ahead) === A.id ? A : B;
-      if (E.lastTackT > (m.tackT ?? -Infinity) || markDist(E, mk) > ZONE + 2) m.ended = true;
+      if ((E.headToWindT ?? -Infinity) > (m.tackT ?? -Infinity) || markDist(E, mk) > ZONE + 2) m.ended = true; // (a gybe doesn't: it passes the wind astern)
     }
     if (dA > ZONE * 2.2 && dB > ZONE * 2.2) { rec.mark = null; rec.r183 = null; }
   } else {
@@ -227,7 +227,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     rec.ovStart = { t: ctx.t, astern, tacker, insideMark, markUnable, insideObst, obstUnable };
   } else if (!overlapped) rec.ovStart = null;
   rec.wasOverlapped = overlapped;
-  rec.seenTack[A.id] = A.lastTackT; rec.seenTack[B.id] = B.lastTackT;
+  rec.seenTack[A.id] = A.headToWindT ?? -Infinity; rec.seenTack[B.id] = B.headToWindT ?? -Infinity;
 
   // Rule 20.2(e): 18.2 is off from the hail until the hailing boat has tacked and avoided the hailed boat. Set when a
   // hail for room to tack is made (on her record before this step), ended here once she has tacked, is out of the tack

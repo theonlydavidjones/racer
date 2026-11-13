@@ -22,7 +22,7 @@ describe('Rule 18.2(c) and (d) · mark-room after 18.2(a) has ended', () => {
     const red = boat('Red', { at: [9, 30.5], heading: 190 });
     const p = pair(blue, red, [mark]);
     expect(p.at(100).rule).toBe('18.2(a)');
-    blue.lastTackT = 100.5; // Blue passes head to wind: 18.2(a) no longer applies
+    blue.lastTackT = 100.5; blue.headToWindT = 100.5; // Blue passes head to wind: 18.2(a) no longer applies
     moveTo(blue, [6, 20]); moveTo(red, [8, 28]);
     expect(p.at(101)).toMatchObject({ keepsClear: 'Red', rule: '12' }); // not overlapped: the basic rules
     return { blue, red, p };

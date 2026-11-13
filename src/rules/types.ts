@@ -9,7 +9,10 @@ export interface RulesBoat {
   vx: number; vy: number; // velocity over the ground, m/s
   tack: Tack;
   tacking: boolean; // past head to wind, not yet close-hauled
-  lastTackT: number; // race time she last passed head to wind
+  lastTackT: number; // race time she last changed tack, tacking or gybing (rule 15: a change of tack, either way)
+  /** Race time she last passed head to wind: a tack, not a gybe, which passes the wind astern (Definitions, Tack;
+   *  rules 18.2(b) and 18.3 turn on it). Undefined: never. */
+  headToWindT?: number;
   penalty: number; // degrees of penalty turn still to do
   ocs: boolean; // over early and not yet returned
   /**
@@ -84,7 +87,7 @@ export interface MarkRoomState {
   ahead?: number; // boat id clear ahead when not overlapped
   /** Rule 18.2(b): the entitled boat has since passed head to wind or left the zone, so 18.2(a) no longer applies. */
   ended?: boolean;
-  /** The entitled boat's lastTackT when mark-room began (to see her pass head to wind). */
+  /** The entitled boat's headToWindT when mark-room began (to see her pass head to wind). */
   tackT?: number;
 }
 
@@ -104,7 +107,7 @@ export interface PairRecord {
   /** Rule 18.3: a boat that passed head to wind from port to starboard in the zone of a mark left to port, and the
    * mark. `binds`: the other boat had been on starboard since entering the zone, so 18.3(a) and (b) apply. */
   r183: { tacker: number; idx: number; binds: boolean } | null;
-  /** Each boat's lastTackT at the previous step (to see a tack happen). */
+  /** Each boat's headToWindT at the previous step (to see her pass head to wind, rule 18.3). */
   seenTack: Record<number, number>;
   /** For each boat in the zone of the next mark: has she been on starboard tack since entering it? (Rule 18.3) */
   stbdInZone: Record<number, boolean>;
