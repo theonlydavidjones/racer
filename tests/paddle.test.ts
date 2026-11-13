@@ -40,6 +40,13 @@ describe('Paddling her with the boom crutch (boat/paddle.ts): one person against
     expect(atRest).toBeGreaterThan(2); expect(atRest).toBeLessThan(6);
     expect(going).toBeLessThan(1);
   });
+  it('with way on, a moderate helm holds her straight against the paddle\'s turn', () => {
+    // (Deep Physics: the rudder's authority at a knot should beat it; read live from physics.ts, so their rudder work follows)
+    const b = paddled('P', 100); // (making about 1.5 kt, the bow drifting to starboard)
+    (b as Boat & { handsOff?: boolean }).handsOff = true; b.tiller = 0.4; // (tiller to starboard: the bow to port, against it; held, as the tack drill's tests hold it)
+    sail(b, 20);
+    expect(b.turnRate!).toBeLessThanOrEqual(0.05);
+  });
   it('back-paddling makes sternway', () => {
     const b = paddled('S', 60, true);
     expect((b.astern ?? 0) / KT).toBeGreaterThan(0.4);

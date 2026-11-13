@@ -81,4 +81,14 @@ describe('the mirror World is the real one over again', () => {
         if (i === 600) applyCommand(w, { k: 'ctlTarget', key: 'vang', v: 0.6 });
       });
   }, 900_000);
+
+  it('paddling with the boom crutch in a calm, and a contact (the paddle state and lastHitT go across)', () => {
+    sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 1, sailFrom: 'cityfront', sailTo: '', current: 'slack' }), 5, { freeSail: true }),
+      400, () => 4, 40, (w, i) => {
+        if (i === 5) applyCommand(w, { k: 'paddle', side: 'P' });
+        if (i === 120) applyCommand(w, { k: 'paddle', side: 'S', back: true });
+        if (i === 200) w.user.lastHitT = w.t; // (as a contact would set it)
+        if (i === 300) applyCommand(w, { k: 'paddle', side: null });
+      });
+  }, 300_000);
 });
