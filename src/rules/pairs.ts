@@ -308,9 +308,25 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   const row = r.kc === A ? B : A, kc = r.kc;
   const youTack = yt ? { hailer: yt.by === A.id ? A : B, hailed: yt.by === A.id ? B : A, v0: yt.replyV ?? Infinity } : null;
   const obst = rule19(A, B, r.rule, rec, ctx);
+  // Rule 18.3(a): the boat that tacked in the zone shall not cause a boat fetching the mark (on starboard since entering
+  // the zone) to sail above close-hauled to avoid contact. It doesn't switch off the basic rules: a fetching boat that
+  // bears away into her broke them (11 to windward, 12 from astern). But one at or above close-hauled, not turning
+  // toward her, was made to luff to avoid her: the tacker's breach, overlapped (rightOfWay's '18.3') or from clear
+  // ahead (rule 12 alone would have the boat astern luff).
+  const r3 = rec.r183;
+  const r183T = r3?.binds && (r.rule === '18.3' || r.rule === '12') ? (r3.tacker === A.id ? A : B) : null;
+  const r183O = r183T ? (r183T === A ? B : A) : null;
+  const r183a = !!r183T && !!r183O && (r.rule === '18.3' || r.kc === r183O) && turnedToward(r183O, r183T) === 0
+    && twaOf(r183O, ctx) <= (ctx.beat ?? 42) + 3;
   if (notRacing(kc) && !notRacing(row)) {
     // Rule 23.1: a boat not racing (she has retired, or finished and cleared the line) shall not interfere with a boat that is racing
     rule = '23'; part = '23.1';
+  } else if (r183a) {
+    fouler = r183T!; rule = '18.3'; part = '18.3(a)';
+  } else if (r.rule === '18.3' && r183O && kc === r183T && turnedToward(r183O, r183T) > 0) {
+    // the fetching boat to windward bore away into the boat that tacked: 18.3 gave her no right of way, and 18.2 is off,
+    // so rounding the mark she still had to keep clear (rule 11)
+    fouler = r183O; rule = '11';
   } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) {
     // Rule 15: she only just got right of way
     fouler = rec.by === A.id ? A : B; rule = '15'; byWhy = rec.byWhy;
