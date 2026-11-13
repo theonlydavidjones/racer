@@ -1246,6 +1246,7 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .standings tr.you td{background:rgba(255,182,39,.09)}.standings tr.you .no,.standings tr.you .nett{color:var(--accent)}
 .standings .sp{width:96px;padding:2px 6px}.spark text{font:600 9px var(--f-inst);fill:var(--muted)}
 .standings tbody tr:hover .spark polyline:not(.halo){stroke-width:3}
+.standings .sclub{color:var(--muted);font:500 11px var(--f-inst);letter-spacing:.06em;margin-left:6px}
 .bchip{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--f-inst);letter-spacing:.04em}
 .bchip i{width:11px;height:11px;border-radius:50%;border:2.5px solid;box-sizing:border-box;flex:none;box-shadow:0 0 0 1px rgba(233,242,245,.28)}
 .spark .halo{stroke:rgba(233,242,245,.22);stroke-width:3.4}

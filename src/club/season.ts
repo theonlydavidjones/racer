@@ -88,7 +88,7 @@ export const currentSeason = (): Series | undefined => seasons().at(-1);
 export const seasonById = (id: string): Series | undefined => seasons().find(s => s.id === id);
 
 /** One boat's result in one race of the series, as kept. */
-export interface SeasonScore { sail: string; name: string; hull: string; you: boolean; points: number; code: string | null }
+export interface SeasonScore { sail: string; name: string; hull: string; you: boolean; points: number; code: string | null; club?: string }
 /** A race of the series as sailed: when, and every boat's score. */
 export interface SeasonResult { at: string; scores: SeasonScore[] }
 
@@ -104,7 +104,7 @@ export function keepSeasonRace(id: string, no: number, r: SeasonResult): void {
 }
 
 export interface StandingRow {
-  sail: string; name: string; hull: string; you: boolean;
+  sail: string; name: string; hull: string; you: boolean; club?: string;
   /** by race number: points and code, or null (not in that race: DNC); `out` the excluded (thrown out) score */
   races: Record<number, { points: number; code: string | null; out: boolean }>;
   total: number; nett: number; rank: number;
@@ -116,10 +116,15 @@ export const throwouts = (sailed: number, scheduled: number): number => sailed >
  * The series standings from the races sailed. `entries`: the boats entered (a DNC scores entries + 1). Abandoned races
  * and races not yet sailed don't count.
  */
-export function standings(series: Series, res: Record<number, SeasonResult>): { rows: StandingRow[]; sailed: number[]; discards: number } {
+/**
+ * A boat as she is now, by her sail number (her spec: name, hull color, club), where she's one the game knows: the owner's
+ * rule, results follow a boat's listed club, so an edit to her shows in every race she's sailed, not only the next.
+ */
+export type LiveBoat = (sail: string) => { name?: string; hull?: string; club?: string } | undefined;
+export function standings(series: Series, res: Record<number, SeasonResult>, live?: LiveBoat): { rows: StandingRow[]; sailed: number[]; discards: number } {
   const sailed = series.races.filter(r => !r.abandoned && res[r.no]).map(r => r.no);
   const boats = new Map<string, Omit<StandingRow, 'races' | 'total' | 'nett' | 'rank'>>();
-  for (const no of sailed) for (const s of res[no].scores) boats.set(s.sail, { sail: s.sail, name: s.name, hull: s.hull, you: s.you || !!boats.get(s.sail)?.you });
+  for (const no of sailed) for (const s of res[no].scores) boats.set(s.sail, { sail: s.sail, name: s.name, hull: s.hull, you: s.you || !!boats.get(s.sail)?.you, club: s.club });
   const entries = boats.size, discards = throwouts(sailed.length, series.scheduled); // (an abandoned race is a race not completed)
   const rows: StandingRow[] = [...boats.values()].map(b => {
     const races: StandingRow['races'] = {};
@@ -128,7 +133,8 @@ export function standings(series: Series, res: Record<number, SeasonResult>): { 
     const order = sailed.slice().sort((x, y) => races[y].points - races[x].points || x - y);
     for (const no of order.slice(0, Math.min(discards, sailed.length - 1))) races[no].out = true;
     const total = sailed.reduce((a, no) => a + races[no].points, 0), nett = sailed.reduce((a, no) => a + (races[no].out ? 0 : races[no].points), 0);
-    return { ...b, races, total, nett, rank: 0 };
+    const now = live?.(b.sail);
+    return { ...b, ...(now?.name ? { name: now.name } : {}), ...(now?.hull ? { hull: now.hull } : {}), ...(now && 'club' in now ? { club: now.club } : {}), races, total, nett, rank: 0 };
   });
   rows.sort((a, b) => a.nett - b.nett || tieBreak(a, b, sailed));
   rows.forEach((r, i) => { r.rank = i > 0 && rows[i - 1].nett === r.nett && tieBreak(rows[i - 1], r, sailed) === 0 ? rows[i - 1].rank : i + 1; });
