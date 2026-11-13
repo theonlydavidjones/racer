@@ -3,7 +3,7 @@ import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
-import { CAR_FORE_PINS, CAR_IN_PINS, carLead } from '../boat/controls';
+import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { P3 } from './coords';
 import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
@@ -473,17 +473,16 @@ const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xfffff
 const COCKPIT_LINING = new THREE.MeshLambertMaterial({ color: 0xe9e3d4, side: THREE.DoubleSide });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), CAM_GREEN = new THREE.MeshLambertMaterial({ color: 0x3fb36a });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
+/** Josephine's jib car on its cabin-top H (m): the bar's middle off the centreline, its holes' spacing, and the middle fore–aft hole's distance aft of the forestay pin. */
+export const JOSEPHINE_CAR = { centre: 0.66, pin: 0.024, aft: 2.65 };
 const carPos = (side: number, fore: number, ins: number) => {
-  // the middle fore–aft pin 2.65 m aft of the stay (North Sails' tuning guide); across, where the physics' lead angle puts it
-  // (carLead, seen from the tack: 12.3° puts the car the guide's 58 cm off the centreline)
-  const z0 = FORESTAY_DECK.z + 2.65 + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), lead = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
-  const lead0 = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(0) * D2R), lead1 = (z0 - FORESTAY_DECK.z) * Math.tan(carLead(CAR_IN_PINS - 1) * D2R);
-  // (drawn on the roof: the track's outboard end stays on the cabin top, within its edge; the lead angle the physics
-  // uses is the sheet's, not this drawing's)
-  // (drawn on the roof between the grab rail and the roof's edge, where it sits on Josephine: the cross-bar about 5 in
-  // (127 mm) long, the tracks 7 in (178 mm); the owner. The lead angle the physics uses is the sheet's, not this drawing's)
-  const edge = cabinHalf(uAtZ(z0)) - CABIN_LEAN, mid = (HANDRAIL_X + 0.02 + edge) / 2, span = TRACK.bar - 0.03;
-  const z = z0, x = side * (mid - span / 2 + span * (lead - lead0) / (lead1 - lead0));
+  // where Josephine's car is (the owner): on the cabin top, on a short H whose cross-bar (about 5 in) lies between the
+  // grab rail and the roof's edge, the car's forward edge level with the rail's forward end. On our cabin top that puts
+  // the bar's middle JOSEPHINE_CAR.centre off the centreline, its holes JOSEPHINE_CAR.pin apart; fore and aft, the middle
+  // hole JOSEPHINE_CAR.aft behind the forestay pin, holes 25 mm apart. (North Sails' guide gives 58 cm and 2.65 m for a
+  // cabin-top lead; Josephine's own figures, from the owner's description, stand until the owner measures them.) The
+  // physics' sheet lead (carLead) takes the same figures; tests/rig.test.ts holds the two together.
+  const z = FORESTAY_DECK.z + JOSEPHINE_CAR.aft + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2));
   return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.045, z); // on the cabin top's arch, riding its bar
 };
 /**
