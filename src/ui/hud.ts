@@ -706,7 +706,7 @@ export class Hud {
     if (on('laylines') && L) sim.push('laylines');
     if (on('ships') && wd.vessels.length) sim.push('ships');
     if (kind === 'current') sim.push('current');
-    if (kind === 'wind') sim.push('wind', 'puffs');
+    if (kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
     if (field === 'sea' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
     if (on('shadows') && !wd.freeSail) sim.push('shadows');
