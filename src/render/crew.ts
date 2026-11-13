@@ -222,8 +222,9 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
   if (tAft && Math.sign(want.hip.x) === q.side) q.goal = want.hip.z; // (going to a seat aft of it: wherever that is now)
   // (up onto the side deck first, where they are, if they're down in the cockpit)
   if (Math.abs(c.x) < chz(c.z) && Math.abs(q.z - c.z) < 0.3) {
-    // (the knees out toward that side as they step up, not fore or aft into the thwart or the bulkhead)
-    const w = deckWalk(q.side, q.z, q.face ?? (q.goal < q.z ? -1 : 1), k); w.knee = V(q.side * 0.15, 1, 0); return w;
+    // (the knees up as they step up, not fore or aft into the thwart or the bulkhead, nor out toward that side, through the
+    // coaming beside them as the hips rise: crewfig, a tack in light air)
+    const w = deckWalk(q.side, q.z, q.face ?? (q.goal < q.z ? -1 : 1), k); w.knee = V(0, 1, 0); return w;
   }
   // (up into the crouch first, weight forward, facing as they were and feet where they are, so the thighs rise off the
   // coaming rather than sweep along it; then they turn and step along the deck: not slid along it still sitting up)
@@ -790,7 +791,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const a = ppl?.[i + 1], o = ppl?.[j + 1];
     const seated = (q: typeof a) => !!q && (q.pose === 'sit' || q.pose === 'lee' || q.pose === 'hike' || q.pose === 'cross');
     if (seated(a) && seated(o) && (Math.sign(o!.x) === Math.sign(a!.x) || a!.pose === 'cross' || o!.pose === 'cross') && inC(zs[i]) && inC(zs[j]) && Math.abs(zs[i] - zs[j]) < SEP) {
-      const fore = Math.min(zs[i], zs[j]), lo = Math.min(fore, ZMAX - SEP);
+      // (both forward of the thwart, they stay forward of it: the pair moved forward along the bench rather than the aft
+      // one pushed back into the thwart's line, where the side deck's seat is beyond it, and they set off round it)
+      const fore = Math.min(zs[i], zs[j]), fwdOf = Math.max(zs[i], zs[j]) < THW_A;
+      const lo = fwdOf && fore + SEP > THW_A - 0.05 ? Math.max(ZC_FWD, THW_A - 0.05 - SEP) : Math.min(fore, ZMAX - SEP);
       // (in their order along the cockpit, front to back, as the physics keeps them (crewPhys.ts stationZ): not by where
       // each is this moment. One still crossing can be a little forward of the other for a second, and the one sat
       // forward was put aft past the thwart, then left there when the other moved on)
