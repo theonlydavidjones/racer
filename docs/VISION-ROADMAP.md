@@ -112,10 +112,12 @@ multiplayer mode." The priority still holds: physics and racing first. Community
     capabilities that the saves use (store/cloud.ts).
   - Seasons (section 2).
 - **Size:** 15–25 h beyond the Yacht Club and Seasons themselves.
-- **Open questions:**
-  - Real clubs (GGYC, StFYC, Corinthian, SBYC…) or invented ones? Real burgees need each club's permission to be used.
-  - Is crew trading between players, or with AI members only, until multiplayer?
-  - Which traditions matter most to the owner?
+- **The owner's answers (13 November):**
+  - **Real clubs**, for now (GGYC, StFYC, the Corinthian, SBYC…). Before any public release, each real club's name and
+    burgee need its permission.
+  - **Crew trading with AI members only**, until multiplayer.
+  - **Traditions:** researched, ranked by how central they are to a member's life and by what a sim can honestly
+    portray, in docs/TRADITIONS.md.
 
 ### Long term: live multiplayer
 
@@ -144,11 +146,11 @@ multiplayer mode." The priority still holds: physics and racing first. Community
   - the Yacht Club;
   - the desktop release or a hosted page that can reach a server.
 - **Size:** 60–120 h for a first live race of a few boats, more for a full regatta.
-- **Open questions:**
-  - Open to anyone, or club members only?
-  - Real-time only, or also "ghost" races against another player's recorded race? Ghosts are much cheaper and need
-    no server.
-  - Who runs and pays for the server?
+- **The owner's answers (13 November):**
+  - **Club members only**, but "membership is just an attribute at this point".
+  - **"Ghost" races first:** racing against another member's recorded race, with no server needed.
+  - **Who runs the server:** open for later. When it's time, this doc lays out the simple options and their costs in
+    plain words.
 
 ## Open questions for the owner
 
