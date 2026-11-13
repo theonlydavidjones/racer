@@ -252,7 +252,7 @@ export class World {
   readonly prepFlag: PrepFlag;
   flags: Flag[] = [];
   /** Racing called off for the wind (signals.ts CANCEL_KT): when, the wind then, and the signal flying. */
-  cancelled: { t: number; kt: number; up: Flag[]; say: string } | null = null;
+  cancelled: { t: number; kt: number; up: Flag[]; say: string; places?: Vec[] } | null = null; // (places: where each AI boat lies to off the harbour, ai.ts standOffPlaces)
   /** The wind the committee reads over the course, over about two minutes (kt). */
   private cbMean: number | null = null;
   private cbWin: number[] = [];
@@ -658,7 +658,7 @@ export class World {
    * (her own wake doesn't count; her land lee is cached, refreshed every half second).
    */
   shadowAt(p: Vec, self?: Boat): Shadow {
-    const sum = new WindSum(), kt = this.wind.kt, from = this.wind.from;
+    const sum = new WindSum(this.wind.from), kt = this.wind.kt, from = this.wind.from;
     const lee = self?.leeK ?? landLee(p, from);
     for (const o of this.boats) {
       if (o === self) continue;

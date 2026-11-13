@@ -34,6 +34,36 @@ perf test's: Seaweed Soup course 10, a fleet of eight (seven opponents), west wi
 
 This agrees with the Coordinator's 55–58. Main sits right at the line.
 
+### 1.1a The budget's units: the step's own thread (13 Nov 2026)
+
+A reading over budget on main (55.8–57.6) was bisected from v168 (425a5eb) to e75a23d: no code regression (the two
+ends' medians over 11 runs each, 53.17 and 53.72; two commits with identical `src`, 56.27 and 52.32 over 5 runs each).
+The same code read anywhere from about 50 to 58 against 54.7, for two reasons:
+
+- `process.cpuUsage()` counts every thread in the process. The sim's step measured ~1,140 CPU µs against ~900 µs of
+  wall time on one thread: about a quarter of it is V8's helpers (concurrent compiling and marking), a share that
+  varies. Under `node --single-threaded` the two agree (1,117 and 1,127).
+- Even the step's own thread drifts ±6% on this shared host, run to run: its memory and caches slow the sim
+  (memory, allocation) more than the reference (arithmetic in the cache).
+
+So the test now times **the step's own thread** (`process.threadCpuUsage()`, Node 22) for both the sim and the
+reference, and judges **the median of three races** (a fresh World each, the same seed and steps). The budget moved
+to the new units only, measured both ways at once on v168, twelve runs:
+
+| | median | range |
+|---|---|---|
+| the process's CPU time (the old units) | 53.74 | 51.52–58.16 |
+| the step's thread (the new) | 42.31 | 39.84–45.34 |
+| the thread's share, run by run | 0.787 | ±1.2% (sd) |
+
+**54.7 × 42.31 / 53.74 = 43.06 → 43.1.** The same line as before for the same code, as v128's change from the wall
+clock was (40 × 49.8 / 36.4 = 54.7).
+
+The new test, ten runs on main (4f72dbf, which reads like e75a23d): medians 38.87–43.91, their median 41.67 (sd 1.41;
+52.95 in the old units), one run over 43.1. On the old test the same code failed six vitest runs in eight. The
+remaining misses are the host's slow drift, which lasts minutes and so outlasts the three races, and main's typical
+reading is within about 3% of the line. Only room under the budget would remove them, and the budget is the owner's.
+
 ### 1.2 Where a step's time goes (Node CPU profile, 450 s of the race from t = −150 s, 27,000 steps)
 
 Inclusive time (a function plus everything it calls), as a share of all the steps' time:
@@ -422,7 +452,7 @@ settings and seed, and never stepped.
 
 ## Method (to repeat these numbers)
 
-- The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line).
+- The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line: the median of three races, each one's after it).
 - Step profile and spikes: a throwaway vitest file building the perf test's World, then `node:inspector`'s Profiler
   over 450 s of the race (sampling at 200 µs), and wall time per step grouped by `steps % 30 / 60 / 1800`.
 - The browser frame: `npm run dev`, Playwright, the perf.cjs setup (seeded `Math.random`, the full fleet, 22 kt),
