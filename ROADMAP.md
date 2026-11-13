@@ -197,6 +197,9 @@ What's planned, roughly in order. Done work is described in the README.
    - The setup builds the World only on Start (owner: the configurator lags because it rebuilds the play surface
      behind it).
    - Bug: the flag index doesn't scroll.
+   - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
+   - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
+     index.html line 369; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
@@ -822,6 +825,11 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
+  East Bay landmarks you navigate by (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
+  Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
+  sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
+  the university's and the hotel's own figures) and they belong in the landmark set used for transits, like Coit
+  Tower and the Transamerica Pyramid.
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
