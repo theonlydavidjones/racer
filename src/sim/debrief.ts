@@ -57,7 +57,7 @@ export class RaceLog {
    */
   private endTurn(t: number, into: Moment[] = this.done): void {
     const T = this.turn!; if (into === this.done) this.turn = null;
-    if (T.lost >= 3) into.push({ key: 'tacks', t0: T.t0 - 3, t1: Math.min(T.t0 + 20, t), x: T.x, y: T.y, lost: T.lost, text: `A ${T.gybe ? 'gybe' : 'tack'} that cost about ${Math.round(T.lost)} s against your target speed.` });
+    if (T.lost >= 3) into.push({ key: 'tacks', t0: T.t0 - 3, t1: Math.min(T.t0 + 20, t), x: T.x, y: T.y, lost: T.lost, text: `A ${T.gybe ? 'jibe' : 'tack'} that cost about ${Math.round(T.lost)} s against your target speed.` });
   }
   /** Each beat's worst spell past the layline, by leg: costed in moments() just as overstands() costs the finding. */
   private over = new Map<number, { t0: number; t1: number; x: number; y: number; peak: number; name: string }>();
@@ -283,8 +283,8 @@ export class RaceLog {
       tip: 'Tack when the mark is just abaft your beam on the other tack\'s side (or on the laylines drawn on the water, or the transit): every length past it is sailed twice.' });
     if (this.tacks.n + this.tacks.gybes > 0) {
       const per = this.tacks.n ? this.tacks.lost / this.tacks.n : 0;
-      out.push({ key: 'tacks', title: 'Tacks and gybes', lost: this.tacks.lost + this.tacks.gybeLost,
-        detail: `${this.tacks.n} tack${this.tacks.n === 1 ? '' : 's'}${this.tacks.n ? `, each costing about ${per.toFixed(1)} s` : ''}; ${this.tacks.gybes} gybe${this.tacks.gybes === 1 ? '' : 's'}.`,
+      out.push({ key: 'tacks', title: 'Tacks and jibes', lost: this.tacks.lost + this.tacks.gybeLost,
+        detail: `${this.tacks.n} tack${this.tacks.n === 1 ? '' : 's'}${this.tacks.n ? `, each costing about ${per.toFixed(1)} s` : ''}; ${this.tacks.gybes} jibe${this.tacks.gybes === 1 ? '' : 's'}.`,
         tip: per > 6 ? 'Smooth tacks: turn steadily (not too fast in a chop), let the jib come across as you pass head to wind, and bear off a few degrees to build speed before pointing.' : 'Tack only when it pays (a header, a layline, clear air): each one costs a few seconds.' });
     }
     if (this.dirty.lost > 0.5) {

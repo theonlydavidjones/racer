@@ -14,7 +14,7 @@ export function mountDrills(app: AppCtx) {
 /* The tack and gybe drill (sim/drill.ts): each manoeuvre scored in the race, shown here in the Coach card as it's
  * scored, the whole list (and your bests, kept by manoeuvre and wind band) on the Pause screen. */
 let drillSeen = 0;
-const drillName = (k: 'tack' | 'gybe') => (k === 'tack' ? 'Tack' : 'Gybe');
+const drillName = (k: 'tack' | 'gybe') => (k === 'tack' ? 'Tack' : 'Jibe');
 const drillKey = (s: ManoeuvreScore) => `${s.kind}-${windBand(s.tws)}`;
 function drillTick(): void {
   const el = $('tpDrill'), list = app.w.drill?.list;
@@ -79,9 +79,9 @@ function drillHtml(): string {
   const bestOf = (k: 'tack' | 'gybe') => list.reduce((bi, x, i) => (x.kind === k && x.scored && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
   const lit = new Set([bestOf('tack'), bestOf('gybe')]);
   const rows = list.map((s, i) => !s.scored ? `<tr class="noscore"><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td colspan="6">not scored</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>` : `<tr${lit.has(i) ? ' class="best"' : ''}><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td><b>${Math.max(0, Math.round(s.lostM))} m</b> / ${Math.round(s.goodM)} m</td><td>${f(s.rate)}°/s</td><td>${s.kind === 'tack' ? f(s.deadS, 1) + ' s' : '—'}</td><td>${f(s.overshoot)}°</td><td>${s.acrossS == null ? '—' : (s.acrossS >= 0 ? '+' : '') + s.acrossS.toFixed(1) + ' s'}</td><td>${f(s.backS)} s</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>`).join('');
-  const bests = Object.entries(app.S.practiceBest ?? {}).filter(([k]) => /^(tack|gybe)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Gybe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
-  return `<h3>Tacks and gybes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or gybes yet: tack when you\'re ready, or bear away to a run, settle, and gybe.</p>'}`
-    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on, until she was back to 90% speed (98% after a gybe), not the whole loss to full speed. Good crew: the sim's own crew, measured the same way in this wind, in flat water (in a chop she'll lose a little more). A shift or a puff reaches the twin too. Only a tack from close-hauled and a gybe from a run, each from a steady course, are scored. Turn: its mean rate. Past course: how far past the new close-hauled course (or up from the run). Across: when the jib (or the boom) came across, in seconds after head to wind (dead downwind).</p>`
+  const bests = Object.entries(app.S.practiceBest ?? {}).filter(([k]) => /^(tack|gybe)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Jibe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
+  return `<h3>Tacks and jibes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or jibes yet: tack when you\'re ready, or bear away to a run, settle, and jibe.</p>'}`
+    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on, until she was back to 90% speed (98% after a jibe), not the whole loss to full speed. Good crew: the sim's own crew, measured the same way in this wind, in flat water (in a chop she'll lose a little more). A shift or a puff reaches the twin too. Only a tack from close-hauled and a jibe from a run, each from a steady course, are scored. Turn: its mean rate. Past course: how far past the new close-hauled course (or up from the run). Across: when the jib (or the boom) came across, in seconds after head to wind (dead downwind).</p>`
     + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
 }
 
