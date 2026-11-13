@@ -80,15 +80,15 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
 /**
  * Seconds a tack or a gybe costs, by the true wind (kt): the distance made good the sim's own Folkboat loses in one
  * (boat/physics.ts, measured against a twin sailing on until she's back to speed: tests/manoeuvre.test.ts keeps this
- * table in step with it), over her VMG. A tack loses 0.8-1.7 boat lengths: most in light air, where she's slowest to get
+ * table in step with it), over her VMG. A tack loses 0.8-2.1 boat lengths: most in light air, where she's slowest to get
  * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
  * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
  * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
  * (manoeuvreS's `hs`).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 20], [4, 13.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 3.0], [25, 4.5]],
-  gybe: [[3, 4.1], [4, 3.6], [6, 2.4], [8, 1.9], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
+  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 4.3]],
+  gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
 };
 /**
  * The cost (s) of a tack or a gybe in `tws` kt, and `hs` m of chop: in a wind sea a tack costs about 40% more a metre of
