@@ -62,8 +62,7 @@ export function airTempC(date: string, tMin: number): AirTemp {
   return { c: at(C.mean, month, hour) ?? 15, warmShare: at(C.warm, month, hour) ?? 0,
     source: `the usual for this month and hour at NOAA's Fort Point station (9414290, 2021–2025)` };
 }
-/** The temperature counted as a warm day for shorts (°C). A judgement, not a sourced figure: about where people
- * sailing in a breeze, with a jacket on, take their salopettes off. */
+/** The temperature counted as a warm day for shorts (°C): 68 °F, the owner's (13 Nov 2026). */
 export const WARM_C = 20;
 
 /** 0..1 from a date (YYYY-MM-DD): the same for everyone sailing that day. */
