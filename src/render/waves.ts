@@ -5,7 +5,7 @@ import { N_WAVES, type WaveField } from '../environment/waveField';
  * The waves you see: the World's wave field (environment/waveField.ts), the same one the boats' heave and pitch come
  * from (boat/seaway.ts waveMotion), drawn as Gerstner waves on the GPU (the water surface, below).
  */
-export { N_WAVES };
+export { N_WAVES } from '../environment/waveField';
 
 /** Uniform arrays for the water shader: (dir x, dir y, k, amp) and (ω, phase, Q, swell?). */
 export function packWaves(f: WaveField, a: Float32Array, b: Float32Array): void {
@@ -57,7 +57,7 @@ vec3 waveDisp(vec2 p, float kW, float kS, float dist) {
 // surface slope (dh/dx, dh/dy) and height, all wavelengths, each faded out where it gets smaller than the patch of
 // water one pixel covers (foot, m: long at a glancing angle), so the far water doesn't shimmer with aliased crests.
 // For the light only, each wind-sea component also comes in groups: its height swells and fades over a few
-// wavelengths, as in a real sea (wave groups: the sum of neighbouring frequencies beating), so the crests don't run
+// wavelengths, as in a real sea (wave groups: the sum of neighboring frequencies beating), so the crests don't run
 // on in endless even rows. (The boats ride the plain sum, waveDisp.)
 float wgHash(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }
 float wgNoise(vec2 q) { vec2 i = floor(q), f = fract(q); f = f * f * (3.0 - 2.0 * f);

@@ -45,7 +45,7 @@ const SECTIONS: [string, Row[]][] = [
     { flags: ['S'], name: 'S', sound: '↑ ••', meaning: 'The course has been shortened. Rule 32.2 is in effect.', more: 'Rule 32.2: the finishing line is then, at a rounding mark, between the mark and a staff displaying flag S.' }
   ]],
   ['Changing the next leg', [
-    { flags: ['C'], name: 'C', sound: '– – – – –', meaning: 'The position of the next mark has been changed: to starboard (a green triangle); to port (a red rectangle); to decrease the length of the leg (–); to increase the length of the leg (+).', more: 'Rule 33: signalled before boats begin the leg, with the new compass bearing or the triangle or rectangle.' }
+    { flags: ['C'], name: 'C', sound: '– – – – –', meaning: 'The position of the next mark has been changed: to starboard (a green triangle); to port (a red rectangle); to decrease the length of the leg (–); to increase the length of the leg (+).', more: 'Rule 33: signaled before boats begin the leg, with the new compass bearing or the triangle or rectangle.' }
   ]],
   ['Other signals', [
     { flags: ['L'], name: 'L', sound: '↑ •', meaning: 'Ashore: A notice to competitors has been posted. Afloat: Come within hail or follow this vessel.' },

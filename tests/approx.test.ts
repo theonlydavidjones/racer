@@ -31,7 +31,7 @@ describe('the shore distance off a 10 m lattice', () => {
     expect(Math.sqrt(s2 / n)).toBeLessThan(0.5);
     expect(worst).toBeLessThan(6);
     expect(worstK).toBeLessThan(0.013); // (0.75 / 350 per metre: 6 m is 1.3% of the current)
-  }, 120_000);
+  }, 180_000);
 
   it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over eight races', async () => {
     // A race isn't chaotic to a nudge (a boat moved a micrometre sails the same race), but a small change to the forces

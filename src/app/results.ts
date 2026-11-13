@@ -165,7 +165,7 @@ function vsDebriefHtml(log: NonNullable<typeof app.w.log>): string {
   }).join('');
   const big = bigMoments(V);
   const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span><b>Leg ${m.leg}:</b> ${app.esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
-  return `<div class="eyebrow">Against ${app.esc(V.rivalName)}, ${rivalWho(V, app.w.boats[V.rival].finished)}</div><p class="lede">${app.esc(gapWords(V))} Leg by leg, from both your tracks. Metres are ground made good up or down the course (across the mean wind; along the leg on a reach), in the same minutes of wind, less your plain speed difference: so they're the tacks and the shifts. Downwind, a lift is the wind going aft: gybe on the lifts.</p><ol>${legs}</ol>${moments}`;
+  return `<div class="eyebrow">Against ${app.esc(V.rivalName)}, ${rivalWho(V, app.w.boats[V.rival].finished)}</div><p class="lede">${app.esc(gapWords(V))} Leg by leg, from both your tracks. Meters are ground made good up or down the course (across the mean wind; along the leg on a reach), in the same minutes of wind, less your plain speed difference: so they're the tacks and the shifts. Downwind, a lift is the wind going aft: gybe on the lifts.</p><ol>${legs}</ol>${moments}`;
 }
 
 /* ---------------- the boats' logbooks ---------------- */
@@ -235,7 +235,7 @@ function settleLog(next: () => void): void {
   const mins = (s?: number) => s == null ? '' : `${Math.floor(s / 60)} min`;
   $('keepTitle').textContent = e.kind === 'race' ? 'Keep this race?' : 'Keep this cruise?';
   $('keepWhat').textContent = e.kind === 'race'
-    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing cancelled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
+    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing canceled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
     : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}. Saved, it goes in her logbook.`;
   $('keepAsk').hidden = false;
   const done = (keep: boolean) => {

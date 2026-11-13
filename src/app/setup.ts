@@ -351,7 +351,7 @@ function beginRaceNow(seed?: number): void {
     : app.S.mode === 'drill'
     ? `Start practice${app.w.boats.length === 1 ? ', alone' : ''}: ${app.w.startAt / 60 === 1 ? 'one minute' : `${app.w.startAt / 60} minutes`} to the gun. Check the line head to wind, time your run in, and be on the line at full speed when it goes. Current: ${app.w.cur.label}.`
     : `${app.S.seq}-minute sequence.${app.w.courseSignal ? ` The committee is flying course ${app.w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${app.w.cur.label}. Sea: ${describeSea(app.w.seaHere(app.w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
-  if (app.w.courseSignal && app.S.mode !== 'sail') logMessage(`Course ${app.w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signalled by the warning signal). ${app.w.courseSignal.why}`);
+  if (app.w.courseSignal && app.S.mode !== 'sail') logMessage(`Course ${app.w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signaled by the warning signal). ${app.w.courseSignal.why}`);
 }
 
 $('bGo').onclick = () => { if (app.S.mode === 'drill') app.S.mode = 'race'; app.courseView.close(); app.navView.close(); $('setup').hidden = true; beginRace(); };

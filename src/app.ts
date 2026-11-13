@@ -19,7 +19,7 @@ import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, scoreOrder, type Incident } from './rules';
 import { MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
-import { seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
+import { currentSeason, seasonById, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
 import { seasonHtml } from './ui/season';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
 import { placeAmong, realFleetIds, realRace, realRaces, sailKey } from './sim/realRaces';
@@ -370,7 +370,7 @@ function showTiller(): void {
   if (tillerHeld) $('tgCur').style.left = `${50 + t * TILLER_SPAN * 100}%`;
   $('tiller').setAttribute('aria-valuenow', String(Math.round(t * 100)));
   $('tillerLab').textContent = w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
-    : Math.abs(t) < 0.04 ? 'Tiller · centred' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
+    : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
 }
 // Tiller bar: drag the handle left/right. Let go and it springs back to centre.
 let barDrag = false;
@@ -400,7 +400,7 @@ function takeTiller(x?: number): void {
   pilotOff('Pilot on standby: you have the tiller.'); unlash();
   tillerHeld = true; document.body.classList.add('tiller-held'); $('tiller').classList.add('held');
   if (x != null) tillerFromCursor(x);
-  if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's centre line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
+  if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's center line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
 }
 function releaseTiller(): void {
   if (!tillerHeld) return;
@@ -431,7 +431,7 @@ type CtlItem = { key: CtlKey | 'carFore' | 'carIn'; label: string; group: string
 /** The lines, grouped as they are on Josephine. */
 const CTL_UI: CtlItem[] = [
   { group: 'Cockpit thwart', key: 'mainsheet', label: 'Mainsheet' },
-  { group: 'Cockpit thwart', key: 'traveller', label: 'Traveller' },
+  { group: 'Cockpit thwart', key: 'traveller', label: 'Traveler' },
   { group: 'Cockpit thwart', key: 'backstay', label: 'Backstay' },
   { group: 'Piano', key: 'vang', label: 'Vang' },
   { group: 'Piano', key: 'outhaul', label: 'Outhaul' },
@@ -872,7 +872,7 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
   syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
   // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
   const views: MenuView[] = [
-    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' centre and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
+    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
     { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
   const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f), views),
     layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
@@ -1262,8 +1262,8 @@ const fleet: Fleet = new Fleet(S, {
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
-  seasonHtml: () => { const s = seasons()[0]; return s ? seasonHtml(s, seasonResults(s.id)) : ''; },
-  sailSeason: no => sailSeason(no),
+  seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons()) : ''; },
+  sailSeason: (id, no) => sailSeason(id, no),
   back: () => nav.back(),
   toBoat: id => nav.go({ k: 'boat', id }),
   backLabel: () => nav.backLabel()
@@ -1379,8 +1379,8 @@ const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id
 /* ---------------- the season (club/season.ts): a real club series, race by race, against the club's fleet ---------------- */
 let pendingSeason: { series: Series; no: number; at: string } | null = null;
 /** Sail race `no` of the season: its real day and start, the day's observed wind and tide, its course (or the committee's), the club's fleet. */
-function sailSeason(no: number): void {
-  const series = seasons()[0], r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
+function sailSeason(id: string, no: number): void {
+  const series = seasonById(id), r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
     chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.realId ?? undefined });
   replayPin = null; ghostNext = null;
@@ -1419,7 +1419,7 @@ function seasonLine(): string {
   const now = seasonResult('now'); if (!now) return '';
   const res = { ...seasonResults(sr.series.id), [sr.no]: now }, { rows } = standings(sr.series, res);
   const you = rows.find(r => r.you), lead = rows[0]; if (!you) return '';
-  const done = sr.series.races.filter(r => !r.abandoned).every(r => res[r.no]);
+  const done = sr.series.races.length >= sr.series.scheduled && sr.series.races.filter(r => !r.abandoned).every(r => res[r.no]); // (every scheduled race on the calendar, and sailed)
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
   return `<b>${esc(sr.series.title.replace(/ \d{4}.*/, ''))}: ${results.ordinal(you.rank)} · ${you.nett} nett</b> <span>· ${lead === you ? (done ? 'you win the series' : 'you lead') : `${esc(lead.sail)} ${esc(lead.name)} ${done ? 'wins' : 'leads'} on ${lead.nett}`} · counts when you save it</span>`;
 }
@@ -1441,7 +1441,7 @@ function pastRaces(): void {
   realRaceRows();
   pastList = loadLog().filter(e => e.kind === 'race' && e.skipper === 'you').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'CXL' ? 'Cancelled (wind)' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${results.ordinal(e.place)} of ${e.of}` : '';
+  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'CXL' ? 'Canceled (wind)' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${results.ordinal(e.place)} of ${e.of}` : '';
   $('pastRows').innerHTML = pastList.length ? pastList.map((e, i) => {
     const boat = S.boats.find(b => b.id === e.boatId), ok = !!courseOfEntry(e);
     const day = new Date(e.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
