@@ -98,3 +98,31 @@ describe('Protests: the AI boats take their turns, or not, and protest (ai/condu
     u.penalty = 0; w.step(DT); expect(w.protests[0].turnsT).not.toBeNull();
   });
 });
+
+describe('Umpired: finishing with the penalty not taken', () => {
+  // (World Sailing Appendix UF, 2025: an umpire may disqualify a boat that fails to take a penalty, UF3.4(a)(5), UF3.5(c))
+  const finishOwing = (judging: 'protests' | 'umpired') => {
+    const w = new World(SS2, settings({ judging, fleet: 0 }), 3); racing(w);
+    const u = w.user, n = w.C.marks.length, C = w.C;
+    u.leg = n; u.penalty = 720; u.penaltyTotal = 720;
+    // (just short of the finishing line, sailing across it)
+    const mid = { x: (C.pin.x + C.committee.x) / 2, y: (C.pin.y + C.committee.y) / 2 }, nx = -(C.committee.y - C.pin.y), ny = C.committee.x - C.pin.x, l = Math.hypot(nx, ny);
+    for (const s of [1, -1]) {
+      Object.assign(u, { x: mid.x + s * nx / l * 6, y: mid.y + s * ny / l * 6, finished: false, prevD: null });
+      u.h = (Math.atan2(-s * nx, -s * ny) * 180 / Math.PI + 360) % 360; u.desired = u.h; u.v = 2.5;
+      for (let i = 0; i < 60 * 8 && !u.finished; i++) { w.step(DT); w.drainEvents(); u.penalty = Math.max(u.penalty, 1); }
+      if (u.finished) break;
+    }
+    return u;
+  };
+  it('umpired, she is disqualified (DSQ)', () => {
+    const u = finishOwing('umpired');
+    expect(u.finished).toBe(true);
+    expect(u.scoring).toBe('DSQ');
+  });
+  it('under protests, it is left to a protest', () => {
+    const u = finishOwing('protests');
+    expect(u.finished).toBe(true);
+    expect(u.scoring ?? null).toBeNull();
+  });
+});

@@ -23,7 +23,7 @@
  * wins; nobody is moved up or down by her penalty.
  */
 
-export type ScoreCode = 'ZFP' | 'UFD' | 'BFD' | 'RET' | 'DSQ' | null; // (DSQ: by a protest hearing, 60.5(c))
+export type ScoreCode = 'ZFP' | 'UFD' | 'BFD' | 'RET' | 'DSQ' | null; // (DSQ: by a protest hearing, 60.5(c), or an umpire)
 /**
  * `ahead`: for a boat still racing, where she is in the race now (lower = further on), to project how the boats still
  * out there will finish: a Z-flag boat's final place waits on them (every boat that finishes later on fewer points
