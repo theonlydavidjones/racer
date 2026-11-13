@@ -142,7 +142,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'moveHere': return w.moveHere(c.p, c.name);
     case 'dest': w.setDest(c.p, c.name); return;
     case 'retire': return w.retire(c.why);
-    case 'penalty': w.assignPenalty(w.boats[c.boat]); return;
+    case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
     case 'settings': Object.assign(w.settings, c.patch); return;
     case 'logNote': w.log?.note(c.note); return;
