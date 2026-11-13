@@ -143,7 +143,8 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Deep Physics
+   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Sculling comes
+   from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
@@ -252,7 +253,7 @@ What's planned, roughly in order. Done work is described in the README.
       into the gap, which turn the current across the entrance and back on itself. Deep Physics models the water there
       carefully, from the flood and ebb past the breakwater and through the pier's piles, sourced where it can be
       (NOAA's SFBOFS currents, shallow-water eddy shedding behind a breakwater). The eddies should be visible on the
-      water as the other eddies are.
+      water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
@@ -364,7 +365,7 @@ What's planned, roughly in order. Done work is described in the README.
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
      stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
      editor, the Yacht Club's boats) in the audit. Owner's decision: leaving with unsaved edits asks "Save changes?" with Save and Discard.
-   - **The pause menu redesigned** (owner, 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
+   - **The pause menu redesigned** (approved by the owner, "fine for now"; 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
      too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
      Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
      Proposed: one narrow column (about a third of the screen's width), grouped by what you're doing:
@@ -1104,6 +1105,10 @@ traveling over the hull and sails to help players learn about sail shape and lam
   instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
   coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
 
+- **Badges along the ASA ladder** (owner, 13 November): the learn-to-sail mode's lessons and badges follow the American
+  Sailing Association's course ladder, with ASA 101 Basic Keelboat as Learn to Sail. Each badge has a hover saying it
+  isn't the certification. ASA's permission is needed before any public release.
+
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
@@ -1240,6 +1245,11 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
+  whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's
+  scored and saved. That covers RET or DNF in the season and the results, the ghost and the logbook kept or not, and
+  practice against a season race.
 
 - **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
   getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the
