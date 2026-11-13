@@ -214,9 +214,14 @@ const sinc = (x: number) => Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x
  *   small against the wavelength). So the orbit goes where the current does: into her motion over the ground and into
  *   the wind her sails meet (physics.ts), not into her speed through the water (her log, her resistance, her rudder,
  *   the AI's "is she going fast enough to tack"). Averaged over her length and beam with the Smith factor, as the force
- *   would be. Running before a chop that travels a little faster than she sails (a 2.5 s wave runs at 3.9 m/s, she at
- *   about 3), she's carried on its face as it passes, a brief surf over the ground; a 12–18 s swell (19–28 m/s) only
- *   rocks her to and fro. The mean loss in waves stays seaDrag's (the second-order drift).
+ *   would be. That's exact for a boat at rest. Under way she also sails through the orbit, from water moving one way
+ *   into water moving another: her speed through the water changes by −U·∂u/∂ξ (U her speed through the water, ξ along
+ *   her), the convective part of the water's acceleration along her path (the physics review: dv_rel/dt = (T −
+ *   R(v_rel))/m′ − U·∂u/∂ξ). It's nothing when she's stopped and grows with her speed; as she nears the waves' own
+ *   speed it and the orbit together make the whole Froude–Krylov push of a wave face, so running before a chop that
+ *   travels a little faster than she sails (a 2.5–3 s wave runs at 3.9–4.7 m/s, she at about 3) she can be picked up and
+ *   carried on a face: surf-riding (Grim 1951; Spyrou 2006), from the physics, not a rule. A 12–18 s swell (19–28 m/s)
+ *   only rocks her to and fro. The mean loss in waves stays seaDrag's (the second-order drift).
  * - **Roll:** the same slope across her beam: a wave tilts the water under her and she heels to follow it, a moment
  *   ρ·g·∇·GM × that effective slope (the standard beam-sea simplification, Journée & Massie ch. 6). The slope is the
  *   Froude–Krylov one, averaged across her beam and along her length with the Smith factor, so in a long swell it's
@@ -225,10 +230,10 @@ const sinc = (x: number) => Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x
  *   to the heel balance (balance.ts rollStep) as a change in the heel she settles to. Her roll period, about 3.5 s, is
  *   longer than the Bay's chop, so a beam chop rocks her little; a long swell tilts her with its slope, gently.
  */
-export function waveForces(f: WaveField, p: { x: number; y: number }, h: number, t: number, kW: number, kS: number): { F: number; M: number; U: number; V: number; S: number } {
+export function waveForces(f: WaveField, p: { x: number; y: number }, h: number, t: number, kW: number, kS: number): { F: number; M: number; U: number; V: number; DU: number; S: number } {
   const fx = Math.sin(h * D2R), fy = Math.cos(h * D2R); // forward
   const cx = p.x - fx * WM.cfAft, cy = p.y - fy * WM.cfAft; // the centre of flotation
-  let F = 0, M = 0, U = 0, V = 0, S = 0;
+  let F = 0, M = 0, U = 0, V = 0, DU = 0, S = 0;
   for (let i = 0; i < N_WAVES; i++) {
     const a = f.amp[i] * (f.swell[i] ? kS : kW); if (a < 1e-5) continue;
     const k = f.k[i], sd = f.sd[i], cd = f.cd[i];
@@ -246,15 +251,16 @@ export function waveForces(f: WaveField, p: { x: number; y: number }, h: number,
     // averaged over her waterplane
     const av = A * sinc(q); S += ay * av * c;
     const u = av * f.w[i] * s / k; U += ax * u; V += ay * u;
+    DU += av * f.w[i] * c * ax * ax / k; // (∂U/∂ξ: the along-her orbit's change along her)
   }
-  return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M, U, V, S };
+  return { F: RHO * G * WM.be * F, M: RHO * G * WM.be * M, U, V, DU, S };
 }
 
 /** Step her heave and pitch `dt` seconds on the waves of field `f` at wave time t (semi-implicit Euler: stable at the sim's step). */
 export function waveMotion(b: Boat, f: WaveField, t: number, dt: number): void {
   const s = b.sea; if (!s) return;
-  const { kW, kS } = f.scaleFor(s), { F, M, U, V, S } = waveForces(f, b, b.h, t, kW, kS);
-  b.waveU = U; b.waveV = V; b.waveRoll = S / D2R; // (for physics.ts: the water's orbit under her, and the heel the slope across her asks, deg + to port)
+  const { kW, kS } = f.scaleFor(s), { F, M, U, V, DU, S } = waveForces(f, b, b.h, t, kW, kS);
+  b.waveU = U; b.waveV = V; b.waveDU = DU; b.waveRoll = S / D2R; // (for physics.ts: the water's orbit under her, and the heel the slope across her asks, deg + to port)
   let z = b.heave ?? 0, zr = b.heaveRate ?? 0, th = b.pitch ?? 0, thr = b.pitchRate ?? 0;
   zr += (F - C33 * z - B33 * zr) / M33 * dt; z += zr * dt;
   thr += (M - C55 * th - B55 * thr) / I55 * dt; th += thr * dt;

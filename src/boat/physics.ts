@@ -323,7 +323,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
   // (with her sails up and flogging, in irons, the same: their windage on top of the rig's, so she gathers sternway
   // faster, and the rudder then works backwards; the way out is to bear away, the tiller pushed the way she's to go)
-  const v1 = b.v + a * dt;
+  // (sailing through the waves' orbit, from water moving one way into water moving another: seaway.ts waveForces;
+  // nothing when she's stopped)
+  const v1 = b.v + (a - (b.v - (b.astern ?? 0)) * (b.waveDU ?? 0)) * dt;
   if (v1 >= 0) b.v = v1; else { b.v = 0; b.astern = (b.astern ?? 0) - v1; }
   // (headway and sternway are one motion through the water: netted, so the drag on each doesn't push the other)
   if (b.v > 0 && (b.astern ?? 0) > 0) { const n = b.v - b.astern!; if (n >= 0) { b.v = n; b.astern = 0; } else { b.v = 0; b.astern = -n; } }
@@ -541,7 +543,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const Y = main.heel + jib.heel + windY + hullY + rudY;
   const M = sailYaw(sails, b.heelMag!, b.sheets.main, smAll.ceh) - windY * HOVE.windLever + hullM + rudY * RUDDER.arm + F * clrShift(cs.trim);
   const mx = HANDLING.mass * disp / HULL.displacement, my = disp * (1 + HOVE.swayAdded), I = disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
-  const u1 = u0 + X / mx * dt; b.v = Math.max(0, u1); b.astern = Math.max(0, -u1);
+  const u1 = u0 + (X / mx - u0 * (b.waveDU ?? 0)) * dt; b.v = Math.max(0, u1); b.astern = Math.max(0, -u1); // (and the waves' orbit she sails through: seaway.ts)
   b.sway = -toWind * (d0 + Y / my * dt);
   b.yawRate = toWind * (r0 + M / I * dt) / D; b.turnRate = b.yawRate; // (her turn carries on as she lets draw)
   b.helmNeed = undefined; b.weatherHeld = undefined;

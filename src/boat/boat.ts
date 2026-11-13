@@ -231,6 +231,8 @@ export interface Boat {
   heave?: number; heaveRate?: number; pitch?: number; pitchRate?: number;
   /** The water's orbital velocity under her (m/s, along her + forward, across her + to starboard) and the heel the wave's slope across her asks (deg, + to port): seaway.ts waveForces. */
   waveU?: number; waveV?: number; waveRoll?: number;
+  /** ... and how that orbit along her changes along her (1/s): sailing through it changes her speed through the water (seaway.ts waveForces). */
+  waveDU?: number;
   /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
   seaShare?: number; seaShareT?: number;
   /** Her push against the polar crew's, a share of the drive (physics.ts powerFactor), and seconds until it's worked out again. */

@@ -157,6 +157,14 @@ describe('phase 2: the waves surge her and heel her', () => {
     expect(mx / want).toBeGreaterThan(0.95); expect(mx / want).toBeLessThan(1.01);
     expect(Math.abs(sum / n)).toBeLessThan(want * 0.01); expect(mv).toBeLessThan(1e-9);
   });
+  it('sailing through the orbit: at the wave\'s own speed the convective term equals the water\'s acceleration (together, the whole push of a face: surf-riding)', () => {
+    const T = 3, a = 0.3, f = regular(T, a, 0), w = 2 * Math.PI / T, c = G / w; // following, travelling the way she heads
+    for (const t of [0.1, 0.6, 1.3, 2.2]) {
+      const r0 = waveForces(f, B, 0, t, 1, 1), r1 = waveForces(f, B, 0, t + 1e-4, 1, 1);
+      const dUdt = (r1.U - r0.U) / 1e-4;
+      expect(-c * r0.DU).toBeCloseTo(dUdt, 3);
+    }
+  });
   it('a stopped boat in steep chop, sails down: the orbit carries her to and fro but not along (no creeping ahead)', async () => {
     const { DEFAULT_SETTINGS } = await import('../src/settings');
     const { World, DT } = await import('../src/sim/world');
