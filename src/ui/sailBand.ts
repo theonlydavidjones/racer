@@ -425,7 +425,7 @@ export class SailBand {
 
   /** Every frame while it's open: the ropes, the boom and the car, who has what, and where the crew would set it. */
   /**
-   * The rope's inches on a line (a design branch, the owner's "middle way": the marks unchanged, the rope through the hand
+   * The rope's inches on a line (the owner's "middle way": the marks unchanged, the rope through the hand
    * marked as faint hairlines in the well, Rigging's purchases and travels, ropeScale.ts). Even for the tension lines (each
    * works the sail evenly over its travel), every foot for the working jib sheet (by its geometry: they bunch toward hard
    * in), none on the lazy sheet. Redrawn only when they'd move.

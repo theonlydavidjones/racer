@@ -4,9 +4,9 @@ import { D2R } from '../core/math';
 
 /**
  * Rope through the hand, for the sail band's inch ticks (the "middle way" the owner asked to see, 13 Nov 2026: the band's
- * marks unchanged, with inches of rope marked on each line). A design branch, not merged: the figures are Rigging's
- * (reference/design/sheet-geometry.md and their note of 13 Nov 2026), measured on Josephine where they say so, else
- * their estimates.
+ * marks unchanged, with inches of rope marked on each line; shipped on the owner's go, 13 Nov 2026, after seeing it in
+ * situ: reference/design/bandscale/in-situ). The figures are Rigging's (reference/design/sheet-geometry.md and their
+ * note of 13 Nov 2026), measured on Josephine where they say so, else their estimates.
  */
 const IN = 0.0254;
 
