@@ -80,8 +80,11 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
  * TANGLE_MAX. A touch after she has sailed clear of both is a new incident however soon it comes.
  */
 const ENGAGED = 2 * LOA;
-/** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
+/** Rule 44.1: a tangle after a foul (the boats still together, not a length apart since) counts as one incident for at most this long from its first contact, s. */
 const TANGLE_MAX = 30;
+/** Below this speed through the water, m/s, a Folkboat has too little flow over her rudder to steer away (about 2 kt:
+ * flowTurnRate(1) is under 7°/s, against 16°/s at 2.5 m/s): in a tangle, she can't do anything new. A modelling choice. */
+const STEERAGE = 1;
 
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
@@ -243,10 +246,11 @@ export class World {
   /** Rule 44.1: each boat's last penalized foul, against whom, and whether she has since been clear of that boat. */
   private lastFoulVs = new Map<number, { vs: number; t: number; clear: boolean }>();
   /** Rule 44.1's tangle, pair by pair (pairKey): the last contact between the two, and whether they've since been a
-   * length clear of each other. A jam of three or four boats is several pairs; each pair's contacts while it lasts are
-   * one incident whoever touches whom, and whether or not a boat has begun her turns (US Appeal 65: "the inevitable
-   * result of the first"). */
-  private tangles = new Map<string, { t: number; clear: boolean }>();
+   * length clear of each other, opened by a foul that carried a penalty (`fouler` owes it). A jam of three or four boats
+   * is several pairs; each pair's contacts while it lasts are one incident (US Appeal 65: "the inevitable result of the
+   * first"), turns begun or not, for TANGLE_MAX from the first contact. The other boat touching back counts only within
+   * COMPELLED_WINDOW (pushed into it, 43.1(a)'s idea); later, her own breach is her own. */
+  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number }>();
   private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
   private fouledAt = new Map<number, { by: number; t: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
@@ -1121,26 +1125,29 @@ export class World {
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
       if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
+      const jammed = Math.max(A.v, B.v) < STEERAGE; // (before the contact takes their way off: how they were sailing)
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
       // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
-      // from that foul (she hasn't been a length clear of her since, nor begun her turns), is that same incident: no
-      // second foul, and her turns aren't restarted. Once she has started turning she must keep clear of everyone
-      // (rule 21.2) and should have got well clear first (rule 44.2), so a contact then is a new breach.
+      // from that foul (not a length clear of each other since), is that same incident: no second foul, and her turns
+      // aren't restarted. (The AI gets clear before turning, and again if a new penalty comes mid-turns: rule 44.2.)
       // (a jam: contacts within it, between the same two boats, while they haven't been a length apart since, are the
       // incident already called, whoever touches whom and whether or not her turns have begun. Rule 21.2 still has the
       // boat turning keep clear of others, but against a boat she's still caught up with it's the same incident. A
       // boat new to the jam, or one she has got clear of, is a new incident)
       const pk = pairKey(A, B), prior = this.tangles.get(pk);
-      if (incident.kind !== 'hail' && prior && !prior.clear && this.t - prior.t < TANGLE_MAX) {
+      // (how long: TANGLE_MAX from the first contact; but while both are below steerage way, jammed (in the ebb at a mark,
+      // a fleet can sit at a few tenths of a knot inside a length of each other for minutes), neither can do anything
+      // new, and it runs on from the last contact)
+      if (incident.kind !== 'hail' && prior && !prior.clear && this.t - (jammed ? prior.t : prior.t0) < TANGLE_MAX && (prior.fouler === f.id || jammed || this.t - prior.t < COMPELLED_WINDOW)) {
         prior.t = this.t; // (the tangle goes on)
         if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).` });
         continue;
       }
-      if (incident.kind !== 'hail') this.tangles.set(pk, { t: this.t, clear: false });
+      if (incident.kind !== 'hail' && incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id });
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       if (A.isUser || B.isUser) {

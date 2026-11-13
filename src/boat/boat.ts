@@ -25,6 +25,9 @@ export interface AiState {
   /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
   kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** The penalty total she last saw: a new penalty while she's turning sends her to clear water again first (44.2). */
+  penSeen?: number;
+  reclear?: boolean;
   /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
   below?: boolean;
   /** Expensive start-timing predictions, refreshed 10 times a second. */
