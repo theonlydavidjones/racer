@@ -5,8 +5,7 @@ import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { outlookFor } from '../src/sim/outlook';
-import { planLegs } from '../src/sim/strategist';
+import { sail } from './helpers/racePool';
 
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', ...o });
@@ -39,21 +38,32 @@ describe('the strategist\'s leg times against the fleet sailing them', () => {
    * ROADMAP 4b; the same reach the second time round took the plan's time); 47 min planned against about 50 sailed. (The ROADMAP's earlier "planned at 38 min,
    * the AI took 47–71" was the AI's unheld tacks.) The bands hold the brief to that.
    */
-  it('each leg within the fleet\'s range, and the whole race within 15%', () => {
-    const w = new World(SS2, settings({ fleet: 4, current: 'ebb' }), 11), legs = planLegs(w, outlookFor(w));
-    const times: Record<number, number[]> = {}, log = w.log!, orig = log.onAdvance.bind(log);
-    log.onAdvance = (ww, b, idx) => { (times[b.id] ??= []).push(w.t); orig(ww, b, idx); };
-    while (w.t < 110 * 60 && !w.boats.slice(1).every(b => b.finished)) w.step(DT);
+  /*
+   * Over nine races (seeds 11–19), each leg's median across them: one race's start, its penalties at the first mark, can
+   * put a leg anywhere (the fleet's first beat ran 1.2–1.9 times the plan from seed to seed, November 13, 2026), and one
+   * seed passed or failed by that luck. The median of nine is the fleet against the plan, not one race's traffic.
+   */
+  it('each leg within the fleet\'s range, and the whole race within 15%, over nine races', async () => {
     const median = (xs: number[]) => { const s = xs.slice().sort((a, b) => a - b); return s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
-    let plan = 0, sailed = 0;
-    legs.forEach((L, i) => {
-      const ai = w.boats.slice(1).map(b => { const T = [w.startTimes[b.id] ?? NaN, ...(times[b.id] ?? []), b.finishT ?? NaN]; return (T[i + 1] - T[i]) / 60; }).filter(x => isFinite(x));
-      expect(ai.length, L.name).toBeGreaterThan(2);
-      const r = median(ai) / L.minutes;
-      expect(r, `${L.name} (${L.kind}): planned ${L.minutes.toFixed(1)} min, the fleet ${ai.map(x => x.toFixed(1)).join(', ')}`).toBeGreaterThan(0.8);
-      expect(r, `${L.name} (${L.kind}): planned ${L.minutes.toFixed(1)} min, the fleet ${ai.map(x => x.toFixed(1)).join(', ')}`).toBeLessThan(i <= 1 ? 1.6 : 1.35); // (wider for the first beat and the leg after the first mark: the fleet's crowding there)
-      plan += L.minutes; sailed += median(ai);
+    const legR: number[][] = [], totals: number[] = [];
+    let names: string[] = [];
+    // (the nine races sailed side by side on the race pool's threads: tests/helpers/races.ts fleetLegs; then seed by seed as before)
+    const seeds = [11, 12, 13, 14, 15, 16, 17, 18, 19], R = await sail('fleetLegs', seeds.map(seed => [seed] as [number]));
+    seeds.forEach((seed, k) => {
+      const { perLeg, total } = R[k];
+      names = perLeg.map(L => L.name);
+      perLeg.forEach((L, i) => {
+        expect(L.sailedBy, `seed ${seed}: ${L.name}`).toBeGreaterThan(2);
+        (legR[i] ??= []).push(L.ratio);
+      });
+      totals.push(total);
     });
-    expect(sailed / plan).toBeGreaterThan(0.9); expect(sailed / plan).toBeLessThan(1.15);
-  }, 300_000);
+    legR.forEach((rs, i) => {
+      const r = median(rs), why = `${names[i]}: the fleet against the plan, seed by seed ${rs.map(x => x.toFixed(2)).join(' ')}`;
+      expect(r, why).toBeGreaterThan(0.8);
+      expect(r, why).toBeLessThan(i <= 1 ? 1.6 : 1.35); // (wider for the first beat and the leg after the first mark: the fleet's crowding there)
+    });
+    const t = median(totals), why = `the whole race, seed by seed ${totals.map(x => x.toFixed(2)).join(' ')}`;
+    expect(t, why).toBeGreaterThan(0.9); expect(t, why).toBeLessThan(1.15);
+  }, 1_800_000);
 });

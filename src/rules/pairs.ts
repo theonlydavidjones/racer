@@ -4,27 +4,52 @@ import { clearAstern, cpa, hullGap } from './geometry';
 import { returning, rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, PoseRing, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
 
-/** Hulls closer than this count as contact, m. */
+/**
+ * Hulls closer than this count as contact, m: measured centreline to centreline (geometry.ts hullGap), so exact for two
+ * boats side by side at their widest (2 × 1.1 m half-beam), and early for a bow into a side (about 1.1 m there). No
+ * published distance: rule 14's "contact" includes booms, rigging and crew (WS Case Book 2025–2028, Cases 7 and 49),
+ * which touch before hulls do, so a margin is defensible.
+ */
 export const CONTACT_GAP = 2.2;
 /** When she last passed head to wind (a tack). Rule 20's hails are about tacking: a gybe neither answers "Room to tack"
  * nor does the hailing boat's duty to tack, so the hail logic reads this, not lastTackT (any change of tack). */
 const htw = (b: { headToWindT?: number }) => b.headToWindT ?? -Infinity;
-/** Rule 15: how long a boat that just acquired right of way must give the other boat room, s. */
+/**
+ * Rule 15: how long a boat that just acquired right of way must give the other boat room, s. The rules and cases give no
+ * number: "space and time for response", protecting her "only temporarily, and only if [she] responds promptly" (WS Case
+ * Book 2025–2028, Case 24; also Cases 7, 53). Case 27 has the keep-clear boat with "perhaps one to two seconds"; Perry
+ * (Understanding the Racing Rules of Sailing through 2028, rule 15) "a second or two" to react, the protection fading "as
+ * the seconds go by". So 3.5 s is at the generous end.
+ */
 export const RULE15_GRACE = 3.5;
-/** How long a boat counts as having "just tacked", s: after any change of tack for rule 15, after passing head to wind for 18.2(d). */
+/**
+ * How long a boat counts as having "just tacked", s: after any change of tack for rule 15, after passing head to wind for
+ * 18.2(d). Not a rules term: rule 13 runs from head to wind until she's on a close-hauled course, and rule 15 starts there
+ * (Case 27; Perry, rule 15).
+ */
 export const JUST_TACKED = 2;
 /** After an incident, the same pair can't foul again for this long, s. */
 export const INCIDENT_COOLDOWN = 6;
 /** Rule 16.1: a right-of-way boat that turned toward the other boat within this many seconds before
  * the incident didn't give her room to keep clear. (About the time a Folkboat needs to respond.) */
 export const RULE16_WINDOW = 3;
-/** Rule 16.1: a turn smaller than this (deg) is ordinary steering, not a course change. */
+/**
+ * Rule 16.1: a turn smaller than this (deg) is ordinary steering, not a course change. A modelling choice: the rules set no
+ * least angle ("to change course means to change the direction in which the boat is heading or moving": US Sailing
+ * Appeal 33). What decides is whether the change left the other boat room (Case 7: a slight luff with room to spare
+ * breaks nothing). The window above has no published number either; Perry (rule 16) calls any change within about two
+ * lengths of the other boat risky, about 5–6 s for a Folkboat at 5–6 kt.
+ */
 export const RULE16_MIN_TURN = 12;
 /** Rule 17 applies when the leeward overlap starts within two hull lengths. */
 export const RULE17_RANGE = 2 * LOA;
 
 /** Rule 20.2: "as soon as possible", modelled as starting to respond within this many seconds. It applies to the
- * hailed boat (tack, or reply "You tack") and then to the hailing boat (tack once the hailed boat has responded). */
+ * hailed boat (tack, or reply "You tack") and then to the hailing boat (tack once the hailed boat has responded).
+ * No published number: the hailed boat must reply "immediately" or give "the time required for a competent, but not
+ * expert, crew to prepare for and execute her tack" (WS Case 54); the hailer must "put your helm down within a couple of
+ * seconds" of the other's, and breaks 20.2(d) if she goes "another couple of boat-lengths" (Perry, rule 20): 2 s to
+ * about 5–6 s at a Folkboat's speed. */
 export const HAIL_RESPONSE = 5;
 /**
  * Rule 20.2(c) and (d) ask each boat to "respond ... by tacking as soon as possible": the response is starting the tack,
@@ -95,7 +120,12 @@ export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: 
   return late ? { boat: hailer, role: 'hailer' } : null;
 }
 
-/** Room for a Folkboat to pass between a boat and a mark or obstruction: her beam and a little, m. */
+/**
+ * Room for a Folkboat to pass between a boat and a mark or obstruction: her beam and a little, m. No metric figure in the
+ * rules ("the space a boat needs ... while manoeuvring promptly in a seamanlike way", the definition Room; Case 103: a
+ * "competent, but not expert, crew"). The cases' own clearances: a stern passed by 1 m or more was room (Case 35); one
+ * passed within 0.6 m at hard-over helm wasn't keeping clear (Case 88). Her 2.2 m beam plus 1.3 m fits them.
+ */
 export const ROOM_GAP = 3.5;
 /** Rule 19: a boat this close to an obstruction (m) is at it, and needs room to pass it. */
 export const AT_OBSTRUCTION = 1.5 * LOA;
@@ -133,7 +163,8 @@ export function wideOfGybe(b: RulesBoat, idx: number, ctx: RulesContext): boolea
 /** Rule 20.2(c): how long a "You tack" reply's room lasts if the hailing boat hasn't tacked, s: a stale-hail cap. Once
  * the hailed boat has responded the hailing boat "shall tack as soon as possible" (20.2(d), called after HAIL_RESPONSE),
  * which after "You tack" is "normally immediately" (Dave Perry, Understanding the Racing Rules of Sailing through 2028,
- * rule 20); the room clears 4 s after her tack. A modelling choice, cut from 25 s (Bay East's audit, 13 Nov 2026). */
+ * rule 20); the room clears 4 s after her tack. A modelling choice, cut from 25 s (Bay East's audit, 13 Nov 2026). No published basis; the test is whether she could tack and clear
+ * "promptly in a seamanlike way" (Case 35). */
 export const REPLY_ROOM = 10;
 
 /**

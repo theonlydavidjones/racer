@@ -215,6 +215,16 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 #coachTip.on{opacity:1;transform:translate(-50%,0)}
 #coachTip.done{border-left-color:#3fd197;color:#3fd197}#coachTip.ok,#coachTip.info{border-left-color:var(--accent)}
 .tp-hint:empty{display:none}
+/* the tack and gybe drill's last manoeuvre in the Coach card; .attempts, the practice modes' run of attempts (shared with the start-line drill) */
+.tp-drill{font:500 11.5px/1.38 var(--f-body);color:var(--text);border-top:1px solid var(--rule);padding-top:4px;margin-top:2px;max-width:300px}
+.tp-drill[hidden]{display:none}
+.tp-dcoach{color:#ffd28a}
+.attempts{width:100%;border-collapse:collapse;font:500 12px/1.3 var(--f-body);font-variant-numeric:tabular-nums}
+.attempts th{font:700 9.5px/1.2 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 6px;border-bottom:1px solid var(--rule)}
+.attempts td{padding:5px 6px 1px;text-align:left;white-space:nowrap}
+.attempts tr.dcoach td{color:#ffd28a;padding:0 6px 6px;font-size:11.5px;white-space:normal;border-bottom:1px solid var(--rule)}
+.attempts tr.noscore td{color:var(--muted)}
+.drillnote{font-size:11px;color:var(--muted)}
 /* what the sail control under the mouse (or last touched) does: the band's help, in the Coach card, not over the controls */
 .tp-help{font:500 11px/1.38 var(--f-body);color:var(--muted);border-top:1px solid var(--rule);padding-top:4px;margin-top:2px;max-width:300px}
 .tp-help b{color:var(--text);font-weight:700}
@@ -233,7 +243,9 @@ body.pilot-on #keysHint{display:none}
 .mo-thr input{width:110px}
 #moGears .tp-btn[aria-pressed="true"],#motorHead .tp-btn.on{border-color:var(--accent);color:var(--accent)}
 #bMotor.on{border-color:var(--accent);color:var(--accent)}
-#bHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
+#bHome.dim,#bNavHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
+#bHome.dim{opacity:.45}
+.pastrow .ghostpick{width:auto;max-width:230px;margin-right:6px;padding:6px 8px;font-size:12px} /* (no home slip: the tooltip says how to give her one) */
 @media (min-width:760px){ #trimPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)} }
 /* one line along the bottom: the helm's buttons, then the pilot's control head while it steers (clear of the view buttons) */
 #controls{flex-direction:row;align-items:flex-end;padding-right:calc(max(16px,env(safe-area-inset-right,0px)) + 96px)}
@@ -1010,6 +1022,7 @@ body.showroom #hudRight,body.showroom #flagIndex{visibility:hidden}
 .nc-num span{font-size:11px;color:var(--muted);margin-left:2px}
 #ncSketch{width:150px;height:46px;flex:none;display:block}
 .nc-sub{font:600 10px/1.3 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.nc-ghost{color:#b9c8d2}
 .nc-sub .fav{color:var(--accent)} .nc-sub small{font-size:10px;text-transform:none;letter-spacing:0}
 .nc-tr{text-transform:none;letter-spacing:0;font:12px/1.3 var(--f-body)}
 .nc-tr b{color:var(--text);font-weight:600} .nc-tr .on{color:#3fd197}
@@ -1119,3 +1132,62 @@ body.showroom #flowPanel{display:none}
 #realRows:not(:empty){margin-bottom:10px}
 #realRows .warn,#resReal .warn{color:#ffb08a}
 #resReal tr.you td{color:var(--accent);font-weight:700}
+
+/* the surface audit (owner, 13 Nov): controls folded into what's already on screen */
+/* the where-next card opens the course (racing) or the navigator (cruising) */
+#nextCard{cursor:pointer}
+#nextCard:hover,#nextCard:focus-visible{border-color:var(--accent)}
+/* the Coach card's crew line opens the crew's places (in place of the Crew button); amber once you've placed them */
+.tp-crew{pointer-events:auto;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+.tp-crew:hover{color:var(--text)}
+.tp-crew.mine{color:var(--accent)}
+/* messages rest once they're stale: the card keeps only its header (and All, for the log) */
+#msgLog.rest #msgRecent{display:none}
+#nextCard{pointer-events:auto}
+/* the navigator's Sail home sits beside its Close (the owner: Home belongs in the navigator) */
+.cvhead .btnrow{flex-wrap:nowrap;align-items:flex-start}
+.cvhead .btnrow .ghost{width:auto;white-space:nowrap}
+/* One feedback for every menu button (the owner: some setup buttons didn't react). The cards already lit on hover;
+   the plain buttons, the segmented choices, the chips and the text links had no hover or pressed look at all.
+   Hover: the accent edge or brighter words. Press: the selected fill and a small give, as a real button does. */
+.cta,.ghost,.chip,.seg button,.opp,.yctabs button,.modecard,.fcard,.linkbtn,.tab,.sw,.pick{transition:background-color .12s,border-color .12s,color .12s,box-shadow .12s,filter .12s,transform .08s}
+.cta:hover{filter:brightness(1.1)}
+.cta:active{filter:brightness(.9);transform:scale(.98)}
+.ghost:hover,.chip:hover{border-color:var(--accent);background-color:rgba(255,255,255,.05)}
+.ghost:active,.chip:active{background-color:var(--btn-hi);border-color:var(--accent);transform:scale(.98)}
+.seg button:hover:not([aria-pressed="true"]),.opp:hover:not([aria-pressed="true"]):not(:disabled){color:var(--text);background-color:rgba(255,255,255,.06)}
+.opp:hover:not(:disabled){border-color:var(--accent)}
+.seg button:active,.opp:active:not(:disabled){background-color:var(--btn-hi);color:var(--text);transform:scale(.97)}
+.modecard:active,.fcard:active{transform:scale(.99)}
+.linkbtn:hover{filter:brightness(1.25)}
+.linkbtn:active{filter:brightness(.85)}
+.tab:active,.yctabs button:hover,.yctabs button:active{color:var(--text)}
+.sw:hover{box-shadow:0 0 0 2px var(--accent)}
+.pick:hover{border-color:var(--accent)}
+:is(.cta,.ghost,.chip,.seg button,.opp,.modecard,.fcard,.linkbtn):disabled{filter:none;transform:none;cursor:default}
+/* the field: one of several, as radio rows boxed together apart from the switches (ui/layers.ts) */
+.layerpop .lp-field{display:flex;flex-direction:column;padding:2px 6px;margin:0 -4px;border:1px solid var(--rule);border-radius:5px;background:rgba(255,255,255,.03)}
+.layerpop .lp-sub{text-transform:none;letter-spacing:0}
+/* The flag index sits in the left column, which lets the pointer through to the boat (pointer-events:none); the index
+   itself must take the pointer, or the wheel and a drag go to the view behind it and it never scrolls (the owner). */
+#flagIndex{pointer-events:auto;overscroll-behavior:contain;cursor:grab}
+#flagIndex.drag{cursor:grabbing;-webkit-user-select:none;user-select:none}
+#flagIndex .fi-x{cursor:pointer}
+/* the start-line drill's choices for the next attempt (inside its panel) */
+.dopts{display:flex;gap:8px;flex-wrap:wrap}
+.dopts .seg{flex:1 1 200px}
+.dopts .dlabel{flex:1 0 100%;font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.attempts tr.best td{color:var(--accent);font-weight:700} /* the best of a drill's attempts (shared with the manoeuvres drill) */
+/* the band put away with its ▾ tab and brought back with a click on the windex (the owner, 13 Nov) */
+.sb-away{font-size:12px!important;padding:0 8px!important;color:var(--muted)!important}
+.sb-wx{position:relative}
+.sb-wx-hint{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;padding:3px 7px;border-radius:5px;
+  background:rgba(9,22,33,.86);border:1px solid var(--rule);font:700 9.5px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--text);
+  opacity:0;transition:opacity .15s;pointer-events:none}
+.sailband.shut .sb-wx{pointer-events:auto;cursor:pointer;border-radius:50%}
+.sailband.shut .sb-wx:hover .sb-wx-hint{opacity:1}
+.sailband.shut .sb-wx:hover svg{filter:drop-shadow(0 0 0 2px var(--accent)) brightness(1.15)}
+/* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
+   which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
+body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
+body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}

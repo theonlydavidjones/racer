@@ -23,20 +23,33 @@ export const HULL = {
 export const HANDLING = {
   /** Effective mass in surge: displacement plus ~8% added mass of water. */
   mass: HULL.displacement * 1.08,
-  /** Friction form factor for a full-bodied long-keel hull. */
+  /**
+   * Friction form factor for a full-bodied long-keel hull. Unsourced. ORC's VPP uses 1.05 for the canoe body with the
+   * Hughes friction line, 0.066/(log10 Re − 2.03)², at Re on 0.85 × its sailing length (ORC VPP Documentation 2023,
+   * §6.1.1 eq. 6.2), and puts the rest of the hull's form effect in its residuary resistance. So the two figures aren't
+   * directly comparable: this one and the RESIDUARY table below have to be checked together.
+   */
   formFactor: 1.15,
-  /** Drag area of hull, mast and rigging, m². */
+  /**
+   * Drag area of hull, mast and rigging, m². ORC's windage model (VPP Documentation 2023, §5.3, Table 5.10: hull Cd 0.816
+   * on freeboard × beam bow-on and on freeboard × LOA beam-on; mast 0.4 front, 0.6 side; rigging wire 1.0 × 1.2) gives
+   * about 1.9 m² for her with the wind dead ahead (0.65 m freeboard, 2.2 m beam, a 9.5 m mast, the crew's 0.27), which
+   * fits; but beam-on it's about 4.8 m², and blended between the two (its eq. 5.26) about 4 m² close-hauled. Here it
+   * stays 2.0 at every angle. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
+   */
   windageCdA: 2.0,
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
    * edge-on to the wind: ~0.12 × 25.8 m² of main and jib. */
   flogCdA: 3,
-  /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). */
+  /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). An uncited estimate: it sets
+   * the penalty turns' pace too (physics.ts PENALTY_TURN_RATE, where the sim's 720 is compared with a real one). */
   turnRadius: 9,
   /** Turn rate when nearly stopped, by sculling (physics.ts: only toward close-hauled from above it, rule 42.3(d)), deg/s. An estimate. */
   minTurnRate: 4,
   /** Hard limit on turn rate, deg/s. */
   maxTurnRate: 22,
-  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). */
+  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). An uncited estimate (with turnRadius it
+   * sets how long penalty turns take: physics.ts PENALTY_TURN_RATE). */
   turnDrag: 0.15,
   /** Drive while luffing (sails eased until they lift), as a fraction of normal target speed. */
   luffFactor: 0.12,

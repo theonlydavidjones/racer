@@ -162,6 +162,15 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
+8b. **A UI audit with real rigour** (owner, 13 November; next): "a UI audit on the roadmap to focus on real rigor on these
+   screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
+   docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
+   navigation in place of "< Start page"; and the Yacht Club's Everyone / Skippers / Crew / Yours toggle, which confuses
+   the owner. Proposals go to the owner before building; the screen rule above applies.
+   Also filed with it:
+   - The setup builds the World only on Start (owner: the configurator lags because it rebuilds the play surface
+     behind it).
+   - Bug: the flag index doesn't scroll.
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
@@ -396,10 +405,12 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   - From Marinas, the motor: the outboard's thrust is off her centreline (about 0.45 m out on the bracket, some 180 N·m at full
     throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
     both real lessons at the dock. And sourced figures for the figure of merit (0.55), reverse (0.5) and the leg's drag.
-  - From Charts, after Lime Point (#64): blocky 50 m terrain cliffs along the Marin shore, Horseshoe Bay included (needs
-    a shore fit for all the ENC land); a small sand-coloured sliver floating southwest of Horseshoe Bay's marina; a
-    possible spike at the west edge of the Lime Point box; the tiller pilot tacks into the cove behind Lime Point on a
-    westerly beat out of the Gate (AI/pilot).
+  - From Charts, after Lime Point (#64): ~~blocky 50 m terrain cliffs along the Marin shore~~ (done: the shore fit and
+    12.5 m shore patches, and from 13 Nov the Headlands' water's edge in rock, sand only on OpenStreetMap's beaches:
+    no pale sand skirt under the cliffs); ~~the sand sliver southwest of Horseshoe Bay's marina~~ (done: a 64 m piece of
+    the chart's land, drawn as a rock); ~~a possible spike at the west edge of the Lime Point box~~ (checked 13 Nov:
+    none); still open: the tiller pilot tacks into the cove behind Lime Point on a westerly beat out of the Gate
+    (AI/pilot), and Kirby Cove's beach, which OpenStreetMap doesn't map as one (drawn as rock).
   - From Crew Figures (#63): the crew's fore-and-aft stations (crewPhys) reach slightly past the real benches; fixing it
     shifts the trim calibration, so it needs its own reviewed PR.
   - From Bay East: Richmond YC and Encinal slips, BYC and Encinal racing marks, and the current in embayments without

@@ -59,3 +59,25 @@ describe('realFleetFor (for the debrief)', () => {
     expect(realFleetFor({ settings: {} })).toBe(null); expect(realFleetFor('nope')).toBe(null);
   });
 });
+
+import { outlookFor } from '../src/sim/outlook';
+import { planLegs } from '../src/sim/strategist';
+describe('a real race whose course is uncertain', () => {
+  // A perfect boat (the planner: the polar, NOAA's current, the observed wind, every leg on its best line) slower than
+  // most of the real fleet means the course or the day's wind isn't what the fleet had: those races say so.
+  it('is flagged exactly when a perfect boat is slower than the median real finisher', () => {
+    for (const r of realRaces()) {
+      const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, current: 'real', sea: 'real', opponents: [], fleet: 0 };
+      const w = new World(courseFile(r.courseId), S, 7), o = outlookFor(w), legs = planLegs(w, o), last = legs[legs.length - 1];
+      const perfect = (last.t0 - o.t0 + last.minutes) * 60;
+      const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).map(b => b.elapsedS!).sort((a, b) => a - b);
+      expect(!!r.uncertain, `${r.id}: perfect ${(perfect / 60).toFixed(1)} min, median real ${(fin[Math.floor(fin.length / 2)] / 60).toFixed(1)}`).toBe(perfect > fin[Math.floor(fin.length / 2)]);
+    }
+    expect(realFleetFor('GGYC_T008047221-r1')!.uncertain).toMatch(/Course uncertain/);
+    expect(realFleetFor('GGYC_T008047221-r5')!.uncertain).toBe(null);
+    // the course sheet unread for the races whose distance disagrees; the player is warned only where the check fails
+    expect(realRaces().filter(r => r.sheetUnverified).map(r => r.id).sort()).toEqual(['GGYC_T008047221-r1', 'GGYC_T008047221-r4']);
+    expect(realRaces().filter(r => r.uncertain).map(r => r.id)).toEqual(['GGYC_T008047221-r1']);
+    expect(realFleetFor('GGYC_T008047221-r4')!.sheetUnverified).toBe(true);
+  });
+});

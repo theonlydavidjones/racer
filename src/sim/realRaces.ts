@@ -7,11 +7,22 @@ import { COURSES } from '../courses/registry';
  * on the course they sailed, and see where you'd have placed among them (docs/VISION-ROADMAP.md, near term 7).
  *
  * From the published results (src/boat/data/sf-folkboat-results.json: Jibeset, GGYC's Seaweed Soup): a race is here
- * when every finisher's time is published, its course is on GGYC's course sheet (Addendum B: the 2025–26 and 2026–27
- * sheets are the same table, so the course files in src/courses/data serve both seasons), and the wind that day is in
+ * when every finisher's time is published, its course is on GGYC's course sheet (Addendum B), and the wind that day is in
  * the sim's record of what was observed (environment/data/sf-real-days.json). Where the scorer's course number and
  * distance disagree with the sheet, the race says so: the course is the number published (it's what the committee
  * flies), the disagreement shown beside it.
+ *
+ * The course sheet: the course files are the 2026–27 sheet (Jibeset DOC=X0). The 2025–26 sheet (DOC=cr) is assumed to
+ * be the same table, UNVERIFIED (it couldn't be read again: jibeset refuses this project's fetches), and three of the four
+ * 2025–26 races scored with a course disagree with the 2026–27 distances (sf-folkboat-results.json, as published):
+ *
+ *   race 1 (1 Nov 2025)   course 3    6.1 nm published   3.7 nm on the 2026–27 sheet
+ *   race 3 (3 Jan 2026)   course 1    1.0 nm             1.6 nm
+ *   race 4 (7 Feb 2026)   course 13   8.9 nm             5.0 nm
+ *   race 5 (7 Mar 2026)   course 12   3.4 nm             3.4 nm   (agrees)
+ *
+ * Those races carry `sheetUnverified`. The player is warned ("course uncertain", UNCERTAIN below) only where a perfect
+ * boat can't sail the drawn course as fast as the fleet did, so the warning still means something.
  */
 
 export interface RealBoat {
@@ -30,14 +41,28 @@ export interface RealRace {
   courseId: string; courseNo: string; distanceNm: number;
   /** what the scorer published, where it disagrees with the sheet, in words; or null */
   doubt: string | null;
+  /** why the course itself is in doubt (the sim's best possible time is slower than the real fleet's), in words; or null */
+  uncertain: string | null;
+  /** the course is drawn from the 2026–27 sheet, the race's own season's sheet unread, and its published distance disagrees */
+  sheetUnverified: boolean;
   /** the results page */
   url: string;
   boats: RealBoat[];
 }
 
 type RawBoat = { sail: string; key: string; boat: string; skipper: string; elapsedS: number | null; place: number | null; code: string | null };
-type RawRace = { raceNo: number; date: string; start: string | null; course: string | null; distanceNm: number | null; url: string; boats: RawBoat[] };
+type RawRace = { raceNo: number; date: string; start: string | null; course: string | null; distanceNm: number | null; sheet?: 'unverified'; url: string; boats: RawBoat[] };
 type RawEvent = { source: string; id: string; name: string; races: RawRace[] };
+
+/**
+ * Races whose course is uncertain: a perfect boat (the sim's own polar, NOAA's predicted current and the wind observed
+ * at Fort Point, every leg on the planner's best line, sim/strategist.ts planLegs) is slower than most of the
+ * real fleet (than its median finisher). Measured 13 Nov 2026; tests/realRaces.test.ts checks the list against the planner. On the other
+ * races the real fleet takes 0.9–1.5 × the perfect boat's time, as a fleet of real boats does.
+ */
+const UNCERTAIN: Record<string, string> = {
+  'GGYC_T008047221-r1': 'Course uncertain: on course 3 as the sheet draws it, a perfect boat in the wind observed at Fort Point (9 kt from 249°) and NOAA\'s ebb takes about 53 min, slower than every real finisher (47–52 min). It would need about 11 kt to make 47. The fleet may have sailed a shorter course, or had more wind than Fort Point recorded, so compare your time with care.'
+};
 
 /** At least this many timed finishers, so a placing among them means something. */
 const MIN_TIMED = 3;
@@ -56,11 +81,11 @@ export function realRaces(): RealRace[] {
       // (which one is the typo: the published distance in the winner's time, beside a Folkboat's hull speed, about 6 kt)
       const win = Math.min(...timed.map(b => b.elapsedS!)), kt = r.distanceNm != null ? r.distanceNm / (win / 3600) : 0;
       const doubt = r.distanceNm != null && nm && Math.abs(r.distanceNm - nm) > 0.15
-        ? `The results give course ${r.course} as ${r.distanceNm} nm; GGYC's course sheet has it as ${nm} nm. ${r.distanceNm} nm in the winner's time would be ${kt.toFixed(1)} kt${kt > 6 ? ', faster than a Folkboat sails' : ''}, so the distance looks like the typo: this is course ${r.course}, the number the committee flies.`
+        ? `The results give course ${r.course} as ${r.distanceNm} nm; the 2026–27 course sheet, drawn here, has it as ${nm} nm (that season's own sheet couldn't be checked). ${r.distanceNm} nm in the winner's time would be ${kt.toFixed(1)} kt${kt > 6 ? ', faster than a Folkboat sails, so the published distance isn\'t what was sailed' : ''}.`
         : null;
       out.push({
         id: `${ev.id}-r${r.raceNo}`, event: ev.name, raceNo: r.raceNo, date: r.date, start: r.start.slice(0, 5),
-        courseId: course.id, courseNo: r.course, distanceNm: nm, doubt, url: r.url,
+        courseId: course.id, courseNo: r.course, distanceNm: nm, doubt, uncertain: UNCERTAIN[`${ev.id}-r${r.raceNo}`] ?? null, sheetUnverified: r.sheet === 'unverified', url: r.url,
         boats: r.boats.map(b => ({ key: b.key, sail: b.sail, boat: b.boat, skipper: b.skipper, elapsedS: b.elapsedS, place: b.place, code: b.code }))
       });
     }
@@ -102,6 +127,10 @@ export interface RealFleet {
   boats: { name: string; sail: string; elapsed: number | null; place: number | null; code?: string }[];
   /** the course sheet's distance (nm); what the scorer published, if it disagrees, in words */
   courseNm: number; doubt: string | null;
+  /** why the course itself is in doubt, in words; or null */
+  uncertain: string | null;
+  /** the course drawn from the 2026–27 sheet, the race's own season's unread, its published distance disagreeing */
+  sheetUnverified: boolean;
   /** where the times come from, in words, and the results page */
   source: string; url: string;
 }
@@ -111,6 +140,6 @@ export function realFleetFor(x: string | { settings: { realRace?: string } }): R
   const title = (t: string) => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
   return {
     boats: r.boats.map(b => ({ name: title(b.boat), sail: b.key, elapsed: b.elapsedS, place: b.place, ...(b.code ? { code: b.code } : {}) })),
-    courseNm: r.distanceNm, doubt: r.doubt, source: `${r.event}, race ${r.raceNo} (${r.date}), published results`, url: r.url
+    courseNm: r.distanceNm, doubt: r.doubt, uncertain: r.uncertain, sheetUnverified: r.sheetUnverified, source: `${r.event}, race ${r.raceNo} (${r.date}), published results`, url: r.url
   };
 }
