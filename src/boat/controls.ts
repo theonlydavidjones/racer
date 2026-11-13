@@ -110,7 +110,10 @@ export const CAR_AFT = Math.sqrt(JOSEPHINE_CAR.tape ** 2 - JOSEPHINE_CAR.centre 
  * The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins` (0 inboard
  * .. CAR_IN_PINS−1 outboard): atan(out / CAR_AFT), 11.6° to 13.7°, 12.65° at the middle hole, half a degree a hole.
  */
-export const carLead = (ins: number) => Math.atan((JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2)) / CAR_AFT) * 180 / Math.PI;
+const leadAt = (ins: number) => Math.atan((JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2)) / CAR_AFT) * 180 / Math.PI;
+/** (the holes' leads worked out once: the sheet's angle is asked for every boat every step) */
+const LEADS = Array.from({ length: CAR_IN_PINS }, (_, i) => leadAt(i));
+export const carLead = (ins: number) => LEADS[ins] ?? leadAt(ins);
 /** The outermost athwartships pin whose lead is no wider than `angle` deg (the innermost if none is). */
 export const carInFor = (angle: number) => { let k = 0; for (let i = 1; i < CAR_IN_PINS; i++) if (carLead(i) <= angle) k = i; return k; };
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). The sheet's 0–1 to the
