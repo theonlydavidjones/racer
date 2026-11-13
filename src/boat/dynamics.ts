@@ -30,14 +30,6 @@ export const HANDLING = {
    * directly comparable: this one and the RESIDUARY table below have to be checked together.
    */
   formFactor: 1.15,
-  /**
-   * Drag area of hull, mast and rigging, m². ORC's windage model (VPP Documentation 2023, §5.3, Table 5.10: hull Cd 0.816
-   * on freeboard × beam bow-on and on freeboard × LOA beam-on; mast 0.4 front, 0.6 side; rigging wire 1.0 × 1.2) gives
-   * about 1.9 m² for her with the wind dead ahead (0.65 m freeboard, 2.2 m beam, a 9.5 m mast, the crew's 0.27), which
-   * fits; but beam-on it's about 4.8 m², and blended between the two (its eq. 5.26) about 4 m² close-hauled. Here it
-   * stays 2.0 at every angle. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
-   */
-  windageCdA: 2.0,
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
    * edge-on to the wind: ~0.12 × 25.8 m² of main and jib. */
   flogCdA: 3,
@@ -154,7 +146,29 @@ export function airDrag(aws: number, awa: number, flog: number, hoisted = 1): nu
   const bare = Math.max(flog, 1 - hoisted), cloth = Math.min(flog, hoisted);
   if (awa >= 90 || bare <= 0) return 0;
   const q = 0.5 * RHO_AIR * aws * aws;
-  return q * (HANDLING.windageCdA * bare + HANDLING.flogCdA * cloth) * Math.cos(awa * D2R);
+  return q * (windCdA(awa) * bare + HANDLING.flogCdA * cloth) * Math.cos(awa * D2R);
+}
+
+/**
+ * Windage: the wind on her hull, mast and crew, as a drag area (Cd × area, m²) at apparent wind angle `awa` (deg), from
+ * ORC's windage model (VPP Documentation 2023, §5.3: each element's drag at 0° and 90°, blended between by eq. 5.26,
+ * Cd·A = Cd_front·A_front·|cos β| + Cd_side·A_side·sin β, 180° as 0°; Table 5.10's coefficients):
+ *  - hull: Cd 0.816 on freeboard × beam bow-on, freeboard × LOA beam-on (0.65 m freeboard, an estimate; 2.20 m beam,
+ *    7.64 m LOA, the class's);
+ *  - mast: 0.4 bow-on and 0.6 side-on (with sail set; 0.8 bare), on its section × 9.5 m (0.075 m across, 0.10 m fore
+ *    and aft: estimates);
+ *  - crew: 1.08 on 0.25 m² bow-on and 0.5 m² a person beam-on (ORC's "0.5·Mvblcrew", read as a head count: an estimate).
+ * Rigging wire, small beside these, is left out. So about 1.7 m² bow-on, 4.6 m² close-hauled (30°) and 6.2 m² beam-on with
+ * three aboard (the sim had 2.0 fore and aft at every angle, and 5.5 side-on). ORC adds it to the drag, along the
+ * apparent wind; its fore-and-aft and sideways parts are cos and sin of the angle.
+ */
+const WINDAGE = {
+  front: 0.816 * 0.65 * 2.2 + 0.4 * 0.075 * 9.5 + 1.08 * 0.25,
+  side: 0.816 * 0.65 * 7.64 + 0.6 * 0.10 * 9.5, crewSide: 1.08 * 0.5
+};
+export function windCdA(awa: number, crew = 3): number {
+  const a = Math.abs(awa) * D2R;
+  return WINDAGE.front * Math.abs(Math.cos(a)) + (WINDAGE.side + WINDAGE.crewSide * crew) * Math.sin(a);
 }
 
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */
