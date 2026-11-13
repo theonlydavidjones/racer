@@ -566,12 +566,17 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     { const l = line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay', 'backstay'); l.userData.inside = true; grp.add(l); }
     grp.add(line([new THREE.Vector3(x, ty + 0.03, TRAV_Z - 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.06)], 'backstay', 'backstay')); // the tail
   }
-  // vang: a rope tackle from a block under the boom, about a quarter of the way out, down to a block on a fitting at the
-  // foot of the mast, four parts (Josephine's photos: hauled out from starboard, and the mast foot from forward; CR 8.60
-  // only limits what may hold the boom up, so a rope vang is legal). Its tail comes down to the turning blocks at the
-  // mast's foot and aft to the piano. (The part count is read off the photo: an estimate.)
-  { const ub = sheaveBlock(0.025, -0.05); ub.position.set(0, BOOM_TOP - 2 * BOOM_R, VANG_R); boomPivot.add(ub);
-    const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb); }
+  // vang: a rope tackle from a block hung under the boom on a two-legged wire span, down to a block shackled at the base
+  // of the mast with the jammer on it (Josephine: the owner's photo of the vang to the mast base, from the cabin top
+  // looking forward at the mast's starboard side; CR 8.60 only limits what may hold the boom up, so a rope vang is legal).
+  // The span's forward leg goes to an eye on the boom just aft of the gooseneck, the other further aft; the tackle's four
+  // parts and the legs' positions are read off the photo (estimates). Its tail comes down to the turning blocks at the
+  // mast's foot and aft to the piano.
+  { const ub = sheaveBlock(0.025, -0.05); ub.position.copy(VANG_SPAN).setY(VANG_SPAN.y + 0.05); boomPivot.add(ub);
+    const under = BOOM_TOP - 2 * BOOM_R;
+    for (const z of VANG_LEGS) boomPivot.add(line([new THREE.Vector3(0, under, z), VANG_SPAN.clone().setY(VANG_SPAN.y + 0.05)], MAT.wire)); // the span's wire legs
+    const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb);
+    const jam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.05), BLACK); jam.position.copy(VANG_FOOT).add(new THREE.Vector3(0.03, -0.02, 0.02)); grp.add(jam); } // (the jammer on the lower block)
   const vang = line(Array.from({ length: 5 }, () => VANG_FOOT.clone()), 'main', 'vang'); grp.add(vang);
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>;
@@ -696,8 +701,14 @@ const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Ve
 const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
 /** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
 const MS_GAP = 0.15;
-/** The vang's lower block: on its fitting at the foot of the mast, abaft it (fixed to the mast: the tackle swings to the boom's block). */
-const VANG_FOOT = new THREE.Vector3(0, DECK_AT_MAST + 0.07 + 0.05, MAST_AFT_Z + 0.05);
+/** The vang's lower block: shackled at the base of the mast, abaft it, its sheave 5 cm above whatever the mast stands
+ * out of there (the owner's photo: the block at the mast base, with the jammer on it). */
+const VANG_FOOT = new THREE.Vector3(0, Math.max(DECK_AT_MAST, cabinTopAt(uAtZ(MAST_AFT_Z + 0.04), 0) * (uAtZ(MAST_AFT_Z + 0.04) > CABIN.u0 ? 1 : 0)) + 0.05, MAST_AFT_Z + 0.04);
+/** The vang's top block, hung on its wire span under the boom (in the boom's frame, from the gooseneck): on the line from
+ * where the old single block was (VANG_R along) toward the foot, 0.4 m down it; the span's two legs to the boom at
+ * VANG_LEGS (m from the gooseneck). Estimates from the photo. */
+const VANG_LEGS = [0.45, 1.2];
+const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R - 0.05, VANG_R), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.4); })();
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
@@ -1150,7 +1161,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
-    const top = tmpG.set(Math.sin(a) * VANG_R, BOOM_TOP - 2 * BOOM_R - 0.05, boomZ + Math.cos(a) * VANG_R);
+    const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
     for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.006, at = i % 2 ? top : VANG_FOOT; q.setXYZ(i, at.x + ux * o, at.y, at.z + uz * o); }
     q.needsUpdate = true; }
   // the Cunninghams' cringles come down with their sails as they're struck (the tack stays put)
