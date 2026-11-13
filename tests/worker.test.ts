@@ -177,4 +177,27 @@ describe('the race in its worker sails as in the page', () => {
     expect(W.mode).toBe('local'); expect(why).toMatch(/numbered apart/);
     expect(W.view.t).toBeGreaterThan(-180 + 1.5); // (two seconds of race sailed, here)
   }, 300_000);
+
+  it('rebuilt in the same worker (the setup\'s changes): the old race\'s answers dropped, the new race the same as in the page', () => {
+    const fake = new FakeWorker(true), W = new WorkerHost(fake as unknown as Worker, race());
+    W.send({ k: 'running', on: true });
+    for (let i = 0; i < 40; i++) { W.advance(frameDt(i)); if (i % 2) fake.deliver(); }
+    const old = W.ask({ k: 'moveHere', p: { x: 0, y: 0 }, name: 'nowhere' }); W.advance(1 / 60); // (asked of the old race, and in flight)
+    // the setup changes: another fleet, wind and seed; the page's own facts World for it adopted as the mirror
+    const b: WorldArgs = { file: ss2 as unknown as CourseFile, settings: S({ fleet: 4, windKt: 18, current: 'real' }), seed: 33, opts: {} };
+    const facts = new World(b.file, b.settings, b.seed, b.opts);
+    W.rebuild(b, facts);
+    expect(W.view).toBe(facts);
+    fake.deliver(); // (the old race's answers arrive now: dropped)
+    const L = new LocalHost(new World(b.file, b.settings, b.seed, b.opts));
+    for (let i = 0; i < 400; i++) {
+      for (const c of SCRIPT.get(i) ?? []) { L.send(c); W.send(c); }
+      L.advance(frameDt(i)); W.advance(frameDt(i)); fake.deliver();
+    }
+    expect(W.mode).toBe('worker');
+    expect(state(fake.race.world!)).toBe(state(L.world));
+    expect(firstDifference(fake.race.world!, W.world)).toBeNull();
+    expect(W.faults).toBe(0);
+    return old.then(r => expect(r).toBeUndefined()); // (the old race's question goes unanswered)
+  }, 300_000);
 });

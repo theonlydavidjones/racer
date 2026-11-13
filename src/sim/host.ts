@@ -77,6 +77,11 @@ export interface SimHost {
   drainEvents(): SimEvent[];
   /** Done with this race (a new one's being built): the worker stops. */
   dispose(): void;
+  /**
+   * A new race in place (the setup's changes), keeping the worker: read `view` again after. `mirror`: the page's own
+   * World built from these args and untouched, to be used rather than building another.
+   */
+  rebuild(args: WorldArgs, mirror?: World): void;
 }
 
 /**
@@ -119,8 +124,12 @@ export class LocalHost implements SimHost {
   /** Time not yet stepped, s (the race's time: the page's time × its speed). */
   private acc = 0;
   /** The view the page reads: the World itself, or (?simguard, dev only) a proxy that refuses writes. */
-  readonly view: SimView;
-  constructor(readonly world: World, guard = false) { this.view = guard ? guarded(world) : world; }
+  view: SimView;
+  constructor(public world: World, private guard = false) { this.view = guard ? guarded(world) : world; }
+  rebuild(args: WorldArgs, mirror?: World): void {
+    this.world = mirror && mirror.steps === 0 && !mirror.running ? mirror : new World(args.file, args.settings, args.seed, args.opts);
+    this.view = this.guard ? guarded(this.world) : this.world; this.acc = 0;
+  }
   advance(dt: number, twa?: number): number {
     const w = this.world, t0 = performance.now();
     if (w.running && !w.paused) {
@@ -152,8 +161,10 @@ export interface WorldArgs { file: CourseFile; settings: Settings; seed: number;
  */
 export class WorkerHost implements SimHost {
   mode: 'local' | 'worker' = 'worker';
-  readonly world: World;
-  readonly view: SimView;
+  world: World;
+  view: SimView;
+  /** Which World the worker sails (rebuild makes a new one): answers from an older one are dropped. */
+  private gen = 0;
   private mirror: SyncMirror;
   private queue: { c: Command; id?: number }[] = [];
   /** The frames sent and not yet answered: their commands, and when each was sent (ms, the page's clock). */
@@ -182,16 +193,39 @@ export class WorkerHost implements SimHost {
    * setup's World made something the worker's hasn't), the race sails on that World in the page instead.
    */
   constructor(private worker: Worker, args: WorldArgs, private guard = false, private onFail?: (why: string) => void, mirror?: World) {
+    worker.onmessage = (e: MessageEvent<FromWorker>) => this.receive(e.data);
+    worker.onerror = e => { e.preventDefault(); this.fail(e.message || 'the worker stopped'); };
+    // (set by begin, here as for a rebuild)
+    this.world = null as unknown as World; this.view = null as unknown as SimView; this.mirror = null as unknown as SyncMirror;
+    this.begin(args, mirror);
+  }
+  /** A World for these args (or the page's own untouched one) as the mirror, and the worker told to build its own. */
+  private begin(args: WorldArgs, mirror?: World): void {
     const adopt = !!mirror && mirror.steps === 0 && !mirror.running;
     this.world = adopt ? mirror! : new World(args.file, args.settings, args.seed, args.opts);
     this.mirror = new SyncMirror(this.world);
-    this.view = guard ? guarded(this.world) : this.world;
-    worker.onmessage = (e: MessageEvent<FromWorker>) => this.receive(e.data);
-    worker.onerror = e => { e.preventDefault(); this.fail(e.message || 'the worker stopped'); };
-    worker.postMessage({ k: 'init', ...args, ...(adopt ? { fresh: true } : {}) } satisfies ToWorker);
+    this.view = this.guard ? guarded(this.world) : this.world;
+    this.worker.postMessage({ k: 'init', ...args, gen: this.gen, ...(adopt ? { fresh: true } : {}) } satisfies ToWorker);
+  }
+  /**
+   * A new race in the same worker (the setup's changes: another course, boat, day or fleet): no new worker started. The
+   * page reads the new `view` after this (the old one is the old race). What was sent and not yet answered is dropped
+   * (its answers, if they come, are for the old World); questions asked of the old race come back unanswered.
+   * `mirror`: the page's own untouched World for these args, as in the constructor.
+   */
+  rebuild(args: WorldArgs, mirror?: World): void {
+    for (const [, res] of this.asks) res(undefined);
+    this.asks.clear(); this.queue = []; this.sent = []; this.inflight = 0; this.due = 0; this.events = [];
+    if (this.local) { // (the worker failed earlier: the page sails the new race itself)
+      const adopt = !!mirror && mirror.steps === 0 && !mirror.running;
+      this.world = adopt ? mirror! : new World(args.file, args.settings, args.seed, args.opts);
+      this.local = new LocalHost(this.world, this.guard); this.view = this.local.view; return;
+    }
+    this.gen++;
+    this.begin(args, mirror);
   }
   private receive(m: FromWorker): void {
-    if (this.local) return;
+    if (this.local || m.gen !== this.gen) return; // (an answer for a World since replaced)
     if (m.k === 'failed') { this.fail(m.msg); return; }
     // (an adopted mirror numbered apart from the worker's World: the race sails on it here, which is right, if slower)
     if (m.packet.count != null && m.resync == null && m.packet.count !== this.mirror.count) { this.fail(`the page's World and the worker's were numbered apart (${this.mirror.count} against ${m.packet.count})`); return; }
