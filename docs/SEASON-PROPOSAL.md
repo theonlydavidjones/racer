@@ -104,3 +104,11 @@ summaries only. Until it's settled, the sim's trophy is simply "the series troph
 4. **Colors: hull colors, duplicates and all** (the owner: "that's true in life too"). Each sparkline ends in its sail
    number, and a row's line thickens on hover, so two lines of one color can be told apart. A faint light edge keeps a
    black or navy hull visible on the dark panel.
+
+## 2026–27, the season under way (13 Nov 2026)
+
+The Season tab opens on 2026–27, and its season picker (inside the tab) goes back to 2025–26. Race 1 is the real one:
+7 Nov 2026, Folkboats starting 13:35, on course 2 (a last-minute change the results don't show, from the owner, who sailed
+it; reference/results/seaweed-soup-2026-27-race1-2026-11-07.png). Later races appear only as they're published: no date is
+invented. The header says how many of the series' five are still to come. The results sheet also settles the ratings:
+every Folkboat on PHRF 252, so time on time is level.
