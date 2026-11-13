@@ -308,6 +308,20 @@ function onSole(x0: number, z0: number, k: number): PoseT {
   p.hands = [thigh(0), thigh(1)];
   return p;
 }
+/**
+ * Working on deck or the cabin top on one knee (as on the cockpit sole: the owner, and the Coordinator's brief, 13 Nov:
+ * one knee down, the other foot planted, low and braced, a hand on the boat): the down knee under the hips with its shin
+ * flat behind, the other foot a stride ahead, the hips low and the body leaning to the work. `front` which leg is
+ * forward (0 left, 1 right); `hands` [left, right], one of them on the boat.
+ */
+function kneelOn(x: number, z: number, yaw: number, front: number, hands: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
+  const f = fwd(yaw), r = right(yaw), g = ground(x, z);
+  const hip = V(x, g + 0.42 * k, z);
+  const feet = [0, 1].map(j => j === front
+    ? onGround(hip.clone().addScaledVector(f, 0.38 * k).addScaledVector(r, (j ? 1 : -1) * 0.14 * k))
+    : (() => { const q = hip.clone().addScaledVector(f, -0.36 * k).addScaledVector(r, (j ? 1 : -1) * 0.09 * k); return q.setY(Math.max(g, ground(q.x, q.z)) + 0.07); })()) as [THREE.Vector3, THREE.Vector3];
+  return { hip, yaw, pitch: -0.35, roll: 0, feet, hands, look: lookAt.clone() };
+}
 /** Kneeling on the surface at (x, z), facing `yaw`, shins flat behind, hands at `reach`. */
 function kneel(x: number, z: number, yaw: number, reach: [THREE.Vector3, THREE.Vector3], k: number, lookAt = JIB_LUFF): PoseT {
   // (the hips 0.34 m up, so with the thigh leaning forward the knee is on the surface and the shin lies flat behind it:
@@ -409,22 +423,31 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     return { hip, yaw: 0, pitch: 0.12, roll: 0, feet, hands: [V(-0.13, deckY(u, 0.13) + 0.03, z + 0.06), V(0.13, deckY(u, 0.13) + 0.03, z + 0.06)], look: V(0, 1, z - 6) };
   }
   if (job === 'fore') {
-    // on the foredeck between the mast and the forestay, knees up, feet on the deck ahead, watching the jib on its pole
-    const u = uAtZ(z), hip = V(x, deckY(u, ax) + 0.09 * k, z);
-    const feet = [0, 1].map(j => onGround(V(x + (j ? 1 : -1) * 0.13 * k, 0, z - 0.42 * k))) as [THREE.Vector3, THREE.Vector3];
-    const knees = V(x, hip.y + 0.32 * k, z - 0.26 * k);
-    return { hip, yaw: 0, pitch: -0.2, roll: 0, feet, hands: [knees.clone().add(V(-0.08, 0, -0.03)), knees.clone().add(V(0.08, 0, -0.03))], look: JIB_LUFF.clone() };
+    // on the foredeck between the mast and the forestay with the pole, on one knee facing forward, the outboard foot
+    // planted ahead: one hand on the pole out at the jib's clew, the other on the deck beside them, braced
+    const u = uAtZ(z), d = deckY(u, ax), side = s, out = side > 0 ? 1 : 0;
+    const hands: [THREE.Vector3, THREE.Vector3] = [V(0, 0, 0), V(0, 0, 0)];
+    hands[out] = V(x + side * 0.22, d + 0.55 * k, z - 0.5 * k); // (the pole, going out to the clew)
+    hands[1 - out] = V(x - side * 0.2, deckY(u, Math.abs(x - side * 0.2)) + 0.04, z - 0.18 * k); // (on the deck)
+    return kneelOn(x, z, 0, out, hands, k, JIB_LUFF);
   }
   if (job === 'mast') {
     // kneeling on the cabin top just aft of the mast (the pole, a halyard), hands up on it
-    const zz = Math.max(z, CAB0 + 0.45);
-    return kneel(s * 0.22, zz, 0, [V(-0.06, ground(0, zz) + 0.75, CAB0 + 0.08), V(0.06, ground(0, zz) + 0.95, CAB0 + 0.08)], k, V(0, 3, -2.5));
+    // (one knee down, the outboard foot planted ahead; a hand round the mast, the other up on the pole or the halyard)
+    const zz = Math.max(z, CAB0 + 0.45), out = s > 0 ? 1 : 0, hands: [THREE.Vector3, THREE.Vector3] = [V(0, 0, 0), V(0, 0, 0)];
+    hands[1 - out] = V(s * 0.05, ground(0, zz) + 0.55, MAST_Z + 0.06); // (holding the mast)
+    hands[out] = V(s * 0.07, ground(0, zz) + 0.95, MAST_Z + 0.04); // (the pole's heel, or the halyard, up the mast)
+    return kneelOn(s * 0.22, zz, 0, out, hands, k, V(0, 3, -2.5));
   }
   if (job === 'car') {
     // kneeling on the side deck beside the cabin, facing forward along it, reaching in to the car on its track
     const u = uAtZ(z), px = s * Math.min(halfBeam(u) - 0.16, Math.max(cabinHalf(u) + 0.14, ax));
     const car = V(s * 0.58, cabinTopAt(u, 0.58) + 0.06, z - 0.2);
-    return kneel(px, z, 0, [car.clone().add(V(0, 0, 0.06)), car.clone().add(V(s * 0.04, 0.02, -0.06))], k, car);
+    // (on one knee, the outboard foot ahead: the inboard hand on the car, the outboard one on the cabin top's edge)
+    const out = s > 0 ? 1 : 0, hands: [THREE.Vector3, THREE.Vector3] = [V(0, 0, 0), V(0, 0, 0)];
+    hands[1 - out] = car.clone().add(V(0, 0, 0.02));
+    hands[out] = V(s * (cabinHalf(u) - 0.02), cabinTopAt(u, cabinHalf(u) - 0.02) + 0.04, z - 0.05);
+    return kneelOn(px, z, 0, out, hands, k, car);
   }
   const onDeckHere = job === 'hike' || z > ZC_AFT + 0.05 || ax >= chz(benchZ(z)) - 0.06, zc = onDeckHere ? deckZ(z) : benchZ(z);
   if (job === 'piano' && ax > 0.55) {
