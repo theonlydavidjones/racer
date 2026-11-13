@@ -335,7 +335,7 @@ export const ROLL_HOLD = 2;
  *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
  *   Performance Sailing);
  * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
- * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time):
+ * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time), and for `last` s after, as the puff fills in, they carry on out to where it asks, not a second move:
  *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
  *   body, not a move.
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
