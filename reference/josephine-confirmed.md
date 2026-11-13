@@ -26,6 +26,10 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   halfway between the hatch and the roof's edge.
 - The jib car tracks are H-shaped, on the cabin top between the grab rail and the roof's edge; cross-bar about 5 in,
   tracks at most 7 in; the car's forward edge level with the grab rail's forward end. (Photo looking aft from the mast.)
+- Josephine's jib cars are on the cabin top today. Years ago they were on the side deck: the old track is still there,
+  on the side deck beside the cabin's forward window (the owner's photo). Many SF fleet boats moved theirs to the cabin top.
+  The exact distances (off the centreline, aft of the forestay) are not yet measured; North Sails' guide gives 58 cm and
+  2.65 m for a cabin-top lead, which on our model lands on the grab rail, so one of them is a little off.
 - No T-bar or other fitting on the cabin top besides these.
 - The cabin may be dark inside by day. Cushions are brown. The mast is keel-stepped. The lantern stays mounted, dark when unlit.
 - The companionway hatch slides forward to open, its own length, clearing the opening fully.
