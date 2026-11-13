@@ -46,6 +46,12 @@ export interface RaceReplayData {
   vs?: Versus | null;
   /** A real past race: a line on where you'd have placed among the real fleet that day. */
   real?: string;
+  /** The tactical debrief's chart (ui/tacticsView.ts), drawn into the list by the app; a leg picked there jumps to it. */
+  tactics?: (host: HTMLElement, onLeg: (i: number) => void) => void;
+  /** The planner's ideal track on each leg (0-based), dashed beside yours when you sail a leg. */
+  idealPaths?: { x: number; y: number }[][];
+  /** The boats chosen on the tactical chart, drawn beside you like the rival. */
+  chosen?: () => number[];
 }
 
 const SPEEDS = [10, 30, 60];
@@ -121,6 +127,7 @@ export class RaceReplay {
     this.tl = this.root.querySelector('.rrTime')!;
     this.root.hidden = false;
     this.root.onclick = e => this.click(e);
+    const th = this.root.querySelector<HTMLElement>('.tacHost'); if (th && D.tactics) D.tactics(th, i => this.pickLegNo(i));
     this.tl.onpointerdown = e => { this.dragging = true; this.tl.setPointerCapture(e.pointerId); this.scrub(e, true); };
     this.tl.onpointermove = e => { if (this.dragging) this.scrub(e, false); };
     this.tl.onpointerup = () => { this.dragging = false; };
@@ -143,7 +150,7 @@ export class RaceReplay {
       <p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
     const rules = D.moments.filter(m => m.key === 'rule').map(m => `<li class="rrPick" data-at="${m.t1}" tabindex="0">
       <div class="dbHead"><b>${badge('rule', '!')}${esc(m.text)}</b><span class="dbLost">${mmss(m.t1)}</span></div></li>`).join('');
-    return `${this.vsHtml()}<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
+    return `${this.D!.tactics ? '<div class="eyebrow">Tactics, leg by leg</div><div class="tacHost"></div>' : ''}${this.vsHtml()}<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
       <ol>${items}</ol>${rules ? `<div class="eyebrow">Rule incidents</div><ol>${rules}</ol>` : ''}`;
   }
 
@@ -168,6 +175,15 @@ export class RaceReplay {
     this.clipView?.stop(); this.clipView = null;
     this.sel = null; this.selLeg = null; this.selVsm = m; this.follow = true;
     this.t = Math.max(this.D!.frames[0].t, m.t0 - 5);
+    this.caption(); this.paintButtons(); this.setPlaying(true);
+  }
+
+  /** Jump to leg i (0 the start) from the tactical chart: as a leg of the comparison if there is one, else from its start. */
+  pickLegNo(i: number): void {
+    const L = this.D?.vs?.legs.find(x => x.i === i);
+    if (L) { this.pickLeg(L); return; }
+    const t0 = i === 0 ? -15 : this.D?.marks[i - 1]?.t; if (t0 == null) return;
+    this.sel = null; this.selLeg = null; this.selVsm = null; this.follow = true; this.t = Math.max(this.D!.frames[0].t, t0 - 5);
     this.caption(); this.paintButtons(); this.setPlaying(true);
   }
 
@@ -338,12 +354,18 @@ export class RaceReplay {
       return on;
     };
     // the others' tracks, so far; the boat you're measured against brighter, all of hers faint ahead
-    const rv = D.vs?.rival ?? -1;
-    w.boats.forEach((bt, i) => { if (i === u || i === rv) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
-    if (rv >= 0) {
-      const c = w.boats[rv].color;
-      ctx.strokeStyle = hexA(c, .2); ctx.lineWidth = 1.5; if (line(rv, 0, F.length)) ctx.stroke();
-      ctx.setLineDash([2, 3]); ctx.strokeStyle = hexA(c, .9); ctx.lineWidth = 2.5; if (line(rv, 0, upto)) ctx.stroke(); ctx.setLineDash([]);
+    const rv = D.vs?.rival ?? -1, picked = new Set([...(rv >= 0 ? [rv] : []), ...(D.chosen?.() ?? [])].filter(i => i !== u));
+    w.boats.forEach((bt, i) => { if (i === u || picked.has(i)) return; ctx.strokeStyle = hexA(bt.color, .45); ctx.lineWidth = 1.3; if (line(i, 0, upto)) ctx.stroke(); });
+    for (const id of picked) {
+      const c = w.boats[id].color;
+      ctx.strokeStyle = hexA(c, .2); ctx.lineWidth = 1.5; if (line(id, 0, F.length)) ctx.stroke();
+      ctx.setLineDash([2, 3]); ctx.strokeStyle = hexA(c, .9); ctx.lineWidth = 2.5; if (line(id, 0, upto)) ctx.stroke(); ctx.setLineDash([]);
+    }
+    // the ideal (the planner's perfect sail) on the leg you're sailing, dashed
+    const ip = this.selLeg && this.selLeg.i > 0 ? D.idealPaths?.[this.selLeg.i - 1] : null;
+    if (ip && ip.length > 1) {
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(233,242,245,.55)'; ctx.lineWidth = 1.6; ctx.beginPath();
+      ip.forEach((p, k) => { const q = tf(p.x, p.y); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); ctx.setLineDash([]);
     }
     // yours: all of it faint, so far bright
     ctx.strokeStyle = 'rgba(233,242,245,.18)'; ctx.lineWidth = 1.5; if (line(u, 0, F.length)) ctx.stroke();
