@@ -23,12 +23,17 @@ export async function poolSize(): Promise<number> {
   return n >= 2 ? n : 0;
 }
 
-/** Sail `fn` once for each argument list, in the pool (or here); the results in the same order as `jobs`. */
-export async function sail<F extends Fn>(fn: F, jobs: Parameters<Races[F]>[]): Promise<ReturnType<Races[F]>[]> {
+/**
+ * Sail `fn` once for each argument list, in the pool (or here); the results in the same order as `jobs`. `threads`
+ * (tests/racepool.test.ts): sail on that many threads whatever the cores, and fail if there are no threads to be had.
+ */
+export async function sail<F extends Fn>(fn: F, jobs: Parameters<Races[F]>[], threads?: number): Promise<ReturnType<Races[F]>[]> {
   const call = races[fn] as unknown as (...a: unknown[]) => ReturnType<Races[F]>;
-  const n = Math.min(await poolSize(), jobs.length);
-  if (n < 2) return jobs.map(a => call(...a));
-  const { Worker } = (await nodeModule<{ Worker: WorkerCtor }>('node:worker_threads'))!;
+  const n = Math.min(threads ?? await poolSize(), jobs.length);
+  if (!threads && n < 2) return jobs.map(a => call(...a));
+  const wt = await nodeModule<{ Worker?: WorkerCtor }>('node:worker_threads');
+  if (!wt?.Worker) throw new Error('race pool: no worker_threads here');
+  const Worker = wt.Worker;
   const here = new URL('.', import.meta.url), root = new URL('../../', here);
   const out: ReturnType<Races[F]>[] = new Array(jobs.length);
   let next = 0, done = 0;
