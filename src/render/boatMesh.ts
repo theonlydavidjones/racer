@@ -553,7 +553,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
-    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main'); grp.add(tl); travLines.push(tl);
+    // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
+    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl);
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
