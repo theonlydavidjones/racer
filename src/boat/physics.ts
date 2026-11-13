@@ -272,10 +272,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
   const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt);
   rollTo(b, heelT, rel, disp, dt);
-  b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.ceh, clrShift(cs.trim));
-  // what turns her by itself, for the next step's turn (N·m, + to starboard): the sails' moment about the keel, and the
-  // wind on her topsides, rig and crew (dynamics.ts windTurn: ahead of the keel's centre it blows her bow off)
-  b.turnM = (rel >= 0 ? 1 : -1) * (sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * clrShift(cs.trim) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, 3, 1 - (b.rig?.main ?? 1)));
+  // what turns her by itself (N·m, toward the wind): the sails' moment about the keel, and the wind on her topsides, rig
+  // and crew (dynamics.ts windTurn: its centre ahead of the keel's blows her bow off). Kept for the next step's turn
+  // (b.turnM, + to starboard), and as the helm she needs to sail straight: the rudder angle whose lift balances it
+  // (balance.ts helmNeeded's, with the windage: below about 3.5 kt the hull's grip falls away as fast as the rudder's,
+  // so the balance doesn't run away at low speed)
+  const mTurn = sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * clrShift(cs.trim) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, 3, 1 - (b.rig?.main ?? 1));
+  b.turnM = (rel >= 0 ? 1 : -1) * mTurn;
+  // (and, a little, her hull's broadside drag as she makes leeway: its centre is aft of the keel's, HOVE.dragAft, so it
+  // turns her bow off: turning.ts hullSide's strips, summed)
+  const lee = -(rel >= 0 ? 1 : -1) * (b.sway ?? 0), mLee = -0.5 * 1025 * HOVE.latArea * HOVE.crossCd * HOVE.dragAft * lee * Math.abs(lee);
+  b.helmNeed = clamp((mTurn + mLee) / (0.5 * 1025 * Math.max(1.8, b.v) ** 2 * RUDDER.area * RUDDER.slope * RUDDER.arm) / D2R, -25, 25);
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
   // heel past her best; the weight aboard (displacement) and where it sits fore and aft (the trim's resistance); in a
   // drifter, the sails' own weight (heeled to leeward, gravity helps hold them in shape)
