@@ -143,13 +143,13 @@ const nearBox = (g: Group, p: Vec, r: number) => p.x > g.box.x0 - r && p.x < g.b
  * Build, before the start, the grids of the harbors within `r` of these places (the course, her start, her slip, where
  * she's bound), so nothing is built mid-race there.
  */
-export function prepareBasins(near: Vec[], r: number): void { for (const g of GROUPS) if (!g.calm && near.some(p => nearBox(g, p, r))) calmOf(g); }
+export function prepareBasins(near: readonly Vec[], r: number): void { for (const g of GROUPS) if (!g.calm && near.some(p => nearBox(g, p, r))) calmOf(g); }
 /**
  * Work on the nearest unbuilt grid within `r` of any of these places (the boats) for up to `ms` milliseconds, a slice at a
  * time, so a harbor a boat is sailing toward is ready long before she's there. The grid comes out the same however its
  * building is sliced. True while there's more to do.
  */
-export function warmBasins(near: Vec[], r: number, ms: number): boolean {
+export function warmBasins(near: readonly Vec[], r: number, ms: number): boolean {
   let best: Group | null = null, bd = Infinity;
   for (const g of GROUPS) { if (g.calm) continue; for (const p of near) { if (!nearBox(g, p, r)) continue; const dx = Math.max(g.box.x0 - p.x, 0, p.x - g.box.x1), dy = Math.max(g.box.y0 - p.y, 0, p.y - g.box.y1), d = dx * dx + dy * dy; if (d < bd) { bd = d; best = g; } } }
   if (!best) return false;
@@ -184,9 +184,21 @@ function calmIn(c: Calm, p: Vec): number {
   return w > 0 ? s / w : c.floor[Math.max(0, Math.min(c.ny - 1, j)) * c.nx + Math.max(0, Math.min(c.nx - 1, i))];
 }
 /** How much of the stream reaches p (1 in open water): the most open of the harbor grids it's on. */
+/** As basinCalm, for drawing only: undefined where the grid isn't built yet (it never builds one). */
+export function basinCalmIfBuilt(p: Vec): number | undefined {
+  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return g.calm ? calmIn(g.calm, p) : undefined;
+  return 1;
+}
 export function basinCalm(p: Vec): number {
   for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return calmIn(calmOf(g), p);
   return 1;
+}
+/** (tests) Advance the build of harbor h's grid by n slices; true once it's built. */
+export function _advanceBasin(h: Harbor, n: number): boolean {
+  const g = GROUPS.find(g => g.harbors.includes(h))!; if (g.calm) return true;
+  const job = g.job ??= buildCalm(g);
+  for (let i = 0; i < n; i++) { const r = job.next(); if (r.done) { g.calm = r.value; g.job = undefined; return true; } }
+  return false;
 }
 export const _calmGrid = (h: Harbor) => calmOf(GROUPS.find(g => g.harbors.includes(h))!);
 /** (for the tests) The grids' boxes, and the harbors on each. */

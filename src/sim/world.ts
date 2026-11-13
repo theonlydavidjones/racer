@@ -9,7 +9,7 @@ import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReac
 import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
-import { CURRENTS, basinCalm, currentAt, prepareBasins, warmBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
+import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
@@ -53,8 +53,8 @@ import { RaceLog } from './debrief';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
-/** How near (m) the basins' current is worked out before the start; and how far ahead of a boat, as she sails. */
-const BASINS_NEAR = 4000, BASINS_AHEAD = 3000;
+/** How near (m) the basins' current is worked out before the start (farther ones in the worker's or the page's spare time: sim/worker.ts, app.ts). */
+const BASINS_NEAR = 4000;
 /** Two-turns penalty, in degrees of turning. */
 export const TWO_TURNS = 720;
 
@@ -603,6 +603,12 @@ export class World {
   }
   /** The stream at a point as if no breakwater stood there: the sea's look upwind for the water its waves came
    * through (environment/sea.ts), which is never a harbor's still basin (no waves come to open water through one). */
+  /** The current for drawing (the chart's streaks and arrows, its readout, the water's flow): as currentAt, but never
+   * waiting on a harbor's still-water grid not built yet (the open stream there until it is, a moment later). */
+  currentDrawn(p: Vec): Vec {
+    const c = withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t), k = basinCalmIfBuilt(p) ?? 1;
+    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+  }
   openStreamAt(p: Vec): Vec { return withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t); }
   /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
    * every step, where the same places come up again and again; the sea map, the chart and the arrows, which sample the
@@ -840,7 +846,6 @@ export class World {
 
   /* ---------- the fixed step ---------- */
   step(dt = DT): void {
-    if (this.steps % 6 === 0) warmBasins(this.boats, BASINS_AHEAD, 1); // (a harbor a boat is sailing toward, a millisecond at a time)
     const prevT = this.t;
     this.t += dt;
     this.steps++;
@@ -1509,7 +1514,6 @@ export class World {
    * starboard of the wind) if given; the race clock doesn't move and nothing else happens.
    */
   idle(dt: number, twa?: number): void {
-    warmBasins(this.boats, BASINS_AHEAD, 2);
     const u = this.user;
     if (u.docked) { this.dockStep(u, dt); return; }
     const h = twa != null ? n360(this.wind.from + twa) : u.h;

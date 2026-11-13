@@ -39,7 +39,7 @@ export function flowAt(w: SimView, kind: FlowKind, p: Vec): { kt: number; ux: nu
     const f = w.fieldAt(p), q = w.puffs.at(p), kt = w.wind.kt * f.k * q.k, a = (w.wind.from + f.turn + q.veer) * Math.PI / 180;
     return { kt, ux: -Math.sin(a), uy: -Math.cos(a) };
   }
-  const c = w.currentAt(p), s = Math.hypot(c.x, c.y);
+  const c = w.currentDrawn(p), s = Math.hypot(c.x, c.y);
   return { kt: s / KT, ux: s ? c.x / s : 0, uy: s ? c.y / s : 0 };
 }
 
@@ -53,7 +53,7 @@ export function tideWord(w: SimView, p: Vec, c: Vec): string {
 }
 /** The two lines of the readout at p: the layer's own first. `wind` and `cur` default to what's on the water there. */
 export function readout(w: SimView, kind: FlowKind, p: Vec, wind?: { kt: number; from: number }, cur?: Vec): [string, string] {
-  const wv = wind ?? w.windHere(p, undefined, false), c = cur ?? w.currentAt(p), ck = Math.hypot(c.x, c.y) / KT, tw = tideWord(w, p, c);
+  const wv = wind ?? w.windHere(p, undefined, false), c = cur ?? w.currentDrawn(p), ck = Math.hypot(c.x, c.y) / KT, tw = tideWord(w, p, c);
   const wl = `${Math.round(wv.kt)} kt from ${deg(wv.from)}`;
   const cl = tw === 'slack' ? 'slack water' : `${tw} ${ck.toFixed(1)} kt toward ${deg(Math.atan2(c.x, c.y) * 180 / Math.PI)}`;
   return kind === 'wind' ? [wl, cl] : [cl, `wind ${wl}`];

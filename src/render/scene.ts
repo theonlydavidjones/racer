@@ -30,7 +30,6 @@ import { Harbor } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
-import { warmBasins } from '../environment/current';
 import { N_WAVES, WAVE_GLSL, boatOnWaves, packWaves, waterGrid } from './waves';
 import { waveTime } from '../environment/waveField';
 import type { SeaHere } from '../environment/sea';
@@ -579,7 +578,7 @@ export class SceneView {
     // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s
     const cc = span / (CUR_N - 1), cx0 = Math.round((at.x - span / 2) / cc) * cc, cy0 = Math.round((at.y - span / 2) / cc) * cc, // (on its own grid, so a sharp edge in the current doesn't slide between updates)
       U = new Float32Array(CUR_N * CUR_N * 2);
-    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentAt({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
+    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentDrawn({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
     const d = this.curData, at2 = (i: number, j: number, k: number) => U[(Math.min(CUR_N - 1, Math.max(0, j)) * CUR_N + Math.min(CUR_N - 1, Math.max(0, i))) * 2 + k];
     for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) {
       const o = (j * CUR_N + i) * 4, conv = -((at2(i + 1, j, 0) - at2(i - 1, j, 0)) + (at2(i, j + 1, 1) - at2(i, j - 1, 1))) / (2 * cc);
@@ -802,7 +801,6 @@ export class SceneView {
       this.seaAcc = 0; this.seaRef = w.seaHere(focus);
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
     }
-    warmBasins([focus], 3000, 1); // (the page's own copy of the harbors' still water, ready before the camera's there: environment/current.ts)
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
@@ -812,7 +810,7 @@ export class SceneView {
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);
     for (const mo of this.markObjs) {
-      const c = w.currentAt(mo.p), kt = Math.hypot(c.x, c.y) / 0.5144, set = Math.atan2(c.x, c.y);
+      const c = w.currentDrawn(mo.p), kt = Math.hypot(c.x, c.y) / 0.5144, set = Math.atan2(c.x, c.y);
       const lean = Math.min(16, 6.5 * kt) * D2R; // a moored buoy heels over downstream on its chain
       if (!mo.fixed) { // (a beacon stands on its pile: it doesn't heel or ride the waves)
         mo.float.rotation.set(0, 0, 0); mo.float.rotateOnWorldAxis(new THREE.Vector3(Math.cos(set), 0, Math.sin(set)), -lean);
@@ -843,7 +841,7 @@ export class SceneView {
         gm.crew.group.visible = false; // (no crew aboard the ghost: its track doesn't know where they sat, and a see-through crew is clutter)
       }
     }
-    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => waves.height(p, tw, 0.7, 0.4));
+    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentDrawn(p), p => w.windHere(p), p => waves.height(p, tw, 0.7, 0.4));
     this.wildlife.setMonth(+w.raceDate.slice(5, 7) || new Date().getMonth() + 1);
     this.wildlife.update(w.running && !w.paused ? dt * w.speed : 0, tw, w.user, w.boats, (x, y) => waves.height({ x, y }, tw, 1, 1));
     this.vesselView.sync(w.vessels, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => waves.height({ x, y }, tw, 1, 1));

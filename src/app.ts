@@ -1,5 +1,6 @@
 import { CoachMemory } from './boat/coach';
 import { PREP_MEANING } from './sim/signals';
+import { warmBasins } from './environment/current';
 import { describeSea } from './environment/sea';
 import './styles.css';
 import { CURRENTS } from './environment/current';
@@ -235,6 +236,7 @@ function prepare(seed = randomSeed()): void {
       : new LocalHost(facts, SIM_GUARD);
   }
   w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false; resultsShown = false;
+  warmBasinsIdle();
   document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   unshown = true; document.documentElement.dataset.prepared = String(++prepared);
 }
@@ -2188,3 +2190,16 @@ requestAnimationFrame(frame);
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
 if (import.meta.env.DEV) Object.assign(window, { __ghost: (pts: Ghost['pts'] | null) => { activeGhost = pts ? { at: 'dev', key: 'dev', pts } : null; view.setGhost(w, pts); } }); // (a ghost on any race, for checking how it's drawn)
 if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; }, __nav: () => nav.trail });
+
+/**
+ * The page's own copy of the harbors' still-water grids (environment/current.ts), worked on in its idle time round the
+ * boats, so the chart and the water have them before they're looked at, and a race in the page's own thread (?inproc,
+ * or a worker that wouldn't start) never stops to build one. Started once; it naps a second when there's nothing near.
+ */
+let basinsWarming = false;
+function warmBasinsIdle(): void {
+  if (basinsWarming) return; basinsWarming = true;
+  const idle = (cb: (ms: number) => void) => typeof requestIdleCallback === 'function' ? requestIdleCallback(d => cb(Math.max(0, d.timeRemaining() - 1)), { timeout: 1000 }) : setTimeout(() => cb(4), 50);
+  const tick = (ms: number) => { const more = !!w && warmBasins(w.boats, 3000, ms); if (more) idle(tick); else setTimeout(() => idle(tick), 1000); };
+  idle(tick);
+}
