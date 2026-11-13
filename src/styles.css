@@ -1246,3 +1246,13 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 /* a member's crew ratings: the number always, "auto" by one that follows their Skill (set by hand, plain) */
 .mslider output{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap}
 .mslider .mauto{font:600 9.5px/1 var(--f-inst);font-style:normal;letter-spacing:.1em;text-transform:uppercase;color:#7ee0a5;opacity:.85}
+/* Settings in two tabs, Training aids and Keys (docs/UI-AUDIT.md §4.10); the keys' groups as an index at the top */
+#keysView #setTabs{margin:0 0 4px}
+#keysView .settab{display:flex;flex-direction:column;gap:14px}
+#keysView .settab[hidden]{display:none}
+#keysView .kindex{display:flex;flex-wrap:wrap;gap:6px}
+#keysView .kgroup{scroll-margin-top:12px}
+/* Past races: their own screen under Race (docs/UI-AUDIT.md §2) */
+#pastView .pastrows{max-height:none}
+/* Settings is a layer: the screen it opened over (the start page, the pause menu) is put away while it's up, not half-seen */
+body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .panel{visibility:hidden}

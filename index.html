@@ -169,18 +169,9 @@
     <div class="modes three">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
-      <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats and their records</span></button>
+      <button type="button" class="modecard" data-home="fleet"><b>Yacht Club</b><span>Your boats, your crew, the club</span></button>
     </div>
     <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button></div>
-  </div>
-</div>
-<div class="overlay" id="club" hidden>
-  <div class="panel">
-    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
-    <div class="eyebrow">Yacht Club</div>
-    <h2>Coming next</h2>
-    <p>The club is where you'll keep your crew and skippers: who sails with you, and who skippers each boat you race against. A skipper's skill (starts, shifts, laylines, boat handling) will decide how well the AI sails, on top of the boat's own condition.</p>
-    <div class="btnrow"><button class="cta" type="button" data-home="home">Back</button></div>
   </div>
 </div>
 <div class="overlay" id="raceChoose" hidden>
@@ -189,9 +180,16 @@
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
-      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
+      <button type="button" class="modecard" id="bPast" data-home="past"><b>Past races</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
     </div>
-    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="pastView" hidden>
+  <div class="panel wide home">
+    <button type="button" class="linkbtn back" id="pastBack" data-home="back">‹ Race</button>
+    <h1>Past races</h1>
+    <div class="pastnote"><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
   </div>
 </div>
 
@@ -360,6 +358,8 @@
       <div><div class="eyebrow">Settings</div><h2>Settings</h2></div>
       <button class="ghost" id="bKeysClose" type="button">Done</button>
     </div>
+    <div class="yctabs" id="setTabs"><button type="button" data-st="aids" aria-pressed="true">Training aids</button><button type="button" data-st="keys" aria-pressed="false">Keys</button></div>
+    <div class="settab" id="setAids">
     <div class="field"><span>Training aids</span>
       <div class="togs">
         <label class="tog">Show laylines and zones<input type="checkbox" data-t="aids"><span class="tog-sw"></span></label>
@@ -375,11 +375,15 @@
       <b>Hail</b><span>The Hail tab on the sail controls band (it shows when there's a hail to make) or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
+    </div>
+    <div class="settab" id="setKeys" hidden>
+    <div class="kindex" id="keysIndex"></div>
     <div class="field"><span>Keyboard</span>
     <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
     <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button></div>
+    </div>
   </div>
 </div>
 
