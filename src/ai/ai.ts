@@ -342,6 +342,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // not started turning yet; or a new penalty came while she was turning (in a jam): rule 44.2, she takes it "after
     // getting well clear of other boats", so she gets clear again before she carries on turning
     if (ai.penSeen != null && b.penaltyTotal > ai.penSeen + 1) ai.reclear = true;
+    // (and while turning, a boat drifting in close: she must keep clear of everyone while she takes it, rule 21.2, so she
+    // stops spinning and sails clear again, rather than turn into her)
+    if (b.penaltyDir && near && nd < PENALTY_CLEAR * 0.6) ai.reclear = true;
     ai.penSeen = b.penaltyTotal;
     if (!near) ai.reclear = false;
     ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
