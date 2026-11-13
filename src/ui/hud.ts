@@ -380,8 +380,9 @@ export class Hud {
         el.className = 'row';
       } else if (hail.clearAt != null) {
         const left = Math.max(0, hail.clearAt + HAIL_RESPONSE - w.t);
-        $('situMsg').textContent = u.lastTackT >= hail.at ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
-        el.className = u.lastTackT >= hail.at ? 'row' : 'kc alarm';
+        const tacked = (u.headToWindT ?? -Infinity) >= hail.at; // (a gybe isn't the tack rule 20.2(d) asks for)
+        $('situMsg').textContent = tacked ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
+        el.className = tacked ? 'row' : 'kc alarm';
       } else if (hail.respondedAt != null) {
         $('situMsg').textContent = `${o.name} is tacking to give you room. Tack as soon as she's through the wind.`;
         el.className = 'kc';
