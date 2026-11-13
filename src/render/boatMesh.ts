@@ -840,6 +840,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
   // starboard jumper strut (she has no spreaders; the masthead has the windex). Flying a foreign ensign on the Bay, she
   // flies the US flag as a courtesy flag at the starboard strut and moves her burgee to port.
+  // (The burgee at the starboard strut, struck for racing, is the Folkboat fleet's own practice: the owner, 13 Nov 2026.)
   const flags: FlyingFlag[] = [];
   let ensign: BoatMesh['ensign'] = null;
   const flagCleats = new Set<number>(); // (one flag-halyard cleat on each side of the mast that flies a flag)

@@ -89,7 +89,7 @@ export const DEFAULT_BOAT: BoatSpec = {
   id: 'josephine', name: 'JOSEPHINE',
   hull: { material: 'fiberglass', upper: '#f4f1e8', lower: '#2a2d33', stripe: '#24324f' },
   deck: '#8e9f7c',
-  sails: { country: 'USA', number: '110', color: 'white' },
+  sails: { country: 'USA', number: '122', color: 'white' }, // (Josephine's own: USA 122, the owner and the 2026–27 Seaweed Soup results, reference/results)
   club: 'stfyc', skipper: 'you',
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
@@ -130,7 +130,9 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     id: typeof x.id === 'string' && x.id ? x.id : newId(),
     name: typeof x.name === 'string' ? x.name.slice(0, 18) : d.name,
     hull: { ...d.hull, ...x.hull }, deck: x.deck ?? d.deck,
-    sails: { ...d.sails, ...x.sails }, perf: { ...d.perf, ...x.perf },
+    // (older saves: Josephine was drawn as 110 before her real number, 122, was known; a boat named JOSEPHINE still on 110
+    // takes 122. Only that case: a number a player chose for any other boat is theirs)
+    sails: (sl => (sl.number === '110' && (typeof x.name === 'string' ? x.name : d.name).trim().toUpperCase() === 'JOSEPHINE' ? { ...sl, number: '122' } : sl))({ ...d.sails, ...x.sails }), perf: { ...d.perf, ...x.perf },
     club: typeof x.club === 'string' ? x.club : x.flags?.burgee ?? '', // older saves: her burgee was her club
     ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',

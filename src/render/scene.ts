@@ -17,7 +17,7 @@ import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
 import type { Boat } from '../boat/boat';
 import { P3 } from './coords';
-import { addLandscape, bridgeLights } from './landscape';
+import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
 import { updateNight } from './night';
 import { REFLECTIVE, RIG } from './boatMesh';
 import type { Terrain } from './terrain';
@@ -30,7 +30,8 @@ import { Harbor } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
-import { N_WAVES, WAVE_GLSL, WaveSet, boatOnWaves, waterGrid } from './waves';
+import { N_WAVES, WAVE_GLSL, boatOnWaves, packWaves, waterGrid } from './waves';
+import { waveTime } from '../environment/waveField';
 import type { SeaHere } from '../environment/sea';
 
 export const VIEWS = ['Cockpit', 'Chase', 'Overhead'] as const;
@@ -261,7 +262,6 @@ export class SceneView {
   private envCam = new THREE.CubeCamera(1, 100000, this.envTarget);
   private envAcc = 99;
   /** The waves: one set, drawn by the water shader and ridden by the boats. */
-  private waves = new WaveSet();
   private waveA = new Float32Array(N_WAVES * 4);
   private waveB = new Float32Array(N_WAVES * 4);
   private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
@@ -427,7 +427,7 @@ export class SceneView {
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
     this.ripAngle = -w.windModel.base * D2R; this.wtex.offset.set(0, 0);
-    this.waves = new WaveSet(); this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12);
+
     this.wakes.reset(w.boats);
     const month = +w.raceDate.slice(5, 7) || new Date().getMonth() + 1; // the grass: gold in summer and autumn, green after the rains
     if (month !== this.landMonth) { this.landMonth = month; this.land?.setSeason(month); }
@@ -487,7 +487,7 @@ export class SceneView {
   conditionsChanged(w: SimView): void {
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     this.ripAngle = -w.windModel.base * D2R; // (the ripples lie across the new wind at once, not swept round to it)
-    this.waves.setSwellPeriod(w.sea.swell?.tp ?? 12, w.t + 600); // (wave time: see sync)
+
     // the lee of the land in the puffs' shading, for the new wind's direction
     const key = `${Math.round(w.C.center.x)},${Math.round(w.C.center.y)},${Math.round(w.windModel.base)}`;
     if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y, 5000, 50, w.windModel.base); this.terrainKey = key; }
@@ -507,6 +507,14 @@ export class SceneView {
     if (w.freeSail) {
       // just sailing: no race course, only the buoys that are really out there
       this.signal = null;
+      // the mark-rounding drill: its two marks (the windward mark and the pin), each with its three-length zone ring
+      if (w.rounding) for (const m of w.rounding.marks) {
+        this.addMark(add, m.p, m.shape, m.look);
+        if (aids) {
+          const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.25, ZONE + 0.25, 64), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+          ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(m.p.x, m.p.y, 0.3)); add(ring);
+        }
+      }
       for (const pl of PLACES) if (pl.buoy) this.addMark(add, pl.p, pl.buoy.shape, pl.buoy.look ?? 'Y');
       if (w.dest && !PLACES.some(pl => pl.buoy && pl.p === w.dest!.p) && aids) {
         // a spot rather than a buoy: a faint ring on the water where you're heading
@@ -556,12 +564,12 @@ export class SceneView {
     }
   }
 
-  /** The sea map: how big the chop and swell are around `at`, relative to the sea at the focus, and the whitecaps. */
+  /** The sea map: how big the chop and swell are around `at`, against the wave field's reference sea (as each boat's are), and the whitecaps. */
   private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void {
-    const ref = this.seaRef!, cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
+    const cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
     for (let j = 0; j < SEA_N; j++) for (let i = 0; i < SEA_N; i++) {
       const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
-      v[o] = ref.hsW > 0.01 ? s.hsW / ref.hsW : 1; v[o + 1] = ref.hsS > 0.01 ? s.hsS / ref.hsS : 1; v[o + 2] = s.white;
+      const k = w.waves.scaleFor(s); v[o] = k.kW; v[o + 1] = k.kS; v[o + 2] = s.white;
     }
     this.seaGrid = { x0, y0, cell, v };
     // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s
@@ -701,6 +709,8 @@ export class SceneView {
     this.skyUni.uSkyCol.value.copy(haze); this.skyUni.uDay.value = 0.3 + 0.7 * day;
     (this.water.material.specular as THREE.Color).setRGB(0.55, 0.55 - 0.2 * warm, 0.5 - 0.3 * warm).multiplyScalar(up * (1 - 0.9 * murk));
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
+    { const on = ((performance.now() / 1000) % 2) < 0.33; // Sutro Tower's beacons: 30 flashes a minute (landscape.ts sutroBeacons)
+      if (sutroBeacons.red) sutroBeacons.red.visible = on && el < 3; if (sutroBeacons.white) sutroBeacons.white.visible = on && el >= 3; }
     if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
     const fogAmt = fog === 'real' ? fogBankAmount(tMin) : 0; // set fog replaces the summer fog bank
@@ -787,10 +797,10 @@ export class SceneView {
       this.seaAcc = 0; this.seaRef = w.seaHere(focus);
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
     }
-    const tw = w.t + 600; // wave time: the sim's clock, so the waves pause, speed up and replay with it
-    this.waves.update(this.seaRef, w.windModel.base, dt, focus); // (turning about where you are: waves.ts)
-    this.waves.pack(this.waveA, this.waveB);
-    this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(this.waves.ref.hsW, this.waves.ref.hsS); this.waveUni.uWhiteRef.value = this.seaRef.white;
+    const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
+    const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
+    packWaves(waves, this.waveA, this.waveB);
+    this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(waves.refW, waves.refS); this.waveUni.uWhiteRef.value = this.seaRef.white;
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);
     for (const mo of this.markObjs) {
@@ -798,7 +808,7 @@ export class SceneView {
       const lean = Math.min(16, 6.5 * kt) * D2R; // a moored buoy heels over downstream on its chain
       if (!mo.fixed) { // (a beacon stands on its pile: it doesn't heel or ride the waves)
         mo.float.rotation.set(0, 0, 0); mo.float.rotateOnWorldAxis(new THREE.Vector3(Math.cos(set), 0, Math.sin(set)), -lean);
-        mo.float.position.y = this.waves.height(mo.p, tw, 1, 1);
+        mo.float.position.y = waves.height(mo.p, tw, 1, 1);
       }
       const len = Math.min(1.6, kt / 1.5);
       mo.wake.visible = kt > 0.15; mo.wake.scale.set(0.6 + 0.4 * len, len, 1);
@@ -807,8 +817,9 @@ export class SceneView {
       (mo.wake.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, kt / 1.2);
     }
     w.boats.forEach((b, i) => {
-      const kW = this.waves.ref.hsW > 0.01 ? b.sea.hsW / this.waves.ref.hsW : 0, kS = this.waves.ref.hsS > 0.01 ? b.sea.hsS / this.waves.ref.hsS : 0;
-      const mo = boatOnWaves(this.waves, b, b.h, tw, kW, kS); this.pitches[i] = mo.pitch;
+      // riding her own heave and pitch (boat/seaway.ts waveMotion: the physics', so the sails, flags and heel answer the
+      // same motion; roll is her heel's)
+      const mo = { heave: b.heave ?? 0, pitch: b.pitch ?? 0, roll: 0 }; this.pitches[i] = mo.pitch;
       // her heave, smoothed twice over (about 0.8 s each) for the chase camera to ride: it glides on a swell (90% of a 14 s
       // one) but hardly stirs on the chop (15% of a 2 s one)
       if (b.isUser) { const k = Math.min(1, dt / 0.8); this.heave1 += (mo.heave - this.heave1) * k; this.heaveS += (this.heave1 - this.heaveS) * k; }
@@ -820,15 +831,15 @@ export class SceneView {
       const g = ghostAt(this.ghost.pts, w.t), gm = this.ghost.mesh; gm.grp.visible = !!g;
       if (g) {
         const gb = { ...w.user, id: 98, isUser: false, x: g.x, y: g.y, h: g.h, tack: g.tack, boom: g.boom, heel: 0, flags: [], burgee: undefined, ensign: undefined } as unknown as Boat;
-        syncBoatMesh(gm, gb, t, boatOnWaves(this.waves, g, g.h, tw, 1, 1));
+        syncBoatMesh(gm, gb, t, boatOnWaves(waves, g, g.h, tw, 1, 1));
         gm.crew.group.visible = false; // (no crew aboard the ghost: its track doesn't know where they sat, and a see-through crew is clutter)
       }
     }
-    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => this.waves.height(p, tw, 0.7, 0.4));
+    this.moorings.update(w.running && !w.paused ? dt * w.speed : dt * 0.2, p => w.currentAt(p), p => w.windHere(p), p => waves.height(p, tw, 0.7, 0.4));
     this.wildlife.setMonth(+w.raceDate.slice(5, 7) || new Date().getMonth() + 1);
-    this.wildlife.update(w.running && !w.paused ? dt * w.speed : 0, tw, w.user, w.boats, (x, y) => this.waves.height({ x, y }, tw, 1, 1));
-    this.vesselView.sync(w.vessels, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1));
-    this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => this.waves.height({ x, y }, tw, 1, 1), this.pitches);
+    this.wildlife.update(w.running && !w.paused ? dt * w.speed : 0, tw, w.user, w.boats, (x, y) => waves.height({ x, y }, tw, 1, 1));
+    this.vesselView.sync(w.vessels, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => waves.height({ x, y }, tw, 1, 1));
+    this.wakes.update(w.boats, tw, w.running && !w.paused ? dt * w.speed : 0, (x, y) => waves.height({ x, y }, tw, 1, 1), this.pitches);
     this.updateLaylines(w, dt);
     const u = w.user, camera = this.camera, um = this.boatMeshes[0];
     this.userHeading = u.h; this.userHeel = u.heel;

@@ -6,7 +6,7 @@ import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
-import { applyMemberInput, memberPage, membersGrid, type MemberFilter } from './members';
+import { applyMemberInput, memberPage, membersGrid } from './members';
 import { morph } from './morph';
 
 /**
@@ -23,11 +23,18 @@ export interface FleetHooks {
   edit(id: string): void;
   /** Sail her: race or cruise, from her slip or not. */
   sail(id: string, mode: 'race' | 'cruise', fromSlip: boolean): void;
-  /** Leave the Fleet (back where you came from). */
+  /** Leave the Fleet, or her page (back where you came from: ui/nav.ts). */
   back(): void;
+  /** Open her page, from the list (on the back stack: ui/nav.ts). */
+  toBoat(id: string): void;
+  /** The back link for where you are ("‹ Race", "‹ Yacht Club"): ui/nav.ts. */
+  backLabel(): string;
   /** The Yacht Club's members (club/members.ts), and that they changed (saved by the caller). */
   members(): Member[];
   membersChanged(): void;
+  /** The Season tab's contents (ui/season.ts), and sailing one of its races. */
+  seasonHtml(): string;
+  sailSeason(raceNo: number): void;
 }
 
 const VIEW_KEY = 'fbsim-fleet-view';
@@ -39,9 +46,8 @@ export class Fleet {
   private boatId = '';
   private confirmDelete = false;
   /** The Yacht Club's tab (docs/YACHT-CLUB.md): your boats, or the members; the member open, and the roster's filter. */
-  private tab: 'boats' | 'members' = 'boats';
+  private tab: 'boats' | 'members' | 'season' = 'boats';
   private memberId: string | null = null;
-  private filter: MemberFilter = 'all';
   private confirmMemberDel = false;
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
@@ -81,6 +87,11 @@ export class Fleet {
     this.list.hidden = true;
     this.drawBoat(); this.page.hidden = false; this.hooks.showroom(b);
   }
+  /** Esc on the Yacht Club: a member's page back to the members (true), else nothing here (false: the back stack's). */
+  escape(): boolean {
+    if (this.list.hidden || !this.memberId) return false;
+    this.memberId = null; this.confirmMemberDel = false; this.drawList(); return true;
+  }
   /** Straight to the members (from the race setup's crew line). */
   openMembers(): void { this.tab = 'members'; this.memberId = null; this.openList(); }
   close(): void { this.list.hidden = true; this.page.hidden = true; this.hooks.showroom(null); }
@@ -91,8 +102,8 @@ export class Fleet {
     switch (t.dataset.f) {
       case 'back': this.close(); this.hooks.back(); return;
       case 'view': this.view = v === 'list' ? 'list' : 'grid'; try { localStorage.setItem(VIEW_KEY, this.view); } catch { /* ignore */ } this.drawList(); return;
-      case 'boat': this.openBoat(v); return;
-      case 'toList': this.openList(); return;
+      case 'boat': this.hooks.toBoat(v); return;
+      case 'toList': this.hooks.back(); return;
       case 'new': {
         const names = new Set(this.S.boats.map(b => b.name)); let n = 'NEW BOAT', k = 2; while (names.has(n)) n = `NEW BOAT ${k++}`;
         const nb = newBoat(n); nb.sails.number = freeNumber(this.S.boats, 100); delete nb.slip; delete nb.marina;
@@ -107,10 +118,10 @@ export class Fleet {
         this.S.boats = this.S.boats.filter(x => x.id !== gone);
         this.S.opponents = this.S.opponents.filter(o => o !== gone);
         if (this.S.boatId === gone) { this.S.boat = this.S.boats[0]; this.S.boatId = this.S.boat.id; }
-        this.hooks.changed(); this.openList(); return;
+        this.hooks.changed(); this.hooks.back(); return;
       }
-      case 'tab': this.tab = v === 'members' ? 'members' : 'boats'; this.memberId = null; this.drawList(); return;
-      case 'mfilter': this.filter = (['all', 'skipper', 'crew', 'yours'] as const).find(x => x === v) ?? 'all'; this.drawList(); return;
+      case 'tab': this.tab = v === 'members' ? 'members' : v === 'season' ? 'season' : 'boats'; this.memberId = null; this.drawList(); return;
+      case 'season': this.close(); this.hooks.sailSeason(Number(v)); return;
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
       case 'mback': this.memberId = null; this.drawList(); return;
       case 'mnew': { const m = newMember(this.hooks.members(), { h: 1.75, w: 75 }, 'New member'); this.hooks.membersChanged(); this.memberId = m.id; this.drawList(); return; }
@@ -137,18 +148,25 @@ export class Fleet {
       ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}"><img class="fthumb" data-thumb="${b.id}" alt=""><b>${esc(b.name || 'Unnamed')}</b><span>${ensignImg(b)}${esc(sailNo(b))}</span></button>`).join('')}</div>`
       : `<div class="ftable"><table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Club</th><th>Marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
           `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${slipById(b.slip)?.label ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
-    // the Yacht Club's tabs (docs/YACHT-CLUB.md): your boats, the members; the club's sliders and seasons to come
-    const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button><span class="later">Club · Seasons: later</span></div>`;
+    // the Yacht Club's tabs (docs/YACHT-CLUB.md): your boats, the members, the season (ui/season.ts); the club's sliders to come
+    const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button><button type="button" data-f="tab" data-v="season" aria-pressed="${this.tab === 'season'}">Season</button></div>`;
+    if (this.tab === 'season') {
+      morph(this.list, `<div class="panel wide fleetpanel">
+        <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
+        <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
+        ${this.hooks.seasonHtml()}</div>`);
+      return;
+    }
     if (this.tab === 'members') {
       const ms = this.hooks.members(), m = this.member();
       morph(this.list, `<div class="panel wide fleetpanel">
-        <button type="button" class="linkbtn back" data-f="back">‹ Back</button>
+        ${m ? '' : `<button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>`}
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats, this.filter)}</div>`);
+        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats)}</div>`);
       return;
     }
     morph(this.list, `<div class="panel wide fleetpanel">
-      <button type="button" class="linkbtn back" data-f="back">‹ Back</button>
+      <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
       <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div>
         <div class="seg"><button type="button" data-f="view" data-v="grid" aria-pressed="${this.view === 'grid'}">Grid</button><button type="button" data-f="view" data-v="list" aria-pressed="${this.view === 'list'}">List</button></div>
         <button type="button" class="cta" data-f="new">New boat</button></div>${tabs}
@@ -186,7 +204,7 @@ export class Fleet {
     const colour = (list: [string, string][], c: string) => list.find(x => x[1] === c)?.[0] ?? '';
     const p = b.perf, ages = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
     morph(this.page, `
-      <div class="bphead"><button type="button" class="linkbtn" data-f="toList">‹ Yacht Club</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
+      <div class="bphead"><button type="button" class="linkbtn" data-f="toList">${esc(this.hooks.backLabel())}</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
       <div class="garage">
         <div class="gbtns"><button type="button" class="cta" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
         ${this.confirmDelete ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')} and her record? <button type="button" class="ghost danger" data-f="delYes">Delete</button><button type="button" class="ghost" data-f="delNo">Keep her</button></div>` : ''}
@@ -218,7 +236,7 @@ export class Fleet {
       <section><h3>Crew history</h3>
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
           : '<small>Nobody has sailed her yet.</small>'}
-        <small>Skippers and crews come with the Yacht Club; until then, when she isn't sailed by you she has a generic AI skipper and crew.</small></section>
+        <small>When you don't sail her, a generic AI skipper does.</small></section>
       </div>`);
   }
 

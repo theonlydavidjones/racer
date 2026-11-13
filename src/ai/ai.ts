@@ -152,7 +152,10 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   if (!ai.home) {
     let at = w.C.center, best = Infinity;
     for (const H of HARBORS) for (const e of H.exits) { const d = dist(e, w.C.center); if (d < best) { best = d; at = e; } }
-    const stand = standOff(w, b, at, from);
+    // (the fleet's places worked out once, when racing's called off, with the course's wind then, and kept: every boat
+    // reads hers from the same list)
+    const places = w.cancelled ? (w.cancelled.places ??= standOffPlaces(w, at, w.wind.from)) : standOffPlaces(w, at, w.wind.from);
+    const stand = places[w.boats.filter(o => !o.isUser).indexOf(b)] ?? at;
     ai.home = { route: routeAround(b, stand, 120), i: 0, at: stand, lying: false };
   }
   const h = ai.home, toLee = (p: Vec, d: number) => { const u = V(from + 180); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; };
@@ -195,28 +198,58 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   }
   return { desired, luff: false, beating };
 }
-/**
- * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
- * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
- * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 80 m apart along the wind's line
- * across, so the fleet isn't all on one point.
- */
 /** No land, pier, dock or breakwater within r m of p, looking out eight ways (anyShoreDist doesn't see what's built). */
 function clearRound(p: Vec, r: number): boolean {
   for (let a = 0; a < 360; a += 45) { const u = V(a); if (landAlong(p, { x: p.x + u.x * r, y: p.y + u.y * r }) < Infinity) return false; }
   return true;
 }
-function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
+/**
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
+ * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * such, a little upwind of it the better (on a lee shore, well out): the fleet's spot; each boat her own place 80 m apart along the wind's line
+ * across, so the fleet isn't all on one point. All the fleet's places (non-user boats, in order).
+ */
+function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
   const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && clearRound(p, 100) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
-  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 80;
-  let best: Vec | null = null, cost = Infinity;
+  // The fleet's one spot first (open water, the nearer and the more upwind of the entrance the better); then each boat
+  // her own place 80 m apart across the wind from it, alternately either side. (Each choosing her own best spot with
+  // the spread added, they all chose points round the same corner of open water, 11–32 m apart, and those sailing back
+  // to theirs passed close to those lying to.)
+  const open: Vec[] = []; // (open water she can reach straight from the entrance)
+  let base: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
-    const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r }, p = { x: c.x + across.x * spread, y: c.y + across.y * spread };
+    const u = V(a), p = { x: h.x + u.x * r, y: h.y + u.y * r };
     if (!clearLee(p) || landAlong(h, p) < Infinity) continue;
-    const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2; // (nearer, and upwind of the entrance, the better)
-    if (q < cost) { cost = q; best = p; }
+    open.push(p);
+    const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2;
+    if (q < cost) { cost = q; base = p; }
   }
-  return best ?? h;
+  const fleet = w.boats.filter(o => !o.isUser);
+  if (!base) return fleet.map(() => h);
+  // Apart across the wind is what counts: lying to, a boat sags straight to leeward until she's drifted 300 m, so two
+  // places one dead to leeward of the other share a lane, the one drifting down through the other's spot and that one
+  // beating back up through hers. Clear: 60 m apart across the wind, or more than her drift along it.
+  const across = V(from + 90), taken: Vec[] = [];
+  const clearOf = (p: Vec) => taken.every(q => { const dx = p.x - q.x, dy = p.y - q.y; return Math.abs(dx * across.x + dy * across.y) >= 60 || Math.abs(dx * lee.x + dy * lee.y) > 300; });
+  const ok = (p: Vec) => clearLee(p) && landAlong(base!, p) === Infinity && clearOf(p);
+  for (let k = 0; k < fleet.length; k++) {
+    const side = k % 2 ? 1 : -1, spread = side * Math.ceil(k / 2) * 80;
+    let spot: Vec | null = null;
+    // her place, or further out along the same line across the wind; then the other side; then the nearest open
+    // water clear of the others; failing that, the open water furthest across the wind from them
+    for (const s of [1, -1]) for (let m = Math.abs(spread); m <= 800 && !spot; m += 20) {
+      const p = { x: base.x + across.x * side * s * m, y: base.y + across.y * side * s * m };
+      if (ok(p)) spot = p;
+    }
+    const want = { x: base.x + across.x * spread, y: base.y + across.y * spread };
+    if (!spot) { let bd = Infinity; for (const p of open) if (clearOf(p) && dist(p, want) < bd) { bd = dist(p, want); spot = p; } }
+    if (!spot) {
+      let bg = -1;
+      for (const p of open) { const g = taken.reduce((m, q) => Math.min(m, Math.abs((p.x - q.x) * across.x + (p.y - q.y) * across.y)), Infinity); if (g > bg) { bg = g; spot = p; } }
+    }
+    taken.push(spot ?? base);
+  }
+  return taken;
 }
 
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
@@ -352,11 +385,19 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     let near: Vec | null = null, nd = PENALTY_CLEAR;
     for (const o of w.boats) if (o !== b) { const d = dist(o, b); if (d < nd) { nd = d; near = o; } }
     for (const m of w.touchableMarks(b)) { const d = dist(m.p, b); if (d < MARK_CLEAR && d < nd + 10) { nd = d; near = m.p; } } // and away from the marks
-    ai.clearing = !!near && b.penalty >= b.penaltyTotal - 1; // not started turning yet
+    // not started turning yet; or a new penalty came while she was turning (in a jam): rule 44.2, she takes it "after
+    // getting well clear of other boats", so she gets clear again before she carries on turning
+    if (ai.penSeen != null && b.penaltyTotal > ai.penSeen + 1) ai.reclear = true;
+    // (and while turning, a boat drifting in close: she must keep clear of everyone while she takes it, rule 21.2, so she
+    // stops spinning and sails clear again, rather than turn into her; a mark that close, likewise: no touching it either)
+    if (b.penaltyDir && near && nd < PENALTY_CLEAR * 0.6) ai.reclear = true;
+    ai.penSeen = b.penaltyTotal;
+    if (!near) ai.reclear = false;
+    ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
     b.luff = false; return;
   }
-  ai.clearing = false;
+  ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
   const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
   if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
