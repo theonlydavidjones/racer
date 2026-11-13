@@ -143,7 +143,7 @@ export function sailable(b: Boat, desired: number): number {
  * the way round the land a skipper would draw (sim/routing.ts), allowing for the current as she does racing (crabFor).
  * Off the harbour she stands off and lies to (going in to her berth is the harbour's work, not drawn yet): at a spot of
  * her own (the fleet spread along the wind, not all on one point), with open water a long way to leeward for the drift
- * while she lies there, on the tack she came in on; drifted well off it, or with the land coming up to leeward, she
+ * while she lies there, on starboard; drifted well off it, or with the land coming up to leeward, she
  * sails back. The rest is her ordinary sailing (aiThink): the shore, the marks, and the right-of-way rules, which still
  * apply between boats that have been racing (Part 2 preamble), though a boat not racing takes no penalty for breaking one.
  */
@@ -159,8 +159,10 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
   if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
-  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = lieTack(w, b, from); }
-  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on)
+  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = 'S'; }
+  // (beam-on, all on starboard: right of way kept (RRS 10), and the way each carries in as she stops takes them all the
+  // same way along the line, not two neighbours on opposite tacks toward each other)
+  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false };
   // her way: each turn of it passed within 60 m, or the next in sight with clear water to it
   while (h.i < h.route.length - 1 && (dist(b, h.route[h.i]) < 60 || landAlong(b, h.route[h.i + 1]) === Infinity)) h.i++;
   const q = h.i < h.route.length - 1 ? h.route[h.i] : h.at, bq = brg(q.x - b.x, q.y - b.y), rel = Math.abs(wrap(from - bq));
@@ -183,31 +185,26 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
  * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 40 m apart along the wind's line
  * across, so the fleet isn't all on one point.
  */
-/**
- * The tack she lies to on: beam-on, she still forereaches slowly along her spot's line across the wind, so on the tack
- * that heads her away from the nearest other boat's spot, as a skipper heaving to near others would. (On the tack she
- * came in on, two neighbours 40 m apart on opposite tacks lay heading at each other and closed it: tests/abandon-home.)
- */
-function lieTack(w: World, b: Boat, from: number): 'S' | 'P' {
-  const at = b.ai!.home!.at;
-  let near: Vec | null = null, best = Infinity;
-  for (const o of w.boats) { const q = o !== b && o.ai?.home?.at; if (q && dist(q, at) < best) { best = dist(q, at); near = q; } }
-  if (!near) return b.tack;
-  const s = V(from - 90); // (her heading lying to on starboard)
-  return s.x * (at.x - near.x) + s.y * (at.y - near.y) >= 0 ? 'S' : 'P';
-}
-
+const fleetStand = new WeakMap<World, { c: Vec; across: Vec }>();
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
-  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
-  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
-  let best: Vec | null = null, cost = Infinity;
-  for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
-    const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r }, p = { x: c.x + across.x * spread, y: c.y + across.y * spread };
-    if (!clearLee(p) || landAlong(h, p) < Infinity) continue;
-    const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2; // (nearer, and upwind of the entrance, the better)
-    if (q < cost) { cost = q; best = p; }
+  // (one line for the whole fleet, laid out once, in the wind when racing was called off, so they're truly 40 m apart:
+  // each searching her own best point and then stepping 40 m along it put neighbours 16 to 18 m apart)
+  const fleet = w.boats.filter(o => !o.isUser), off = (k: number) => (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
+  let line = fleetStand.get(w);
+  if (!line) {
+    const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
+    const across = V(from + 90), at = (c: Vec, k: number) => ({ x: c.x + across.x * off(k), y: c.y + across.y * off(k) });
+    let best: Vec | null = null, cost = Infinity;
+    for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
+      const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r };
+      if (fleet.some((_, k) => { const p = at(c, k); return !clearLee(p) || landAlong(h, p) < Infinity; })) continue;
+      const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2; // (nearer, and upwind of the entrance, the better)
+      if (q < cost) { cost = q; best = c; }
+    }
+    line = { c: best ?? h, across }; fleetStand.set(w, line);
   }
-  return best ?? h;
+  const k = Math.max(0, fleet.indexOf(b));
+  return { x: line.c.x + line.across.x * off(k), y: line.c.y + line.across.y * off(k) };
 }
 
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
