@@ -1,0 +1,133 @@
+{
+ "note": "The skippers behind the anonymous ids in src/boat/data/sf-folkboat-results.json (scripts/skipper-keys.mjs). Never imported by the app: real skippers' names stay out of the game. Names as the scorers published them.",
+ "ids": {
+  "k001": {
+   "key": "peterjeal",
+   "names": [
+    "Peter Jeal"
+   ]
+  },
+  "k002": {
+   "key": "kelleygallese",
+   "names": [
+    "Kelley Gallese"
+   ]
+  },
+  "k003": {
+   "key": "triciadantin",
+   "names": [
+    "Tricia D Antin",
+    "Tricia Dantin",
+    "Tricia D’antin"
+   ]
+  },
+  "k004": {
+   "key": "pauldixon",
+   "names": [
+    "Paul Dixon"
+   ]
+  },
+  "k005": {
+   "key": "andersonhorschschafers",
+   "names": [
+    "Anderson/Horsch Schafer/S"
+   ]
+  },
+  "k006": {
+   "key": "alanwilk",
+   "names": [
+    "Alan Wilk"
+   ]
+  },
+  "k007": {
+   "key": "erinslichter",
+   "names": [
+    "Erin Slichter"
+   ]
+  },
+  "k008": {
+   "key": "laurencechambers",
+   "names": [
+    "Laurence Chambers"
+   ]
+  },
+  "k009": {
+   "key": "gordonanderson",
+   "names": [
+    "Gordon Anderson"
+   ]
+  },
+  "k010": {
+   "key": "tomreed",
+   "names": [
+    "Tom Reed"
+   ]
+  },
+  "k011": {
+   "key": "masonsmith",
+   "names": [
+    "Mason Smith"
+   ]
+  },
+  "k012": {
+   "key": "richardkeldsen",
+   "names": [
+    "Richard Keldsen"
+   ]
+  },
+  "k013": {
+   "key": "jamesvernon",
+   "names": [
+    "James Vernon"
+   ]
+  },
+  "k014": {
+   "key": "chrisherrmann",
+   "names": [
+    "Chris Herrmann"
+   ]
+  },
+  "k015": {
+   "key": "tomhaverstock",
+   "names": [
+    "Tom Haverstock"
+   ]
+  },
+  "k016": {
+   "key": "georgecathey",
+   "names": [
+    "George Cathey"
+   ]
+  },
+  "k017": {
+   "key": "chandlergrenier",
+   "names": [
+    "Chandler Grenier"
+   ]
+  },
+  "k018": {
+   "key": "davidwilson",
+   "names": [
+    "David Wilson"
+   ]
+  },
+  "k019": {
+   "key": "markslichter",
+   "names": [
+    "Mark Slichter"
+   ]
+  },
+  "k020": {
+   "key": "andersonhorschschaferstrumph",
+   "names": [
+    "Anderson/Horsch Schafer/Strumph"
+   ]
+  },
+  "k021": {
+   "key": "thomashaverstock",
+   "names": [
+    "Thomas Haverstock"
+   ]
+  }
+ }
+}
