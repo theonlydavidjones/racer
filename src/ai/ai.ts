@@ -51,6 +51,8 @@ const OPEN_GAP = 3 + 2 * HALF_BEAM;
 /** Closer than this between the centrelines (m: rules hullGap; contact is called at a beam, 2.2 m, rules CONTACT_GAP),
  * she's all but touching, with little more than a metre of water: she gets off the other boat, sailing full. */
 const UNTANGLE_GAP = 3.5;
+/** ...and closer than this (m between centrelines: a beam and 40 cm) whether closing or not: all but touching. */
+const CONTACT_NEAR = 2.6;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   let near: string | null = null;
@@ -641,7 +643,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // way on. (Easing her sails at it, as she does to keep clear, both boats lay stopped and locked together, and the
     // rules judged them again every few seconds: a third of all the AI's incidents were the same two boats again within
     // half a minute)
-    if (hullGap(b, o) < UNTANGLE_GAP) {
+    // (not two boats sailing side by side close, as boats pinned at an obstruction do, closing on neither, nor the boat of
+    // a hail for room to tack, which the hail's own moves have in hand)
+    const gap = hullGap(b, o), closingIn = dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0;
+    if ((gap < CONTACT_NEAR || (gap < UNTANGLE_GAP && closingIn)) && o.id !== ai.hailTack?.with && w.pairRecord(b, o)?.hail?.kind !== 'room') {
       desired = sailable(b, brg(-dx, -dy)); luff = false; avoiding = true;
       if (cp.t < lagT + 1) ai.urgent = true;
       continue;
