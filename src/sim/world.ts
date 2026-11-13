@@ -1,4 +1,5 @@
 import { DrillTracker } from './drill';
+import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -61,6 +62,8 @@ export function addPenalty(b: Boat, deg: number): void { if (b.penalty > 0) { b.
 export const ONE_TURN = 360;
 /** Half the hull's width for mark contact, m (a Folkboat is 2.2 m wide, narrower toward the ends). */
 const HULL_HALF_BEAM = 0.85;
+/** How far a mark's buoy reaches from its position (m), by shape, for a touch (an island is land: boats run aground on it). */
+const MARK_R: Record<string, number> = { sphere: 1.2, cylinder: 1.0, column: 1.0, lighted: 1.6, island: 0, beacon: 0.3 };
 
 /** A mark a boat could touch: where it is and how big its float is. A boat (the committee boat) is a line from `p`
  * to `q` with half-width `r`. `rule31`: touching it is a Rule 31 touch (otherwise it's just something solid). */
@@ -210,6 +213,8 @@ export class World {
   rec: Frame[] = [];
   /** The tack and gybe drill (sim/drill.ts): your manoeuvres scored, in that mode only. */
   readonly drill: DrillTracker | null;
+  /** The mark-rounding drill (sim/roundings.ts): laps of the practice course, W and the pin, each rounding scored; that mode only. */
+  readonly rounding: RoundingTracker | null;
   /** Racing: the whole race once a second (the race replay), from just before the gun. */
   track: Frame[] = [];
   horns: Record<number, boolean> = {};
@@ -292,6 +297,7 @@ export class World {
     this.cvec = currentVector(this.cur);
     this.freeSail = !!opts.freeSail; this.showFlags = !!opts.showFlags;
     this.drill = settings.mode === 'manoeuvres' ? new DrillTracker() : null;
+    this.rounding = settings.mode === 'roundings' ? new RoundingTracker(this.C) : null;
     this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
     this.homeSlip = slipById(settings.boat?.slip);
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
@@ -398,6 +404,11 @@ export class World {
       // in her slip, bow in (boats nose in here, never back in), made fast: push off to leave
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
+    } else if (isUser && this.rounding) {
+      // the mark-rounding drill: on port tack, coming in below the starboard layline to the windward mark, 120 m short
+      // of it and 250 m out: tack onto it when you judge you'll fetch the mark
+      const W = this.rounding.marks[0].p, beat = beatAngle(this.windModel.kt), sS = V(n360(this.windModel.base - beat)), hP = n360(this.windModel.base + beat), pP = V(hP);
+      p = { x: W.x - sS.x * 250 - pP.x * 120, y: W.y - sS.y * 250 - pP.y * 120 }; h = hP;
     } else if (isUser && this.freeSail) {
       // where you chose to start, on a beam reach (close-hauled for the drill): whichever way has more open water ahead
       const at = getPlace(this.settings.sailFrom)?.p;
@@ -512,7 +523,7 @@ export class World {
   lineA(p: Vec): number { return (p.x - this.center.x) * this.L.x + (p.y - this.center.y) * this.L.y; }
   /** Sailing free: a cruise, or a race she's retired from (she's no longer racing: her own destination, and the tiller pilot). */
   get cruising(): boolean { return this.freeSail || !!this.user?.retired; }
-  nextMark(b: Boat): CourseMark | null { return this.freeSail || (b.isUser && b.retired) ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
+  nextMark(b: Boat): CourseMark | null { if (this.rounding && b === this.user) return this.rounding.mark; return this.freeSail || (b.isUser && b.retired) ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
   obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
@@ -804,6 +815,7 @@ export class World {
     }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
+    else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);
     this.trackCourses();
     this.shipEncounters();
@@ -883,11 +895,11 @@ export class World {
   touchableMarks(b: Boat): Touchable[] {
     const C = this.C, n = C.marks.length, out: Touchable[] = [];
     if (b.finished || b.retired) return out; // (no longer racing)
+    if (this.rounding) return b === this.user ? this.rounding.marks.map(m => ({ name: m.name, p: m.p, r: m.key === 'pin' ? 0.9 : MARK_R[m.shape] })) : out; // (the rounding drill: its two marks)
     const pinMark = C.marks.find(m => dist(m.p, C.pin) < 1);
     const pin: Touchable | null = C.pinKind === 'buoy' ? { name: C.pinLabel, p: C.pin, r: 0.9 }
       : pinMark ? { name: pinMark.name, p: C.pin, r: pinMark.shape === 'sphere' ? 1.2 : 1.0 } : null;
-    const R = { sphere: 1.2, cylinder: 1.0, column: 1.0, lighted: 1.6, island: 0, beacon: 0.3 }; // (a beacon's pile: about 0.6 m across)
-    const mk = (i: number): Touchable | null => C.marks[i].shape === 'island' ? null : { name: C.marks[i].name, p: C.marks[i].p, r: R[C.marks[i].shape] }; // an island is land: boats run aground on it instead
+    const mk = (i: number): Touchable | null => C.marks[i].shape === 'island' ? null : { name: C.marks[i].name, p: C.marks[i].p, r: MARK_R[C.marks[i].shape] }; // an island is land: boats run aground on it instead
     const cb = this.committeeHull; // the committee boat is a starting mark too (and a finishing mark)
     if (!b.started) { if (pin) out.push(pin); if (cb) out.push(cb); return out; } // a starting mark (the line begins the first leg)
     if (b.leg === 0) { if (pin) out.push(pin); if (cb) out.push(cb); }

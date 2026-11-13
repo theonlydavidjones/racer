@@ -2,7 +2,7 @@ import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 export interface Settings {
-  mode: 'race' | 'drill' | 'sail' | 'manoeuvres'; // full race, start practice (from one minute to go), just sail (open water, no race), or the tack and gybe drill (open water, alone)
+  mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings'; // full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
   /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
    * drill's are the fewest metres lost, by manoeuvre and wind band ('tack-medium'), with a good crew's then. */
   practiceBest?: Record<string, { lostM: number; goodM: number }>;

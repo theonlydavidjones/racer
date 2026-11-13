@@ -40,6 +40,7 @@ installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said
 import { SailBand } from './ui/sailBand';
 import { WindLadder } from './render/windLadder';
 import { windBand, type ManoeuvreScore } from './sim/drill';
+import { roundingKey, type RoundingScore } from './sim/roundings';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { CurrentField, nextSaturday, sfClock } from './environment/tide';
@@ -190,10 +191,13 @@ function newGame(seed = randomSeed()): void {
   const WS = shown ? { ...WS1, ...(showCond ?? {}), ...(showMin != null ? { tideTime: hhmm(showMin + WS1.seq) } : {}) } : WS1;
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
-  // (the tack and gybe drill: open water off the Cityfront, alone, in the setup's day and conditions)
-  const WSd = S.mode === 'manoeuvres' && !shown ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
-  const args: WorldArgs = { file: rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), settings: WSd, seed,
-    opts: S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : (S.mode === 'sail' || S.mode === 'manoeuvres') && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
+  // (the practice drills, alone, in the setup's day and conditions: the tack and gybe drill off the Cityfront; the
+  // mark-rounding drill round the practice course's marks, so its file is forced to the practice course)
+  const soloDrill = (S.mode === 'manoeuvres' || S.mode === 'roundings') && !shown;
+  const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
+  const drillFile = S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
+  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course)), settings: WSd, seed,
+    opts: S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : soloDrill ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
   host?.dispose();
   // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
   // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
@@ -514,6 +518,44 @@ function drillTick(): void {
   el.innerHTML = `<b>${drillName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
   el.querySelector('.tp-dcoach')!.textContent = s.coach;
 }
+/* ---- the mark-rounding drill (sim/roundings.ts): the same Coach card and Pause slot, one drill at a time ---- */
+const roundName = (k: 'windward' | 'leeward') => (k === 'windward' ? 'Windward mark' : 'Leeward mark');
+let roundSeen = 0;
+function roundTick(): void {
+  const el = $('tpDrill'), list = w.rounding?.list;
+  if (!list) { if (w.drill) return; if (!el.hidden) { el.hidden = true; roundSeen = 0; } return; }
+  if (list.length === roundSeen) return;
+  for (let i = roundSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by mark and wind band)
+    const s = list[i], k = roundingKey(s), b = S.practiceBest?.[k];
+    if (!s.scored || s.lostM < 0) continue;
+    if (!b || Math.max(0, s.lostM) < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(S); }
+  }
+  roundSeen = list.length;
+  const s = list[list.length - 1], best = S.practiceBest?.[roundingKey(s)];
+  el.hidden = false;
+  if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
+  el.innerHTML = `<b>${roundName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
+  el.querySelector('.tp-dcoach')!.textContent = s.coach;
+}
+/** The Pause screen's list for the rounding drill: every rounding, its numbers, and your bests. */
+function roundHtml(): string {
+  const list = w.rounding?.list ?? [], f = (v: number | null, d = 0) => (v == null ? '—' : v.toFixed(d));
+  const bestOf = (k: 'windward' | 'leeward') => list.reduce((bi, x, i) => (x.kind === k && x.scored && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
+  const lit = new Set([bestOf('windward'), bestOf('leeward')]);
+  const row = (s: RoundingScore, i: number) => {
+    const head = `<td>${i + 1}. ${roundName(s.kind)}</td><td>${Math.round(s.tws)} kt</td>`;
+    if (!s.scored) return `<tr class="noscore">${head}<td colspan="5">not scored</td></tr><tr class="dcoach"><td colspan="7">${s.coach.replace(/</g, '&lt;')}</td></tr>`;
+    // approach: the tacks inside the zone (windward) or the pole down before the mark (leeward); exit: how close onto the new course
+    const approach = s.kind === 'windward' ? `${s.tacks} tack${s.tacks === 1 ? '' : 's'}${s.pinchS > 2 ? `, pinched ${f(s.pinchS)} s` : s.freeS > 2 ? `, free ${f(s.freeS)} s` : ''}` : `in ${Math.round(s.entryD)} m`;
+    const pole = s.kind === 'windward' ? (s.poleS == null ? 'no pole' : `+${f(s.poleS)} s`) : (s.dropS == null ? '—' : `−${f(Math.max(0, s.dropS))} s`);
+    return `<tr${lit.has(i) ? ' class="best"' : ''}>${head}<td><b>${Math.max(0, Math.round(s.lostM))} m</b> / ${Math.round(s.goodM)} m</td><td>${approach}</td><td>${pole}</td><td>${Math.round(s.exitD)} m</td></tr><tr class="dcoach"><td colspan="7">${s.coach.replace(/</g, '&lt;')}</td></tr>`;
+  };
+  const rows = list.map(row).join('');
+  const bests = Object.entries(S.practiceBest ?? {}).filter(([k]) => /^(wmark|lmark)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'wmark' ? 'Windward' : 'Leeward'} mark, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
+  return `<h3>Mark roundings</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Approach</th><th>Pole</th><th>Exit off mark</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No roundings yet: beat up to the windward mark, round it to port and set the pole for the run down to the pin; round the pin to port and beat up again.</p>'}`
+    + `<p class="drillnote">Lost: progress along the course you gave away against a twin sailing on from ${100} m off the mark to ${100} m past it, measured through the water (the tide doesn't count). Good crew: the sim's own crew, measured the same way in this wind, in flat water. Approach: tacks in the last few lengths, and whether you reached in (free) or pinched. Pole: for the windward mark, seconds from rounding to the pole set; for the leeward mark, seconds the pole was down before the mark. Exit off mark: how far off the mark you were as you came onto the new course (wide in, close out). Only the windward mark and the pin (the leeward mark), each left to port, are scored.</p>`
+    + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
+}
 /** The Pause screen's list: every manoeuvre so far, with its numbers, and your bests. */
 function drillHtml(): string {
   const list = w.drill?.list ?? [], f = (v: number | null, d = 0) => (v == null ? '—' : v.toFixed(d));
@@ -791,8 +833,8 @@ $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'S
 $('bSound2').onclick = () => $('bSound').click();
 $('bPause').onclick = () => {
   if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;
-  $('bRestart').textContent = w.drill ? 'Restart the drill' : w.freeSail ? 'Restart this cruise' : 'Restart this race';
-  const d = $('pauseDebrief'), html = w.drill ? drillHtml() : w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
+  $('bRestart').textContent = w.drill || w.rounding ? 'Restart the drill' : w.freeSail ? 'Restart this cruise' : 'Restart this race';
+  const d = $('pauseDebrief'), html = w.drill ? drillHtml() : w.rounding ? roundHtml() : w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
   $('pauseWatch').hidden = !html || w.track.length < 2;
 };
 /** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
@@ -1331,7 +1373,7 @@ function crewRows(): void {
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
   replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
-  if (S.mode === 'drill' || S.mode === 'manoeuvres') { S.mode = 'race'; newGame(); }
+  if (S.mode === 'drill' || S.mode === 'manoeuvres' || S.mode === 'roundings') { S.mode = 'race'; newGame(); }
   courseView.close(); navView.close(); send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
@@ -1340,6 +1382,9 @@ function beginRaceNow(seed?: number): void {
   newGame(seed);
   if (S.mode === 'manoeuvres') { logMessage('— Tacks and gybes'); send({ k: 'running', on: true }); send({ k: 'pause', on: false }); word('bFast', 'Speed 1×');
     toast(`Tacks and gybes: ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
+  if (S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); send({ k: 'running', on: true }); send({ k: 'pause', on: false }); word('bFast', 'Speed 1×');
+    const W = w.rounding!.marks[0];
+    toast(`Mark roundings: ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
   logMessage(`— ${S.mode === 'sail' ? `Cruise · ${place(S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
   send({ k: 'running', on: true }); send({ k: 'pause', on: false });
   word('bFast', 'Speed 1×');
@@ -1381,6 +1426,7 @@ $('bDSetup').onclick = () => { closeDrill(); openSetup(); };
 $('bGo').onclick = () => { if (S.mode === 'drill') S.mode = 'race'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
 $('bDrill').onclick = () => { S.mode = 'drill'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
 $('bManoeuvres').onclick = () => { S.mode = 'manoeuvres'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
+$('bRoundings').onclick = () => { S.mode = 'roundings'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
 /* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
 const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
 let lastPick = hostOf(S.course) === 'ggyc' && S.course !== RC_COURSE ? S.course : COURSES.find(c => c.group)!.id;
@@ -1599,7 +1645,7 @@ function frame(now: number): void {
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drillTick();
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drillTick(); roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
