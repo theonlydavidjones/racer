@@ -658,7 +658,7 @@ export class World {
    * (her own wake doesn't count; her land lee is cached, refreshed every half second).
    */
   shadowAt(p: Vec, self?: Boat): Shadow {
-    const sum = new WindSum(), kt = this.wind.kt, from = this.wind.from;
+    const sum = new WindSum(this.wind.from), kt = this.wind.kt, from = this.wind.from;
     const lee = self?.leeK ?? landLee(p, from);
     for (const o of this.boats) {
       if (o === self) continue;
