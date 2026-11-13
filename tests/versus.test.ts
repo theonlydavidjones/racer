@@ -134,4 +134,29 @@ describe('your race against the winner', () => {
     const V = race2(beat([150], () => 0), fast);
     expect(V.moments.filter(m => m.kind === 'tack')).toEqual([]);
   });
+
+  it('with real tack losses (speed down to 60%, back over 25 s), the same tacks at different times are charged only for the timing', () => {
+    // identical boats, steady wind: she tacks at 100 and 200 s, you at 140 and 220 s. Below the layline the order is free,
+    // and each tack costs you both the same: so the moments, if any, are under a boat length
+    const lossy = (tacks: number[]) => { const P: Frame['b'][number][] = []; let x = 0, y = 0, tack = 'S', last = -999;
+      for (let t = 0; t <= 500; t++) { if (tacks.includes(t)) { tack = tack === 'S' ? 'P' : 'S'; last = t; }
+        const v = 3 * Math.min(1, 0.6 + 0.4 * (t - last) / 25), h = tack === 'S' ? -45 : 45;
+        P.push([x, y, (h + 360) % 360, tack as 'S', 0, 0, 0, 0]); x += v * Math.sin(h * Math.PI / 180); y += v * Math.cos(h * Math.PI / 180); }
+      return P; };
+    const V = race2(lossy([140, 220]), lossy([100, 200]));
+    for (const m of V.moments.filter(m => m.kind === 'tack')) expect(Math.abs(m.lostM), m.text).toBeLessThan(8);
+  });
+
+  it('at a rounding: your tack before she reached the mark isn\'t paired with hers', () => {
+    // leg 1 a reach east to (300, 0), leg 2 a beat north. You round at 100 s and tack onto port at 115; she rounds at 160
+    // and tacks onto port at 200. Nothing about leg 2's tacks should charge you for her being 60 s behind at the mark
+    const mk = (round: number, tackAt: number) => { const P: Frame['b'][number][] = []; let x = 0, y = 0, tack = 'P';
+      for (let t = 0; t <= 600; t++) { let h: number; if (t < round) { h = 90; } else { if (t === round) tack = 'S'; if (t === tackAt) tack = 'P'; h = tack === 'S' ? -45 : 45; }
+        const v = t < round ? 300 / round : 3; P.push([x, y, (h + 360) % 360, tack as 'S', 0, 0, 0, 0]); x += v * Math.sin(h * Math.PI / 180); y += v * Math.cos(h * Math.PI / 180); }
+      return P; };
+    const you = mk(100, 115), her = mk(160, 200);
+    const F = you.map((p, t) => ({ t, b: [p, her[t]] })) as Frame[];
+    const V = versus(input(F, 600, 590, { marks: [[100], [160]], legs: [{ name: 'A', to: { x: 300, y: 0 }, kind: 'reach' }, { name: 'the finish', to: { x: 300, y: 2000 }, kind: 'beat' }] }))!;
+    expect(V.moments.filter(m => m.leg === 2 && m.kind === 'tack').filter(m => Math.abs(m.lostM) > 8)).toEqual([]);
+  });
 });

@@ -234,12 +234,19 @@ function legMoments(F: Frame[], me: number, r: number, name: string, leg: number
     const up = { x: Math.sin(wd * Math.PI / 180), y: Math.cos(wd * Math.PI / 180) }, sg = L.kind === 'run' ? -1 : 1;
     return { x: up.x * sg, y: up.y * sg };
   };
+  // every turn either of you made on the leg (for whether a stretch is clean to measure plain speed over)
+  const allTurns = [...turnsOf(F, r, b0, b1, [b0, b1]), ...turnsOf(F, me, a0, a1, [a0, a1])].map(x => x.t);
   const lost = (t0: number, t1: number): number | null => {
+    t0 = Math.max(lo, t0);
     const u = axis((t0 + t1) / 2), h = madeGood(F, r, t0, t1, u), y = madeGood(F, me, t0, t1, u);
     if (h == null || y == null) return null;
-    // the plain speed difference over the minute before (both on the leg), taken out
-    const p0 = Math.max(lo, t0 - 60), hb = madeGood(F, r, p0, t0, u), yb = madeGood(F, me, p0, t0, u);
-    const base = t0 - p0 >= 20 && hb != null && yb != null ? (hb - yb) / (t0 - p0) : 0;
+    // the plain speed difference over the minute before, taken out, but only when that minute is clean: both on the
+    // leg, on the same tack, and neither of you turning in it or recovering from a turn (else a tack's own loss, or a
+    // split's gain in a shift, would be read as speed)
+    const p0 = Math.max(lo, t0 - 60);
+    const clean = t0 - p0 >= 20 && !allTurns.some(x => x > p0 - RECOVER && x <= t0) && tackAt(F, r, p0) === tackAt(F, me, p0);
+    const hb = clean ? madeGood(F, r, p0, t0, u) : null, yb = clean ? madeGood(F, me, p0, t0, u) : null;
+    const base = hb != null && yb != null ? (hb - yb) / (t0 - p0) : 0;
     return h - y - base * (t1 - t0);
   };
   const verb = (g: boolean) => g ? 'gybed' : 'tacked';
@@ -260,12 +267,13 @@ function legMoments(F: Frame[], me: number, r: number, name: string, leg: number
       let k = -1;
       if (tackAt(F, me, h.t - 1) === h.to) {
         // you were already there: your last turn onto it (if on this leg, within 5 min, not already paired)
-        for (let i = mine.length - 1; i >= 0; i--) if (mine[i].t < h.t && mine[i].to === h.to) { if (!used.has(i) && h.t - mine[i].t < 300) k = i; break; }
+        // (only a turn made while she was on the leg too: one before that was at a mark or on the leg before, not a choice against her)
+        for (let i = mine.length - 1; i >= 0; i--) if (mine[i].t < h.t && mine[i].to === h.to) { if (!used.has(i) && mine[i].t >= lo && h.t - mine[i].t < 300) k = i; break; }
         if (k < 0) return; // on it all along: nothing to compare
       } else k = mine.findIndex((y, i) => !used.has(i) && y.to === h.to && y.t >= h.t && y.t < next);
       if (k >= 0) {
         used.add(k);
-        const y = mine[k], d = y.t - h.t, t0 = Math.min(h.t, y.t) - 5, t1 = Math.min(Math.max(h.t, y.t) + RECOVER, hi), m = lost(t0, t1);
+        const y = mine[k], d = y.t - h.t, t0 = Math.max(lo, Math.min(h.t, y.t) - 5), t1 = Math.min(Math.max(h.t, y.t) + RECOVER, hi), m = lost(t0, t1);
         if (m == null || Math.abs(m) < MIN_M) return;
         const myShift = onShift(shiftOver(F, me, h.t, y.t));
         const text = d > 5 ? `${name} ${v} onto ${side(h.to)}${sh} at ${clock(h.t)}; you stayed on ${other(h.to)} ${Math.round(d)} s longer${myShift ? `,${myShift}` : ''}, and ${metres(m)}${apart(h.t, y.t)}.`
