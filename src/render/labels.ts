@@ -25,6 +25,7 @@ export class Labels {
     this.markTags = [];
     const seen: Record<string, number> = {};
     if (w.freeSail) { // just sailing: only where you're heading
+      if (w.rounding) for (const m of w.rounding.marks) this.markTags.push({ el: mk(m.name), p: m.p, z: 4, idx: [] }); // the rounding drill's marks
       if (w.dest) this.markTags.push({ el: mk(w.dest.name), p: w.dest.p, z: 6, idx: [] });
       return;
     }

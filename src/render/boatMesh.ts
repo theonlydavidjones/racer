@@ -840,6 +840,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
   // starboard jumper strut (she has no spreaders; the masthead has the windex). Flying a foreign ensign on the Bay, she
   // flies the US flag as a courtesy flag at the starboard strut and moves her burgee to port.
+  // (The burgee at the starboard strut, struck for racing, is the Folkboat fleet's own practice: the owner, 13 Nov 2026.)
   const flags: FlyingFlag[] = [];
   let ensign: BoatMesh['ensign'] = null;
   const flagCleats = new Set<number>(); // (one flag-halyard cleat on each side of the mast that flies a flag)
@@ -883,7 +884,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const flag = ens ? flags[flags.length - 1].mesh : null;
     // (down the staff no further than leaves the flag's foot clear of the deck: a Danish or Norwegian ensign is deep in the hoist)
     const fh = ens ? 0.61 * ens.height / ens.width : 0, slideMax = Math.max(0, Math.min(0.62, staffH - 0.03 - fh - 0.05));
-    ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), slideMax, down: b.ensignStruck ? 1 : 0 };
+    ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), slideMax, down: b.ensignStruck || b.ensignNight ? 1 : 0 };
   }
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
@@ -977,7 +978,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   if (m.ensign) {
     // striking the ensign: hand over hand down the staff (about 3 s), then the staff out of its socket and below (1 s);
     // hoisting it again, the other way round
-    const e = m.ensign, { down, slide, out } = ensignStep(e.down, !!b.ensignStruck, dt); e.down = down;
+    const e = m.ensign, { down, slide, out } = ensignStep(e.down, !!b.ensignStruck || !!b.ensignNight, dt); e.down = down;
     if (e.flag) { e.flag.position.copy(e.at).addScaledVector(e.axis, -slide * e.slideMax); e.flag.visible = slide < 1; } // (down the raked staff, gathered in at the foot)
     e.staff.position.copy(e.axis).multiplyScalar(out * 0.3); e.staff.visible = out < 1; // (lifted up out of its socket, along its rake)
   }
