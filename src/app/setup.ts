@@ -128,6 +128,7 @@ function courseCard(): void {
     document.querySelectorAll<HTMLButtonElement>('#hostSeg [data-host]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.host === host)));
     document.querySelectorAll<HTMLButtonElement>('#courseMode [data-cm]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.cm === 'rc') === rc)));
     $('courseMode').hidden = host === 'practice';
+    $('judgingField').hidden = host === 'practice'; // (the practice area is always umpired)
     $('courseSel').hidden = host === 'practice' || rc;
     if (!rc && host !== 'practice') ($('courseSel') as HTMLSelectElement).value = app.S.course;
     const flag = app.S.prepFlag === 'black' ? 'black flag' : `${app.S.prepFlag ?? 'P'} flag`;
