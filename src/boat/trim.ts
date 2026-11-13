@@ -28,7 +28,7 @@ export interface SailSpec {
  * The best angles of attack are estimates: no primary source was reachable for either (Marchaj's 22° for a main is
  * quoted second-hand). The jib's is measured, as everything here is, from the apparent wind to its sheeting angle,
  * which reads low: the main's upwash bends the wind round ahead of it, so the jib meets it at a wider angle than the
- * boat's apparent wind (Gentry, "The Aerodynamics of Sail Interaction", 1971; in degrees, not found). 16.5° is fitted to
+ * boat's apparent wind (Gentry, "The Aerodynamics of Sail Interaction", Ancient Interface III, 3rd AIAA Symposium on the Aero/Hydronautics of Sailing, 1971; in degrees, not found). 16.5° is fitted to
  * the lead: North's car track (controls.ts carLead, 11.6–13.7°) puts the jib at its best close-hauled from the beat in
  * light air (apparent wind 28.5°, the inner holes) to a breeze (32°, eased off the outer ones), as a Folkboat sails;
  * at 18° the inner hole was too wide for the beat itself in 8 kt, the jib luffing a little at its own best course.
