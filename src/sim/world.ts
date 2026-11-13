@@ -969,6 +969,10 @@ export class World {
           }
         } else if (b.started && b.leg >= n && !b.finished && !b.retired && !this.cancelled && (C.finishSign > 0 ? crossedFwd : crossedBack)) { // (not once racing's called off)
           b.finished = true; b.finishT = this.t; b.cleared = false;
+          // Umpired: she finished with her penalty not taken. An umpire "may penalize her" for failing to take it,
+          // disqualifying her (the black flag), without a hearing (World Sailing Appendix UF, 2025: UF3.4(a)(5), UF3.5(c),
+          // UF3.6; RRS 60.5(b)(3)). The sim's umpire always does. Under protests, her turns are her own affair (44.1)
+          if (b.penalty > 0 && !this.protestsOn && this.settings.mode === 'race' && !b.scoring) b.scoring = 'DSQ';
           if (b.isUser) { this.userFinishT = this.t; this.emit({ type: 'toast', msg: 'Finished!' }); this.emit({ type: 'horn', dur: 0.5 }); this.emit({ type: 'finished' }); }
         } else if (this.obstructed(b) && (crossedFwd || crossedBack) && b.penalty <= 0) {
           startPenalty(b, TWO_TURNS); // the Seaweed Soup addendum (B1.1) sets two turns for this, whatever the foul penalty
