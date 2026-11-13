@@ -16,7 +16,7 @@ describe('generic club Folkboats', () => {
     expect(new Set(fleet.map(b => b.sails.number)).size).toBe(12); // no two generic boats share a number either
     for (const b of fleet) {
       expect(b.skipper).toBe('ai');
-      expect(['87', '104', '92', '120', '63', '110']).not.toContain(b.sails.number); // not a club boat's or yours
+      expect(['87', '104', '92', '120', '63', '122']).not.toContain(b.sails.number); // not a club boat's or yours
     }
   });
   it('steers clear of your boats\' sail numbers', () => {

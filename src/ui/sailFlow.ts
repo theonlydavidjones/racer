@@ -45,7 +45,7 @@ const MAST_FA = 0.133;
 
 /** The three heights the panel cuts the sails at (m above the waterline): low, where the sim trims (its centre of
  * effort), and high, above the jib's head, where only the main is. */
-export const FLOW_HEIGHTS = [{ name: 'Low', z: 2.4 }, { name: 'Centre of effort', z: CE_ABOVE_WL }, { name: 'High', z: 8.2 }] as const;
+export const FLOW_HEIGHTS = [{ name: 'Low', z: 2.4 }, { name: 'Center of effort', z: CE_ABOVE_WL }, { name: 'High', z: 8.2 }] as const;
 
 /** The true wind at height z over the water, as a share of the 10 m wind (ORC eq. 7.1). */
 export const windShare = (z: number) => Math.log(Math.max(0.05, z) / 0.005) / Math.log(10 / 0.005);
@@ -172,7 +172,7 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
     const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
       : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
       : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
-        : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveller on purpose to keep her on her feet; the lifting luff is the price`
+        : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveler on purpose to keep her on her feet; the lifting luff is the price`
         : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
         : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': windward telltales lifting'}. Trim in about ${deg(by)}${turn}`)
       : s.atMax ? `<em class="stall">stalled</em> ${pct(t.amount)}, ${stallTell}, with the sheet all the way out: the wind's too far aft for it. Head up`

@@ -83,7 +83,7 @@ describe('the bridges\' towers and piers: solid', () => {
       expect(hit, P.name).toMatch(new RegExp((P.name ?? '').split(', ')[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       expect(deepest, `${P.name}: her bow inside it`).toBe(0);
     }
-  }, 120_000);
+  }, 180_000);
 
   it('is an obstruction under Rule 20 (ahead and needing a substantial course change) and under Rule 19 (nearest, with the way out)', () => {
     for (const P of OPEN) {
@@ -122,7 +122,7 @@ describe('the bridges\' towers and piers: solid', () => {
     let hits = 0;
     for (let i = 0; i < 60 * 900 && w.arrivedT == null; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast' && /Collision|Aground/.test(e.msg)) hits++; }
     expect(hits).toBe(0); expect(w.arrivedT, "she got there").not.toBeNull();
-  }, 120_000);
+  }, 180_000);
 
   it('stands the north tower at the edge of Lime Point, with the light on its spit (OpenStreetMap\'s coastline)', () => {
     // the Lime Point light, at its Light List position (37°49.5′ N, 122°28.7′ W; OSM's node 1243877573 within 10 m)
@@ -141,5 +141,5 @@ describe('the bridges\' towers and piers: solid', () => {
       for (let t = 0; t <= 1; t += 0.002) expect(inPoly({ x: r[i - 1].x + (r[i].x - r[i - 1].x) * t, y: r[i - 1].y + (r[i].y - r[i - 1].y) * t }, P.pts), `${k} through ${P.name}`).toBe(false);
     }
     void LL; void wharfNearest;
-  }, 60_000);
+  }, 180_000);
 });

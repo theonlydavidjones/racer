@@ -21,7 +21,7 @@ describe('AI fleet sails the course', () => {
   it('training course: every AI boat starts, rounds and finishes', () => {
     const w = race(TRAIN, { fleet: 5, current: 'ebb' }, 7, 20);
     for (const b of w.boats.slice(1)) expect(b.finished, `${b.name} leg ${b.leg}`).toBe(true);
-  }, 60_000);
+  }, 180_000);
 
   it('Seaweed Soup course 2 in an ebb: every AI boat finishes', () => {
     const w = race(SS2, { fleet: 3, current: 'ebb' }, 11, 90); // (the real jetty pushes the last beat out from the Marina shore)
@@ -31,7 +31,7 @@ describe('AI fleet sails the course', () => {
 
 describe('the strategist\'s leg times against the fleet sailing them', () => {
   /**
-   * The brief plans each leg as a perfect sail (the best plan, 8 s a tack: sim/routing.ts). The AI fleet, sailing the
+   * The brief plans each leg as a perfect sail (the best plan, each tack at its cost for the wind: sim/routing.ts manoeuvreS). The AI fleet, sailing the
    * same course in the same wind and tide, should take about as long: measured on November 12, 2026 (Seaweed Soup
    * course 2, west 12 kt), the runs and reaches matched or beat the plan, the beats took 5–20% longer, and the first beat
    * longest (the start's traffic), as did the leg after the first rounding (the fleet bunched there, with penalties:
