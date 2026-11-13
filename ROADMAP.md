@@ -221,6 +221,10 @@ What's planned, roughly in order. Done work is described in the README.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **The place** (owner's chart screenshot): Josephine's real slip, at the west end of a Gashouse Cove fairway close to
+     the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
+     literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
+     crew would. It's hard but possible, as in real life.
    - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
      Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
      Gashouse Cove with the wind on the beam both ways.
