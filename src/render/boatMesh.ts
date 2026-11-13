@@ -13,7 +13,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestWall, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -315,16 +315,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   }
   // the footrest (Josephine, the owner's photo): one teak plank right across the cockpit's after end, its grain across
   // like the washboards, sliding out from the hollow under the after deck as a footrest for the helm sitting on the
-  // after deck, or back under it so they can stand to steer. Its edges ride on two slim metal rails screwed flat to the
-  // hull's inside (footrestWall), from as far forward as it goes to its after end slid back. It's drawn slid out and
-  // moves with her footrest state (b.footrest: 0 out … 1 back under the deck), out if she has none.
-  { const zA = -L / 2 + COCKPIT.u1 * L, { y, len, out, rail: rw } = FOOTREST, N = 10, rails: THREE.BufferGeometry[] = [];
-    for (const sx of [-1, 1]) {
-      const pts: THREE.Vector3[] = [];
-      for (let i = 0; i <= N; i++) { const z = zA - out + (len + out) * i / N; pts.push(new THREE.Vector3(sx * (footrestWall(z) - rw / 2), y - 0.016, z)); }
-      rails.push(wall(pts, () => 0.016, rw).toNonIndexed()); // (a dark metal track, about 16 mm deep, its top the plank's underside: the owner's photo)
-    }
-    grp.add(new THREE.Mesh(mergeGeometries(rails), FOOTREST_RAIL));
+  // after deck, or back under it so they can stand to steer. (It runs on slim metal rails along the hull's inside, left
+  // out for simplicity: the owner.) It's drawn slid out and moves with her footrest state (syncBoatMesh).
+  { const zA = -L / 2 + COCKPIT.u1 * L, { y, len, out } = FOOTREST, N = 10;
     // (the plank in plan, x across and z along, where it lies slid out: the hull's shape where it slides back to, `out` aft)
     const ring: THREE.Vector2[] = [];
     for (let i = 0; i <= N; i++) { const z = zA - out + len * i / N; ring.push(new THREE.Vector2(footrestEdge(z + out), z)); }
@@ -451,7 +444,6 @@ const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.
 const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
-const FOOTREST_RAIL = new THREE.MeshPhongMaterial({ color: 0x2e3033, specular: 0x444444, shininess: 40, side: THREE.DoubleSide }); // (the footrest's rails: dark metal, Josephine's photo)
 /** The mast's foot on deck (m): the stainless plate's radius, the rubber boot's height, and the horseshoe's radius round the mast, its height at the top (aft of the mast, about 6 in), and how far round it reaches from aft (rad: its ends on the deck either side just forward of the mast). The lines thread under it or are made fast to it. */
 export const MAST_RING = { plate: 0.16, boot: 0.4, r: 0.14, h: 0.152, ends: 150 * Math.PI / 180 };
 /** The jib winch's handle below the side deck (m): its spindle's drop under the deck, the crank arm's length (about 10 in, the owner), the grip's length. */
@@ -1238,8 +1230,13 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
   syncCompanionway(m.companionway, b);
-  // the footrest slid out, or back under the after deck
-  { const fr = m.grp.userData.footrest as THREE.Group | undefined, t = Math.max(0, Math.min(1, (b as Boat & { footrest?: number }).footrest ?? 0)); if (fr) fr.position.z = t * FOOTREST.out; }
+  // the footrest: slid out while the helm sits on the after deck (their feet on it), slid back under the deck when they
+  // stand to steer (the owner). b.footrest (0 out … 1 back) is set by whoever poses the helm (crew.ts): out by default,
+  // as the helm sits. It slides there by hand, about half a metre a second, not in a jump.
+  { const fr = m.grp.userData.footrest as THREE.Group | undefined;
+    if (fr) { const want = Math.max(0, Math.min(1, (b as Boat & { footrest?: number }).footrest ?? 0)) * FOOTREST.out, last = fr.userData.t as number | undefined;
+      const dt = last === undefined ? 1e3 : Math.max(0, Math.min(0.5, t - last)); fr.userData.t = t;
+      fr.position.z += Math.max(-0.5 * dt, Math.min(0.5 * dt, want - fr.position.z)); } }
   // the cabin's lantern swings on its chain under her motion, and its light goes with it
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);

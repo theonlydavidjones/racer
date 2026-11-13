@@ -337,19 +337,19 @@ const stZ = (st: number) => L / 2 - 2 * 0.5 - (st - 3) * 0.5;
  * plank, it runs aft to z1, its floor the cockpit sole's level carried aft (or the hull's inside, where that rises
  * higher), its sides the hull's own inside; storage, and room for the footrest to slide back
  * into. The footrest: one teak plank right across the cockpit's after end, about 2 ft (`len`) fore and aft, its top
- * level with the seats. Its edges ride on two slim metal rails screwed flat to the hull's inside, port and starboard,
- * that run only as far forward as the plank goes. Slid out, its forward edge is halfway between the thwart's after edge
+ * level with the seats. (On Josephine it rides on two slim metal rails screwed flat to the hull's inside; they aren't
+ * drawn, for simplicity: the owner.) Slid out, its forward edge is halfway between the thwart's after edge
  * and the cockpit's after end (`out` m forward of it), a footrest for the helm sitting on the after deck; slid back,
- * flush with the cockpit's after end under the deck, so they can stand to steer (the owner). It's cut to the hull's
+ * flush with the cockpit's after end under the deck, so they can stand to steer (the owner): out while the helm sits, back when they stand. It's cut to the hull's
  * shape where it slides back to (footrestEdge), so slid out, where she's wider, it stands a little clear of the hull.
  * (The hollow's size is an estimate from the photo.)
  */
 export const HOLLOW = { z1: L / 2 - 0.41 };
-/** `y`: the rails' top, the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
+/** `y`: the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
 export const FOOTREST = { y: COCKPIT.sole + 0.30 - 0.025, len: 0.61, out: 0.35, rail: 0.022 };
 /** The hull's lining's half-breadth at the footrest's rails, at z (the lining stands 30 mm in from hullInnerHalf). */
 export const footrestWall = (z: number) => hullInnerHalf(uAtZ(z), FOOTREST.y) - 0.03;
-/** The plank's half-width at z, slid back: to its rails' middle, cut to the hull there. */
+/** The plank's half-width at z, slid back: cut to the hull there, as far out as the rails' middle. */
 export const footrestEdge = (z: number) => footrestWall(z) - FOOTREST.rail / 2 - 0.004;
 export const COCKPIT_FIT = {
   seat: -0.08 + 0.30, soleHalf: 0.35,
@@ -604,7 +604,7 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   // the cockpit's after end, and under the after deck a hollow (Josephine, the owner's photo): open to the cockpit and
   // open under the footrest plank, its floor the cockpit sole's level carried on aft until the hull's own inside rises
   // above that (the hull lifting towards the transom), running aft to HOLLOW.z1, lined; the plank slides in and out of it
-  // on rails (boatMesh)
+  // (boatMesh)
   { const { z1 } = HOLLOW, zs = span(zA - 0.04, z1, 10); // (begun a little forward of the after end, under the well's lining, so the two meet without a seam)
     const floorY = (u: number) => { let y = sole; while (y < sole + 0.4 && hullInnerHalf(u, y) - 0.03 < 0.1) y += 0.005; return y; };
     const wF = (u: number) => Math.max(0.07, hullInnerHalf(u, floorY(u)) - 0.03);
