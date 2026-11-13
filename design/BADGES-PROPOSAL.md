@@ -1,4 +1,6 @@
-# Badges that follow the real ladder (Debrief, 13 Nov 2026; for the owner)
+# Badges that follow the real ladder (Debrief, 13 Nov 2026)
+
+**Decided (the owner, via the Coordinator, 13 Nov):** ASA. The badge reads "101 · Basic Keelboat skills". Its hover says "Practice of the ASA 101 skills in the sim. Not the ASA certification." Before the badge ships (PR 6), the 12 lessons get checked against ASA 101's own published standard. The permission flag below still holds.
 
 The owner: "Badges should follow normal sailing certifications. ASA 101, etc." The picture is `badges-mockup.png`.
 
