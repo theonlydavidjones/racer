@@ -274,22 +274,59 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
   });
 });
 
+/**
+ * A move to a new place: their goal more than 0.1 m from where it last was, and while it carries on the same way without
+ * stopping, the same move. (Counted by every 0.1 m their goal shifted, one smooth move out on a filling puff, or the
+ * rail's ease, scored as several, and a jump the same distance as one: the counting step, not how often they change
+ * place. Each reversal, and each start after a stop of half a second, is a new move: a flicker can't hide in it.
+ * Deep Physics and Crew Figures, 13 Nov 2026: on main 67 and 69 moves counted so, with crew-still's rail ease 69 and
+ * 73, where the 0.1 m steps gave 75 and 81.)
+ */
+function settledCounter(at: { x: number; z: number }) {
+  let anchor = { ...at }, prev = { ...at }, dir = { x: 0, z: 0 }, still = 1, n = 0;
+  return {
+    step(g: { x: number; z: number }, dt: number) {
+      const v = { x: g.x - prev.x, z: g.z - prev.z }, moved = Math.hypot(v.x, v.z) > 1e-4; prev = { ...g };
+      if (moved && still < 0.5 && v.x * dir.x + v.z * dir.z > 0) { anchor = { ...g }; still = 0; return; } // (the same move, on its way)
+      still = moved ? 0 : still + dt;
+      if (Math.hypot(g.x - anchor.x, g.z - anchor.z) > 0.1) { n++; dir = { x: g.x - anchor.x, z: g.z - anchor.z }; anchor = { ...g }; }
+    },
+    get n() { return n; }
+  };
+}
+
 describe('How often the crew move (crewPhys.ts HOLD)', () => {
   /** Ten minutes upwind in a puffy breeze (10 kt, ±2 kt over half a minute, flickering ±0.7 kt every few seconds): how many times each crew member sets off for a new place. */
   let lastTrips: number[] = [];
   function moves(windKt: number): number[] {
     const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4, windKt }); b.crew = newCrew(crewOf(0.6), 'S');
     sail(b, 30, () => { b.h = courseHeading(b, 360 - twa); });
-    const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0), trips = last.map(() => 0); // (then held: her leeway at the mean wind)
+    const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), trips = last.map(() => 0); // (then held: her leeway at the mean wind)
+    const seats = b.crew.people.map(p => settledCounter(p.goal!));
     sail(b, 600, t => {
       b.h = h; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
-      // (setting off for a seat, or back to one from a job; a trip out to a line at the cabin top is the puff being
+      // (to a new seat, or back to one from a job: settledCounter; a trip out to a line at the cabin top is the puff being
       // trimmed for, not the flicker, and is counted on its own)
-      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (p.job?.station) trips[i]++; else n[i]++; last[i] = { ...p.goal }; } });
+      b.crew!.people.forEach((p, i) => {
+        if (!p.goal) return;
+        if (!p.job?.station) seats[i].step(p.goal, 1 / 60);
+        if (Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (p.job?.station) trips[i]++; last[i] = { ...p.goal }; }
+      });
     });
     lastTrips = trips.slice(1);
-    return n.slice(1);
+    return seats.slice(1).map(c => c.n);
   }
+  it("the count can't be fooled: a crew member flicking 0.3 m out and back, every second or every fifth of one, is a move each time", () => {
+    for (const every of [60, 12]) {
+      const c = settledCounter({ x: 0.5, z: 1.5 });
+      for (let i = 0; i < 600 * 60; i++) c.step({ x: Math.floor(i / every) % 2 ? 0.8 : 0.5, z: 1.5 }, 1 / 60);
+      expect(c.n).toBeGreaterThanOrEqual(600 * 60 / every - 1);
+    }
+    // (and a smooth 0.35 m move out, at a hiker's pace over a second, then held, is one)
+    const d = settledCounter({ x: 0.45, z: 1.65 });
+    for (let i = 0; i < 180; i++) d.step({ x: 0.45 + 0.35 * Math.min(1, i / 60), z: 1.65 }, 1 / 60);
+    expect(d.n).toBe(1);
+  });
   it('they sit still through the flicker and move on the real puffs and lulls', () => {
     // in 10 kt they're up on the windward deck whatever the puffs do: they stay there, but for a hike as a puff hits
     for (const m of moves(10)) expect(m).toBeLessThan(20);
