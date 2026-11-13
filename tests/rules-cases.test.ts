@@ -244,7 +244,7 @@ describe('Rules 10–17 · Section A and B', () => {
     expect(case53(true).after.foul).toBeNull();
   });
 
-  it.fails('Case 105: running on opposite tacks side by side, starboard luffs and port doesn\'t respond though she had room (she could gybe): port broke 10; starboard didn\'t break 16.1', () => {
+  it('Case 105: running on opposite tacks side by side, starboard luffs and port doesn\'t respond though she had room (she could gybe): port broke 10; starboard didn\'t break 16.1', () => {
     const S = boat('S', { at: [0, 0], heading: 185 }), P = boat('P', { at: [-6, 0], heading: 175 });
     const p = pair(S, P);
     clean(p, 50);

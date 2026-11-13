@@ -1,7 +1,8 @@
 import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec } from '../core/math';
+import { escapes, type Pose } from '../boat/arcs';
 import { clearAstern, cpa, hullGap } from './geometry';
 import { returning, rightOfWay } from './rightOfWay';
-import type { Incident, PairRecord, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
+import type { Incident, PairRecord, PoseRing, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
 
 /** Hulls closer than this count as contact, m. */
 export const CONTACT_GAP = 2.2;
@@ -153,6 +154,78 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   return after < before - 5 ? Math.abs(turn) : 0;
 }
 
+/** How many poses a pair keeps of each boat, and how often: 8 s at 0.1 s. */
+const RING = 80, RING_DT = 0.1;
+
+/** Keep `b`'s pose in this pair's history (at most every RING_DT s): a fixed ring, no allocation once made. */
+export function recordPose(rec: PairRecord, b: RulesBoat, t: number): void {
+  const H = rec.hist ??= {};
+  let r = H[b.id];
+  if (!r) r = H[b.id] = { t: new Float64Array(RING), x: new Float64Array(RING), y: new Float64Array(RING), h: new Float64Array(RING), v: new Float64Array(RING), n: 0, i: 0 };
+  const last = r.n ? (r.i + RING - 1) % RING : -1;
+  if (last >= 0 && t < r.t[last]) r.n = r.i = 0; // (time went back: a new race, a test re-run)
+  else if (last >= 0 && t - r.t[last] < RING_DT - 1e-9) return;
+  r.t[r.i] = t; r.x[r.i] = b.x; r.y[r.i] = b.y; r.h[r.i] = b.h; r.v[r.i] = Math.hypot(b.vx, b.vy);
+  r.i = (r.i + 1) % RING; r.n = Math.min(RING, r.n + 1);
+}
+
+/** The k-th newest sample's index (0 = the newest). */
+const at = (r: PoseRing, k: number) => (r.i + RING - 1 - k) % RING;
+
+/** Her pose at time t from the ring, between samples (headings the short way round); before the oldest, the oldest. */
+function poseAt(r: PoseRing, t: number): Pose {
+  for (let k = 0; k < r.n - 1; k++) {
+    const a = at(r, k + 1), b = at(r, k);
+    if (r.t[a] <= t && t <= r.t[b]) {
+      const f = r.t[b] > r.t[a] ? (t - r.t[a]) / (r.t[b] - r.t[a]) : 1;
+      return { x: r.x[a] + (r.x[b] - r.x[a]) * f, y: r.y[a] + (r.y[b] - r.y[a]) * f, h: r.h[a] + wrap(r.h[b] - r.h[a]) * f, v: r.v[a] + (r.v[b] - r.v[a]) * f };
+    }
+  }
+  const o = at(r, r.n - 1);
+  return { x: r.x[o], y: r.y[o], h: r.h[o], v: r.v[o] };
+}
+
+/** Rule 16.1's "room to keep clear": the reaction time of a helmsman watching the other boat ("promptly", Definitions,
+ * Room), s. A modelling choice (docs/ROOM-TO-RESPOND.md): human reaction to a visual cue is about 0.7–1.5 s. */
+export const RESPOND_DELAY = 1;
+
+/**
+ * Rule 16.1 (and 16.2): when the right-of-way boat `row` changed course, did she leave `kc` room to keep clear?
+ * Definitions, Room: "the space a boat needs ... while manoeuvring promptly in a seamanlike way". From where both were
+ * when her present turn toward the other began (this pair's history), could the other, reacting promptly, have turned
+ * away (physics' own turn rate, src/boat/arcs.ts escapes) and kept her hull clear of the right-of-way boat's actual
+ * course? WS Case 105: the boat that could have kept clear (there, by gybing away) and didn't broke the basic rule; the
+ * one that luffed broke nothing. Without a history (a single look), the turn is taken as leaving no room.
+ */
+export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: PairRecord): boolean {
+  return roomGap(row, kc, ctx, rec) >= CONTACT_GAP;
+}
+
+/** The widest gap `kc` could have kept from `row`, turning away promptly once `row` began her turn, m (leftRoom). */
+export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: PairRecord): number {
+  const R = rec.hist?.[row.id], K = rec.hist?.[kc.id];
+  if (!R || !K || R.n < 2) return 0;
+  // when her present turn began: back through her samples while she kept turning the same way (faster than 1°/s)
+  const now = R.t[at(R, 0)], dir = Math.sign(wrap(R.h[at(R, 0)] - R.h[at(R, 1)])) || Math.sign(wrap(row.h - (row.headingAgo ?? row.h)));
+  let k = 0;
+  while (k < R.n - 1) {
+    const a = at(R, k + 1), b = at(R, k), dh = wrap(R.h[b] - R.h[a]), dt = R.t[b] - R.t[a];
+    if (dt <= 0 || Math.sign(dh) !== dir || Math.abs(dh) / dt < 1) break;
+    k++;
+  }
+  const t0 = R.t[at(R, k)];
+  if (now - t0 < 1e-6) return 0;
+  const k0 = poseAt(K, t0);
+  const rowTrack = (tau: number): Pose => {
+    const t = t0 + tau;
+    if (t <= now) return poseAt(R, t);
+    const u = V(row.h), v = Math.hypot(row.vx, row.vy), dt = t - now;
+    return { x: row.x + u.x * v * dt, y: row.y + u.y * v * dt, h: row.h, v };
+  };
+  const c = escapes(k0, [rowTrack], kc.ww?.from ?? ctx.windFrom, { delay: RESPOND_DELAY, horizon: now - t0 + 2 });
+  return Math.max(...c.map(q => q.minGap));
+}
+
 /** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
 function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
   if (b.headingAgo == null || b.tack !== 'S') return false;
@@ -173,6 +246,7 @@ export interface PairAssessment<B> { verdict: Verdict<B>; incident: Incident<B> 
 /** One step of the rules for a pair of boats. Updates `rec` (the pair's memory) in place and
  * reports any incident. Deterministic: depends only on its arguments. */
 export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx: RulesContext, obs: PairObservation): PairAssessment<B> {
+  recordPose(rec, A, ctx.t); recordPose(rec, B, ctx.t);
   const n = ctx.marks.length;
   // (rule 18 applies between boats required to leave a mark on the same side (18.1): a boat that's retired has no mark to
   // leave, so no mark-room either way between her and anyone)
@@ -352,11 +426,16 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // boat she must give room to is still rule 16.1's, below). Before the start there's no proper course: a turn onto her
     // is the sign.
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
-  } else if (['10', '11', '12', '13', '21.1', '21.2', '21.3'].includes(r.rule) && (turned = turnedToward(row, r.kc)) > 0) {
+  } else if (['10', '11', '12', '13', '21.1', '21.2', '21.3'].includes(r.rule) && (turned = turnedToward(row, r.kc)) > 0
+    && ((r.rule === '10' && boreAwayOnBeat(row, ctx)) || !leftRoom(row, r.kc, ctx, rec))) {
     // (rule 16.1 whatever gave her right of way: the basic rules, or a tacking boat, or one returning, taking a penalty or
     // backing a sail keeping clear of her under 13 or 21)
-    // Rule 16.1: the right-of-way boat changed course into the other boat without leaving her room to respond.
-    // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is passing astern of her.
+    // Rule 16.1: the right-of-way boat changed course toward the other boat without leaving her room to keep clear (from
+    // where they were when her turn began, could the other have turned away in time: leftRoom). A turn that left room
+    // is no breach, and contact after it is the keep-clear boat's (WS Case 105).
+    // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is passing astern of her. Stricter: she
+    // "shall not change course if as a result the port-tack boat would immediately need to change course to continue
+    // keeping clear", room or no room (WS Case 92).
     fouler = row; rule = r.rule === '10' && boreAwayOnBeat(row, ctx) ? '16.2' : '16.1';
   } else if (r.rule === '11' && rec.r17 === row.id && ctx.t > 0 && row.aboveProper) {
     // Rule 17: overlapped from astern within two lengths, then sailed above her proper course
