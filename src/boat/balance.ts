@@ -88,13 +88,20 @@ export const LEVER = { main: -0.538, jib: 1.342 };
 /** Chord of each sail at its centre of effort (m). */
 const CHORD = { main: 2.4, jib: 2.0 };
 /**
- * Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m). Unsourced. The class rules
- * give the blade's shape (NFIA Class Rules 2025–2028, 5.20: breadths 105 mm at the heel, 490 mm at most about 1.22 m up,
- * 415 mm at the waterline 1.53 m up). Summed below the waterline, that is about 0.56 m² over a 1.53 m span, a geometric
- * aspect ratio of about 4.2. The area here is a quarter smaller, and the aspect (used for the rudder's induced drag) a
- * third of the geometric one. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
+ * Rudder: area (m²), lift slope (per radian), arm from the centre of lateral resistance (m), aspect ratio.
+ *  - area and aspect: the class's blade (NFIA Nordic Folkboat Class Rules 2025–2028, 5.20: breadths 105 mm at the heel,
+ *    490 mm at most about 1.22 m up, 415 mm at the waterline 1.53 m up, measured along the fore edge). Summed below the
+ *    waterline (the offsets taken as straight between the stations, a few per cent either way for the fair curve):
+ *    0.562 m² over 1.528 m, a geometric aspect ratio b²/S of 4.16. (The fore edge is raked, so the blade's depth is a
+ *    little less than 1.53 m; the area is as measured along it.)
+ *  - slope: Helmbold's lifting-surface form for that aspect ratio, a = 2πA / (2 + √(A² + 4)) = 3.97 per radian (Helmbold
+ *    1942; it fits Whicker & Fehlner's 1958 low-aspect-ratio rudders, DTMB). Taken at the geometric aspect ratio: the
+ *    hull above it would raise the effective one (the blade hangs on the keel's aft end, no gap between, CR 4.70 and
+ *    5.40), but by how much wasn't found (Molland & Turnock, Marine Rudders and Control Surfaces, 5.5, not reached).
+ *  - arm: from the centre of lateral resistance to the blade's centre of pressure, an estimate.
  */
-export const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
+const helmbold = (A: number) => 2 * Math.PI * A / (2 + Math.sqrt(A * A + 4));
+export const RUDDER = { area: 0.562, slope: helmbold(4.16), arm: 2.6, aspect: 4.16 };
 /** Full helm (deg of rudder) for the sim's fastest turn. */
 export const FULL_RUDDER = 30;
 /**
