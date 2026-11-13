@@ -224,7 +224,6 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .attempts td{padding:5px 6px 1px;text-align:left;white-space:nowrap}
 .attempts tr.dcoach td{color:#ffd28a;padding:0 6px 6px;font-size:11.5px;white-space:normal;border-bottom:1px solid var(--rule)}
 .attempts tr.noscore td{color:var(--muted)}
-.attempts tr.best td{color:var(--accent);font-weight:700} /* (the run's best: as the start-line drill's) */
 .drillnote{font-size:11px;color:var(--muted)}
 /* what the sail control under the mouse (or last touched) does: the band's help, in the Coach card, not over the controls */
 .tp-help{font:500 11px/1.38 var(--f-body);color:var(--muted);border-top:1px solid var(--rule);padding-top:4px;margin-top:2px;max-width:300px}
@@ -1169,3 +1168,26 @@ body.showroom #flowPanel{display:none}
 /* the field: one of several, as radio rows boxed together apart from the switches (ui/layers.ts) */
 .layerpop .lp-field{display:flex;flex-direction:column;padding:2px 6px;margin:0 -4px;border:1px solid var(--rule);border-radius:5px;background:rgba(255,255,255,.03)}
 .layerpop .lp-sub{text-transform:none;letter-spacing:0}
+/* The flag index sits in the left column, which lets the pointer through to the boat (pointer-events:none); the index
+   itself must take the pointer, or the wheel and a drag go to the view behind it and it never scrolls (the owner). */
+#flagIndex{pointer-events:auto;overscroll-behavior:contain;cursor:grab}
+#flagIndex.drag{cursor:grabbing;-webkit-user-select:none;user-select:none}
+#flagIndex .fi-x{cursor:pointer}
+/* the start-line drill's choices for the next attempt (inside its panel) */
+.dopts{display:flex;gap:8px;flex-wrap:wrap}
+.dopts .seg{flex:1 1 200px}
+.dopts .dlabel{flex:1 0 100%;font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.attempts tr.best td{color:var(--accent);font-weight:700} /* the best of a drill's attempts (shared with the manoeuvres drill) */
+/* the band put away with its ▾ tab and brought back with a click on the windex (the owner, 13 Nov) */
+.sb-away{font-size:12px!important;padding:0 8px!important;color:var(--muted)!important}
+.sb-wx{position:relative}
+.sb-wx-hint{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;padding:3px 7px;border-radius:5px;
+  background:rgba(9,22,33,.86);border:1px solid var(--rule);font:700 9.5px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--text);
+  opacity:0;transition:opacity .15s;pointer-events:none}
+.sailband.shut .sb-wx{pointer-events:auto;cursor:pointer;border-radius:50%}
+.sailband.shut .sb-wx:hover .sb-wx-hint{opacity:1}
+.sailband.shut .sb-wx:hover svg{filter:drop-shadow(0 0 0 2px var(--accent)) brightness(1.15)}
+/* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
+   which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
+body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
+body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #keysHint,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar{display:none!important}

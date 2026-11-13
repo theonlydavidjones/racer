@@ -1,6 +1,6 @@
 # Room to respond: one model for the rules and the AI (design note)
 
-This note is a design for review; nothing in it is built yet. It covers finding 2 in docs/RULES-CASES.md, which is WS Case 105
+Built (13 Nov 2026): `escapes()` in src/boat/arcs.ts, and rule 16.1 in src/rules/pairs.ts (`leftRoom`, `roomGap`). The pose history is kept per pair in the rules engine (`PairRecord.hist`, a fixed ring of 80 samples at 0.1 s per boat, `recordPose`), not in world.ts. 16.2 doesn't go through it: on a beat it bars any bear-away that makes the ducking boat respond at once, room or not (WS Case 92). The rest of this note is the design as agreed. It covers finding 2 in docs/RULES-CASES.md, which is WS Case 105
 (rule 16.1). Rules and Skipper Model share it, so the sim has one answer to "could she have kept clear from here?", not two.
 
 ## The problem

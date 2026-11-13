@@ -48,7 +48,7 @@ import { PerfMeter } from './ui/perfMeter';
 import { compassPoint, degAndPoint, turnWords } from './core/compass';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
-import { startDebrief } from './sim/startDebrief';
+import { startDebrief, type StartStats } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
 import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } from './ui/feedback';
@@ -63,6 +63,7 @@ import { PlanChart } from './ui/planChart';
 import { passageNow, whyNot } from './sim/navigator';
 import { FlowPanel } from './ui/flowPanel';
 import type { PilotMode } from './boat/autopilot';
+import { Nav, type Place } from './ui/nav';
 
 const S: Settings = loadSettings();
 // the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
@@ -85,7 +86,9 @@ const navView = new NavView();
 const drillView = new ReplayView($<HTMLCanvasElement>('dcanvas'));
 const raceReplay = new RaceReplay($('raceReplay'));
 /** Start practice begins this many seconds before the gun, and the debrief comes this long after it. */
-const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
+const DRILL_FROM = 120, DRILL_DEBRIEF_AT = 15;
+/** The start-line drill's attempts this session, for the run to compare (newest last). */
+const drillRuns: (StartStats & { n: number; from: number; solo: boolean })[] = [];
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
@@ -179,8 +182,24 @@ let condLive = false;
  * ghost's very race), and your run of the race just logged (kept as a ghost if you save it). */
 let ghostNext: Ghost | null = null, activeGhost: Ghost | null = null, pendingGhost: Ghost | null = null;
 function newGame(seed = randomSeed()): void {
-  incidentClips = []; // (a new race: its own rule incidents)
   if (condLive && w?.running) { saveSettings(S); void host.ask({ k: 'conditions', settings: S }).then(() => view.conditionsChanged(w)); return; } // (redrawn once the race has them: the committee boat to the new wind) // (the owner: at once, without a restart)
+  // (a setup change still waiting on its debounce is overtaken: this race is built from the settings as they are now)
+  clearTimeout(setupTimer); const fs = [...setupAfter]; setupAfter.clear();
+  prepare(seed); show(); fs.forEach(f => f());
+}
+/*
+ * The setup's changes build the race but not the scene (the owner, 13 Nov 2026: "let me finish configuring the race
+ * before loading up the game"). prepare() builds the one World the setup's cards and charts read (its course, weather,
+ * tide, start) and hands it to the host, in the same worker (sim/host.ts rebuild, adopting it as the mirror); show()
+ * builds the scene for it, once, at Start or Cast off. Between the two the view is `still`: the last frame stays on the
+ * screen, nothing is drawn or sailed (the World handed over must stay untouched until the race starts), and the game's
+ * own displays are put away (body.still).
+ */
+let still = false, unshown = false;
+/** How many Worlds the page has built (for the checks: a setup change builds one, after the debounce). */
+let prepared = 0;
+function prepare(seed = randomSeed()): void {
+  incidentClips = []; // (a new race: its own rule incidents)
   pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
   const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
@@ -197,15 +216,24 @@ function newGame(seed = randomSeed()): void {
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
   const drillFile = S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course)), settings: WSd, seed,
-    opts: S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : soloDrill ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
-  host?.dispose();
-  // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
-  // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
-  const wk = SIM_INPROC ? null : spawnSimWorker();
-  host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); })
-    : new LocalHost(new World(args.file, args.settings, args.seed, args.opts), SIM_GUARD);
+    opts: S.mode === 'drill' ? { startAt: S.drillFrom ?? DRILL_FROM, solo: S.drillSolo ?? true, showFlags, courseSignal } : (S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
+  // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
+  const facts = new World(args.file, args.settings, args.seed, args.opts);
+  if (host) host.rebuild(args, facts);
+  else {
+    // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
+    // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
+    const wk = SIM_INPROC ? null : spawnSimWorker();
+    host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); }, facts)
+      : new LocalHost(facts, SIM_GUARD);
+  }
   w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false; resultsShown = false;
   document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
+  unshown = true; document.documentElement.dataset.prepared = String(++prepared);
+}
+/** The scene for the race prepare() built: the boats, marks and labels drawn, and the view live again. */
+function show(): void {
+  unshown = false; setStill(false);
   showTrimOwner(); showLash(); showCrewPlace();
   word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint(); insetViews();
   view.setWorld(w);
@@ -213,6 +241,22 @@ function newGame(seed = randomSeed()): void {
   // course, seed, start time and conditions); any other race has none
   activeGhost = ghostNext && S.mode === 'race' && setupKey(raceSetup()) === ghostNext.key ? ghostNext : null; view.setGhost(w, activeGhost?.pts ?? null);
   labels.build(w);
+}
+function setStill(on: boolean): void { still = on; document.body.classList.toggle('still', on); }
+/** Leaving the setup without sailing (the start page): its race drawn, and live again. */
+function wake(): void { if (unshown) show(); else setStill(false); }
+let setupTimer = 0;
+const setupAfter = new Set<() => void>();
+/**
+ * A choice in the setup: its race built once the clicks stop (120 ms), then `after` (the cards that read it). Outside
+ * the setup (the showroom, the pause menu's conditions) the change is drawn at once, as before.
+ */
+function setupChanged(after?: () => void, wait = 120): void {
+  if (!still || condLive) { newGame(); after?.(); return; }
+  if (after) setupAfter.add(after);
+  clearTimeout(setupTimer);
+  const go = () => { if (!still) return; prepare(); const fs = [...setupAfter]; setupAfter.clear(); fs.forEach(f => f()); };
+  if (wait <= 0) go(); else setupTimer = window.setTimeout(go, wait);
 }
 
 /* ---------------- sim events → UI ---------------- */
@@ -489,6 +533,10 @@ function openFlow(open = !flowPanel.open): void {
 addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
+// (the owner OKd the mock-up, 13 Nov: no Sail controls button. The ▾ tab on the band's edge puts the band away; put away,
+// the windex stays where it was, and a click on it brings the band back, its hover saying so)
+document.querySelector<HTMLElement>('#sailBand .sb-away')!.addEventListener('click', e => { e.stopPropagation(); openLines(false); });
+document.querySelector<HTMLElement>('#sailBand .sb-wx')!.addEventListener('click', () => { if (!band.open) openLines(true); });
 /* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
  * beside her at three heights, off unless you turn it on (the inset map's Layers menu, or its key), and remembered. */
 const ladder = new WindLadder(); ladder.grp.visible = false; view.scene.add(ladder.grp);
@@ -671,6 +719,23 @@ function togglePole(): void {
 // the Flags tile opens the flag index; × or Esc closes it
 $('sigPanel').addEventListener('click', () => hud.flagIndex(w, !!$('flagIndex').hidden));
 $('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
+// Drag the flag index to scroll it, as you'd push a page up (the wheel scrolls it too); a drag that moves isn't a click.
+{
+  const fi = $('flagIndex'); let drag: { y: number; top: number; id: number; moved: boolean } | null = null;
+  fi.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    drag = { y: e.clientY, top: fi.scrollTop, id: e.pointerId, moved: false };
+  });
+  fi.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.abs(dy) < 4) return;
+    if (!drag.moved) { drag.moved = true; fi.setPointerCapture(e.pointerId); fi.classList.add('drag'); }
+    fi.scrollTop = drag.top - dy; e.preventDefault();
+  });
+  const end = (e: PointerEvent) => { if (!drag || e.pointerId !== drag.id) return; drag = null; fi.classList.remove('drag'); };
+  fi.addEventListener('pointerup', end); fi.addEventListener('pointercancel', end);
+}
 function doHail(): void { if (w.running && !w.paused) send({ k: 'hail' }); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) send({ k: 'pushOff' }); }
@@ -809,7 +874,7 @@ function sailButtons(): void {
 let ensignShown = false;
 function ensignButton(): void {
   const u = w.user, tws = u.twsSlow ?? 0, el = $('bEnsign');
-  ensignShown = !!u.ensign && w.running && w.freeSail && (!!u.ensignStruck || tws >= 20 || (ensignShown && tws >= 17));
+  ensignShown = !!u.ensign && w.running && w.freeSail && !u.ensignNight && (!!u.ensignStruck || tws >= 20 || (ensignShown && tws >= 17));
   if (el.hidden !== !ensignShown) el.hidden = !ensignShown;
   word('bEnsign', u.ensignStruck ? 'Hoist ensign' : 'Strike ensign');
   el.classList.toggle('on', !!u.ensignStruck);
@@ -886,7 +951,7 @@ let chartDest: unknown = null;
 const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); newGame(); tideBox(); } // (the tide graph's Arrive moves with them)
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); setupChanged(tideBox, 0); } // (the tide graph's Arrive moves with them; at once, for the chart that redraws from it)
 };
 setupChart = new SetupChart(hud, cruisePicks);
 /** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
@@ -1015,8 +1080,15 @@ addEventListener('keydown', e => {
     if (navView.isOpen) { navView.close(); return; }
     if (chart.isOpen) { chart.close(); return; }
     if (!$('logView').hidden) { $('logView').hidden = true; return; }
+    // the screens around the sailing (docs/UI-AUDIT.md §3 rule 5): Esc is back. A layer over one closes first, then a
+    // sub-page (a member's page), then back to where you came from; on the start page, nothing
+    if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
+    if (boatPanel.open) { $('boatPanel').querySelector<HTMLElement>('[data-act="done"]')?.click(); return; }
+    if (fleet.escape()) return;
+    if (!$('raceChoose').hidden || !$('setup').hidden || fleet.open) { nav.back(); return; }
+    if (!$('club').hidden) { openHome(); return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
-    if (condLive && !$('condDlg').hidden) { $('bCondDone').click(); return; } // (back to the pause menu)
+    if (condLive && !$('condDlg').hidden) { $('bCondClose').click(); return; } // (back to the pause menu)
     if (!$('pause').hidden) { $('bResume').click(); return; }
     if (!anyOverlay() && w.running) $('bPause').click();
     return;
@@ -1167,7 +1239,7 @@ function buildSetupChoices(): void {
   groups.delete('Practice');
   sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
   sel.value = S.course;
-  sel.onchange = () => { S.course = lastPick = sel.value; saveSettings(S); newGame(); courseCard(); tideBox(); };
+  sel.onchange = () => { S.course = lastPick = sel.value; saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); };
   $('condDlg').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
 function courseCard(): void {
@@ -1210,7 +1282,7 @@ function courseCard(): void {
   // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
   // clarification, March 2006, under class rule 1.11); the bracket can stay
   if (S.mode !== 'sail' && S.boat.perf.outboard === 'bracket') {
-    S.boat.perf.outboard = 'stowed'; saveSettings(S); newGame();
+    S.boat.perf.outboard = 'stowed'; saveSettings(S); if (still) prepare(); else newGame();
     toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
   }
   const cruise = S.mode === 'sail';
@@ -1221,7 +1293,7 @@ function courseCard(): void {
   $('bGo').textContent = cruise ? 'Cast off' : 'Start the sequence';
   $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
   $('setupTitle').textContent = cruise ? 'Cruise' : 'Create a race';
-  $('setupBack').textContent = cruise ? '‹ Start page' : '‹ Race'; $('setupBack').dataset.home = cruise ? 'home' : 'race';
+  $('setupBack').textContent = nav.backLabel() || (cruise ? '‹ Start page' : '‹ Race');
   $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
   { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
     $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Single-handed'}, ${Math.round(kg / 0.4536)} lb aboard`; }
@@ -1323,8 +1395,8 @@ function drawTideGraph(): void {
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
-$<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); newGame(); tideBox(); });
-$<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); newGame(); tideBox(); });
+$<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); setupChanged(tideBox); });
+$<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); setupChanged(tideBox); });
 
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
@@ -1341,9 +1413,9 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); newGame(); courseCard(); tideBox(); return; }
+  if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
   (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
-  paintSeg(); newGame(); courseCard(); tideBox();
+  paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 }));
 /**
  * Your crew in the race setup (the Yacht Club, phase 3; the owner: the race setup "isn't where crew are configured",
@@ -1363,22 +1435,26 @@ function crewRows(): void {
   rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${pick(0)}${pick(1)}`
     + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
     + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
-  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); newGame(); courseCard(); crewRows(); };
+  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); crewRows(); setupChanged(courseCard); };
   rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => {
     const ids = [...(boat.crewIds ?? [])], i = Number(sel.dataset.seat);
     if (sel.value) ids[i] = sel.value; else ids.splice(i, 1);
     boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
   });
   rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
-  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openMembers(); });
+  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => nav.go({ k: 'club', tab: 'members' }));
 }
 function openSetup(): void { settleLog(openSetupNow); }
 function openSetupNow(): void {
   replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
-  if (S.mode === 'drill' || S.mode === 'manoeuvres' || S.mode === 'roundings') { S.mode = 'race'; newGame(); }
-  courseView.close(); navView.close(); send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
+  if (S.mode === 'drill' || S.mode === 'manoeuvres' || S.mode === 'roundings') { S.mode = 'race'; prepare(); }
+  // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
+  // and is sent nothing until it starts)
+  setStill(true);
+  courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
+  nav.reset({ k: 'setup' }); // (the pause menu's and the results' Back to setup: the setup you sailed from)
   realRaceHolds();
   saveSettings(S);
   newGame(seed);
@@ -1400,7 +1476,7 @@ function beginRaceNow(seed?: number): void {
   toast(S.mode === 'sail'
     ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}.${w.dest ? ' The navigator (M) has a passage plan.' : ' Try the tiller, the trim and the pole.'}`
     : S.mode === 'drill'
-    ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
+    ? `Start practice${w.boats.length === 1 ? ', alone' : ''}: ${w.startAt / 60 === 1 ? 'one minute' : `${w.startAt / 60} minutes`} to the gun. Check the line head to wind, time your run in, and be on the line at full speed when it goes. Current: ${w.cur.label}.`
     : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
   if (w.courseSignal && S.mode !== 'sail') logMessage(`Course ${w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signalled by the warning signal). ${w.courseSignal.why}`);
 }
@@ -1410,6 +1486,8 @@ let drillClip: ReplayClip | null = null;
 function showDrill(): void {
   drillShown = true; send({ k: 'pause', on: true }); setControlsIdle();
   const d = startDebrief(w);
+  if (d.stats) drillRuns.push({ ...d.stats, n: drillRuns.length + 1, from: w.startAt, solo: w.boats.length === 1 });
+  drillOptions(); drillTable();
   $('dTitle').textContent = d.title;
   const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   $('dFacts').innerHTML = d.facts.map(f => `<li>${esc(f)}</li>`).join('');
@@ -1420,6 +1498,30 @@ function showDrill(): void {
   drillView.play(w, drillClip);
 }
 const closeDrill = () => { $('drill').hidden = true; drillView.stop(); };
+/** The drill's two choices (inside its panel): how long before the gun each attempt starts, and alone or with the fleet. */
+function drillOptions(): void {
+  const from = S.drillFrom ?? DRILL_FROM, solo = S.drillSolo ?? true;
+  $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
+    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet</button></div>`;
+}
+$('dOpts').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-v]'), g = b?.closest<HTMLElement>('[data-dopt]')?.dataset.dopt; if (!b || !g) return;
+  if (g === 'from') S.drillFrom = +b.dataset.v!; else S.drillSolo = b.dataset.v === '1';
+  saveSettings(S); drillOptions();
+});
+/** The run of attempts this session: each start's numbers, the best marked, to see the trend. */
+function drillTable(): void {
+  if (drillRuns.length < 2) { $('dRuns').innerHTML = ''; return; }
+  // (a start is as good as it is on time and at speed: each 10% of speed short counts as about 5 s late, the time it
+  // takes a Folkboat to build that speed back)
+  const score = (r: typeof drillRuns[number]) => r.grade === 'ocs' ? Infinity : Math.abs(r.lateS) + (100 - r.pct) / 2;
+  const best = drillRuns.reduce((a, r) => score(r) < score(a) ? r : a);
+  const endW = (e: string) => e === 'pin' ? w.C.pinLabel : e === 'committee' ? w.C.committeeLabel : 'middle';
+  const rows = drillRuns.slice(-10).map(r => `<tr${r === best ? ' class="best"' : ''}><td>${r.n}</td><td>${r.grade === 'ocs' ? `over, ${Math.round(-r.behindM)} m` : r.behindM < 0 ? `past, ${Math.round(-r.behindM)} m` : `${Math.round(r.behindM)} m · ${Math.round(r.lateS)} s`}</td><td>${r.pct}%</td><td>${esc(endW(r.end))}${r.fav ? (r.onFav ? ' ✓' : '') : ''}</td><td>${r.grade}</td></tr>`).join('');
+  const last = drillRuns.slice(-3), avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const clean = last.filter(r => r.grade !== 'ocs'), trend = drillRuns.length >= 4 && clean.length ? ` Your last three averaged ${Math.round(avg(clean.map(r => r.lateS)))} s late at ${Math.round(avg(last.map(r => r.pct)))}% speed${clean.length < last.length ? ` (${last.length - clean.length} over early)` : ''}.` : '';
+  $('dRuns').innerHTML = `<p class="lede">Your starts this session (the best highlighted; ✓ started at the favoured end).${trend}</p><table class="res attempts"><thead><tr><th>#</th><th>At the gun</th><th>Speed</th><th>End</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 $('bDReplay').onclick = () => { if (drillClip) drillView.play(w, drillClip); };
 $('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
 $('bDNew').onclick = () => { closeDrill(); beginRace(); };
@@ -1432,7 +1534,7 @@ $('bRoundings').onclick = () => { S.mode = 'roundings'; courseView.close(); navV
 /* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
 const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
 let lastPick = hostOf(S.course) === 'ggyc' && S.course !== RC_COURSE ? S.course : COURSES.find(c => c.group)!.id;
-function setCourse(id: string): void { S.course = id; saveSettings(S); newGame(); courseCard(); tideBox(); }
+function setCourse(id: string): void { S.course = id; saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); }
 $('hostSeg').addEventListener('click', e => {
   const h = (e.target as HTMLElement).closest<HTMLElement>('[data-host]')?.dataset.host; if (!h || h === hostOf(S.course)) return;
   setCourse(h === 'practice' ? COURSES.find(c => !c.group)!.id : RC_COURSE);
@@ -1443,7 +1545,7 @@ $('courseMode').addEventListener('click', e => {
 });
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
-$('bCondClose').onclick = $('bCondDone').onclick = () => {
+$('bCondClose').onclick = () => {
   $('condDlg').hidden = true;
   if (condLive) { condLive = false; $('pause').hidden = false; }
   if (showSaved) { // (from the showroom: what was set becomes the showroom's, and your own conditions go back as they were)
@@ -1475,7 +1577,7 @@ $('bShowReal').onclick = () => { showMin = null; showCond = null; newGame(); sho
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
   Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
-  saveSettings(S); paintSeg(); newGame(); courseCard(); tideBox();
+  saveSettings(S); paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 };
 
 /** The tactics debrief: what cost you time, most first, and your place at each mark. */
@@ -1633,6 +1735,7 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (still) return; // (behind the setup: the last frame stays, and its race waits untouched for the start)
   // the steps due (sim/host.ts: here, or in the worker): racing at the race's speed; with nothing running (the start
   // page, setup, the showroom) she still sails, in the real wind and physics, so her sails, heel and flags agree; in the
   // showroom on a close reach
@@ -1676,7 +1779,7 @@ function boatSummary(): void {
 function fleetChanged(): void {
   const ids = new Set(S.boats.map(b => b.id));
   S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId));
-  S.fleet = S.opponents.length; saveSettings(S); newGame(); oppRows();
+  S.fleet = S.opponents.length; saveSettings(S); oppRows(); setupChanged();
 }
 function oppRows(): void {
   const chip = (id: string, name: string, no: string, colour: string, hull: string) => {
@@ -1710,13 +1813,12 @@ $('oppList').addEventListener('click', e => {
   fleetChanged();
 });
 boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(S); newGame(); boatSummary(); oppRows(); }, () => {
-  const id = boatPanel.editing.id; boatPanel.hide(); fleet.openBoat(id); // back to her page in the Fleet
+  const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
 });
 boatPanel.onSpin = () => (look.spin = !look.spin);
-$('bBoat').onclick = () => { fleetFrom = 'setup'; $('setup').hidden = true; fleet.openList(); };
+$('bBoat').onclick = () => nav.go({ k: 'club' });
 
 /* ---------------- the start page: Race, Cruise, Marina, Yacht Club ---------------- */
-let fleetFrom: 'home' | 'setup' = 'home';
 /** The showroom: on while one of your boats is on show (her page in the Fleet, or editing her). */
 function showroom(on: boolean): void {
   if (on) queueMicrotask(showBar); // (once she's on show: the time she's shown at)
@@ -1736,13 +1838,32 @@ const fleet: Fleet = new Fleet(S, {
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
     if (mode === 'cruise') { S.mode = 'sail'; S.sailFrom = fromSlip && b.slip ? 'slip' : S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom; }
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
-    saveSettings(S); boatSummary(); oppRows(); newGame(); openSetup();
+    saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
-  back: () => { newGame(); if (fleetFrom === 'setup') openSetup(); else $('home').hidden = false; }
+  back: () => nav.back(),
+  toBoat: id => nav.go({ k: 'boat', id }),
+  backLabel: () => nav.backLabel()
 });
+/*
+ * The back stack (ui/nav.ts; docs/UI-AUDIT.md §3): the screens around the sailing, each shown here, and named for the
+ * back link of the screen above it.
+ */
+const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'club' ? 'Yacht Club'
+  : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
+function showPlace(p: Place): void {
+  if (p.k === 'home') { openHome(); return; }
+  for (const id of ['home', 'raceChoose', 'setup', 'condDlg', 'club']) $(id).hidden = true;
+  if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
+  if (p.k === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceBack').textContent = nav.backLabel(); $('raceChoose').hidden = false; }
+  else if (p.k === 'setup') { prepare(); openSetup(); }
+  else if (p.k === 'club') { if (p.tab === 'members') fleet.openMembers(); else fleet.openList(); }
+  else fleet.openBoat(p.id);
+}
 function openHome(): void { settleLog(openHomeNow); }
 function openHomeNow(): void {
-  courseView.close(); navView.close(); send({ k: 'running', on: false }); send({ k: 'pause', on: false });
+  nav.reset(); // (the start page: the bottom of the back stack)
+  courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
+  wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
   for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
@@ -1752,13 +1873,13 @@ function openHomeNow(): void {
 document.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-home]'); if (!b) return;
   const where = b.dataset.home;
-  if (where === 'home') { openHome(); return; }
-  $('home').hidden = true; $('raceChoose').hidden = true; $('setup').hidden = true; $('condDlg').hidden = true;
-  if (where === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceChoose').hidden = false; }
-  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); newGame(); openSetup(); }
-  else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); newGame(); openSetup(); }
-  else if (where === 'fleet') { fleetFrom = 'home'; fleet.openList(); }
-  else if (where === 'club') $('club').hidden = false;
+  if (where === 'home') openHome();
+  else if (where === 'back') nav.back(); // (a back link: where you came from, ui/nav.ts)
+  else if (where === 'race') nav.go({ k: 'race' });
+  else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); nav.go({ k: 'setup' }); }
+  else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); nav.go({ k: 'setup' }); }
+  else if (where === 'fleet') nav.go({ k: 'club' });
+  else if (where === 'club') { $('home').hidden = true; $('club').hidden = false; }
 });
 $('bExit').onclick = () => openHome();
 $('bExit2').onclick = () => openHome();
@@ -1907,8 +2028,8 @@ function adjustUi(): void {
 for (const [k, a] of Object.entries(ADJ)) {
   const inp = $<HTMLInputElement>(a.el);
   inp.addEventListener('input', () => { $(a.el + 'V').textContent = a.show(Number(inp.value)); });
-  inp.addEventListener('change', () => { (a.set as (v: number | null) => void)(Number(inp.value)); saveSettings(S); newGame(); courseCard(); tideBox(); });
-  document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!.onclick = () => { (a.set as (v: number | null) => void)(null); saveSettings(S); newGame(); courseCard(); tideBox(); };
+  inp.addEventListener('change', () => { (a.set as (v: number | null) => void)(Number(inp.value)); saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); });
+  document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!.onclick = () => { (a.set as (v: number | null) => void)(null); saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); };
 }
 
 buildSetupChoices();
@@ -1917,4 +2038,4 @@ requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
 if (import.meta.env.DEV) Object.assign(window, { __ghost: (pts: Ghost['pts'] | null) => { activeGhost = pts ? { at: 'dev', key: 'dev', pts } : null; view.setGhost(w, pts); } }); // (a ghost on any race, for checking how it's drawn)
-if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; } });
+if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; }, __nav: () => nav.trail });
