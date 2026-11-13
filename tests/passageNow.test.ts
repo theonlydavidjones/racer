@@ -4,12 +4,21 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { World } from '../src/sim/world';
 import { dist } from '../src/core/math';
 import { passageNow, passagePlan } from '../src/sim/navigator';
+import { beatInChop } from '../src/boat/seaway';
 
 // the owner: "a realistic course estimate on the cruise chart: not only the navigator's route round land, but the
 // course she'd actually sail, with the tacks (or gybes) on legs that are upwind or dead downwind ... the sailed
 // distance and an ETA", the in-game navigator and the chart agreeing.
 const S = (o: Partial<Settings>): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', sailTo: 'crissy', tideDate: '2026-07-11', tideTime: '12:00', current: 'real', sea: 'flat', ...o });
 const at = (o: Partial<Settings>) => new World(COURSES[0], S(o), 7, { freeSail: true });
+
+// (first in the file: an unrounded call to beatInChop on a key nothing else here uses, then the key's own rounded point)
+describe('beatInChop remembers the same angle for a key whoever asks first', () => {
+  it("the angle for 9.13 kt, 0.333 m, 2.77 s is the one for its key's own point, 9.25 kt, 0.34 m, 2.8 s (the review's survey: a plan changed with the order)", () => {
+    const first = beatInChop(9.13, 0.333, 2.77), keyed = beatInChop(9.25, 0.34, 2.8);
+    expect(first).toBe(keyed);
+  });
+});
 
 describe('the passage she would sail leaving now', () => {
   it('is the one the passage plan is worked from (one passage for the plan, the chart and the tide graph)', () => {
@@ -118,12 +127,7 @@ describe('passages along a shore', () => {
     }, 30_000);
 });
 
-import { beatInChop } from '../src/boat/seaway';
 describe('the same plan whatever was planned before it', () => {
-  it("beatInChop remembers the angle for its rounded key, not for whoever asked first (the review's survey: a plan changed with the order)", () => {
-    const a = beatInChop(8.13, 0.211, 2.43), b = beatInChop(8.11, 0.209, 2.41); // (the same key: 8.25 kt... 0.2 m, 2.4 s)
-    expect(a).toBe(b);
-  });
   it('Berkeley to Belvedere in 8 kt in the real sea gets there (it ran ashore depending on what came before)', () => {
     const pn = passageNow(at({ sailFrom: 'berkeley', sailTo: 'belvedere', windKt: 8, tideTime: '15:00', sea: 'real' }))!;
     expect(pn.ok, pn.why).toBe(true);
