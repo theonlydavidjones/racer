@@ -250,7 +250,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // front of her, she gets right of way by that boat's action, and rule 15 is the other's, as in WS Case 27)
     // (a tack counts too when she got right of way by finishing it, from 13 to 10, 11 or 12: reaching close-hauled can
     // come later than JUST_TACKED after head to wind, and WS Case 27 has rule 15 bind her then)
-    const tackDone = rec.rule === '13' && rec.kc === newRow.id;
+    const tackDone = rec.rule === '13' && rec.kc === newRow.id && ['10', '11', '12'].includes(r.rule);
     if (tacked || tackDone || out21 || (rec.rule === '12' && rec.kc === newRow.id && r.rule === '11')) {
       rec.grace = ctx.t + RULE15_GRACE; rec.by = newRow.id; rec.byWhy = tacked || tackDone ? 'tack' : out21 ? 'rule21' : 'overlap';
     }
@@ -260,6 +260,10 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   if (r.rule === '11' && rec.rule === '12' && rec.kc != null && r.kc.id !== rec.kc && gap < RULE17_RANGE) rec.r17 = rec.kc; // the boat that was astern is now leeward
   if (rec.r17 != null && (A.tack !== B.tack || r.rule !== '11' || gap > RULE17_RANGE)) rec.r17 = null;
   rec.kc = r.kc.id; rec.rule = r.rule;
+  // (the replying boat's speed at "You tack", taken at once, before any cooldown: slowing into the hailing boat's way is
+  // not giving room. A modelling sign, and a big lull would read the same; it only counts at contact while the hail is live)
+  const hr = rec.hail;
+  if (hr?.kind === 'room' && hr.replyAt != null && hr.replyV == null) { const Hd = hr.by === A.id ? B : A; hr.replyV = Math.hypot(Hd.vx, Hd.vy); }
   if (rec.cool > ctx.t) return { verdict: r, incident: null };
 
   // Rule 20: not responding to a hail for room to tack is a breach in itself (and so is the hailing
@@ -281,8 +285,6 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     else if (ctx.t > Math.max(hl.at, hl.clearAt ?? -Infinity, hl.passedOn?.respondedAt ?? -Infinity) + 30 || (hailerDone && hailed.lastTackT >= hl.at && !hailed.tacking)) rec.hail = null;
   }
 
-  const hr = rec.hail;
-  if (hr?.kind === 'room' && hr.replyAt != null && hr.replyV == null) { const Hd = hr.by === A.id ? B : A; hr.replyV = Math.hypot(Hd.vx, Hd.vy); }
   let kind: 'contact' | 'swerve' | null = null;
   if (gap < CONTACT_GAP) kind = 'contact';
   else if (obs.swerve) kind = 'swerve';
