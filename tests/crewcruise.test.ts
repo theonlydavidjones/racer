@@ -26,7 +26,7 @@ import { n360 } from '../src/core/math';
  * - the most they turn round in 4 s;
  * - time two of them spend within a body's width of each other both moving at once (the "dancing around each other").
  */
-type Watch = { secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
+type Watch = { seat?: number; secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
 
 function cruise(twa: number, kt: number, mins: number) {
   const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
@@ -49,7 +49,9 @@ function cruise(twa: number, kt: number, mins: number) {
         s.secs += DT;
         if (now.pose !== q.pose) s.poses++;
         if (Math.abs(now.gz - q.gz) > 0.3 || (job(now.pose) && !job(q.pose))) s.trips++;
-        if (Math.sign(now.x) !== Math.sign(q.x) && Math.abs(now.x) > 0.2) s.cross++;
+        // (a crossing: from a seat out beyond 0.15 m on one side to one on the other; a few centimetres either way about
+        // the middle isn't one: tests/crewcross.test.ts's own)
+        if (Math.abs(now.x) > 0.15 && !job(now.pose)) { const sd = Math.sign(now.x); if (s.seat && sd !== s.seat) s.cross++; s.seat = sd; }
         s.knee += Math.abs(now.knee[0] - q.knee[0]) + Math.abs(now.knee[1] - q.knee[1]);
         s.lean += Math.abs(now.pitch - q.pitch) + Math.abs(now.roll - q.roll);
         s.crawl += Math.abs(now.hip.z - q.hip.z);
