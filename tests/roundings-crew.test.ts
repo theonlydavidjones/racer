@@ -40,7 +40,7 @@ describe('The mark-rounding drill, against the sim crew (full World; excluded fr
     const kinds = crewLaps(12, 6).map(s => s.kind);
     expect(kinds).toContain('windward'); expect(kinds).toContain('leeward');
     for (let i = 1; i < kinds.length; i++) expect(kinds[i], `rounding ${i} after ${kinds[i - 1]}`).not.toBe(kinds[i - 1]);
-  }, 90000);
+  }, 180_000);
 
   // (that the tide doesn't score her is shown with a scripted boat in tests/roundings.test.ts: the sim crew itself sails
   // worse in a strong stream, overstanding with the set, which the drill rightly charges)

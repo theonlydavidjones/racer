@@ -81,7 +81,7 @@ const WATER_FRAGMENT = `
   float edge = 1.0 - smoothstep(0.3, 0.5, length(puv - 0.5)); // faded out in a circle over the map's outer part, so its edge never shows
   float kw = mix(1.0, 0.4 + 1.4 * texture2D(uPuff, clamp(puv, 0.0, 1.0)).r, edge);
   // the gusts inside a puff: the map is 20 m cells, but the wind in a puff comes in smaller bursts (turbulence a few
-  // tens of metres across), which roughen the water in ragged patches and cat's paws. Carried along with the
+  // tens of meters across), which roughen the water in ragged patches and cat's paws. Carried along with the
   // puffs (uPuffOff: how far they've carried, added up step by step at their speed, so a shift of the wind turns the
   // drift from then on and doesn't swing the whole pattern), so the dark patch and its ragged edge move down the wind together.
   vec2 adv = vWaveP - uPuffOff;
@@ -95,7 +95,7 @@ const WATER_FRAGMENT = `
   // how rough the water is: the ripples (capillary and short gravity waves, 2–30 cm) grow with the wind, in seconds
   float rough = clamp(0.85 + 0.55 * gust - 0.35 * paws * edge, 0.2, 1.4);
   diffuseColor.rgb *= mix(vec3(1.0), texelColor.rgb * mix(vec3(1.0), fine.rgb * 1.12, clamp(rough - 0.6, 0.0, 1.0)), rough);
-  // a puff is darker and bluer (rough water shows the deep water's colour), a lull paler and greyer (smooth water
+  // a puff is darker and bluer (rough water shows the deep water's color), a lull paler and greyer (smooth water
   // shows the sky)
   diffuseColor.rgb *= 1.0 - 0.34 * max(gust, 0.0) + 0.26 * max(-gust, 0.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.95, 1.08), max(gust, 0.0) * 0.6);
@@ -103,7 +103,7 @@ const WATER_FRAGMENT = `
   float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0;
   float tlG = length(vec2(texture2D(uCur, cuv + vec2(tdx, 0.0)).b - texture2D(uCur, cuv - vec2(tdx, 0.0)).b, texture2D(uCur, cuv + vec2(0.0, tdx)).b - texture2D(uCur, cuv - vec2(0.0, tdx)).b));
   // the front: a thin line where the convergence crosses ~4.5e-4 /s (distance to that level, in texels, from the
-  // local slope), a few metres of foam and debris; inside it the water is a little smoother (a slick)
+  // local slope), a few meters of foam and debris; inside it the water is a little smoother (a slick)
   float tlD = (tlI - 0.28) / max(0.5 * tlG, 1e-3), far = 1.0 - smoothstep(800.0, 2500.0, length(vPuffXZ - cameraPosition.xz));
   float tl = (1.0 - smoothstep(0.015, 0.055, abs(tlD))) * step(0.004, tlG) * far;
   float slick = smoothstep(0.24, 0.34, tlI) * far;
@@ -115,12 +115,12 @@ const WATER_FRAGMENT = `
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.83, 0.76), clamp(debris * 0.8, 0.0, 0.8));
   // the waves: their slope tilts the surface (light and reflections), whitecaps break on the crests
   float camDF = length(vPuffXZ - cameraPosition.xz);
-  float foot = max(length(dFdx(vWaveP)), length(dFdy(vWaveP))); // metres of water under this pixel
+  float foot = max(length(dFdx(vWaveP)), length(dFdy(vWaveP))); // meters of water under this pixel
   vec3 ws = waveSlope(vWaveP, vKW, vKS, foot);
   vec3 waveN = normalize((viewMatrix * vec4(normalize(vec3(-ws.x, 1.0, ws.y)), 0.0)).xyz);
   float hsLocal = max(0.04, length(vec2(vKW * uHs.x, vKS * uHs.y)));
   float crest = ws.z / (0.5 * hsLocal) * (1.0 - smoothstep(300.0, 1500.0, camDF));
-  // whitecaps: patches a few metres across covering the fraction of the water the coverage law gives (vWhite: sea.ts).
+  // whitecaps: patches a few meters across covering the fraction of the water the coverage law gives (vWhite: sea.ts).
   // Each breaks and fades where it lies (two layers, each patch white within a second, then fading over about 8 s), and
   // the foam drifts only with the surface water (uFoamOff: the current plus 3% of the wind, sea.ts foamDrift), not with
   // the waves or the puffs. The threshold is the noise field's own quantile for that fraction (fitted from its
@@ -264,7 +264,7 @@ export class SceneView {
   /** The waves: one set, drawn by the water shader and ridden by the boats. */
   private waveA = new Float32Array(N_WAVES * 4);
   private waveB = new Float32Array(N_WAVES * 4);
-  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
+  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
   private wakes!: Wakes;
@@ -799,7 +799,9 @@ export class SceneView {
     }
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
-    packWaves(waves, this.waveA, this.waveB);
+    // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
+    const wo = { x: Math.round(focus.x / 500) * 500, y: Math.round(focus.y / 500) * 500 };
+    packWaves(waves, this.waveA, this.waveB, tw, wo); this.waveUni.uWaveO.value.set(wo.x, wo.y);
     this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(waves.refW, waves.refS); this.waveUni.uWhiteRef.value = this.seaRef.white;
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);

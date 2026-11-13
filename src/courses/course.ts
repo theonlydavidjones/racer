@@ -74,7 +74,7 @@ export interface CourseOptions { bias: number; fleet: number; windFrom?: number 
 
 const markPos = (m: MarkDef, center: Vec | null, turn = 0): Vec => {
   if (m.from === 'lineCenter') {
-    if (!center) throw new Error(`Mark ${m.name}: lineCenter offsets need a centred start line`);
+    if (!center) throw new Error(`Mark ${m.name}: lineCenter offsets need a centered start line`);
     const u = V((m.bearing ?? 0) + turn);
     return { x: center.x + u.x * (m.distance ?? 0), y: center.y + u.y * (m.distance ?? 0) };
   }
