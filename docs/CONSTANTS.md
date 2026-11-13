@@ -40,7 +40,7 @@ that would act on a finding.
 | 2 | dynamics.ts HANDLING.turnRadius 9 m, maxTurnRate 22°/s, turnDrag 0.15 | How fast she turns and what a tack or a gybe costs in speed. routing.ts MANOEUVRE_LOSS is measured from the sim's own boat, so it inherits these | Tack-loss measurements for long-keel boats (GPS tracks of Folkboats tacking; published tack-loss studies) | Deep Physics |
 | 3 | dynamics.ts HANDLING.formFactor 1.15, windageCdA 2.0 m², flogCdA 3 m² | Hull resistance beyond friction, and the rig's windage: speed at every angle, and upwind most | Form factors for full-bodied keelboats (ITTC/Delft series); windage of a rig and hull (Marchaj, ORC VPP windage terms) | Deep Physics |
 | 4 | balance.ts CREW.kg 240, CREW.reach 1.05 m (estimate) | The crew's righting moment hiking: heel, and so speed, in every breeze | Sailor weights for the SF fleet (the owner); hiking reach from the deck plan and anthropometry | Crew Model |
-| 5 | polar.ts NO_GO 25° | Below this true wind angle, no drive at all: pinching and luffing behaviour | Folkboat polars (ORC certificates' beat angles) and sail-model stall | Deep Physics |
+| 5 | polar.ts NO_GO 25° | Below this true wind angle, no drive at all: pinching and luffing behavior | Folkboat polars (ORC certificates' beat angles) and sail-model stall | Deep Physics |
 | 6 | balance.ts RUDDER (area 0.42 m², arm 2.6 m), CHORD (2.4, 2.0 m), IDEAL_HELM 2.5°, FULL_RUDDER 30° | Weather helm, and how much rudder she needs: the feel of the boat, and the rudder's drag | Class plans (rudder dimensions), the ORC rig for chords; sailing texts for ideal helm (2–4° is the usual advice) | Deep Physics |
 | 7 | controls.ts CONTROL_RATE (11 lines), trim.ts crewRate/handRate | How fast lines are worked: how quickly a crew answers a puff or rounds a mark | Timed routines (the owner can time them next season); until then published timings for small keelboats | Crew Model |
 | 8 | physics.ts HOIST (30/15/15/10 s), POLE (8/5/8 s), CREW_LAG 0.8 s, PENALTY_TURN_RATE 10°/s | Crew timings for the sails and the pole, and the penalty turns | As 7 | Crew Model |
@@ -75,7 +75,7 @@ physics, ranked like the ten above:
 | 2 | controls.ts targetShape (main depth 14% → 12.5%, draft 48% → 46%, twist 13° → 7°; jib 13.5% → 12%, 42% → 40%; depowered 4.5% flatter) and shapeEfficiency (the widths 0.025 depth, 0.08 draft, 6° twist; at most 8% lost) | The fastest sail shape for each wind, and what being off it costs: the heart of the trim lessons | Sailmakers' design shapes (depth and draft position by wind range), ORC's flat and twist terms | Deep Physics |
 | 3 | current.ts shoreRelief: 25% of the stream at the beach, full strength 350 m out | Current relief along the shore: the Cityfront's classic tactic on the flood and ebb | NOAA current predictions and ADCP surveys near the shore (the PORTS and survey stations off Crissy Field and the Marina), or a bottom-boundary-layer estimate from depth | Deep Physics (Bay East can source it) |
 | 4 | balance.ts sailYaw: the drive's leeward offset 0.55 × CE height × sin(heel), and 1.6 m × sin(boom angle) × ½ | Weather helm from heel and from easing the main: the round-up in a gust | Larsson & Eliasson's balance chapter; a VPP's yaw balance | Deep Physics |
-| 5 | controls.ts boomAngle / jibAngle: traveller ±9.5°, sheet 80° with exponent 1.5; jib 70° with 1.4, lead 8° + 1.25° a pin | How the controls map to sheet angles | The deck plan: traveller length, sheet geometry (measurable from the drawn boat) | Rigging |
+| 5 | controls.ts boomAngle / jibAngle: traveler ±9.5°, sheet 80° with exponent 1.5; jib 70° with 1.4, lead 8° + 1.25° a pin | How the controls map to sheet angles | The deck plan: traveler length, sheet geometry (measurable from the drawn boat) | Rigging |
 | 6 | trim.ts trimEfficiency: stall over 25° with exponent 1.3 and a floor of 0.5; downwind 0.4 + 0.6 × sin(sheet) | What a stalled or under-eased sail costs | The same sail-force data as the first ten's #1 | Deep Physics |
 | 7 | physics.ts crew depowering: starts at 14 kt true, full by 24 (line 875); off-wind 45°/120° | When the crew start to flatten and twist | North Sails' Folkboat guide (its wind bands), the owner's fleet | Crew Model |
 | 8 | seaway.ts added resistance: peak at wavelength 1.2 × her length, width 0.6, heading exponent 1.3, speed 0.4 + 0.6·min(1, v/2.5) | Speed lost in the Bay's chop | Gerritsma & Beukelman's added resistance, the Delft series in waves | Deep Physics |
@@ -199,7 +199,7 @@ physics, ranked like the ten above:
 | SAIL_WEAR.clMul | 0.98 | 124 | unsourced | sail wear by age |
 | STD_RIG.bend | 1 | 130 | estimate |  |
 | CONTROL_RATE.mainsheet | 0.12 | 234 | unsourced | crew timing |
-| CONTROL_RATE.traveller | 0… | 234 | unsourced | crew timing |
+| CONTROL_RATE.traveler | 0… | 234 | unsourced | crew timing |
 | CONTROL_RATE.vang | 0.25 | 234 | unsourced | crew timing |
 | CONTROL_RATE.outhaul | 0.3 | 234 | unsourced | crew timing |
 | CONTROL_RATE.cunningham | 0.3 | 234 | unsourced | crew timing |
@@ -236,19 +236,19 @@ physics, ranked like the ten above:
 | lean | 1 | 256 | numerical |  |
 | RECOVER | 60 | 273 | sourced |  |
 | ROLL_HOLD | 2 | 325 | owner |  |
-| HOLD.heel | 2 | 344 | estimate | coaching practice; the seconds are judgement |
-| HOLD.last | 3 | 344 | estimate | coaching practice; the seconds are judgement |
-| HOLD.dwell | 10 | 344 | estimate | coaching practice; the seconds are judgement |
-| HOLD.urgent | 2 | 344 | estimate | coaching practice; the seconds are judgement |
-| HOLD.fore | 0.3 | 344 | estimate | coaching practice; the seconds are judgement |
-| HOLD.settle | 4 | 344 | estimate | coaching practice; the seconds are judgement |
-| LAYOUT_STAY | 60 | 601 | estimate | coaching practice; the seconds are judgement |
+| HOLD.heel | 2 | 344 | estimate | coaching practice; the seconds are judgment |
+| HOLD.last | 3 | 344 | estimate | coaching practice; the seconds are judgment |
+| HOLD.dwell | 10 | 344 | estimate | coaching practice; the seconds are judgment |
+| HOLD.urgent | 2 | 344 | estimate | coaching practice; the seconds are judgment |
+| HOLD.fore | 0.3 | 344 | estimate | coaching practice; the seconds are judgment |
+| HOLD.settle | 4 | 344 | estimate | coaching practice; the seconds are judgment |
+| LAYOUT_STAY | 60 | 601 | estimate | coaching practice; the seconds are judgment |
 
 ### src/boat/crewWork.ts
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| LINE_TAU | 20 | 45 | estimate | coaching practice; the seconds are judgement |
+| LINE_TAU | 20 | 45 | estimate | coaching practice; the seconds are judgment |
 | LINE_GAP | 60 | 53 | sourced |  |
 | LINE_TRIP | 90 | 53 | sourced |  |
 | LINE_URGENT | 0.25 | 55 | estimate |  |
@@ -463,7 +463,7 @@ physics, ranked like the ten above:
 | GUSTS.charnock | 0.011 | 27 | sourced | Charnock/Smith 1988, Kaimal, IEC 61400-1 |
 | GUSTS.z | 10 | 27 | sourced | Charnock/Smith 1988, Kaimal, IEC 61400-1 |
 | GUSTS.L | 8… | 27 | sourced | Charnock/Smith 1988, Kaimal, IEC 61400-1 |
-| GUSTS.sigmaFloor | 0.35 | 27 | estimate | judgement from NOAA 9414290 gusts |
+| GUSTS.sigmaFloor | 0.35 | 27 | estimate | judgment from NOAA 9414290 gusts |
 | GUSTS.vOverU | 0.8 | 27 | sourced | Charnock/Smith 1988, Kaimal, IEC 61400-1 |
 | SIG_STEP | 0.05 | 39 | numerical |  |
 | WAVES | 16 | 45 | numerical |  |
@@ -694,9 +694,9 @@ physics, ranked like the ten above:
 | RULE16_WINDOW | 3 | 16 | unsourced | RRS names the rule, not the number |
 | RULE16_MIN_TURN | 12 | 18 | unsourced | RRS names the rule, not the number |
 | HAIL_RESPONSE | 5 | 24 | unsourced | RRS names the rule, not the number |
-| TACK_BEGUN | 15 | 33 | estimate | modelling threshold, flagged |
+| TACK_BEGUN | 15 | 33 | estimate | modeling threshold, flagged |
 | BEGUN_TWA | 30 | 36 | unsourced | RRS names the rule, not the number |
-| THROUGH_WIND | 15 | 42 | estimate | modelling threshold, flagged |
+| THROUGH_WIND | 15 | 42 | estimate | modeling threshold, flagged |
 | ROOM_GAP | 3.5 | 95 | unsourced | RRS names the rule, not the number |
 | REPLY_ROOM | 25 | 130 | unsourced | RRS names the rule, not the number |
 

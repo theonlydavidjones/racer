@@ -5,7 +5,7 @@ _Bay East, 13 Nov 2026. For the Coordinator. No code until it's agreed._
 ## Where it stands
 
 - **The physics** feels the sea only on average:
-  - a mean added resistance (seaway.ts seaDrag: Gerritsma–Beukelman's form, calibrated to a judgement);
+  - a mean added resistance (seaway.ts seaDrag: Gerritsma–Beukelman's form, calibrated to a judgment);
   - a yaw rate from a slender hull's Froude–Krylov moment, scaled to what the sim had (seaway.ts waveYaw).
 - **No first-order motion:**
   - no surge, heave or pitch;
@@ -65,7 +65,7 @@ Linear seakeeping in the time domain. Each wave component's force is worked out 
   - There is a beam average, sinc(k·B·sin β / 2), so short crests across her cancel.
   - The pressure decays as e^(−k·T_m), the Smith effect.
   - The restoring terms are measured from the hull, as above. Added mass and damping are flagged estimates until sourced.
-  - First version: uncoupled. Heave–pitch coupling (her centre of flotation is 0.36 m aft of the middle) is a second step.
+  - First version: uncoupled. Heave–pitch coupling (her center of flotation is 0.36 m aft of the middle) is a second step.
 - **Roll:** the same Froude–Krylov idea gives a roll moment ∝ Δ·g·GM × the effective wave slope across her beam.
   - The standard simplification: Journée & Massie; IMO's weather criterion uses the same r·s slope factor.
   - It enters rollStep through its heel target: heelEq + the slope's angle. rollStep's signature doesn't change.
@@ -80,11 +80,11 @@ Linear seakeeping in the time domain. Each wave component's force is worked out 
 
 - **The rig moves through the air.** This is already done for roll (physics.ts rigSway: roll rate × height). Pitch adds the same along the boat: the speed at height z is pitch rate × (z − pitch axis).
   - That's about ±1 m/s at the masthead for ±2° at 2 s.
-  - It goes into the sails' apparent wind (sailWind, at the centre of effort) and the wind at each height (physics.ts:1047, for the windex, flags and telltales).
+  - It goes into the sails' apparent wind (sailWind, at the center of effort) and the wind at each height (physics.ts:1047, for the windex, flags and telltales).
   - So sails, telltales and flags all answer the same pitching, as the standing rule asks.
 - **Heave** moves the rig vertically. That doesn't change the wind across the sails, so it's left out.
 - **The sails' response stays quasi-steady.**
-  - Wind-tunnel and FSI work shows hysteresis in pitching (Fossati & Muggiasca; Augier et al.; Bot et al. 2012); it's not modelled here.
+  - Wind-tunnel and FSI work shows hysteresis in pitching (Fossati & Muggiasca; Augier et al.; Bot et al. 2012); it's not modeled here.
 - **One state, drawn:** the worker carries heave, pitch and the wave roll in each boat's state.
   - The mirror sends them.
   - syncBoatMesh draws the hull at the physics' motion instead of boatOnWaves's own (which goes).
