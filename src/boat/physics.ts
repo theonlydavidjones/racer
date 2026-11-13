@@ -59,7 +59,9 @@ export const HOIST = { main: 30, jib: 15, strikeMain: 15, strikeJib: 10 };
 export function crewAtDock(b: Boat, dt: number): void {
   const cs = b.crew; if (!cs) return;
   const yours = cs.place;
-  cs.place = { across: 'mid', fore: 'mid' };
+  // (placed by you, they're where you put them, at the dock as under way; and fore and aft in the cockpit unless you've
+  // put them elsewhere: no bow hand off to the mast for the trim of a boat that isn't sailing)
+  cs.place = { across: yours?.across ?? 'mid', fore: yours?.fore ?? 'mid' };
   placeCrew(cs, { need: 0, twa: b.twa, tws: b.ww.kt, v: 0, pole: false, tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(b.ww.kt), extraMoment: 0, sea: 0, heel: b.heelMag ?? 0, tackComing: false, rmPerDeg: 250 }, dt);
   cs.place = yours;
 }
@@ -268,7 +270,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (under bare poles, the sails struck, there's no heel worth sailing at: the crew sit her upright, in the middle, not out
   // to windward for a breeze she isn't sailing in nor to leeward for a light-air heel she can't have; as at the dock,
   // crewAtDock. Placed by you, they stay where you put them)
-  const bare = !!b.rig && b.rig.main < 0.5 && b.rig.jib < 0.5, yours = cs.place;
+  // (struck, not half-hoisted: a sail half up still heels her, sf.main.heel by the hoist, and they sit up for it)
+  const bare = !!b.rig && b.rig.main <= 0.05 && b.rig.jib <= 0.05, yours = cs.place;
   if (bare && !yours?.across) cs.place = { across: 'mid', fore: yours?.fore ?? 'mid' };
   const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt, bare ? 0 : undefined);
   cs.place = yours;

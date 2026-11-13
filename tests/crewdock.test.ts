@@ -30,6 +30,16 @@ describe('the crew at the dock', () => {
       expect(far, 'arm from the middle, m').toBeLessThan(0.3); expect(lean).toBe(0);
       expect(u.crew!.people.slice(1).every(p => p.pose === 'sit')).toBe(true);
     }, 30_000);
+  it('placed by you at the dock (up to windward), they stay there; given back to Auto, to the middle', () => {
+    const w = atSlip(12), u = w.user;
+    u.crew!.place = { across: 'up', fore: null };
+    for (let i = 0; i < 20 * 60; i++) w.step(DT);
+    const wd = u.crew!.wind;
+    expect(u.crew!.people.slice(1).every(p => p.x * wd > 0.3), `up to windward: ${u.crew!.people.map(p => (p.x * wd).toFixed(2) + p.pose)} tack ${u.tack} wind ${wd}`).toBe(true);
+    expect(u.crew!.place?.across).toBe('up'); // (your placing kept)
+    u.crew!.place = undefined; const { far } = spread(w, 10);
+    expect(far).toBeLessThan(0.3);
+  }, 30_000);
   it('pushed off and walked out under bare poles: still in the middle, no hiking', () => {
     const w = atSlip(14), u = w.user;
     for (let i = 0; i < 5 * 60; i++) w.step(DT);

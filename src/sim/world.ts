@@ -1539,7 +1539,9 @@ export class World {
   /** A boat in her slip: made fast, she stays put; her crew can hoist or strike sail there. */
   private dockStep(b: Boat, dt: number): void {
     b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
-    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    // (her tack by the wind's side, held dead downwind (or head to wind in her slip) as moveBoat holds it: a wind
+    // wandering either side of her stern or bow lying in a slip doesn't send the helm across the cockpit each time)
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); if (b.twa < 176 && b.twa > 4) b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
     b.boom += (side * 75 - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
