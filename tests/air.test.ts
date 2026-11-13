@@ -33,4 +33,9 @@ describe('The air temperature on the race area (environment/air.ts, NOAA CO-OPS 
     expect(jul).toBeLessThan(0.03);
     expect(warmAt('2027-10-09', at('2027-10-09T14:00:00', 7))).toBe(warmAt('2027-10-09', at('2027-10-09T14:00:00', 7)));
   });
+  it("a day on record reads what Fort Point saw (11 July 2026: 53–55 °F in the morning fog)", () => {
+    const a = airTempC('2026-07-11', at('2026-07-11T11:00:00', 7));
+    expect(a.observed).toBe(true);
+    expect(a.c).toBeGreaterThan(11); expect(a.c).toBeLessThan(14); // (54.9 °F is 12.7 °C, the station's own 11:00 reading)
+  });
 });

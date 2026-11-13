@@ -15,6 +15,8 @@
  *  - Wind across the Bay, observed: NOAA CO-OPS shore stations Pier 1 (9414311), Oakland Middle Harbor (9414769),
  *    Point Potrero (9414847) and Richmond (9414863), hourly vector means 10:00–17:59 local.
  *  - Visibility observed: NOAA CO-OPS 9414296 (Pier 17, a PORTS visibility sensor), hourly 09:00–18:00 local.
+ *  - Air temperature observed: NOAA CO-OPS 9414290 (Fort Point), hourly 09:00–18:00 local (environment/air.ts: what
+ *    the crew wear). Forecast: the NWS grid's temperature at the Cityfront cell (MTR 84,107), hourly.
  *  - Forecast: NWS gridded forecast (api.weather.gov): wind on the 2.5 km grid cell over the Cityfront race area
  *    (MTR 84,107), hourly; the wind, visibility, sky cover and cloud ceiling on every cell over the race area
  *    (MTR x 81–95, y 102–115, inside the sim's world), 09:00–18:00; swell at
@@ -179,6 +181,30 @@ for (let t = new Date(visStart); t <= yesterday;) {
 for (const [date, a] of visRaw) if (a.some(x => x !== 65535)) { const b = Buffer.alloc(a.length * 2); a.forEach((x, i) => b.writeUInt16BE(x, i * 2)); visObs[date] = b.toString('base64'); }
 console.log(`visibility: ${Object.keys(visObs).length} days`);
 
+// NOAA CO-OPS 9414290's air temperature (Fort Point, the wind's station), hourly on the hour, local; stored as base64 of
+// AIR_HOURS bytes, (°C + 10) × 4 (a quarter of a degree, −10 to 53.5 °C), 255 = missing. Readings with a quality flag
+// set are left out.
+const AIR_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18], AIR_FMT = 'c+10x4';
+const airSame = prev?.airStation?.fmt === AIR_FMT;
+const airObs = { ...(airSame ? prev?.airObs ?? {} : {}) }, airRaw = new Map();
+const airStart = airSame ? start : new Date(Date.UTC(FROM_YEAR, 0, 1)); // (the first time, or a new format: the whole history)
+for (let t = new Date(airStart); t <= yesterday;) {
+  const end = new Date(Math.min(t.getTime() + 364 * 86400e3, yesterday.getTime() + 86400e3));
+  const j = await fetchRetry(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=air_temperature&station=${WIND_STATION}&begin_date=${ymd(t)}&end_date=${ymd(end)}&interval=h&time_zone=gmt&units=metric&format=json&application=folkboat-sim`);
+  let n = 0;
+  for (const r of j?.data ?? []) {
+    const v = parseFloat(r.v); if (!Number.isFinite(v) || (r.f && r.f.split(',').some(x => x !== '0'))) continue;
+    const L = local(Date.parse(r.t.replace(' ', 'T') + ':00Z')), k = AIR_HOURS.indexOf(L.min / 60);
+    if (k < 0) continue;
+    if (!airRaw.has(L.date)) airRaw.set(L.date, new Uint8Array(AIR_HOURS.length).fill(255));
+    airRaw.get(L.date)[k] = Math.max(0, Math.min(254, Math.round((v + 10) * 4))); n++;
+  }
+  console.log(`air temperature ${ymd(t)}–${ymd(end)}: ${n} hours`);
+  t = new Date(end.getTime() + 86400e3);
+}
+for (const [date, a] of airRaw) if (a.some(x => x !== 255)) airObs[date] = Buffer.from(a).toString('base64');
+console.log(`air temperature: ${Object.keys(airObs).length} days`);
+
 /* ---------- the NWS forecast, the coming week ---------- */
 /** An NWS grid series ("2026-11-10T04:00:00+00:00/PT2H" → value) as hourly values by local date and hour. */
 function hourly(series, conv, after = -Infinity) {
@@ -198,11 +224,12 @@ const grid = await fetchRetry('https://api.weather.gov/gridpoints/MTR/84,107', '
 const sea = await fetchRetry('https://api.weather.gov/gridpoints/MTR/77,107', 'json', { Accept: 'application/geo+json' });
 const g = grid.properties, s = sea.properties;
 const ws = hourly(g.windSpeed, v => r1(v * KMH)), wd = hourly(g.windDirection, v => Math.round(v)), wg = hourly(g.windGust, v => r1(v * KMH));
+const at = hourly(g.temperature, v => r1(v)); // (°C)
 const sh = hourly(s.primarySwellHeight ?? s.waveHeight, v => r2(v)), sp = hourly(s.wavePeriod, v => v), sd = hourly(s.primarySwellDirection, v => v);
 const today = local(now).date, forecast = {};
 for (const date of Object.keys(ws)) {
   if (date < today) continue;
-  forecast[date] = { kt: ws[date], from: wd[date] ?? [], gust: wg[date] ?? [], swell: [sh[date]?.[13] ?? null, sp[date]?.[13] ?? null, sd[date]?.[13] ?? null] };
+  forecast[date] = { kt: ws[date], from: wd[date] ?? [], gust: wg[date] ?? [], swell: [sh[date]?.[13] ?? null, sp[date]?.[13] ?? null, sd[date]?.[13] ?? null], air: at[date] ?? [] };
 }
 console.log(`forecast: ${Object.keys(forecast).join(', ')} (issued ${g.updateTime})`);
 
@@ -248,7 +275,7 @@ for (const gx of GRID_X) for (const gy of GRID_Y) {
 console.log(`forecast grid: ${cells.length} cells, ${Object.keys(gridDays).length} days`);
 
 await writeFile(OUT, JSON.stringify({
-  source: `Observed wind: NOAA CO-OPS ${WIND_STATION} (Fort Point), 6-minute, 10:00–17:54 local, base64 of [speed kt ×4, direction from /2, gust kt ×4] per slot, 255 = missing. Observed swell: NDBC ${BUOY}, mean over 11:00–16:59 local, [Hs m, dominant period s, mean direction from]. Forecast: NWS gridded forecast, MTR 84,107 (wind, kt, hourly by local hour 0–23) and MTR 77,107 (swell at 13:00).`,
+  source: `Observed wind: NOAA CO-OPS ${WIND_STATION} (Fort Point), 6-minute, 10:00–17:54 local, base64 of [speed kt ×4, direction from /2, gust kt ×4] per slot, 255 = missing. Observed swell: NDBC ${BUOY}, mean over 11:00–16:59 local, [Hs m, dominant period s, mean direction from]. Forecast: NWS gridded forecast, MTR 84,107 (wind, kt, hourly by local hour 0–23) and MTR 77,107 (swell at 13:00), and the forecast's air temperature (°C, hourly). Observed air temperature: CO-OPS ${WIND_STATION}, hourly, see airStation.`,
   updated: new Date(now).toISOString(), forecastIssued: g.updateTime,
   slot0: SLOT0, slotMin: SLOT_MIN, slots: SLOTS,
   wind: Object.fromEntries(Object.entries(wind).sort()), swell: Object.fromEntries(Object.entries(swell).sort()), forecast,
@@ -257,6 +284,8 @@ await writeFile(OUT, JSON.stringify({
   stations: Object.fromEntries(STATIONS.map(st => [st.id, { name: st.name, lat: st.lat, lon: st.lon, days: Object.fromEntries(Object.entries(stationsData[st.id]).sort()) }])),
   grid: { hours: GRID_HOURS, cells, days: gridDays, fogWords: FOG_WORDS },
   visStation: { id: VIS_STATION, name: 'Pier 17', lat: 37.8031, lon: -122.3971, hours: VIS_HOURS, unit: VIS_UNIT, cap: 10000, note: 'base64 of 16-bit big-endian values in tens of metres, 65535 missing; the sensor reads up to 10 km' },
-  visObs: Object.fromEntries(Object.entries(visObs).sort())
+  visObs: Object.fromEntries(Object.entries(visObs).sort()),
+  airStation: { id: WIND_STATION, name: 'Fort Point', hours: AIR_HOURS, fmt: AIR_FMT, note: 'base64 of bytes, (°C + 10) × 4, 255 missing; the forecast days\' air is in forecast[date].air, °C by local hour 0–23' },
+  airObs: Object.fromEntries(Object.entries(airObs).sort())
 }) + '\n');
 console.log(`Wrote ${OUT.pathname}: ${Object.keys(wind).length} days of wind, ${Object.keys(swell).length} of swell, ${Object.keys(forecast).length} forecast days`);
