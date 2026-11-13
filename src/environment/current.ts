@@ -35,7 +35,7 @@ export function currentVector(c: CurrentPreset): Vec {
  * the Cityfront the near-shore water floods and ebbs in the channel's proportion, and Crissy Field is the exception, in
  * Fort Point's lee on the flood (the headland upstream of it then, not on the ebb). The profile itself (25% at the beach,
  * full by 350 m) is an ESTIMATE; what would settle it is the speed going as the depth to the 2/3 power (Manning) from
- * the chart's depths against the water just offshore (spot check: 2.7 m against 13.6 m gives 0.34; this gives 0.33 at
+ * the chart's depths against the water just offshore (spot check: 2.7 m against 13.6 m gives 0.34; this gives 0.34 at
  * 40 m off), which wants finer depths than the ENC's bands and a grid to read them from each step.
  */
 export const shoreRelief = (p: Vec, lattice = false): number => {

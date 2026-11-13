@@ -38,7 +38,7 @@ describe('leeway (physics.ts: the keel\'s lift against the sails\' side force)',
     const sag = -(b.sway ?? 0) / KT;
     expect(sag).toBeGreaterThan(0.3); expect(sag).toBeLessThan(0.7);
   });
-  it('running, none: the sails push her along her heading', () => {
+  it('running: no leeway from her sails (they push her along her heading); what slip she has is their little side force and her windage', () => {
     const b = testBoat({ heading: 180 - 20, kt: 5, windKt: 12 });
     sail(b, 40, () => { b.h = 160; });
     // Her steady slip (deg) under a side force F (N): where it meets her keel's lift and her hull broadside, physics.ts

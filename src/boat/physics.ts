@@ -262,8 +262,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // leeway: the polar's angles are the angles of her course through the water (ORC's VPP solves for the leeway), so her
   // speed is the polar's at her heading's angle plus the leeway she makes there: the side force across the water against
   // the keel's lift at the polar's speed, F = ½ρ·πT²·v²·λ (slender-wing lift, Newman §5.12, as HOVE and rollStep take it):
-  // 3–6° close-hauled (6 to 20 kt), nothing downwind. Steering to the beat angle means steering that much higher.
-  const Fside = F * Math.cos((b.heelMag ?? 0) * D2R), lwAt = (v: number) => twa < 150 ? clamp(Fside / (0.5 * 1025 * Math.PI * orc.boat.draft ** 2 * Math.max(0.8, v) ** 2) / D2R, 0, 12) : 0;
+  // 3–6.4° close-hauled (6 to 20 kt; her windage is in it), nothing downwind. Steering to the beat angle means steering that much higher.
+  // (the wind on her topsides, rig and crew sets her to leeward with the sails' side force: dynamics.ts windSide. ORC's
+  // polar has it in its leeway too)
+  const Fwind = 0.5 * 1.225 * ap.aws * ap.aws * windSide(ap.awa, 3, 1 - hm);
+  // (the same balance as her sway's below: the keel's lift and, a little, her hull broadside, F = ½ρ·A·(πAR/2·u·v + Cd·v²),
+  // so the leeway she steers for is the slip she makes)
+  const Fside = F * Math.cos((b.heelMag ?? 0) * D2R), kLat = 0.5 * 1025 * HOVE.latArea, lwAt = (v: number) => {
+    if (twa >= 150) return 0;
+    const u = Math.max(0.8, v), lift = Math.PI * HOVE.aspect / 2 * u, sw = (-lift + Math.sqrt(lift * lift + 4 * HOVE.crossCd * (Fside + Fwind) / kLat)) / (2 * HOVE.crossCd);
+    return clamp(Math.atan2(sw, u) / D2R, 0, 12);
+  };
   // (her steady leeway, over a few seconds: what a helmsman allows for, and the polar's frame; the instant slip is b.sway.
   // The polar's speed at her course's angle, by the leeway she had: settled over the seconds, it needs no iterating)
   const vAt = polar(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), plan), lwNow = lwAt(vAt);
@@ -320,7 +329,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || hm < 1 || hj < 1 ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
-  // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
+  // wind in 15 kt on bare poles that comes to about 0.6 m/s (her windage bow-on, dynamics.ts windFore, against ASTERN_DRAG on her mass)
   // (with her sails up and flogging, in irons, the same: their windage on top of the rig's, so she gathers sternway
   // faster, and the rudder then works backwards; the way out is to bear away, the tiller pushed the way she's to go)
   const v1 = b.v + a * dt;
@@ -337,8 +346,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (b.leeway, above); slow, little holds her and she sags off to leeward (0.5–0.7 kt at 1.5 kt in 12 kt); stopped, only
   // the broadside drag does. With her sails struck, the wind on her rig alone (leaving a berth).
   {
-    const q = 0.5 * 1.225 * ap.aws * ap.aws, side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
-    const Fy = side * (q * windSide(ap.awa) + (b.luff ? 0 : Fside)); // (windage: its part across her, dynamics.ts windSide)
+    const side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
+    const Fy = side * (Fwind + (b.luff ? 0 : Fside)); // (windage: its part across her, dynamics.ts windSide)
     const sw = b.sway ?? 0, aL = Math.PI * HOVE.aspect / 2, Fw = -0.5 * 1025 * HOVE.latArea * (aL * Math.max(0, b.v) * sw + HOVE.crossCd * sw * Math.abs(sw));
     b.sway = sw + (Fy + Fw) / (disp * (1 + HOVE.swayAdded)) * dt;
     if (Math.abs(b.sway) < 1e-4) b.sway = 0;
@@ -455,6 +464,9 @@ function calAt(w: number, twa: number): number {
   const sm = optimalSheet('main', ap.awa), sj = optimalSheet('jib', ap.awa);
   const sf = sailForces(ap.aws, ap.awa, { trim: sailTrim('main', ap.awa, sm), shape: targetShape('main', w, ap.awa), out: sm }, { trim: sailTrim('jib', ap.awa, sj), shape: targetShape('jib', w, ap.awa) }, false);
   const windX = -0.5 * 1.225 * ap.aws ** 2 * windFore(ap.awa), drive = sf.main.drive + sf.jib.drive;
+  // (never above 1: where the sail model's own drive falls short of the polar's need, as it does in light air and on
+  // broad reaches (two cells in five, by up to twice), she's left a little short hove to and letting draw, not given
+  // drive the sail model doesn't make. The shortfall is the sail model's to answer: the constants audit, sailForces)
   const k = drive > 1 ? clamp((hullResistance(vt) - windX) / drive, 0.02, 1) : 1;
   driveCal.set(key, k);
   return k;
@@ -503,7 +515,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // further aft than a drawing jib's does: `ceAft` shortens its lever ahead of the keel by that (balance.ts sailYaw).
   const jib = { heel: fn * Math.cos(clew), drive: fn * Math.sin(clew), ceAft: 0.25 * Math.sin(clamp(alpha, 0, Math.PI / 2)) };
   // windage: along the apparent wind's flow (aft and to leeward)
-  const windX = -q * windFore(ap.awa), windY = q * windSide(ap.awa);
+  const windX = -q * windFore(ap.awa, 3, 1 - hm), windY = q * windSide(ap.awa, 3, 1 - hm);
   // hull and keel: strips along the waterline, each with lift (with way on, either way: a foil's lift opposes the
   // sideways flow whichever end leads; trailing edge first, about half of it: an estimate) and broadside drag
   const L = orc.boat.imsL, A = HOVE.latArea, AR = HOVE.aspect, aL = Math.PI * AR / 2, N = 8;
