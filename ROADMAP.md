@@ -230,6 +230,19 @@ What's planned, roughly in order. Done work is described in the README.
      Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
      fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
      Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
+8k. **Drop and raise the anchor** (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
+   later cruising mode's anchoring challenge):
+   - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
+     anchor: haul in the rode, break it out, stow it. Each takes the time it takes, by crew and skill.
+   - The physics, sourced: the holding force against the wind and current on her hull and rig; the scope (rode out
+     against depth, from the NOAA chart, with the tide's height); she swings to whichever wins, wind or current, as the
+     moored boats already do; and she drags if the scope is short, the bottom poor (the chart's bottom types) or the
+     load too high.
+   - Racing: on the Bay, kedging is a real tactic. In no wind against a foul tide, anchoring keeps the ground a drifting
+     boat would lose. The racing rules allow anchoring, but she must recover the anchor before she continues (check
+     the 2025–2028 text, rule 45). The strategist and the smart crew should know when to call it.
+   - At anchor: the anchor light at night (built, Rule 30) and the anchor ball by day (Rule 30(a)).
+   - On the screen rule: the call goes inside an existing element (the sail band's crew tab, a key), not a new button.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
