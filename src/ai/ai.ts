@@ -7,7 +7,7 @@ import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
-import { landAlong, onLand } from '../geo/shore';
+import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
@@ -170,22 +170,32 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // Beating, she tacks, with way enough to (below about 1.5 m/s a tack becomes a gybe right round: physics.ts
   // SLOW_TACK), and not onto land; else, or slow, she bears away to build speed and clear it
   const track = (hd: number, d: number) => { const u = V(hd), s = Math.max(1, b.v); return { x: b.x + (u.x * s + b.cur.x) * d / s, y: b.y + (u.y * s + b.cur.y) * d / s }; };
-  if (landAlong(b, track(desired, 100)) < Infinity) {
+  // (her whole width, not just her centreline: a line 4 m either side too, so she doesn't brush a breakwater's end)
+  const landOn = (hd: number, d: number) => {
+    const q = track(hd, d), dx = q.x - b.x, dy = q.y - b.y, L = Math.hypot(dx, dy) || 1, sx = -dy / L * 4, sy = dx / L * 4;
+    return landAlong(b, q) < Infinity || landAlong({ x: b.x + sx, y: b.y + sy }, { x: q.x + sx, y: q.y + sy }) < Infinity || landAlong({ x: b.x - sx, y: b.y - sy }, { x: q.x - sx, y: q.y - sy }) < Infinity;
+  };
+  if (landOn(desired, 100)) {
     const other = n360(from + (b.tack === 'S' ? 1 : -1) * (beat + 1));
-    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && landAlong(b, track(other, 60)) === Infinity) desired = other;
-    else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (landAlong(b, track(cand, 100)) === Infinity) { desired = cand; break; } }
+    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && !landOn(other, 60)) desired = other;
+    else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (!landOn(cand, 100)) { desired = cand; break; } }
   }
   return { desired, luff: false, beating };
 }
 /**
- * Where she stands off the harbour (h: its entrance): open water within 800 m of it, reached from it straight, with no
- * land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
- * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 40 m apart along the wind's line
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
+ * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 80 m apart along the wind's line
  * across, so the fleet isn't all on one point.
  */
+/** No land, pier, dock or breakwater within r m of p, looking out eight ways (anyShoreDist doesn't see what's built). */
+function clearRound(p: Vec, r: number): boolean {
+  for (let a = 0; a < 360; a += 45) { const u = V(a); if (landAlong(p, { x: p.x + u.x * r, y: p.y + u.y * r }) < Infinity) return false; }
+  return true;
+}
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
-  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
-  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40;
+  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && clearRound(p, 100) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
+  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 80;
   let best: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
     const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r }, p = { x: c.x + across.x * spread, y: c.y + across.y * spread };
@@ -200,7 +210,7 @@ function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
  * a few metres wide is in the way even if the water beyond it is clear. */
 function blocked(w: World, b: Boat, h: number, d: number): boolean {
   const u = V(h), q = { x: b.x + u.x * d, y: b.y + u.y * d };
-  if (landAlong(b, q) <= d) return true;
+  if (landAlongNear(b, q) <= d) return true; // (the same answer as landAlong, cheaply when the shore's well off)
   if (w.obstructed(b) && segCross(b, q, w.pin, w.committee)) return true;
   return false;
 }
@@ -657,7 +667,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         continue;
       }
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
-      if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
+      // (racing called off, the boat she must keep clear of lying to, stopped: she sails round her with way on, as a
+      // sailor would, not luffs and eases alongside, where she'd stop and drift down onto her)
+      if (w.cancelled && o.v + (o.astern ?? 0) < 0.5) { desired = away; luff = false; }
+      else if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') {
         // head up from her heading, but no more than 35° above her course: turned up afresh from wherever she'd got to
         // each time she thought, she ratcheted on up to close-hauled with her sails eased, and stalled

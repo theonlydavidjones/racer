@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import { dist, type Vec } from '../core/math';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { P3 } from './coords';
 
 interface MarkTag { el: HTMLDivElement; p: Vec; z: number; idx: number[] }
@@ -13,7 +13,7 @@ export class Labels {
   private tmp = new THREE.Vector3();
   constructor(private root: HTMLElement) {}
 
-  build(w: World): void {
+  build(w: SimView): void {
     this.root.innerHTML = ''; this.tagEls = [];
     for (const b of w.boats) {
       if (b.isUser) { this.tagEls.push(null); continue; }
@@ -45,7 +45,7 @@ export class Labels {
     el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
   }
 
-  update(w: World, camera: THREE.Camera, viewMode: number): void {
+  update(w: SimView, camera: THREE.Camera, viewMode: number): void {
     const u = w.user;
     w.boats.forEach((b, i) => {
       const el = this.tagEls[i]; if (!el) return;

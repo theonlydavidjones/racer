@@ -7,6 +7,7 @@ import { trimDrive } from '../boat/trim';
 import { driveSpeed, tuneLoss } from '../boat/coach';
 import { presetFor, tuneName, tuneWords, TUNE_PRESETS } from '../boat/rigTune';
 import type { World } from './world';
+import type { SimView } from './host';
 
 /**
  * The tactics debrief: a log of your race as you sail it, and afterwards what cost you time, ranked, with what to do.
@@ -135,7 +136,7 @@ export class RaceLog {
   }
 
   /** Every moment so far, in time order (spells and a turn still going included, as far as they've got). */
-  moments(w: World): Moment[] {
+  moments(w: SimView): Moment[] {
     const out = this.done.slice(), over = new Map(this.over);
     for (const S of this.open.values()) if (S.key === 'laylines') this.keepOver(S, over); else this.close(S, out);
     if (this.turn) this.endTurn(w.t, out);
@@ -251,7 +252,7 @@ export class RaceLog {
   }
 
   /** Seconds lost on the laylines, mark by mark. */
-  private overstands(w: World): { lost: number; worst: MarkLog | null } {
+  private overstands(w: SimView): { lost: number; worst: MarkLog | null } {
     let lost = 0, worst: MarkLog | null = null;
     const vBeat = Math.max(1, polar(w.wind.kt, beatAngle(w.wind.kt)));
     for (const L of this.marks) if (L.overM > 0) { lost += 0.6 * L.overM / vBeat; if (!worst || L.overM > worst.overM) worst = L; }
@@ -259,7 +260,7 @@ export class RaceLog {
   }
 
   /** What cost you time, most first: only what cost a couple of seconds or more. */
-  findings(w: World): Finding[] {
+  findings(w: SimView): Finding[] {
     const out: Finding[] = [], mmss = (x: number) => x < 60 ? `${Math.round(x)} s` : `${Math.floor(x / 60)} min ${Math.round(x % 60)} s`;
     const bl = (m: number) => `${Math.round(m / 7.6)} boat length${Math.round(m / 7.6) === 1 ? '' : 's'}`;
     // the start
