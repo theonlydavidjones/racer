@@ -70,7 +70,8 @@ type RawEvent = { source: string; id: string; name: string; races: RawRace[] };
 // against the fleet's 51–55 (13 Nov 2026). The tide is right, NOAA's SFB1204 2.2–2.4 kt ebb toward 271°, and the sim
 // has the shore's relief (0.8 kt within 100 m of the Cityfront, 2.4 at the marks 400 m out); but the planner's runs
 // east sail out in the stream (−1.9 kt along the leg) where a crew would hug the shore, and the record's wind fades to
-// 6.5 kt for the second lap. Not flagged "course uncertain": the gap is the sim's to close, not the course's.)
+// 6.5 kt for the second lap. Not flagged "course uncertain": the gap is the sim's to close, not the course's; it's an
+// expected failure in tests/realRaces.test.ts until the planner learns to hug the Cityfront.)
 const UNCERTAIN: Record<string, string> = {
   'GGYC_T008047221-r1': 'Course uncertain: on course 3 as the sheet draws it, a perfect boat in the wind observed at Fort Point (9 kt from 249°) and NOAA\'s ebb takes about 53 min, slower than every real finisher (47–52 min). It would need about 11 kt to make 47. The fleet may have sailed a shorter course, or had more wind than Fort Point recorded, so compare your time with care.'
 };
