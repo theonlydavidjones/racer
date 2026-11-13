@@ -79,20 +79,28 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
 
 /**
  * Seconds a tack or a gybe costs, by the true wind (kt): the distance made good the sim's own Folkboat loses in one
- * (boat/physics.ts, measured against a twin sailing on: tests/manoeuvre.test.ts keeps this table in step with it),
- * over her VMG. A tack loses 0.8–1.2 boat lengths (most in light air, where she's slowest to get going again); keelboats
- * generally lose 1–2 (US Sailing, "Tacking Tips Part II – The Acceleration": a secondary figure; no Folkboat-specific
- * one was found). A gybe from her deep run angle is a small turn and costs little.
+ * (boat/physics.ts, measured against a twin sailing on until she's back to speed: tests/manoeuvre.test.ts keeps this
+ * table in step with it), over her VMG. A tack loses 0.8-1.7 boat lengths: most in light air, where she's slowest to get
+ * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
+ * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
+ * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
+ * (manoeuvreS's `hs`).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[6, 7.6], [8, 5.3], [12, 3.3], [16, 3.4], [20, 3.3]],
-  gybe: [[6, 1.8], [8, 1.1], [12, 0.5], [16, 0.1], [20, 0.1]]
+  tack: [[3, 20], [4, 13.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 3.0], [25, 4.5]],
+  gybe: [[3, 4.1], [4, 3.6], [6, 2.4], [8, 1.9], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
 };
-export function manoeuvreS(kind: 'tack' | 'gybe', tws: number): number {
+/**
+ * The cost (s) of a tack or a gybe in `tws` kt, and `hs` m of chop: in a wind sea a tack costs about 40% more a metre of
+ * significant height (the sim's own boat in its own sea, environment/sea.ts windSea: +10-25% at 0.3-0.6 m, measured in
+ * the physics review of this table); a gybe, running before it, about the same as in flat water.
+ */
+export function manoeuvreS(kind: 'tack' | 'gybe', tws: number, hs = 0): number {
   const T = MANOEUVRE_LOSS[kind];
-  if (tws <= T[0][0]) return T[0][1];
-  for (let i = 1; i < T.length; i++) if (tws <= T[i][0]) { const f = (tws - T[i - 1][0]) / (T[i][0] - T[i - 1][0]); return T[i - 1][1] + (T[i][1] - T[i - 1][1]) * f; }
-  return T[T.length - 1][1];
+  let v = T[T.length - 1][1];
+  if (tws <= T[0][0]) v = T[0][1];
+  else for (let i = 1; i < T.length; i++) if (tws <= T[i][0]) { const f = (tws - T[i - 1][0]) / (T[i][0] - T[i - 1][0]); v = T[i - 1][1] + (T[i][1] - T[i - 1][1]) * f; break; }
+  return kind === 'tack' ? v * (1 + 0.4 * Math.max(0, hs)) : v;
 }
 
 const DT = 10;
@@ -122,11 +130,11 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   const turns: SailResult['turns'] = [];
   let turnedNow = false, lastTurnT = -Infinity, forced: LegKind | null = null;
   /** A tack or a gybe here: where, on the drawn track, and the time it costs (manoeuvreS, in the wind here). */
-  const turn = (kind: 'tack' | 'gybe', c: Vec, tws: number) => {
+  const turn = (kind: 'tack' | 'gybe', c: Vec, tws: number, hs = 0) => {
     tacks++; turns.push({ p: { ...p }, kind }); turnedNow = true; lastTurnT = t;
     const lp = path[path.length - 1]; if (lp.p.x !== p.x || lp.p.y !== p.y) path.push({ p: { ...p }, t });
     // (what it costs, as time with no way on, drifting with the current: the distance made good it loses, over her VMG)
-    const ms = manoeuvreS(kind, tws);
+    const ms = manoeuvreS(kind, tws, hs);
     t += ms / 60; p = { x: p.x + c.x * ms, y: p.y + c.y * ms };
   };
   const path = [{ p: { ...p }, t }];
@@ -197,7 +205,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         const xt = cross(legU, sub(p, a)); // + left of the straight course
         if (((tack === 'S' && xt > lim) || (tack === 'P' && xt < -lim)) && t - lastTurnT > 0.5) flip = true; // (half a minute on a board at least)
       }
-      if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt); }
+      if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt, ch.hs); }
       h = hd(tack); v = vb;
       if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
         const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
@@ -208,7 +216,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     // laid for the mark): that's a tack or a gybe too, and costs the same
     // (within 15° of dead downwind she sails a little by the lee rather than gybe: a crossing there isn't counted, and her
     // own gybes, on the layline or the lane's edge, are counted where she makes them)
-    { const r = wrap(h - w.from), sd2 = Math.abs(r) < 165 ? Math.sign(r) : 0; if (side && sd2 && sd2 !== side && !turnedNow) turn(Math.abs(r) < 90 ? 'tack' : 'gybe', c, w.kt); if (sd2) side = sd2; turnedNow = false; }
+    { const r = wrap(h - w.from), sd2 = Math.abs(r) < 165 ? Math.sign(r) : 0; if (side && sd2 && sd2 !== side && !turnedNow) turn(Math.abs(r) < 90 ? 'tack' : 'gybe', c, w.kt, ch.hs); if (sd2) side = sd2; turnedNow = false; }
     const d = V(h);
     p = { x: p.x + (d.x * v + c.x) * DT, y: p.y + (d.y * v + c.y) * DT };
     t += DT / 60;
