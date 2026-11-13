@@ -327,6 +327,37 @@ in 10 races). Nerve now never makes margins tighter than today's.
 - the AI's foul rate: rule 10 and 11 crossings in open water, and the Fort Mason touches;
 - then calibrating the skill mix for tau.
 
+### The foul-rate target (13 November)
+
+**No published protest, penalty or OCS statistics were found.** The researcher searched US Sailing, World Sailing,
+judges' manuals and the umpired-fleet-racing papers. YachtScoring's per-event protest logs are primary data, but they
+load only through JavaScript, and reading them would need a browser export by hand.
+
+**What the scoring codes in real results show:**
+
+| Data | Starts | OCS/UFD/BFD | DSQ/DNE | RET | SCP/ZFP |
+|---|---|---|---|---|---|
+| 25 one-design events on Regatta Network, 2023–25 (Thistle, J/24, Snipe, Lightning, Soling, J/80, J/22, J/105 at SYC, Santa Cruz 27, Express 27, Moore 24, Knarr…), 172 races | 4,693 | 1.41% | 0.15% | 1.30% | 0.09% |
+| The SF Folkboat races in sf-folkboat-results.json, 55 races | 308 | 0 | 0.32% (1) | 0.97% (3) | 0 |
+
+Rates are per starter. Sources: regattanetwork.com applet_regatta_results.php?regatta_id=<id>, series standings.
+
+**Reading it:**
+
+- Penalty turns taken on the water aren't recorded in results, so the true foul rate is higher than DSQ + RET.
+- RET (since RRS 2025) covers every retirement, including after a foul, so it is an upper bound for fouls ending in
+  retirement.
+- Start penalties cluster in big dinghy fleets under flags. Keelboat fleets without flags show none.
+
+**The target for the sim (an estimate, labelled as one):**
+
+- fouls ending in DSQ or RET: about 1.5% of starts or fewer;
+- OCS: 0–1.5% of starts;
+- all incidents, turns included: no data. A working target is **under 0.1 per boat per race**, roughly one penalty in a
+  ten-boat race.
+
+The AI today: about 0.6–0.75 penalties per boat per race, 46–54 in 16 five-boat races.
+
 ## 7. Phases and hours
 
 | Phase | What | Hours |
