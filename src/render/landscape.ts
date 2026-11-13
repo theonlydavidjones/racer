@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import { LL } from '../geo/geo';
 import { LAND, onLand, shoreDist } from '../geo/shore';
 import { HARBOR } from '../geo/marina';
+import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
-import { segPt } from '../core/math';
+import { inPoly, segPt } from '../core/math';
 import { buildBayBridge, BAY_APPROACH } from './bayBridge';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildEastBay } from './eastBay';
@@ -42,7 +43,11 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // shore you see is the one you run aground on
   {
     const s = new THREE.Shape();
-    LAND.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
+    // (less Fort Mason's piers: they stand on piles over the water, drawn below; the apron runs straight along the bulkhead
+    // across each pier's foot)
+    const foot = (p: { x: number; y: number }) => FORT_MASON_PILES.some(f => p.x >= f.box.x0 && p.x <= f.box.x1 && p.y >= f.box.y0 && p.y <= f.box.y1
+      && Math.min(...[f.pts[0], f.pts[f.pts.length - 1]].map(q => Math.hypot(p.x - q.x, p.y - q.y))) > 2);
+    LAND.filter(p => !foot(p)).forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
     // West Harbor's basin is water (geo/marina.ts): cut out of the apron
     const hole = new THREE.Path(); HARBOR.basin.forEach((p, i) => i ? hole.lineTo(p.x, p.y) : hole.moveTo(p.x, p.y)); s.holes.push(hole);
     const g = new THREE.ExtrudeGeometry(s, { depth: 2.3, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
@@ -419,8 +424,31 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // north end a few metres short of its pier's, turned to the pier: they run 7–14° west of north)
   for (const [end, lon, brg] of [[37.8085, -122.4324, 346], [37.8091, -122.4316, 350], [37.8092, -122.4304, 353]]) {
     const r = brg * Math.PI / 180, back = 80; // the shed's middle, 80 m back along the pier from the end
-    place(group(block(20, 150, 3, lam(0x9d968a)), block(18, 140, 13, lam(0xd9cfb8), 3)), end - back * Math.cos(r) / 111320, lon - back * Math.sin(r) / 88000, brg, 0);
+    place(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK), end - back * Math.cos(r) / 111320, lon - back * Math.sin(r) / 88000, brg, 0);
   }
+  // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
+  // through: in under there a boat's a wreck (boat/physics.ts). The deck's height and the piles' size and spacing are
+  // ESTIMATES (no survey found): a deck about 3 m above the water, piles 0.6 m across about 4.5 m apart each way.
+  {
+    const deckMat = lam(0x9d968a), pileMat = lam(0x6f6a60), PITCH = 4.5, R = 0.3, D = 0.7;
+    const decks: THREE.BufferGeometry[] = [], at: THREE.Vector3[] = [];
+    for (const f of FORT_MASON_PILES) {
+      const sh = new THREE.Shape(); f.pts.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, PIER_DECK - D, 0); decks.push(g);
+      // the piles on a grid along the pier (from its bulkhead end toward its end), kept a little inside the deck's edge
+      const a = f.pts[0], e = f.pts.reduce((m, p) => Math.hypot(p.x - a.x, p.y - a.y) > Math.hypot(m.x - a.x, m.y - a.y) ? p : m, a);
+      const L = Math.hypot(e.x - a.x, e.y - a.y), u = { x: (e.x - a.x) / L, y: (e.y - a.y) / L }, n = { x: -u.y, y: u.x };
+      for (let s = -10; s <= L + 10; s += PITCH) for (let t = -20; t <= 20; t += PITCH) {
+        const q = { x: a.x + u.x * s + n.x * t, y: a.y + u.y * s + n.y * t };
+        if (inPoly(q, f.pts) && f.pts.every((p, i) => segPt(q, p, f.pts[(i + 1) % f.pts.length]) > 0.6)) at.push(P3(q.x, q.y, 0));
+      }
+    }
+    grp.add(new THREE.Mesh(mergeGeometries(decks), deckMat));
+    const piles = new THREE.InstancedMesh(new THREE.CylinderGeometry(R, R, PIER_DECK - D + 4, 8), pileMat, at.length), m = new THREE.Matrix4();
+    at.forEach((v, i) => piles.setMatrixAt(i, m.makeTranslation(v.x, (PIER_DECK - D - 4) / 2, v.z))); // (from 4 m down to the deck's underside)
+    grp.add(piles);
+  }
+
   // Fort Point: the brick fort (1853–61) at the foot of the bridge, on the rock blasted down to 15 ft (4.6 m) above
   // the sea (Wikipedia, "Fort Point National Historic Site"): three tiers of casemates round a courtyard, with the
   // lighthouse on its roof. Position and footprint from the DataSF building footprints; the bridge's arch crosses its
@@ -569,6 +597,8 @@ export const bridgeLights: THREE.Object3D[] = [];
  * FAA's 20–40), each lit for a third of a second (scene.ts).
  */
 export const sutroBeacons: { red?: THREE.Object3D; white?: THREE.Object3D } = {};
+/** Fort Mason's pier decks' top above the water, m (ESTIMATE: no survey found). */
+const PIER_DECK = 3;
 
 /**
  * The Golden Gate Bridge from its published dimensions: a 1,280 m main span between towers 227 m above the
