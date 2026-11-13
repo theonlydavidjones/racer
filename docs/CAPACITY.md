@@ -317,6 +317,83 @@ The owner gave the go on 13 November 2026, through the Coordinator. Step 2 is on
   published page: a plain class, plain objects and the same language features the page already uses. The proxy guard
   is dev-only. The owner's probe (§1.5a) covers the Worker side for step 3.
 
+## 6. Step 3, built: the race in a Web Worker
+
+The owner gave the go on 13 November 2026. Step 3 is on branch `claude/sim-worker`.
+
+### The design: a mirror World on the page
+
+The page doesn't only read the race's state. Every frame it also asks the World questions synchronously: the current
+at each mooring, the wind map's field, the laylines, the strategist's briefing, the passage plan, the debriefs. A
+snapshot of fields can't answer those. So the page keeps its own World, the **mirror**, built from the same course,
+settings and seed, and never stepped.
+
+- **Each frame** (sim/host.ts `WorkerHost`): the page sends the time that's passed and the commands since the last
+  frame. The worker (sim/worker.ts `RaceWorker`) applies the commands and sails the steps due, with the same fixed step
+  and accumulator as before. It then sends back what changed, the race's events and the commands' answers. The page
+  writes those onto the mirror (sim/sync.ts), and draws the mirror and asks it its questions: the same code on the
+  same numbers. The picture is one frame behind the race.
+- **What's sent** (sim/sync.ts):
+  - Both sides number every object in their World in the same walk order, and the numbers match because the Worlds
+    are built alike.
+  - The worker sends each object whose own fields changed, and only those fields. The mirror updates its object of
+    that number in place, or makes a new one of the same class, so identities hold: a boat stays the same boat, and a
+    new destination is a new object.
+  - Functions, the random streams and the events aren't part of the state. The events travel in the packet, with the
+    mirror's own boats in them.
+  - **Memos stay local to each side** (the `LOCAL` table: the World's `kcMemo` and the tide field's memos). The
+    page's questions fill the mirror's memos, so sending the worker's would mix one side's key with the other's answer.
+  - The course, the weather and the wind field are sent only when they're replaced. The tide stations' long
+    prediction lists are sent once. The recorded frames and the track send only what's new.
+- **The published page** carries the worker's code (built by Vite as one classic script) in a script element that
+  isn't run, and starts the worker from a blob URL of it. The owner's probe showed the host allows blob workers.
+- **Fallback**:
+  - With `?inproc`, or where a worker can't start, the race sails in the page as before (`LocalHost`).
+  - If a running worker fails, the mirror (a whole World, in step to the last frame) sails on in the page, and the
+    player sees a short message.
+- **The answers the page needs** (the motor's start while racing, home, move her here) come back as promises, at
+  most a frame later.
+- **Two-frame rule**: at most two frames are in flight. Past that the page's time waits, as a slow frame's does now.
+
+### Checks
+
+- **tests/sync.test.ts**: a race of eight at 1× and 4× through the start, and a cruise driven by commands. The mirror
+  equals the worker's World in every member, its objects correspond one to one, and it gives the same answers to every
+  question the page asks: current, wind, sea, the field, puffs, marks, right of way, hails, laylines, the race log's
+  moments and findings, the start's debrief, the briefing, and the passage now and its plan.
+- **tests/worker.test.ts**:
+  - The same frames and about 16 commands through `LocalHost` and through `WorkerHost` give the same race to the last
+    bit, whether the worker answers within the frame or a frame late. The worker runs as `RaceWorker` behind a stand-in
+    Worker, with every message cloned.
+  - The mirror equals the worker's World.
+  - Answers come back.
+  - A failing worker leaves the mirror sailing.
+- **tests/host.test.ts** still holds: the commands sail as the page's old direct writes did.
+- **scripts/check/simguard.cjs** (dev, worker mode): no write by the page, the guard's self-test passes, and the race
+  is confirmed to be in its worker.
+- **scripts/check/smoke.cjs** (the published page): clean, and the race is in its worker.
+- **The perf test**: the step is unchanged. A second test guards the sync's cost a frame on each side, against the
+  same reference workload.
+
+### What it costs and gives (this container; a laptop runs this workload about 3× faster, §1.5a)
+
+| | in the page (before) | with the worker |
+|---|---|---|
+| The page's JS a frame, race of eight at 4× (software GL, 480×300) | 52 ms | 40 ms |
+| The sim on the page's thread at 4× | 4 steps, about 5.8 CPU ms | none: applying the mirror, about 0.9 CPU ms |
+| The worker's frame at 4× | — | 4 steps (5.8 ms) plus finding what changed and cloning it (3.5 CPU ms) |
+| The page (HTML) | 5.0 MB | **8.9 MB** (the worker's code, 3.9 MB, travels alongside the page's) |
+
+- **Headroom for the physics**: the worker's frame can take about 12 of the 16.7 ms at 60 fps. Less the sync's
+  fixed part, that's about 3.5× today's step at 4× on a laptop, and about 14× at 1×. It's less than §2's estimate of
+  4–5×, because finding what changed walks the World's state every frame. Making that walk cheaper is the next lever
+  (most of it: about 180 new small objects a step, the 170 puffs and the boats).
+- **At 1×** the page's thread saves little: the mirror's apply and the message cost about as much as one step. The gain
+  at 1× is the room for the physics, not the page's frame.
+- **The page's size**: 8.9 MB is under the host's 16 MB, but heavier to load. The sim's code and data are in it
+  twice: once for the mirror and once for the worker. One copy would do if the page could `import()` a blob URL
+  (the worker and the page sharing a module). The probe didn't test that, so a second probe would settle it.
+
 ## Method (to repeat these numbers)
 
 - The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line).
