@@ -40,3 +40,12 @@ describe('a protest hearing', () => {
     expect(s.map(x => x.points)).toEqual([1, 4, 2]);
   });
 });
+
+describe('a protest hearing, the review\'s cases', () => {
+  it('a boat not racing (the Part 2 preamble) is not penalized: no penalty, for that reason', () => {
+    expect(decide(P({ notRacing: true }), racingNo).outcome).toBe('notRacing');
+  });
+  it('rule 23.1, with no turns to take (none owed): disqualified (60.5(c), in the race nearest in time)', () => {
+    expect(decide(P({ rule: '23', owed: false }), racingNo).outcome).toBe('DSQ');
+  });
+});

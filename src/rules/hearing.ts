@@ -9,6 +9,7 @@ export interface ProtestRec {
   hailT: number; flagT: number | null;
   owed: boolean | null; turnsT: number | null;
   exonerated?: boolean;
+  notRacing?: boolean;
 }
 
 /** What the committee needs to know of the protested boat now. */
@@ -21,6 +22,8 @@ export type Outcome =
   | 'dismissed'
   /** She broke a rule but is exonerated (43.1). */
   | 'exonerated'
+  /** She broke a rule of Part 2 while not racing: no penalty (the Part 2 preamble; rule 23.1 excepted). */
+  | 'notRacing'
   /** She broke it and took the penalty: no further penalty (60.5(c)(2)). */
   | 'penaltyTaken'
   /** She broke it, didn't take the penalty: disqualified (60.5(c)). */
@@ -47,6 +50,7 @@ export function decide(p: ProtestRec, vs: Protestee): Decision {
   if (!valid.hail || !valid.flag) return d('invalid');
   if (p.rule == null || p.fouler !== p.vs) return d('dismissed');
   if (p.exonerated) return d('exonerated');
+  if (p.notRacing) return d('notRacing');
   if (p.owed && p.turnsT != null) return d('penaltyTaken');
   if (p.owed && vs.racing) return d('pending');
   return d('DSQ');

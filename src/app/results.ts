@@ -41,7 +41,7 @@ function vsInput(log: NonNullable<typeof app.w.log>): VsInput {
   const off = Math.abs(wrap(brg(C.center.x - last.x, C.center.y - last.y) - wind)), fin = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
   return {
     frames: app.w.track, you: app.w.user.id, startTimes: app.w.startTimes, marks: log.boatMarks, from: C.center, finishLine: [C.pin, C.committee],
-    boats: (sc => app.w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD' || b.scoring === 'DSQ', points: sc.get(b.id)!.points })))(scores()),
+    boats: (sc => app.w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD' || sc.get(b.id)!.code === 'DSQ', points: sc.get(b.id)!.points })))(scores()),
     legs: [...C.marks.map(m => ({ name: m.name, to: m.p, kind: m.leg })), { name: 'the finish', to: C.center, kind: fin as 'beat' | 'reach' | 'run' }]
   };
 }
@@ -267,12 +267,12 @@ function protestSection(): void {
   const mine = heard().decisions.filter(d => d.protest.by === u.id || d.protest.vs === u.id);
   el.hidden = !mine.length; if (!mine.length) { el.innerHTML = ''; return; }
   const tick = (ok: boolean, what: string) => `<span class="${ok ? 'ok' : 'no'}">${ok ? '✔' : '✘'}</span> ${what}`;
-  const OUT: Record<Decision['outcome'], string> = { invalid: 'Protest invalid: not hailed and flagged at the first reasonable opportunity (Rule 60.4)', dismissed: 'Dismissed: no rule broken', exonerated: 'No penalty: exonerated (Rule 43.1)', penaltyTaken: 'Penalty taken: no further penalty (Rule 60.5(c)(2))', DSQ: 'Disqualified (Rule 60.5(c))', pending: 'Still racing: her turns still to do', retired: 'Retired (RET): nothing to decide' };
+  const OUT: Record<Decision['outcome'], string> = { invalid: 'Protest invalid: not hailed and flagged at the first reasonable opportunity (Rule 60.4)', dismissed: 'Dismissed: no rule broken', exonerated: 'No penalty: exonerated (Rule 43.1)', penaltyTaken: 'Penalty taken: no further penalty (Rule 60.5(c)(2))', notRacing: 'No penalty: not racing (Part 2 preamble)', DSQ: 'Disqualified (Rule 60.5(c))', pending: 'Still racing: her turns still to do', retired: 'Retired (RET): nothing to decide' };
   const clipOf = (t: number) => app.incidentClips.find(c => c.t != null && Math.abs(c.t - t) < 1.5);
   el.innerHTML = '<h3>Protests</h3>' + mine.map((d, i) => {
     const p = d.protest, key = `${p.vs}@${p.t}`, rule = d.rule && d.rule in RULES ? RULES[d.rule as keyof typeof RULES][0] : d.rule ? `Rule ${d.rule}` : 'no rule found';
     const head = `<div class="pHead"><span>${nm(p.by)} protest${p.by === u.id ? '' : 's'} ${p.vs === u.id ? 'you' : nm(p.vs)} · ${rule}</span></div>`;
-    if (p.vs === u.id && !answered.has(key) && d.outcome !== 'retired') return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
+    if (owesAnswer(d)) return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
     const turns = p.owed == null ? '–' : !p.owed ? 'Declined' : p.turnsT != null ? 'Taken' : 'Not taken';
     const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
     return head + `<div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}${clipOf(p.t) ? ` &nbsp; <a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</div>`
@@ -281,7 +281,10 @@ function protestSection(): void {
   }).join('');
   el.querySelectorAll<HTMLButtonElement>('[data-pr]').forEach(b => b.onclick = () => {
     const key = b.dataset.key!, how = b.dataset.pr as 'retire' | 'hearing'; answered.set(key, how);
-    if (how === 'retire') { app.send({ k: 'retire', why: ', answering a protest', afterFinish: true }); setTimeout(showResults, 300); } else protestSection();
+    if (how === 'hearing') { showResults(); return; }
+    // (retired once the worker has it: the results then show RET)
+    app.send({ k: 'retire', why: ', answering a protest', afterFinish: true });
+    const t0 = performance.now(), wait = () => { if (app.w.user.retired || performance.now() - t0 > 3000) showResults(); else requestAnimationFrame(wait); }; wait();
   });
   el.querySelectorAll<HTMLAnchorElement>('[data-pclip]').forEach(a => a.onclick = e => {
     e.preventDefault(); const c = clipOf(mine[Number(a.dataset.pclip)].protest.t);
@@ -292,10 +295,19 @@ function protestSection(): void {
   });
 }
 
-/** The protest hearings, on the facts as they are now (rules/hearing.ts): the decisions and the boats disqualified. */
+/** A protest against you that would cost you (a DSQ, or not decided yet) that you haven't answered: Retire or Hearing. */
+function owesAnswer(d: Decision): boolean {
+  if (answeredFor !== app.w) { answered.clear(); answeredFor = app.w; }
+  const p = d.protest;
+  return p.vs === app.w.user.id && (d.outcome === 'DSQ' || d.outcome === 'pending') && !answered.has(`${p.vs}@${p.t}`);
+}
+
+/** The protest hearings, on the facts as they are now (rules/hearing.ts): the decisions and the boats disqualified
+ * (not you, until you've chosen the hearing over retiring). */
 function heard(): ReturnType<typeof hearings> {
-  const w = app.w;
-  return hearings(w.protests, id => { const b = w.boats[id]; return { id, racing: w.racing(b), retired: !!b.retired }; });
+  const w = app.w, h = hearings(w.protests, id => { const b = w.boats[id]; return { id, racing: w.racing(b), retired: !!b.retired }; });
+  if (h.decisions.some(owesAnswer)) h.dsq.delete(w.user.id);
+  return h;
 }
 
 function scores(): Map<number, ScoreOut> {
@@ -310,7 +322,7 @@ function showResults(): void {
   app.send({ k: 'shown', finishShown: true }); app.resultsShown = true;
   // in order of points (RRS A4, 44.3(c)), then of time across the line for the boats still racing
   const sc = scores(), rows = scoreOrder([...sc.values()], id => app.w.boats[id].finished ? app.w.boats[id].finishT : null).map(s => app.w.boats[s.id]);
-  logRace(rows, sc);
+  if (!heard().decisions.some(owesAnswer)) logRace(rows, sc); // (your logbook entry once you've answered any protest against you)
   const mine = sc.get(app.w.user.id)!, place = mine.rank ?? rows.indexOf(app.w.user) + 1, tied = rows.filter(b => sc.get(b.id)!.rank === place && sc.get(b.id)!.points === mine.points).length > 1;
   const nth = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
   // a Z-flag place waits on the boats still racing: any of them finishing on fewer points beats her (44.3(c))

@@ -304,7 +304,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   const preamble = !!inc.notRacing;
   $('rPen').textContent = preamble ? `No penalty: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing${w.cancelled ? ' (racing was called off)' : ''}. The right-of-way rules still apply between boats out here, but a boat not racing isn't penalized for breaking them (Part 2 preamble).` : notRacing ? `No turns: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing, and a turns penalty is only for an incident while racing (Rule 44.1). ${youFault ? `${other.name} may protest you` : `You may protest ${inc.fouler.name}`} instead.` : exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
     ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a gybe (Rule 44.2).${w.protestsOn ? ` Skip them and ${other.name} may protest.` : ''}`
-    : `${other.name} takes a ${turns} penalty.`;
+    : w.protestsOn ? `${other.name}'s ${turns} penalty is theirs to take (Rule 44.1). To protest, hail "Protest!" now (${keymap.label('hail')}).` : `${other.name} takes a ${turns} penalty.`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
   pendingPenalty = exonerated || notRacing || preamble ? null : inc.fouler;
   lastClip = clip;
@@ -1474,7 +1474,7 @@ $('pastRows').addEventListener('click', e => {
   ghostNext = g && en.setup && g.key === setupKey(en.setup) ? g : null;
   // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
   // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
-  if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  if (en.setup) Object.assign(S, { windTurn: 0, judging: 'umpired' }, structuredClone(en.setup.s)); // (a race saved before On-the-water judging was umpired) else { S.tideDate = en.day; S.tideTime = en.time; }
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
