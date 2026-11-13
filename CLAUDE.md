@@ -45,6 +45,9 @@ come later, once the physics and racing are dialed in.
 - Ask before big design changes. Desktop only (no phone layout).
 - Keep building through everything they've asked for. Don't install npm packages without asking.
 - Don't relabel things they've named (e.g. the S/P labels).
+- No blocks of explanatory copy on the player's screens (owner, 13 Nov 2026: "these blocks of tiny copy are useless.
+  nobody will ever read this."). At most one short line where the player needs it to act; methods and caveats go
+  behind one hover or link, or are cut. Prefer visuals (tiles, charts, icons) to words.
 - Be extremely conservative about new buttons and distractions on the game surface (owner, 13 Nov 2026): put new controls inside existing elements (the inset map, the sail band, menus, Keys), not as new on-screen buttons.
 
 ## Workflow
@@ -54,7 +57,9 @@ npm run test:fast        # ~40 s: everything but the whole-race runs; use while 
 npm test                 # ~23 min: the full suite (run before publishing)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
-node scripts/check/smoke.cjs <out-dir>        # ~2 min: the built page in headless Chromium, fails on page errors
+node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headless Chromium, both ways it loads (blob modules,
+                                              # and the fallback with blob: refused); fails on page errors
+node scripts/check/spelling.cjs              # US spelling in what the player reads (strings, index.html, README, docs); --fix changes them
 npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost races end to end (sail, save, sail it again with its ghost)
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
@@ -96,7 +101,7 @@ Use them; they're cheaper than doing it all yourself and catch what the author m
   class rules, RRS text, places. It returns facts with sources. Run several in parallel for independent questions.
 - **visual-checker** (lighter model): after any change to what's drawn, before publishing. It renders both tacks from
   both sides and checks against a sailor's checklist.
-- **physics-reviewer** (strongest model, read-only): before publishing any change under src/boat, src/environment,
+- **physics-reviewer** (Fable 5.2, the strongest model; trial from 13 Nov 2026, owner; read-only): before publishing any change under src/boat, src/environment,
   src/sim, src/ai or src/rules. An independent review against the science and the RRS; fix what it confirms.
 
 Keep the core simulation work (physics, world, main loop) in the main session: those files are shared, so splitting
@@ -108,3 +113,8 @@ them across agents makes conflicting edits.
 - Sail pictures (render/boatMesh.ts `sailTexture`) are in the cloth's own uv (u luff→leech, v foot→head): draw
   everything where it physically is; only the starboard set of figures runs back to front.
 - Comments explain the sailing or physics reason, in plain words.
+- The page's styles are src/styles/NN-<part>.css, joined in that order by src/styles.css: the order is the cascade, so a
+  rule goes in its part's file, and a new part's file at the end.
+- src/app.ts's parts are src/app/*.ts (setup, results and the pause screen, drills, dev handles), each a `mount…(app)`
+  function run where its code used to be. They reach app.ts's own state through its `ctx`: a getter for each binding,
+  and a setter where a part changes it. A part never keeps its own copy of `w` or `host`.

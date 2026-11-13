@@ -10,9 +10,9 @@ Every Case whose rules-referred list touches Part 2 (rules 10–24, 43, 44), mar
 **Status**
 - **covered**: the engine models every rule the Case turns on; a test sets the Case up and checks the engine reaches its answer.
 - **partly**: the engine reaches the Case's answer on the main rule, but the Case also turns on something the sim doesn't model
-  (exoneration under 43.1(b)/(c), rule 14 for the right-of-way boat, a judgement of proper course, three or more boats in a chain).
+  (exoneration under 43.1(b)/(c), rule 14 for the right-of-way boat, a judgment of proper course, three or more boats in a chain).
   The test checks what the engine does model.
-- **not modelled**: the Case turns on hails' wording, intent, propulsion (rule 42), equipment out of position, protest or race
+- **not modeled**: the Case turns on hails' wording, intent, propulsion (rule 42), equipment out of position, protest or race
   committee procedure, or scoring: things the sim doesn't simulate.
 - A Case the engine answers differently is a **finding** (below): its test is written as `it.fails` with the Case's answer, so it
   turns red, asking to be made a plain test, once the engine is fixed. Findings aren't fixed in the same change.
@@ -21,7 +21,7 @@ What the engine models (src/rules): rules 10–13, 15 (a few seconds' grace), 16
 (above proper course), 18.2(a)–(d), 18.3, 18.4, 19.2(b)/(c) (the shore, the committee boat after the start, a boat both must keep
 clear of), 20 (hails, "You tack", 20.2(e), 20.3), 21.1–21.3, 23.1/23.2 (physical interference), 29.1, 30 (I, Z, U, black), 31,
 43.1(a) (compelled within a few seconds), 44.1 (one penalty per incident), the Part 2 preamble (no penalty when not racing).
-Rule 14 only as "the right-of-way boat had to swerve". Not modelled: 43.1(b)/(c) exoneration as such (the engine names one
+Rule 14 only as "the right-of-way boat had to swerve". Not modeled: 43.1(b)/(c) exoneration as such (the engine names one
 fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Rules 10–17 (Part 2, Sections A and B)
@@ -32,7 +32,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 7 | 85 | 11, 15, 16.1, 17 | L overlapped from astern within 2 lengths, not above her proper course: W broke 11 | covered |
 | 9 | 88 | 10, 18.1(a) | Opposite tacks at a windward mark: no rule 18; P keeps clear (10) | covered |
 | 13 | 95 | 11, 15, 16.1, 17 | Before the start L luffs from a leeward overlap from astern: no proper course, so no 17; W broke 11 | covered |
-| 14 | 97 | 11, 16.1, 17 | L luffs slowly to her own proper course: W broke 11 | partly (proper course is a judgement) |
+| 14 | 97 | 11, 16.1, 17 | L luffs slowly to her own proper course: W broke 11 | covered: L from clear astern (rule 17 binds her), a luff that leaves room (16.1), W's 11; above her proper course it's L's 17. The proper course itself is the sim's `aboveProper`, not a judgment |
 | 17 | 102 | 13 | Rule 13 ends when she's on a close-hauled course, whatever her speed | partly (the physics decides when she's close-hauled) |
 | 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered |
 | 24 | 111 | 11, 12, 15 | B overlaps to leeward from astern close to A's stern: A must luff promptly; contact then is B's (15) | partly (whether A responded promptly) |
@@ -42,7 +42,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 46 | 147 | 11, 16.1, 17 | L luffs to her proper course after a leeward overlap from astern: W broke 11 | partly (proper course) |
 | 50 | 153 | 10 | No contact, S bore away for fear of it: P broke 10 | partly (only as a forced swerve) |
 | 51 | 155 | 11, 43.1(a) | A chain of four boats before the start: W broke 11; the others exonerated | partly (two-boat chains only) |
-| 52 | 157 | 16.1 | Pre-start manoeuvring to drive a boat off the line: no breach | partly |
+| 52 | 157 | 16.1 | Pre-start maneuvering to drive a boat off the line: no breach | partly |
 | 53 | 159 | 11, 15 | L overlaps a near-stationary W from astern: 15 gives W time; no breach | covered (finding 5, fixed) |
 | 87 | 203 | 10, 14 | P3 hits S on the line: P3 broke 10 | partly (S's own rule 14) |
 | 88 | 205 | 10 | P passes 2 ft astern after S luffed hard: P broke 10 (keeping clear isn't just avoiding contact) | partly (only as a forced swerve) |
@@ -50,11 +50,11 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 99 | 226 | 10, 14, 44.1(b) | P broaches into S: P broke 10 (and retires) | partly (retirement as penalty) |
 | 105 | 235 | 10, 15, 16.1 | Running, S luffs after a long parallel course and P doesn't respond: P broke 10, S didn't break 16.1 (P had room) | covered (finding 2, fixed) |
 | 107 | 238 | 10, 14 | Head-on before the start: Jupa (P) broke 10 | partly (lookout, 14 for S) |
-| 123 | 274 | 10, 14 | S holds her course, P doesn't clear her: P broke 10 | partly (S's own 14 not modelled) |
-| 134 | 293 | 17 | Proper course depends on the sails set | not modelled |
+| 123 | 274 | 10, 14 | S holds her course, P doesn't clear her: P broke 10 | partly (S's own 14 not modeled) |
+| 134 | 293 | 17 | Proper course depends on the sails set | not modeled |
 | 147 | 317 | 10, 16.1, 43.1(b) | S luffs onto PB after ducking PA: PB exonerated; S owed room under 16.1 | partly (43.1(b) exoneration) |
-| 73, 74 | 183–4 | 2, 11 | Crew reaching out to touch the other boat | not modelled (intent, crew position) |
-| 77, 91 | 188, 211 | 12, 14 | Spinnaker or guy out of position | not modelled (equipment) |
+| 73, 74 | 183–4 | 2, 11 | Crew reaching out to touch the other boat | not modeled (intent, crew position) |
+| 77, 91 | 188, 211 | 12, 14 | Spinnaker or guy out of position | not modeled (equipment) |
 
 ## Rule 18 (mark-room)
 
@@ -63,16 +63,16 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 2 | 77 | 12, 15, 18.2(a)(2) | B, clear astern, reached the zone first while A was outside it: A owes B mark-room and broke 12 and 18.2(a)(2) | covered, gybes included (finding 3, fixed) |
 | 12 | 93 | 11, 18.2(a)(1) | Overlapped when the first reached the zone, on courses 90° apart: OL broke 18.2(a)(1) | covered |
 | 15 | 99 | 12, 13, 18.2(a)(2), 18.2(b) | A clear ahead at the zone, upwind: B keeps clear and gives mark-room; once A tacks, 18.2(a) ends and B has right of way (13) | covered |
-| 21 | 105 | Mark-Room, Room | How much space mark-room is | not modelled (a judgement) |
-| 103 | | Room, 19.2(b) | Room at an obstruction and seamanlike handling | not modelled (a judgement) |
-| 25 | 112 | 11, 16.1, 18.1(b) | Once the inside boat has left the mark astern, rule 18 ends: IW broke 11 | partly (when the mark is "left astern") |
+| 21 | 105 | Mark-Room, Room | How much space mark-room is | not modeled (a judgment) |
+| 103 | | Room, 19.2(b) | Room at an obstruction and seamanlike handling | not modeled (a judgment) |
+| 25 | 112 | 11, 16.1, 18.1(b) | Once the inside boat has left the mark astern, rule 18 ends: IW broke 11; OL's 30° luff over two lengths left room (16.1) | covered: a luff at the Case's rate that leaves room (contact comes after about 16° and a length), IW's 11. Rule 18's end is the sim's mark passing, set in the diagram, not sailed |
 | 26 | 115 | 10, 14, 18.1(a) | Boats leaving the mark on different sides: no rule 18; P broke 10 | partly (one course: both boats always leave a mark on the same side) |
 | 59 | 167 | 18.2(a)(2) | D outside the zone when E reached it: D owes E mark-room | covered |
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
 | 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered (finding 1, fixed) |
-| 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | partly (the mark touch's exoneration) |
+| 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | covered: Jagga's 11 (18.3(b)'s mark-room is met by rule 11 here: she's to windward of the inside boat); Freebird's touch exonerated (43.1(b): forced onto the mark by Jagga's breach, tests/sim.test.ts) |
 | 114 | 253 | 16.1, 18.2(a)(1), 31 | Room owed through a middle boat; at a starting mark L luffs W onto it: L broke 16.1 | partly (three-boat chains; Q3 buildable) |
 | 118 | 260 | 18.2(a)(1) | "Room to sail to the mark" at a leeward mark: no breach | partly |
 | 132 | 289 | 16.2, 18.1(a)(1) | When boats on opposite tacks are "on a beat" | partly (the sim uses the leg's beat flag) |
@@ -92,11 +92,11 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 54 | 161 | 20 | When a boat may hail, and the hailed boat's options | partly (hail timing: sim/obstruction.ts hailRange) |
 | 101 | 229 | 20.2(c) | "You tack", A tacks to port, then must keep clear (10) | covered (finding 6, fixed) |
 | 113 | 251 | 20 | L, M and W: M must pass the hail on to W (20.3) | partly (the pass-on's timing only) |
-| 117 | 259 | 15, 19.2(b) | A row of boats isn't a continuing obstruction; L overlapping D to leeward ends D being an obstruction | partly |
+| 117 | 259 | 15, 19.2(b) | A row of boats isn't a continuing obstruction; L overlapping D to leeward ends D being an obstruction | covered: D's obstruction ends with L's leeward overlap (the engine's boat obstruction needs both to keep clear of her); a counterpart test, D taken as an obstruction, makes it L's 19.2(b) |
 | 124 | 276 | 19.2(a), 19.2(b) | Who chooses the side to pass an obstruction | partly |
-| 125 | 278 | 19.2(b) | Three port boats meeting S: PL must give room to PM and PW | partly (three boats) |
+| 125 | 278 | 19.2(b) | Three port boats meeting S: PL must give room to PM and PW | covered (S crossing ahead, as in the Case; PL, 19.2(b), pair by pair: finding 7). The room enough for PM to give PW room too isn't judged as such |
 | 126 | 280 | 23.2 | Which leg a boat is on when she has made a mistake | partly |
-| 146 | 315 | 11, 16.1, Section C preamble | A starting committee vessel in open water: rule 19 doesn't apply; W exonerated (room under 16.1) | partly (the engine always names one boat at an incident, where the Case penalises nobody: W exonerated, L met 16.1. Not tested: after the gun the committee boat is an obstruction once both have started, where the Section C preamble excludes it until they've left it astern) |
+| 146 | 315 | 11, 16.1, Section C preamble | A starting committee vessel in open water: rule 19 doesn't apply; W exonerated (room under 16.1) | partly (the engine always names one boat at an incident, where the Case penalizes nobody: W exonerated, L met 16.1. Not tested: after the gun the committee boat is an obstruction once both have started, where the Section C preamble excludes it until they've left it astern) |
 | 149 | 322 | 21.2, 23.2, 44.2 | B breaks off her turns to keep clear of A: no breach by B; A broke 23.2 only if off her proper course | partly (23.2 for A) |
 | 150 | 325 | 19.1, 19.2 | When boats are "at" an obstruction; who is inside at a breakwater | partly |
 
@@ -104,31 +104,33 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 | Case | p. | Rules | The Case's answer | Status |
 |---|---|---|---|---|
-| 5 | 82 | Racing, 22, 42 | An anchored boat is racing | not modelled (anchoring, propulsion) |
-| 8, 69 | 87, 179 | 42 | Propulsion | not modelled |
-| 19, 141 | 104, 308 | 43.1(c), 44.1(b) | "Damage", "serious damage" | not modelled |
-| 28 | 119 | 28.1, 31, 43.1(a) | S compelled to touch the pin is exonerated, but must still start | partly (a compelled mark touch isn't exonerated) |
-| 31, 79, 96, 111, 136 | | 26, 29.1, 30 | Recall signals and their timing, redress, evidence | not modelled (race committee) |
-| 58, 90, 106, 112, 128, 129, 145, 148 | | 28, Finish, Sail the Course | The taut string; finishing | not modelled (the sim's own mark passing, not the string test) |
-| 65 | 175 | 2, 30.4 | Racing on after a black flag | not modelled (intent) |
-| 68 | 178 | Racing, Part 2 preamble | A boat with an invalid certificate is still racing | not modelled (certificates) |
+| 5 | 82 | Racing, 22, 42 | An anchored boat is racing | not modeled (anchoring, propulsion) |
+| 8, 69 | 87, 179 | 42 | Propulsion | not modeled |
+| 19, 141 | 104, 308 | 43.1(c), 44.1(b) | "Damage", "serious damage" | not modeled |
+| 28 | 119 | 28.1, 31, 43.1(a) | S compelled to touch the pin is exonerated, but must still start | covered for the touch (43.1(a): forced onto the mark by another boat's breach, tests/sim.test.ts); the start itself is the sim's own line crossing |
+| 31, 79, 96, 111, 136 | | 26, 29.1, 30 | Recall signals and their timing, redress, evidence | not modeled (race committee) |
+| 58, 90, 106, 112, 128, 129, 145, 148 | | 28, Finish, Sail the Course | The taut string; finishing | not modeled (the sim's own mark passing, not the string test) |
+| 65 | 175 | 2, 30.4 | Racing on after a black flag | not modeled (intent) |
+| 68 | 178 | Racing, Part 2 preamble | A boat with an invalid certificate is still racing | not modeled (certificates) |
 | 108 | 240 | 31, 44.1, 44.2 | Taking a One-Turn Penalty at a mark | partly (the turn's mechanics) |
-| 127 | 282 | Racing | She clears the finishing line and marks when no mark influences her course: touching one before that is rule 31 | partly (the sim's `cleared` flag, not the judgement) |
-| 135 | 295 | 44.1(b), 61.4 | Redress after damage | not modelled |
+| 127 | 282 | Racing | She clears the finishing line and marks when no mark influences her course: touching one before that is rule 31 | partly (the sim's `cleared` flag, not the judgment) |
+| 135 | 295 | 44.1(b), 61.4 | Redress after damage | not modeled |
 | 140 | 305 | Start, 30.3, 43.1(a) | Forced over the line in a U or black flag start | partly |
 
 ## Tally
 
-- Covered, the test reaching the Case's answer: 18 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 93, 101, 105).
+Order of work: no published counts of protests by rule were found (US Sailing, RYA, World Sailing, club logs searched, 13 Nov 2026). The qualitative guidance found: US Sailing's rule 18 notes (ussailing.org/wp-content/uploads/2024/12/18.2a2.pdf) name port-tackers tacking into the windward mark's zone near starboard boats on the layline as a frequent source of conflict, and US Sailing's rule 10 notes call no-contact port/starboard protests "very common"; coaching articles put most incidents at mark roundings and the start. So: the windward mark (18.3, 13), leeward marks (18.2), the start (11, 15, 16), then obstructions (19). The Cases added in that order: 25, 95, 14, 125, 117.
+
+- Covered, the test reaching the Case's answer: 24 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 28, 43, 53, 59, 81, 92, 93, 95, 101, 105, 117, 125).
 - Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the gybe, found while checking
   Case 2) and 4–6 (Cases 27, 53, 101) are fixed.
-- Partly: 42.
-- Not modelled: 28.
+- Partly: 36.
+- Not modeled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
 
 ## Tests
 
-tests/rules-cases.test.ts: one `it` per covered Case, named by its number, each reaching the Case's answer; a test of the modelled
+tests/rules-cases.test.ts: one `it` per covered Case, named by its number, each reaching the Case's answer; a test of the modeled
 part for some partly covered Cases (17, 24, 87, 113, 127, 149); and for each finding an `it.fails` with the Case's answer, next to a
 "(the setup)" test pinning what the engine does today, so a fix shows up as both turning red. Every diagram first checks the boats
 start apart (`clean`): an opening contact starts the 6 s incident cooldown and would hide the contact the Case is about.
@@ -143,8 +145,8 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
    with the fetching boat to windward of her, where rule 11 alone would have that boat luff above close-hauled; otherwise the basic
    rules, 15 and 16 govern. At an incident, 18.3(a) is the tacker's breach when the fetching boat, at or above close-hauled and not
    turning toward her, was overlapped to windward of her; a fetching boat that bears away into her broke 11, and one clear astern
-   is under 12 as usual (made to luff above close-hauled from there isn't modelled: it needs ROOM-TO-RESPOND's escapes()).
-   Not modelled: 18.3(b)'s mark-room as exoneration under 43.1(b) (as for 18.2). Tests: Case 93 in tests/rules-cases.test.ts,
+   is under 12 as usual (made to luff above close-hauled from there isn't modeled: it needs ROOM-TO-RESPOND's escapes()).
+   Not modeled: 18.3(b)'s mark-room as exoneration under 43.1(b) (as for 18.2). Tests: Case 93 in tests/rules-cases.test.ts,
    "Rule 18.3" in tests/rules.test.ts.
 2. **Fixed** (src/rules/pairs.ts leftRoom, from each pair's pose history, with src/boat/arcs.ts escapes(): could the other
    boat, reacting in 1 s, have turned away from where they were when the luff began? docs/ROOM-TO-RESPOND.md. 16.2 stays
@@ -185,3 +187,12 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
    contact while the hailing boat is still tacking, or within rule 15's few seconds after (her time to bear away round the
    other's stern), or after the replying boat turned toward her, is the replying boat's breach of 20.2(c); after that it is
    the hailing boat's, under 10 (or 12, or 13).
+7. **Fixed. Which boat is inside at an obstruction (19.2(b)).** The engine took the boat nearer the obstruction as inside. With the
+   obstruction still ahead on the bow (WS Case 125: three port boats meeting a starboard boat they'll pass astern of) the
+   leewardmost, outside boat is the nearer, so the engine penalized the middle boat for bearing away to give room. Now
+   (src/rules/pairs.ts insideAt) the inside boat is the one on the obstruction's side of the pair, judged square to their mean
+   heading; dead ahead or astern, the nearer. Found by the physics-reviewer on the Case 125 test.
+8. **Open. 16.1 ignores a large course change made slowly.** Its trigger is a turn of 12° within 3 s (RULE16_MIN_TURN,
+   RULE16_WINDOW), so a 30° luff at 2°/s never comes to the room question. Rule 16.1 has no minimum ("when a right-of-way boat
+   changes course"); with the room judgment now doing the work (leftRoom), the trigger could be any turn toward the other boat
+   since the history began.

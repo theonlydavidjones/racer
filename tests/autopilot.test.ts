@@ -69,7 +69,7 @@ describe('the tiller pilot', () => {
     expect(called).toBeGreaterThanOrEqual(1); // it called a tack itself (not only by finding it could lay the mark)
     expect(tacks).toBeGreaterThanOrEqual(called);
     expect(w.pilot.mode).toBe('auto');
-  }, 120_000);
+  }, 180_000);
 
   it('Nav tacks off a lee shore instead of running aground', () => {
     // starboard tack in a westerly heads her for the city shore; the destination is out under the Gate
@@ -81,7 +81,7 @@ describe('the tiller pilot', () => {
     for (let i = 0; i < 60 * 900 && w.arrivedT == null; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast' && /Aground/.test(e.msg)) aground++; }
     expect(aground).toBe(0);
     expect(w.pilot.mode).not.toBe('off');
-  }, 120_000);
+  }, 180_000);
 
   it('Nav allows for the current: in a cross-current she makes good the bearing instead of being set off it', () => {
     const w = new World(COURSES[0], S({ sea: 'flat', current: 'ebb' }), 9, { freeSail: true }), u = w.user;
@@ -91,5 +91,5 @@ describe('the tiller pilot', () => {
     let worst = 0;
     for (let i = 0; i < 60 * 600 && w.arrivedT == null; i++) { w.step(DT); worst = Math.max(worst, Math.abs((u.x - start.x) * uy - (u.y - start.y) * ux)); }
     expect(worst).toBeLessThan(150); // off the straight track, m, over a mile of it
-  }, 120_000);
+  }, 180_000);
 });

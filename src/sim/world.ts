@@ -21,11 +21,11 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink, crewPoleCall } from '../ai/ai';
+import { aiThink, poleMustCome } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
@@ -285,7 +285,10 @@ export class World {
    * (44.2), and her turns there don't excuse the touches; the AI gets clear before it turns. */
   private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }>();
   private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
-  private fouledAt = new Map<number, { by: number; t: number }>();
+  /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
+   * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
+   * after the first sign of it; at most TANGLE_MAX after `t`). */
+  private fouledAt = new Map<number, { by: number; t: number; on: number; x: number; y: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
   private hHist: number[][] = [];
 
@@ -507,7 +510,7 @@ export class World {
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
-      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser && this.settings.manualTrim === 2, pole: 'down', poleT: 0, poleTack: 'S',
+      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
       weatherHeld: undefined, carOff: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
@@ -865,8 +868,8 @@ export class World {
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
     }
-    // your crew sets and stows the pole too, unless you've taken it (the band's pole tab)
-    if (!this.user.poleMine && !this.user.handled) crewPoleCall(this, this.user);
+    // your pole: out only on your call; your crew brings it in only when it must come in, and says why (ai.ts poleMustCome)
+    if (this.user.poleWant) { const why = poleMustCome(this.user); if (why) { this.user.poleWant = false; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -1017,16 +1020,36 @@ export class World {
         const lf = this.lastFoul.get(b.id), lv = this.lastFoulVs.get(b.id);
         const atMark = !!lf && solidGap(lf, lf, touching) - touching.r < ENGAGED;
         const sameIncident = !!lf && this.t - lf.t < TANGLE_MAX && !b.penaltyDir && ((!!lv && lv.vs === lf.vs && !lv.clear) || atMark);
-        if (!sameIncident) {
+        // Rule 43.1: a boat that touches the mark as a consequence of another boat's breach against her is exonerated: under
+        // (a) "compelled" by it (WS Case 28: P's breaches made the mark bounce onto S), and under (b), entitled to mark-room
+        // or room, touching it "as a consequence of an incident with a boat required to give her that room or mark-room"
+        // (Case 95: Freebird, squeezed by Jagga, touched it and was exonerated). The sim's sign of either, a proxy for the
+        // rules' "as a consequence": a breach against her, here at this mark (within ENGAGED of it), still going on within
+        // COMPELLED_WINDOW of the touch (a squeeze can last), with the boat that broke it still on her and on her far side
+        // from the mark, pushing her toward it, not away. (Approximate both ways: 43.1(b) needs no breach by the other boat,
+        // so a squeeze the engine didn't flag goes unexcused; and it doesn't check she was sailing within her mark-room.)
+        const by = this.fouledAt.get(b.id), byBoat = by ? this.boats.find(o => o.id === by.by) : undefined;
+        // (the mark's nearest point to her: on the committee boat, a segment, its nearest point along the hull)
+        let mp: Vec = touching.p;
+        if (touching.q) {
+          const qx = touching.q.x - touching.p.x, qy = touching.q.y - touching.p.y;
+          const k = Math.max(0, Math.min(1, ((b.x - touching.p.x) * qx + (b.y - touching.p.y) * qy) / (qx * qx + qy * qy || 1)));
+          mp = { x: touching.p.x + qx * k, y: touching.p.y + qy * k };
+        }
+        const pushed = !!byBoat && (byBoat.x - b.x) * (mp.x - b.x) + (byBoat.y - b.y) * (mp.y - b.y) < 0;
+        const exonerated = !sameIncident && !!by && !!byBoat && this.t - by.on < COMPELLED_WINDOW && hullGap(b, byBoat) < ENGAGED
+          && pushed && solidGap(by, by, touching) - touching.r < ENGAGED;
+        if (!sameIncident && !exonerated) {
           addPenalty(b, ONE_TURN);
           this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id) });
         }
         if (b.isUser) {
-          if (!sameIncident) this.fouls++;
+          if (!sameIncident && !exonerated) this.fouls++;
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
             ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
+            : exonerated ? `You touched ${touching.name}, forced onto it by ${byBoat!.name}'s foul: no penalty (Rule 43.1).`
             : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a gybe.` });
-        } else if (!sameIncident) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
       }
       b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }
@@ -1161,9 +1184,19 @@ export class World {
         if (hailer.isUser) this.emit({ type: 'toast', ms: 3500, msg: `${hailed.name} is tacking to give you room. Tack now (Rule 20.2(d)).` });
       }
       if (incident) found.push({ A, B, incident });
+      // (a breach against one of them still going on, by its own signs, whoever has right of way now (a right-of-way
+      // boat's luff, 16.1, squeezes too): touching, the boat she's fouled by still making her swerve, or inside room-to-
+      // keep-clear distance and still closing. Only giving room again, overlapped round the mark, isn't one)
+      const fA = this.fouledAt.get(A.id), fB = this.fouledAt.get(B.id);
+      if ((fA && fA.by === B.id) || (fB && fB.by === A.id)) {
+        const g = hullGap(A, B), closing = (B.x - A.x) * (B.vx - A.vx) + (B.y - A.y) * (B.vy - A.vy) < 0;
+        for (const [V, F, fa] of [[A, B, fA], [B, A, fB]] as const) {
+          if (fa && fa.by === F.id && this.t - fa.t < TANGLE_MAX && (g < CONTACT_GAP || V.forced14 === F.id || (g < ROOM_GAP && closing))) fa.on = this.t;
+        }
+      }
     }
     // who fouled whom this step, before deciding penalties (Rule 43.1(a) needs the whole picture)
-    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
+    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t, on: this.t, x: v.x, y: v.y }); }
     // (each boat's speed, and her velocity, before any contact this step takes her way off: a jam is judged on how they
     // were sailing, not on what the touch did to them)
     const pre = found.length ? new Map(this.boats.map(b => [b.id, { v: b.v, vx: b.vx, vy: b.vy }])) : null; // (only when there's something to judge)
@@ -1517,13 +1550,15 @@ export class World {
    * The sea the wave field's heights are set for (environment/waveField.ts), which each boat's own sea scales: in a
    * race the sea at the course's middle, so every boat in the fleet rides the same waves wherever your own boat is (in
    * her slip, or off at the far end); sailing free, your boat is the only one, and the sea at her is the reference.
-   * Worked out twice a second.
+   * The swell's direction is always the course's middle's: one direction for the whole field (where it's turned by the
+   * bar and the channel shows in its local height, not by turning the field: turning it as she sailed swept the swell's
+   * pattern past everywhere but her, the owner's "rushing water" in v176). Worked out twice a second.
    */
   private waveRefSea: SeaHere | null = null;
   waveRef(): SeaHere {
     if (this.waveRefSea) return this.waveRefSea;
-    const s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : this.seaHere(this.C.center);
-    return this.waveRefSea = { ...s, wake: undefined };
+    const mid = this.seaHere(this.C.center), s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : mid;
+    return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */
