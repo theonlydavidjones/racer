@@ -1115,3 +1115,7 @@ body.showroom #bMapNav{display:none!important}
 #flowPanel .fp-story em.luff{color:#ffd34d}#flowPanel .fp-story em.stall{color:#ff6a5c}
 #flowPanel .fp-twist,#flowPanel .fp-slot,#flowPanel .fp-keel{color:var(--muted)}
 body.showroom #flowPanel{display:none}
+/* real past races (sim/realRaces.ts): the list above your own past races, and your row among the real fleet's */
+#realRows:not(:empty){margin-bottom:10px}
+#realRows .warn,#resReal .warn{color:#ffb08a}
+#resReal tr.you td{color:var(--accent);font-weight:700}

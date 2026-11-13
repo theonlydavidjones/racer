@@ -187,9 +187,9 @@
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
-      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>Sail one of your races again: the same course, fleet, day and start</span></button>
+      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
     </div>
-    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="pastRows"></div></div>
+    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
   </div>
 </div>
 
@@ -411,6 +411,7 @@
     <p id="resStart"></p>
     <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
     <p id="resFouls" class="lede"></p>
+    <div id="resReal" class="debrief" hidden></div>
     <div id="resDebrief" class="debrief"></div>
     <div class="btnrow"><button class="ghost" id="bWatch" type="button">Watch your race</button></div>
     <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Back to setup</button></div>
