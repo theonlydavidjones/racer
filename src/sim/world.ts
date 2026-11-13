@@ -1918,13 +1918,14 @@ export class World {
     }
     const blocker = this.roomBlocker(u);
     if (blocker) return { kind: 'room', to: blocker, words: 'Room to tack!' };
-    const pr = this.protestOption();
-    if (pr) return { kind: 'protest', to: pr, words: 'Protest!' };
     if (u.tack === 'S') {
       const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
         .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
       if (port) return { kind: 'starboard', to: port.o, words: 'Starboard!' };
     }
+    // (after the hails that keep boats apart: a port-tacker coming at you now matters more than a protest)
+    const pr = this.protestOption();
+    if (pr) return { kind: 'protest', to: pr, words: 'Protest!' };
     return null;
   }
 
