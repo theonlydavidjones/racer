@@ -12,6 +12,17 @@ import { World } from '../src/sim/world';
 import { LocalHost, WorkerHost, type WorldArgs } from '../src/sim/host';
 import { RaceWorker, type FromWorker, type ToWorker } from '../src/sim/worker';
 import type { Command } from '../src/sim/commands';
+import { laylinesFor } from '../src/sim/laylines';
+import { passageNow } from '../src/sim/navigator';
+
+/** The page's own questions (asked of the mirror in the worker's case): the field, current, sea, laylines, rights, the passage. */
+function questions(w: World): string {
+  const out: unknown[] = [];
+  for (const p of [{ x: 0, y: 0 }, { x: 900, y: -300 }, ...w.boats.map(b => ({ x: b.x + 25, y: b.y - 15 }))]) out.push(w.fieldAt(p), w.fieldExtra(p), w.currentAt(p), w.windHere(p), w.seaHere(p), w.puffs.at(p));
+  for (const b of w.boats) { out.push(laylinesFor(w, b), w.nextMark(b)?.name ?? null); for (const o of w.boats) if (o !== b) out.push(w.rights(b, o).kc.id); }
+  if (w.freeSail) out.push(passageNow(w));
+  return JSON.stringify(out, (_k, v) => (typeof v === 'number' && !Number.isFinite(v) ? String(v) : typeof v === 'object' && v && 'isUser' in v ? `boat ${(v as { id: number }).id}` : v));
+}
 
 /** A stand-in for the browser's Worker: RaceWorker answering each message (cloned both ways), now or when told. */
 class FakeWorker {
@@ -45,18 +56,20 @@ const SCRIPT = at([
 ]);
 
 /** The same frames and commands through LocalHost and through WorkerHost; the two races' states, frame by frame. */
-function sail(late: boolean, frames: number): { local: string[]; worker: string[]; mirror: World; real: World } {
+function sail(late: boolean, frames: number): { local: string[]; worker: string[]; asked: [string, string][]; mirror: World; real: World } {
   const L = new LocalHost(new World(race().file, race().settings, race().seed, race().opts));
   const fake = new FakeWorker(late), W = new WorkerHost(fake as unknown as Worker, race());
-  const local: string[] = [], worker: string[] = [];
+  const local: string[] = [], worker: string[] = [], asked: [string, string][] = [];
   for (let i = 0; i < frames; i++) {
     for (const c of SCRIPT.get(i) ?? []) { L.send(c); W.send(c); }
     L.advance(frameDt(i)); W.advance(frameDt(i));
     if (late) fake.deliver(); // (a frame late: the answer to this frame comes before the next)
     if (i % 25 === 0) { local.push(state(L.world)); worker.push(state(fake.race.world!)); }
+    // (the page's questions: of the mirror, once it has this frame's answer, against the race in the page)
+    if (i % 50 === 0) { fake.deliver(); asked.push([questions(L.world), questions(W.world)]); }
   }
   fake.deliver();
-  return { local, worker, mirror: W.world, real: fake.race.world! };
+  return { local, worker, asked, mirror: W.world, real: fake.race.world! };
 }
 
 describe('the race in its worker sails as in the page', () => {
@@ -66,6 +79,7 @@ describe('the race in its worker sails as in the page', () => {
     expect(k, `the races part at frame ${k * 25}`).toBe(-1);
     // and the page's mirror is the worker's World after the last answer
     expect(state(r.mirror)).toBe(state(r.real));
+    r.asked.forEach(([a, b], i) => expect(b, `the page's questions at frame ${i * 50}`).toBe(a));
     expect(r.real.t).toBeGreaterThan(-170); // (it sailed)
   }, 300_000);
 
@@ -77,8 +91,11 @@ describe('the race in its worker sails as in the page', () => {
     const moved = W.ask({ k: 'moveHere', p: { x: 1200, y: 600 }, name: 'Off the city front' });
     W.advance(1 / 60);
     expect(await moved).toBe(true);
+    W.send({ k: 'dest', p: { x: 2500, y: 1800 }, name: 'Off somewhere' });
     for (let i = 0; i < 60; i++) W.advance(1 / 60);
     expect(W.mode).toBe('worker');
+    // (the passage plan, the laylines and the field, asked of the mirror, as of the worker's own World)
+    expect(questions(W.world)).toBe(questions(fake.race.world!));
     const t0 = W.view.t;
     // (a command that fails in the worker: a penalty for a boat that isn't there)
     W.send({ k: 'penalty', boat: 99 });
