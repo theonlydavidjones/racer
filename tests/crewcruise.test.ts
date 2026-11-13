@@ -22,7 +22,7 @@ import { n360 } from '../src/core/math';
  * - crossings of the cockpit that her side didn't call for;
  * - the hips' travel fore and aft (the "crawling along the rail");
  * - the body's lean, pitch and roll (the "flopping");
- * - the knees' movement (the "knee kicking");
+ * - the knees' movement while they're not walking anywhere (the "knee kicking");
  * - the most they turn round in 4 s;
  * - time two of them spend within a body's width of each other both moving at once (the "dancing around each other").
  */
@@ -52,7 +52,9 @@ function cruise(twa: number, kt: number, mins: number) {
         // (a crossing: from a seat out beyond 0.15 m on one side to one on the other; a few centimetres either way about
         // the middle isn't one: tests/crewcross.test.ts's own)
         if (Math.abs(now.x) > 0.15 && !job(now.pose)) { const sd = Math.sign(now.x); if (s.seat && sd !== s.seat) s.cross++; s.seat = sd; }
-        s.knee += Math.abs(now.knee[0] - q.knee[0]) + Math.abs(now.knee[1] - q.knee[1]);
+        // (the knees while they're not on their way anywhere: walking is legs moving, as it should be, and the trips and
+        // the travel along the deck are counted on their own; the "knee kicking" was legs moving while sat still)
+        if (!f.going && !f.route) s.knee += Math.abs(now.knee[0] - q.knee[0]) + Math.abs(now.knee[1] - q.knee[1]);
         s.lean += Math.abs(now.pitch - q.pitch) + Math.abs(now.roll - q.roll);
         s.crawl += Math.abs(now.hip.z - q.hip.z);
         const d = Math.atan2(Math.sin(now.yaw - q.yaw), Math.cos(now.yaw - q.yaw));
@@ -88,7 +90,7 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         expect(o.crawl, `${t}: along the boat, m a minute`).toBeLessThan(1.5);
         // (sitting, a body sways a little with the boat; not flopping out and in with each wave)
         expect(o.lean, `${t}: lean, rad a minute`).toBeLessThan(6);
-        // (still legs, sitting; a few steps on a trip)
+        // (still legs, sitting: the knees moved in a minute while sat, or at a job, not walking)
         expect(o.knee, `${t}: knees, rad a minute`).toBeLessThan(15);
         // (turning round to walk aft is half a circle; a spin is a whole one)
         expect(o.spin, `${t}: turned within 4 s`).toBeLessThan(200);
