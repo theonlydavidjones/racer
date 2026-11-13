@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** sat in the middle, side by side with another */ mid?: boolean; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh }
 type Limb = Body['arm'][number];
@@ -785,7 +785,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     }
   }
   // (two of them in the middle sit side by side on the sole)
-  const mids = cr.crew.map((_, i) => { const a = ppl?.[i + 1]; return !!a && Math.abs(a.x) < 0.3 && (a.pose === 'sit' || a.pose === 'lee') && inC(zs[i]); });
+  // (forward of the thwart, where the sole is clear: aft of it the helm's feet are there, and they sit on the side decks,
+  // aftSide. And taken there when both are well in the middle, left only when one is well out of it: by the 0.3 m line
+  // alone, a pair near the middle on a run, each a little either side with the puffs, were up and forward to sit side by
+  // side, then back aft to their own places, and again: the owner's "dancing around each other", v162)
+  const mids = cr.crew.map((f, i) => { const a = ppl?.[i + 1]; return f.mid = !!a && Math.abs(a.x) < (f.mid ? 0.4 : 0.25) && (a.pose === 'sit' || a.pose === 'lee') && inC(zs[i]) && zs[i] < THWART.z - 0.05; });
   const nMid = mids.filter(Boolean).length; let m = 0;
   // a tack under way: from the helm putting her about (the roll's lead) through the wind until they're across. The forward
   // crew works the jib on one knee, the others tack the main in a crouch (alone with the helm, the one crew does the jib)
