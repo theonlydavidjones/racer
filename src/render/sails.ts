@@ -35,6 +35,11 @@ export interface SailShape {
   time: number; // s, for the flapping
   /** Camber (depth / chord) and where the deepest point is (fraction of the chord from the luff), from the sail controls. */
   depth?: number; draft?: number;
+  /**
+   * The luff carried off its straight line by the spar or stay it's on (the mast's bend, the forestay's sag): offset
+   * (x, z) in the sail's frame times f(t) at height fraction t, fading out across the sail to nothing at the leech.
+   */
+  luff?: { x: number; z: number; f: (t: number) => number };
 }
 
 const tmp = new THREE.Vector3();
@@ -117,6 +122,7 @@ export class Sail {
   /** A point on the sail surface at height fraction t and chord fraction s (0 luff → 1 leech). */
   point(t: number, s: number, sh: SailShape, out = new THREE.Vector3()): THREE.Vector3 {
     const [L, F] = this.edges(t);
+    if (sh.luff) { const k = sh.luff.f(t); L.x += sh.luff.x * k; L.z += sh.luff.z * k; }
     out.copy(L).lerp(F, s);
     // camber: depth and draft position from the controls (or the sail's default), flatter toward the head
     const k = sh.draft ? Math.log(0.5) / Math.log(sh.draft) : 0.8; // sin(π s^k) is deepest where s^k = ½, i.e. at s = draft
@@ -220,6 +226,17 @@ export class Telltale {
   }
 }
 
+/** The main's leech telltale: streaming off the leech while the flow leaves it cleanly, curling round behind it to
+ * leeward once the main's stalled past a little (the flow's left the sail before the leech), hanging downwind or luffing. */
+export function leechTellState(trim: SailTrim, awa: number, luffing: boolean): TellState {
+  return awa > 115 || luffing ? 'hang' : trim.flow === 'stalled' && trim.amount > 0.12 ? 'curl' : 'stream';
+}
+/** The boat's telltales as she has them: the jib's luff pair (none when it isn't on its sheet) and the main's leech one,
+ * from the sails' trim and the apparent wind (deg off the bow); luffing on purpose, the jib's windward ones lift and the
+ * rest hang. The 3D boat and the flow view both use this, so they can't disagree. */
+export function boatTells(jib: SailTrim | null, main: SailTrim, awa: number, luffing: boolean): { jib: { windward: TellState; leeward: TellState }; leech: TellState } {
+  return { jib: luffing ? { windward: 'lift', leeward: 'hang' } : luffTellStates(jib, awa), leech: leechTellState(main, awa, luffing) };
+}
 /** Telltale behaviour for a luff telltale pair from how the sail is drawing. */
 export function luffTellStates(trim: SailTrim | null, awa: number): { windward: TellState; leeward: TellState } {
   if (!trim || awa > 115) return { windward: 'hang', leeward: 'hang' };

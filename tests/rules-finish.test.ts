@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { DT, World } from '../src/sim/world';
+import { AI_EVERY, DT, World } from '../src/sim/world';
 import { V, n360, type Vec } from '../src/core/math';
 import { LL } from '../src/geo/geo';
 import { onLand } from '../src/geo/shore';
@@ -31,10 +31,10 @@ describe('Rule 20.2(e): 18.2 stays off until the hailing boat has tacked and avo
     const red = boat('Red', { at: [-12, -10], heading: 315 }), blue = boat('Blue', { at: [-6, -16], heading: 315 });
     const p = pair(red, blue, [M]);
     p.at(48); p.rec.hail = { by: blue.id, at: 48.5, kind: 'room' }; p.at(49);
-    red.lastTackT = 50; moveTo(red, [-16, -6], 45); // Red responds by tacking
+    red.lastTackT = 50; red.headToWindT = 50; moveTo(red, [-16, -6], 45); // Red responds by tacking
     p.at(51);
     expect(p.rec.r202e).not.toBeNull(); // Blue hasn't tacked yet
-    blue.lastTackT = 52; moveTo(blue, [-2, -14], 45); // Blue tacks, away from Red
+    blue.lastTackT = 52; blue.headToWindT = 52; moveTo(blue, [-2, -14], 45); // Blue tacks, away from Red
     p.at(53);
     expect(p.rec.r202e).not.toBeNull(); // just out of the tack
     p.at(55);
@@ -142,7 +142,7 @@ describe('in the world', () => {
     expect(w.tackBlocker(M)).toBe(W);
     w.hail(L, M, 'room');
     const t0 = w.t;
-    w.step(DT); w.step(DT);
+    for (let i = 0; i < AI_EVERY + 1; i++) w.step(DT); // (within her next think: the AI thinks 10 times a second)
     expect(w.pairRecord(M, W)?.hail).toMatchObject({ by: M.id, kind: 'room', relayed: true });
     expect(w.pairRecord(L, M)?.hail?.passedOn?.to).toBe(W.id);
     // (each boat's first tack after the hail: free of it, W may well tack back for the mark later)
@@ -272,5 +272,31 @@ describe('hull contact geometry', () => {
   it('two hulls crossing each other (an X) are in contact, not 3–4 m apart', () => {
     const a = boat('A', { at: [0, 0], heading: 315 }), b = boat('B', { at: [0.2, 0], heading: 45 });
     expect(hullGap(a, b)).toBe(0);
+  });
+});
+
+describe('Rule 44.1: one penalty per incident', () => {
+  it('you foul a boat and touch her again while still tangled: the same incident. Once you have begun your turns, or been clear of her, a new contact is a new foul (21.2, 44.2)', async () => {
+    const cases: [string, { turned: number; clear: boolean }, number][] = [
+      ['still tangled, turns not begun', { turned: 0, clear: false }, 0],
+      ['already turning next to her', { turned: 90, clear: false }, 1],
+      ['had been clear of her since', { turned: 0, clear: true }, 1]
+    ];
+    for (const [name, c, want] of cases) {
+      const w = race(), [u, A] = w.boats;
+      w.boats[2].x = OPEN.x + 3000; w.boats[3].x = OPEN.x + 4000;
+      sail(w, u, OPEN, 'P'); sail(w, A, OPEN, 'S');
+      // (A on her proper course for her mark, so she isn't above it: rule 23.2 doesn't come into it)
+      const { properTwa } = await import('../src/sim/world'), pt = properTwa(w, A) ?? 90;
+      A.h = A.desired = n360(w.wind.from - pt); A.twa = pt;
+      u.penalty = u.penaltyTotal = 720; u.penaltyTurned = c.turned; u.penaltyDir = c.turned ? 1 : 0; // her turns from the first foul, against A
+      const hh = (w as unknown as { hHist: number[][] }).hHist; hh[0] = [u.h]; hh[1] = [A.h]; // (nobody turned onto the other)
+      (w as unknown as { lastFoulVs: Map<number, { vs: number; t: number; clear: boolean }> }).lastFoulVs.set(u.id, { vs: A.id, t: w.t - 7, clear: c.clear });
+      u.x = OPEN.x; u.y = OPEN.y; A.x = OPEN.x + 0.2; A.y = OPEN.y; // in contact again
+      const fouls = w.fouls;
+      w.step(DT);
+      expect(w.drainEvents().filter(e => e.type === 'incident').length, name).toBe(want);
+      expect(w.fouls - fouls, name).toBe(want);
+    }
   });
 });

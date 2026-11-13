@@ -4,8 +4,10 @@ import type { Boat } from '../boat/boat';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { heelFactor } from '../boat/balance';
 import { trimDrive } from '../boat/trim';
-import { driveSpeed } from '../boat/coach';
+import { driveSpeed, tuneLoss } from '../boat/coach';
+import { presetFor, tuneName, tuneWords, TUNE_PRESETS } from '../boat/rigTune';
 import type { World } from './world';
+import type { SimView } from './host';
 
 /**
  * The tactics debrief: a log of your race as you sail it, and afterwards what cost you time, ranked, with what to do.
@@ -34,6 +36,8 @@ export interface Moment { key: string; t0: number; t1: number; x: number; y: num
 interface Spell { key: string; t0: number; t1: number; x: number; y: number; lost: number; peak: number; aux: number; who: Map<string, number>; leg?: number }
 /** A spell off for this long is over (a brief let-up doesn't split it); one that cost less than EP_MIN isn't kept. */
 const EP_GAP = 4, EP_MIN = 1;
+/** A wind shift worth calling a header or a lift, deg: past the wind's own wobble (the debrief's and the replay's line). */
+export const SHIFT_DEG = 4;
 /** Dirty air with no boat to windward to blame. */
 const SHIP = 'a ship or the committee boat';
 interface MarkLog { name: string; leg: 'beat' | 'reach' | 'run'; overM: number; overT: number; wide: number | null; place: number | null; t: number | null }
@@ -62,6 +66,8 @@ export class RaceLog {
   pole = { t: 0, lost: 0 };
   heel = { t: 0, lost: 0 };
   trim = { lost: 0 };
+  /** The rig's tune against the guide's for the wind she met, upwind (sampled every 2 s: speedFactor twice is not free). */
+  tune = { lost: 0, t: 0, every: 0, kt: 0, n: 0 };
   pen = { n: 0, t: 0 };
   private inPen = false;
   marks: MarkLog[] = [];
@@ -132,7 +138,7 @@ export class RaceLog {
   }
 
   /** Every moment so far, in time order (spells and a turn still going included, as far as they've got). */
-  moments(w: World): Moment[] {
+  moments(w: SimView): Moment[] {
     const out = this.done.slice(), over = new Map(this.over);
     for (const S of this.open.values()) if (S.key === 'laylines') this.keepOver(S, over); else this.close(S, out);
     if (this.turn) this.endTurn(w.t, out);
@@ -207,11 +213,14 @@ export class RaceLog {
     const trimK = byHandTrim ? 1 - driveSpeed(u, clamp(trimDrive(u.trim.main, u.trim.jib) * u.shape.eff, 0, 1)) : 0;
     this.trim.lost += dt * trimK;
     this.spell(w, 'trim', trimK > 0.001, dt * trimK);
+    if (u.tune && u.twa < 70 && !u.tacking && !u.luff && (this.tune.every -= dt) <= 0) {
+      this.tune.every = 2; const k = tuneLoss(u); this.tune.lost += 2 * k; this.tune.kt += ww.kt; this.tune.n++; if (k > 0.005) this.tune.t += 2;
+    }
     // shifts, on a beat: on a header (against the mean wind), the other tack would be lifted
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), headed = u.tack === 'S' ? -dev : dev; // + headed
     this.liftedAtTack = -headed;
     if (leg === 'beat' && u.twa < 65 && !u.tacking) {
-      if (headed > 4) {
+      if (headed > SHIFT_DEG) {
         this.header.streak += dt;
         // (the spell runs from the header's start; it costs only once held for 15 s, and one let go sooner isn't kept)
         if (this.header.streak > 15) {
@@ -245,7 +254,7 @@ export class RaceLog {
   }
 
   /** Seconds lost on the laylines, mark by mark. */
-  private overstands(w: World): { lost: number; worst: MarkLog | null } {
+  private overstands(w: SimView): { lost: number; worst: MarkLog | null } {
     let lost = 0, worst: MarkLog | null = null;
     const vBeat = Math.max(1, polar(w.wind.kt, beatAngle(w.wind.kt)));
     for (const L of this.marks) if (L.overM > 0) { lost += 0.6 * L.overM / vBeat; if (!worst || L.overM > worst.overM) worst = L; }
@@ -253,7 +262,7 @@ export class RaceLog {
   }
 
   /** What cost you time, most first: only what cost a couple of seconds or more. */
-  findings(w: World): Finding[] {
+  findings(w: SimView): Finding[] {
     const out: Finding[] = [], mmss = (x: number) => x < 60 ? `${Math.round(x)} s` : `${Math.floor(x / 60)} min ${Math.round(x % 60)} s`;
     const bl = (m: number) => `${Math.round(m / 7.6)} boat length${Math.round(m / 7.6) === 1 ? '' : 's'}`;
     // the start
@@ -295,6 +304,13 @@ export class RaceLog {
     if (this.trim.lost > 1) out.push({ key: 'trim', title: 'Sail trim', lost: this.trim.lost,
       detail: 'Your sheets and controls, against the best trim for the conditions.',
       tip: 'Watch the telltales, and open the Trim coach for what to change.' });
+    const u = w.user;
+    if (u.tune && this.tune.lost > 1 && this.tune.n) {
+      const kt = this.tune.kt / this.tune.n, want = presetFor(kt);
+      out.push({ key: 'tune', title: 'Rig tune', lost: this.tune.lost,
+        detail: `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)} in about ${Math.round(kt)} kt, where ${tuneName(u.tune) === want ? 'it was right only part of the time' : `${tuneWords(TUNE_PRESETS[want])} would have fitted`}.`,
+        tip: 'Tune the rig at the dock for the forecast: the forestay and shrouds can\'t be touched once racing (CR 7.40), nor the mast foot (CR 6.1.5). (The time is what her sails gave up; heel and the rest add to it.) If the wind is forecast to cross a setting, tune for the part of the race that matters most, and use the backstay for the rest.' });
+    }
     if (this.pen.n) out.push({ key: 'penalty', title: 'Penalties', lost: this.pen.t,
       detail: `${this.pen.n} penalt${this.pen.n === 1 ? 'y' : 'ies'}: ${mmss(this.pen.t)} doing turns.`,
       tip: 'Know who has right of way before you get close: port gives way to starboard, windward to leeward, and give room at marks. The replay of each foul shows the rule.' });

@@ -1,5 +1,5 @@
 import { D2R, LOA } from '../core/math';
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
 import { drawCourse, drawHull, drawLand, hexA, makeTf } from '../ui/draw2d';
 import type { Frame } from './recorder';
 
@@ -19,7 +19,7 @@ export class ReplayView {
 
   stop(): void { cancelAnimationFrame(this.anim); }
 
-  play(w: World, D: ReplayClip): void {
+  play(w: SimView, D: ReplayClip): void {
     this.stop();
     const cv = this.cv, dpr = Math.min(2, devicePixelRatio || 1);
     const wpx = cv.clientWidth || 500, hpx = cv.clientHeight || 300;

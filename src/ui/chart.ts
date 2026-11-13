@@ -1,4 +1,5 @@
-import type { World } from '../sim/world';
+import type { SimView } from '../sim/host';
+import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
 import { $ } from './dom';
 import { PLACES, latLon } from '../sim/places';
@@ -16,16 +17,22 @@ export const chartPoint = (sx: number, sy: number, w: number, h: number, cx: num
   ({ x: cx + (sx - w / 2) / scale, y: cy - (sy - h / 2) / scale });
 
 export class Chart {
-  private w: World | null = null;
+  private w: SimView | null = null;
   private cx = 0; private cy = 0; private scale = 0.25; // px per metre
   private pick: { p: Vec; name: string } | null = null;
   private wasPaused = false;
   private c = $<HTMLCanvasElement>('chartC');
+  /** the overlay for the wind's or the current's moving streaks and the readout under the cursor (Hud.chartFx) */
+  private fx = $<HTMLCanvasElement>('chartFx');
+  private cursor: [number, number] | null = null;
+  private raf = 0;
 
-  constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void) {
+  /** race: how the chart changes the race (sim/host.ts): pausing it while open, a destination, a new start. */
+  constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void, private race: { send(c: Command): void; ask(c: Command): Promise<CommandResult> }) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
     this.c.addEventListener('pointermove', e => {
+      const r = this.c.getBoundingClientRect(); this.cursor = e.pointerType === 'mouse' ? [e.clientX - r.left, e.clientY - r.top] : null;
       if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 4) drag.moved = true;
@@ -33,6 +40,7 @@ export class Chart {
     });
     this.c.addEventListener('pointerup', e => { if (drag && !drag.moved) this.tap(e.clientX, e.clientY); drag = null; });
     this.c.addEventListener('pointercancel', () => { drag = null; });
+    this.c.addEventListener('pointerleave', () => { this.cursor = null; });
     this.c.addEventListener('wheel', e => {
       e.preventDefault();
       const r = this.c.getBoundingClientRect(), before = this.at(e.clientX - r.left, e.clientY - r.top);
@@ -49,23 +57,22 @@ export class Chart {
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
       if (!this.w || !this.pick) return;
-      this.w.setDest(this.pick.p, this.pick.name);
+      this.race.send({ k: 'dest', p: this.pick.p, name: this.pick.name });
       this.close();
     };
     // cruising: a new start, without ending the cruise (she's put there, stopped; the clock and the log carry on)
     $('bChartMove').onclick = () => {
       if (!this.w || !this.pick) return;
-      if (!this.w.moveHere(this.pick.p, this.pick.name)) { this.info('She can\'t be put there: pick a spot on open water.'); return; }
-      this.close();
+      void this.race.ask({ k: 'moveHere', p: this.pick.p, name: this.pick.name }).then(ok => { if (ok) this.close(); else this.info('She can\'t be put there: pick a spot on open water.'); });
     };
     addEventListener('resize', () => { if (this.isOpen) this.draw(); });
   }
 
   get isOpen(): boolean { return !$('chart').hidden; }
 
-  open(w: World): void {
+  open(w: SimView): void {
     this.w = w; this.pick = null;
-    this.wasPaused = w.paused; w.paused = true;
+    this.wasPaused = w.paused; this.race.send({ k: 'pause', on: true });
     this.cx = w.user.x; this.cy = w.user.y;
     this.scale = Math.min(innerWidth, innerHeight) / 6000; // about 3 nm across to begin with
     $('chart').hidden = false;
@@ -73,6 +80,16 @@ export class Chart {
     $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place: sail there, or move her there. Drag to move, scroll to zoom.' : w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
     this.info(); this.palLabel();
     this.draw();
+    // the streaks move every frame while the chart's open (the sail is paused: they're the only thing that moves)
+    let last = performance.now();
+    const tick = (t: number) => {
+      if (!this.isOpen || !this.w) { this.raf = 0; return; }
+      const r = this.c.getBoundingClientRect();
+      Object.assign(this.fx.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+      this.hud.chartFx(this.fx, this.w, (t - last) / 1000, this.cursor); last = t;
+      this.raf = requestAnimationFrame(tick);
+    };
+    if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
   private palLabel(): void { $('bChartPal').textContent = (this.w?.settings.chartPal ?? 'day') === 'day' ? 'Dusk colours' : 'Day colours'; }
@@ -80,7 +97,7 @@ export class Chart {
   close(): void {
     if (!this.isOpen) return;
     $('chart').hidden = true;
-    if (this.w && !this.wasPaused) this.w.paused = false;
+    if (this.w && !this.wasPaused) this.race.send({ k: 'pause', on: false });
     this.onClose();
   }
 

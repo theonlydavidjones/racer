@@ -5,7 +5,9 @@ import type { SeaHere } from '../environment/sea';
 import { HALF, V, type Vec } from '../core/math';
 import type { Wind } from '../environment/wind';
 import type { SailTrim } from './trim';
-import type { Controls, CrewSettings, Shape } from './controls';
+import type { Controls, CrewSettings, SailRig, Shape } from './controls';
+import type { RigTune } from './rigTune';
+import type { SkipperKnobs } from '../ai/skipper';
 
 /** A line you can work: every control, plus the lazy jib car's pins. */
 export type LineKey = Exclude<keyof Controls, 'car'> | 'car';
@@ -20,6 +22,8 @@ export interface AiState {
   aggr: number; // seconds of extra margin taken on the approach
   width: number; // how far off the rhumb line before tacking back, m
   aware: boolean; // accounts for current on the approach
+  /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
+  kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
   /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
   below?: boolean;
@@ -30,6 +34,13 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
+  urgent?: boolean;
+  /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
+   *  harbour, and whether she's lying to there (and on which tack) */
+  home?: { route: Vec[]; i: number; at: Vec; lying: boolean; tack?: 'S' | 'P' };
+  /** The world's step on which she last thought (world.ts AI_EVERY) */
+  thought?: number;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
    * wind and slow, a passing change of plan mustn't turn her back. */
   hailTack?: { to: 'S' | 'P'; at: number; with: number } | null;
@@ -48,6 +59,10 @@ export interface AiState {
   passing?: { key: string; side: number } | null;
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
+  /** Her aim point (the mark, a detour round the land, or the line) upwind of her: within 44° of the wind, let go past
+   *  48° (ai.ts); and the leg it was decided on, as each leg decides afresh */
+  upwind?: boolean;
+  upwindLeg?: number;
   /** About a minute's running mean of the wind direction where she is (deg): her compass's average, for lifts and headers. */
   avgFrom?: number;
   /** How long she's been headed (s), by her compass. */
@@ -73,6 +88,8 @@ export interface Boat {
   lightsOff?: boolean;
   /** Sternway, m/s: pushed off astern, she coasts back, slowing, and steers backwards. */
   astern?: number;
+  /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
+  motor?: import('./motor').MotorState;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
@@ -92,9 +109,13 @@ export interface Boat {
   tack: Tack;
   tacking: boolean; // past head to wind, not yet close-hauled (Rule 13)
   lastTackT: number;
+  /** When she last passed head to wind (a tack; a gybe passes the wind astern): rules 18.2(b), 18.3. */
+  headToWindT?: number;
   // helm
   steer: number; // −1..1: turn to port .. starboard (keys, and the AI's helm)
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
+  /** Sculling (rule 42.3(d)): the way she's being sculled round (+ to starboard), held until she's close-hauled (SCULL 2). */
+  scullDir?: number;
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;
@@ -145,6 +166,8 @@ export interface Boat {
   sway?: number;
   /** Turn rate, deg/s, + turning to starboard (clockwise): kept every step, so a turn carries on across a change of model. */
   yawRate?: number;
+  /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
+  turnRate?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
@@ -240,6 +263,12 @@ export interface Boat {
   /** About a minute's running mean of the wind she's in (deg): her compass's average, for lifts and headers. */
   avgFrom?: number;
   /** Her condition in physical terms, worked out from `spec` (boat/condition.ts). */
+  /** Her rig's tune this outing (rigTune.ts): absent, she's on the guide's tune for whatever wind she meets. */
+  tune?: RigTune;
+  /** The jumpers' setting you've asked the crew for (turns), while they work toward it, and the time on this half turn (s). */
+  jumperTarget?: number; jumperT?: number;
+  /** Her main's rig with the tune worked in (condition.ts mainRig): cleared when the tune changes. */
+  rigMain?: SailRig;
   cond?: Condition;
 }
 
@@ -254,7 +283,7 @@ export interface Build { hull: 'fiberglass' | 'wood'; spars: 'aluminium' | 'wood
 const WOOD: Build = { hull: 'wood', spars: 'wood' };
 
 /** How a boat looks: hull topsides, boot stripe, bottom paint, deck, and the name on her quarters (if shown). */
-export interface Paint { deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** her navigation lights under sail */ navLights?: 'deck' | 'tricolour'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic'; /** the companionway open or shut */ companionway?: 'open' | 'closed'; /** the colour her name is lettered in (else one that stands out on the cabin side) */ nameColor?: string }
+export interface Paint { /** the sail numbers' and the class insignia's colours, when chosen (spec.ts) */ numberColor?: string; insigniaColor?: string; deck: string; boot: string; bottom: string; boatName?: string; /** the cabin top, when not like the deck */ cabinTop?: string; /** where the whisker pole is stowed */ poleSide?: 'port' | 'starboard'; /** her navigation lights under sail */ navLights?: 'deck' | 'tricolour'; /** the forehatch's make */ hatch?: 'teak' | 'acrylic'; /** the companionway open or shut */ companionway?: 'open' | 'closed'; /** the colour her name is lettered in (else one that stands out on the cabin side) */ nameColor?: string }
 export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
   // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom

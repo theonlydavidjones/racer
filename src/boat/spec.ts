@@ -1,4 +1,5 @@
 import slipRenames from '../geo/data/slip-renames.json';
+import { fixTune, type RigTune } from './rigTune';
 
 /**
  * Your boat as you've set her up: how she looks (hull, deck, sails, flags) and the things about her that change
@@ -29,7 +30,12 @@ export interface BoatSpec {
   /** The colour her name is lettered in on the cabin sides ('' or absent: one that stands out). */
   nameColor?: string;
   /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
-  sails: { country: string; number: string; color: 'white' | 'black' };
+  sails: {
+    country: string; number: string; color: 'white' | 'black';
+    /** The sail numbers' and national letters' colour, and the class insignia's (the F): absent, the ink that contrasts
+     * with the cloth (RRS Appendix G); the insignia absent, like the numbers. */
+    numberColor?: string; insigniaColor?: string;
+  };
   /** (Older saves: chosen flags. Now her club gives the burgee and her country the ensign; officers' flags go with skippers.) */
   flags?: { burgee?: string; ensign?: string; special?: string };
   // her particulars: who she belongs to and where she lives (they rarely change)
@@ -37,6 +43,9 @@ export interface BoatSpec {
   club: string;
   /** Who skippers her: you, or (until the Yacht Club has skippers) a generic AI skipper. */
   skipper: 'you' | 'ai';
+  /** Her crew from the Yacht Club's members, by seat: the middle crew (the main), then the forward hand (the jib, the
+   * cabin top, the pole). Absent: not assigned (club/members.ts). */
+  crewIds?: string[];
   /** Her home marina (geo/marina.ts MARINAS), and her slip in it. */
   marina?: string;
   slip?: string;
@@ -50,7 +59,13 @@ export interface BoatSpec {
     mast: SparMaterial; boom: SparMaterial;
     mastStiffness: 'soft' | 'average' | 'stiff'; // a wooden mast's own character (aluminium masts are all alike)
     outboard: 'none' | 'stowed' | 'bracket'; // left ashore, stowed below, or on its transom bracket (lifted)
+    /** which outboard (boat/motor.ts): 2.5, 3.5 (the usual) or 6 hp */
+    outboardHp?: 2.5 | 3.5 | 6;
     gearKg: number; // gear and stores beyond the racing minimum
+    /** The rig's tune at the dock (rigTune.ts): absent, on the guide's tune for the wind (as the sim always sailed). */
+    tune?: RigTune;
+    /** The jumpers adjustable under way: a row in the sail band (CR 7.40 allows it; most crews never do). */
+    jumpersUnderWay?: boolean;
   };
 }
 
@@ -127,6 +142,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
       .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
+    // (her crew's seats, from the Yacht Club's members: at most two, ids only)
+    ...(Array.isArray(x.crewIds) ? { crewIds: x.crewIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 2) } : {}),
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
     ...(typeof x.slip === 'string' && x.slip ? (sl => ({ marina: sl.split(':')[0], slip: sl }))((r => (slipRenames as Record<string, string>)[r] ?? r)(x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}`)) : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
@@ -135,8 +152,11 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
   }
   spec.sails.number = String(spec.sails.number).replace(/\D/g, '').slice(0, 5) || d.sails.number;
+  for (const k of ['numberColor', 'insigniaColor'] as const) if (spec.sails[k] != null && !/^#[0-9a-f]{6}$/i.test(String(spec.sails[k]))) delete spec.sails[k];
   spec.perf.cleanedWeeks = Math.max(0, Math.min(26, Math.round(Number(spec.perf.cleanedWeeks) || 0)));
   spec.perf.gearKg = Math.max(0, Math.min(400, Number(spec.perf.gearKg) || 0));
+  if (spec.perf.tune) spec.perf.tune = fixTune(spec.perf.tune); // (absent: the guide's tune for the wind, rigTune.ts)
+  if (spec.perf.outboardHp != null && ![2.5, 3.5, 6].includes(spec.perf.outboardHp)) delete spec.perf.outboardHp; // (2.5, 3.5 or 6 hp)
   return spec;
 }
 

@@ -1,7 +1,7 @@
 import { KT, V, clamp, n360, type Vec } from '../core/math';
 import type { Rng } from '../core/rng';
 import { LL } from '../geo/geo';
-import { anyShoreDist } from '../geo/shore';
+import { anyShoreDist, anyShoreDistNear } from '../geo/shore';
 import { terrainLee } from './shadows';
 import clim from './data/sf-wind-climate.json';
 
@@ -126,9 +126,11 @@ export function landLee(p: Vec, from: number): number {
 /** How much the wind comes in through the Gate (the slot): all of a westerly, none of a northerly or southerly. */
 export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 255) * Math.PI / 180)) ** 2;
 
-export function windTerrain(p: Vec, from = 255): number {
+export function windTerrain(p: Vec, from = 255, lattice = false): number {
   const slot = slotWeight(p) * slotFlow(from);
-  const shore = 0.8 + 0.2 * clamp(anyShoreDist(p) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
+  // (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear, a few metres out at most, so
+  // under 0.3% of the wind here, typically 0.005% (the review's measure over the water within 420 m of a shore): for a boat's own wind every step, as for her current; the map keeps the exact one)
+  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
   return (1 + SLOT_BOOST * slot) * shore;
 }
 
@@ -210,11 +212,15 @@ export class Puffs {
 }
 
 /** windTerrain on a precomputed 50 m grid (for drawing the wind on the water, where it's needed at thousands of points). */
+/** The spacing (m) of TerrainGrid's nodes beyond its grid, as the lee's inside it. */
+const FAR_CELL = 200;
 export class TerrainGrid {
   private g: Float32Array;
   private readonly n: number;
   /** `from`: the wind direction, for the lee of the land (environment/shadows.ts); omitted, no lee. */
-  constructor(readonly cx: number, readonly cy: number, readonly half = 5000, readonly cell = 50, from?: number) {
+  /** Beyond the grid: the same terrain and lee on 200 m nodes, worked out as they're first needed (TerrainGrid.at). */
+  private outer = new Map<number, number>();
+  constructor(readonly cx: number, readonly cy: number, readonly half = 5000, readonly cell = 50, private readonly from?: number) {
     this.n = Math.round(2 * half / cell) + 1;
     this.g = new Float32Array(this.n * this.n);
     // the lee of the land changes slowly across the water: worked out every 200 m and interpolated
@@ -230,9 +236,29 @@ export class TerrainGrid {
     }
   }
   at(x: number, y: number): number {
-    const fx = (x - this.cx + this.half) / this.cell, fy = (y - this.cy + this.half) / this.cell;
-    if (fx < 0 || fy < 0 || fx >= this.n - 1 || fy >= this.n - 1) return 1;
+    const fx = (x - this.cx + this.half) / this.cell, fy = (y - this.cy + this.half) / this.cell, m = this.n - 1;
+    if (fx < 0 || fy < 0 || fx >= m || fy >= m) return this.far(x, y);
     const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = this.n, g = this.g;
-    return (g[j * n + i] * (1 - u) + g[j * n + i + 1] * u) * (1 - v) + (g[(j + 1) * n + i] * (1 - u) + g[(j + 1) * n + i + 1] * u) * v;
+    const near = (g[j * n + i] * (1 - u) + g[j * n + i + 1] * u) * (1 - v) + (g[(j + 1) * n + i] * (1 - u) + g[(j + 1) * n + i + 1] * u) * v;
+    // across its last 200 m, eased into the coarser nodes beyond it, so the wind drawn on the water has no edge (it
+    // fell to 1 outside: up to 70% off Lands End, a straight seam west of the Gate)
+    const e = Math.min(fx, fy, m - fx, m - fy) * this.cell / FAR_CELL;
+    if (e >= 1) return near;
+    const sm = e * e * (3 - 2 * e);
+    return this.far(x, y) * (1 - sm) + near * sm;
+  }
+  /** The terrain and lee at (x, y) off the 200 m nodes beyond the grid (each worked out once, as it's needed). */
+  private far(x: number, y: number): number {
+    const fx = (x - this.cx) / FAR_CELL, fy = (y - this.cy) / FAR_CELL, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+    const node = (a: number, b: number) => {
+      const key = (a + 32768) * 65536 + (b + 32768);
+      let val = this.outer.get(key);
+      if (val === undefined) {
+        const p = { x: this.cx + a * FAR_CELL, y: this.cy + b * FAR_CELL };
+        val = windTerrain(p, this.from ?? 255) * (this.from != null ? landLee(p, this.from) : 1); this.outer.set(key, val);
+      }
+      return val;
+    };
+    return (node(i, j) * (1 - u) + node(i + 1, j) * u) * (1 - v) + (node(i, j + 1) * (1 - u) + node(i + 1, j + 1) * u) * v;
   }
 }

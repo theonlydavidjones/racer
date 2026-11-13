@@ -22,7 +22,7 @@ describe('Rule 18.2(c) and (d) · mark-room after 18.2(a) has ended', () => {
     const red = boat('Red', { at: [9, 30.5], heading: 190 });
     const p = pair(blue, red, [mark]);
     expect(p.at(100).rule).toBe('18.2(a)');
-    blue.lastTackT = 100.5; // Blue passes head to wind: 18.2(a) no longer applies
+    blue.lastTackT = 100.5; blue.headToWindT = 100.5; // Blue passes head to wind: 18.2(a) no longer applies
     moveTo(blue, [6, 20]); moveTo(red, [8, 28]);
     expect(p.at(101)).toMatchObject({ keepsClear: 'Red', rule: '12' }); // not overlapped: the basic rules
     return { blue, red, p };
@@ -42,6 +42,28 @@ describe('Rule 18.2(c) and (d) · mark-room after 18.2(a) has ended', () => {
     moveTo(blue, [3.5, 4]); moveTo(red, [2, 14]); expect(p.at(103).rule).toBe('12'); // Red still clear astern, Blue at the mark
     moveTo(red, [1, 4.5]); // Red's bow now inside Blue, between her and the mark: no room
     expect(p.at(104).rule).not.toBe('18.2(c)');
+  });
+});
+
+describe('Rule 18.2(d) · an overlap obtained by tacking, not by gybing', () => {
+  //   Red ↙ (gybes) ... Blue ↙        Red changes tack and the overlap begins at once
+  function overlapAfter(passedHeadToWind: boolean) {
+    const blue = boat('Blue', { at: [0, 0], heading: 190 });
+    const red = boat('Red', { at: [-6, 20], heading: 190 });
+    const p = pair(blue, red);
+    p.at(100);
+    red.lastTackT = 100.5; if (passedHeadToWind) red.headToWindT = 100.5;
+    moveTo(red, [-6, 1]); // now overlapped
+    p.at(101);
+    return { red, p };
+  }
+  it('a gybe that brings an overlap does not make her the tacking boat', () => {
+    const { p } = overlapAfter(false);
+    expect(p.rec.ovStart).toMatchObject({ tacker: null });
+  });
+  it('a tack that brings an overlap does', () => {
+    const { red, p } = overlapAfter(true);
+    expect(p.rec.ovStart).toMatchObject({ tacker: red.id });
   });
 });
 
@@ -113,7 +135,30 @@ describe('Rule 23 · interfering with another boat', () => {
     const p = pair(red, blue);
     p.at(50);
     moveTo(red, [0, 0], 350, 320); moveTo(blue, [-0.5, 2.5]); // Red luffs toward Blue, who was crossing ahead
+    red.aboveProper = true; // (luffed above close-hauled: off her proper course, as the World judges it)
     expect(p.at(52).foul).toMatchObject({ by: 'Red', rule: '23', part: '23.2' });
+  });
+
+  it('16.1 after the start: a right-of-way boat turning onto a boat taking a penalty, or returning to start, gives her no room: her foul', () => {
+    for (const kind of ['penalty', 'returning'] as const) {
+      const red = boat('Red', { at: [0, -8], heading: 320 });
+      const blue = boat('Blue', { at: [-8, -6], heading: 45, ...(kind === 'penalty' ? { penalty: 1 } : { started: false }) });
+      if (kind === 'returning') blue.returning = true;
+      const p = pair(red, blue);
+      p.at(50);
+      moveTo(red, [0, 0], 350, 320); moveTo(blue, [-0.5, 2.5]); // Red turns onto Blue, on her proper course (not above it)
+      expect(p.at(52).foul, kind).toMatchObject({ by: 'Red', rule: '16.1' });
+    }
+  });
+
+  it('23.2 after the start: turning toward a boat on another leg while on her proper course (rounding her mark) is not 23.2', () => {
+    // Red, rounding her mark, turns onto her new course; Blue, on another leg, is there and must keep clear (port)
+    const red = boat('Red', { at: [0, -8], heading: 270, leg: 2 });
+    const blue = boat('Blue', { at: [-8, -6], heading: 45, leg: 1 });
+    const p = pair(red, blue);
+    p.at(50);
+    moveTo(red, [0, 0], 320, 270); moveTo(blue, [-0.5, 2.5]); // her rounding turn, on her proper course (not above it)
+    expect(p.at(52).foul?.rule).not.toBe('23');
   });
 
   it('23.2 doesn\'t stop a boat sailing her proper course: the port boat on the other leg must still keep clear', () => {

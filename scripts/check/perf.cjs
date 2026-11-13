@@ -49,7 +49,7 @@ const VIEWS = [
   // the same race each run (the seed, the wildlife, the fleet's colours all come from Math.random): a fixed sequence
   await p.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
   await p.addInitScript(() => { if (!localStorage.getItem('fbsim-settings-v2')) localStorage.setItem('fbsim-settings-v2', JSON.stringify({ opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], windDay: 2, traffic: 1 })); });
-  await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1500);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
   // the sim's steps and the scene's update/draw, timed inside the frame
