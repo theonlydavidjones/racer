@@ -149,6 +149,14 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
     ...(typeof x.slip === 'string' && x.slip ? (sl => ({ marina: sl.split(':')[0], slip: sl }))((r => (slipRenames as Record<string, string>)[r] ?? r)(x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}`)) : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };
+  // colours: any #rrggbb from the boat editor's picker (Marinas' rework), not only the old palettes; the deck and cabin
+  // top may instead be laid teak (a material, not a colour). Anything else falls back to her default.
+  const hex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  const surface = (v: unknown) => hex(v) || (typeof v === 'string' && TEAK_DECKS.some(([, k]) => k === v));
+  for (const k of ['upper', 'lower'] as const) if (!hex(spec.hull[k])) spec.hull[k] = d.hull[k];
+  if (spec.hull.stripe != null && spec.hull.stripe !== '' && !hex(spec.hull.stripe)) spec.hull.stripe = d.hull.stripe; // ('' or none: no boot stripe)
+  if (!surface(spec.deck)) spec.deck = d.deck;
+  if (spec.cabinTop != null && !surface(spec.cabinTop)) delete spec.cabinTop;
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
   }

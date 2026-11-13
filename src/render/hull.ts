@@ -319,7 +319,7 @@ const zU = (z: number) => (z + L / 2) / L;
 export const SIDE_DECK = 0.30;
 /** The line of the cabin sides and the coamings' outer face: the sheer less the side deck. */
 export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
-export const CABIN = { u0: zU(-0.847) /* (the front's foot about 4 cm aft of the mast: Josephine, the owner's side photo) */, u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
+export const CABIN = { u0: zU(-0.79) /* (the front's foot a strip of deck aft of the mast foot's horseshoe, the owner; and CR 3.11's least deck-line length, 1850 mm, to u1, so no further aft) */, u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
 export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
 /**
  * The cockpit's furniture, from the construction plan's profile and cockpit section (1:10; the arrangement is free,
@@ -332,6 +332,24 @@ export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
  * at its ends (the owner, from Josephine).
  */
 const stZ = (st: number) => L / 2 - 2 * 0.5 - (st - 3) * 0.5;
+/**
+ * The hollow under the after deck (Josephine, the owner): open to the cockpit at its after end, it runs aft to z1, its
+ * floor `floor` m over the waterline, its sides the hull's own inside; storage, and room for the footrest to slide back
+ * into. The footrest: one teak plank right across the cockpit's after end, about 2 ft (`len`) fore and aft, its top
+ * level with the seats. Its edges ride on two slim metal rails screwed flat to the hull's inside, port and starboard,
+ * that run only as far forward as the plank goes. Slid out, its forward edge is halfway between the thwart's after edge
+ * and the cockpit's after end (`out` m forward of it), a footrest for the helm sitting on the after deck; slid back,
+ * flush with the cockpit's after end under the deck, so they can stand to steer (the owner). It's cut to the hull's
+ * shape where it slides back to (footrestEdge), so slid out, where she's wider, it stands a little clear of the hull.
+ * (The hollow's size is an estimate from the photo.)
+ */
+export const HOLLOW = { floor: 0.17, z1: L / 2 - 0.41 };
+/** `y`: the rails' top, the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
+export const FOOTREST = { y: COCKPIT.sole + 0.30 - 0.025, len: 0.61, out: 0.35, rail: 0.022 };
+/** The hull's lining's half-breadth at the footrest's rails, at z (the lining stands 30 mm in from hullInnerHalf). */
+export const footrestWall = (z: number) => hullInnerHalf(uAtZ(z), FOOTREST.y) - 0.03;
+/** The plank's half-width at z, slid back: to its rails' middle, cut to the hull there. */
+export const footrestEdge = (z: number) => footrestWall(z) - FOOTREST.rail / 2 - 0.004;
 export const COCKPIT_FIT = {
   seat: -0.08 + 0.30, soleHalf: 0.35,
   benchAft: stZ(4.75), shelfFwd: stZ(4.05),
@@ -446,11 +464,12 @@ function aftRound(u: number, b: number): number {
 /**
  * The cabin's front is a raked face, not an upright one (Josephine: the owner's side photo, as Rigging measured it,
  * about 700 px/m; CR 3.11 agrees, the roof at least 1785 mm long against at least 1850 mm at the deck line): from the
- * deck about 4 cm aft of the mast it rises to the cabin side's height over about CABIN_NOSE m, about 37° to the deck,
- * steepest at its foot and easing round onto the roof. The roof's crown comes down with it in the same proportion: the
+ * deck a strip aft of the mast foot's horseshoe (MAST_RING, the owner) it rises to the cabin side's height over about
+ * CABIN_NOSE m, about 45° to the deck, steepest at its foot and easing round onto the roof, which it reaches where the
+ * side photo shows. The roof's crown comes down with it in the same proportion: the
  * side photo can't show the centreline's height at the front, so that much is an estimate.
  */
-export const CABIN_NOSE = 0.265;
+export const CABIN_NOSE = 0.208;
 function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sin(Math.PI / 2 * d / CABIN_NOSE); }
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
 /**
@@ -462,7 +481,7 @@ function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L
  * 51 cm at 0.1, 0.38, 0.65, 1.0, 1.3 and 1.8 m aft of its front; within a few cm, the photo being a little oblique).
  */
 const CONE_K = 1.9;
-const CROWN = fairCurve([[-0.847, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
+const CROWN = fairCurve([[-0.79, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
 export const cabinTopAt = (u: number, x: number) => {
   const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w), full = r - Math.sqrt(r * r - w * w);
   const arch = (Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w)) / full; // (0 at the sides' top edges … 1 on the centreline)
@@ -566,30 +585,35 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   };
   out.push(strip(span(z0, zA, 16).map(u => [V(-sh(u), sole, zAt(u)), V(sh(u), sole, zAt(u))]))); // the sole
   for (const s of [1, -1]) {
-    const bench = span(z0, benchAft), well = span(benchAft, shelfFwd, 4), shelf = span(shelfFwd, zA, 6);
+    const bench = span(z0, benchAft), well = span(benchAft, zA, 8); void shelfFwd; // (no after shelf: the footwell runs to the cockpit's after end, where the sliding footrest comes out from under the after deck)
     // the bench is a lazarette, a solid locker: its front a varnished panel up to the lid, and the lid on top, 25 mm
     // thick, its edge standing a little proud of the front
     const lid = 0.025;
     panel.push(strip(bench.map(u => [V(s * sh(u), sole, zAt(u)), V(s * sh(u), seat - lid, zAt(u))]))); // the locker's front
     panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat - lid, zAt(u)), V(s * (sh(u) - 0.012), seat, zAt(u))]))); // the lid's edge
     panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the lid: a solid varnished panel
-    for (const segs of [bench, shelf]) lining.push(strip(segs.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
+    lining.push(strip(bench.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
     // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
     const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
       for (let k = 0; k <= 5; k++) { const y = sole + (top - sole) * k / 5; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
       return pts; };
     for (let k = 0; k < 6; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
-    out.push(strip(shelf.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the shelf's top, outboard
     const ub = zU(benchAft); panel.push(face(benchAft, [[s * (sh(ub) - 0.012), sole], ...hullSide(ub, s, true), [s * (sh(ub) - 0.012), seat]])); // the locker's end, out to the hull
   }
-  const us = zU(shelfFwd), wsh = sh(us);
-  out.push(strip(span(shelfFwd, zA, 6).map(u => [V(-sh(u), seat, zAt(u)), V(sh(u), seat, zAt(u))]))); // the after shelf's top
-  panel.push(face(shelfFwd, [...hullSide(us, 1, true), ...hullSide(us, -1, false)])); void wsh; // its front, a solid panel out to the hull each side
-  const w1 = benchOut(u1), ya = deckY(u1, 0);
-  // the after wall, over the shelf: its top follows the deck's camber, which falls away outboard (a flat top at the
-  // centreline's height stood up through the deck at its corners)
-  { const N = 8; for (let i = 0; i < N; i++) { const xa = -w1 + 2 * w1 * i / N, xb = -w1 + 2 * w1 * (i + 1) / N;
-    lining.push(quad(V(xa, seat, zA), V(xb, seat, zA), V(xb, deckY(u1, Math.abs(xb)) - 0.004, zA), V(xa, deckY(u1, Math.abs(xa)) - 0.004, zA))); } void ya; }
+  // the cockpit's after end, and under the after deck a hollow (Josephine, the owner's photo): open to the cockpit, its
+  // floor HOLLOW.floor up, running aft to HOLLOW.z1, lined; the footrest plank slides in and out of it on rails (boatMesh)
+  { const { floor, z1 } = HOLLOW, zs = span(zA, z1, 8), wH = (u: number) => Math.max(0.1, hullInnerHalf(u, floor) - 0.03);
+    const ua = zU(zA); lining.push(face(zA, [[-sh(ua), sole], [sh(ua), sole], [wH(ua), floor], [-wH(ua), floor]])); // the step up from the sole into it
+    lining.push(strip(zs.map(u => [V(-wH(u), floor, zAt(u)), V(wH(u), floor, zAt(u))]))); // its floor
+    // its sides: the hull's inside, from the floor up to the deck over it
+    const profOf = (s: number) => (u: number) => { const top = deckY(u, halfBeam(u)) - 0.02, q: THREE.Vector3[] = [];
+        for (let k = 0; k <= 5; k++) { const y = floor + (top - floor) * k / 5; q.push(V(s * Math.max(wH(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
+        return q; };
+    for (const s of [1, -1]) { const prof = profOf(s); for (let k = 0; k < 5; k++) lining.push(strip(zs.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; }))); }
+    // its after end, closing it off from the floor to the deck, hull side to hull side
+    const ub = zU(z1), sb = profOf(1)(ub), pt = profOf(-1)(ub), top: number[][] = [];
+    for (let i = 1; i < 8; i++) { const x = sb[5].x - (sb[5].x - pt[5].x) * i / 8; top.push([x, deckY(ub, Math.abs(x)) - 0.01]); }
+    lining.push(face(z1, [...sb.map(q => [q.x, q.y]), ...top, ...pt.reverse().map(q => [q.x, q.y])])); }
   return { teak: out, lining, panel };
 }
 
