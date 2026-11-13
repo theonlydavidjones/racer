@@ -972,7 +972,7 @@ export class World {
           // Umpired: she finished with her penalty not taken. An umpire "may penalize her" for failing to take it,
           // disqualifying her (the black flag), without a hearing (World Sailing Appendix UF, 2025: UF3.4(a)(5), UF3.5(c),
           // UF3.6; RRS 60.5(b)(3)). The sim's umpire always does. Under protests, her turns are her own affair (44.1)
-          if (b.penalty > 0 && !this.protestsOn && this.settings.mode === 'race' && !b.scoring) b.scoring = 'DSQ';
+          if (b.penalty > 0 && !this.protestsOn && this.settings.mode === 'race' && b.scoring !== 'UFD' && b.scoring !== 'BFD') b.scoring = 'DSQ'; // (over a ZFP too)
           if (b.isUser) { this.userFinishT = this.t; this.emit({ type: 'toast', msg: 'Finished!' }); this.emit({ type: 'horn', dur: 0.5 }); this.emit({ type: 'finished' }); }
         } else if (this.obstructed(b) && (crossedFwd || crossedBack) && b.penalty <= 0) {
           startPenalty(b, TWO_TURNS); // the Seaweed Soup addendum (B1.1) sets two turns for this, whatever the foul penalty
@@ -1918,13 +1918,14 @@ export class World {
     }
     const blocker = this.roomBlocker(u);
     if (blocker) return { kind: 'room', to: blocker, words: 'Room to tack!' };
+    const pr = this.protestOption();
     if (u.tack === 'S') {
       const port = this.boats.filter(o => o !== u && o.tack === 'P' && !o.finished)
         .map(o => ({ o, c: cpa(u, o) })).filter(x => x.c.t < 15 && x.c.d < 25).sort((a, b) => a.c.t - b.c.t)[0];
-      if (port) return { kind: 'starboard', to: port.o, words: 'Starboard!' };
+      // (not the boat you've just had the incident with: that hail is "Protest!"; nor one you've hailed already)
+      if (port && port.o !== pr && this.pairs[pairKey(u, port.o)]?.hail?.kind !== 'starboard') return { kind: 'starboard', to: port.o, words: 'Starboard!' };
     }
     // (after the hails that keep boats apart: a port-tacker coming at you now matters more than a protest)
-    const pr = this.protestOption();
     if (pr) return { kind: 'protest', to: pr, words: 'Protest!' };
     return null;
   }
