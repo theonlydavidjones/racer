@@ -102,7 +102,7 @@ Use them; they're cheaper than doing it all yourself and catch what the author m
   class rules, RRS text, places. It returns facts with sources. Run several in parallel for independent questions.
 - **visual-checker** (lighter model): after any change to what's drawn, before publishing. It renders both tacks from
   both sides and checks against a sailor's checklist.
-- **physics-reviewer** (strongest model, read-only): before publishing any change under src/boat, src/environment,
+- **physics-reviewer** (Fable 5.2, the strongest model; trial from 13 Nov 2026, owner; read-only): before publishing any change under src/boat, src/environment,
   src/sim, src/ai or src/rules. An independent review against the science and the RRS; fix what it confirms.
 
 Keep the core simulation work (physics, world, main loop) in the main session: those files are shared, so splitting
@@ -114,3 +114,8 @@ them across agents makes conflicting edits.
 - Sail pictures (render/boatMesh.ts `sailTexture`) are in the cloth's own uv (u luff→leech, v foot→head): draw
   everything where it physically is; only the starboard set of figures runs back to front.
 - Comments explain the sailing or physics reason, in plain words.
+- The page's styles are src/styles/NN-<part>.css, joined in that order by src/styles.css: the order is the cascade, so a
+  rule goes in its part's file, and a new part's file at the end.
+- src/app.ts's parts are src/app/*.ts (setup, results and the pause screen, drills, dev handles), each a `mount…(app)`
+  function run where its code used to be. They reach app.ts's own state through its `ctx`: a getter for each binding,
+  and a setter where a part changes it. A part never keeps its own copy of `w` or `host`.

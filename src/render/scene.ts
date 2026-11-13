@@ -267,7 +267,7 @@ export class SceneView {
   /** The waves: one set, drawn by the water shader and ridden by the boats. */
   private waveA = new Float32Array(N_WAVES * 4);
   private waveB = new Float32Array(N_WAVES * 4);
-  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
+  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
   private wakes!: Wakes;
@@ -803,7 +803,9 @@ export class SceneView {
     }
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
-    packWaves(waves, this.waveA, this.waveB);
+    // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
+    const wo = { x: Math.round(focus.x / 500) * 500, y: Math.round(focus.y / 500) * 500 };
+    packWaves(waves, this.waveA, this.waveB, tw, wo); this.waveUni.uWaveO.value.set(wo.x, wo.y);
     this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(waves.refW, waves.refS); this.waveUni.uWhiteRef.value = this.seaRef.white;
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);

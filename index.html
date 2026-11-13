@@ -43,10 +43,7 @@
 </div>
 <canvas id="map" aria-label="Course map, tap to zoom" title="Tap the map for the chart"></canvas>
 <canvas id="mapFx" aria-hidden="true"></canvas>
-<button type="button" id="bMapLayers" class="maplayers" title="Map layers: wind, current, sea, fog, ships…" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5Z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
-<div id="mapLayersPop" class="layerpop" hidden></div>
 <div id="mapHint">Tap map · chart</div>
-<button type="button" id="bMapNav" class="maplayers mapnav" hidden title="Navigator: the passage, whole (again for the map)" aria-label="Navigator view" aria-pressed="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 14V2.5 M3 3h8l-1.8 2.6L11 8.2H3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
 <div id="plan" hidden role="dialog" aria-modal="true" aria-labelledby="planTitle">
   <div class="ch-head">
     <div><h2 id="planTitle">Plan the cruise</h2><p class="ch-sub" id="planSub">Drag the start or the destination to move it. Tap the water, a place or her slip to put the one that's selected there. Drag the chart to move it, scroll to zoom.</p></div>
@@ -59,7 +56,7 @@
 </div>
 <div id="chart" hidden role="dialog" aria-modal="true" aria-labelledby="chartTitle">
   <div class="ch-head">
-    <div><h2 id="chartTitle">Chart</h2><p class="ch-sub" id="chartSub"></p></div>
+    <div><h2 id="chartTitle">Chart</h2></div>
     <div class="ch-btns"><span class="lp-wrap"><button class="ghost" type="button" id="bChartLayers" aria-expanded="false">Layers</button><div id="chartLayersPop" class="layerpop" hidden></div></span><button class="ghost" type="button" id="bChartPal" title="The chart's colors: NOAA's paper chart (day) or a dark display (dusk)">Dusk colors</button><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
   </div>
   <canvas id="chartC" aria-label="Chart of the Bay: drag to move, scroll to zoom, tap to pick a destination"></canvas>
@@ -162,7 +159,6 @@
     </div>
   </div>
 </div>
-<span class="keys" id="keysHint"></span>
 
 <div class="overlay" id="home">
   <div class="panel wide home">
@@ -243,7 +239,7 @@
         <small id="tideNote"></small>
         <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
         <button class="ghost" id="bCond" type="button">Change the conditions…</button>
-        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practice the start</button><button class="ghost" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: every tack and gybe scored against a good crew's, with what to change">Practice tacks and gybes</button><button class="ghost" id="bRoundings" type="button" title="Alone on the practice course, in this day's wind and sea: laps round the windward mark and the pin, each rounding scored against a good crew's">Practice mark roundings</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun">Practice the start</button><button class="ghost" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: every tack and gybe scored against a good crew's, with what to change">Practice tacks and gybes</button><button class="ghost" id="bRoundings" type="button" title="Alone on the practice course, in this day's wind and sea: laps round the windward mark and the pin, each rounding scored against a good crew's">Practice mark roundings</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
       </div>
     </div>
   </div>
@@ -260,7 +256,6 @@
       <div class="adjrow" id="windDaySeg"><span>Records day</span><div class="seg" data-k="windDay"><button type="button" data-v="0">Light</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Windy</button></div></div>
       <div class="adjrow" id="windTurnRow"><span>Turn the wind</span><button type="button" class="realbtn" data-real="windTurn">Usual</button><input type="range" id="adjWindTurn" min="-30" max="30" step="5" aria-label="Turn the wind: up to 30° either way from its usual direction"><b id="adjWindTurnV"></b></div>
       <div class="adjrow"><span>Current</span><div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div></div>
-      <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small>
       <div class="adjrow"><span>Chop</span><button type="button" class="realbtn" data-real="chop">Real</button><input type="range" id="adjChop" min="0" max="3" step="0.1"><b id="adjChopV"></b></div>
       <div class="adjrow"><span>Swell outside</span><button type="button" class="realbtn" data-real="swellHs">Real</button><input type="range" id="adjSwell" min="0" max="5" step="0.1"><b id="adjSwellV"></b></div>
       <div class="adjrow" id="swellDaySeg"><span>Records swell</span><div class="seg" data-k="swellDay"><button type="button" data-v="0">Small</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Big</button></div></div>
@@ -268,7 +263,6 @@
       <div class="adjrow"><span>Fog</span><div class="seg" data-k="fog"><button type="button" data-v="real">Real</button><button type="button" data-v="0">None</button><button type="button" data-v="1">Patchy</button><button type="button" data-v="2">Thick</button></div></div>
       <div class="adjrow"><span>Ship traffic</span><div class="seg" data-k="traffic"><button type="button" data-v="1">Ships, ferries &amp; tour boats</button><button type="button" data-v="0">None</button></div></div>
     </div>
-    <small>Chop comes from the wind over the water and the open water upwind; the swell is the ocean's, from the San Francisco Bar buoy, dying away inside the Gate. Real fog is the summer fog bank at the Gate, by month and hour. Ships keep to their usual tracks; the collision regulations apply between you and them, not the racing rules.</small>
     <div class="btnrow"><button class="ghost" id="bCondReal" type="button">Put everything back to real</button></div>
   </div>
 </div>
@@ -381,7 +375,7 @@
     <div class="settab" id="setKeys" hidden>
     <div class="kindex" id="keysIndex"></div>
     <div class="field"><span>Keyboard</span>
-    <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
+    <small>Click a key, then press the one you want.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
     <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button></div>
