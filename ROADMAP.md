@@ -194,6 +194,13 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
+   v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
+   line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
+   current's flow-mapped texture, a jump in the focus (camera switch, the chart opened and closed, "Move her here"), or
+   float precision far from the origin. Then add one test over every water layer: none moves past a still boat faster
+   than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
+   back.
 8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
    sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
